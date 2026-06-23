@@ -1,4 +1,4 @@
-# 🏗️ '"$PROJECT_NAME"'
+# '"damn"'
 
 Monorepo SOFEA con microfrontends (Next.js) y microservicios (NestJS).
 
