@@ -1,0 +1,19 @@
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+
+@Entity('credentials')
+export class Credential {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ unique: true })
+    email: string;
+
+    @Column()
+    passwordHash: string;
+
+    @Column({ nullable: true })
+    userId: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+}

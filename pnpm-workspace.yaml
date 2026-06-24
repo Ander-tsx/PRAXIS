@@ -1,4 +1,7 @@
 packages:
   - "apps/**"
+  - "apps/backend/*"
+  - "apps/backend/commons/*"
+  - "apps/backend/commons/contracts"
   - "packages/**"
   - "stubs/**"

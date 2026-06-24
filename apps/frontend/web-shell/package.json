@@ -1,5 +1,5 @@
 {
-  "name": "@project/web-shell",
+  "name": "@praxis/web-shell",
   "version": "0.1.0",
   "private": true,
   "scripts": {
