@@ -21,7 +21,6 @@ import { Credential } from './entities/credential.entity';
       }),
     }),
 
-    // conexion a bede
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
