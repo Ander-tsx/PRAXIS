@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import type { LoginDto, RegisterDto, VerifyTokenDto } from '@praxis/contracts';
+import { LoginDto, RegisterDto, VerifyTokenDto } from '@praxis/contracts';
 import { AuthService } from './auth.service';
 
 @Controller()
