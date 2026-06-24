@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "dev":   "tsc --project tsconfig.json --watch"
+    "dev": "tsc --project tsconfig.json --watch"
   },
   "dependencies": {
     "class-validator": "^0.14.0",

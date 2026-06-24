@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { JwtService } from '@nestjs/jwt';
 import { RpcException } from '@nestjs/microservices';
-import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import { In, type Repository } from 'typeorm';
 import { Credential } from './entities/credential.entity';
 
 @Injectable()
@@ -16,11 +16,11 @@ export class AuthService {
 
   async register(data: { email: string; password: string }) {
     const exists = await this.credentialRepo.findOne({
-      where: { email: data.email},
+      where: { email: data.email },
     });
 
     if (exists) {
-      throw new RpcException('Email already registered')
+      throw new RpcException('Email already registered');
     }
 
     const passwordHash = await bcrypt.hash(data.password, 12);
@@ -39,12 +39,12 @@ export class AuthService {
     });
 
     if (!credential) {
-      throw new RpcException('Invalid credentials')
+      throw new RpcException('Invalid credentials');
     }
 
     const valid = await bcrypt.compare(data.password, credential.passwordHash);
     if (!valid) {
-      throw new RpcException('Invalid credentials')
+      throw new RpcException('Invalid credentials');
     }
 
     const payload = { sub: credential.id };
@@ -57,7 +57,7 @@ export class AuthService {
     try {
       return this.jwtService.verify(token);
     } catch {
-      throw new RpcException('Invalid or expired token')
+      throw new RpcException('Invalid or expired token');
     }
   }
 }
