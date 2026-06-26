@@ -1,0 +1,21 @@
+import { IsString, IsUUID, IsOptional, MinLength, IsEmail } from 'class-validator';
+
+export class CreateUserDto {
+    @IsUUID()
+    authId: string;
+
+    @IsEmail()
+    email: string;
+
+    @IsString()
+    @MinLength(2)
+    firstName: string;
+
+    @IsString()
+    @MinLength(2)
+    lastName: string;
+
+    @IsOptional()
+    @IsString()
+    avatarUrl?: string;
+}

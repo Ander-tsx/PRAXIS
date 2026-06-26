@@ -13,16 +13,26 @@
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
-    "indentWidth": 2,
+    "indentWidth": 4,
     "lineWidth": 100
   },
   "javascript": {
     "parser": {
       "unsafeParameterDecoratorsEnabled": true
     },
-    "formatter": { "quoteStyle": "single", "trailingCommas": "all" }
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
   },
   "files": {
-    "ignore": ["node_modules", "dist", ".next", ".turbo", "coverage"]
+    "ignore": [
+      "node_modules",
+      "dist",
+      ".next",
+      ".turbo",
+      "coverage"
+    ]
   }
 }

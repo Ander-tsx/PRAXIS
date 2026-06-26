@@ -7,6 +7,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "format": "biome format --write .",
+    "format:check": "biome format .",
     "prepare": "husky"
   },
   "devDependencies": {

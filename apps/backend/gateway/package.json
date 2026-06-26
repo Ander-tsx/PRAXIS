@@ -1,5 +1,6 @@
 {
   "name": "@praxis/gateway",
+  "main": "dist/main",
   "version": "0.0.1",
   "description": "",
   "author": "",
