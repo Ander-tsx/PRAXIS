@@ -99,15 +99,61 @@ export class UserService {
         });
 
         if (!user) {
-            throw new RpcException('User doesnt exists');
+            throw new RpcException('User does exists');
         }
 
         return user;
     }
 
-    async createUser(dto: CreateUserDto) {}
+    async createUser(dto: CreateUserDto) {
+        const user = this.userRepo.create({
+            ...dto,
+        });
 
-    async updateUser(dto: UpdateUserDto) {}
+        try {
+            return await this.userRepo.save(user);
+        } catch (error) {
+            throw new RpcException('Error creating user');
+        }
+    }
 
-    async deleteUser(dto: DeleteUserDto) {}
+    async updateUser(dto: UpdateUserDto) {
+        const user = await this.userRepo.findOne({
+            where: { id: dto.id },
+        });
+
+        if (!user) {
+            throw new RpcException('User does not exists');
+        }
+        
+        // TODO: No actualizar ni id, ni email
+        const updated = this.userRepo.merge(user, dto);
+
+        try {
+            return await this.userRepo.save(updated);
+        } catch (error) {
+            throw new RpcException('Error updating user');
+        }
+    }
+
+    async deleteUser(dto: DeleteUserDto) {
+        const user = await this.userRepo.findOne({
+            where: { id: dto.id },
+        });
+
+        if (!user) {
+            throw new RpcException('User does not exists');
+        }
+
+        try {
+            await this.userRepo.remove(user);
+
+            return {
+                success: true,
+                id: dto.id,
+            };
+        } catch (error) {
+            throw new RpcException('Error deleting user');
+        }
+}
 }
