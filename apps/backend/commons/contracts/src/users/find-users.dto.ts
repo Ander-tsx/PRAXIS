@@ -11,7 +11,7 @@ class FindUsersFilter {
     // @IsOptional()
     // @IsUUID()
     // roleId?: string;
-    // 
+    //
     //@IsOptional()
     //@IsString()
     //status?: string;

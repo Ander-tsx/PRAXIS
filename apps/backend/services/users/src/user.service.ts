@@ -1,12 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CreateUserDto, DeleteUserDto, FindOneUserDto, FindUsersDto, UpdateUserDto } from '@praxis/contracts';
-import { User } from './entities/user.entity';
+import {
+    CreateUserDto,
+    DeleteUserDto,
+    FindOneUserDto,
+    FindUsersDto,
+    UpdateUserDto,
+} from '@praxis/contracts';
 import { ObjectLiteral, Repository } from 'typeorm';
+import { User } from './entities/user.entity';
 
-import { SelectQueryBuilder } from 'typeorm/browser';
-import { QueryOptionsDto, SortOrder } from '@praxis/contracts/dist/pagination.dto';
 import { RpcException } from '@nestjs/microservices';
+import { QueryOptionsDto, SortOrder } from '@praxis/contracts/dist/pagination.dto';
+import { SelectQueryBuilder } from 'typeorm/browser';
 
 interface ApplyQueryOptions<T extends ObjectLiteral> {
     qb: SelectQueryBuilder<T>;
@@ -99,15 +105,9 @@ export class UserService {
         return user;
     }
 
-    async createUser(dto: CreateUserDto) {
-        
-    }
+    async createUser(dto: CreateUserDto) {}
 
-    async updateUser(dto: UpdateUserDto) {
+    async updateUser(dto: UpdateUserDto) {}
 
-    }
-
-    async deleteUser(dto: DeleteUserDto) {
-
-    }
+    async deleteUser(dto: DeleteUserDto) {}
 }

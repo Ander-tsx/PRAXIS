@@ -1,9 +1,7 @@
 {
-  "name": "@praxis/shared-devtools",
-  "version": "0.0.1",
-  "private": true,
+    "name": "@praxis/shared-devtools",
+    "version": "0.0.1",
+    "private": true,
 
-  "dependencies": {
-    
-  }
+    "dependencies": {}
 }

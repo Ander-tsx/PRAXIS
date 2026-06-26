@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-# Valida el mensaje de commit con commitlint
-pnpm commitlint --edit "$1"

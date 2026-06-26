@@ -1,13 +1,13 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { UserService } from './user.service';
 import {
-    FindUsersDto,
-    FindOneUserDto,
     CreateUserDto,
-    UpdateUserDto,
     DeleteUserDto,
+    FindOneUserDto,
+    FindUsersDto,
+    UpdateUserDto,
 } from '@praxis/contracts';
+import { UserService } from './user.service';
 
 @Controller()
 export class UserController {

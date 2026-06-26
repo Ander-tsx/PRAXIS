@@ -6,17 +6,17 @@ export const applyFilters = (qb, filters) => {
                 { search: `%${filters.search}%` },
             );
         }
-    
+
         if (filters.createdFrom) {
             qb.andWhere('user.createdAt >= :createdFrom', {
                 createdFrom: filters.createdFrom,
             });
         }
-    
+
         if (filters.createdTo) {
             qb.andWhere('user.createdAt <= :createdTo', {
                 createdTo: filters.createdTo,
             });
         }
-    };
-}
+    }
+};
