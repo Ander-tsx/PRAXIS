@@ -18,7 +18,7 @@ export class AuthService {
 
   async register(data: { email: string; password: string }) {
     this.logger.log(`Attempting to register new credential for email: ${data.email}`);
-    
+
     const exists = await this.credentialRepo.findOne({
       where: { email: data.email },
     });
@@ -41,7 +41,7 @@ export class AuthService {
 
   async login(data: { email: string; password: string }) {
     this.logger.log(`Attempting login for email: ${data.email}`);
-    
+
     const credential = await this.credentialRepo.findOne({
       where: { email: data.email },
     });
@@ -70,7 +70,9 @@ export class AuthService {
       const result = this.jwtService.verify(token);
       return result;
     } catch (error) {
-      this.logger.warn(`Token verification failed: ${error instanceof Error ? error.message : 'Invalid or expired token'}`);
+      this.logger.warn(
+        `Token verification failed: ${error instanceof Error ? error.message : 'Invalid or expired token'}`,
+      );
       throw new RpcException('Invalid or expired token');
     }
   }

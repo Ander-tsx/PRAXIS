@@ -8,9 +8,7 @@ import { firstValueFrom } from 'rxjs';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(
-    @Inject('AUTH_SERVICE') private readonly authClient: ClientProxy,
-  ) {}
+  constructor(@Inject('AUTH_SERVICE') private readonly authClient: ClientProxy) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -37,4 +35,3 @@ export class AuthController {
     return response;
   }
 }
-
