@@ -6,7 +6,10 @@ import { firstValueFrom } from 'rxjs';
 
 @Controller('auth')
 export class AuthController {
-  constructor(@Inject('AUTH_SERVICE') private readonly authClient: ClientProxy) {}
+  constructor(
+    @Inject('AUTH_SERVICE') private readonly authClient: ClientProxy,
+    @Inject('USER_SERVICE') private readonly usersClient: ClientProxy
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -15,7 +18,21 @@ export class AuthController {
   }
 
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return firstValueFrom(this.authClient.send({ cmd: 'auth_register ' }, body));
+  async register(@Body() body: RegisterDto) {
+    const { userId } = await firstValueFrom(this.authClient.send({ cmd: 'auth_register ' }, {
+      email: body.email,
+      password: body.password,
+    }));
+
+    await firstValueFrom(
+      this.usersClient.send({ cmd: 'user_create' }, {
+        authId: userId,
+        email: body.email,
+        firstName: body.email
+      }),
+    );
+
+    //TODO: Hacer uniforme las respuestas del backend
+    return { success: true };
   }
 }

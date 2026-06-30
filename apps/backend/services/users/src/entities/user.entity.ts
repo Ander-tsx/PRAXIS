@@ -11,14 +11,14 @@ export class User {
     @Column({ unique: true })
     email: string;
 
-    @Column({ unique: true })
-    first_name: string;
+    @Column({ nullable: false })
+    firstName: string;
 
-    @Column({ unique: true })
-    last_name: string;
+    @Column({ nullable: false })
+    lastLame: string;
 
-    @Column({ unique: true })
-    avatar_url: string;
+    @Column({ nullable: false })
+    avatarUrl: string;
 
     @CreateDateColumn()
     createdAt: Date;

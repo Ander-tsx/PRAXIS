@@ -30,7 +30,7 @@ export class AuthService {
     });
 
     await this.credentialRepo.save(credential);
-    return { success: true };
+    return { userId: credential.id };
   }
 
   async login(data: { email: string; password: string }) {

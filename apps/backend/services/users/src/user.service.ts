@@ -12,7 +12,7 @@ import { User } from './entities/user.entity';
 
 import { RpcException } from '@nestjs/microservices';
 import { QueryOptionsDto, SortOrder } from '@praxis/contracts/dist/pagination.dto';
-import { SelectQueryBuilder } from 'typeorm/browser';
+import { SelectQueryBuilder } from 'typeorm';
 
 interface ApplyQueryOptions<T extends ObjectLiteral> {
     qb: SelectQueryBuilder<T>;
@@ -80,7 +80,7 @@ export class UserService {
         applyQueryOptions({
             qb,
             query: dto.query,
-            allowedSortFields: ['first_name', 'last_name', 'email'],
+            allowedSortFields: ['firstName', 'lastName', 'email'],
         });
 
         const [items, total] = await qb.getManyAndCount();
@@ -99,7 +99,7 @@ export class UserService {
         });
 
         if (!user) {
-            throw new RpcException('User does exists');
+            throw new RpcException('User does not exists');
         }
 
         return user;

@@ -14,8 +14,6 @@ import { User } from './entities/user.entity';
         validationSchema: Joi.object({
             DATABASE_URL: Joi.string().required(),
             DB_SCHEMA: Joi.string().required(),
-            JWT_SECRET: Joi.string().required(),
-            JWT_EXPIRES_IN: Joi.string().default('15m'),
             TCP_PORT: Joi.number().default(3001),
         }),
         }),

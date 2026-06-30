@@ -21,6 +21,21 @@ import { JwtGuard } from './jwt.guard';
         }),
       },
     ]),
+    
+    ClientsModule.registerAsync([
+      {
+        name: 'USER_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('USER_SERVICE_HOST'),
+            port: config.get<number>('USER_SERVICE_PORT'),
+          },
+        }),
+      },
+    ]),
 
     JwtModule.registerAsync({
       imports: [ConfigModule],
