@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ObservabilityModule } from '@praxis/observability';
 import { AuthModule } from './auth/auth.module';
 import { envValidationSchema } from './common/config/env.validation';
 
 @Module({
   imports: [
+    ObservabilityModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envValidationSchema,
