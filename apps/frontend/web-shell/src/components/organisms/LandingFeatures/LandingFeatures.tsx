@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { FeatureCard, type FeatureCardData, SectionHeader } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { FeatureCard, type FeatureCardData, SectionHeader } from '@praxis/commons';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 /* ── Feature overlay components (internal to this organism) ── */
 
@@ -32,7 +32,7 @@ function KanbanOverlay() {
           },
         ].map((col, ci) => (
           <div
-            key={ci}
+            key={col.label}
             className="flex-1 rounded-lg p-2 flex flex-col gap-1"
             style={{ background: col.bg, border: '1px solid rgba(255,255,255,0.04)' }}
           >
@@ -41,7 +41,7 @@ function KanbanOverlay() {
             </span>
             {col.cards.map((card, i) => (
               <div
-                key={i}
+                key={card}
                 className="px-2 py-1 rounded font-sans"
                 style={{
                   fontSize: 9,
@@ -97,8 +97,8 @@ function PermissionOverlay() {
       className="absolute inset-0 px-5 pb-4 flex flex-col gap-1.5 pointer-events-none"
       style={{ paddingTop: 56 }}
     >
-      {perms.map((p, i) => (
-        <div key={i} className="flex items-center justify-between gap-2">
+      {perms.map((p) => (
+        <div key={p.name} className="flex items-center justify-between gap-2">
           <span
             className="font-mono truncate"
             style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}
@@ -147,6 +147,7 @@ function ReportOverlay() {
         <span style={{ fontSize: 9, color: '#f87171', fontWeight: 600 }}>+14% sobre estimado</span>
       </div>
       <svg viewBox="0 0 220 72" style={{ width: '100%', height: 72 }}>
+        <title>Gráfico de desviación</title>
         {[18, 36, 54].map((y) => (
           <line
             key={y}
@@ -266,9 +267,10 @@ function TeamOverlay() {
       style={{ paddingTop: 56 }}
     >
       <svg viewBox="0 20 200 95" style={{ width: '100%', height: 90 }}>
+        <title>Nodos del equipo</title>
         {edges.map(([x1, y1, x2, y2], i) => (
           <line
-            key={i}
+            key={`edge-${x1}-${y1}-${x2}-${y2}`}
             x1={x1}
             y1={y1}
             x2={x2}
@@ -277,8 +279,8 @@ function TeamOverlay() {
             strokeWidth="1"
           />
         ))}
-        {nodes.map((n, i) => (
-          <g key={i}>
+        {nodes.map((n) => (
+          <g key={n.label}>
             <circle cx={n.x} cy={n.y} r={n.r + 4} fill={n.color} opacity={0.15} />
             <circle cx={n.x} cy={n.y} r={n.r} fill={n.color} />
             <text
@@ -332,8 +334,8 @@ function LogOverlay() {
       style={{ paddingTop: 56 }}
     >
       <div className="flex flex-col gap-1.5">
-        {events.map((ev, i) => (
-          <div key={i} className="flex items-start gap-2">
+        {events.map((ev) => (
+          <div key={ev.time} className="flex items-start gap-2">
             <span
               className="font-mono flex-shrink-0"
               style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', paddingTop: 1 }}

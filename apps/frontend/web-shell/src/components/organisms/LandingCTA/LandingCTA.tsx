@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { Sparkle } from '@praxis/commons';
+import Link from 'next/link';
 
 const TRUST_SIGNALS = [
   '✓ Configuración en menos de 2 minutos',

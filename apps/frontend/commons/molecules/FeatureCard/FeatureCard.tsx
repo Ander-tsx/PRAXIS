@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
 import { Badge } from '@praxis/commons/atoms';
+import { type ReactNode, useState } from 'react';
 
 export interface FeatureCardData {
   id: number;

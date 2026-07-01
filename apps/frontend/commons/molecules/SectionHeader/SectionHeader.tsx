@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
 import { Sparkle } from '@praxis/commons/atoms';
+import type { ReactNode } from 'react';
 
 export interface SectionHeaderProps {
   /** Small uppercase text above the heading */

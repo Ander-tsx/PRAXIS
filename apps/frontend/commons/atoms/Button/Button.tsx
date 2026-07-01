@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { type ButtonHTMLAttributes, forwardRef } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'pill';

@@ -7,10 +7,10 @@
  * Solo tiene sentido en el hero de la landing como elemento visual.
  */
 
-import { useRef, useState, useEffect, Suspense } from 'react';
+import { ContactShadows, Environment, Float, useGLTF } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, useGLTF, Environment, ContactShadows } from '@react-three/drei';
 import { gsap } from 'gsap';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 /* Pre-load the model */
@@ -121,13 +121,9 @@ function SpeechBubble({ text, visible }: { text: string; visible: boolean }) {
           style={{ background: 'var(--color-primary)' }}
         />
       </div>
-      <span
-        className="font-sans text-sm text-text-primary leading-snug"
-        role="status"
-        aria-live="polite"
-      >
+      <output className="font-sans text-sm text-text-primary leading-snug" aria-live="polite">
         {text}
-      </span>
+      </output>
     </div>
   );
 }
@@ -153,7 +149,7 @@ export function EchoDot3D() {
       return () => clearTimeout(nextTimer);
     }, 3000);
     return () => clearTimeout(holdTimer);
-  }, [visible, currentIdx]);
+  }, [visible]);
 
   return (
     <div className="flex flex-col items-center" style={{ width: 300 }}>

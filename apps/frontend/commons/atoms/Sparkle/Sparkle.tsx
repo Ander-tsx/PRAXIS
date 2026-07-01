@@ -29,6 +29,7 @@ export function Sparkle({
       className={className}
       aria-hidden={ariaHidden}
     >
+      <title>Sparkle</title>
       <path d="M12 0l1.8 8.7 8.7 1.8-8.7 1.8L12 21l-1.8-8.7L1.5 10.5l8.7-1.8z" />
     </svg>
   );

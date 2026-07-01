@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { ProgressBar, RoleBadge, Sparkle } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Sparkle, ProgressBar, RoleBadge } from '@praxis/commons';
+import { type ReactNode, useEffect, useRef } from 'react';
 
 interface RoleData {
   role: string;
@@ -255,7 +255,7 @@ export function LandingHowItWorks() {
 
                 <ul className="flex flex-col gap-3">
                   {role.steps.map((step, si) => (
-                    <li key={si} className="flex items-start gap-3">
+                    <li key={step} className="flex items-start gap-3">
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 font-sans font-bold"
                         style={{

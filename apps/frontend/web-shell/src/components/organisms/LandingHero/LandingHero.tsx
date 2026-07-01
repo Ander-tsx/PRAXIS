@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
+import { Sparkle, StatItem } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Sparkle, StatItem } from '@praxis/commons';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { AsciiBackground } from './AsciiBackground';
 
 /* Three.js must be client-side only */
@@ -184,7 +184,7 @@ export function LandingHero() {
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
         {PARTICLES.map((p, i) => (
           <div
-            key={i}
+            key={`p-${p.top}-${p.left || p.right}`}
             className="absolute rounded-full"
             style={{
               width: p.size,

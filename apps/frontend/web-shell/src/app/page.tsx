@@ -1,11 +1,11 @@
-import type { Metadata } from 'next';
-import { LandingTemplate } from '@/components/templates/LandingTemplate';
-import { PublicNavbar } from '@/components/organisms/PublicNavbar';
-import { LandingHero } from '@/components/organisms/LandingHero';
-import { LandingFeatures } from '@/components/organisms/LandingFeatures';
-import { LandingHowItWorks } from '@/components/organisms/LandingHowItWorks';
 import { LandingCTA } from '@/components/organisms/LandingCTA';
+import { LandingFeatures } from '@/components/organisms/LandingFeatures';
+import { LandingHero } from '@/components/organisms/LandingHero';
+import { LandingHowItWorks } from '@/components/organisms/LandingHowItWorks';
 import { PublicFooter } from '@/components/organisms/PublicFooter';
+import { PublicNavbar } from '@/components/organisms/PublicNavbar';
+import { LandingTemplate } from '@/components/templates/LandingTemplate';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Praxis — Gestión de proyectos inteligente',

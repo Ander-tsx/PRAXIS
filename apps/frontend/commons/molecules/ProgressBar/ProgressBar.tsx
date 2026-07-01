@@ -36,6 +36,7 @@ export function ProgressBar({
         aria-valuenow={clampedPct}
         aria-valuemin={0}
         aria-valuemax={100}
+        tabIndex={0}
       >
         <div
           className="h-full rounded-full transition-all duration-1000"
