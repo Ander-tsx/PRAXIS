@@ -1,0 +1,1 @@
+export { LandingHowItWorks } from './LandingHowItWorks';
