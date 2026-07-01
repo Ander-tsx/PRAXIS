@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ObservabilityModule } from '@praxis/observability';
 import * as Joi from 'joi';
 
 import { AuthController } from './auth.controller';
@@ -10,6 +11,7 @@ import { Credential } from './entities/credential.entity';
 
 @Module({
   imports: [
+    ObservabilityModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
