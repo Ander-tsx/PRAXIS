@@ -1,11 +1,17 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import {
+  type Role,
+  type User,
+  getActiveRoleClient,
+  getActiveUserClient,
+  hasPrivilege,
+} from '@praxis/commons';
+import { Badge, Button, Input } from '@praxis/commons/atoms';
+import { ProgressBar } from '@praxis/commons/molecules/ProgressBar';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getActiveRoleClient, getActiveUserClient, hasPrivilege, type Role, type User } from '@praxis/commons';
-import { Button, Input, Badge } from '@praxis/commons/atoms';
-import { ProgressBar } from '@praxis/commons/molecules/ProgressBar';
+import { use, useEffect, useState } from 'react';
 
 interface ProjectMember {
   userId: string;
@@ -116,7 +122,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (!inviteEmail || !project || !currentUser) return;
     setInvitingState(true);
 
-    const alreadyMember = project.members?.some((m) => m.userEmail.toLowerCase() === inviteEmail.toLowerCase());
+    const alreadyMember = project.members?.some(
+      (m) => m.userEmail.toLowerCase() === inviteEmail.toLowerCase(),
+    );
     if (alreadyMember) {
       alert('El usuario ya participa en el proyecto.');
       setInvitingState(false);
@@ -132,7 +140,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     try {
       const usersRes = await fetch('/api/mock/users');
       const allUsers = await usersRes.json();
-      const matched = allUsers.find((u: any) => u.email.toLowerCase() === inviteEmail.toLowerCase());
+      const matched = allUsers.find(
+        (u: any) => u.email.toLowerCase() === inviteEmail.toLowerCase(),
+      );
       if (matched) {
         invitedUser = {
           id: matched.id,
@@ -148,11 +158,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
       userId: invitedUser.id,
       userName: invitedUser.name,
       userEmail: invitedUser.email,
-      permissions: invitePermission === 'tarea:crear' 
-        ? ['tarea:ver', 'tarea:mover', 'tarea:crear']
-        : invitePermission === 'tarea:mover'
-        ? ['tarea:ver', 'tarea:mover']
-        : ['tarea:ver'],
+      permissions:
+        invitePermission === 'tarea:crear'
+          ? ['tarea:ver', 'tarea:mover', 'tarea:crear']
+          : invitePermission === 'tarea:mover'
+            ? ['tarea:ver', 'tarea:mover']
+            : ['tarea:ver'],
     };
 
     const updatedMembers = [...(project.members || []), newMember];
@@ -174,17 +185,21 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handleUpdateMemberPermission = async (memberId: string, level: 'ver' | 'mover' | 'crear') => {
+  const handleUpdateMemberPermission = async (
+    memberId: string,
+    level: 'ver' | 'mover' | 'crear',
+  ) => {
     if (!project) return;
     const updatedMembers = project.members.map((m) => {
       if (m.userId === memberId) {
         return {
           ...m,
-          permissions: level === 'crear'
-            ? ['tarea:ver', 'tarea:mover', 'tarea:crear']
-            : level === 'mover'
-            ? ['tarea:ver', 'tarea:mover']
-            : ['tarea:ver'],
+          permissions:
+            level === 'crear'
+              ? ['tarea:ver', 'tarea:mover', 'tarea:crear']
+              : level === 'mover'
+                ? ['tarea:ver', 'tarea:mover']
+                : ['tarea:ver'],
         };
       }
       return m;
@@ -233,8 +248,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // Permissions check
   const isPm = project.pmUserId === currentUser.id || currentUser.role === 'admin';
   const projectMember = project.members?.find((m) => m.userId === currentUser.id);
-  const canMove = isPm || (projectMember?.permissions && projectMember.permissions.includes('tarea:mover'));
-  const canCreateTask = isPm || (projectMember?.permissions && projectMember.permissions.includes('tarea:crear'));
+  const canMove =
+    isPm || (projectMember?.permissions && projectMember.permissions.includes('tarea:mover'));
+  const canCreateTask =
+    isPm || (projectMember?.permissions && projectMember.permissions.includes('tarea:crear'));
   const canSeeCosts = true;
 
   // ── DRAG & DROP HANDLERS ────────────────────────────────
@@ -348,18 +365,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // Collaborators workload and hours efforts data (dynamic from members and tasks!)
   const projectMembers = [
     { userId: project.pmUserId, userName: project.pm, roleName: 'Project Manager' },
-    ...(project.members || []).map(m => ({ userId: m.userId, userName: m.userName, roleName: m.permissions.includes('tarea:crear') ? 'Creador de Tareas' : m.permissions.includes('tarea:mover') ? 'Colaborador Técnico' : 'Observador' }))
+    ...(project.members || []).map((m) => ({
+      userId: m.userId,
+      userName: m.userName,
+      roleName: m.permissions.includes('tarea:crear')
+        ? 'Creador de Tareas'
+        : m.permissions.includes('tarea:mover')
+          ? 'Colaborador Técnico'
+          : 'Observador',
+    })),
   ];
 
   const collaboratorEfforts = projectMembers.map((m) => {
     // Buscar tareas asignadas a este miembro
-    const memberTasks = tasks.filter((t) => 
-      t.assignee.toLowerCase().includes(m.userName.split(' ')[0].toLowerCase())
+    const memberTasks = tasks.filter((t) =>
+      t.assignee.toLowerCase().includes(m.userName.split(' ')[0].toLowerCase()),
     );
-    
+
     // Calcular horas estimadas y reales
     const estimated = memberTasks.length * 12;
-    const real = memberTasks.filter((t) => t.status === 'done').length * 11 + memberTasks.filter((t) => t.status === 'doing').length * 3;
+    const real =
+      memberTasks.filter((t) => t.status === 'done').length * 11 +
+      memberTasks.filter((t) => t.status === 'doing').length * 3;
 
     return {
       name: m.userName,
@@ -370,10 +397,16 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     };
   });
 
-  const totalEffortEstimatedHours = collaboratorEfforts.reduce((acc, curr) => acc + curr.estimatedHours, 0);
+  const totalEffortEstimatedHours = collaboratorEfforts.reduce(
+    (acc, curr) => acc + curr.estimatedHours,
+    0,
+  );
   const totalEffortRealHours = collaboratorEfforts.reduce((acc, curr) => acc + curr.realHours, 0);
   const effortHoursDiff = totalEffortRealHours - totalEffortEstimatedHours;
-  const effortPercent = totalEffortEstimatedHours > 0 ? Math.round((totalEffortRealHours / totalEffortEstimatedHours) * 100) : 0;
+  const effortPercent =
+    totalEffortEstimatedHours > 0
+      ? Math.round((totalEffortRealHours / totalEffortEstimatedHours) * 100)
+      : 0;
 
   // Estimations deviation calculations
   const estimationTasks = tasks.map((t, idx) => {
@@ -685,7 +718,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                       </td>
                       <td
                         className={`px-6 py-4 font-mono text-xs ${
-                          t.limitDate < todayStr && t.status !== 'done' ? 'text-[#F87171] font-bold' : ''
+                          t.limitDate < todayStr && t.status !== 'done'
+                            ? 'text-[#F87171] font-bold'
+                            : ''
                         }`}
                       >
                         {t.limitDate}
@@ -709,8 +744,12 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
         {activeTab === 'costs' && (
           <div className="bg-[#161B27] border border-[#2A3045] rounded-xl p-5 shadow-lg space-y-6">
             <div>
-              <h3 className="text-base font-bold text-white uppercase tracking-wider">Esfuerzo y Carga Horaria</h3>
-              <p className="text-xs text-[#9AA0B4] mt-0.5">Control de horas estimadas vs horas reales registradas por el equipo.</p>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider">
+                Esfuerzo y Carga Horaria
+              </h3>
+              <p className="text-xs text-[#9AA0B4] mt-0.5">
+                Control de horas estimadas vs horas reales registradas por el equipo.
+              </p>
             </div>
 
             {/* Effort Summary Cards */}
@@ -737,7 +776,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </span>
                 <h4
                   className={`text-2xl font-serif font-black mt-1 ${
-                    effortHoursDiff > 0 ? 'text-[#F87171]' : effortHoursDiff < 0 ? 'text-[#4ADE80]' : 'text-white'
+                    effortHoursDiff > 0
+                      ? 'text-[#F87171]'
+                      : effortHoursDiff < 0
+                        ? 'text-[#4ADE80]'
+                        : 'text-white'
                   }`}
                 >
                   {effortHoursDiff > 0 ? `+${effortHoursDiff}h` : `${effortHoursDiff}h`}
@@ -757,7 +800,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {/* Hours breakdown table */}
             <div>
               <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">
-                 Esfuerzo por Integrante
+                Esfuerzo por Integrante
               </h4>
               <div className="overflow-x-auto rounded-lg border border-[#2A3045]">
                 <table className="w-full border-collapse text-left text-sm text-[#9AA0B4]">
@@ -781,9 +824,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         </td>
                         <td className="px-6 py-4 font-mono">{c.estimatedHours}h</td>
                         <td className="px-6 py-4 font-mono text-[#E8EAF0]">{c.realHours}h</td>
-                        <td className={`px-6 py-4 font-mono font-bold text-right ${
-                          c.diff > 0 ? 'text-[#F87171]' : c.diff < 0 ? 'text-[#4ADE80]' : 'text-[#9AA0B4]'
-                        }`}>
+                        <td
+                          className={`px-6 py-4 font-mono font-bold text-right ${
+                            c.diff > 0
+                              ? 'text-[#F87171]'
+                              : c.diff < 0
+                                ? 'text-[#4ADE80]'
+                                : 'text-[#9AA0B4]'
+                          }`}
+                        >
                           {c.diff > 0 ? `+${c.diff}h` : `${c.diff}h`}
                         </td>
                       </tr>
@@ -941,7 +990,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     <option value="tarea:mover">Colaborador (Mover)</option>
                     <option value="tarea:crear">Creador (Crear/Mover)</option>
                   </select>
-                  <Button type="submit" variant="primary" size="sm" isLoading={invitingState} disabled={invitingState}>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="sm"
+                    isLoading={invitingState}
+                    disabled={invitingState}
+                  >
                     Invitar
                   </Button>
                 </form>
@@ -959,7 +1014,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                     <div>
                       <h4 className="font-bold text-white text-sm">{project.pm}</h4>
-                      <span className="text-[10px] text-[#9AA0B4] block font-mono">Propietario / PM</span>
+                      <span className="text-[10px] text-[#9AA0B4] block font-mono">
+                        Propietario / PM
+                      </span>
                     </div>
                   </div>
                   <span className="text-xs text-[#D4A843] font-bold uppercase tracking-widest bg-[#D4A843]/10 border border-[#D4A843]/20 px-2.5 py-0.5 rounded-full">
@@ -981,14 +1038,19 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                   ).length;
 
                   return (
-                    <div key={m.userId} className="p-4 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
+                    <div
+                      key={m.userId}
+                      className="p-4 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-full bg-gray-500/20 flex items-center justify-center font-bold text-gray-300">
                           {m.userName[0]}
                         </div>
                         <div>
                           <h4 className="font-bold text-white text-sm">{m.userName}</h4>
-                          <span className="text-xs text-[#9AA0B4] block truncate max-w-[200px] font-mono">{m.userEmail}</span>
+                          <span className="text-xs text-[#9AA0B4] block truncate max-w-[200px] font-mono">
+                            {m.userEmail}
+                          </span>
                         </div>
                       </div>
 
@@ -1006,7 +1068,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                         {isPm ? (
                           <select
                             value={currentLevel}
-                            onChange={(e) => handleUpdateMemberPermission(m.userId, e.target.value as any)}
+                            onChange={(e) =>
+                              handleUpdateMemberPermission(m.userId, e.target.value as any)
+                            }
                             className="bg-[#0D0F14] border border-[#2A3045] text-xs text-[#E8EAF0] h-9 px-2 rounded-lg focus:outline-none cursor-pointer animate-none"
                           >
                             <option value="ver">Lectura (Observador)</option>
@@ -1015,7 +1079,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                           </select>
                         ) : (
                           <span className="text-xs text-[#9AA0B4] font-semibold bg-[#161B27] border border-[#2A3045] px-2.5 py-1 rounded-lg">
-                            {currentLevel === 'crear' ? 'Creador' : currentLevel === 'mover' ? 'Colaborador' : 'Lectura'}
+                            {currentLevel === 'crear'
+                              ? 'Creador'
+                              : currentLevel === 'mover'
+                                ? 'Colaborador'
+                                : 'Lectura'}
                           </span>
                         )}
 

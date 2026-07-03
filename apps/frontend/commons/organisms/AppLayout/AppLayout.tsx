@@ -1,14 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  type User,
-  MOCK_USERS,
-  getActiveUserClient,
-  setDemoUserClient,
-} from '../../auth';
+import { useEffect, useState } from 'react';
 import { Badge } from '../../atoms/Badge';
+import { MOCK_USERS, type User, getActiveUserClient, setDemoUserClient } from '../../auth';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -215,7 +210,12 @@ export function AppLayout({ children }: AppLayoutProps) {
               className="md:hidden p-1 rounded-md text-[#9AA0B4] hover:text-[#E8EAF0] focus:outline-none"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
 
@@ -272,7 +272,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           {/* Overlay backdrop */}
-          <div className="fixed inset-0 bg-[#080A0F]/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div
+            className="fixed inset-0 bg-[#080A0F]/80 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
 
           {/* Drawer content */}
           <div className="fixed inset-y-0 left-0 w-64 bg-[#161B27] border-r border-[#2A3045] p-5 flex flex-col justify-between z-10 animate-slide-in">
@@ -284,7 +287,12 @@ export function AppLayout({ children }: AppLayoutProps) {
                   className="p-1 rounded-md text-[#9AA0B4] hover:text-[#E8EAF0] focus:outline-none"
                 >
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -319,7 +327,9 @@ export function AppLayout({ children }: AppLayoutProps) {
                   {currentUser.name[0]}
                 </div>
                 <div className="truncate">
-                  <p className="text-sm font-semibold truncate text-[#E8EAF0]">{currentUser.name}</p>
+                  <p className="text-sm font-semibold truncate text-[#E8EAF0]">
+                    {currentUser.name}
+                  </p>
                   <p className="text-xs text-[#9AA0B4] truncate">{currentUser.email}</p>
                 </div>
               </div>

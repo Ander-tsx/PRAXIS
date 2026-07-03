@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AuthGuard, AppLayout } from '@praxis/commons';
+import { AppLayout, AuthGuard } from '@praxis/commons';
 
 export const metadata: Metadata = {
   title: 'PRAXIS — Administración',

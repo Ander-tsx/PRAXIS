@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { getActiveRoleClient, getActiveUserClient, hasPrivilege, type Role, type User } from '@praxis/commons';
+import {
+  type Role,
+  type User,
+  getActiveRoleClient,
+  getActiveUserClient,
+  hasPrivilege,
+} from '@praxis/commons';
 import { Button, Input } from '@praxis/commons/atoms';
 import { ProgressBar } from '@praxis/commons/molecules/ProgressBar';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 interface ProjectMember {
   userId: string;

@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { type Role, type User, MOCK_USERS } from './index';
+import { MOCK_USERS, type Role, type User } from './index';
 
 /**
  * Obtiene el rol activo en el servidor leyendo cookies
@@ -35,4 +35,3 @@ export async function getActiveUserServer(): Promise<User | null> {
   // Por defecto en la demo académica
   return MOCK_USERS['usr-1'];
 }
-

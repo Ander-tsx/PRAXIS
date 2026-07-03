@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { getActiveRoleClient, getActiveUserClient, type Role, type User } from '@praxis/commons';
+import { type Role, type User, getActiveRoleClient, getActiveUserClient } from '@praxis/commons';
 import { ProgressBar } from '@praxis/commons/molecules/ProgressBar';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 interface ProjectMember {
   userId: string;
@@ -406,7 +406,9 @@ export default function DashboardPage() {
         {/* Columna Derecha: Bitácora de Actividad / Costos globales */}
         <div className="space-y-6">
           {/* Resumen de Esfuerzo de Proyectos (Solo Admin/PM/dueño) */}
-          {(currentUser.role === 'admin' || currentUser.id === 'usr-2' || currentUser.id === 'usr-3') && (
+          {(currentUser.role === 'admin' ||
+            currentUser.id === 'usr-2' ||
+            currentUser.id === 'usr-3') && (
             <section className="bg-[#161B27] border border-[#2A3045] rounded-xl p-5 shadow-lg">
               <h3 className="text-lg font-serif font-extrabold text-white mb-4">
                 Horas de Trabajo Totales

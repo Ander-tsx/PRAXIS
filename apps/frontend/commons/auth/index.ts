@@ -69,11 +69,7 @@ export const ROLE_PRIVILEGES: Record<Role, string[]> = {
     'reporte:ver',
     'reporte:exportar',
   ],
-  user: [
-    'proyecto:crear',
-    'proyecto:ver',
-    'tarea:ver',
-  ],
+  user: ['proyecto:crear', 'proyecto:ver', 'tarea:ver'],
 };
 
 /**
@@ -126,4 +122,3 @@ export function setDemoUserClient(userId: string | 'logged_out'): void {
 }
 
 export { AuthGuard } from './AuthGuard';
-

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { getActiveRoleClient, hasPrivilege, type Role } from '@praxis/commons';
+import { type Role, getActiveRoleClient, hasPrivilege } from '@praxis/commons';
 import { Button } from '@praxis/commons/atoms';
+import { useEffect, useState } from 'react';
 
 interface Project {
   id: string;

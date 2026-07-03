@@ -1,8 +1,8 @@
 'use client';
 
+import { ROLE_PRIVILEGES, type Role } from '@praxis/commons';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ROLE_PRIVILEGES, type Role } from '@praxis/commons';
 
 export default function AdminRolesPage() {
   const pathname = usePathname();

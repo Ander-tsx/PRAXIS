@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Button, Input } from '@praxis/commons/atoms';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button, Input } from '@praxis/commons/atoms';
+import { useEffect, useState } from 'react';
 
 interface UserDb {
   id: string;
