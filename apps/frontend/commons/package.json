@@ -4,6 +4,10 @@
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",
+  "dependencies": {
+    "next": "16.2.9",
+    "jose": "^5.9.6"
+  },
   "peerDependencies": {
     "react": ">=19",
     "react-dom": ">=19"
@@ -14,3 +18,4 @@
     "typescript": "^5"
   }
 }
+

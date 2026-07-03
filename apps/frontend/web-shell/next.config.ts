@@ -12,11 +12,31 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:3002';
+    const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:3003';
+    const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:3004';
+    const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:3005';
+    const reportsFrontUrl = process.env.REPORTS_FRONT_URL ?? 'http://localhost:3006';
 
     return [
       {
         source: '/auth/:path*',
         destination: `${authFrontUrl}/auth/:path*`,
+      },
+      {
+        source: '/admin/:path*',
+        destination: `${adminFrontUrl}/admin/:path*`,
+      },
+      {
+        source: '/projects/:path*',
+        destination: `${projectsFrontUrl}/projects/:path*`,
+      },
+      {
+        source: '/dashboard/:path*',
+        destination: `${dashboardFrontUrl}/dashboard/:path*`,
+      },
+      {
+        source: '/reports/:path*',
+        destination: `${reportsFrontUrl}/reports/:path*`,
       },
     ];
   },

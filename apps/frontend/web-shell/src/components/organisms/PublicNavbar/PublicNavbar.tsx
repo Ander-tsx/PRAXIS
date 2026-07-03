@@ -56,6 +56,30 @@ export function PublicNavbar() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                document.cookie = 'praxis_demo_user=usr-1; path=/; max-age=604800';
+                window.location.href = '/dashboard';
+              }}
+              className="font-sans text-sm font-bold cursor-pointer transition-all duration-150 px-5 py-2 rounded-full text-[#0D0F14]"
+              style={{
+                background: 'var(--color-accent)',
+                boxShadow: '0 0 0 0 rgba(212,168,67,0)',
+              }}
+              onMouseEnter={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = 'var(--color-accent-hover)';
+                el.style.boxShadow = '0 0 15px rgba(212,168,67,0.45)';
+              }}
+              onMouseLeave={(e) => {
+                const el = e.currentTarget as HTMLButtonElement;
+                el.style.background = 'var(--color-accent)';
+                el.style.boxShadow = '0 0 0 0 rgba(212,168,67,0)';
+              }}
+            >
+              Ver Demo
+            </button>
             <a href="/auth/login">
               <span
                 className="font-sans text-sm cursor-pointer transition-colors"

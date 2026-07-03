@@ -1,6 +1,6 @@
 export interface ProgressBarProps {
   label?: string;
-  value: string | number;
+  value?: string | number;
   percentage: number;
   color?: string;
   height?: number;

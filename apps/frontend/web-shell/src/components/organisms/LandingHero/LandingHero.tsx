@@ -316,30 +316,52 @@ export function LandingHero() {
             {/* CTA buttons */}
             <div
               ref={ctaRef}
-              className="flex flex-col sm:flex-row gap-3 items-start"
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-4"
               style={{ opacity: 0 }}
             >
+              <button
+                type="button"
+                onClick={() => {
+                  document.cookie = 'praxis_demo_user=usr-1; path=/; max-age=604800';
+                  window.location.href = '/dashboard';
+                }}
+                className="font-sans text-sm font-bold px-7 py-3 rounded-full transition-all duration-200 cursor-pointer text-[#0D0F14]"
+                style={{
+                  background: 'var(--color-accent)',
+                  boxShadow: '0 4px 24px rgba(212,168,67,0.35)',
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.boxShadow = '0 4px 40px rgba(212,168,67,0.6)';
+                  el.style.transform = 'translateY(-1px)';
+                  el.style.background = 'var(--color-accent-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.boxShadow = '0 4px 24px rgba(212,168,67,0.35)';
+                  el.style.transform = 'translateY(0)';
+                  el.style.background = 'var(--color-accent)';
+                }}
+              >
+                Ver Demo Interactiva (Admin)
+              </button>
               <a href="/auth/signup">
                 <button
                   type="button"
-                  className="font-sans text-sm font-semibold px-7 py-3 rounded-full transition-all duration-200 cursor-pointer"
-                  style={{
-                    background: 'var(--color-primary)',
-                    color: '#fff',
-                    boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
-                  }}
+                  className="font-sans text-sm font-semibold px-7 py-3 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
+                  style={{ borderColor: 'rgba(255,255,255,0.12)' }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 40px rgba(108,99,255,0.6)';
-                    el.style.transform = 'translateY(-1px)';
+                    el.style.borderColor = 'rgba(255,255,255,0.25)';
+                    el.style.background = 'rgba(255,255,255,0.04)';
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
-                    el.style.transform = 'translateY(0)';
+                    el.style.borderColor = 'rgba(255,255,255,0.12)';
+                    el.style.background = 'transparent';
                   }}
                 >
-                  Comenzar gratis
+                  Registrarse
                 </button>
               </a>
               <a href="/auth/login">
