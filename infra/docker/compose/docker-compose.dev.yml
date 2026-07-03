@@ -4,16 +4,29 @@ services:
     container_name: praxis_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-praxis}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-praxis123}
-      POSTGRES_DB: ${POSTGRES_DB:-praxis}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
+      POSTGRES_DB: ${POSTGRES_DB:-clase_grupo}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-praxis}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: praxis_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-root}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-root}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

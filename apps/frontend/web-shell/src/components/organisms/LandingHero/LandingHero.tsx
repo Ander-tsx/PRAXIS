@@ -4,7 +4,7 @@ import { Sparkle, StatItem } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
+
 import { useEffect, useRef } from 'react';
 import { AsciiBackground } from './AsciiBackground';
 
@@ -319,7 +319,7 @@ export function LandingHero() {
               className="flex flex-col sm:flex-row gap-3 items-start"
               style={{ opacity: 0 }}
             >
-              <Link href="/signup">
+              <a href="/auth/signup">
                 <button
                   type="button"
                   className="font-sans text-sm font-semibold px-7 py-3 rounded-full transition-all duration-200 cursor-pointer"
@@ -341,8 +341,8 @@ export function LandingHero() {
                 >
                   Comenzar gratis
                 </button>
-              </Link>
-              <Link href="/login">
+              </a>
+              <a href="/auth/login">
                 <button
                   type="button"
                   className="font-sans text-sm font-medium px-7 py-3 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
@@ -360,7 +360,7 @@ export function LandingHero() {
                 >
                   Iniciar sesión
                 </button>
-              </Link>
+              </a>
             </div>
 
             {/* Micro stats */}

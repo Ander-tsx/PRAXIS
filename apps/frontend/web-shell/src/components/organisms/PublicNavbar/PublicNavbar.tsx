@@ -56,7 +56,7 @@ export function PublicNavbar() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/login">
+            <a href="/auth/login">
               <span
                 className="font-sans text-sm cursor-pointer transition-colors"
                 style={{ color: 'rgba(154,160,180,0.8)' }}
@@ -69,8 +69,8 @@ export function PublicNavbar() {
               >
                 Iniciar sesión
               </span>
-            </Link>
-            <Link href="/signup">
+            </a>
+            <a href="/auth/signup">
               <button
                 type="button"
                 className="font-sans text-sm font-semibold cursor-pointer transition-all duration-150"
@@ -94,7 +94,7 @@ export function PublicNavbar() {
               >
                 Comenzar
               </button>
-            </Link>
+            </a>
           </div>
         </nav>
       </div>
