@@ -1,19 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RpcException } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { In, type Repository } from 'typeorm';
+import { type Repository } from 'typeorm';
 import { Credential } from './entities/credential.entity';
+import { Logger } from '@praxis/observability';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     @InjectRepository(Credential)
     private readonly credentialRepo: Repository<Credential>,
     private readonly jwtService: JwtService,
+    private readonly logger: Logger,
   ) {}
 
   async register(data: { email: string; password: string }) {

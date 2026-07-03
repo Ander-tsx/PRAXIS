@@ -29,6 +29,7 @@ Los paquetes de `packages/` y `commons/` necesitan compilarse antes de que los s
 
 ```bash
 pnpm --filter @praxis/contracts build
+pnpm --filter @praxis/observability build
 ```
 
 ---

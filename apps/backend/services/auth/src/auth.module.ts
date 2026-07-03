@@ -10,41 +10,44 @@ import { AuthService } from './auth.service';
 import { Credential } from './entities/credential.entity';
 
 @Module({
-  imports: [
-    ObservabilityModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-      validationSchema: Joi.object({
-        DATABASE_URL: Joi.string().required(),
-        DB_SCHEMA: Joi.string().required(),
-        JWT_SECRET: Joi.string().required(),
-        JWT_EXPIRES_IN: Joi.string().default('15m'),
-        TCP_PORT: Joi.number().default(3001),
-      }),
-    }),
+    imports: [
+        ObservabilityModule,
+        ConfigModule.forRoot({
+            isGlobal: true,
+            validationSchema: Joi.object({
+                DATABASE_URL: Joi.string().required(),
+                DB_SCHEMA: Joi.string().required(),
+                JWT_SECRET: Joi.string().required(),
+                JWT_EXPIRES_IN: Joi.string().default('15m'),
+                TCP_PORT: Joi.number().default(3001),
+                LOG_LEVEL: Joi.string()
+                    .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+                    .default('info'),
+            }),
+        }),
 
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get('DATABASE_URL'),
-        schema: config.get('DB_SCHEMA'),
-        entities: [Credential],
-        synchronize: true, // TODO: aguas que aca es solo pa desarrollo
-      }),
-    }),
+        TypeOrmModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                type: 'postgres',
+                url: config.get('DATABASE_URL'),
+                schema: config.get('DB_SCHEMA'),
+                entities: [Credential],
+                synchronize: true, // TODO: aguas que aca es solo pa desarrollo
+            }),
+        }),
 
-    TypeOrmModule.forFeature([Credential]),
+        TypeOrmModule.forFeature([Credential]),
 
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: config.get('JWT_EXPIRES_IN') },
-      }),
-    }),
-  ],
-  controllers: [AuthController],
-  providers: [AuthService],
+        JwtModule.registerAsync({
+            inject: [ConfigService],
+            useFactory: (config: ConfigService) => ({
+                secret: config.get('JWT_SECRET'),
+                signOptions: { expiresIn: config.get('JWT_EXPIRES_IN') },
+            }),
+        }),
+    ],
+    controllers: [AuthController],
+    providers: [AuthService],
 })
 export class AuthModule {}

@@ -13,6 +13,7 @@ import { User } from './entities/user.entity';
 import { RpcException } from '@nestjs/microservices';
 import { QueryOptionsDto, SortOrder } from '@praxis/contracts/dist/pagination.dto';
 import { SelectQueryBuilder } from 'typeorm';
+import { Logger } from '@praxis/observability';
 
 interface ApplyQueryOptions<T extends ObjectLiteral> {
     qb: SelectQueryBuilder<T>;
@@ -48,15 +49,19 @@ export class UserService {
     constructor(
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+            private readonly logger: Logger,
     ) {}
 
     async findAll(dto: FindUsersDto) {
+        this.logger.log('Retrieving all users')
+
         const qb = this.userRepo.createQueryBuilder('user');
 
         // TODO
         // Aplicación de filtros personalizados
         const filters = dto.filters;
         if (filters) {
+            this.logger.log(`Applying filters: ${JSON.stringify(filters)}`)
             if (filters.search) {
                 qb.andWhere(
                     '(user.firstName ILIKE :search OR user.lastName ILIKE :search OR user.email ILIKE :search)',
@@ -92,6 +97,8 @@ export class UserService {
     }
 
     async findOne(dto: FindOneUserDto) {
+        this.logger.log(`Retrieving one user: ${JSON.stringify(dto)}`)
+
         const user = await this.userRepo.findOne({
             where: {
                 id: dto.id,
@@ -99,6 +106,7 @@ export class UserService {
         });
 
         if (!user) {
+            this.logger.warn('User not found')
             throw new RpcException('User does not exists');
         }
 
@@ -113,16 +121,20 @@ export class UserService {
         try {
             return await this.userRepo.save(user);
         } catch (error) {
+            this.logger.error(`Error creating user: ${JSON.stringify(error)}`)
             throw new RpcException('Error creating user');
         }
     }
 
     async updateUser(dto: UpdateUserDto) {
+        this.logger.log(`Updating user: ${JSON.stringify(dto)}`)
+
         const user = await this.userRepo.findOne({
             where: { id: dto.id },
         });
 
         if (!user) {
+            this.logger.warn('User not found')
             throw new RpcException('User does not exists');
         }
         
@@ -132,16 +144,20 @@ export class UserService {
         try {
             return await this.userRepo.save(updated);
         } catch (error) {
+            this.logger.error(`Error updating user: ${error}`)
             throw new RpcException('Error updating user');
         }
     }
 
     async deleteUser(dto: DeleteUserDto) {
+        this.logger.log(`Deleting user: ${JSON.stringify(dto)}`)
+
         const user = await this.userRepo.findOne({
             where: { id: dto.id },
         });
 
         if (!user) {
+            this.logger.warn('User not found')
             throw new RpcException('User does not exists');
         }
 
@@ -153,7 +169,8 @@ export class UserService {
                 id: dto.id,
             };
         } catch (error) {
+            this.logger.error(`Error deleting user: ${JSON.stringify(error)}`)
             throw new RpcException('Error deleting user');
         }
-}
+    }
 }
