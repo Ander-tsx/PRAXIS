@@ -1,7 +1,6 @@
 'use client';
 
 import { Sparkle } from '@praxis/commons';
-import Link from 'next/link';
 
 const TRUST_SIGNALS = [
   '✓ Configuración en menos de 2 minutos',
@@ -47,7 +46,7 @@ export function LandingCTA() {
 
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-center mb-12">
-          <Link href="/signup">
+          <a href="/auth/signup">
             <button
               type="button"
               className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
@@ -69,8 +68,8 @@ export function LandingCTA() {
             >
               Crear cuenta gratis
             </button>
-          </Link>
-          <Link href="/login">
+          </a>
+          <a href="/auth/login">
             <button
               type="button"
               className="font-sans text-sm font-medium px-8 py-3.5 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
@@ -84,7 +83,7 @@ export function LandingCTA() {
             >
               Iniciar sesión
             </button>
-          </Link>
+          </a>
         </div>
 
         {/* Trust signals */}
