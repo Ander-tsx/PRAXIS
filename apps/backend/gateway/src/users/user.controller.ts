@@ -1,36 +1,57 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Post, Put } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Param,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { CreateUserDto, DeleteUserDto, FindOneUserDto, FindUsersDto, UpdateUserDto } from '@praxis/contracts';
+import {
+  DeleteUserDto,
+  FindUsersDto,
+  UpdateUserDto,
+} from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
+import { JwtGuard } from '../auth/jwt.guard';
 
-@Controller('user')
+@UseGuards(JwtGuard)
+@Controller('users')
 export class UserController {
-  constructor(@Inject('USER_SERVICE') private readonly userClient: ClientProxy) {}
+  constructor(
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+  ) {}
 
-  @Get('find-all')
+  @Get()
   @HttpCode(HttpStatus.OK)
   findAll(@Body() body: FindUsersDto) {
-    return firstValueFrom(this.userClient.send({ cmd: 'user_find_all' }, body));
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_find_all' }, body),
+    );
   }
 
-  @Get('find-one')
-  findOne(@Body() body: FindOneUserDto) {
-    return firstValueFrom(this.userClient.send({ cmd: 'user_find_one ' }, body));
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_find_one' }, { id }),
+    );
   }
 
-  @Post('create')
-  create(@Body() body: CreateUserDto) {
-    return firstValueFrom(this.userClient.send({ cmd: 'user_create' }, body))
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: Omit<UpdateUserDto, 'id'>) {
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_update' }, { id, ...body }),
+    );
   }
 
-  @Put('update')
-  update(@Body() body: UpdateUserDto) {
-    return firstValueFrom(this.userClient.send({ cmd: 'user_update' }, body))
-  }
-
-  @Delete('delete')
-  delete(@Body() body: DeleteUserDto) {
-    return firstValueFrom(this.userClient.send({ cmd: 'user_delete' }, body))
+  @Delete(':id')
+  delete(@Param('id') id: string) {
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_delete' }, { id } satisfies DeleteUserDto),
+    );
   }
 }

@@ -6,6 +6,8 @@ import { envValidationSchema } from './common/config/env.validation';
 
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
+import { RolesModule } from './roles/roles.module';
+import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -14,17 +16,18 @@ import { UserModule } from './users/user.module';
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 100,
+      },
+    ]),
 
-        ThrottlerModule.forRoot([
-            {
-                ttl: 60_000,
-                limit: 100,
-            },
-        ]),
-
-        //TODO: Modulos de negocio
-        AuthModule,
-        UserModule,
-    ],
+    // Módulos de negocio
+    AuthModule,
+    UserModule,
+    RolesModule,
+    ProjectsModule,
+  ],
 })
 export class AppModule {}

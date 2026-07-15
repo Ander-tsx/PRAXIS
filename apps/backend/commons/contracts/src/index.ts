@@ -1,3 +1,7 @@
 export * from './auth';
+export * from './credentials';
+export * from './pagination.dto';
 export * from './permissions';
+export * from './projects';
+export * from './roles';
 export * from './users';

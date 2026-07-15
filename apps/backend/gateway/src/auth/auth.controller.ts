@@ -1,47 +1,62 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { LoginDto, RegisterDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
+import { JwtGuard } from './jwt.guard';
 
 @Controller('auth')
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
+
   constructor(
-    @Inject('AUTH_SERVICE') private readonly authClient: ClientProxy,
-    @Inject('USER_SERVICE') private readonly usersClient: ClientProxy
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
   ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: LoginDto) {
-    this.logger.log('Incoming request: POST /auth/login - Forwarding to AUTH_SERVICE');
-    this.logger.debug(`Request payload: ${JSON.stringify(body)}`);
-
-    const response = await firstValueFrom(this.authClient.send({ cmd: 'auth_login' }, body));
-
-    this.logger.debug(`Inter-microservice response from AUTH_SERVICE: ${JSON.stringify(response)}`);
-
-    return response;
+    this.logger.log('POST /auth/login → credentials-service');
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'auth_login' }, body),
+    );
   }
 
   @Post('register')
+  @HttpCode(HttpStatus.CREATED)
   async register(@Body() body: RegisterDto) {
-    this.logger.log('Incoming request: POST /auth/register - Forwarding to AUTH_SERVICE');
-    this.logger.debug(`Request payload: ${JSON.stringify(body)}`);
-    
-    const { userId } = await firstValueFrom(this.authClient.send({ cmd: 'auth_register ' }, body));
-    this.logger.debug(`Inter-microservice response from AUTH_SERVICE: ${userId}`);
-    
-    await firstValueFrom(
-      this.usersClient.send({ cmd: 'user_create' }, {
-        authId: userId,
-        email: body.email,
-        firstName: body.email
-      }),
+    this.logger.log('POST /auth/register → credentials-service');
+    // credentials-service crea la credencial y el perfil de usuario en un solo paso
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'auth_register' }, body),
     );
+  }
 
-    //TODO: Hacer uniforme las respuestas del backend
-    return { success: true };
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: { refreshToken: string }) {
+    this.logger.log('POST /auth/refresh → credentials-service');
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'auth_refresh' }, body),
+    );
+  }
+
+  @UseGuards(JwtGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Request() req: Express.Request) {
+    this.logger.log('POST /auth/logout → credentials-service');
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'auth_logout' }, { userId: req.user!.userId }),
+    );
   }
 }

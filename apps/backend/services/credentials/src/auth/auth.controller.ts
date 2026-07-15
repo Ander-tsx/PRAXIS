@@ -1,0 +1,40 @@
+import { Controller } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+
+import {
+  RegisterDto,
+  LoginDto,
+  VerifyTokenDto,
+} from '@praxis/contracts';
+
+import { AuthService } from './auth.service';
+
+@Controller()
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @MessagePattern({ cmd: 'auth_register' })
+  register(@Payload() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @MessagePattern({ cmd: 'auth_login' })
+  login(@Payload() dto: LoginDto) {
+    return this.authService.login(dto);
+  }
+
+  @MessagePattern({ cmd: 'auth_verify_token' })
+  verifyToken(@Payload() dto: VerifyTokenDto) {
+    return this.authService.verifyToken(dto);
+  }
+
+  @MessagePattern({ cmd: 'auth_refresh' })
+  refresh(@Payload() dto: { refreshToken: string }) {
+    return this.authService.refresh(dto.refreshToken);
+  }
+
+  @MessagePattern({ cmd: 'auth_logout' })
+  logout(@Payload() dto: { userId: string }) {
+    return this.authService.logout(dto.userId);
+  }
+}

@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String
+  workspaces  Workspace[]
+  members     ProjectMember[]
+  roles       ProjectRole[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("projects")
+}
+
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  boards    Board[]
+  createdAt DateTime @default(now())
+
+  @@map("workspaces")
+}
+
+model Board {
+  id          String        @id @default(uuid())
+  name        String
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns     BoardColumn[]
+  createdAt   DateTime      @default(now())
+
+  @@map("boards")
+}
+
+model BoardColumn {
+  id      String @id @default(uuid())
+  name    String
+  order   Int
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@map("board_columns")
+}
+
+model ProjectRole {
+  id          String          @id @default(uuid())
+  name        String
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  permissions Json
+  members     ProjectMember[]
+
+  @@unique([projectId, name])
+  @@map("project_roles")
+}
+
+model ProjectMember {
+  id            String      @id @default(uuid())
+  projectId     String
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId        String
+  projectRole   ProjectRole @relation(fields: [projectRoleId], references: [id])
+  projectRoleId String
+  joinedAt      DateTime    @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}

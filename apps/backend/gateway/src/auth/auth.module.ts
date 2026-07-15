@@ -9,29 +9,14 @@ import { JwtGuard } from './jwt.guard';
   imports: [
     ClientsModule.registerAsync([
       {
-        name: 'AUTH_SERVICE',
+        name: 'CREDENTIALS_SERVICE',
         imports: [ConfigModule],
         inject: [ConfigService],
         useFactory: (config: ConfigService) => ({
           transport: Transport.TCP,
           options: {
-            host: config.get<string>('AUTH_SERVICE_HOST'),
-            port: config.get<number>('AUTH_SERVICE_PORT'),
-          },
-        }),
-      },
-    ]),
-    
-    ClientsModule.registerAsync([
-      {
-        name: 'USER_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('USER_SERVICE_HOST'),
-            port: config.get<number>('USER_SERVICE_PORT'),
+            host: config.get<string>('CREDENTIALS_SERVICE_HOST'),
+            port: config.get<number>('CREDENTIALS_SERVICE_PORT'),
           },
         }),
       },
@@ -41,12 +26,12 @@ import { JwtGuard } from './jwt.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SERVICE'),
+        secret: config.get<string>('JWT_SECRET'),
       }),
     }),
   ],
   controllers: [AuthController],
   providers: [JwtGuard],
-  exports: [JwtGuard, JwtModule],
+  exports: [JwtGuard, JwtModule, ClientsModule],
 })
 export class AuthModule {}
