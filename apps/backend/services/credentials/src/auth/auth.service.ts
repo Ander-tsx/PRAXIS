@@ -3,7 +3,7 @@ import { RpcException } from '@nestjs/microservices';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -68,7 +68,11 @@ export class AuthService {
       include: { user: true },
     });
 
-    const userId = credential.user!.id;
+    if (!credential.user) {
+      throw new Error('User profile not found')
+    }
+
+    const userId = credential.user.id;
     const accessToken = await this.signAccess(userId);
     const refreshToken = await this.signRefresh(userId);
 

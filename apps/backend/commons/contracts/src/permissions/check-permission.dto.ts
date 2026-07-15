@@ -6,6 +6,9 @@ export class CheckPermissionDto {
   @IsUUID()
   userId: string;
 
+  @IsUUID()
+  projectId: string;
+
   @IsIn(['admin', 'user'])
   role: Role;
 }
