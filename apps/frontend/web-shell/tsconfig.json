@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@praxis/commons": ["../commons/index.ts"],
+      "@praxis/commons/*": ["../commons/*"]
     }
   },
   "include": [

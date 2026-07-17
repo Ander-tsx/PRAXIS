@@ -65,3 +65,7 @@ Thumbs.db
 # IDE
 .idea/
 .vscode/settings.json
+
+# AI Agent context (local only)
+AGENTS.md
+DESIGN.md
