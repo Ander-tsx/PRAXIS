@@ -9,7 +9,11 @@
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "biome format --write .",
-        "format:check": "biome format ."
+        "format:check": "biome format .",
+        "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
+        "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
+        "docker:restart": "docker compose -f infra/docker/compose/docker-compose.yml down && docker compose -f infra/docker/compose/docker-compose.yml up -d",
+        "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",

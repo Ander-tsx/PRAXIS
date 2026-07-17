@@ -10,10 +10,49 @@ Monorepo SOFEA con microfrontends (Next.js) y microservicios (NestJS).
 | Backend | NestJS + PostgreSQL |
 | Monorepo | pnpm workspaces + Turborepo |
 
-## Inicio rápido
+## Requisitos
+
+- Node.js 20+
+- pnpm 9+
+- Docker Desktop
+
+## Primer inicio
+
+Instala las dependencias:
 
 ```bash
 pnpm install
+```
+
+Levanta la infraestructura:
+
+```bash
+pnpm docker:up
+```
+
+Compila todos los paquetes del monorepo:
+
+```bash
+pnpm build
+```
+
+## Desarrollo
+
+Backend:
+
+```bash
+pnpm dev:backend
+```
+
+Frontend:
+
+```bash
+pnpm dev:frontend
+```
+
+O ambos:
+
+```bash
 pnpm dev
 ```
 
