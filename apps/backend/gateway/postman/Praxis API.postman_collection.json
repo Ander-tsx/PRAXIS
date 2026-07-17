@@ -11,67 +11,26 @@
       "name": "Credentials",
       "item": [
         {
-          "name": "Users",
-          "item": [
-            {
-              "name": "Find All",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/users/find-all",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "users",
-                    "find-all"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Find one",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/users/find-all",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "users",
-                    "find-all"
-                  ]
-                }
-              },
-              "response": []
-            },
-            {
-              "name": "Update",
-              "request": {
-                "method": "GET",
-                "header": []
-              },
-              "response": []
-            },
-            {
-              "name": "Delete",
-              "request": {
-                "method": "GET",
-                "header": []
-              },
-              "response": []
-            }
-          ]
-        },
-        {
           "name": "Auth",
           "item": [
             {
               "name": "Register",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const res = pm.response.json();",
+                      "const token = res.accessToken || res.access_token;",
+                      "if (token) {",
+                      "  pm.collectionVariables.set('access_token', token);",
+                      "  console.log('Token guardado automáticamente');",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
               "request": {
                 "method": "POST",
                 "header": [
@@ -110,8 +69,9 @@
                   "script": {
                     "exec": [
                       "const res = pm.response.json();",
-                      "if (res.access_token) {",
-                      "  pm.collectionVariables.set('access_token', res.access_token);",
+                      "const token = res.accessToken || res.access_token;",
+                      "if (token) {",
+                      "  pm.collectionVariables.set('access_token', token);",
                       "  console.log('Token guardado automáticamente');",
                       "}"
                     ],
@@ -148,8 +108,339 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "Refresh",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const res = pm.response.json();",
+                      "const token = res.accessToken || res.access_token;",
+                      "if (token) {",
+                      "  pm.collectionVariables.set('access_token', token);",
+                      "  console.log('Token guardado automáticamente');",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"refresh-token-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/refresh",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/auth/logout",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "auth",
+                    "logout"
+                  ]
+                }
+              },
+              "response": []
             }
           ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"sortBy\": \"first_name\",\n    \"sortOrder\": \"ASC\"\n  },\n  \"filters\": {\n    \"search\": \"test\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/users",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find One",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/users/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "user-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/users/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "user-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/users/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "users",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "user-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Roles",
+      "item": [
+        {
+          "name": "Find All",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/roles",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-here\",\n  \"roleName\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/roles/assign",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "roles",
+                "assign"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-here\",\n  \"roleName\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/roles/revoke",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "roles",
+                "revoke"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Roles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/roles/user/:userId",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "roles",
+                "user",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "user-uuid-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-here\",\n  \"roleName\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/roles/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "roles",
+                "check"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -158,23 +449,782 @@
       "item": [
         {
           "name": "Projects",
-          "item": []
+          "item": [
+            {
+              "name": "Create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Project\",\n  \"description\": \"Project description\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ownerId\": \"optional-owner-uuid-here\",\n  \"query\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"sortBy\": \"name\",\n    \"sortOrder\": \"ASC\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find One",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Project Name\",\n  \"description\": \"Updated project description\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         },
         {
           "name": "Workspaces",
-          "item": []
+          "item": [
+            {
+              "name": "Create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Workspace\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/workspaces",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "workspaces"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/workspaces",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "workspaces"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Workspace Name\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "workspaces",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "workspace-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "workspaces",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "workspace-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         },
         {
           "name": "Boards",
-          "item": []
-        },
-        {
-          "name": "Members",
-          "item": []
+          "item": [
+            {
+              "name": "Create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Board\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/workspaces/:workspaceId/boards",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "workspaces",
+                    ":workspaceId",
+                    "boards"
+                  ],
+                  "variable": [
+                    {
+                      "key": "workspaceId",
+                      "value": "workspace-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/workspaces/:workspaceId/boards",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "workspaces",
+                    ":workspaceId",
+                    "boards"
+                  ],
+                  "variable": [
+                    {
+                      "key": "workspaceId",
+                      "value": "workspace-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Board Name\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "workspaces",
+                    ":workspaceId",
+                    "boards",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "workspaceId",
+                      "value": "workspace-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "workspaces",
+                    ":workspaceId",
+                    "boards",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "workspaceId",
+                      "value": "workspace-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         },
         {
           "name": "Columns",
-          "item": []
+          "item": [
+            {
+              "name": "Create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"To Do\",\n  \"order\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/columns",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "columns"
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Reorder",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"columnIds\": [\n    \"column-uuid-1\",\n    \"column-uuid-2\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/columns/reorder",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "columns",
+                    "reorder"
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/columns/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "columns",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "column-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Members",
+          "item": [
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/members",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "members"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Add",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"user-uuid-here\",\n  \"projectRoleId\": \"project-role-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/members",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "members"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Remove",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"user-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/members",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "members"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Project Roles",
+          "item": [
+            {
+              "name": "Create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Developer\",\n  \"permissions\": {\n    \"canCreateBoard\": true,\n    \"canEditBoard\": true,\n    \"canDeleteBoard\": false,\n    \"canCreateColumn\": true,\n    \"canEditColumn\": true,\n    \"canDeleteColumn\": false,\n    \"canCreateTask\": true,\n    \"canEditTask\": true,\n    \"canDeleteTask\": true,\n    \"canManageMembers\": false,\n    \"canManageRoles\": false\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/roles",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "roles"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Lead Developer\",\n  \"permissions\": {\n    \"canCreateBoard\": true,\n    \"canEditBoard\": true,\n    \"canDeleteBoard\": true,\n    \"canCreateColumn\": true,\n    \"canEditColumn\": true,\n    \"canDeleteColumn\": true,\n    \"canCreateTask\": true,\n    \"canEditTask\": true,\n    \"canDeleteTask\": true,\n    \"canManageMembers\": true,\n    \"canManageRoles\": true\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/roles/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "roles",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "role-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/projects/:projectId/roles/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "projects",
+                    ":projectId",
+                    "roles",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    },
+                    {
+                      "key": "id",
+                      "value": "role-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         }
       ]
     }
@@ -184,7 +1234,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{auth_secret_0fk2}}",
+        "value": "{{access_token}}",
         "type": "string"
       }
     ]
@@ -221,10 +1271,6 @@
     {
       "key": "access_token",
       "value": ""
-    },
-    {
-      "key": "auth_secret_0fk2",
-      "secret": true
     }
   ]
 }
