@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
 import { RolesModule } from './roles/roles.module';
 import { ProjectsModule } from './projects/projects.module';
+import { TasksModule } from './tasks/tasks.module';
+
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { ProjectsModule } from './projects/projects.module';
     UserModule,
     RolesModule,
     ProjectsModule,
+    TasksModule,
   ],
 })
+
 export class AppModule {}

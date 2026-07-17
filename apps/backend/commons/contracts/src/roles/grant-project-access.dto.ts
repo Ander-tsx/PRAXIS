@@ -1,4 +1,5 @@
-import { IsUUID } from 'class-validator';
+import { IsEnum, IsUUID } from 'class-validator';
+import { ProjectPermission } from './project-permission.enum';
 
 export class GrantProjectAccessDto {
   @IsUUID('4')
@@ -6,4 +7,7 @@ export class GrantProjectAccessDto {
 
   @IsUUID('4')
   projectId: string;
+
+  @IsEnum(ProjectPermission)
+  permission: ProjectPermission;
 }

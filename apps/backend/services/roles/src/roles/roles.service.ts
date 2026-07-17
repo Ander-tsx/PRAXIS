@@ -11,6 +11,7 @@ import {
   GrantProjectAccessDto,
   RevokeProjectAccessDto,
   CheckProjectAccessDto,
+  ProjectPermission,
 } from '@praxis/contracts';
 
 const ROLES_CACHE_TTL    = 60;   // 1 min — cambios se reflejan pronto
@@ -121,39 +122,77 @@ export class RolesService implements OnModuleInit {
   /* ─── Permisos de vista de proyectos ─────────────────────────────── */
 
   async grantProjectAccess(dto: GrantProjectAccessDto) {
-    const existing = await this.prisma.userProjectAccess.findUnique({
-      where: { userId_projectId: { userId: dto.userId, projectId: dto.projectId } },
-    });
+    const permissionsToGrant: ProjectPermission[] =
+      dto.permission === ProjectPermission.EDIT
+        ? [ProjectPermission.VIEW, ProjectPermission.EDIT]
+        : [ProjectPermission.VIEW];
 
-    if (existing) {
-      throw new RpcException({
-        statusCode: 409,
-        message: 'El usuario ya tiene acceso a este proyecto',
+    let mainAccess: any = null;
+
+    for (const perm of permissionsToGrant) {
+      const existing = await this.prisma.userProjectAccess.findUnique({
+        where: {
+          userId_projectId_permission: {
+            userId: dto.userId,
+            projectId: dto.projectId,
+            permission: perm,
+          },
+        },
       });
-    }
 
-    const access = await this.prisma.userProjectAccess.create({
-      data: { userId: dto.userId, projectId: dto.projectId },
-    });
+      if (!existing) {
+        const access = await this.prisma.userProjectAccess.create({
+          data: {
+            userId: dto.userId,
+            projectId: dto.projectId,
+            permission: perm,
+          },
+        });
+        if (perm === dto.permission) {
+          mainAccess = access;
+        }
+      } else {
+        if (perm === dto.permission) {
+          throw new RpcException({
+            statusCode: 409,
+            message: `El usuario ya tiene el permiso ${dto.permission} en este proyecto`,
+          });
+        }
+      }
+    }
 
     await this.redis.del(`project_access:user:${dto.userId}`);
     await this.redis.del(`project_access:project:${dto.projectId}`);
-    return access;
+    return mainAccess || { userId: dto.userId, projectId: dto.projectId, permission: dto.permission };
   }
 
   async revokeProjectAccess(dto: RevokeProjectAccessDto) {
-    const access = await this.prisma.userProjectAccess.findUnique({
-      where: { userId_projectId: { userId: dto.userId, projectId: dto.projectId } },
+    let permissionsToRevoke: ProjectPermission[] = [];
+
+    if (!dto.permission) {
+      permissionsToRevoke = [ProjectPermission.VIEW, ProjectPermission.EDIT];
+    } else if (dto.permission === ProjectPermission.VIEW) {
+      // Si se revoca VIEW, se debe revocar EDIT de manera obligatoria.
+      permissionsToRevoke = [ProjectPermission.VIEW, ProjectPermission.EDIT];
+    } else {
+      permissionsToRevoke = [ProjectPermission.EDIT];
+    }
+
+    const { count } = await this.prisma.userProjectAccess.deleteMany({
+      where: {
+        userId: dto.userId,
+        projectId: dto.projectId,
+        permission: { in: permissionsToRevoke },
+      },
     });
 
-    if (!access) {
+    if (count === 0) {
       throw new RpcException({
         statusCode: 404,
-        message: 'El usuario no tiene acceso a este proyecto',
+        message: 'El usuario no tiene acceso o ese permiso en este proyecto',
       });
     }
 
-    await this.prisma.userProjectAccess.delete({ where: { id: access.id } });
     await this.redis.del(`project_access:user:${dto.userId}`);
     await this.redis.del(`project_access:project:${dto.projectId}`);
     return { success: true };
@@ -169,9 +208,21 @@ export class RolesService implements OnModuleInit {
       orderBy: { grantedAt: 'desc' },
     });
 
-    const projectIds = accesses.map((a) => a.projectId);
-    await this.redis.set(cacheKey, projectIds, ACCESS_CACHE_TTL);
-    return projectIds;
+    const groupedMap = new Map<string, Set<string>>();
+    for (const a of accesses) {
+      if (!groupedMap.has(a.projectId)) {
+        groupedMap.set(a.projectId, new Set());
+      }
+      groupedMap.get(a.projectId)!.add(a.permission);
+    }
+
+    const result = Array.from(groupedMap.entries()).map(([projectId, perms]) => ({
+      projectId,
+      permissions: Array.from(perms),
+    }));
+
+    await this.redis.set(cacheKey, result, ACCESS_CACHE_TTL);
+    return result;
   }
 
   async checkProjectAccess(dto: CheckProjectAccessDto) {
@@ -184,8 +235,16 @@ export class RolesService implements OnModuleInit {
       if (isAdmin) return { hasAccess: true };
     }
 
+    const requiredPermission = dto.permission || ProjectPermission.VIEW;
+
     const access = await this.prisma.userProjectAccess.findUnique({
-      where: { userId_projectId: { userId: dto.userId, projectId: dto.projectId } },
+      where: {
+        userId_projectId_permission: {
+          userId: dto.userId,
+          projectId: dto.projectId,
+          permission: requiredPermission,
+        },
+      },
     });
 
     return { hasAccess: !!access };
@@ -201,8 +260,20 @@ export class RolesService implements OnModuleInit {
       orderBy: { grantedAt: 'desc' },
     });
 
-    const userIds = accesses.map((a) => a.userId);
-    await this.redis.set(cacheKey, userIds, ACCESS_CACHE_TTL);
-    return userIds;
+    const groupedMap = new Map<string, Set<string>>();
+    for (const a of accesses) {
+      if (!groupedMap.has(a.userId)) {
+        groupedMap.set(a.userId, new Set());
+      }
+      groupedMap.get(a.userId)!.add(a.permission);
+    }
+
+    const result = Array.from(groupedMap.entries()).map(([userId, perms]) => ({
+      userId,
+      permissions: Array.from(perms),
+    }));
+
+    await this.redis.set(cacheKey, result, ACCESS_CACHE_TTL);
+    return result;
   }
 }

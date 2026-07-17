@@ -41,4 +41,9 @@ export class ProjectsController {
   delete(@Payload() dto: DeleteProjectDto) {
     return this.projectsService.deleteProject(dto.id);
   }
+
+  @MessagePattern({ cmd: 'project_resolve_resource' })
+  resolveResource(@Payload() dto: { workspaceId?: string; boardId?: string }) {
+    return this.projectsService.resolveResource(dto);
+  }
 }

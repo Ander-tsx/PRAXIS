@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id           String      @id @default(uuid())
+  title        String
+  description  String?
+  status       String
+  boardId      String
+  columnId     String
+  assigneeId   String?
+  reporterId   String
+  projectId    String
+  parentTaskId String?
+  parent       Task?       @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]      @relation("Subtasks")
+  checklists   Checklist[]
+  dueDate      DateTime?
+  priority     Priority    @default(MEDIUM)
+  order        Int         @default(0)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@map("tasks")
+}
+
+model Checklist {
+  id        String  @id @default(uuid())
+  taskId    String
+  task      Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text      String
+  completed Boolean @default(false)
+  order     Int     @default(0)
+
+  @@map("checklists")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}

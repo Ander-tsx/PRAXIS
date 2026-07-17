@@ -29,12 +29,18 @@ model UserRole {
   @@map("user_roles")
 }
 
-model UserProjectAccess {
-  id        String   @id @default(uuid())
-  userId    String
-  projectId String
-  grantedAt DateTime @default(now())
+enum ProjectPermission {
+  VIEW
+  EDIT
+}
 
-  @@unique([userId, projectId])
+model UserProjectAccess {
+  id         String            @id @default(uuid())
+  userId     String
+  projectId  String
+  permission ProjectPermission @default(VIEW)
+  grantedAt  DateTime          @default(now())
+
+  @@unique([userId, projectId, permission])
   @@map("user_project_access")
 }

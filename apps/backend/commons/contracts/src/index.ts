@@ -4,4 +4,5 @@ export * from './pagination.dto';
 export * from './permissions';
 export * from './projects';
 export * from './roles';
+export * from './tasks';
 export * from './users';

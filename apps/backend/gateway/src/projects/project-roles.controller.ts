@@ -14,11 +14,14 @@ import { ClientProxy } from '@nestjs/microservices';
 import {
   CreateProjectRoleDto,
   UpdateProjectRoleDto,
+  ProjectPermission,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/roles')
 export class ProjectRolesController {
   constructor(
@@ -28,6 +31,7 @@ export class ProjectRolesController {
   /** Crea un rol local dentro de un proyecto */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @RequireProjectPermission(ProjectPermission.EDIT)
   create(
     @Param('projectId') projectId: string,
     @Body() body: Omit<CreateProjectRoleDto, 'projectId'>,
@@ -39,6 +43,7 @@ export class ProjectRolesController {
 
   /** Actualiza un rol local (permisos, nombre) */
   @Patch(':id')
+  @RequireProjectPermission(ProjectPermission.EDIT)
   update(
     @Param('id') id: string,
     @Body() body: Omit<UpdateProjectRoleDto, 'id'>,
@@ -50,6 +55,7 @@ export class ProjectRolesController {
 
   /** Elimina un rol local del proyecto */
   @Delete(':id')
+  @RequireProjectPermission(ProjectPermission.EDIT)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_role_delete' }, { id }),

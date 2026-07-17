@@ -44,3 +44,14 @@ export class DeleteProjectRoleDto {
   @IsUUID('4')
   id: string;
 }
+
+export class CheckProjectPermissionDto {
+  @IsUUID('4')
+  userId: string;
+
+  @IsUUID('4')
+  projectId: string;
+
+  @IsString()
+  permission: string;
+}

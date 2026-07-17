@@ -22,4 +22,9 @@ export const envValidationSchema = Joi.object({
   // projects-service — TCP 3003
   PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
   PROJECTS_SERVICE_PORT: Joi.number().default(3003),
+
+  // tasks-service — TCP 3004
+  TASKS_SERVICE_HOST: Joi.string().default('localhost'),
+  TASKS_SERVICE_PORT: Joi.number().default(3004),
 });
+

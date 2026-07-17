@@ -104,4 +104,29 @@ export class ProjectsService {
     await this.redis.del(`project:${id}`);
     return { success: true };
   }
+
+  async resolveResource(dto: { workspaceId?: string; boardId?: string }) {
+    if (dto.boardId) {
+      const board = await this.prisma.board.findUnique({
+        where: { id: dto.boardId },
+        include: { workspace: true },
+      });
+      if (!board) {
+        throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
+      }
+      return { projectId: board.workspace.projectId };
+    }
+
+    if (dto.workspaceId) {
+      const workspace = await this.prisma.workspace.findUnique({
+        where: { id: dto.workspaceId },
+      });
+      if (!workspace) {
+        throw new RpcException({ statusCode: 404, message: 'Workspace no encontrado' });
+      }
+      return { projectId: workspace.projectId };
+    }
+
+    throw new RpcException({ statusCode: 400, message: 'Falta workspaceId o boardId' });
+  }
 }

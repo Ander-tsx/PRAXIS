@@ -4,9 +4,10 @@ import {
   CreateProjectRoleDto,
   UpdateProjectRoleDto,
   DeleteProjectRoleDto,
-  CheckPermissionDto,
+  CheckProjectPermissionDto,
 } from '@praxis/contracts';
 import { ProjectRolesService } from './project-roles.service';
+
 
 @Controller()
 export class ProjectRolesController {
@@ -28,7 +29,8 @@ export class ProjectRolesController {
   }
 
   @MessagePattern({ cmd: 'project_check_permission' })
-  checkPermission(@Payload() dto: CheckPermissionDto) {
+  checkPermission(@Payload() dto: CheckProjectPermissionDto) {
     return this.projectRolesService.checkPermission(dto);
   }
 }
+

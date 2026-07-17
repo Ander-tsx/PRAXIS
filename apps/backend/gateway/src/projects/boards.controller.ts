@@ -15,11 +15,14 @@ import { ClientProxy } from '@nestjs/microservices';
 import {
   CreateBoardDto,
   UpdateBoardDto,
+  ProjectPermission,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('workspaces/:workspaceId/boards')
 export class BoardsController {
   constructor(
@@ -29,6 +32,7 @@ export class BoardsController {
   /** Crea un board en un workspace */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @RequireProjectPermission(ProjectPermission.EDIT)
   create(
     @Param('workspaceId') workspaceId: string,
     @Body() body: Omit<CreateBoardDto, 'workspaceId'>,
@@ -41,6 +45,7 @@ export class BoardsController {
   /** Lista todos los boards de un workspace */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.VIEW)
   findAll(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
@@ -49,6 +54,7 @@ export class BoardsController {
 
   /** Actualiza un board */
   @Patch(':id')
+  @RequireProjectPermission(ProjectPermission.EDIT)
   update(
     @Param('id') id: string,
     @Body() body: Omit<UpdateBoardDto, 'id'>,
@@ -60,6 +66,7 @@ export class BoardsController {
 
   /** Elimina un board */
   @Delete(':id')
+  @RequireProjectPermission(ProjectPermission.EDIT)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_delete' }, { id }),

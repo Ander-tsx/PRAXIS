@@ -6,3 +6,4 @@ export * from './grant-project-access.dto';
 export * from './revoke-project-access.dto';
 export * from './get-user-project-access.dto';
 export * from './check-project-access.dto';
+export * from './project-permission.enum';

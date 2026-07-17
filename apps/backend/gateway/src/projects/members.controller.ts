@@ -14,11 +14,14 @@ import { ClientProxy } from '@nestjs/microservices';
 import {
   AddMemberDto,
   RemoveMemberDto,
+  ProjectPermission,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
-@UseGuards(JwtGuard)
+@UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/members')
 export class MembersController {
   constructor(
@@ -28,6 +31,7 @@ export class MembersController {
   /** Lista todos los miembros de un proyecto */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.VIEW)
   findAll(@Param('projectId') projectId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_find_all' }, { projectId }),
@@ -37,6 +41,7 @@ export class MembersController {
   /** Agrega un miembro a un proyecto */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @RequireProjectPermission(ProjectPermission.EDIT)
   add(
     @Param('projectId') projectId: string,
     @Body() body: Omit<AddMemberDto, 'projectId'>,
@@ -49,6 +54,7 @@ export class MembersController {
   /** Elimina un miembro de un proyecto */
   @Delete()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.EDIT)
   remove(
     @Param('projectId') projectId: string,
     @Body() body: Omit<RemoveMemberDto, 'projectId'>,
