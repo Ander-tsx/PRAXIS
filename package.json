@@ -13,7 +13,8 @@
         "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
         "docker:restart": "docker compose -f infra/docker/compose/docker-compose.yml down && docker compose -f infra/docker/compose/docker-compose.yml up -d",
-        "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f"
+        "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
+        "seed:credentials": "pnpm --filter @praxis/credentials-service run prisma:seed"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",

@@ -1,4 +1,4 @@
-# '"damn"'
+# '"PRAXIS"'
 
 Monorepo SOFEA con microfrontends (Next.js) y microservicios (NestJS).
 
@@ -34,6 +34,12 @@ Compila todos los paquetes del monorepo:
 
 ```bash
 pnpm build
+```
+
+Corre el seed inicial (crea el usuario admin y roles base):
+
+```bash
+pnpm seed:credentials
 ```
 
 ## Desarrollo
