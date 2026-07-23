@@ -1,0 +1,2726 @@
+{
+  "info": {
+    "_postman_id": "b91929ef-1a97-4218-a5f2-468b94444d7d-e2e",
+    "name": "Praxis API (E2E Flow)",
+    "description": "Flujo automático End-to-End de la API Praxis, ordenado de lo externo a lo interno.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01. Register",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const randomSuffix = Math.floor(Math.random() * 1000000);",
+              "pm.collectionVariables.set('register_email', `test-${randomSuffix}@test.com`);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Register failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
+              "    pm.collectionVariables.set('userId', res.userId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{register_email}}\",\n  \"password\": \"12345678\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Login failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{register_email}}\",\n  \"password\": \"12345678\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02-1. Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Admin Login failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('admin_access_token', res.accessToken || res.access_token);",
+              "    pm.collectionVariables.set('admin_refresh_token', res.refreshToken || res.refresh_token);",
+              "    pm.collectionVariables.set('adminId', res.userId);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@praxis.dev\",\n  \"password\": \"Admin@12345!\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03. Refresh",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Refresh failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/refresh",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "refresh"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04. Find All Users",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"sortBy\": \"first_name\",\n    \"sortOrder\": \"ASC\"\n  },\n  \"filters\": {\n    \"search\": \"{{register_email}}\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/users",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Users failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Find One User",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/users/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{userId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find One User failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Update User",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/users/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{userId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update User failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Find All Permissions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/permissions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "permissions"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Permissions failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Assign Permission",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"roleName\": \"Admin\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/permissions/assign",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "permissions",
+            "assign"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200 or 201\", function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "if (pm.response.code !== 200 && pm.response.code !== 201) {",
+              "    console.error(\"Assign Permission failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Get User Roles",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/permissions/user/:userId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "permissions",
+            "user",
+            ":userId"
+          ],
+          "variable": [
+            {
+              "key": "userId",
+              "value": "{{userId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Get User Roles failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Check Permission",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"roleName\": \"ADMIN\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/permissions/check",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "permissions",
+            "check"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Check Permission failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Revoke Permission",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"roleName\": \"Admin\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/permissions/revoke",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "permissions",
+            "revoke"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Revoke Permission failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Create Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Project\",\n  \"description\": \"Project description\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Project failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('projectId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Find All Projects",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ownerId\": \"{{userId}}\",\n  \"query\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"sortBy\": \"name\",\n    \"sortOrder\": \"ASC\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Projects failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Find One Project",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find One Project failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "15. Update Project",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated Project Name\",\n  \"description\": \"Updated project description\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update Project failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "16. Create Project Role",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Developer\",\n  \"permissions\": {\n    \"canCreateBoard\": true,\n    \"canEditBoard\": true,\n    \"canDeleteBoard\": false,\n    \"canCreateColumn\": true,\n    \"canEditColumn\": true,\n    \"canDeleteColumn\": false,\n    \"canCreateTask\": true,\n    \"canEditTask\": true,\n    \"canDeleteTask\": true,\n    \"canManageMembers\": false,\n    \"canManageRoles\": false\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/roles",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "roles"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Project Role failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('projectRoleId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "17. Update Project Role",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Lead Developer\",\n  \"permissions\": {\n    \"canCreateBoard\": true,\n    \"canEditBoard\": true,\n    \"canDeleteBoard\": true,\n    \"canCreateColumn\": true,\n    \"canEditColumn\": true,\n    \"canDeleteColumn\": true,\n    \"canCreateTask\": true,\n    \"canEditTask\": true,\n    \"canDeleteTask\": true,\n    \"canManageMembers\": true,\n    \"canManageRoles\": true\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/roles/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "roles",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{projectRoleId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update Project Role failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "18. Find All Members (Pre-add)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/members",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "members"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Members failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "19. Add Member",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"projectRoleId\": \"{{projectRoleId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/members",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "members"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Add Member failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "20. Find All Members (Post-add)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/members",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "members"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Members failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "21. Create Workspace",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Workspace\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/workspaces",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "workspaces"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Workspace failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('workspaceId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22. Find All Workspaces",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/workspaces",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "workspaces"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Workspaces failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "23. Update Workspace",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated Workspace Name\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "workspaces",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{workspaceId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update Workspace failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "24. Create Board",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Board\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/workspaces/:workspaceId/boards",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "workspaces",
+            ":workspaceId",
+            "boards"
+          ],
+          "variable": [
+            {
+              "key": "workspaceId",
+              "value": "{{workspaceId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Board failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('boardId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "25. Find All Boards",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/workspaces/:workspaceId/boards",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "workspaces",
+            ":workspaceId",
+            "boards"
+          ],
+          "variable": [
+            {
+              "key": "workspaceId",
+              "value": "{{workspaceId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Boards failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "26. Update Board",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Updated Board Name\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "workspaces",
+            ":workspaceId",
+            "boards",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "workspaceId",
+              "value": "{{workspaceId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update Board failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "27. Create Column (To Do)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"To Do\",\n  \"order\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/columns",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "columns"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Column To Do failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('columnId1', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "28. Create Column (In Progress)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"In Progress\",\n  \"order\": 2\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/columns",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "columns"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Column In Progress failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('columnId2', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "29. Create Column (Done)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Done\",\n  \"order\": 3\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/columns",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "columns"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Column Done failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('columnId3', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "30. Reorder Columns",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"columnIds\": [\n    \"{{columnId1}}\",\n    \"{{columnId2}}\",\n    \"{{columnId3}}\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/columns/reorder",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "columns",
+            "reorder"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Reorder Columns failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "31. Create Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"columnId\": \"{{columnId1}}\",\n  \"title\": \"Nueva Tarea\",\n  \"description\": \"Descripción de la tarea\",\n  \"status\": \"TO_DO\",\n  \"assigneeId\": \"{{userId}}\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"MEDIUM\",\n  \"order\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/tasks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "tasks"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('taskId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "32. Find All Tasks",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/tasks?columnId=column-uuid-here&page=1&limit=10",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "tasks"
+          ],
+          "query": [
+            {
+              "key": "columnId",
+              "value": "{{columnId1}}",
+              "disabled": false
+            },
+            {
+              "key": "page",
+              "value": "1",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "disabled": true
+            }
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find All Tasks failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "33. Find One Task",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/tasks/:id?projectId=project-uuid-here",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":id"
+          ],
+          "query": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find One Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "34. Update Task",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"title\": \"Tarea Actualizada\",\n  \"description\": \"Nueva descripción\",\n  \"status\": \"IN_PROGRESS\",\n  \"columnId\": \"{{columnId1}}\",\n  \"assigneeId\": \"{{userId}}\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"HIGH\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/tasks/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Update Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "35. Assign Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeId\": \"{{userId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/tasks/:id/assign",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":id",
+            "assign"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Assign Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "36. Move Task",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"columnId\": \"{{columnId2}}\",\n  \"status\": \"DONE\",\n  \"order\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/tasks/:id/move",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":id",
+            "move"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Move Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "37. Create Subtask",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"columnId\": \"{{columnId1}}\",\n  \"title\": \"Nueva Subtarea\",\n  \"description\": \"Descripción de la subtarea\",\n  \"status\": \"TO_DO\",\n  \"parentTaskId\": \"{{taskId}}\",\n  \"assigneeId\": \"{{userId}}\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"LOW\",\n  \"order\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/tasks",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "tasks"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Subtask failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('subtaskId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "38. Create Checklist Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\",\n  \"text\": \"Nuevo ítem de checklist\",\n  \"order\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/tasks/:taskId/checklists",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":taskId",
+            "checklists"
+          ],
+          "variable": [
+            {
+              "key": "taskId",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 201\", function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "if (pm.response.code !== 201) {",
+              "    console.error(\"Create Checklist Item failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "} else {",
+              "    const res = pm.response.json();",
+              "    pm.collectionVariables.set('checklistId', res.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "39. Toggle Checklist Item",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/checklists/:id/toggle",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "checklists",
+            ":id",
+            "toggle"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{checklistId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Toggle Checklist Item failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "40. Delete Checklist Item",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/checklists/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "checklists",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{checklistId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Checklist Item failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "41. Delete Task",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"projectId\": \"{{projectId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/tasks/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "tasks",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{taskId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Task failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "42. Delete Column",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId/columns/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId",
+            "columns",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{columnId1}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Column failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "43. Delete Board",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "workspaces",
+            ":workspaceId",
+            "boards",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "workspaceId",
+              "value": "{{workspaceId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Board failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "44. Delete Workspace",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "workspaces",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{workspaceId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Workspace failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "45. Remove Member",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/members",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "members"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Remove Member failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "46. Delete Project Role",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:projectId/roles/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":projectId",
+            "roles",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "projectId",
+              "value": "{{projectId}}"
+            },
+            {
+              "key": "id",
+              "value": "{{projectRoleId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Project Role failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "47. Delete Project",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/projects/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "projects",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{projectId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete Project failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "48. Delete User",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/users/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "{{userId}}"
+            }
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Delete User failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "49. Logout",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/auth/logout",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Logout failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "register_email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectRoleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workspaceId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "boardId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "columnId1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "columnId2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "columnId3",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subtaskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checklistId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

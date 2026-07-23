@@ -6,6 +6,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["projects"]
 }
 
 model Project {
@@ -19,6 +20,7 @@ model Project {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  @@schema("projects")
   @@map("projects")
 }
 
@@ -30,6 +32,7 @@ model Workspace {
   boards    Board[]
   createdAt DateTime @default(now())
 
+  @@schema("projects")
   @@map("workspaces")
 }
 
@@ -41,6 +44,7 @@ model Board {
   columns     BoardColumn[]
   createdAt   DateTime      @default(now())
 
+  @@schema("projects")
   @@map("boards")
 }
 
@@ -51,6 +55,7 @@ model BoardColumn {
   boardId String
   board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
 
+  @@schema("projects")
   @@map("board_columns")
 }
 
@@ -63,6 +68,7 @@ model ProjectRole {
   members     ProjectMember[]
 
   @@unique([projectId, name])
+  @@schema("projects")
   @@map("project_roles")
 }
 
@@ -76,5 +82,6 @@ model ProjectMember {
   joinedAt      DateTime    @default(now())
 
   @@unique([projectId, userId])
+  @@schema("projects")
   @@map("project_members")
 }

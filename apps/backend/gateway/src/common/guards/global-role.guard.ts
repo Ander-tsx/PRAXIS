@@ -29,7 +29,9 @@ export class GlobalRoleGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.userId;
-    if (!userId) return false;
+    if (!userId) {
+      return false
+    };
 
     try {
       const { hasRole } = await firstValueFrom(

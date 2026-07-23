@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas = ["permissions"]
   url      = env("DATABASE_URL")
 }
 
@@ -15,6 +16,7 @@ model Role {
   userRoles   UserRole[]
   createdAt   DateTime   @default(now())
 
+  @@schema("permissions")
   @@map("roles")
 }
 
@@ -26,5 +28,6 @@ model UserRole {
   createdAt DateTime @default(now())
 
   @@unique([userId, roleId])
+  @@schema("permissions")
   @@map("user_roles")
 }

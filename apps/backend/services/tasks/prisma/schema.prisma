@@ -5,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas = ["tasks"]
   url      = env("DATABASE_URL")
 }
 
@@ -28,6 +29,7 @@ model Task {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
+  @@schema("tasks")
   @@map("tasks")
 }
 
@@ -39,6 +41,7 @@ model Checklist {
   completed Boolean @default(false)
   order     Int     @default(0)
 
+  @@schema("tasks")
   @@map("checklists")
 }
 
@@ -47,4 +50,6 @@ enum Priority {
   MEDIUM
   HIGH
   URGENT
+  
+  @@schema("tasks")
 }
