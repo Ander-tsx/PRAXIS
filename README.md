@@ -30,6 +30,18 @@ Levanta la infraestructura:
 pnpm docker:up
 ```
 
+Crea todas las tablas de la base de datos:
+
+```bash
+pnpm prisma:reset
+```
+
+Ejecuta los seeds iniciales:
+
+```bash
+pnpm prisma:seed
+```
+
 Compila todos los paquetes del monorepo:
 
 ```bash
@@ -61,6 +73,20 @@ O ambos:
 ```bash
 pnpm dev
 ```
+
+## Scripts útiles
+
+| Comando | Descripción |
+|---------|-------------|
+| `pnpm docker:up` | Levanta PostgreSQL y Redis. |
+| `pnpm docker:down` | Detiene la infraestructura. |
+| `pnpm docker:restart` | Reinicia PostgreSQL y Redis. |
+| `pnpm docker:logs` | Muestra los logs de Docker. |
+| `pnpm prisma:reset` | Reinicia la base de datos y ejecuta todas las migraciones (sin seeds). |
+| `pnpm prisma:seed` | Ejecuta los seeds de todos los microservicios en el orden correcto. |
+| `pnpm prisma:deploy` | Aplica las migraciones existentes sin crear nuevas (ideal para producción). |
+
+Si ya tenias creado el contenedor y tienes que hacer docker compose down -v y despues docker compose up tienes que volver a hacer prisma:reset y prisma:seed
 
 ## Estructura
 
