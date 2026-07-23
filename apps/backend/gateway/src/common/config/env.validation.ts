@@ -15,9 +15,9 @@ export const envValidationSchema = Joi.object({
   CREDENTIALS_SERVICE_HOST: Joi.string().default('localhost'),
   CREDENTIALS_SERVICE_PORT: Joi.number().default(3001),
 
-  // roles-service — TCP 3002
-  ROLES_SERVICE_HOST: Joi.string().default('localhost'),
-  ROLES_SERVICE_PORT: Joi.number().default(3002),
+  // permissions-service — TCP 3002
+  PERMISSIONS_SERVICE_HOST: Joi.string().default('localhost'),
+  PERMISSIONS_SERVICE_PORT: Joi.number().default(3002),
 
   // projects-service — TCP 3003
   PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),

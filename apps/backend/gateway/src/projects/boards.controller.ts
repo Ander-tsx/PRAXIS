@@ -29,10 +29,10 @@ export class BoardsController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
-  /** Crea un board en un workspace */
+  /** Crea un board en un workspace (requiere canCreateBoard) */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_CREATE_BOARD)
   create(
     @Param('workspaceId') workspaceId: string,
     @Body() body: Omit<CreateBoardDto, 'workspaceId'>,
@@ -42,19 +42,18 @@ export class BoardsController {
     );
   }
 
-  /** Lista todos los boards de un workspace */
+  /** Lista todos los boards de un workspace (la membresía basta) */
   @Get()
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.VIEW)
   findAll(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
     );
   }
 
-  /** Actualiza un board */
+  /** Actualiza un board (requiere canEditBoard) */
   @Patch(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   update(
     @Param('id') id: string,
     @Body() body: Omit<UpdateBoardDto, 'id'>,
@@ -64,9 +63,9 @@ export class BoardsController {
     );
   }
 
-  /** Elimina un board */
+  /** Elimina un board (requiere canDeleteBoard) */
   @Delete(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_delete' }, { id }),

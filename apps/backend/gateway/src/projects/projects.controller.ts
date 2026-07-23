@@ -55,27 +55,27 @@ export class ProjectsController {
     );
   }
 
-  /** Detalle de un proyecto */
+  /** Detalle de un proyecto (requiere ser miembro con cualquier rol) */
   @Get(':id')
-  @RequireProjectPermission(ProjectPermission.VIEW)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   findOne(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_find_one' }, { id }),
     );
   }
 
-  /** Actualiza un proyecto */
+  /** Actualiza un proyecto (requiere poder editar boards) */
   @Patch(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   update(@Param('id') id: string, @Body() body: Omit<UpdateProjectDto, 'id'>) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_update' }, { id, ...body }),
     );
   }
 
-  /** Elimina un proyecto */
+  /** Elimina un proyecto (requiere poder eliminar boards) */
   @Delete(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_delete' }, { id }),

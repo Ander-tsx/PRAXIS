@@ -25,18 +25,6 @@ import { ProjectRolesController } from './project-roles.controller';
           },
         }),
       },
-      {
-        name: 'ROLES_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('ROLES_SERVICE_HOST'),
-            port: config.get<number>('ROLES_SERVICE_PORT'),
-          },
-        }),
-      },
     ]),
   ],
   controllers: [

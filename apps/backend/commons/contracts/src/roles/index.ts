@@ -2,8 +2,4 @@ export * from './assign-role.dto';
 export * from './revoke-role.dto';
 export * from './check-role.dto';
 export * from './get-user-roles.dto';
-export * from './grant-project-access.dto';
-export * from './revoke-project-access.dto';
-export * from './get-user-project-access.dto';
-export * from './check-project-access.dto';
 export * from './project-permission.enum';

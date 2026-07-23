@@ -32,7 +32,7 @@ export class ChecklistsController {
   /** Agrega un ítem al checklist de una tarea */
   @Post('tasks/:taskId/checklists')
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   create(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
@@ -53,7 +53,7 @@ export class ChecklistsController {
   /** Alterna el estado completado de un ítem de checklist */
   @Post('checklists/:id/toggle')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   toggle(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -74,7 +74,7 @@ export class ChecklistsController {
   /** Elimina un ítem del checklist */
   @Delete('checklists/:id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   delete(
     @Param('id') id: string,
     @Request() req: Express.Request,

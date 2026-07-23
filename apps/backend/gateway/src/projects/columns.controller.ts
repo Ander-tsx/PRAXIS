@@ -28,10 +28,10 @@ export class ColumnsController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
-  /** Agrega una columna a un board */
+  /** Agrega una columna a un board (requiere canCreateColumn) */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_CREATE_COLUMN)
   create(
     @Param('boardId') boardId: string,
     @Body() body: Omit<CreateColumnDto, 'boardId'>,
@@ -41,10 +41,10 @@ export class ColumnsController {
     );
   }
 
-  /** Reordena las columnas de un board */
+  /** Reordena las columnas de un board (requiere canCreateColumn) */
   @Patch('reorder')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_CREATE_COLUMN)
   reorder(
     @Param('boardId') boardId: string,
     @Body() body: Omit<ReorderColumnsDto, 'boardId'>,
@@ -54,9 +54,9 @@ export class ColumnsController {
     );
   }
 
-  /** Elimina una columna */
+  /** Elimina una columna (requiere canDeleteColumn) */
   @Delete(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_DELETE_COLUMN)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'column_delete' }, { id }),

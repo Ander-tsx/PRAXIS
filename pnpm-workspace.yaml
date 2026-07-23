@@ -1,7 +1,6 @@
 packages:
-  - "apps/**"
-  - "apps/backend/*"
+  - "apps/backend/gateway"
+  - "apps/backend/services/*"
   - "apps/backend/commons/*"
-  - "apps/backend/commons/contracts"
   - "packages/**"
   - "stubs/**"

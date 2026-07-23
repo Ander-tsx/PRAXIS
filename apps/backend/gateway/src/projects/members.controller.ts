@@ -28,20 +28,19 @@ export class MembersController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
-  /** Lista todos los miembros de un proyecto */
+  /** Lista todos los miembros de un proyecto (la membresía basta) */
   @Get()
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.VIEW)
   findAll(@Param('projectId') projectId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_find_all' }, { projectId }),
     );
   }
 
-  /** Agrega un miembro a un proyecto */
+  /** Agrega un miembro a un proyecto (requiere canManageMembers) */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   add(
     @Param('projectId') projectId: string,
     @Body() body: Omit<AddMemberDto, 'projectId'>,
@@ -51,10 +50,10 @@ export class MembersController {
     );
   }
 
-  /** Elimina un miembro de un proyecto */
+  /** Elimina un miembro de un proyecto (requiere canManageMembers) */
   @Delete()
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   remove(
     @Param('projectId') projectId: string,
     @Body() body: Omit<RemoveMemberDto, 'projectId'>,

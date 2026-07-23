@@ -6,7 +6,7 @@ import { envValidationSchema } from './common/config/env.validation';
 
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
-import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
 import { TasksModule } from './tasks/tasks.module';
 
@@ -28,7 +28,7 @@ import { TasksModule } from './tasks/tasks.module';
     // Módulos de negocio
     AuthModule,
     UserModule,
-    RolesModule,
+    PermissionsModule,
     ProjectsModule,
     TasksModule,
   ],

@@ -28,19 +28,3 @@ model UserRole {
   @@unique([userId, roleId])
   @@map("user_roles")
 }
-
-enum ProjectPermission {
-  VIEW
-  EDIT
-}
-
-model UserProjectAccess {
-  id         String            @id @default(uuid())
-  userId     String
-  projectId  String
-  permission ProjectPermission @default(VIEW)
-  grantedAt  DateTime          @default(now())
-
-  @@unique([userId, projectId, permission])
-  @@map("user_project_access")
-}

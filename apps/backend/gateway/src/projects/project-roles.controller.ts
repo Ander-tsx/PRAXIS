@@ -28,10 +28,10 @@ export class ProjectRolesController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
-  /** Crea un rol local dentro de un proyecto */
+  /** Crea un rol local dentro de un proyecto (requiere canManageRoles) */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   create(
     @Param('projectId') projectId: string,
     @Body() body: Omit<CreateProjectRoleDto, 'projectId'>,
@@ -41,9 +41,9 @@ export class ProjectRolesController {
     );
   }
 
-  /** Actualiza un rol local (permisos, nombre) */
+  /** Actualiza un rol local — permisos y nombre (requiere canManageRoles) */
   @Patch(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   update(
     @Param('id') id: string,
     @Body() body: Omit<UpdateProjectRoleDto, 'id'>,
@@ -53,9 +53,9 @@ export class ProjectRolesController {
     );
   }
 
-  /** Elimina un rol local del proyecto */
+  /** Elimina un rol local del proyecto (requiere canManageRoles) */
   @Delete(':id')
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   delete(@Param('id') id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_role_delete' }, { id }),

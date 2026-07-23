@@ -1,9 +1,9 @@
 import {
   CanActivate,
   ExecutionContext,
-  Injectable,
-  Inject,
   ForbiddenException,
+  Inject,
+  Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ClientProxy } from '@nestjs/microservices';
@@ -15,7 +15,6 @@ import { ProjectPermission } from '@praxis/contracts';
 export class ProjectPermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Inject('ROLES_SERVICE') private readonly rolesClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
@@ -25,30 +24,26 @@ export class ProjectPermissionGuard implements CanActivate {
       context.getHandler(),
     );
 
-    // Si no se requiere permiso específico, por defecto permitimos.
-    if (!requiredPermission) {
-      return true;
-    }
+    // Si no se requiere permiso específico, deja pasar
+    if (!requiredPermission) return true;
 
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.userId;
-    if (!userId) {
-      return false;
-    }
+    if (!userId) return false;
 
-    // Intentar resolver projectId del request
-    let projectId = request.params.projectId || request.body.projectId;
+    // Resolver projectId desde params o body
+    let projectId: string | undefined =
+      request.params.projectId || request.body?.projectId;
 
-    // Si es ProjectsController, ":id" es el projectId
+    // Si es ProjectsController, ':id' es el projectId
     const controllerName = context.getClass().name;
     if (!projectId && controllerName === 'ProjectsController' && request.params.id) {
       projectId = request.params.id;
     }
 
-    // Si no tenemos projectId pero tenemos workspaceId o boardId en params,
-    // los resolvemos llamando a projects-service
-    const workspaceId = request.params.workspaceId;
-    const boardId = request.params.boardId;
+    // Si no tenemos projectId pero tenemos workspaceId o boardId, los resolvemos
+    const workspaceId: string | undefined = request.params.workspaceId;
+    const boardId: string | undefined = request.params.boardId;
 
     if (!projectId && (workspaceId || boardId)) {
       try {
@@ -59,37 +54,35 @@ export class ProjectPermissionGuard implements CanActivate {
           ),
         );
         projectId = res?.projectId;
-      } catch (err) {
-        throw new ForbiddenException('Resource not found or could not be resolved');
+      } catch {
+        throw new ForbiddenException('Recurso no encontrado o no se pudo resolver');
       }
     }
 
     if (!projectId) {
-      throw new ForbiddenException('Project context is missing');
+      throw new ForbiddenException('Contexto de proyecto no encontrado en la petición');
     }
 
-    // 1. Verificar si el usuario es el dueño del proyecto
+    // 1. Verificar si el usuario es el dueño del proyecto — siempre tiene acceso total
     try {
       const project = await firstValueFrom(
         this.projectsClient.send({ cmd: 'project_find_one' }, { id: projectId }),
       );
-      if (project && project.ownerId === userId) {
-        return true; // El dueño siempre tiene acceso total
-      }
-    } catch (err) {
-      // Si no se encuentra el proyecto o falla, continuamos con la validación de roles-service
+      if (project && project.ownerId === userId) return true;
+    } catch {
+      // Si no se encuentra el proyecto, continuar con la verificación de permisos
     }
 
-    // 2. Verificar permisos en el roles-service
+    // 2. Consultar projects-service por el permiso granular
     try {
-      const { hasAccess } = await firstValueFrom(
-        this.rolesClient.send(
-          { cmd: 'project_access_check' },
+      const { allowed } = await firstValueFrom(
+        this.projectsClient.send(
+          { cmd: 'project_check_permission' },
           { userId, projectId, permission: requiredPermission },
         ),
       );
-      return hasAccess;
-    } catch (err) {
+      return !!allowed;
+    } catch {
       return false;
     }
   }

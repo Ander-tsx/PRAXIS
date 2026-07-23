@@ -1,7 +1,7 @@
 {
-  "name": "@praxis/roles-service",
+  "name": "@praxis/permissions-service",
   "version": "0.0.1",
-  "description": "Roles microservice — global roles and project-view access",
+  "description": "Permissions microservice — global roles management",
   "author": "",
   "private": true,
   "license": "UNLICENSED",

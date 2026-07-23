@@ -302,7 +302,7 @@
       ]
     },
     {
-      "name": "Roles",
+      "name": "Permissions",
       "item": [
         {
           "name": "Find All",
@@ -310,12 +310,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/roles",
+              "raw": "{{base_url}}/permissions",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "roles"
+                "permissions"
               ]
             }
           },
@@ -341,12 +341,12 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/roles/assign",
+              "raw": "{{base_url}}/permissions/assign",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "roles",
+                "permissions",
                 "assign"
               ]
             }
@@ -373,12 +373,12 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/roles/revoke",
+              "raw": "{{base_url}}/permissions/revoke",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "roles",
+                "permissions",
                 "revoke"
               ]
             }
@@ -391,12 +391,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/roles/user/:userId",
+              "raw": "{{base_url}}/permissions/user/:userId",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "roles",
+                "permissions",
                 "user",
                 ":userId"
               ],
@@ -430,12 +430,12 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/roles/check",
+              "raw": "{{base_url}}/permissions/check",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "roles",
+                "permissions",
                 "check"
               ]
             }
@@ -1218,6 +1218,441 @@
                     {
                       "key": "id",
                       "value": "role-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "Tasks",
+          "item": [
+            {
+              "name": "Create Task",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"columnId\": \"column-uuid-here\",\n  \"title\": \"Nueva Tarea\",\n  \"description\": \"Descripción de la tarea\",\n  \"status\": \"TO_DO\",\n  \"assigneeId\": \"user-uuid-here\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"MEDIUM\",\n  \"order\": 0\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/tasks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "tasks"
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create Subtask",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"columnId\": \"column-uuid-here\",\n  \"title\": \"Nueva Subtarea\",\n  \"description\": \"Descripción de la subtarea\",\n  \"status\": \"TO_DO\",\n  \"parentTaskId\": \"parent-task-uuid-here\",\n  \"assigneeId\": \"user-uuid-here\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"LOW\",\n  \"order\": 0\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/tasks",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "tasks"
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find All",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId/tasks?columnId=column-uuid-here&page=1&limit=10",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId",
+                    "tasks"
+                  ],
+                  "query": [
+                    {
+                      "key": "columnId",
+                      "value": "column-uuid-here",
+                      "disabled": true
+                    },
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "disabled": true
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10",
+                      "disabled": true
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find One",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id?projectId=project-uuid-here",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id"
+                  ],
+                  "query": [
+                    {
+                      "key": "projectId",
+                      "value": "project-uuid-here"
+                    }
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"title\": \"Tarea Actualizada\",\n  \"description\": \"Nueva descripción\",\n  \"status\": \"IN_PROGRESS\",\n  \"columnId\": \"column-uuid-here\",\n  \"assigneeId\": \"user-uuid-here\",\n  \"dueDate\": \"2026-12-31T23:59:59.000Z\",\n  \"priority\": \"HIGH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Move",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"columnId\": \"new-column-uuid-here\",\n  \"status\": \"DONE\",\n  \"order\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id/move",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id",
+                    "move"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Assign",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"assigneeId\": \"user-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id/assign",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id",
+                    "assign"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/tasks/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Checklists",
+          "item": [
+            {
+              "name": "Create Item",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\",\n  \"text\": \"Nuevo ítem de checklist\",\n  \"order\": 0\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/tasks/:taskId/checklists",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "tasks",
+                    ":taskId",
+                    "checklists"
+                  ],
+                  "variable": [
+                    {
+                      "key": "taskId",
+                      "value": "task-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Toggle Item",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/checklists/:id/toggle",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checklists",
+                    ":id",
+                    "toggle"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "checklist-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectId\": \"project-uuid-here\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/checklists/:id",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "checklists",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "checklist-uuid-here"
                     }
                   ]
                 }

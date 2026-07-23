@@ -35,10 +35,10 @@ export class TasksController {
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
   ) {}
 
-  /** Crea una tarea en un board */
+  /** Crea una tarea en un board (requiere canCreateTask) */
   @Post('boards/:boardId/tasks')
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_CREATE_TASK)
   create(
     @Param('boardId') boardId: string,
     @Request() req: Express.Request,
@@ -57,10 +57,9 @@ export class TasksController {
     );
   }
 
-  /** Lista tareas de un board (soporta filtrar por columnId en query) */
+  /** Lista tareas de un board (la membresía basta) */
   @Get('boards/:boardId/tasks')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.VIEW)
   findAll(
     @Param('boardId') boardId: string,
     @Query('columnId') columnId?: string,
@@ -80,10 +79,9 @@ export class TasksController {
     );
   }
 
-  /** Detalle de una tarea */
+  /** Detalle de una tarea (la membresía basta) */
   @Get('tasks/:id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.VIEW)
   findOne(
     @Param('id') id: string,
     @Query('projectId') projectId: string, // Requerido para el guard
@@ -93,10 +91,10 @@ export class TasksController {
     );
   }
 
-  /** Actualiza una tarea */
+  /** Actualiza una tarea (requiere canEditTask) */
   @Patch('tasks/:id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   update(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -114,10 +112,10 @@ export class TasksController {
     );
   }
 
-  /** Mueve una tarea de columna u orden */
+  /** Mueve una tarea de columna u orden (requiere canEditTask) */
   @Post('tasks/:id/move')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   move(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -135,10 +133,10 @@ export class TasksController {
     );
   }
 
-  /** Elimina una tarea */
+  /** Elimina una tarea (requiere canDeleteTask) */
   @Delete('tasks/:id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_DELETE_TASK)
   delete(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -156,10 +154,10 @@ export class TasksController {
     );
   }
 
-  /** Asigna un encargado a una tarea */
+  /** Asigna un encargado a una tarea (requiere canEditTask) */
   @Post('tasks/:id/assign')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.EDIT)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   assign(
     @Param('id') id: string,
     @Request() req: Express.Request,
