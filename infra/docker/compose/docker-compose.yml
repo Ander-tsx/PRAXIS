@@ -4,16 +4,16 @@ services:
     container_name: praxis_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-root}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root}
-      POSTGRES_DB: ${POSTGRES_DB:-clase_grupo}
+      POSTGRES_USER: ${POSTGRES_USER:-praxis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-praxis123}
+      POSTGRES_DB: ${POSTGRES_DB:-praxis}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-praxis}"]
       interval: 10s
       timeout: 5s
       retries: 5
