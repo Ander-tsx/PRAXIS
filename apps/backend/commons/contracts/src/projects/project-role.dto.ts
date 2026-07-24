@@ -1,15 +1,18 @@
-import { IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class CreateProjectRoleDto {
   @IsUUID('4')
+  @IsNotEmpty()
   projectId: string;
 
   @IsString()
+  @IsNotEmpty()
   @MinLength(2)
   @MaxLength(50)
   name: string;
 
   @IsObject()
+  @IsNotEmpty()
   permissions: {
     canCreateBoard?: boolean;
     canEditBoard?: boolean;
@@ -27,6 +30,7 @@ export class CreateProjectRoleDto {
 
 export class UpdateProjectRoleDto {
   @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 
   @IsOptional()
@@ -42,16 +46,20 @@ export class UpdateProjectRoleDto {
 
 export class DeleteProjectRoleDto {
   @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 }
 
 export class CheckProjectPermissionDto {
   @IsUUID('4')
+  @IsNotEmpty()
   userId: string;
 
   @IsUUID('4')
+  @IsNotEmpty()
   projectId: string;
 
   @IsString()
+  @IsNotEmpty()
   permission: string;
 }

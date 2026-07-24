@@ -1,22 +1,26 @@
 import {
-  IsEnum,
-  IsISO8601,
-  IsOptional,
-  IsString,
-  IsUUID,
-  MaxLength,
-  MinLength,
+    IsEnum,
+    IsISO8601,
+    IsNotEmpty,
+    IsOptional,
+    IsString,
+    IsUUID,
+    MaxLength,
+    MinLength,
 } from 'class-validator';
 import { Priority } from './priority.enum';
 
 export class UpdateTaskDto {
   @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 
   @IsUUID('4')
+  @IsNotEmpty()
   requesterId: string;
 
   @IsUUID('4')
+  @IsNotEmpty()
   projectId: string;
 
   @IsOptional()

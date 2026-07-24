@@ -1,14 +1,17 @@
-import { IsIn, IsUUID } from 'class-validator';
+import { IsIn, IsNotEmpty, IsUUID } from 'class-validator';
 
 export type Role = 'admin' | 'user';
 
 export class CheckPermissionDto {
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   userId: string;
 
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   projectId: string;
 
   @IsIn(['admin', 'user'])
+  @IsNotEmpty()
   role: Role;
 }

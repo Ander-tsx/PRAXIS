@@ -1,17 +1,9 @@
-import { IsEmail, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class UpdateUserDto {
-    @IsUUID()
+    @IsUUID('4')
+    @IsNotEmpty()
     id: string;
-
-    // TODO
-    // @IsOptional()
-    // @IsUUID()
-    // roleId: string;
-
-    // @IsOptional()
-    // @IsString()
-    // status?: string;
 
     @IsOptional()
     @IsString()

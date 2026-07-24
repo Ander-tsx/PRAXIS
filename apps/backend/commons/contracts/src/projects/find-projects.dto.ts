@@ -1,5 +1,5 @@
-import { IsOptional, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptional, IsUUID, ValidateNested } from 'class-validator';
 import { QueryOptionsDto } from '../pagination.dto';
 
 export class FindProjectsDto {
@@ -8,6 +8,7 @@ export class FindProjectsDto {
   ownerId?: string;
 
   @IsOptional()
+  @ValidateNested()
   @Type(() => QueryOptionsDto)
   query?: QueryOptionsDto;
 }

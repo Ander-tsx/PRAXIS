@@ -1,16 +1,19 @@
-import { IsUUID } from 'class-validator';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 
 export class FindOneProjectDto {
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 }
 
 export class FindProjectsByOwnerDto {
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   ownerId: string;
 }
 
 export class DeleteProjectDto {
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 }

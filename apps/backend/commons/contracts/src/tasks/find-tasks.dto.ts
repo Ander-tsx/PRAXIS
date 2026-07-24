@@ -1,8 +1,10 @@
-import { IsOptional, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsUUID, ValidateNested } from 'class-validator';
 import { QueryOptionsDto } from '../pagination.dto';
 
 export class FindTasksDto {
   @IsUUID('4')
+  @IsNotEmpty()
   boardId: string;
 
   @IsOptional()
@@ -10,5 +12,7 @@ export class FindTasksDto {
   columnId?: string;
 
   @IsOptional()
+  @ValidateNested()
+  @Type(() => QueryOptionsDto)
   query?: QueryOptionsDto;
 }

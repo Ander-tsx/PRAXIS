@@ -1,6 +1,7 @@
-import { IsUUID, IsString } from 'class-validator';
+import { IsNotEmpty, IsUUID } from 'class-validator';
 
 export class LogoutDto {
   @IsUUID('4')
+  @IsNotEmpty()
   userId: string;
 }

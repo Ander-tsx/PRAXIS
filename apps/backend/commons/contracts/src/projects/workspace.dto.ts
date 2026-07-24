@@ -1,7 +1,8 @@
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateWorkspaceDto {
   @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 
   @IsOptional()
@@ -13,5 +14,6 @@ export class UpdateWorkspaceDto {
 
 export class DeleteWorkspaceDto {
   @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 }

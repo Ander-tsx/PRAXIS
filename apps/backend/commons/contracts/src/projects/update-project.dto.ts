@@ -1,7 +1,8 @@
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class UpdateProjectDto {
-  @IsUUID()
+  @IsUUID('4')
+  @IsNotEmpty()
   id: string;
 
   @IsOptional()
