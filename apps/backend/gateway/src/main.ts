@@ -3,7 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@praxis/observability';
 import { AppModule } from './app.module';
-import { RpcExceptionFilter } from './common/filters/rpc-exception.filter';
+import { StandardExceptionFilter } from './common/filters/standard-exception.filter';
+import { StandardResponseInterceptor } from './common/interceptors/standard-response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -21,7 +22,8 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new RpcExceptionFilter());
+  app.useGlobalInterceptors(new StandardResponseInterceptor());
+  app.useGlobalFilters(new StandardExceptionFilter());
 
   app.setGlobalPrefix('api');
 
