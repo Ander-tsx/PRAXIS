@@ -4,6 +4,7 @@ import {
   CreateBoardDto,
   UpdateBoardDto,
   DeleteBoardDto,
+  FindOneBoardDto,
 } from '@praxis/contracts';
 import { BoardsService } from './boards.service';
 
@@ -19,6 +20,11 @@ export class BoardsController {
   @MessagePattern({ cmd: 'board_find_all' })
   findBoards(@Payload() dto: { workspaceId: string }) {
     return this.boardsService.findBoards(dto.workspaceId);
+  }
+
+  @MessagePattern({ cmd: 'board_find_one' })
+  findOneBoard(@Payload() dto: FindOneBoardDto) {
+    return this.boardsService.findOneBoard(dto.id);
   }
 
   @MessagePattern({ cmd: 'board_update' })

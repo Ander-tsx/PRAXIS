@@ -4,6 +4,7 @@ import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
   DeleteWorkspaceDto,
+  FindOneWorkspaceDto,
 } from '@praxis/contracts';
 import { WorkspacesService } from './workspaces.service';
 
@@ -19,6 +20,11 @@ export class WorkspacesController {
   @MessagePattern({ cmd: 'workspace_find_all' })
   findWorkspaces(@Payload() dto: { projectId: string }) {
     return this.workspacesService.findWorkspaces(dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'workspace_find_one' })
+  findOneWorkspace(@Payload() dto: FindOneWorkspaceDto) {
+    return this.workspacesService.findOneWorkspace(dto.id);
   }
 
   @MessagePattern({ cmd: 'workspace_update' })

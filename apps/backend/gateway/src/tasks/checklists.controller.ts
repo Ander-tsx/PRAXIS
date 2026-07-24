@@ -23,14 +23,14 @@ import {
 } from '@praxis/contracts';
 
 @UseGuards(JwtGuard, ProjectPermissionGuard)
-@Controller()
+@Controller('tasks/:taskId/checklists')
 export class ChecklistsController {
   constructor(
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
   ) {}
 
   /** Agrega un ítem al checklist de una tarea */
-  @Post('tasks/:taskId/checklists')
+  @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   create(
@@ -51,10 +51,11 @@ export class ChecklistsController {
   }
 
   /** Alterna el estado completado de un ítem de checklist */
-  @Post('checklists/:id/toggle')
+  @Post(':id/toggle')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   toggle(
+    @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
     @Body() body: Omit<ToggleChecklistDto, 'id' | 'requesterId'>,
@@ -72,10 +73,11 @@ export class ChecklistsController {
   }
 
   /** Elimina un ítem del checklist */
-  @Delete('checklists/:id')
+  @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   delete(
+    @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
     @Body() body: Omit<DeleteChecklistDto, 'id' | 'requesterId'>,

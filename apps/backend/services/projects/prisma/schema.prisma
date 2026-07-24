@@ -11,7 +11,7 @@ datasource db {
 
 model Project {
   id          String          @id @default(uuid())
-  name        String
+  name        String          @unique
   description String?
   ownerId     String
   workspaces  Workspace[]
@@ -32,6 +32,7 @@ model Workspace {
   boards    Board[]
   createdAt DateTime @default(now())
 
+  @@unique([projectId, name])
   @@schema("projects")
   @@map("workspaces")
 }

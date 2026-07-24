@@ -1,5 +1,10 @@
 import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
+export class FindOneWorkspaceDto {
+  @IsUUID('4')
+  id: string;
+}
+
 export class UpdateWorkspaceDto {
   @IsUUID('4')
   id: string;

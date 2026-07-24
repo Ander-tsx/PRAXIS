@@ -45,6 +45,25 @@ export class WorkspacesService {
     return workspaces;
   }
 
+  async findOneWorkspace(id: string) {
+    const cacheKey = `workspace:${id}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached;
+
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id },
+      include: { boards: { include: { columns: { orderBy: { order: 'asc' } } } } },
+    });
+
+    if (!workspace) {
+      throw new RpcException({ statusCode: 404, message: 'Workspace no encontrado' });
+    }
+
+    await this.redis.set(cacheKey, workspace, LIST_CACHE_TTL);
+    return workspace;
+  }
+
+
   async updateWorkspace(dto: UpdateWorkspaceDto) {
     const workspace = await this.prisma.workspace.findUnique({ where: { id: dto.id } });
     if (!workspace) {

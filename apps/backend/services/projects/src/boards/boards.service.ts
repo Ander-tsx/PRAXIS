@@ -46,6 +46,25 @@ export class BoardsService {
     return boards;
   }
 
+  async findOneBoard(id: string) {
+    const cacheKey = `board:${id}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached;
+
+    const board = await this.prisma.board.findUnique({
+      where: { id },
+      include: { columns: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!board) {
+      throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
+    }
+
+    await this.redis.set(cacheKey, board, LIST_CACHE_TTL);
+    return board;
+  }
+
+
   async updateBoard(dto: UpdateBoardDto) {
     const board = await this.prisma.board.findUnique({ where: { id: dto.id } });
     if (!board) {

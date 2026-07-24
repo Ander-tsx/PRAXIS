@@ -22,12 +22,23 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
+// ─── Colección: workspaces de un proyecto ───────────────────────────────────
+
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/workspaces')
 export class WorkspacesController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
+
+  /** Lista todos los workspaces de un proyecto (la membresía basta) */
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  findAll(@Param('projectId') projectId: string) {
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'workspace_find_all' }, { projectId }),
+    );
+  }
 
   /** Crea un workspace dentro de un proyecto (requiere canEditBoard) */
   @Post()
@@ -41,34 +52,44 @@ export class WorkspacesController {
       this.projectsClient.send({ cmd: 'workspace_create' }, { projectId, ...body }),
     );
   }
+}
 
-  /** Lista todos los workspaces de un proyecto (la membresía basta) */
-  @Get()
+// ─── Elemento individual ────────────────────────────────────────────────────
+
+@UseGuards(JwtGuard, ProjectPermissionGuard)
+@Controller('workspaces')
+export class WorkspacesResourceController {
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+  ) {}
+
+  /** Detalle de un workspace por ID (la membresía basta) */
+  @Get(':workspaceId')
   @HttpCode(HttpStatus.OK)
-  findAll(@Param('projectId') projectId: string) {
+  findOne(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'workspace_find_all' }, { projectId }),
+      this.projectsClient.send({ cmd: 'workspace_find_one' }, { id: workspaceId }),
     );
   }
 
   /** Actualiza un workspace (requiere canEditBoard) */
-  @Patch(':id')
+  @Patch(':workspaceId')
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   update(
-    @Param('id') id: string,
+    @Param('workspaceId') workspaceId: string,
     @Body() body: Omit<UpdateWorkspaceDto, 'id'>,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'workspace_update' }, { id, ...body }),
+      this.projectsClient.send({ cmd: 'workspace_update' }, { id: workspaceId, ...body }),
     );
   }
 
   /** Elimina un workspace (requiere canDeleteBoard) */
-  @Delete(':id')
+  @Delete(':workspaceId')
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
-  delete(@Param('id') id: string) {
+  delete(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'workspace_delete' }, { id }),
+      this.projectsClient.send({ cmd: 'workspace_delete' }, { id: workspaceId }),
     );
   }
 }

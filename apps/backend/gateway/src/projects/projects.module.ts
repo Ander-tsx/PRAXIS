@@ -3,11 +3,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { ProjectsController } from './projects.controller';
-import { WorkspacesController } from './workspaces.controller';
-import { BoardsController } from './boards.controller';
+import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
+import { BoardsController, BoardsResourceController } from './boards.controller';
 import { ColumnsController } from './columns.controller';
 import { MembersController } from './members.controller';
 import { ProjectRolesController } from './project-roles.controller';
+
 
 @Module({
   imports: [
@@ -25,12 +26,26 @@ import { ProjectRolesController } from './project-roles.controller';
           },
         }),
       },
+      {
+        name: 'TASKS_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('TASKS_SERVICE_HOST'),
+            port: config.get<number>('TASKS_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [
     ProjectsController,
     WorkspacesController,
+    WorkspacesResourceController,
     BoardsController,
+    BoardsResourceController,
     ColumnsController,
     MembersController,
     ProjectRolesController,

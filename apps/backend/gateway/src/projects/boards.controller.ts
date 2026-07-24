@@ -22,6 +22,8 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
+// ─── Colección: boards de un workspace ─────────────────────────────────────
+
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('workspaces/:workspaceId/boards')
 export class BoardsController {
@@ -50,25 +52,44 @@ export class BoardsController {
       this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
     );
   }
+}
+
+// ─── Elemento individual ────────────────────────────────────────────────────
+
+@UseGuards(JwtGuard, ProjectPermissionGuard)
+@Controller('boards')
+export class BoardsResourceController {
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+  ) {}
+
+  /** Detalle de un board por ID (la membresía basta) */
+  @Get(':boardId')
+  @HttpCode(HttpStatus.OK)
+  findOne(@Param('boardId') boardId: string) {
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'board_find_one' }, { id: boardId }),
+    );
+  }
 
   /** Actualiza un board (requiere canEditBoard) */
-  @Patch(':id')
+  @Patch(':boardId')
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   update(
-    @Param('id') id: string,
+    @Param('boardId') boardId: string,
     @Body() body: Omit<UpdateBoardDto, 'id'>,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'board_update' }, { id, ...body }),
+      this.projectsClient.send({ cmd: 'board_update' }, { id: boardId, ...body }),
     );
   }
 
   /** Elimina un board (requiere canDeleteBoard) */
-  @Delete(':id')
+  @Delete(':boardId')
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
-  delete(@Param('id') id: string) {
+  delete(@Param('boardId') boardId: string) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'board_delete' }, { id }),
+      this.projectsClient.send({ cmd: 'board_delete' }, { id: boardId }),
     );
   }
 }

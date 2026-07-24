@@ -84,7 +84,6 @@ export class TasksController {
   @HttpCode(HttpStatus.OK)
   findOne(
     @Param('id') id: string,
-    @Query('projectId') projectId: string, // Requerido para el guard
   ) {
     return firstValueFrom(
       this.tasksClient.send({ cmd: 'task_find_one' }, { id }),
