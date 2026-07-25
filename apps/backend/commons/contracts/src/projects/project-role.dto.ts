@@ -1,4 +1,5 @@
 import { IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProjectRoleDto {
   @IsUUID('4')
@@ -9,6 +10,11 @@ export class CreateProjectRoleDto {
   @MaxLength(50)
   name: string;
 
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'boolean' },
+    description: 'Diccionario de permisos asignados al rol',
+  })
   @IsObject()
   permissions: {
     canCreateBoard?: boolean;
@@ -29,12 +35,18 @@ export class UpdateProjectRoleDto {
   @IsUUID('4')
   id: string;
 
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(50)
   name?: string;
 
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'boolean' },
+    description: 'Diccionario de permisos del rol',
+  })
   @IsOptional()
   @IsObject()
   permissions?: Record<string, boolean>;

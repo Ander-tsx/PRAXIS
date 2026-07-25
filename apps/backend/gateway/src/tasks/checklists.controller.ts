@@ -11,6 +11,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
@@ -22,6 +28,8 @@ import {
   ToggleChecklistDto,
 } from '@praxis/contracts';
 
+@ApiTags('Task Checklists')
+@ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('tasks/:taskId/checklists')
 export class ChecklistsController {
@@ -33,6 +41,8 @@ export class ChecklistsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Agrega un ítem al checklist de una tarea' })
+  @ApiResponse({ status: 201, description: 'Ítem de checklist creado' })
   create(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
@@ -54,6 +64,8 @@ export class ChecklistsController {
   @Post(':id/toggle')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Alterna el estado completado de un ítem' })
+  @ApiResponse({ status: 200, description: 'Estado de ítem cambiado' })
   toggle(
     @Param('taskId') taskId: string,
     @Param('id') id: string,
@@ -76,6 +88,8 @@ export class ChecklistsController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Elimina un ítem del checklist' })
+  @ApiResponse({ status: 200, description: 'Ítem eliminado' })
   delete(
     @Param('taskId') taskId: string,
     @Param('id') id: string,

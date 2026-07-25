@@ -13,6 +13,12 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
   CreateWorkspaceDto,
   UpdateWorkspaceDto,
   ProjectPermission,
@@ -24,6 +30,8 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 
 // ─── Colección: workspaces de un proyecto ───────────────────────────────────
 
+@ApiTags('Workspaces')
+@ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/workspaces')
 export class WorkspacesController {
@@ -34,6 +42,8 @@ export class WorkspacesController {
   /** Lista todos los workspaces de un proyecto (la membresía basta) */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Lista todos los workspaces de un proyecto' })
+  @ApiResponse({ status: 200, description: 'Lista de workspaces recuperada' })
   findAll(@Param('projectId') projectId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_find_all' }, { projectId }),
@@ -44,6 +54,8 @@ export class WorkspacesController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
+  @ApiOperation({ summary: 'Crea un workspace dentro de un proyecto' })
+  @ApiResponse({ status: 201, description: 'Workspace creado exitosamente' })
   create(
     @Param('projectId') projectId: string,
     @Body() body: Omit<CreateWorkspaceDto, 'projectId'>,
@@ -56,6 +68,8 @@ export class WorkspacesController {
 
 // ─── Elemento individual ────────────────────────────────────────────────────
 
+@ApiTags('Workspaces')
+@ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('workspaces')
 export class WorkspacesResourceController {
@@ -66,6 +80,8 @@ export class WorkspacesResourceController {
   /** Detalle de un workspace por ID (la membresía basta) */
   @Get(':workspaceId')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Detalle de un workspace por ID' })
+  @ApiResponse({ status: 200, description: 'Detalle del workspace recuperado' })
   findOne(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_find_one' }, { id: workspaceId }),
@@ -75,6 +91,8 @@ export class WorkspacesResourceController {
   /** Actualiza un workspace (requiere canEditBoard) */
   @Patch(':workspaceId')
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
+  @ApiOperation({ summary: 'Actualiza un workspace' })
+  @ApiResponse({ status: 200, description: 'Workspace actualizado exitosamente' })
   update(
     @Param('workspaceId') workspaceId: string,
     @Body() body: Omit<UpdateWorkspaceDto, 'id'>,
@@ -87,6 +105,8 @@ export class WorkspacesResourceController {
   /** Elimina un workspace (requiere canDeleteBoard) */
   @Delete(':workspaceId')
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
+  @ApiOperation({ summary: 'Elimina un workspace' })
+  @ApiResponse({ status: 200, description: 'Workspace eliminado exitosamente' })
   delete(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_delete' }, { id: workspaceId }),

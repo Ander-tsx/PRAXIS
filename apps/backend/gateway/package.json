@@ -28,6 +28,7 @@
     "@nestjs/microservices": "^11.1.27",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.0.0",
     "@nestjs/throttler": "^6.5.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",

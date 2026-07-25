@@ -1,6 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from '@praxis/observability';
 import { AppModule } from './app.module';
 import { StandardExceptionFilter } from './common/filters/standard-exception.filter';
@@ -27,7 +28,18 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('PRAXIS API Gateway')
+    .setDescription('Documentación de la API pública de la plataforma PRAXIS')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
+  const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, documentFactory);
+
   await app.listen(port);
   app.get(Logger).log(`Gateway running on http://localhost:${port}/api`);
+  app.get(Logger).log(`Swagger docs available at http://localhost:${port}/api/docs`);
 }
 bootstrap();
