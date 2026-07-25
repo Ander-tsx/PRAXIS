@@ -36,7 +36,7 @@ Crea todas las tablas de la base de datos:
 pnpm prisma:reset
 ```
 
-Ejecuta los seeds iniciales:
+Ejecuta los seeds iniciales (crea roles, usuario admin, proyecto demo y tareas):
 
 ```bash
 pnpm prisma:seed
@@ -46,12 +46,6 @@ Compila todos los paquetes del monorepo:
 
 ```bash
 pnpm build
-```
-
-Corre el seed inicial (crea el usuario admin y roles base):
-
-```bash
-pnpm seed:credentials
 ```
 
 ## Desarrollo
@@ -86,7 +80,21 @@ pnpm dev
 | `pnpm prisma:seed` | Ejecuta los seeds de todos los microservicios en el orden correcto. |
 | `pnpm prisma:deploy` | Aplica las migraciones existentes sin crear nuevas (ideal para producción). |
 
-Si ya tenias creado el contenedor y tienes que hacer docker compose down -v y despues docker compose up tienes que volver a hacer prisma:reset y prisma:seed
+## Seeders
+
+El comando `pnpm prisma:seed` ejecuta los seeds de los 4 microservicios en orden:
+
+| Orden | Servicio | Qué crea |
+|-------|----------|----------|
+| 1 | **permissions** | Roles globales: `Admin`, `User`. Asigna `Admin` al usuario seed. |
+| 2 | **credentials** | Credential `admin@praxis.dev` + perfil de usuario `Admin Praxis`. |
+| 3 | **projects** | Proyecto "PRAXIS Demo" con workspace, board, 4 columnas kanban, roles de proyecto (Manager, Developer) y admin como miembro. |
+| 4 | **tasks** | 3 tareas de ejemplo en distintas columnas + checklists. |
+
+**Notas:**
+- Los seeds son **idempotentes** (usan `upsert`), se pueden correr múltiples veces sin duplicados.
+- Cada seed es **autónomo** y compila independientemente — se puede desplegar en distintas máquinas.
+- Si haces `docker compose down -v` y luego `docker compose up`, debes volver a correr `pnpm prisma:reset` y `pnpm prisma:seed`.
 
 ## Estructura
 

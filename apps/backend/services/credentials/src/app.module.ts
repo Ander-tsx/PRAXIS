@@ -10,7 +10,7 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.register('credentials-service'),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

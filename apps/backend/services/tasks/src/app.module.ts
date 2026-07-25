@@ -9,7 +9,7 @@ import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.register('tasks-service'),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
