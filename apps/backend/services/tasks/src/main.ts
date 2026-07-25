@@ -2,12 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@praxis/observability';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const config = app.get(ConfigService);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
+  app.useLogger(app.get(Logger));
+
+  const config = app.get(ConfigService);
   const tcpPort = config.getOrThrow<number>('TCP_PORT');
 
   app.connectMicroservice<MicroserviceOptions>({
@@ -28,6 +31,8 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
   await app.init();
+
+  app.get(Logger).log(`tasks-service listening on TCP :${tcpPort}`);
 }
 
 bootstrap();

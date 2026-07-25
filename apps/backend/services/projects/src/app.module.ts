@@ -14,7 +14,7 @@ import { ProjectRolesModule } from './project-roles/project-roles.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.register('projects-service'),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

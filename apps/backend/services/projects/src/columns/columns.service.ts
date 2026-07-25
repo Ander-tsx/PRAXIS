@@ -15,7 +15,10 @@ export class ColumnsService {
   ) {}
 
   async createColumn(dto: CreateColumnDto) {
-    const board = await this.prisma.board.findUnique({ where: { id: dto.boardId } });
+    const board = await this.prisma.board.findUnique({
+      where: { id: dto.boardId },
+      include: { workspace: true },
+    });
     if (!board) {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
@@ -24,12 +27,20 @@ export class ColumnsService {
       data: { name: dto.name, order: dto.order, boardId: dto.boardId },
     });
 
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await Promise.all([
+      this.redis.del(`board:${dto.boardId}`),
+      this.redis.del(`boards:workspace:${board.workspaceId}`),
+      this.redis.del(`workspaces:project:${board.workspace.projectId}`),
+      this.redis.del(`project:${board.workspace.projectId}`),
+    ]);
     return column;
   }
 
   async reorderColumns(dto: ReorderColumnsDto) {
-    const board = await this.prisma.board.findUnique({ where: { id: dto.boardId } });
+    const board = await this.prisma.board.findUnique({
+      where: { id: dto.boardId },
+      include: { workspace: true },
+    });
     if (!board) {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
@@ -42,21 +53,31 @@ export class ColumnsService {
     );
 
     const columns = await this.prisma.$transaction(updates);
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await Promise.all([
+      this.redis.del(`board:${dto.boardId}`),
+      this.redis.del(`boards:workspace:${board.workspaceId}`),
+      this.redis.del(`workspaces:project:${board.workspace.projectId}`),
+      this.redis.del(`project:${board.workspace.projectId}`),
+    ]);
     return columns;
   }
 
   async deleteColumn(id: string) {
     const column = await this.prisma.boardColumn.findUnique({
       where: { id },
-      include: { board: true },
+      include: { board: { include: { workspace: true } } },
     });
     if (!column) {
       throw new RpcException({ statusCode: 404, message: 'Columna no encontrada' });
     }
 
     await this.prisma.boardColumn.delete({ where: { id } });
-    await this.redis.del(`boards:workspace:${column.board.workspaceId}`);
+    await Promise.all([
+      this.redis.del(`board:${column.boardId}`),
+      this.redis.del(`boards:workspace:${column.board.workspaceId}`),
+      this.redis.del(`workspaces:project:${column.board.workspace.projectId}`),
+      this.redis.del(`project:${column.board.workspace.projectId}`),
+    ]);
     return { success: true };
   }
 }

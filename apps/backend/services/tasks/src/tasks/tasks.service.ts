@@ -291,7 +291,11 @@ export class TasksService {
       data: { completed: !item.completed },
     });
 
-    await this.redis.del(`task:${item.taskId}`);
+    const task = await this.prisma.task.findUnique({ where: { id: item.taskId } });
+    await Promise.all([
+      this.redis.del(`task:${item.taskId}`),
+      ...(task ? [this.redis.del(`tasks:board:${task.boardId}`)] : []),
+    ]);
     return updated;
   }
 
@@ -303,8 +307,13 @@ export class TasksService {
       throw new RpcException({ statusCode: 404, message: 'Ítem de checklist no encontrado' });
     }
 
+    const task = await this.prisma.task.findUnique({ where: { id: item.taskId } });
+
     await this.prisma.checklist.delete({ where: { id: dto.id } });
-    await this.redis.del(`task:${item.taskId}`);
+    await Promise.all([
+      this.redis.del(`task:${item.taskId}`),
+      ...(task ? [this.redis.del(`tasks:board:${task.boardId}`)] : []),
+    ]);
 
     return { success: true };
   }

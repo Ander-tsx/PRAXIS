@@ -75,8 +75,11 @@ export class WorkspacesService {
       data: { ...(dto.name !== undefined && { name: dto.name }) },
     });
 
-    await this.redis.del(`workspaces:project:${workspace.projectId}`);
-    await this.redis.del(`project:${workspace.projectId}`);
+    await Promise.all([
+      this.redis.del(`workspace:${dto.id}`),
+      this.redis.del(`workspaces:project:${workspace.projectId}`),
+      this.redis.del(`project:${workspace.projectId}`),
+    ]);
     return updated;
   }
 
@@ -87,8 +90,11 @@ export class WorkspacesService {
     }
 
     await this.prisma.workspace.delete({ where: { id } });
-    await this.redis.del(`workspaces:project:${workspace.projectId}`);
-    await this.redis.del(`project:${workspace.projectId}`);
+    await Promise.all([
+      this.redis.del(`workspace:${id}`),
+      this.redis.del(`workspaces:project:${workspace.projectId}`),
+      this.redis.del(`project:${workspace.projectId}`),
+    ]);
     return { success: true };
   }
 }

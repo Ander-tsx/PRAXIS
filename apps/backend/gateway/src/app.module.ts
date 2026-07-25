@@ -13,7 +13,7 @@ import { TasksModule } from './tasks/tasks.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.register('gateway'),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envValidationSchema,

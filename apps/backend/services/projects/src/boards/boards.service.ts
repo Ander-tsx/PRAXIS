@@ -66,7 +66,10 @@ export class BoardsService {
 
 
   async updateBoard(dto: UpdateBoardDto) {
-    const board = await this.prisma.board.findUnique({ where: { id: dto.id } });
+    const board = await this.prisma.board.findUnique({
+      where: { id: dto.id },
+      include: { workspace: true },
+    });
     if (!board) {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
@@ -76,18 +79,31 @@ export class BoardsService {
       data:  { name: dto.name },
     });
 
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await Promise.all([
+      this.redis.del(`board:${dto.id}`),
+      this.redis.del(`boards:workspace:${board.workspaceId}`),
+      this.redis.del(`workspaces:project:${board.workspace.projectId}`),
+      this.redis.del(`project:${board.workspace.projectId}`),
+    ]);
     return updated;
   }
 
   async deleteBoard(id: string) {
-    const board = await this.prisma.board.findUnique({ where: { id } });
+    const board = await this.prisma.board.findUnique({
+      where: { id },
+      include: { workspace: true },
+    });
     if (!board) {
       throw new RpcException({ statusCode: 404, message: 'Board no encontrado' });
     }
 
     await this.prisma.board.delete({ where: { id } });
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await Promise.all([
+      this.redis.del(`board:${id}`),
+      this.redis.del(`boards:workspace:${board.workspaceId}`),
+      this.redis.del(`workspaces:project:${board.workspace.projectId}`),
+      this.redis.del(`project:${board.workspace.projectId}`),
+    ]);
     return { success: true };
   }
 }
