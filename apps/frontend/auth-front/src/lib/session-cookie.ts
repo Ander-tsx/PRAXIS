@@ -1,15 +1,15 @@
-import { type AuthTokens, JwtClaims } from '@praxis/commons/api';
+import type { AuthTokens } from '@praxis/commons/api';
+import {
+  ACCESS_TOKEN_FALLBACK_MAX_AGE,
+  REFRESH_COOKIE,
+  REFRESH_TOKEN_FALLBACK_MAX_AGE,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+} from '@praxis/commons/auth';
 import { decodeJwt } from 'jose';
 import type { NextResponse } from 'next/server';
 
-export const SESSION_COOKIE = 'praxis_session';
-export const REFRESH_COOKIE = 'praxis_refresh';
-
-/** Fallback conservador si el token no declara `exp` o no se puede decodificar. */
-const FALLBACK_MAX_AGE = 60 * 60 * 24; // 24 h
-
-/** El backend firma refresh tokens con REFRESH_TOKEN_EXPIRES_IN=7d. */
-const REFRESH_FALLBACK_MAX_AGE = 60 * 60 * 24 * 7;
+export { SESSION_COOKIE, REFRESH_COOKIE };
 
 /**
  * maxAge derivado del `exp` real del JWT, para que la cookie y el token
@@ -29,44 +29,26 @@ function maxAgeFromJwt(token: string, fallback: number): number {
 
 /**
  * Escribe las cookies de sesión sobre la respuesta.
- *
- * - httpOnly: el token nunca es accesible desde el JS del cliente
- * - secure en producción
- * - sameSite=lax: protección CSRF básica sin romper la navegación entre zonas
- * - path='/': visible en todas las zonas del multi-zone, no solo bajo /auth
+ * Los atributos (httpOnly, secure, sameSite, path) viven en
+ * @praxis/commons/auth para que todas las zonas usen exactamente los mismos.
  */
 export function setSessionCookies(response: NextResponse, tokens: AuthTokens): void {
-  const isProduction = process.env.NODE_ENV === 'production';
+  response.cookies.set(
+    SESSION_COOKIE,
+    tokens.accessToken,
+    sessionCookieOptions(maxAgeFromJwt(tokens.accessToken, ACCESS_TOKEN_FALLBACK_MAX_AGE)),
+  );
 
-  const base = {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: 'lax',
-    path: '/',
-  } as const;
-
-  response.cookies.set(SESSION_COOKIE, tokens.accessToken, {
-    ...base,
-    maxAge: maxAgeFromJwt(tokens.accessToken, FALLBACK_MAX_AGE),
-  });
-
-  response.cookies.set(REFRESH_COOKIE, tokens.refreshToken, {
-    ...base,
-    maxAge: maxAgeFromJwt(tokens.refreshToken, REFRESH_FALLBACK_MAX_AGE),
-  });
+  response.cookies.set(
+    REFRESH_COOKIE,
+    tokens.refreshToken,
+    sessionCookieOptions(maxAgeFromJwt(tokens.refreshToken, REFRESH_TOKEN_FALLBACK_MAX_AGE)),
+  );
 }
 
 /** Borra ambas cookies de sesión. */
 export function clearSessionCookies(response: NextResponse): void {
-  const isProduction = process.env.NODE_ENV === 'production';
-
   for (const name of [SESSION_COOKIE, REFRESH_COOKIE]) {
-    response.cookies.set(name, '', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    });
+    response.cookies.set(name, '', sessionCookieOptions(0));
   }
 }
