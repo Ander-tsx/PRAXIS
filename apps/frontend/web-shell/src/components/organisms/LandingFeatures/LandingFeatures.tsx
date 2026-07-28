@@ -92,9 +92,12 @@ function KanbanScene(active: boolean) {
           {ci === 1 && (
             <div
               style={{
+                /* Solo horizontal: la tarjeta ya ocupa la segunda ranura de su
+                   columna, así que al desplazarse un ancho exacto aterriza justo
+                   bajo "Autenticación", sin descuadrar el hueco. */
                 transform: active
-                  ? 'translate(calc(100% + 10px), 26px) rotate(0deg) scale(1)'
-                  : 'translate(0, 0) rotate(0deg) scale(1)',
+                  ? 'translateX(calc(100% + 10px))'
+                  : 'translateX(0)',
                 filter: active
                   ? 'drop-shadow(0 10px 16px rgba(0,0,0,0.55))'
                   : 'drop-shadow(0 0 0 rgba(0,0,0,0))',
@@ -112,38 +115,37 @@ function KanbanScene(active: boolean) {
 }
 
 /* ── 2. Permisos por rol ───────────────────────────────────────
-   El rol activo cambia y la retícula de los 10 permisos del proyecto
-   se enciende en cascada: un rol es un conjunto de permisos, no
-   una fila de interruptores sueltos. */
-const PROJECT_PERMISSIONS = [
-  { code: 'Tarea+', full: 'canCreateTask' },
-  { code: 'Tarea~', full: 'canEditTask' },
-  { code: 'Tarea−', full: 'canDeleteTask' },
-  { code: 'Tabl+', full: 'canCreateBoard' },
-  { code: 'Tabl~', full: 'canEditBoard' },
-  { code: 'Tabl−', full: 'canDeleteBoard' },
-  { code: 'Col+', full: 'canCreateColumn' },
-  { code: 'Col−', full: 'canDeleteColumn' },
-  { code: 'Miemb', full: 'canManageMembers' },
-  { code: 'Roles', full: 'canManageRoles' },
+   Agrupado por recurso y acción, en lenguaje llano: un rol es un
+   conjunto de permisos, no una fila de interruptores sueltos.
+   Las cuatro filas cubren los 10 permisos reales de ProjectPermission. */
+const PERMISSION_GROUPS = [
+  { resource: 'Tareas', actions: ['Crear', 'Editar', 'Eliminar'] },
+  { resource: 'Tableros', actions: ['Crear', 'Editar', 'Eliminar'] },
+  { resource: 'Columnas', actions: ['Crear', 'Eliminar'] },
+  { resource: 'Equipo', actions: ['Invitar', 'Definir roles'] },
 ];
 
-/** Índices que tiene cada rol; el hover pasa de Desarrollo a Scrum Master. */
+/** Permisos concedidos, como "recurso:acción". El hover pasa de Desarrollo a Scrum Master. */
 const ROLE_GRANTS = {
-  desarrollo: [0, 1, 4, 6],
-  scrumMaster: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  desarrollo: new Set(['Tareas:Crear', 'Tareas:Editar', 'Tableros:Editar', 'Columnas:Crear']),
+  scrumMaster: new Set(
+    PERMISSION_GROUPS.flatMap((g) => g.actions.map((a) => `${g.resource}:${a}`)),
+  ),
 };
 
 function PermissionsScene(active: boolean) {
   const granted = active ? ROLE_GRANTS.scrumMaster : ROLE_GRANTS.desarrollo;
+  const total = ROLE_GRANTS.scrumMaster.size;
   const roles = [
     { name: 'Desarrollo', on: !active },
     { name: 'Scrum Master', on: active },
   ];
 
+  let tileIndex = -1;
+
   return (
-    <div className="flex h-full flex-col justify-center gap-2.5 px-3.5">
-      {/* Selector de rol */}
+    <div className="flex h-full flex-col justify-center gap-2 px-3.5 py-3">
+      {/* Rol activo */}
       <div className="flex items-center gap-1.5">
         {roles.map((role) => (
           <span
@@ -159,35 +161,42 @@ function PermissionsScene(active: boolean) {
             {role.name}
           </span>
         ))}
-        <span
-          className="ml-auto font-mono text-[0.52rem]"
-          style={{ color: 'rgba(255,255,255,0.35)', transition: 'color 320ms ease' }}
-        >
-          {granted.length}/10
+        <span className="ml-auto font-mono text-[0.52rem]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          {granted.size}/{total}
         </span>
       </div>
 
-      {/* Retícula de permisos */}
-      <div className="grid grid-cols-5 gap-1">
-        {PROJECT_PERMISSIONS.map((permission, i) => {
-          const on = granted.includes(i);
-          return (
+      {/* Permisos agrupados por recurso */}
+      <div className="flex flex-col gap-1">
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.resource} className="flex items-center gap-1.5">
             <span
-              key={permission.full}
-              title={permission.full}
-              className="flex items-center justify-center rounded-md py-1 font-sans text-[0.45rem] font-medium"
-              style={{
-                background: on ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.035)',
-                border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.06)'}`,
-                color: on ? '#ddd6fe' : 'rgba(255,255,255,0.22)',
-                transform: on ? 'scale(1)' : 'scale(0.94)',
-                transition: `all 300ms ${EASE} ${i * 45}ms`,
-              }}
+              className="w-14 flex-shrink-0 font-sans text-[0.55rem] font-medium"
+              style={{ color: 'rgba(255,255,255,0.45)' }}
             >
-              {permission.code}
+              {group.resource}
             </span>
-          );
-        })}
+
+            {group.actions.map((action) => {
+              tileIndex += 1;
+              const on = granted.has(`${group.resource}:${action}`);
+              return (
+                <span
+                  key={action}
+                  className="flex-1 rounded-md py-[3px] text-center font-sans text-[0.5rem] font-medium"
+                  style={{
+                    background: on ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.035)',
+                    border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.06)'}`,
+                    color: on ? '#ddd6fe' : 'rgba(255,255,255,0.25)',
+                    transition: `all 280ms ${EASE} ${tileIndex * 40}ms`,
+                  }}
+                >
+                  {action}
+                </span>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -228,8 +237,12 @@ function HierarchyScene(active: boolean) {
             fill="none"
             stroke={active ? 'rgba(129,140,248,0.65)' : 'rgba(129,140,248,0.2)'}
             strokeWidth="1.2"
-            strokeDasharray="60"
-            strokeDashoffset={active ? 0 : 60}
+            /* pathLength normaliza cada rama a 1 con independencia de su
+               longitud real: sin esto, un dasharray fijo se repetía en las
+               ramas largas y la línea se cortaba antes de llegar al nodo. */
+            pathLength={1}
+            strokeDasharray="1"
+            strokeDashoffset={active ? 0 : 1}
             style={{
               transition: `stroke-dashoffset 520ms ${EASE} ${i < 2 ? 0 : 220}ms, stroke 400ms ease`,
             }}
