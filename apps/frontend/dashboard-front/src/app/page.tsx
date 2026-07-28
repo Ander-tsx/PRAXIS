@@ -1,0 +1,86 @@
+import { APP_NAV_ITEMS, AppLayout, type Paginated } from '@praxis/commons';
+import { createServerApiClient } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
+import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
+import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
+import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
+import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
+import { LogoutButton } from '@/components/organisms/LogoutButton';
+import { ProjectList } from '@/components/organisms/ProjectList';
+import { loadCurrentUser } from '@/lib/current-user';
+import { type Project, displayName } from '@/lib/domain';
+
+export const metadata: Metadata = {
+  title: 'Panel',
+};
+
+/**
+ * Panel del área privada.
+ *
+ * Server Component: aquí vive todo el fetch. Los organismos reciben datos por
+ * props y no saben de dónde salen.
+ *
+ * La ruta la protege `src/proxy.ts`; `loadCurrentUser` vuelve a exigir sesión
+ * porque la autorización nunca debe depender de una sola capa.
+ */
+export default async function DashboardPage() {
+  const { userId, profile, roles } = await loadCurrentUser();
+  const api = createServerApiClient();
+
+  /**
+   * ⚠️ Filtro temporal en el cliente.
+   *
+   * `GET /projects` devuelve **todos los proyectos del sistema**: el gateway
+   * manda `{ userId }` pero `FindProjectsDto` solo declara `ownerId`, así que
+   * el `where` acaba vacío. Sin este filtro estaríamos enseñando los proyectos
+   * de otras personas, que es una fuga de información.
+   *
+   * Cuando el backend filtre por membresía (PENDIENTES-BACKEND.md §3), esta
+   * línea se cae y ya está.
+   *
+   * Coste honesto mientras tanto: **no aparecen los proyectos en los que el
+   * usuario es miembro pero no dueño.** No hay forma de saberlo desde aquí.
+   */
+  const page = await api.get<Paginated<Project>>('/projects');
+  const projects = page.items.filter((project) => project.ownerId === userId);
+
+  const totals = projects.reduce(
+    (acc, project) => ({
+      workspaces: acc.workspaces + project._count.workspaces,
+      members: acc.members + project._count.members,
+    }),
+    { workspaces: 0, members: 0 },
+  );
+
+  const name = displayName(profile);
+
+  return (
+    <AppLayout
+      navItems={APP_NAV_ITEMS}
+      activePath="/dashboard"
+      title="Panel"
+      user={{ name, email: profile.credential.email }}
+      headerSlot={projects.length > 0 ? <CreateProjectDialog /> : undefined}
+      footerSlot={<LogoutButton />}
+    >
+      <div className="flex flex-col gap-8">
+        <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
+
+        {projects.length === 0 ? (
+          <DashboardEmptyState
+            action={<CreateProjectDialog triggerLabel="Crear mi primer proyecto" triggerSize="lg" />}
+          />
+        ) : (
+          <>
+            <DashboardMetrics
+              projects={projects.length}
+              workspaces={totals.workspaces}
+              members={totals.members}
+            />
+            <ProjectList projects={projects} />
+          </>
+        )}
+      </div>
+    </AppLayout>
+  );
+}

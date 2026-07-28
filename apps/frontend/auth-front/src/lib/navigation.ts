@@ -11,8 +11,13 @@
  * sesión ya puesta.
  */
 
-/** Dónde aterriza el usuario tras iniciar sesión o registrarse. */
-export const POST_AUTH_DESTINATION = '/';
+/**
+ * Dónde aterriza el usuario tras iniciar sesión o registrarse.
+ *
+ * Es el panel, no la landing: quien acaba de identificarse quiere su área
+ * privada. La sirve el web-shell y la protege su `proxy.ts`.
+ */
+export const POST_AUTH_DESTINATION = '/dashboard';
 
 /**
  * Navega a una ruta de otra zona.

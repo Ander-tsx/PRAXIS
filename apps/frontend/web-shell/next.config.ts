@@ -8,9 +8,11 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@praxis/commons'],
 
   /**
-   * Multi-Zones: redirige todas las rutas /auth/* a auth-front.
-   * En desarrollo: http://localhost:4101
-   * En producción: AUTH_FRONT_URL apunta al deploy real de auth-front.
+   * Multi-Zones: cada zona es una app Next independiente con su propio
+   * `basePath`, y el shell la publica aquí.
+   *
+   * En desarrollo apuntan a localhost; en producción, a su deploy real vía
+   * env var.
    *
    * Los puertos del frontend viven en el rango 4100+ porque 3001-3004 los
    * ocupan los microservicios del backend por TCP. Ver docs/frontend/ESTADO-ACTUAL.md §4.2
@@ -21,11 +23,25 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
+    const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
 
     return [
       {
         source: '/auth/:path*',
         destination: `${authFrontUrl}/auth/:path*`,
+      },
+      /**
+       * Las dos entradas de dashboard-front: la raíz de la zona (`/dashboard`,
+       * sin segmento extra) y todo lo que cuelga de ella. Sin la primera,
+       * `/dashboard` a secas no casa con `/:path*` y cae en un 404 del shell.
+       */
+      {
+        source: '/dashboard',
+        destination: `${dashboardFrontUrl}/dashboard`,
+      },
+      {
+        source: '/dashboard/:path*',
+        destination: `${dashboardFrontUrl}/dashboard/:path*`,
       },
     ];
   },

@@ -7,14 +7,30 @@ import { createSessionRefreshProxy } from '@praxis/commons/auth';
  * de forma transparente mientras el refresh token siga siendo válido. De lo
  * contrario, volver a una pestaña abierta hace 20 minutos mostraría "Iniciar
  * sesión" a alguien que sigue autenticado.
+ *
+ * **No protege rutas.** El shell solo sirve la landing pública; cada zona
+ * privada trae su propio guard (`dashboard-front/src/proxy.ts`). Es lo que
+ * permite desplegar y probar una zona por su cuenta.
  */
 export const proxy = createSessionRefreshProxy();
 
 export const config = {
   /**
-   * Solo páginas: se excluyen los assets de Next, el favicon y las rutas de
-   * API — /api/gateway ya gestiona su propia renovación al hablar con el
-   * gateway, y no tiene sentido pagar el salto de red dos veces.
+   * Solo las páginas **del shell**.
+   *
+   * Se excluyen los assets de Next, el favicon, las rutas de API y **los
+   * prefijos de las zonas**: `/auth/*` y `/dashboard/*` los sirve otra app, que
+   * ya renueva la sesión en su propio proxy. Sin esta exclusión pagaríamos el
+   * salto de red al gateway dos veces por navegación.
    */
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
+  matcher: [
+    /**
+     * ⚠️ `'/'` va aparte: el patrón con lookahead negativo **no casa la raíz**.
+     * Sin esta entrada la landing nunca renovaba la sesión, que es justo el
+     * caso para el que existe este proxy: volver a una pestaña abierta hace 20
+     * minutos y que el navbar siga diciendo "Ir al panel".
+     */
+    '/',
+    '/((?!_next/static|_next/image|favicon.ico|api/|auth(?:/|$)|dashboard(?:/|$)).*)',
+  ],
 };
