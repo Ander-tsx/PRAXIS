@@ -78,8 +78,8 @@ export function FeatureCard({ card }: FeatureCardProps) {
       */}
       <div
         aria-hidden="true"
-        className="relative flex items-center justify-center overflow-hidden px-5 pt-5"
-        style={{ height: 168 }}
+        className="relative flex items-center justify-center overflow-hidden"
+        style={{ height: 188, padding: '20px 20px 0' }}
       >
         <div
           className="h-full w-full rounded-xl"
@@ -97,8 +97,10 @@ export function FeatureCard({ card }: FeatureCardProps) {
       <div className="flex flex-1 flex-col gap-2 p-5">
         <div className="flex items-center gap-2.5">
           <span
-            className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+            className="inline-flex flex-shrink-0 items-center justify-center rounded-xl"
             style={{
+              width: 40,
+              height: 40,
               background: active ? `${card.accent}1a` : 'rgba(255,255,255,0.05)',
               border: `1px solid ${active ? `${card.accent}40` : 'rgba(255,255,255,0.07)'}`,
               color: active ? card.accent : 'rgba(255,255,255,0.4)',

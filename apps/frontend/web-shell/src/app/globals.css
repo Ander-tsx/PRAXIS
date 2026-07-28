@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Tailwind v4 solo genera las clases que encuentra escaneando archivos.
+   Sin estos @source, cualquier utilidad usada ÚNICAMENTE dentro de un
+   componente de @praxis/commons se descarta en silencio: el componente
+   se renderiza pero sin sus estilos. Rutas relativas a este archivo
+   (src/app/globals.css) → ../../../commons = apps/frontend/commons/ */
+@source "../**/*.tsx";
+@source "../../../commons/atoms/**/*.tsx";
+@source "../../../commons/molecules/**/*.tsx";
+@source "../../../commons/organisms/**/*.tsx";
+
 /* ============================================================
    PRAXIS — Design System Tokens
    Todos los colores y fuentes se definen aquí con nombres
@@ -162,28 +172,20 @@ body {
     transform: translateX(0) scale(1);
   }
 }
-@keyframes kanban-slide {
-  0%,
-  15% {
-    transform: translateX(0);
-    opacity: 1;
+/* Inclinación al "arrastrar" una tarjeta entre columnas del Kanban.
+   Solo gira: el desplazamiento lo hace la transición de transform. */
+@keyframes kanban-tilt {
+  0% {
+    rotate: 0deg;
   }
-  35%,
-  55% {
-    transform: translateX(60px);
-    opacity: 1;
+  25% {
+    rotate: -5deg;
   }
-  70%,
-  85% {
-    transform: translateX(120px);
-    opacity: 1;
-  }
-  95% {
-    opacity: 0;
+  70% {
+    rotate: -3deg;
   }
   100% {
-    transform: translateX(0);
-    opacity: 0;
+    rotate: 0deg;
   }
 }
 @keyframes perm-activate {

@@ -17,59 +17,92 @@ import { type ReactNode, useEffect, useRef } from 'react';
 const EASE = 'cubic-bezier(.22,1,.36,1)';
 
 /* ── 1. Tablero Kanban ─────────────────────────────────────────
-   Al pasar el cursor, la tarjeta destacada viaja de "En progreso" a "Hecho". */
+   Al pasar el cursor, la tarea se arrastra de "En progreso" a "Hecho":
+   se inclina, se eleva y aterriza en la columna destino. */
 function KanbanScene(active: boolean) {
   const columns = [
-    { name: 'Por hacer', color: '#7c6cff', cards: ['Diseño de login', 'Endpoint de tareas'] },
-    { name: 'En progreso', color: '#f59e0b', cards: ['Tablero Kanban'] },
-    { name: 'Hecho', color: '#34d399', cards: ['Autenticación'] },
+    {
+      name: 'Por hacer',
+      color: '#7c6cff',
+      tasks: [
+        { title: 'Diseño de login', due: '4 mar' },
+        { title: 'Endpoint tareas', due: '6 mar' },
+      ],
+    },
+    { name: 'En progreso', color: '#f59e0b', tasks: [{ title: 'Filtros', due: '8 mar' }] },
+    { name: 'Hecho', color: '#34d399', tasks: [{ title: 'Autenticación', due: '1 mar' }] },
   ];
 
+  const card = (title: string, due: string, tone?: string) => (
+    <div
+      className="rounded-lg px-2 py-1.5"
+      style={{
+        background: tone ? `${tone}1c` : 'rgba(255,255,255,0.05)',
+        border: `1px solid ${tone ? `${tone}55` : 'rgba(255,255,255,0.08)'}`,
+      }}
+    >
+      <div
+        className="truncate font-sans text-[0.58rem] leading-tight"
+        style={{ color: tone ?? 'rgba(255,255,255,0.62)' }}
+      >
+        {title}
+      </div>
+      <div className="mt-1 flex items-center gap-1">
+        <svg
+          className="h-2 w-2 flex-shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          style={{ color: 'rgba(255,255,255,0.3)' }}
+          aria-hidden="true"
+        >
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M8 3v4M16 3v4M3 11h18" />
+        </svg>
+        <span className="font-mono text-[0.5rem]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+          {due}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="flex h-full gap-2 p-3">
+    <div className="flex h-full gap-2.5 p-3.5">
       {columns.map((col, ci) => (
-        <div key={col.name} className="flex flex-1 flex-col gap-1.5">
+        <div key={col.name} className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: col.color }} />
             <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: col.color, transition: `all 400ms ${EASE}` }}
-            />
-            <span
-              className="font-sans text-[0.6rem] font-medium"
-              style={{ color: active ? col.color : 'rgba(255,255,255,0.35)', transition: 'color 320ms ease' }}
+              className="truncate font-sans text-[0.58rem] font-medium"
+              style={{
+                color: active ? col.color : 'rgba(255,255,255,0.4)',
+                transition: 'color 320ms ease',
+              }}
             >
               {col.name}
             </span>
           </div>
 
-          {col.cards.map((card) => (
-            <div
-              key={card}
-              className="rounded-md px-2 py-1.5 font-sans text-[0.58rem] leading-tight"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                color: 'rgba(255,255,255,0.55)',
-              }}
-            >
-              {card}
-            </div>
+          {col.tasks.map((task) => (
+            <div key={task.title}>{card(task.title, task.due)}</div>
           ))}
 
-          {/* La tarjeta que se mueve: sale de la columna 1 y aterriza en la 2 */}
+          {/* La tarea arrastrada: vive en "En progreso" y aterriza en "Hecho" */}
           {ci === 1 && (
             <div
-              className="rounded-md px-2 py-1.5 font-sans text-[0.58rem] leading-tight"
               style={{
-                background: active ? 'rgba(52,211,153,0.14)' : 'rgba(124,108,255,0.14)',
-                border: `1px solid ${active ? 'rgba(52,211,153,0.5)' : 'rgba(124,108,255,0.45)'}`,
-                color: active ? '#34d399' : '#a5a0ff',
-                transform: active ? 'translate(calc(100% + 8px), 26px)' : 'none',
-                boxShadow: active ? '0 8px 18px rgba(0,0,0,0.45)' : 'none',
-                transition: `transform 620ms ${EASE}, background 400ms ease, border-color 400ms ease, color 400ms ease, box-shadow 400ms ease`,
+                transform: active
+                  ? 'translate(calc(100% + 10px), 26px) rotate(0deg) scale(1)'
+                  : 'translate(0, 0) rotate(0deg) scale(1)',
+                filter: active
+                  ? 'drop-shadow(0 10px 16px rgba(0,0,0,0.55))'
+                  : 'drop-shadow(0 0 0 rgba(0,0,0,0))',
+                transition: `transform 700ms ${EASE}, filter 500ms ease`,
+                animation: active ? 'kanban-tilt 700ms ease-in-out' : undefined,
               }}
             >
-              Permisos
+              {card('Permisos por rol', '11 mar', active ? '#34d399' : '#a5a0ff')}
             </div>
           )}
         </div>
@@ -79,98 +112,164 @@ function KanbanScene(active: boolean) {
 }
 
 /* ── 2. Permisos por rol ───────────────────────────────────────
-   Los interruptores se encienden en cascada. */
+   El rol activo cambia y la retícula de los 10 permisos del proyecto
+   se enciende en cascada: un rol es un conjunto de permisos, no
+   una fila de interruptores sueltos. */
+const PROJECT_PERMISSIONS = [
+  { code: 'Tarea+', full: 'canCreateTask' },
+  { code: 'Tarea~', full: 'canEditTask' },
+  { code: 'Tarea−', full: 'canDeleteTask' },
+  { code: 'Tabl+', full: 'canCreateBoard' },
+  { code: 'Tabl~', full: 'canEditBoard' },
+  { code: 'Tabl−', full: 'canDeleteBoard' },
+  { code: 'Col+', full: 'canCreateColumn' },
+  { code: 'Col−', full: 'canDeleteColumn' },
+  { code: 'Miemb', full: 'canManageMembers' },
+  { code: 'Roles', full: 'canManageRoles' },
+];
+
+/** Índices que tiene cada rol; el hover pasa de Desarrollo a Scrum Master. */
+const ROLE_GRANTS = {
+  desarrollo: [0, 1, 4, 6],
+  scrumMaster: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+};
+
 function PermissionsScene(active: boolean) {
-  const permissions = [
-    { name: 'canCreateTask', on: true },
-    { name: 'canEditTask', on: true },
-    { name: 'canDeleteTask', on: false },
-    { name: 'canCreateBoard', on: true },
-    { name: 'canManageMembers', on: false },
+  const granted = active ? ROLE_GRANTS.scrumMaster : ROLE_GRANTS.desarrollo;
+  const roles = [
+    { name: 'Desarrollo', on: !active },
+    { name: 'Scrum Master', on: active },
   ];
 
   return (
-    <div className="flex h-full flex-col justify-center gap-2 px-3.5">
-      {permissions.map((perm, i) => {
-        const lit = active && perm.on;
-        return (
-          <div key={perm.name} className="flex items-center justify-between gap-2">
+    <div className="flex h-full flex-col justify-center gap-2.5 px-3.5">
+      {/* Selector de rol */}
+      <div className="flex items-center gap-1.5">
+        {roles.map((role) => (
+          <span
+            key={role.name}
+            className="rounded-full px-2 py-0.5 font-sans text-[0.55rem] font-medium"
+            style={{
+              background: role.on ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${role.on ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.07)'}`,
+              color: role.on ? '#c4b5fd' : 'rgba(255,255,255,0.3)',
+              transition: 'all 320ms ease',
+            }}
+          >
+            {role.name}
+          </span>
+        ))}
+        <span
+          className="ml-auto font-mono text-[0.52rem]"
+          style={{ color: 'rgba(255,255,255,0.35)', transition: 'color 320ms ease' }}
+        >
+          {granted.length}/10
+        </span>
+      </div>
+
+      {/* Retícula de permisos */}
+      <div className="grid grid-cols-5 gap-1">
+        {PROJECT_PERMISSIONS.map((permission, i) => {
+          const on = granted.includes(i);
+          return (
             <span
-              className="truncate font-mono text-[0.58rem]"
+              key={permission.full}
+              title={permission.full}
+              className="flex items-center justify-center rounded-md py-1 font-sans text-[0.45rem] font-medium"
               style={{
-                color: lit ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
-                transition: `color 300ms ease ${i * 70}ms`,
+                background: on ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.035)',
+                border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.06)'}`,
+                color: on ? '#ddd6fe' : 'rgba(255,255,255,0.22)',
+                transform: on ? 'scale(1)' : 'scale(0.94)',
+                transition: `all 300ms ${EASE} ${i * 45}ms`,
               }}
             >
-              {perm.name}
+              {permission.code}
             </span>
-            <span
-              className="relative flex-shrink-0 rounded-full"
-              style={{
-                width: 26,
-                height: 15,
-                background: lit ? '#a78bfa' : 'rgba(255,255,255,0.08)',
-                border: `1px solid ${lit ? '#a78bfa' : 'rgba(255,255,255,0.12)'}`,
-                transition: `background 300ms ease ${i * 70}ms, border-color 300ms ease ${i * 70}ms`,
-              }}
-            >
-              <span
-                className="absolute rounded-full bg-white"
-                style={{
-                  top: 2,
-                  left: 2,
-                  width: 9,
-                  height: 9,
-                  transform: lit ? 'translateX(11px)' : 'none',
-                  transition: `transform 340ms ${EASE} ${i * 70}ms`,
-                }}
-              />
-            </span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-/* ── 3. Jerarquía de trabajo ───────────────────────────────────
-   El árbol Proyecto → Espacio → Tablero se despliega por niveles. */
+/* ── 3. Espacios y tableros ────────────────────────────────────
+   Árbol invertido: el proyecto arriba, sus espacios debajo y los
+   tableros colgando de cada espacio. Las ramas se trazan al pasar. */
 function HierarchyScene(active: boolean) {
-  const levels = [
-    { label: 'Proyecto Aurora', indent: 0, color: '#818cf8', icon: '◆' },
-    { label: 'Espacio: Producto', indent: 1, color: '#a5b4fc', icon: '▸' },
-    { label: 'Tablero: Sprint 4', indent: 2, color: '#c7d2fe', icon: '▪' },
-    { label: 'Tablero: Backlog', indent: 2, color: '#c7d2fe', icon: '▪' },
-    { label: 'Espacio: Diseño', indent: 1, color: '#a5b4fc', icon: '▸' },
+  const branches = [
+    { x1: 150, y1: 34, x2: 78, y2: 62 },
+    { x1: 150, y1: 34, x2: 222, y2: 62 },
+    { x1: 78, y1: 82, x2: 42, y2: 110 },
+    { x1: 78, y1: 82, x2: 114, y2: 110 },
+    { x1: 222, y1: 82, x2: 186, y2: 110 },
+    { x1: 222, y1: 82, x2: 258, y2: 110 },
+  ];
+
+  const nodes = [
+    { x: 150, y: 24, w: 92, label: 'Proyecto Aurora', color: '#818cf8', level: 0 },
+    { x: 78, y: 72, w: 74, label: 'Producto', color: '#a5b4fc', level: 1 },
+    { x: 222, y: 72, w: 74, label: 'Diseño', color: '#a5b4fc', level: 1 },
+    { x: 42, y: 120, w: 62, label: 'Sprint 4', color: '#c7d2fe', level: 2 },
+    { x: 114, y: 120, w: 62, label: 'Backlog', color: '#c7d2fe', level: 2 },
+    { x: 186, y: 120, w: 62, label: 'UI Kit', color: '#c7d2fe', level: 2 },
+    { x: 258, y: 120, w: 62, label: 'Research', color: '#c7d2fe', level: 2 },
   ];
 
   return (
-    <div className="flex h-full flex-col justify-center gap-1.5 px-4">
-      {levels.map((level, i) => (
-        <div
-          key={level.label}
-          className="flex items-center gap-2"
-          style={{
-            paddingLeft: level.indent * 14,
-            opacity: active ? 1 : 0.45,
-            transform: active ? 'translateX(0)' : 'translateX(-6px)',
-            transition: `opacity 340ms ease ${i * 80}ms, transform 340ms ${EASE} ${i * 80}ms`,
-          }}
-        >
-          <span
-            className="font-mono text-[0.6rem]"
-            style={{ color: level.color, transition: 'color 300ms ease' }}
+    <div className="flex h-full items-center justify-center px-3">
+      <svg viewBox="0 0 300 144" className="h-full w-full" role="img" aria-label="Jerarquía de proyecto">
+        <title>Proyecto, espacios y tableros</title>
+
+        {branches.map((branch, i) => (
+          <path
+            key={`${branch.x1}-${branch.y1}-${branch.x2}-${branch.y2}`}
+            d={`M ${branch.x1} ${branch.y1} C ${branch.x1} ${(branch.y1 + branch.y2) / 2}, ${branch.x2} ${(branch.y1 + branch.y2) / 2}, ${branch.x2} ${branch.y2}`}
+            fill="none"
+            stroke={active ? 'rgba(129,140,248,0.65)' : 'rgba(129,140,248,0.2)'}
+            strokeWidth="1.2"
+            strokeDasharray="60"
+            strokeDashoffset={active ? 0 : 60}
+            style={{
+              transition: `stroke-dashoffset 520ms ${EASE} ${i < 2 ? 0 : 220}ms, stroke 400ms ease`,
+            }}
+          />
+        ))}
+
+        {nodes.map((node) => (
+          <g
+            key={node.label}
+            style={{
+              opacity: active || node.level === 0 ? 1 : 0.4,
+              transition: `opacity 380ms ease ${node.level * 180}ms`,
+            }}
           >
-            {level.icon}
-          </span>
-          <span
-            className="font-sans text-[0.62rem]"
-            style={{ color: active ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.42)' }}
-          >
-            {level.label}
-          </span>
-        </div>
-      ))}
+            <rect
+              x={node.x - node.w / 2}
+              y={node.y - 9}
+              width={node.w}
+              height={18}
+              rx={5}
+              fill={active ? `${node.color}20` : 'rgba(255,255,255,0.04)'}
+              stroke={active ? `${node.color}70` : 'rgba(255,255,255,0.08)'}
+              strokeWidth="1"
+              style={{ transition: 'all 380ms ease' }}
+            />
+            <text
+              x={node.x}
+              y={node.y + 1}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="7.5"
+              fontFamily="system-ui, sans-serif"
+              fill={active ? node.color : 'rgba(255,255,255,0.45)'}
+              style={{ transition: 'fill 380ms ease' }}
+            >
+              {node.label}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -327,11 +426,11 @@ function VoiceScene(active: boolean) {
 function icon(path: ReactNode) {
   return (
     <svg
-      className="h-[18px] w-[18px]"
+      className="h-5 w-5"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
-      strokeWidth={1.6}
+      strokeWidth={1.7}
       aria-hidden="true"
     >
       {path}
