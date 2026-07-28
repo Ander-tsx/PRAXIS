@@ -89,15 +89,46 @@ Las **pages** son las únicas que tienen lógica de negocio (fetch, estado, vali
 
 ### 3.3 Design system
 
-Tokens duplicados en dos sitios que hay que mantener en sync a mano:
-- `web-shell/src/app/globals.css` → bloque `@theme` (fuente de verdad)
-- `auth-front/src/app/globals.css` → copia literal, con comentario admitiéndolo
-- `commons/tokens/colors.ts` → espejo en TS (`var(--color-*)`) + `colorValues` hex
+> ✅ La duplicación de tokens está **resuelta**. Se conserva el histórico abajo
+> porque explica por qué el archivo compartido está donde está.
+
+Fuente de verdad única: **`commons/styles/theme.css`**. Contiene el bloque
+`@theme`, los estilos base (box-sizing, body, scrollbar, selección),
+`prefers-reduced-motion`, el keyframe `sparkle-spin` (lo usa `Sparkle` desde
+commons) y **los `@source` hacia commons**. Cada zona hace:
+
+```css
+@import "tailwindcss";
+@import "../../../commons/styles/theme.css";
+
+@source "../**/*.tsx";   /* solo su propio src */
+
+@font-face { … url("/<basePath>/fonts/…") … }
+```
+
+Lo único que queda por zona son los `@font-face`, porque su URL lleva el
+basePath, y las animaciones propias (las de la landing viven en el `globals.css`
+del shell). De ~780 líneas repartidas en tres copias se pasa a 162 compartidas
++ 32 por zona.
+
+`commons/tokens/colors.ts` sigue siendo el espejo en TS (`var(--color-*)`) +
+`colorValues` hex, para los sitios que no admiten clases.
+
+⚠️ Los `@source` hacia commons viven **dentro** de `theme.css` y sus rutas son
+relativas a ese archivo. Verificado en runtime: una clase que solo aparece en
+`commons/molecules/ProgressBar` está en el CSS generado de `dashboard-front`,
+que no usa ese componente — prueba de que Tailwind resolvió el `@source` a
+través del `@import`.
 
 Paleta: dark-only. Fondo `#0D0F14`, primario `#6C63FF`, acento `#D4A843`, texto `#E8EAF0`.
-Tipografía: `Redaction 50` (display, self-hosted woff2), Inter + Lora vía `next/font` en el shell, system-ui en auth-front.
+Tipografía: `Redaction 50` (display, self-hosted woff2) + Inter y Lora vía
+`next/font` **en las tres zonas**. Antes auth-front no cargaba `next/font` y
+caía a `system-ui`, y encima le faltaban los `.woff2` (404), así que el salto
+landing → login cambiaba de tipografía dos veces. Resuelto.
 
-⚠️ **Deuda:** cada zona nueva copia ~150 líneas de `@theme` y re-declara `@font-face` apuntando a `/<basePath>/fonts/…`. Es frágil y ya está copiado dos veces.
+> **Histórico:** los tokens se copiaron a mano en cada `globals.css` hasta que
+> hubo tres zonas. La deuda estaba anotada aquí y se saldó al crear
+> `dashboard-front`, que era la tercera copia.
 
 🔴 **Trampa confirmada en producción (`ba94057`):** Tailwind v4 solo genera las
 clases que encuentra **escaneando archivos**. `web-shell/globals.css` no tenía
@@ -106,13 +137,12 @@ de un componente compartido se descartaba **en silencio**: el componente se
 renderizaba sin sus estilos. Lo detectamos porque `pt-5` no se aplicaba en
 `FeatureCard` (`px-5` sí, porque el shell la usa en otro sitio).
 
-**Toda zona nueva debe declarar en su `globals.css`:**
+**Hoy basta con importar el archivo compartido**, que ya trae los `@source`
+hacia commons; la zona solo declara el suyo:
 
 ```css
+@import "../../../commons/styles/theme.css";
 @source "../**/*.tsx";
-@source "../../../commons/atoms/**/*.tsx";
-@source "../../../commons/molecules/**/*.tsx";
-@source "../../../commons/organisms/**/*.tsx";
 ```
 
 Si un componente de `commons` se ve sin estilos, esto es lo primero que hay que
@@ -872,10 +902,12 @@ Checklist, salida de montar esta:
 1. `package.json` con puerto propio (4103+) y `@praxis/commons: workspace:*`.
 2. `next.config.ts` con `basePath: '/<zona>'` y `transpilePackages: ['@praxis/commons']`.
 3. `tsconfig.json` con los `paths` a commons (copiar el de otra zona).
-4. `src/app/globals.css` con **los cuatro `@source`**, incluido
-   `commons/organisms` si usa `AppLayout` — sin él la zona se renderiza sin
-   estilos y sin ningún error.
-5. Fuentes en `public/fonts/` y `@font-face` apuntando a `/<zona>/fonts/...`.
+4. `src/app/globals.css` con `@import "../../../commons/styles/theme.css";`
+   (trae tokens, base y los `@source` hacia commons) más `@source "../**/*.tsx"`
+   para su propio código.
+5. Fuentes en `public/fonts/` y `@font-face` apuntando a `/<zona>/fonts/...`,
+   más `next/font` (Inter + Lora) en su `layout.tsx`: los tokens `--font-sans` y
+   `--font-serif` esperan `--font-inter` y `--font-lora`.
 6. `src/app/api/gateway/[...path]/route.ts` de dos líneas.
 7. `src/proxy.ts` con `createSessionRefreshProxy` + `hasValidSessionToken`, y
    `'/'` en el matcher.

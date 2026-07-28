@@ -27,7 +27,9 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 **Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Dark-only.
 
-⚠️ Cada `globals.css` de zona **debe** declarar `@source` hacia `commons/atoms`, `molecules` y `organisms`. Tailwind solo genera las clases que encuentra escaneando: sin eso, una utilidad usada solo dentro de un componente compartido se descarta **sin ningún error** y el componente se renderiza sin estilos. Ya nos pasó (`ba94057`).
+Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.css` de zona lo importa y solo añade lo suyo: `@source "../**/*.tsx"` y sus `@font-face` (que llevan el basePath).
+
+⚠️ Tailwind solo genera las clases que encuentra escaneando. Los `@source` hacia commons van dentro de `theme.css` y son relativos a ese archivo — si los quitas o el import falla, una utilidad usada solo dentro de un componente compartido se descarta **sin ningún error** y el componente se renderiza sin estilos. Ya nos pasó (`ba94057`).
 
 **Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
 
