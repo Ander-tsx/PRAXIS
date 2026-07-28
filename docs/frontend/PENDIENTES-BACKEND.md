@@ -114,9 +114,15 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 | `GET /api/projects/:id/roles` | Leerlos embebidos en `GET /projects/:id` |
 | `GET /api/boards/:id/columns` | Idem |
 | Permisos efectivos del usuario en un proyecto | Deducirlos cruzando `roles` y `members`, o provocar 403 y reaccionar |
+| `GET /api/tasks?assigneeId=…` (mis tareas) | No hay forma. `GET /boards/:boardId/tasks` exige un board, así que habría que recorrer proyectos → espacios → tableros → tareas y filtrar en el cliente |
 
-El último es el que más duele: **sin él la interfaz no sabe qué botones ocultar**
-y solo puede descubrir que no tiene permiso cuando ya falló la acción.
+Los dos últimos son los que más duelen:
+
+- Sin los **permisos efectivos**, la interfaz no sabe qué botones ocultar y solo
+  descubre que no tiene permiso cuando la acción ya falló.
+- Sin **mis tareas**, el dashboard no puede mostrar en qué está trabajando cada
+  persona sin hacer una cascada de peticiones por cada tablero de cada proyecto.
+  Es la pieza que falta para que el panel de inicio sea realmente útil.
 
 ---
 
