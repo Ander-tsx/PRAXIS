@@ -2,6 +2,10 @@
 
 > Fecha del análisis: 2026-07-28 · rama `main` (commit `ae01766`)
 > Documento vivo. Actualízalo cuando cambien decisiones de arquitectura o cuando el backend rompa un contrato.
+>
+> **Las secciones §1 a §11 son la foto del análisis inicial y se conservan tal cual
+> como registro.** Lo resuelto desde entonces está marcado en su sección y
+> recogido en §12 y §13, que son la fuente de verdad del estado actual.
 
 ---
 
@@ -15,7 +19,7 @@ Estado por pieza:
 | Pieza | Estado | Comentario |
 |---|---|---|
 | `web-shell` | 🟡 Parcial | Landing pública completa (hero 3D, features, CTA). Cero área privada, cero sesión, cero navegación autenticada. |
-| `auth-front` | 🟠 Roto | UI de login/signup completa y BFF bien diseñado, **pero no funciona**: lee mal la respuesta del gateway (ver §5.1). |
+| `auth-front` | ✅ Funcional | Login, signup, session, logout y refresh verificados end-to-end. Ver §13. |
 | `commons` | 🟡 Parcial | 5 átomos + 5 moléculas + tokens. Falta capa de organismos, cliente HTTP, tipos de dominio, estado de sesión. |
 | `projects-front` | 🔴 No existe | Solo mockup sin mergear en `feature/vibecoded-mockup-frontend-flow`. |
 | `dashboard-front` | 🔴 No existe | Idem. |
@@ -23,7 +27,7 @@ Estado por pieza:
 | `reports-front` | 🔴 No existe | Idem. **No hay backend para reportes.** |
 | `apps/mobile` | 🔴 Vacío | Solo `.gitkeep`. Fuera de alcance por ahora. |
 
-**Lo que bloquea todo:** el frontend no está en el `pnpm-workspace.yaml` (§4.1) y el login está roto (§5.1). Sin resolver esos dos puntos no se puede construir ninguna pantalla privada.
+**Lo que bloqueaba todo** (§4.1 workspace, §4.2 puertos, §5.1 login, §12 errores del gateway) **ya está resuelto**. El siguiente bloqueante real es que no existe el proxy autenticado hacia el gateway desde una zona privada (§7).
 
 ---
 
@@ -99,7 +103,9 @@ Tipografía: `Redaction 50` (display, self-hosted woff2), Inter + Lora vía `nex
 
 ## 4. Organización del monorepo — problemas estructurales
 
-### 4.1 🔴 El frontend NO está en el workspace de pnpm
+### 4.1 ✅ RESUELTO — El frontend NO estaba en el workspace de pnpm
+
+> Arreglado en `dd30d19`.
 
 ```yaml
 # pnpm-workspace.yaml
@@ -120,7 +126,9 @@ Falta `apps/frontend/*`. Consecuencias reales, todas verificadas:
 
 **Es el primer arreglo a hacer.** Es de una línea + reinstalar.
 
-### 4.2 🔴 Colisión de puertos frontend ↔ backend
+### 4.2 ✅ RESUELTO — Colisión de puertos frontend ↔ backend
+
+> Arreglado en `dd30d19`. Puertos definitivos en §13.
 
 | Puerto | Backend | Frontend |
 |---|---|---|
@@ -133,7 +141,9 @@ Falta `apps/frontend/*`. Consecuencias reales, todas verificadas:
 
 `pnpm dev` (backend + frontend a la vez) **no puede funcionar**. Hay que reasignar un rango: propongo backend `3000` + `41xx` para TCP, o frontend a partir de `4000`.
 
-### 4.3 🟡 `apps/frontend/commons` no es un paquete real
+### 4.3 ✅ RESUELTO — `apps/frontend/commons` no era un paquete real
+
+> `transpilePackages` añadido en `dd30d19`, como anticipaba esta sección.
 
 `package.json` apunta `main`/`types` a `./index.ts` (TypeScript crudo, sin build, sin `exports`). Como no hay symlink en `node_modules`, Next lo compila por ruta relativa vía tsconfig paths. Cuando se arregle §4.1 y sí exista el symlink, Next necesitará `transpilePackages: ['@praxis/commons']` en cada zona o romperá el build.
 
@@ -148,7 +158,9 @@ Falta `apps/frontend/*`. Consecuencias reales, todas verificadas:
 
 ## 5. Integración con el backend — lo que está roto hoy
 
-### 5.1 🔴 CRÍTICO — El login no funciona
+### 5.1 ✅ RESUELTO — El login no funcionaba
+
+> Arreglado en `31eeea1`.
 
 El gateway envuelve toda respuesta en un sobre estándar (`StandardResponseInterceptor`):
 
@@ -172,11 +184,15 @@ Resultado: `access_token` siempre `undefined` → el BFF responde `502 "Respuest
 
 Causa raíz: el BFF se escribió contra `AuthResponseDto` (`access_token`), que quedó obsoleto cuando se normalizaron las respuestas (commit `136ae55`) y cuando el servicio pasó a devolver `{userId, accessToken, refreshToken}`. **`apps/backend/commons/contracts/src/auth/auth-response.dto.ts` es un contrato muerto que ya no refleja la realidad.**
 
-### 5.2 🟠 El `refreshToken` se tira a la basura
+### 5.2 ✅ RESUELTO — El `refreshToken` se tiraba a la basura
+
+> Arreglado en `31eeea1`: cookie `praxis_refresh` + `POST /auth/api/refresh`.
 
 El backend emite `refreshToken` (7 días, guardado en Redis) y expone `POST /api/auth/refresh`. El BFF ni lo lee ni lo guarda. Cuando expire el access token la sesión muere sin posibilidad de renovar. Hay que decidir: segunda cookie httpOnly `praxis_refresh` + renovación silenciosa.
 
-### 5.3 🟠 El logout no cierra sesión de verdad
+### 5.3 ✅ RESUELTO — El logout no cerraba sesión de verdad
+
+> Arreglado en `31eeea1`: el BFF ya notifica al gateway.
 
 `api/logout/route.ts` borra la cookie pero **no llama a `POST /api/auth/logout`**. La sesión en Redis sobrevive, el refresh token sigue siendo válido. El propio archivo lo documenta como "fuera de scope".
 
@@ -315,20 +331,22 @@ Propuesta: **no mergear la rama**. Portar zona por zona, tomando el layout y la 
 
 | # | Severidad | Problema | Ref |
 |---|---|---|---|
-| 1 | 🔴 Bloqueante | Frontend fuera del workspace pnpm | §4.1 |
-| 2 | 🔴 Bloqueante | Login/signup rotos (sobre + naming) | §5.1 |
-| 3 | 🔴 Bloqueante | Colisión de puertos backend/frontend | §4.2 |
+| 1 | ✅ Resuelto | Frontend fuera del workspace pnpm | §4.1 |
+| 2 | ✅ Resuelto | Login/signup rotos (sobre + naming) | §5.1 |
+| 3 | ✅ Resuelto | Colisión de puertos backend/frontend | §4.2 |
 | 4 | 🔴 Bloqueante | No hay forma de llamar al gateway autenticado desde una zona privada | §7 |
 | 5 | 🟠 Alto | `GET /projects` devuelve todo / no filtra por membresía | §5.5 |
-| 6 | 🟠 Alto | No hay cliente HTTP compartido ni tipos de dominio en el frontend | §10 |
-| 7 | 🟠 Alto | Refresh token ignorado → sesión muere sin renovar | §5.2 |
+| 6 | 🟠 Alto | No hay tipos de dominio compartidos (el cliente HTTP base ya existe en `commons/api/`) | §10 |
+| 7 | ✅ Resuelto | Refresh token ignorado → sesión muere sin renovar | §5.2 |
 | 8 | 🟠 Alto | `GET` con body ⇒ no hay paginación ni búsqueda | §5.6 |
 | 9 | 🟡 Medio | Design tokens duplicados por zona | §3.3 |
-| 10 | 🟡 Medio | Logout no invalida la sesión en Redis | §5.3 |
+| 10 | ✅ Resuelto | Logout no invalida la sesión en Redis | §5.3 |
 | 11 | 🟡 Medio | Faltan endpoints (roles, columnas, me, reportes, logs) | §5.10 |
 | 12 | 🟡 Medio | Biome vs ESLint vs formato real del código | §4.4 |
-| 13 | 🔵 Bajo | `pnpm-lock.yaml` ignorado por git | §4.4 |
+| 13 | ✅ Resuelto | `pnpm-lock.yaml` ignorado por git | §4.4 |
 | 14 | 🔵 Bajo | README dice Module Federation; se usa Multi-Zones | §2 |
+| 15 | ✅ Resuelto | El gateway degradaba todo error de microservicio a 500 | §12 |
+| 16 | 🔵 Bajo | `pnpm build` de contracts/observability no está en el README | §13 |
 
 ---
 
