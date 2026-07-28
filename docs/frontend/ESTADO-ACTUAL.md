@@ -97,7 +97,26 @@ Tokens duplicados en dos sitios que hay que mantener en sync a mano:
 Paleta: dark-only. Fondo `#0D0F14`, primario `#6C63FF`, acento `#D4A843`, texto `#E8EAF0`.
 Tipografía: `Redaction 50` (display, self-hosted woff2), Inter + Lora vía `next/font` en el shell, system-ui en auth-front.
 
-⚠️ **Deuda:** cada zona nueva copia ~150 líneas de `@theme` y re-declara `@font-face` apuntando a `/<basePath>/fonts/…`. Además Tailwind v4 necesita `@source` explícito hacia `commons` en cada `globals.css` o las clases de los átomos se purgan. Es frágil y ya está copiado dos veces.
+⚠️ **Deuda:** cada zona nueva copia ~150 líneas de `@theme` y re-declara `@font-face` apuntando a `/<basePath>/fonts/…`. Es frágil y ya está copiado dos veces.
+
+🔴 **Trampa confirmada en producción (`ba94057`):** Tailwind v4 solo genera las
+clases que encuentra **escaneando archivos**. `web-shell/globals.css` no tenía
+`@source` hacia `commons`, así que cualquier utilidad usada *únicamente* dentro
+de un componente compartido se descartaba **en silencio**: el componente se
+renderizaba sin sus estilos. Lo detectamos porque `pt-5` no se aplicaba en
+`FeatureCard` (`px-5` sí, porque el shell la usa en otro sitio).
+
+**Toda zona nueva debe declarar en su `globals.css`:**
+
+```css
+@source "../**/*.tsx";
+@source "../../../commons/atoms/**/*.tsx";
+@source "../../../commons/molecules/**/*.tsx";
+@source "../../../commons/organisms/**/*.tsx";
+```
+
+Si un componente de `commons` se ve sin estilos, esto es lo primero que hay que
+mirar. No da ningún error: simplemente la clase no existe en el CSS final.
 
 ---
 

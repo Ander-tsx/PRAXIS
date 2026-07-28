@@ -24,7 +24,9 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 - Un organismo sube a `commons/organisms/` solo cuando lo usan ≥2 zonas
 - **La lógica de negocio (fetch, estado, validación) vive solo en las pages.** Moléculas y organismos reciben slots `ReactNode` y props. Patrón de referencia: `commons/molecules/AuthForm` + `auth-front/src/app/login/page.tsx`
 
-**Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Dark-only. Cada `globals.css` de zona necesita `@source` apuntando a `commons/` o las clases de los átomos se purgan.
+**Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Dark-only.
+
+⚠️ Cada `globals.css` de zona **debe** declarar `@source` hacia `commons/atoms`, `molecules` y `organisms`. Tailwind solo genera las clases que encuentra escaneando: sin eso, una utilidad usada solo dentro de un componente compartido se descarta **sin ningún error** y el componente se renderiza sin estilos. Ya nos pasó (`ba94057`).
 
 **Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
 
