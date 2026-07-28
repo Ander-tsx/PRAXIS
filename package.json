@@ -4,7 +4,7 @@
     "scripts": {
         "dev": "turbo run dev",
         "dev:backend":  "turbo run dev --filter=@praxis/gateway --filter=@praxis/*-service",
-        "dev:frontend": "turbo run dev --filter=@praxis/web-shell",
+        "dev:frontend": "turbo run dev --filter='./apps/frontend/*'",
         "build": "turbo run build",
         "lint": "turbo run lint",
         "test": "turbo run test",
