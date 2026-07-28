@@ -81,19 +81,13 @@ export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
                */
               <a
                 href="/dashboard"
-                className="group inline-flex items-center gap-2 rounded-full px-5 py-2 font-sans text-sm font-semibold text-white transition-all duration-200 hover:brightness-110"
+                className="rounded-full px-5 py-2 font-sans text-sm font-semibold text-white transition-all duration-200 hover:brightness-110"
                 style={{
                   background: 'var(--color-primary)',
                   boxShadow: '0 4px 20px rgba(108,99,255,0.35)',
                 }}
               >
                 Ir al panel
-                <span
-                  aria-hidden="true"
-                  className="transition-transform duration-200 group-hover:translate-x-0.5"
-                >
-                  →
-                </span>
               </a>
             ) : (
               <>

@@ -1,6 +1,6 @@
 'use client';
 
-import { RoleBadge, Sparkle } from '@praxis/commons';
+import { RoleBadge, Sparkle, alpha } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -95,7 +95,7 @@ function MemberTasksPanel() {
             <span className="flex-1 truncate font-sans text-xs text-text-primary">{task.name}</span>
             <span
               className="flex-shrink-0 rounded px-1.5 py-0.5 font-sans text-[0.6rem] font-medium"
-              style={{ background: `${task.color}1a`, color: task.color }}
+              style={{ background: alpha(task.color, 12), color: task.color }}
             >
               {task.column}
             </span>
@@ -132,7 +132,11 @@ function AdminPanel() {
             </div>
             <span
               className="ml-auto rounded-full px-2.5 py-0.5 font-sans text-[0.65rem] font-medium"
-              style={{ background: `${user.color}1a`, color: user.color, border: `1px solid ${user.color}30` }}
+              style={{
+                background: alpha(user.color, 12),
+                color: user.color,
+                border: `1px solid ${alpha(user.color, 30)}`,
+              }}
             >
               {user.role}
             </span>
@@ -293,9 +297,9 @@ export function LandingHowItWorks() {
                       <span
                         className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full font-sans text-[0.6rem] font-bold"
                         style={{
-                          background: `${role.roleColor}15`,
+                          background: alpha(role.roleColor, 12),
                           color: role.roleColor,
-                          border: `1px solid ${role.roleColor}30`,
+                          border: `1px solid ${alpha(role.roleColor, 30)}`,
                         }}
                         aria-hidden="true"
                       >

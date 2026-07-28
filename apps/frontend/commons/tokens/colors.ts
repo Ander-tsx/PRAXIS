@@ -61,3 +61,18 @@ export const colorValues = {
   border: '#2A3045',
   borderStrong: '#3D4A6B',
 } as const;
+
+/**
+ * Aplica transparencia a cualquier color CSS.
+ *
+ * No se puede concatenar el alfa al valor (`${color}15`): eso solo funciona
+ * con hex de 6 dígitos y produce CSS inválido —descartado en silencio— cuando
+ * el color viene de un token (`var(--color-primary)15`). `color-mix` acepta
+ * ambas formas.
+ *
+ * @param color   Cualquier color CSS válido, incluido `var(--color-*)`
+ * @param percent Opacidad resultante, de 0 a 100
+ */
+export function alpha(color: string, percent: number): string {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}

@@ -471,38 +471,6 @@ const CARDS: FeatureCardData[] = [
   },
   {
     id: 2,
-    accent: '#a78bfa',
-    badge: 'Permisos',
-    title: 'Permisos por rol',
-    description:
-      'Cada proyecto define sus propios roles y decide, permiso a permiso, quién crea, edita o elimina.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-      />,
-    ),
-    visual: PermissionsScene,
-  },
-  {
-    id: 3,
-    accent: '#818cf8',
-    badge: 'Estructura',
-    title: 'Espacios y tableros',
-    description:
-      'Una jerarquía clara para que nada quede suelto: agrupa por espacio de trabajo y divide en los tableros que hagan falta.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
-      />,
-    ),
-    visual: HierarchyScene,
-  },
-  {
-    id: 4,
     accent: '#34d399',
     badge: 'Detalle',
     title: 'Subtareas y checklists',
@@ -516,6 +484,38 @@ const CARDS: FeatureCardData[] = [
       />,
     ),
     visual: ChecklistScene,
+  },
+  {
+    id: 3,
+    accent: '#f59e0b',
+    badge: 'Voz',
+    title: 'Consulta por voz con Alexa',
+    description:
+      'Pregunta por el estado de un tablero o crea una tarea sin tocar el teclado, con la skill de Alexa integrada.',
+    icon: icon(
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+      />,
+    ),
+    visual: VoiceScene,
+  },
+  {
+    id: 4,
+    accent: '#818cf8',
+    badge: 'Estructura',
+    title: 'Espacios y tableros',
+    description:
+      'Una jerarquía clara para que nada quede suelto: agrupa por espacio de trabajo y divide en los tableros que hagan falta.',
+    icon: icon(
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
+      />,
+    ),
+    visual: HierarchyScene,
   },
   {
     id: 5,
@@ -535,19 +535,19 @@ const CARDS: FeatureCardData[] = [
   },
   {
     id: 6,
-    accent: '#f59e0b',
-    badge: 'Voz',
-    title: 'Consulta por voz con Alexa',
+    accent: '#a78bfa',
+    badge: 'Permisos',
+    title: 'Permisos por rol',
     description:
-      'Pregunta por el estado de un tablero o crea una tarea sin tocar el teclado, con la skill de Alexa integrada.',
+      'Cada proyecto define sus propios roles y decide, permiso a permiso, quién crea, edita o elimina.',
     icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
       />,
     ),
-    visual: VoiceScene,
+    visual: PermissionsScene,
   },
 ];
 

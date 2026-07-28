@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { alpha } from '../../tokens/colors';
 
 export interface RoleBadgeProps {
   /** Number displayed inside the circle */
@@ -21,9 +21,9 @@ export function RoleBadge({ index, role, tagline, color, label = 'Rol' }: RoleBa
       <div
         className="w-10 h-10 rounded-full flex items-center justify-center font-display text-lg font-bold flex-shrink-0"
         style={{
-          background: `${color}15`,
+          background: alpha(color, 12),
           color: color,
-          border: `1px solid ${color}30`,
+          border: `1px solid ${alpha(color, 30)}`,
         }}
         aria-hidden="true"
       >
