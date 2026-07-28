@@ -492,3 +492,93 @@ Verificado end-to-end a través del rewrite del shell (`localhost:4100/auth/*`):
 
 El access token dura **15 minutos** y el refresh **7 días**. Cualquier zona
 privada necesita renovación silenciosa o la sesión se cae a los 15 minutos.
+
+---
+
+## 14. Capa de sesión y proxy autenticado (implementada)
+
+> `66b767f`. Resuelve el bloqueante #4.
+
+### El problema que resuelve
+
+El access token vive en una cookie `httpOnly`, así que el JavaScript del
+navegador no puede leerlo ni añadir `Authorization: Bearer`. Toda llamada al
+gateway tiene que pasar por código de servidor de la propia zona.
+
+### Cómo se llama al gateway
+
+```
+Componente cliente
+   └─ createApiClient({ proxyPath: '/<zona>/api/proxy' })
+        └─ fetch → /<zona>/api/proxy/<ruta>        (cookie httpOnly viaja sola)
+             └─ createGatewayProxy()               (route handler de la zona)
+                  └─ fetch → GATEWAY_URL/api/<ruta>   con Authorization: Bearer
+```
+
+El proxy:
+
+- añade el Bearer leyendo `praxis_session`;
+- **nunca reenvía la cookie al gateway** — solo viaja el Bearer;
+- ante un `401`, canjea `praxis_refresh` por un access token nuevo, reintenta
+  **una sola vez** y reescribe la cookie de sesión. Transparente para quien llama;
+- devuelve el sobre `{success, data, meta}` intacto, para que `unwrapEnvelope`
+  conserve el código y el mensaje reales del backend.
+
+### Qué añadir en una zona nueva
+
+1. `src/app/api/proxy/[...path]/route.ts` — tres líneas:
+
+   ```ts
+   import { createGatewayProxy } from '@praxis/commons/auth';
+   export const { GET, POST, PUT, PATCH, DELETE } = createGatewayProxy();
+   ```
+
+2. `.env.local` con `GATEWAY_URL` y el **mismo** `JWT_SECRET` que el gateway.
+3. El rewrite de la zona en `web-shell/next.config.ts` y su puerto (4102+).
+
+En el servidor (layouts, páginas, route handlers):
+
+```ts
+import { getSession } from '@praxis/commons/auth';
+const session = await getSession();   // { userId, expiresAt, expiresInSeconds } | null
+```
+
+⚠️ `@praxis/commons/auth` es **código de servidor** (usa `next/headers` y
+`next/server`). No se re-exporta desde `@praxis/commons`; impórtalo siempre por
+su subruta o romperás el bundle de cliente.
+
+⚠️ `getSession()` verifica firma y expiración localmente, pero **no es
+autorización**: sirve para decidir qué renderizar. La autorización real la hace
+el gateway en cada petición.
+
+### Estado verificado
+
+| Caso | Resultado |
+|---|---|
+| `GET /api/proxy/users/:id` con sesión | 200 con el `data` real |
+| Sin cookie de sesión | 401 `UNAUTHORIZED` "No hay sesión activa." |
+| `PATCH /api/proxy/users/:id` (nombre y apellido) | 200 |
+| `POST /api/proxy/projects` | 201 |
+| Recurso inexistente | 404 `NOT_FOUND` con el mensaje del backend |
+| Access token caducado + refresh válido | **200**, cookie renovada sola |
+| Access token caducado + refresh inválido | 401 limpio, sin reintentos en bucle |
+
+---
+
+## 15. Pendientes con el equipo de backend
+
+Ninguno tiene workaround limpio desde el frontend. Ordenados por impacto:
+
+| # | Qué | Dónde | Impacto |
+|---|---|---|---|
+| 1 | `GET /projects` no filtra por usuario: devuelve todos los proyectos del sistema. El gateway envía `userId` pero `FindProjectsDto` solo declara `ownerId`. Y aun arreglado filtraría por dueño, no por membresía | `projects-service` | Bloquea el dashboard y la lista de proyectos |
+| 2 | `GET /projects` y `GET /users` reciben filtros por `@Body()` en un GET; `fetch` no puede enviarlo | gateway | Sin paginación ni búsqueda desde el navegador |
+| 3 | Crear proyecto con nombre duplicado → **500**. `Project.name` es `@unique` global y el servicio no captura el error P2002 de Prisma | `projects-service` | No se puede decir "ese nombre ya existe" |
+| 4 | Falta `GET /users/me` | gateway | Hay que sacar el `sub` del JWT y pedir `/users/:id` aparte |
+| 5 | Faltan `GET /projects/:id/roles` y `GET /boards/:id/columns` | gateway | Solo llegan embebidos en `GET /projects/:id` |
+| 6 | No hay endpoint de permisos efectivos por proyecto | gateway | La UI no sabe qué botones ocultar sin provocar 403 |
+| 7 | Reportes y logs no existen | — | `reports-front` y la sección de logs quedan fuera de alcance |
+
+El punto 3 comparte causa con un problema de diseño: **el nombre de proyecto es
+único a nivel global**, no por usuario ni por organización, así que dos equipos
+distintos no pueden tener un proyecto llamado "Sprint 1".
