@@ -1,5 +1,4 @@
-import { SESSION_COOKIE, redirectToZone } from '@praxis/commons/auth';
-import { jwtVerify } from 'jose';
+import { SESSION_COOKIE, hasValidSessionToken, redirectToZone } from '@praxis/commons/auth';
 import { type NextRequest, NextResponse } from 'next/server';
 import { POST_AUTH_DESTINATION } from '@/lib/navigation';
 
@@ -19,23 +18,14 @@ import { POST_AUTH_DESTINATION } from '@/lib/navigation';
 /** Rutas públicas de esta zona, ya sin el basePath `/auth`. */
 const GUEST_ONLY_ROUTES = new Set(['/login', '/signup']);
 
+/**
+ * La verificación vive en `@praxis/commons/auth` para que las dos zonas que
+ * hacen este mismo guard no la dupliquen. Si el token está caducado o la firma
+ * no cuadra devuelve false, y aquí eso significa dejar pasar al login: es justo
+ * lo que ese usuario necesita.
+ */
 async function hasValidSession(request: NextRequest): Promise<boolean> {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return false;
-
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    console.error('[proxy] JWT_SECRET no configurado en auth-front');
-    return false;
-  }
-
-  try {
-    await jwtVerify(token, new TextEncoder().encode(secret));
-    return true;
-  } catch {
-    // Caducado o firma inválida: se le deja pasar al login, que es lo que necesita
-    return false;
-  }
+  return hasValidSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 }
 
 export async function proxy(request: NextRequest) {

@@ -12,4 +12,6 @@ export * from './cookies';
 export * from './session';
 export * from './proxy';
 export * from './refresh-proxy';
+export * from './server-client';
+export * from './verify';
 export * from './zone';
