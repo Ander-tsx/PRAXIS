@@ -2,16 +2,25 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /**
+   * @praxis/commons se publica como TypeScript sin compilar y pnpm lo enlaza
+   * dentro de node_modules, donde Next no transpila por defecto.
+   */
+  transpilePackages: ['@praxis/commons'],
+
+  /**
    * Multi-Zones: redirige todas las rutas /auth/* a auth-front.
-   * En desarrollo: http://localhost:3002
+   * En desarrollo: http://localhost:4001
    * En producción: AUTH_FRONT_URL apunta al deploy real de auth-front.
+   *
+   * Los puertos del frontend viven en el rango 4000+ porque 3001-3004 los
+   * ocupan los microservicios del backend por TCP. Ver docs/frontend/ESTADO-ACTUAL.md §4.2
    *
    * Documentación verificada en:
    * node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/rewrites.md
    * La API de rewrites() no ha cambiado en Next.js 16 respecto a versiones anteriores.
    */
   async rewrites() {
-    const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:3002';
+    const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4001';
 
     return [
       {
