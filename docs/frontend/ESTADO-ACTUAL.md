@@ -586,6 +586,11 @@ el gateway en cada petición.
 
 ## 15. Pendientes con el equipo de backend
 
+> 📄 **La lista mantenida vive en
+> [PENDIENTES-BACKEND.md](PENDIENTES-BACKEND.md)**, con severidad, pasos de
+> reproducción y qué está verificado en runtime. Lo de abajo es el resumen
+> original; ante cualquier duda manda el documento dedicado.
+
 Ninguno tiene workaround limpio desde el frontend. Ordenados por impacto:
 
 | # | Qué | Dónde | Impacto |

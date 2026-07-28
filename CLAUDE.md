@@ -9,6 +9,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 |---|---|
 | [docs/frontend/ESTADO-ACTUAL.md](docs/frontend/ESTADO-ACTUAL.md) | Arquitectura, estado de cada microfrontend, deuda técnica priorizada, roadmap |
 | [docs/frontend/CONTRATO-API.md](docs/frontend/CONTRATO-API.md) | **Antes de escribir cualquier fetch.** Rutas, DTOs, permisos, trampas |
+| [docs/frontend/PENDIENTES-BACKEND.md](docs/frontend/PENDIENTES-BACKEND.md) | Lo que necesitamos del backend y no podemos resolver. Para pasárselo a ese equipo |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
@@ -45,6 +46,14 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 5. `GET /api/projects` y `GET /api/users` esperan filtros por **body en un GET** → inalcanzable desde `fetch`.
 6. `GET /api/projects` no filtra por usuario: devuelve todos los proyectos del sistema.
 7. Un proyecto nuevo no tiene roles ni miembros. Hay que crear un `ProjectRole` antes de invitar a nadie.
+
+**Regla de compatibilidad hacia adelante.** Como hoy el gateway apenas valida (trampa #3), es fácil escribir código que funciona ahora y se rompe cuando lo arreglen. Para evitarlo:
+
+- Envía **solo los campos que el DTO declara**, ni uno más. Hoy sobrarían sin consecuencia; mañana darían 400.
+- **Valida siempre en el cliente**, sin delegar en el servidor.
+- **Confirma el resultado contra el `data` de la respuesta, no contra el status.**
+
+Lista completa de lo que falta por el lado del backend, con severidad y reproducción, en [PENDIENTES-BACKEND.md](docs/frontend/PENDIENTES-BACKEND.md).
 
 ## Estado
 
