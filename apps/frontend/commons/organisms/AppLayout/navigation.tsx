@@ -1,0 +1,87 @@
+import type { ReactNode } from 'react';
+
+/**
+ * Un enlace de la barra lateral del área privada.
+ *
+ * `href` es siempre una ruta **del shell**, sin el basePath de ninguna zona:
+ * la barra lateral cruza zonas, así que sus enlaces son navegación dura
+ * (`<a>`), no `next/link`. Ver ESTADO-ACTUAL §16.
+ */
+export interface AppNavItem {
+  label: string;
+  href: string;
+  icon: ReactNode;
+  /**
+   * El destino todavía no existe. Se muestra apagado y no navega, para que la
+   * estructura del producto se entienda sin prometer una pantalla que daría
+   * 404.
+   */
+  disabled?: boolean;
+}
+
+/**
+ * `aria-hidden` va escrito en cada `<svg>` y no aquí: son iconos decorativos
+ * junto a una etiqueta de texto, así que ocultarlos al lector de pantalla es lo
+ * correcto — pero dentro de un spread el linter de accesibilidad no lo ve y
+ * reclama un `<title>` que sobra.
+ */
+const iconProps = {
+  className: 'h-5 w-5 shrink-0',
+  fill: 'none',
+  viewBox: '0 0 24 24',
+  stroke: 'currentColor',
+  strokeWidth: 1.75,
+} as const;
+
+/**
+ * Navegación canónica del área privada.
+ *
+ * Vive aquí, junto a `AppLayout`, para que las zonas no la vayan copiando y
+ * divergiendo. Se pasa como prop igualmente: una zona puede filtrarla o
+ * sustituirla si lo necesita.
+ */
+export const APP_NAV_ITEMS: AppNavItem[] = [
+  {
+    label: 'Panel',
+    href: '/dashboard',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Proyectos',
+    href: '/projects',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 002 2h2a2 2 0 002-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+        />
+      </svg>
+    ),
+    // La zona projects-front todavía no existe.
+    disabled: true,
+  },
+  {
+    label: 'Reportes',
+    href: '/reports',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+        />
+      </svg>
+    ),
+    // No hay backend de reportes. Ver PENDIENTES-BACKEND.md.
+    disabled: true,
+  },
+];
