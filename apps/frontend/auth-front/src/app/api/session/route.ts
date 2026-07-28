@@ -1,7 +1,6 @@
 import { jwtVerify } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
-
-const COOKIE_NAME = 'praxis_session';
+import { SESSION_COOKIE as COOKIE_NAME } from '@/lib/session-cookie';
 
 /**
  * BFF — GET /auth/api/session

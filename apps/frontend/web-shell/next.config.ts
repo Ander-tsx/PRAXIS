@@ -9,10 +9,10 @@ const nextConfig: NextConfig = {
 
   /**
    * Multi-Zones: redirige todas las rutas /auth/* a auth-front.
-   * En desarrollo: http://localhost:4001
+   * En desarrollo: http://localhost:4101
    * En producción: AUTH_FRONT_URL apunta al deploy real de auth-front.
    *
-   * Los puertos del frontend viven en el rango 4000+ porque 3001-3004 los
+   * Los puertos del frontend viven en el rango 4100+ porque 3001-3004 los
    * ocupan los microservicios del backend por TCP. Ver docs/frontend/ESTADO-ACTUAL.md §4.2
    *
    * Documentación verificada en:
@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
    * La API de rewrites() no ha cambiado en Next.js 16 respecto a versiones anteriores.
    */
   async rewrites() {
-    const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4001';
+    const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
 
     return [
       {

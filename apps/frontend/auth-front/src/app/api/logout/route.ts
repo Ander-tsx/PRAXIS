@@ -1,29 +1,35 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
 
-const COOKIE_NAME = 'praxis_session';
+const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
 
 /**
  * BFF — POST /auth/api/logout
  *
- * Borra la cookie de sesión seteando maxAge=0.
- * No necesita comunicarse con el gateway — el token seguirá siendo
- * técnicamente válido hasta su exp, pero el cliente ya no lo tendrá
- * (no hay localStorage ni sessionStorage).
+ * 1. Avisa al gateway (POST /api/auth/logout) para que credentials-service
+ *    borre la sesión de Redis — eso invalida el refresh token del lado servidor
+ * 2. Borra las cookies del navegador
  *
- * Nota de arquitectura: si se requiere invalidación inmediata del lado
- * del servidor (token blacklist), habría que agregar un endpoint en el
- * microservicio auth y llamarlo aquí. Por ahora esto está fuera del scope.
+ * El paso 1 es best-effort: si el gateway no responde igualmente cerramos la
+ * sesión local, porque dejar la cookie puesta es peor que dejar huérfana una
+ * entrada en Redis (que caduca sola a los 7 días).
  */
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+
+  if (token) {
+    try {
+      await fetch(`${GATEWAY_URL}/api/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+    } catch (error) {
+      console.warn('[logout] no se pudo notificar al gateway', error);
+    }
+  }
+
   const response = NextResponse.json({ success: true });
-
-  response.cookies.set(COOKIE_NAME, '', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 0,
-  });
-
+  clearSessionCookies(response);
   return response;
 }
