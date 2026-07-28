@@ -172,7 +172,15 @@ Cacheado en Redis 5 min — un cambio puede tardar en reflejarse.
 | POST | `/projects/:projectId/members` | `{ userId, projectRoleId }` | `canManageMembers` |
 | DELETE | `/projects/:projectId/members` | `{ userId }` | `canManageMembers` |
 
-⚠️ Un proyecto recién creado **no tiene roles ni miembros**. Hay que crear un `ProjectRole` antes de poder invitar a nadie.
+⚠️ Un proyecto recién creado **no tiene roles ni miembros**. Hay que crear un `ProjectRole` antes de poder añadir a nadie.
+
+⚠️ **Esto no es invitar, es dar de alta.** Recibe un `userId` —no un correo— y
+surte efecto inmediato: la persona entra en el proyecto sin enterarse, sin
+aceptar y sin estado "pendiente". No existe ningún flujo de invitación en el
+backend (ni tabla, ni token, ni correo). Para pasar de correo a `userId` hay que
+traerse `GET /users` y buscar en el cliente, lo que además solo encuentra a
+quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
+"invitar". Ver PENDIENTES-BACKEND §12.
 
 ---
 
@@ -198,6 +206,57 @@ Cacheado en Redis 5 min — un cambio puede tardar en reflejarse.
 ```
 
 > El DTO también admite `canEditColumn`, pero **no existe en el enum `ProjectPermission`** ni lo usa ningún endpoint. No lo uses.
+
+### 🔴 Un array se acepta con 201 y no concede NADA
+
+`permissions` **tiene que ser el objeto de booleanos**. Si mandas un array, el
+gateway responde `201` con un cuerpo de aspecto normal y el rol queda creado —
+pero vacío. El guard evalúa `permisos[clave]`, y sobre un array eso es
+`undefined`.
+
+```ts
+// ❌ 201, y quien tenga este rol no podrá hacer nada
+{ name: 'Colaborador', permissions: ['canEditBoard'] }
+
+// ✅
+{ name: 'Colaborador', permissions: { canEditBoard: true } }
+```
+
+Verificado con dos cuentas: el mismo miembro obtiene **403** con el rol guardado
+como array y **200** con el mismo permiso como diccionario.
+
+Tampoco se validan las claves: `{ canHackearTodo: true }` devuelve 201. Valida
+tú contra la lista de arriba antes de enviar. Ver PENDIENTES-BACKEND §11.
+
+### Jerarquía implícita — refléjala en la interfaz
+
+Al evaluar, el backend expande los permisos hacia abajo
+(`project-roles.service.ts`, `PERMISSION_HIERARCHY`):
+
+| Si concedes | También concede |
+|---|---|
+| `canDeleteBoard` | `canEditBoard`, `canCreateBoard` |
+| `canEditBoard` | `canCreateBoard` |
+| `canDeleteColumn` | `canEditColumn`, `canCreateColumn` |
+| `canEditColumn` | `canCreateColumn` |
+| `canDeleteTask` | `canEditTask`, `canCreateTask` |
+| `canEditTask` | `canCreateTask` |
+
+`canManageMembers` y `canManageRoles` no arrastran nada.
+
+No hace falta guardar los implicados: el backend los deduce al comprobar. Pero
+el formulario de roles **debe enseñarlo** —marcar "eliminar" implica "editar" y
+"crear"— o el usuario creerá que está dando menos permiso del que da.
+
+⚠️ **No hay ningún permiso de lectura.** Ver un proyecto exige `canEditBoard`,
+que además arrastra `canCreateBoard`. Un rol de solo lectura no se puede
+modelar hoy. Ver PENDIENTES-BACKEND §13.
+
+### Los permisos se cachean 5 minutos
+
+`project:<projectId>:user:<userId>:permissions` en Redis, TTL 300s. Se invalida
+al cambiar un rol y al añadir un miembro, así que el camino normal es
+consistente; tenlo en cuenta si algo parece no aplicarse.
 
 ---
 
@@ -263,7 +322,7 @@ No hay `GET`; llegan embebidos en `GET /tasks/:id`.
 ```
 POST /auth/register            → accessToken
 POST /projects                 → projectId
-POST /projects/:id/roles       → projectRoleId   (obligatorio antes de invitar)
+POST /projects/:id/roles       → projectRoleId   (obligatorio antes de añadir miembros)
 POST /projects/:id/members     → { userId, projectRoleId }
 POST /projects/:id/workspaces  → workspaceId
 POST /workspaces/:wid/boards   → boardId
@@ -279,7 +338,10 @@ POST /boards/:bid/tasks        → { projectId, columnId, title, status: <name d
 - `GET /projects` filtrado por membresía real
 - `GET /projects/:projectId/roles`
 - `GET /boards/:boardId/columns`
-- Mis permisos efectivos en un proyecto
+- Mis permisos efectivos en un proyecto (la lógica existe en el microservicio, no está expuesta)
+- **Invitaciones**: modelo, estados, token y canal de aviso (§12)
+- **Permiso de lectura** de proyecto: hoy ver exige `canEditBoard` (§13)
+- `POST /projects/:id/members` que acepte **email**
 - Dominio de **reportes** completo
 - **Logs / auditoría**
 - Notificaciones
