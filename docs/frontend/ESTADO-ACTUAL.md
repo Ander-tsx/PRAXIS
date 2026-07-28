@@ -365,3 +365,44 @@ Esta es la "fase 0". Sin esto, cada zona nueva reimplementa lo mismo y mal.
 3. ¿Cuál es el rango de puertos que reservamos para el frontend?
 4. ¿El registro debe pedir nombre y apellido? (requiere cambiar `RegisterDto`)
 5. ¿Mobile (Flutter) entra en el alcance o se queda vacío?
+
+---
+
+## 12. Hallazgo posterior al análisis (2026-07-28, verificado en runtime)
+
+### 🔴 CRÍTICO — El gateway convierte TODO error de microservicio en un 500
+
+Verificado levantando el stack completo:
+
+```
+POST /api/auth/login  (password incorrecta) → 500 {"code":"INTERNAL_SERVER_ERROR","message":"Internal server error"}
+POST /api/auth/register (email duplicado)   → 500 {"code":"INTERNAL_SERVER_ERROR","message":"Internal server error"}
+```
+
+Los microservicios lanzan bien sus errores (`RpcException({statusCode: 401, message: 'Credenciales inválidas'})`),
+pero se pierden al cruzar el gateway.
+
+**Causa:** cuando un microservicio lanza `RpcException` sobre TCP, el `ClientProxy`
+del gateway rechaza con el **objeto plano deserializado** `{statusCode, message}`,
+no con una instancia de `RpcException`. `StandardExceptionFilter` comprueba, en orden:
+
+1. `instanceof HttpException` → no
+2. `instanceof RpcException` → **no**, es un objeto plano
+3. `isErrorWithStatus()` → busca la propiedad `status`, pero el payload trae `statusCode` → no
+4. → cae al `catch` genérico: 500 "Internal server error"
+
+`rpc-exception.filter.ts` existe pero es código muerto: no está registrado en
+`main.ts` y además usa `@Catch(RpcException)`, que tampoco haría match.
+
+**Alcance:** no es solo auth. Afecta a los cuatro servicios y a todos los códigos
+de negocio: 401, 403, 404 (proyecto/tarea no encontrada), 409 (nombre duplicado).
+Los únicos errores que llegan bien son los que genera el propio gateway
+(ValidationPipe y los guards), porque esos sí son `HttpException`.
+
+**Por qué no tiene workaround en el frontend:** el gateway destruye status y
+mensaje. Al BFF le llega un 500 con "Internal server error" y cero información.
+No hay forma de distinguir "contraseña incorrecta" de "la base de datos se cayó".
+
+**Consecuencia mientras no se arregle:** toda la UI tiene que mostrar un
+"algo salió mal" genérico. Nada de "email ya registrado", "credenciales
+inválidas" o "no tienes permiso".
