@@ -370,7 +370,11 @@ Esta es la "fase 0". Sin esto, cada zona nueva reimplementa lo mismo y mal.
 
 ## 12. Hallazgo posterior al análisis (2026-07-28, verificado en runtime)
 
-### 🔴 CRÍTICO — El gateway convierte TODO error de microservicio en un 500
+### ✅ RESUELTO — El gateway convertía TODO error de microservicio en un 500
+
+> Arreglado en `35013e3`, con autorización explícita para tocar el backend.
+> **Es el único cambio que hemos hecho en `apps/backend/`.** Si el equipo de
+> backend toca `standard-exception.filter.ts`, avisar del conflicto.
 
 Verificado levantando el stack completo:
 
@@ -406,3 +410,67 @@ No hay forma de distinguir "contraseña incorrecta" de "la base de datos se cay�
 **Consecuencia mientras no se arregle:** toda la UI tiene que mostrar un
 "algo salió mal" genérico. Nada de "email ya registrado", "credenciales
 inválidas" o "no tienes permiso".
+
+**Solución aplicada:** una rama nueva en `StandardExceptionFilter` que reconoce la
+forma serializada `{statusCode, message}`, reutilizando los helpers de status y
+código que ya existían. Puramente aditiva: no cambia ningún caso que ya
+funcionaba. Cubierta por dos tests en `response-normalization.spec.ts`.
+
+Resultado verificado:
+
+```
+POST /api/auth/login  (password incorrecta) → 401 UNAUTHORIZED "Credenciales inválidas"
+POST /api/auth/register (email duplicado)   → 409 CONFLICT "El email ya está registrado"
+GET  /api/projects (sin token)              → 401 UNAUTHORIZED "No token provided"
+```
+
+---
+
+## 13. Entorno local — cómo dejarlo listo
+
+Puertos definitivos:
+
+| Rango | Qué |
+|---|---|
+| 3000 | gateway (HTTP) |
+| 3001-3004 | credentials, permissions, projects, tasks (TCP) |
+| 4100 | web-shell |
+| 4101 | auth-front |
+| 4102+ | reservado para las zonas siguientes |
+
+Los `.env` no están versionados. Un clon nuevo necesita crearlos a partir de los
+`.env.example`, con **el mismo `JWT_SECRET` en gateway, credentials-service y
+`auth-front/.env.local`** — si no coinciden, `/auth/api/session` rechaza cookies
+que el gateway considera válidas.
+
+Arranque desde cero:
+
+```bash
+pnpm install
+pnpm docker:up
+pnpm --filter @praxis/contracts --filter @praxis/observability run build   # ← imprescindible
+pnpm prisma:reset
+pnpm prisma:seed
+pnpm dev:backend      # terminal 1
+pnpm dev:frontend     # terminal 2
+```
+
+⚠️ El paso de build de `contracts` y `observability` no está en el README, pero
+sin él los cuatro microservicios fallan con `Cannot find module '@praxis/contracts'`.
+Ambos paquetes publican `dist/` y no se compilan solos en `dev`.
+
+### Estado tras la puesta en marcha (2026-07-28)
+
+Verificado end-to-end a través del rewrite del shell (`localhost:4100/auth/*`):
+
+| Flujo | Estado |
+|---|---|
+| signup → cookies httpOnly | ✅ |
+| session (verificación de firma) | ✅ |
+| logout (borra sesión en Redis) | ✅ |
+| login | ✅ |
+| refresh | ✅ |
+| errores 401 / 409 / 400 con mensaje útil | ✅ |
+
+El access token dura **15 minutos** y el refresh **7 días**. Cualquier zona
+privada necesita renovación silenciosa o la sesión se cae a los 15 minutos.
