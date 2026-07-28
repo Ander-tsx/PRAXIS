@@ -1743,13 +1743,13 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/tasks/:id?projectId=project-uuid-here",
+          "raw": "{{base_url}}/tasks/:taskId?projectId=project-uuid-here",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
-            ":id"
+            ":taskId"
           ],
           "query": [
             {
@@ -1759,7 +1759,7 @@
           ],
           "variable": [
             {
-              "key": "id",
+              "key": "taskId",
               "value": "{{taskId}}"
             }
           ]
@@ -1804,17 +1804,17 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/tasks/:id",
+          "raw": "{{base_url}}/tasks/:taskId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
-            ":id"
+            ":taskId"
           ],
           "variable": [
             {
-              "key": "id",
+              "key": "taskId",
               "value": "{{taskId}}"
             }
           ]
@@ -1859,18 +1859,18 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/tasks/:id/assign",
+          "raw": "{{base_url}}/tasks/:taskId/assign",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
-            ":id",
+            ":taskId",
             "assign"
           ],
           "variable": [
             {
-              "key": "id",
+              "key": "taskId",
               "value": "{{taskId}}"
             }
           ]
@@ -1915,18 +1915,18 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/tasks/:id/move",
+          "raw": "{{base_url}}/tasks/:taskId/move",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
-            ":id",
+            ":taskId",
             "move"
           ],
           "variable": [
             {
-              "key": "id",
+              "key": "taskId",
               "value": "{{taskId}}"
             }
           ]
@@ -2200,17 +2200,17 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/tasks/:id",
+          "raw": "{{base_url}}/tasks/:taskId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
-            ":id"
+            ":taskId"
           ],
           "variable": [
             {
-              "key": "id",
+              "key": "taskId",
               "value": "{{taskId}}"
             }
           ]

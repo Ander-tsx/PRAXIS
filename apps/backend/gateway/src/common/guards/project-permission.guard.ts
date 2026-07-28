@@ -14,7 +14,7 @@ import { ProjectPermission } from '@praxis/contracts';
 /** Nombres de controladores que usan el param `:id` como projectId */
 const PROJECT_ID_CONTROLLERS = new Set(['ProjectsController']);
 
-/** Nombres de controladores cuyo param `:id` / `:taskId` es una tarea */
+/** Nombres de controladores cuyo param `:taskId` es una tarea */
 const TASK_CONTROLLERS = new Set(['TasksController', 'ChecklistsController']);
 
 @Injectable()
@@ -71,8 +71,7 @@ export class ProjectPermissionGuard implements CanActivate {
 
     // Si el controlador maneja tareas, resolvemos taskId → boardId → projectId
     if (!projectId && TASK_CONTROLLERS.has(controllerName)) {
-      // Soporta tanto :taskId como :id en las rutas de tasks
-      const taskId: string | undefined = params.taskId ?? params.id;
+      const taskId: string | undefined = params.taskId;
 
       if (taskId) {
         try {

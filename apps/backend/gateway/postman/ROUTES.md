@@ -227,15 +227,15 @@ Todos los endpoints requieren autenticación mediante un token Bearer en las cab
 
 ### Detalle de una Tarea (Sin projectId en Query)
 * **Método:** `GET`
-* **Ruta:** `/tasks/:id`
+* **Ruta:** `/tasks/:taskId`
 * **Parámetros de Ruta:**
-  * `:id` — ID de la Tarea (UUID v4)
+  * `:taskId` — ID de la Tarea (UUID v4)
 
 ### Actualizar Tarea (Sin projectId en Body/Query)
 * **Método:** `PATCH`
-* **Ruta:** `/tasks/:id`
+* **Ruta:** `/tasks/:taskId`
 * **Parámetros de Ruta:**
-  * `:id` — ID de la Tarea (UUID v4)
+  * `:taskId` — ID de la Tarea (UUID v4)
 * **Body (JSON):**
   ```json
   {
@@ -252,9 +252,9 @@ Todos los endpoints requieren autenticación mediante un token Bearer en las cab
 
 ### Mover Tarea (de Columna o Posición)
 * **Método:** `POST`
-* **Ruta:** `/tasks/:id/move`
+* **Ruta:** `/tasks/:taskId/move`
 * **Parámetros de Ruta:**
-  * `:id` — ID de la Tarea (UUID v4)
+  * `:taskId` — ID de la Tarea (UUID v4)
 * **Body (JSON):**
   ```json
   {
@@ -267,9 +267,9 @@ Todos los endpoints requieren autenticación mediante un token Bearer en las cab
 
 ### Asignar Tarea
 * **Método:** `POST`
-* **Ruta:** `/tasks/:id/assign`
+* **Ruta:** `/tasks/:taskId/assign`
 * **Parámetros de Ruta:**
-  * `:id` — ID de la Tarea (UUID v4)
+  * `:taskId` — ID de la Tarea (UUID v4)
 * **Body (JSON):**
   ```json
   {
@@ -280,9 +280,9 @@ Todos los endpoints requieren autenticación mediante un token Bearer en las cab
 
 ### Eliminar Tarea (Sin projectId en Body/Query)
 * **Método:** `DELETE`
-* **Ruta:** `/tasks/:id`
+* **Ruta:** `/tasks/:taskId`
 * **Parámetros de Ruta:**
-  * `:id` — ID de la Tarea (UUID v4)
+  * `:taskId` — ID de la Tarea (UUID v4)
 * **Body (JSON):**
   ```json
   {

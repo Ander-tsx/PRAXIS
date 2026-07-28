@@ -138,10 +138,10 @@
 |---|---|---|---|---|
 | 31 | **Create Task** | `POST` | `/boards/:boardId/tasks` | `201` · Guardar `id` de la tarea |
 | 32 | **Find All** | `GET` | `/boards/:boardId/tasks` | `200` · La tarea aparece en la lista |
-| 33 | **Find One** | `GET` | `/tasks/:id?projectId=…` | `200` · Datos completos de la tarea |
-| 34 | **Update** | `PATCH` | `/tasks/:id` | `200` · Campos actualizados |
-| 35 | **Assign** | `POST` | `/tasks/:id/assign` | `200` · Asignee actualizado |
-| 36 | **Move** | `POST` | `/tasks/:id/move` | `200` · Tarea en nueva columna/estado |
+| 33 | **Find One** | `GET` | `/tasks/:taskId?projectId=…` | `200` · Datos completos de la tarea |
+| 34 | **Update** | `PATCH` | `/tasks/:taskId` | `200` · Campos actualizados |
+| 35 | **Assign** | `POST` | `/tasks/:taskId/assign` | `200` · Asignee actualizado |
+| 36 | **Move** | `POST` | `/tasks/:taskId/move` | `200` · Tarea en nueva columna/estado |
 | 37 | **Create Subtask** | `POST` | `/boards/:boardId/tasks` | `201` · Subtarea con `parentTaskId` correcto |
 
 ---
@@ -164,7 +164,7 @@
 
 | # | Request | Método | Endpoint |
 |---|---|---|---|
-| 41 | **Delete Task** | `DELETE` | `/tasks/:id` |
+| 41 | **Delete Task** | `DELETE` | `/tasks/:taskId` |
 | 42 | **Delete Column** | `DELETE` | `/boards/:boardId/columns/:id` |
 | 43 | **Delete Board** | `DELETE` | `/workspaces/:workspaceId/boards/:id` |
 | 44 | **Delete Workspace** | `DELETE` | `/projects/:projectId/workspaces/:id` |
