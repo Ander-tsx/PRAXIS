@@ -44,6 +44,21 @@ class TestController {
   unauthorized() {
     throw new UnauthorizedException('Unauthorized');
   }
+
+  /**
+   * Reproduce lo que llega cuando un microservicio lanza RpcException sobre
+   * TCP: el ClientProxy rechaza con el objeto plano ya deserializado, no con
+   * la instancia de RpcException.
+   */
+  @Get('rpc-conflict')
+  rpcConflict() {
+    throw { statusCode: HttpStatus.CONFLICT, message: 'El email ya está registrado' };
+  }
+
+  @Get('rpc-unauthorized')
+  rpcUnauthorized() {
+    throw { statusCode: HttpStatus.UNAUTHORIZED, message: 'Credenciales inválidas' };
+  }
 }
 
 @Module({
@@ -118,6 +133,36 @@ describe('response normalization', () => {
       error: {
         code: 'UNAUTHORIZED',
         message: 'Unauthorized',
+        details: {},
+      },
+    });
+  });
+
+  it('preserves the status of a serialized RpcException instead of degrading it to 500', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/test/rpc-conflict')
+      .expect(HttpStatus.CONFLICT);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'CONFLICT',
+        message: 'El email ya está registrado',
+        details: {},
+      },
+    });
+  });
+
+  it('preserves the status of a serialized RpcException for auth errors', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/test/rpc-unauthorized')
+      .expect(HttpStatus.UNAUTHORIZED);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'Credenciales inválidas',
         details: {},
       },
     });

@@ -47,6 +47,19 @@ export class StandardExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    // Cuando un microservicio lanza RpcException sobre TCP, el ClientProxy del
+    // gateway rechaza con el objeto plano ya deserializado — no con la instancia
+    // de RpcException — así que la rama de arriba no lo captura. Sin este caso,
+    // todo error de negocio (401, 403, 404, 409) degradaba a 500.
+    if (this.isSerializedRpcError(exception)) {
+      const status = this.getStatusFromError(exception);
+      const message = this.extractMessage(exception, 'Internal server error');
+      const details = this.extractDetails(exception, status);
+      const code = this.getRpcErrorCode(exception);
+      response.status(status).json(this.buildErrorPayload(code, message, details));
+      return;
+    }
+
     this.logger.error('Unhandled gateway exception', exception instanceof Error ? exception.stack : exception);
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(
       this.buildErrorPayload('INTERNAL_SERVER_ERROR', 'Internal server error', {}),
@@ -199,6 +212,19 @@ export class StandardExceptionFilter implements ExceptionFilter {
       default:
         return 'HTTP_ERROR';
     }
+  }
+
+  /**
+   * Forma con la que llega un RpcException tras cruzar el transporte TCP:
+   * el objeto que el microservicio pasó al constructor, ya deserializado.
+   */
+  private isSerializedRpcError(value: unknown): value is { statusCode: number; message?: string } {
+    return Boolean(
+      value &&
+        typeof value === 'object' &&
+        'statusCode' in value &&
+        typeof (value as { statusCode?: unknown }).statusCode === 'number',
+    );
   }
 
   private isErrorWithStatus(value: unknown): value is { status: number; response?: unknown; message?: string } {
