@@ -18,11 +18,11 @@ Estado por pieza:
 
 | Pieza | Estado | Comentario |
 |---|---|---|
-| `web-shell` | 🟡 Parcial | Landing pública completa (hero 3D, features, CTA). Cero área privada, cero sesión, cero navegación autenticada. |
+| `web-shell` | ✅ Funcional | Landing pública consciente de la sesión + rewrites hacia las zonas. Ya no sirve páginas de negocio: es la cáscara. Ver §17.0. |
 | `auth-front` | ✅ Funcional | Login, signup, session, logout y refresh verificados end-to-end. Ver §13. |
 | `commons` | 🟡 Parcial | 5 átomos + 5 moléculas + tokens. Falta capa de organismos, cliente HTTP, tipos de dominio, estado de sesión. |
 | `projects-front` | 🔴 No existe | Solo mockup sin mergear en `feature/vibecoded-mockup-frontend-flow`. |
-| `dashboard-front` | 🔴 No existe | Idem. |
+| `dashboard-front` | ✅ Funcional | Panel y datos del usuario, contra el backend real. Zona propia en el 4102. Ver §17. |
 | `admin-front` | 🔴 No existe | Idem. |
 | `reports-front` | 🔴 No existe | Idem. **No hay backend para reportes.** |
 | `apps/mobile` | 🔴 Vacío | Solo `.gitkeep`. Fuera de alcance por ahora. |
@@ -473,7 +473,8 @@ Puertos definitivos:
 | 3001-3004 | credentials, permissions, projects, tasks (TCP) |
 | 4100 | web-shell |
 | 4101 | auth-front |
-| 4102+ | reservado para las zonas siguientes |
+| 4102 | dashboard-front |
+| 4103+ | reservado para las zonas siguientes |
 
 Los `.env` no están versionados. Un clon nuevo necesita crearlos a partir de los
 `.env.example`, con **el mismo `JWT_SECRET` en gateway, credentials-service y
@@ -717,3 +718,190 @@ cuenta.
 | Cookie corrupta → `/auth/login` | 200, accesible |
 | `document.cookie` desde la consola | vacío — httpOnly funcionando |
 | `fetch('/api/gateway/users/:id')` desde la página | 200 con datos reales |
+
+---
+
+## 17. `dashboard-front` — el primer microfrontend de negocio (implementado)
+
+> Panel en `/dashboard` y datos del usuario en `/dashboard/perfil`. Zona propia,
+> puerto 4102, `basePath: '/dashboard'`. Sin mocks: todo sale del backend real.
+
+### 17.0 Por qué es una zona y no una carpeta del shell
+
+Se construyó primero dentro del `web-shell` y **se movió**. El motivo del
+cambio, por si alguien vuelve a tener la tentación:
+
+- En Multi-Zones el shell es la **cáscara**: landing pública, `rewrites()` y
+  poco más. Cada página de negocio que se le añade lo convierte en el monolito
+  que la arquitectura quiere evitar.
+- Concreto: el shell arrastra `three`, `@react-three/fiber`, `drei` y `gsap`
+  para el hero 3D de la landing. Con el panel dentro, el área privada comparte
+  build con dependencias que no usa, y desplegar el panel obliga a redesplegar
+  la landing.
+- La zona se protege sola (§17.2), así que se puede levantar y probar en su
+  puerto sin el shell delante.
+
+### 17.1 `createServerApiClient` — la pieza que faltaba
+
+Un Server Component no podía hablar con el gateway. `createApiClient` es de
+navegador (hace `fetch` con ruta relativa contra el proxy de la zona, y una
+ruta relativa no significa nada en el servidor) y `createGatewayProxy` es un
+route handler, no una función que se pueda llamar.
+
+`createServerApiClient()` (en `@praxis/commons/auth`) lee `praxis_session` con
+`next/headers` y llama al gateway **directo**, sin el rodeo por el proxy: en el
+servidor ya tenemos el token, y ese salto de red no aportaba nada. Desenvuelve
+con `unwrapEnvelope` y lanza el mismo `ApiError` que el cliente de navegador.
+
+No renueva el token, y no le hace falta: `proxy.ts` corre antes del render y ya
+reescribe la cookie de la petición con el token fresco.
+
+```ts
+import { createServerApiClient } from '@praxis/commons/auth';
+const api = createServerApiClient();
+const user = await api.get<UserProfile>(`/users/${session.userId}`);
+```
+
+### 17.2 Cada zona se protege sola
+
+`dashboard-front/src/proxy.ts` hace dos cosas, y el orden importa:
+
+1. renueva la sesión (`createSessionRefreshProxy`);
+2. **después** comprueba la firma.
+
+Comprobando la cookie original echaríamos al login a quien llega con el access
+token caducado y el refresh bueno — justo el caso que el paso 1 acaba de
+arreglar. El token que vale se lee de las cookies de la **respuesta**, no de la
+petición.
+
+Toda la zona es privada, así que no hay lista de rutas. Y el redirect al login
+usa `redirectToZone`: aquí `request.url` apunta al puerto interno (4102).
+
+El `web-shell` **no protege nada**: solo renueva la sesión para que la landing
+sepa si hay alguien identificado, y su `matcher` excluye los prefijos de las
+zonas (`/auth/*`, `/dashboard/*`) para no pagar el salto al gateway dos veces
+por navegación.
+
+La verificación de firma vive en `hasValidSessionToken` (`@praxis/commons/auth`):
+las zonas hacían el mismo guard duplicado y así ninguna necesita declarar `jose`.
+
+### 17.3 `AppLayout` en `commons/organisms`
+
+Sube a commons por construcción, no por apuesta: en multi-zones cada zona
+privada es una app Next independiente y renderiza su propio armazón, así que
+los ≥2 consumidores están garantizados.
+
+⚠️ **El resaltado del ítem activo llega en `activePath`, no de
+`usePathname()`.** Cada zona tiene su propio `basePath`, así que dentro de la
+zona `usePathname()` devuelve la ruta *sin* prefijo y no casa con los enlaces de
+la barra lateral, que son rutas del **shell**. Por eso también son `<a>` y no
+`next/link`.
+
+`Proyectos` y `Reportes` salen apagados con "Pronto": sus zonas no existen y no
+tiene sentido prometer una pantalla que daría 404.
+
+### 17.4 Rutas dentro de la zona: con prefijo y sin prefijo
+
+Es la trampa del `basePath` (§16) aplicada, y conviene tenerla junta:
+
+| Dónde | Se escribe | Por qué |
+|---|---|---|
+| `next/link` dentro de la zona | `/perfil` | Next añade `/dashboard` solo |
+| `revalidatePath()` | `/`, `/perfil` | son rutas del App Router de la app, que no incluye el basePath |
+| `activePath` de `AppLayout` | `/dashboard/perfil` | ruta **pública**: se compara con enlaces del shell |
+| Salir de la zona (logout, landing) | `window.location` | navegación dura |
+| Rewrite en el shell | `/dashboard` **y** `/dashboard/:path*` | sin la primera, `/dashboard` a secas no casa y cae en el 404 del shell |
+
+### 17.5 Lo que el panel puede y no puede mostrar
+
+| Sale de | Qué |
+|---|---|
+| `GET /users/:id` | nombre, apellido, email |
+| `GET /permissions/user/:id` | rol global como Badge |
+| `GET /projects` | proyectos, y los contadores `_count` de espacios y miembros |
+
+⚠️ **`GET /projects` devuelve todos los proyectos del sistema**, así que la page
+filtra por `ownerId === session.userId`. Sin ese filtro estaríamos enseñando
+proyectos ajenos: una fuga de información. Cuando el backend filtre por
+membresía (PENDIENTES-BACKEND §3), la línea se cae.
+
+Coste honesto mientras tanto: **no aparecen los proyectos donde el usuario es
+miembro pero no dueño.** No hay forma de saberlo desde el frontend.
+
+No hay sección de "mis tareas": no existe endpoint. Sacarla obligaría a
+recorrer proyectos → espacios → tableros → tareas (PENDIENTES-BACKEND §5).
+
+### 17.6 Cuatro trampas nuevas, verificadas en runtime
+
+**El `matcher` con lookahead negativo NO casa la raíz.** El patrón habitual
+`'/((?!_next/static|...).*)'` deja `/` fuera. En la zona eso significaba que el
+panel (`/dashboard`, la raíz de la zona) **se servía sin guard**, mientras que
+`/dashboard/perfil` sí redirigía — fácil de pasar por alto. En el shell
+significaba que la landing nunca renovaba la sesión, que es justo para lo que
+existe ese proxy. Se arregla añadiendo `'/'` como entrada aparte:
+
+```ts
+matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|api/).*)']
+```
+
+Se detecta en el desglose de tiempos de `next dev`: `GET /perfil` muestra
+`proxy.ts: 3ms` y `GET /` no muestra nada.
+
+**Un archivo `'use server'` solo puede exportar funciones async.** Exportar de
+ahí una constante (el estado inicial de `useActionState`) rompe el módulo
+entero en tiempo de ejecución. El error apunta al final del archivo, no al
+export culpable, así que despista. Por eso los estados iniciales viven en
+`src/lib/action-state.ts`.
+
+**La validación nativa del navegador corta el `onSubmit` de React.** Un
+`minLength` en el input bloqueaba el envío *antes* de nuestro handler: el
+formulario se quedaba mudo, sin marcar el campo y sin mensaje. Los formularios
+llevan `noValidate` y la validación es nuestra, que además es lo que exige la
+trampa #3 (el gateway no valida).
+
+**`<dialog>` nativo con `showModal()`** da atrapado de foco, cierre con Escape y
+fondo inerte gratis; a mano habría que reimplementar los tres, y el foco se
+escapaba del diálogo con el tabulador. El clic en el fondo se detecta con
+`event.target === dialogRef.current`, porque el `::backdrop` dirige sus eventos
+al propio elemento.
+
+### 17.7 Qué necesita una zona nueva
+
+Checklist, salida de montar esta:
+
+1. `package.json` con puerto propio (4103+) y `@praxis/commons: workspace:*`.
+2. `next.config.ts` con `basePath: '/<zona>'` y `transpilePackages: ['@praxis/commons']`.
+3. `tsconfig.json` con los `paths` a commons (copiar el de otra zona).
+4. `src/app/globals.css` con **los cuatro `@source`**, incluido
+   `commons/organisms` si usa `AppLayout` — sin él la zona se renderiza sin
+   estilos y sin ningún error.
+5. Fuentes en `public/fonts/` y `@font-face` apuntando a `/<zona>/fonts/...`.
+6. `src/app/api/gateway/[...path]/route.ts` de dos líneas.
+7. `src/proxy.ts` con `createSessionRefreshProxy` + `hasValidSessionToken`, y
+   `'/'` en el matcher.
+8. `.env.local` con `GATEWAY_URL` y el **mismo** `JWT_SECRET` que el gateway.
+9. El rewrite en `web-shell/next.config.ts` (las **dos** entradas) y
+   `<ZONA>_FRONT_URL` en su `.env.local`.
+
+`pnpm dev:frontend` la recoge sola: el filtro es por directorio
+(`--filter='./apps/frontend/*'`), no una lista de paquetes.
+
+### 17.8 Verificado en navegador real
+
+| Caso | Resultado |
+|---|---|
+| `/dashboard` sin sesión | 307 → `/auth/login` |
+| `/dashboard/perfil` sin sesión | 307 → `/auth/login` |
+| `/dashboard` con cookie corrupta | 307 → `/auth/login` |
+| Zona servida directa (`:4102/dashboard`) | mismo guard, sin el shell delante |
+| Login → destino | `/dashboard` (`POST_AUTH_DESTINATION`) |
+| Cuenta nueva (sin nombre, sin proyectos) | saluda con el email, ofrece completar perfil, estado vacío con los 3 pasos |
+| Cuenta nueva: roles `[]` | sin insignia, sin romper |
+| `admin@praxis.dev` | insignia ADMIN y sus 2 proyectos de los 4 del sistema |
+| Proyecto de otra cuenta | **no** aparece en la lista del admin |
+| Crear proyecto con nombre de 1 carácter | bloqueado en cliente, con mensaje |
+| Crear proyecto válido | 201, diálogo cerrado y panel revalidado |
+| Guardar nombre y apellido | 200 confirmado contra el `data`; la barra lateral se actualiza sola |
+| Escape / clic en el fondo | cierran el diálogo; el foco vuelve al disparador |
+| Móvil (375px) | cajón lateral, métricas apiladas |
+| Cerrar sesión desde la zona | landing del shell en estado anónimo |

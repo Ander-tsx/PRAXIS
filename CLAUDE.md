@@ -31,7 +31,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 **Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
 
-- servidor → `getSession()` de `@praxis/commons/auth`
+- Server Component → `createServerApiClient()` de `@praxis/commons/auth` (llama al gateway directo; `createApiClient` no sirve en el servidor)
+- sesión en el servidor → `getSession()` de `@praxis/commons/auth`
 - cliente → `createApiClient({ gatewayPath: '/<zona>/api/gateway' })` de `@praxis/commons/api`
 - cada zona monta `src/app/api/gateway/[...path]/route.ts` con `createGatewayProxy()`
 
@@ -59,7 +60,11 @@ Lista completa de lo que falta por el lado del backend, con severidad y reproduc
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP 3001-3004 · web-shell 4100 · auth-front 4101 · 4102+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP 3001-3004 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · 4103+ para zonas nuevas.
+
+**El shell no sirve páginas de negocio.** Es la cáscara: landing pública, `rewrites()` y la renovación de sesión. Cada pantalla privada va en su zona, que trae su propio guard en `proxy.ts` y se puede levantar sola. Checklist de zona nueva en ESTADO-ACTUAL §17.7.
+
+⚠️ El `matcher` de `proxy.ts` con lookahead negativo **no casa la raíz**: hay que añadir `'/'` como entrada aparte o la página raíz de la zona se queda sin guard. Detalle en ESTADO-ACTUAL §17.6.
 
 ## Comandos
 
