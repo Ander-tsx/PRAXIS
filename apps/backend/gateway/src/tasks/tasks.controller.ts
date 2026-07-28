@@ -14,6 +14,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
@@ -28,6 +35,8 @@ import {
   UpdateTaskDto,
 } from '@praxis/contracts';
 
+@ApiTags('Tasks')
+@ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller()
 export class TasksController {
@@ -39,6 +48,8 @@ export class TasksController {
   @Post('boards/:boardId/tasks')
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_CREATE_TASK)
+  @ApiOperation({ summary: 'Crea una tarea o subtarea en un board' })
+  @ApiResponse({ status: 201, description: 'Tarea creada exitosamente' })
   create(
     @Param('boardId') boardId: string,
     @Request() req: Express.Request,
@@ -60,6 +71,11 @@ export class TasksController {
   /** Lista tareas de un board (la membresía basta) */
   @Get('boards/:boardId/tasks')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Lista tareas de un board' })
+  @ApiQuery({ name: 'columnId', required: false, description: 'Filtro por ID de columna' })
+  @ApiQuery({ name: 'page', required: false, description: 'Número de página', type: Number })
+  @ApiQuery({ name: 'limit', required: false, description: 'Límite por página', type: Number })
+  @ApiResponse({ status: 200, description: 'Lista de tareas recuperada' })
   findAll(
     @Param('boardId') boardId: string,
     @Query('columnId') columnId?: string,
@@ -82,6 +98,8 @@ export class TasksController {
   /** Detalle de una tarea (la membresía basta) */
   @Get('tasks/:id')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Detalle de una tarea' })
+  @ApiResponse({ status: 200, description: 'Detalle de la tarea recuperado' })
   findOne(
     @Param('id') id: string,
   ) {
@@ -94,6 +112,8 @@ export class TasksController {
   @Patch('tasks/:id')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Actualiza una tarea' })
+  @ApiResponse({ status: 200, description: 'Tarea actualizada exitosamente' })
   update(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -115,6 +135,8 @@ export class TasksController {
   @Post('tasks/:id/move')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Mueve una tarea de columna u orden' })
+  @ApiResponse({ status: 200, description: 'Tarea movida exitosamente' })
   move(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -136,6 +158,8 @@ export class TasksController {
   @Delete('tasks/:id')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_TASK)
+  @ApiOperation({ summary: 'Elimina una tarea' })
+  @ApiResponse({ status: 200, description: 'Tarea eliminada exitosamente' })
   delete(
     @Param('id') id: string,
     @Request() req: Express.Request,
@@ -157,6 +181,8 @@ export class TasksController {
   @Post('tasks/:id/assign')
   @HttpCode(HttpStatus.OK)
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @ApiOperation({ summary: 'Asigna un encargado a una tarea' })
+  @ApiResponse({ status: 200, description: 'Encargado asignado exitosamente' })
   assign(
     @Param('id') id: string,
     @Request() req: Express.Request,
