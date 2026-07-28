@@ -3,12 +3,16 @@
 import { Sparkle } from '@praxis/commons';
 
 const TRUST_SIGNALS = [
-  '✓ Configuración en menos de 2 minutos',
-  '✓ Sin límite de proyectos',
-  '✓ Integración Alexa Skill incluida',
+  '✓ Listo para usar en minutos',
+  '✓ Sin límite de proyectos ni de tableros',
+  '✓ Integración con Alexa incluida',
 ];
 
-export function LandingCTA() {
+export interface LandingCTAProps {
+  isAuthenticated?: boolean;
+}
+
+export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
   return (
     <section id="pricing" className="py-32 px-6">
       <div className="max-w-4xl mx-auto text-center">
@@ -38,14 +42,42 @@ export function LandingCTA() {
 
         {/* Headline */}
         <h2 className="font-display text-5xl md:text-6xl text-text-primary italic mb-4">
-          Empieza hoy mismo.
+          {isAuthenticated ? 'Continúa donde lo dejaste.' : 'Empieza hoy mismo.'}
         </h2>
         <p className="font-serif text-lg text-text-secondary italic max-w-md mx-auto mb-10">
-          Sin tarjeta de crédito. Sin compromisos. Solo tu equipo y sus proyectos, bajo control.
+          {isAuthenticated
+            ? 'Tu cuenta ya está lista. Continúa donde lo dejaste.'
+            : 'Crea tu primer proyecto, invita a tu equipo y empieza a repartir el trabajo hoy mismo.'}
         </p>
 
         {/* CTA buttons */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-center mb-12">
+          {isAuthenticated ? (
+            <a href="/dashboard">
+              <button
+                type="button"
+                className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
+                style={{
+                  background: 'var(--color-primary)',
+                  color: '#fff',
+                  boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.boxShadow = '0 4px 48px rgba(108,99,255,0.65)';
+                  el.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLButtonElement;
+                  el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
+                  el.style.transform = 'translateY(0)';
+                }}
+              >
+                Ir al panel
+              </button>
+            </a>
+          ) : (
+            <>
           <a href="/auth/signup">
             <button
               type="button"
@@ -84,6 +116,8 @@ export function LandingCTA() {
               Iniciar sesión
             </button>
           </a>
+            </>
+          )}
         </div>
 
         {/* Trust signals */}

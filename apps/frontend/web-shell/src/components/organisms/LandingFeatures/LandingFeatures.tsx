@@ -3,394 +3,335 @@
 import { FeatureCard, type FeatureCardData, SectionHeader } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 
-/* ── Feature overlay components (internal to this organism) ── */
+/**
+ * Escenas de la rejilla de características.
+ *
+ * Cada una recibe `active` y define su propia animación de hover. Se usan
+ * transiciones con `transitionDelay` escalonado en lugar de keyframes: así el
+ * gesto se reproduce hacia delante al entrar y se deshace solo al salir, sin
+ * animaciones que se queden a medias.
+ */
 
-function KanbanOverlay() {
-  return (
-    <div className="absolute inset-0 flex flex-col pointer-events-none" style={{ paddingTop: 56 }}>
-      <div className="flex gap-2 px-5 pb-3" style={{ height: 110 }}>
-        {[
-          {
-            label: 'Por hacer',
-            cards: ['Diseño UI', 'API auth'],
-            bg: 'rgba(124,108,255,0.08)',
-            labelColor: '#7c6cff',
-          },
-          {
-            label: 'En progreso',
-            cards: ['Kanban ✦'],
-            bg: 'rgba(245,158,11,0.08)',
-            labelColor: '#f59e0b',
-          },
-          {
-            label: 'Listo',
-            cards: ['Auth', 'Setup'],
-            bg: 'rgba(52,211,153,0.08)',
-            labelColor: '#34d399',
-          },
-        ].map((col, ci) => (
-          <div
-            key={col.label}
-            className="flex-1 rounded-lg p-2 flex flex-col gap-1"
-            style={{ background: col.bg, border: '1px solid rgba(255,255,255,0.04)' }}
-          >
-            <span className="font-sans font-medium" style={{ fontSize: 9, color: col.labelColor }}>
-              {col.label}
-            </span>
-            {col.cards.map((card, i) => (
-              <div
-                key={card}
-                className="px-2 py-1 rounded font-sans"
-                style={{
-                  fontSize: 9,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  color: 'rgba(255,255,255,0.5)',
-                  animation: ci === 1 ? 'kanban-slide 2.5s ease-in-out infinite' : undefined,
-                }}
-              >
-                {card}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="px-5 flex gap-2 flex-wrap">
-        {[
-          { label: 'Drag & drop activo', color: '#7c6cff' },
-          { label: '5 tareas total', color: '#34d399' },
-        ].map((p) => (
-          <span
-            key={p.label}
-            className="font-sans font-medium"
-            style={{
-              fontSize: 10,
-              padding: '3px 8px',
-              borderRadius: 20,
-              border: `1px solid ${p.color}50`,
-              background: `${p.color}15`,
-              color: p.color,
-            }}
-          >
-            {p.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
+const EASE = 'cubic-bezier(.22,1,.36,1)';
 
-function PermissionOverlay() {
-  const perms = [
-    { name: 'proyecto:crear', on: true },
-    { name: 'proyecto:cerrar', on: false },
-    { name: 'tarea:crear', on: true },
-    { name: 'tarea:mover', on: true },
-    { name: 'costos:ver', on: false },
-    { name: 'admin:panel', on: false },
-    { name: 'bitácora:ver', on: true },
+/* ── 1. Tablero Kanban ─────────────────────────────────────────
+   Al pasar el cursor, la tarjeta destacada viaja de "En progreso" a "Hecho". */
+function KanbanScene(active: boolean) {
+  const columns = [
+    { name: 'Por hacer', color: '#7c6cff', cards: ['Diseño de login', 'Endpoint de tareas'] },
+    { name: 'En progreso', color: '#f59e0b', cards: ['Tablero Kanban'] },
+    { name: 'Hecho', color: '#34d399', cards: ['Autenticación'] },
   ];
+
   return (
-    <div
-      className="absolute inset-0 px-5 pb-4 flex flex-col gap-1.5 pointer-events-none"
-      style={{ paddingTop: 56 }}
-    >
-      {perms.map((p) => (
-        <div key={p.name} className="flex items-center justify-between gap-2">
-          <span
-            className="font-mono truncate"
-            style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}
-          >
-            {p.name}
-          </span>
-          <div
-            style={{
-              width: 24,
-              height: 14,
-              borderRadius: 7,
-              flexShrink: 0,
-              background: p.on ? '#a78bfa' : 'rgba(255,255,255,0.08)',
-              border: `1px solid ${p.on ? '#a78bfa' : 'rgba(255,255,255,0.1)'}`,
-              position: 'relative',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 2,
-                left: 2,
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#fff',
-                transform: p.on ? 'translateX(10px)' : 'none',
-                transition: 'transform 0.25s cubic-bezier(.34,1.56,.64,1)',
-              }}
+    <div className="flex h-full gap-2 p-3">
+      {columns.map((col, ci) => (
+        <div key={col.name} className="flex flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: col.color, transition: `all 400ms ${EASE}` }}
             />
+            <span
+              className="font-sans text-[0.6rem] font-medium"
+              style={{ color: active ? col.color : 'rgba(255,255,255,0.35)', transition: 'color 320ms ease' }}
+            >
+              {col.name}
+            </span>
           </div>
+
+          {col.cards.map((card) => (
+            <div
+              key={card}
+              className="rounded-md px-2 py-1.5 font-sans text-[0.58rem] leading-tight"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: 'rgba(255,255,255,0.55)',
+              }}
+            >
+              {card}
+            </div>
+          ))}
+
+          {/* La tarjeta que se mueve: sale de la columna 1 y aterriza en la 2 */}
+          {ci === 1 && (
+            <div
+              className="rounded-md px-2 py-1.5 font-sans text-[0.58rem] leading-tight"
+              style={{
+                background: active ? 'rgba(52,211,153,0.14)' : 'rgba(124,108,255,0.14)',
+                border: `1px solid ${active ? 'rgba(52,211,153,0.5)' : 'rgba(124,108,255,0.45)'}`,
+                color: active ? '#34d399' : '#a5a0ff',
+                transform: active ? 'translate(calc(100% + 8px), 26px)' : 'none',
+                boxShadow: active ? '0 8px 18px rgba(0,0,0,0.45)' : 'none',
+                transition: `transform 620ms ${EASE}, background 400ms ease, border-color 400ms ease, color 400ms ease, box-shadow 400ms ease`,
+              }}
+            >
+              Permisos
+            </div>
+          )}
         </div>
       ))}
     </div>
   );
 }
 
-function ReportOverlay() {
-  return (
-    <div
-      className="absolute inset-0 px-5 pb-4 flex flex-col gap-2 pointer-events-none"
-      style={{ paddingTop: 56 }}
-    >
-      <div className="flex items-center justify-between">
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Desviación vs. Estimado</span>
-        <span style={{ fontSize: 9, color: '#f87171', fontWeight: 600 }}>+14% sobre estimado</span>
-      </div>
-      <svg viewBox="0 0 220 72" style={{ width: '100%', height: 72 }}>
-        <title>Gráfico de desviación</title>
-        {[18, 36, 54].map((y) => (
-          <line
-            key={y}
-            x1="0"
-            y1={y}
-            x2="220"
-            y2={y}
-            stroke="rgba(255,255,255,0.04)"
-            strokeWidth="1"
-          />
-        ))}
-        <polyline
-          points="0,62 44,48 88,38 132,30 176,22 220,16"
-          fill="none"
-          stroke="rgba(129,140,248,0.45)"
-          strokeWidth="1.5"
-          strokeDasharray="4 3"
-        />
-        <polyline
-          points="0,62 44,56 88,52 132,42 176,36 220,44"
-          fill="none"
-          stroke="#f87171"
-          strokeWidth="2"
-        />
-        <circle cx="220" cy="44" r="3" fill="#f87171" />
-        {['S1', 'S2', 'S3', 'S4', 'S5'].map((l, i) => (
-          <text
-            key={l}
-            x={i * 44 + 4}
-            y="70"
-            fill="rgba(154,160,180,0.4)"
-            fontSize="7"
-            fontFamily="monospace"
-          >
-            {l}
-          </text>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-function CostOverlay() {
-  const [count, setCount] = useState(0);
-  const TARGET = 47832;
-
-  useEffect(() => {
-    let val = 0;
-    const interval = setInterval(() => {
-      val += Math.ceil(TARGET / 35);
-      if (val >= TARGET) {
-        val = TARGET;
-        clearInterval(interval);
-      }
-      setCount(val);
-    }, 28);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div
-      className="absolute inset-0 px-5 pb-4 flex flex-col gap-2 pointer-events-none"
-      style={{ paddingTop: 56 }}
-    >
-      <div
-        style={{
-          fontSize: '1.4rem',
-          fontWeight: 600,
-          color: '#f0f0f5',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        ${count.toLocaleString()}
-      </div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: -4 }}>
-        de $65,000 presupuestados
-      </div>
-      <div
-        style={{
-          height: 4,
-          borderRadius: 2,
-          background: 'rgba(255,255,255,0.06)',
-          marginTop: 4,
-          overflow: 'hidden',
-        }}
-      >
-        <div style={{ height: '100%', width: '73%', borderRadius: 2, background: '#34d399' }} />
-      </div>
-      <div className="flex justify-between">
-        <span style={{ fontSize: 9, color: '#34d399' }}>73% ejecutado</span>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Restan $17,168</span>
-      </div>
-    </div>
-  );
-}
-
-function TeamOverlay() {
-  const nodes = [
-    { x: 100, y: 55, r: 9, label: 'PM', color: '#38bdf8', textColor: '#0d1117', delay: '0.1s' },
-    { x: 45, y: 28, r: 6, label: 'Dev', color: '#7c6cff', textColor: '#fff', delay: '0.25s' },
-    { x: 155, y: 28, r: 6, label: 'UI', color: '#a78bfa', textColor: '#fff', delay: '0.32s' },
-    { x: 25, y: 82, r: 5.5, label: 'QA', color: '#38bdf8', textColor: '#0d1117', delay: '0.38s' },
-    { x: 175, y: 82, r: 5.5, label: 'Ops', color: '#34d399', textColor: '#0d1117', delay: '0.45s' },
-    { x: 100, y: 105, r: 5.5, label: 'DB', color: '#f59e0b', textColor: '#0d1117', delay: '0.52s' },
-  ];
-  const edges = [
-    [100, 55, 45, 28],
-    [100, 55, 155, 28],
-    [100, 55, 25, 82],
-    [100, 55, 175, 82],
-    [100, 55, 100, 105],
+/* ── 2. Permisos por rol ───────────────────────────────────────
+   Los interruptores se encienden en cascada. */
+function PermissionsScene(active: boolean) {
+  const permissions = [
+    { name: 'canCreateTask', on: true },
+    { name: 'canEditTask', on: true },
+    { name: 'canDeleteTask', on: false },
+    { name: 'canCreateBoard', on: true },
+    { name: 'canManageMembers', on: false },
   ];
 
   return (
-    <div
-      className="absolute inset-0 px-5 pb-3 flex flex-col pointer-events-none"
-      style={{ paddingTop: 56 }}
-    >
-      <svg viewBox="0 20 200 95" style={{ width: '100%', height: 90 }}>
-        <title>Nodos del equipo</title>
-        {edges.map(([x1, y1, x2, y2], i) => (
-          <line
-            key={`edge-${x1}-${y1}-${x2}-${y2}`}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            stroke="rgba(56,189,248,0.2)"
-            strokeWidth="1"
-          />
-        ))}
-        {nodes.map((n) => (
-          <g key={n.label}>
-            <circle cx={n.x} cy={n.y} r={n.r + 4} fill={n.color} opacity={0.15} />
-            <circle cx={n.x} cy={n.y} r={n.r} fill={n.color} />
-            <text
-              x={n.x}
-              y={n.y}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fill={n.textColor}
-              fontSize={n.r > 7 ? 6 : 5}
-              fontFamily="system-ui"
-              fontWeight="600"
-            >
-              {n.label}
-            </text>
-          </g>
-        ))}
-      </svg>
-      <div className="flex gap-1.5 flex-wrap mt-1">
-        {nodes.map((n) => (
-          <span
-            key={n.label}
-            className="font-sans font-medium"
-            style={{
-              fontSize: 10,
-              padding: '3px 8px',
-              borderRadius: 20,
-              border: `1px solid ${n.color}40`,
-              background: `${n.color}15`,
-              color: n.color,
-            }}
-          >
-            {n.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LogOverlay() {
-  const events = [
-    { time: '09:42', user: 'Andres G.', action: 'Creó el proyecto Alpha', color: '#7c6cff' },
-    { time: '10:15', user: 'Juan J.', action: 'Movió tarea a En Progreso', color: '#f59e0b' },
-    { time: '11:03', user: 'Cesar E.', action: 'Desplegó módulo auth', color: '#34d399' },
-    { time: '11:48', user: 'Angel S.', action: 'Actualizó estimación', color: '#38bdf8' },
-    { time: '12:30', user: 'Erick T.', action: 'Generó reporte PDF', color: '#a78bfa' },
-  ];
-  return (
-    <div
-      className="absolute inset-0 px-5 pb-4 flex flex-col gap-0 pointer-events-none"
-      style={{ paddingTop: 56 }}
-    >
-      <div className="flex flex-col gap-1.5">
-        {events.map((ev) => (
-          <div key={ev.time} className="flex items-start gap-2">
+    <div className="flex h-full flex-col justify-center gap-2 px-3.5">
+      {permissions.map((perm, i) => {
+        const lit = active && perm.on;
+        return (
+          <div key={perm.name} className="flex items-center justify-between gap-2">
             <span
-              className="font-mono flex-shrink-0"
-              style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', paddingTop: 1 }}
-            >
-              {ev.time}
-            </span>
-            <div
+              className="truncate font-mono text-[0.58rem]"
               style={{
-                width: 5,
-                height: 5,
-                borderRadius: '50%',
-                background: ev.color,
-                marginTop: 3,
-                flexShrink: 0,
+                color: lit ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
+                transition: `color 300ms ease ${i * 70}ms`,
               }}
-            />
-            <div className="flex flex-col">
-              <span className="font-sans font-semibold" style={{ fontSize: 10, color: ev.color }}>
-                {ev.user}
-              </span>
-              <span className="font-sans" style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
-                {ev.action}
-              </span>
-            </div>
+            >
+              {perm.name}
+            </span>
+            <span
+              className="relative flex-shrink-0 rounded-full"
+              style={{
+                width: 26,
+                height: 15,
+                background: lit ? '#a78bfa' : 'rgba(255,255,255,0.08)',
+                border: `1px solid ${lit ? '#a78bfa' : 'rgba(255,255,255,0.12)'}`,
+                transition: `background 300ms ease ${i * 70}ms, border-color 300ms ease ${i * 70}ms`,
+              }}
+            >
+              <span
+                className="absolute rounded-full bg-white"
+                style={{
+                  top: 2,
+                  left: 2,
+                  width: 9,
+                  height: 9,
+                  transform: lit ? 'translateX(11px)' : 'none',
+                  transition: `transform 340ms ${EASE} ${i * 70}ms`,
+                }}
+              />
+            </span>
           </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-1.5 mt-2">
-        <span
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── 3. Jerarquía de trabajo ───────────────────────────────────
+   El árbol Proyecto → Espacio → Tablero se despliega por niveles. */
+function HierarchyScene(active: boolean) {
+  const levels = [
+    { label: 'Proyecto Aurora', indent: 0, color: '#818cf8', icon: '◆' },
+    { label: 'Espacio: Producto', indent: 1, color: '#a5b4fc', icon: '▸' },
+    { label: 'Tablero: Sprint 4', indent: 2, color: '#c7d2fe', icon: '▪' },
+    { label: 'Tablero: Backlog', indent: 2, color: '#c7d2fe', icon: '▪' },
+    { label: 'Espacio: Diseño', indent: 1, color: '#a5b4fc', icon: '▸' },
+  ];
+
+  return (
+    <div className="flex h-full flex-col justify-center gap-1.5 px-4">
+      {levels.map((level, i) => (
+        <div
+          key={level.label}
+          className="flex items-center gap-2"
           style={{
-            width: 5,
-            height: 5,
-            borderRadius: '50%',
-            background: '#34d399',
-            display: 'inline-block',
-            animation: 'blink 0.9s ease infinite alternate',
+            paddingLeft: level.indent * 14,
+            opacity: active ? 1 : 0.45,
+            transform: active ? 'translateX(0)' : 'translateX(-6px)',
+            transition: `opacity 340ms ease ${i * 80}ms, transform 340ms ${EASE} ${i * 80}ms`,
           }}
-        />
-        <span className="font-sans" style={{ fontSize: 10, color: '#34d399' }}>
-          En vivo
+        >
+          <span
+            className="font-mono text-[0.6rem]"
+            style={{ color: level.color, transition: 'color 300ms ease' }}
+          >
+            {level.icon}
+          </span>
+          <span
+            className="font-sans text-[0.62rem]"
+            style={{ color: active ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.42)' }}
+          >
+            {level.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── 4. Subtareas y checklists ─────────────────────────────────
+   Los ítems se marcan uno a uno y la barra de avance acompaña. */
+function ChecklistScene(active: boolean) {
+  const items = ['Definir el modelo de datos', 'Migraciones aplicadas', 'Endpoint documentado'];
+
+  return (
+    <div className="flex h-full flex-col justify-center gap-2.5 px-4">
+      <div className="flex items-center justify-between">
+        <span className="font-sans text-[0.62rem] font-medium text-white/60">Checklist</span>
+        <span
+          className="font-mono text-[0.58rem]"
+          style={{ color: active ? '#34d399' : 'rgba(255,255,255,0.35)', transition: 'color 400ms ease 320ms' }}
+        >
+          {active ? '3/3' : '0/3'}
         </span>
       </div>
+
+      <div className="h-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.07)' }}>
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: active ? '100%' : '0%',
+            background: '#34d399',
+            transition: `width 720ms ${EASE}`,
+          }}
+        />
+      </div>
+
+      {items.map((item, i) => (
+        <div key={item} className="flex items-center gap-2">
+          <span
+            className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-[4px] font-sans text-[0.5rem] font-bold"
+            style={{
+              background: active ? '#34d399' : 'transparent',
+              border: `1px solid ${active ? '#34d399' : 'rgba(255,255,255,0.18)'}`,
+              color: '#0d1117',
+              transition: `background 260ms ease ${i * 140}ms, border-color 260ms ease ${i * 140}ms`,
+            }}
+          >
+            <span style={{ opacity: active ? 1 : 0, transition: `opacity 200ms ease ${i * 140 + 80}ms` }}>
+              ✓
+            </span>
+          </span>
+          <span
+            className="font-sans text-[0.6rem]"
+            style={{
+              color: active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.55)',
+              textDecoration: active ? 'line-through' : 'none',
+              transition: `color 260ms ease ${i * 140}ms`,
+            }}
+          >
+            {item}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ── Card data ─────────────────────────────────────────────── */
-function makeIcon(path: ReactNode) {
+/* ── 5. Equipo y roles ─────────────────────────────────────────
+   Los miembros entran escalonados y se revela su rol en el proyecto. */
+function TeamScene(active: boolean) {
+  const members = [
+    { initials: 'AG', name: 'Andrés G.', role: 'Scrum Master', color: '#38bdf8' },
+    { initials: 'JJ', name: 'Juan J.', role: 'Desarrollo', color: '#7c6cff' },
+    { initials: 'CE', name: 'César E.', role: 'QA', color: '#34d399' },
+  ];
+
+  return (
+    <div className="flex h-full flex-col justify-center gap-2 px-3.5">
+      {members.map((member, i) => (
+        <div
+          key={member.initials}
+          className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
+          style={{
+            background: active ? 'rgba(255,255,255,0.045)' : 'transparent',
+            opacity: active ? 1 : 0.5,
+            transform: active ? 'translateX(0)' : 'translateX(-8px)',
+            transition: `all 380ms ${EASE} ${i * 90}ms`,
+          }}
+        >
+          <span
+            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-sans text-[0.55rem] font-bold"
+            style={{
+              background: `${member.color}22`,
+              border: `1px solid ${member.color}55`,
+              color: member.color,
+            }}
+          >
+            {member.initials}
+          </span>
+          <span className="font-sans text-[0.62rem] text-white/70">{member.name}</span>
+          <span
+            className="ml-auto rounded-full px-2 py-0.5 font-sans text-[0.53rem] font-medium"
+            style={{
+              background: `${member.color}18`,
+              color: member.color,
+              opacity: active ? 1 : 0,
+              transform: active ? 'scale(1)' : 'scale(0.85)',
+              transition: `all 300ms ${EASE} ${i * 90 + 140}ms`,
+            }}
+          >
+            {member.role}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── 6. Control por voz ────────────────────────────────────────
+   La onda de audio cobra vida y aparece la transcripción. */
+function VoiceScene(active: boolean) {
+  const bars = [0.3, 0.55, 0.85, 1, 0.7, 0.95, 0.5, 0.75, 1, 0.6, 0.4, 0.8, 0.55, 0.3];
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
+      <div className="flex h-10 items-center justify-center gap-[3px]">
+        {bars.map((height, i) => (
+          <span
+            key={`bar-${i}-${height}`}
+            className="w-[3px] rounded-full"
+            style={{
+              height: active ? `${height * 100}%` : '14%',
+              background: active
+                ? `rgba(245,158,11,${0.45 + height * 0.5})`
+                : 'rgba(255,255,255,0.16)',
+              transition: `height 420ms ${EASE} ${i * 32}ms, background 420ms ease ${i * 32}ms`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div
+        className="rounded-full px-3 py-1.5 text-center font-sans text-[0.6rem]"
+        style={{
+          background: active ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${active ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.07)'}`,
+          color: active ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+          transition: 'all 400ms ease 200ms',
+        }}
+      >
+        «Alexa, ¿qué tareas tengo hoy?»
+      </div>
+    </div>
+  );
+}
+
+/* ── Iconos ───────────────────────────────────────────────────── */
+function icon(path: ReactNode) {
   return (
     <svg
-      className="w-5 h-5"
+      className="h-[18px] w-[18px]"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={1.6}
       aria-hidden="true"
     >
       {path}
@@ -398,124 +339,111 @@ function makeIcon(path: ReactNode) {
   );
 }
 
+/* ── Datos ────────────────────────────────────────────────────── */
 const CARDS: FeatureCardData[] = [
   {
     id: 1,
-    icon: makeIcon(
+    accent: '#7c6cff',
+    badge: 'Tableros',
+    title: 'Tableros Kanban',
+    description:
+      'Columnas configurables por tablero. Mueve una tarea y su estado se actualiza para todo el equipo al instante.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v12a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v6a2.25 2.25 0 01-2.25 2.25h-2.25A2.25 2.25 0 0113.5 12V6z"
       />,
     ),
-    title: 'Tablero Kanban',
-    description:
-      'Visualiza el flujo de trabajo con drag & drop. Columnas To Do, Doing y Done en tiempo real.',
-    badge: 'Ciclo 2',
-    overlay: <KanbanOverlay />,
-    accent: '#7c6cff',
+    visual: KanbanScene,
   },
   {
     id: 2,
-    icon: makeIcon(
+    accent: '#a78bfa',
+    badge: 'Permisos',
+    title: 'Permisos por rol',
+    description:
+      'Cada proyecto define sus propios roles y decide, permiso a permiso, quién crea, edita o elimina.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.955 11.955 0 003 12c0 6.627 5.373 12 12 12 1.733 0 3.384-.367 4.879-1.028M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"
+        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
       />,
     ),
-    title: 'Permisos dinámicos',
-    description:
-      'Sistema granular por módulo y acción. Define exactamente qué puede ver y hacer cada usuario.',
-    badge: 'Ciclo 1',
-    overlay: <PermissionOverlay />,
-    accent: '#a78bfa',
+    visual: PermissionsScene,
   },
   {
     id: 3,
-    icon: makeIcon(
+    accent: '#818cf8',
+    badge: 'Estructura',
+    title: 'Espacios y tableros',
+    description:
+      'Una jerarquía clara para que nada quede suelto: agrupa por espacio de trabajo y divide en los tableros que hagan falta.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"
+        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
       />,
     ),
-    title: 'Reportes de desviación',
-    description:
-      'Compara estimaciones vs. ejecución real. Detecta desvíos de tiempo y costo antes de que escalen.',
-    badge: 'Ciclo 4',
-    overlay: <ReportOverlay />,
-    accent: '#818cf8',
+    visual: HierarchyScene,
   },
   {
     id: 4,
-    icon: makeIcon(
+    accent: '#34d399',
+    badge: 'Detalle',
+    title: 'Subtareas y checklists',
+    description:
+      'Divide el trabajo grande en pasos verificables. Cada tarea admite subtareas y su propia lista de comprobación.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
       />,
     ),
-    title: 'Control de costos',
-    description:
-      'Presupuesto, costo por hora y gasto acumulado por tarea. Visibilidad financiera en tiempo real.',
-    badge: 'Ciclo 3',
-    overlay: <CostOverlay />,
-    accent: '#34d399',
+    visual: ChecklistScene,
   },
   {
     id: 5,
-    icon: makeIcon(
+    accent: '#38bdf8',
+    badge: 'Equipo',
+    title: 'Equipo y asignaciones',
+    description:
+      'Invita a tu equipo, dale un rol dentro del proyecto y asigna responsables con fecha límite y prioridad.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
       />,
     ),
-    title: 'Gestión de equipos',
-    description:
-      'Crea proyectos, asigna responsables y monitorea el avance de cada miembro del equipo.',
-    badge: 'Ciclo 1',
-    overlay: <TeamOverlay />,
-    accent: '#38bdf8',
+    visual: TeamScene,
   },
   {
     id: 6,
-    icon: makeIcon(
+    accent: '#f59e0b',
+    badge: 'Voz',
+    title: 'Consulta por voz con Alexa',
+    description:
+      'Pregunta por el estado de un tablero o crea una tarea sin tocar el teclado, con la skill de Alexa integrada.',
+    icon: icon(
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"
+        d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
       />,
     ),
-    title: 'Bitácora de actividad',
-    description:
-      'Registro inmutable de quién hizo qué y cuándo. Auditoría completa con trazabilidad total.',
-    badge: 'Ciclo 4',
-    overlay: <LogOverlay />,
-    accent: '#f59e0b',
+    visual: VoiceScene,
   },
 ];
 
-/* Inject feature-specific keyframes */
-const FEATURE_KEYFRAMES = `
-  @keyframes blink { to { opacity: 0.2; } }
-`;
-
-/* ── Section ──────────────────────────────────────────────── */
+/* ── Sección ──────────────────────────────────────────────────── */
 export function LandingFeatures() {
   const sectionRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = FEATURE_KEYFRAMES;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
 
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
@@ -534,17 +462,16 @@ export function LandingFeatures() {
       );
 
       if (gridRef.current) {
-        const cards = gridRef.current.querySelectorAll('.feature-card-wrapper');
         gsap.fromTo(
-          cards,
-          { y: 50, opacity: 0 },
+          gridRef.current.querySelectorAll('.feature-card-wrapper'),
+          { y: 40, opacity: 0 },
           {
             y: 0,
             opacity: 1,
             duration: 0.6,
             stagger: 0.08,
             ease: 'power3.out',
-            scrollTrigger: { trigger: gridRef.current, start: 'top 80%' },
+            scrollTrigger: { trigger: gridRef.current, start: 'top 82%' },
           },
         );
       }
@@ -554,21 +481,17 @@ export function LandingFeatures() {
   }, []);
 
   return (
-    <section id="features" ref={sectionRef} className="py-32 px-6">
-      <div className="max-w-7xl mx-auto">
+    <section id="features" ref={sectionRef} className="px-6 py-32">
+      <div className="mx-auto max-w-7xl">
         <div ref={headingRef} className="mb-16 opacity-0">
           <SectionHeader
             eyebrow="Características"
             heading="Todo lo que tu equipo necesita"
-            subtitle="Construido módulo a módulo para que cada funcionalidad esté pulida antes de agregar la siguiente."
+            subtitle="Una plataforma que se adapta a cómo trabaja tu equipo, en lugar de obligarle a cambiar."
           />
         </div>
 
-        <div
-          ref={gridRef}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-          style={{ overflow: 'visible' }}
-        >
+        <div ref={gridRef} className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           {CARDS.map((card) => (
             <div key={card.id} className="feature-card-wrapper opacity-0">
               <FeatureCard card={card} />

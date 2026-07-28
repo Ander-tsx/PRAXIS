@@ -7,7 +7,8 @@ export interface ProgressBarProps {
 }
 
 /**
- * ProgressBar — molecule for showing progress/budget metrics.
+ * ProgressBar — barra de avance con etiqueta y valor.
+ * Pensada para porcentajes de progreso (tareas completadas, avance de un tablero).
  * Used in LandingHowItWorks role cards.
  */
 export function ProgressBar({

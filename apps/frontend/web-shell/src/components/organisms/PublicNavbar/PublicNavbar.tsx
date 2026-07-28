@@ -3,7 +3,17 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-export function PublicNavbar() {
+export interface PublicNavbarProps {
+  /** Lo resuelve el server component con getSession(). */
+  isAuthenticated?: boolean;
+}
+
+const NAV_LINKS = [
+  { href: '#features', label: 'Características' },
+  { href: '#how-it-works', label: 'Cómo funciona' },
+];
+
+export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -14,8 +24,7 @@ export function PublicNavbar() {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex flex-col">
-      {/* ── MAIN NAV BAR ─────────────────────────────────────── */}
+    <header className="fixed inset-x-0 top-0 z-50">
       <div
         className="transition-all duration-300"
         style={
@@ -25,23 +34,21 @@ export function PublicNavbar() {
                 borderRadius: 18,
                 border: '1px solid rgba(255,255,255,0.08)',
                 background: 'rgba(14,15,24,0.88)',
-                backdropFilter: 'blur(10px)',
+                backdropFilter: 'blur(18px)',
                 WebkitBackdropFilter: 'blur(18px)',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
               }
             : {
                 background: '#0E0F18',
-                border: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
               }
         }
       >
         <nav
-          className="h-14 flex items-center justify-between"
-          style={{ padding: '0 24px' }}
+          className="mx-auto flex h-14 max-w-7xl items-center justify-between px-6"
           aria-label="Navegación principal"
         >
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-0 select-none">
+          <Link href="/" className="select-none">
             <span
               className="font-serif text-2xl font-black tracking-tight"
               style={{
@@ -54,47 +61,60 @@ export function PublicNavbar() {
             </span>
           </Link>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            <a href="/auth/login">
-              <span
-                className="font-sans text-sm cursor-pointer transition-colors"
-                style={{ color: 'rgba(154,160,180,0.8)' }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLSpanElement).style.color = '#E8EAF0';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLSpanElement).style.color = 'rgba(154,160,180,0.8)';
-                }}
+          <div className="hidden items-center gap-8 md:flex">
+            {NAV_LINKS.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
               >
-                Iniciar sesión
-              </span>
-            </a>
-            <a href="/auth/signup">
-              <button
-                type="button"
-                className="font-sans text-sm font-semibold cursor-pointer transition-all duration-150"
+                {link.label}
+              </a>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3">
+            {isAuthenticated ? (
+              /**
+               * Enlace normal, no next/link: el dashboard lo servirá otra zona
+               * del multi-zone y el router del shell no conoce esa ruta.
+               */
+              <a
+                href="/dashboard"
+                className="group inline-flex items-center gap-2 rounded-full px-5 py-2 font-sans text-sm font-semibold text-white transition-all duration-200 hover:brightness-110"
                 style={{
                   background: 'var(--color-primary)',
-                  color: '#fff',
-                  padding: '8px 20px',
-                  borderRadius: 9999,
-                  boxShadow: '0 0 0 0 rgba(108,99,255,0)',
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.background = 'var(--color-primary-hover)';
-                  el.style.boxShadow = '0 0 20px rgba(108,99,255,0.45)';
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.background = 'var(--color-primary)';
-                  el.style.boxShadow = '0 0 0 0 rgba(108,99,255,0)';
+                  boxShadow: '0 4px 20px rgba(108,99,255,0.35)',
                 }}
               >
-                Comenzar
-              </button>
-            </a>
+                Ir al panel
+                <span
+                  aria-hidden="true"
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                >
+                  →
+                </span>
+              </a>
+            ) : (
+              <>
+                <a
+                  href="/auth/login"
+                  className="hidden font-sans text-sm text-text-secondary transition-colors hover:text-text-primary sm:block"
+                >
+                  Iniciar sesión
+                </a>
+                <a
+                  href="/auth/signup"
+                  className="rounded-full px-5 py-2 font-sans text-sm font-semibold text-white transition-all duration-200 hover:brightness-110"
+                  style={{
+                    background: 'var(--color-primary)',
+                    boxShadow: '0 4px 20px rgba(108,99,255,0.3)',
+                  }}
+                >
+                  Comenzar
+                </a>
+              </>
+            )}
           </div>
         </nav>
       </div>

@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@praxis/commons/atoms';
 import { type ReactNode, useState } from 'react';
 
 export interface FeatureCardData {
@@ -8,9 +7,14 @@ export interface FeatureCardData {
   icon: ReactNode;
   title: string;
   description: string;
+  /** Etiqueta corta de categoría, ej. "Tableros". */
   badge: string;
-  overlay: ReactNode;
-  /** Hex accent color for glow and badge */
+  /**
+   * Escena visual propia de la card. Recibe `active` para que cada una
+   * defina su propia animación al pasar el cursor.
+   */
+  visual: (active: boolean) => ReactNode;
+  /** Color de acento en hex. */
   accent: string;
 }
 
@@ -19,146 +23,118 @@ export interface FeatureCardProps {
 }
 
 /**
- * FeatureCard — molecule for the landing features grid.
- * Shows title+description by default; on hover fades them out
- * and reveals an animated overlay (passed as ReactNode).
+ * FeatureCard — molécula de la rejilla de características.
+ *
+ * El título y la descripción **siempre** están visibles: el hover añade
+ * información en la escena superior, no la sustituye. Cada card entrega su
+ * propia escena mediante `visual(active)`, así que la animación es distinta
+ * en cada una sin que la molécula sepa nada de su contenido.
  */
 export function FeatureCard({ card }: FeatureCardProps) {
-  const [hovered, setHovered] = useState(false);
+  const [active, setActive] = useState(false);
 
   return (
-    <div
-      className="relative cursor-pointer"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+    <article
+      className="group relative flex h-full flex-col overflow-hidden rounded-2xl"
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      style={{
+        background: active ? '#171722' : '#131319',
+        border: `1px solid ${active ? `${card.accent}45` : 'rgba(255,255,255,0.07)'}`,
+        transition:
+          'background 320ms ease, border-color 320ms ease, transform 420ms cubic-bezier(.22,1,.36,1), box-shadow 320ms ease',
+        transform: active ? 'translateY(-4px)' : 'none',
+        boxShadow: active
+          ? `0 18px 48px rgba(0,0,0,0.5), 0 0 48px -12px ${card.accent}40`
+          : '0 1px 2px rgba(0,0,0,0.3)',
+      }}
     >
+      {/* Halo inferior */}
       <div
-        className="relative overflow-hidden"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
         style={{
-          background: hovered ? '#1a1a24' : '#13131a',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderColor: hovered ? `${card.accent}40` : 'rgba(255,255,255,0.06)',
-          borderRadius: 16,
-          minHeight: 200,
-          transition:
-            'background 0.3s ease, border-color 0.3s ease, transform 0.3s cubic-bezier(.22,1,.36,1), box-shadow 0.3s ease',
-          transform: hovered ? 'translateY(-3px)' : 'none',
-          boxShadow: hovered
-            ? `0 0 0 1px ${card.accent}20, 0 12px 40px rgba(0,0,0,0.5), 0 0 60px ${card.accent}08`
-            : 'none',
+          background: `radial-gradient(ellipse 75% 55% at 50% 108%, ${card.accent}1f 0%, transparent 70%)`,
+          opacity: active ? 1 : 0,
+          transition: 'opacity 400ms ease',
         }}
+      />
+
+      {/* Línea superior que se ilumina */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${card.accent}, transparent)`,
+          opacity: active ? 0.9 : 0,
+          transition: 'opacity 400ms ease',
+        }}
+      />
+
+      {/*
+        Escena visual — decorativa. Toda la información está en el título y la
+        descripción, que nunca se ocultan, así que quien navegue con teclado o
+        lector de pantalla no se pierde nada al no poder activar el hover.
+      */}
+      <div
+        aria-hidden="true"
+        className="relative flex items-center justify-center overflow-hidden px-5 pt-5"
+        style={{ height: 168 }}
       >
-        {/* Radial glow on hover */}
         <div
+          className="h-full w-full rounded-xl"
           style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: 16,
-            background: `radial-gradient(ellipse 80% 60% at 50% 110%, ${card.accent}12 0%, transparent 70%)`,
-            opacity: hovered ? 1 : 0,
-            transition: 'opacity 0.4s ease',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* Header row */}
-        <div className="flex items-start justify-between p-5 pb-3">
-          {/* Icon box */}
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 10,
-              border: `1px solid ${hovered ? `${card.accent}40` : 'rgba(255,255,255,0.06)'}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: hovered ? `${card.accent}15` : 'rgba(255,255,255,0.04)',
-              color: hovered ? card.accent : 'rgba(255,255,255,0.3)',
-              transition: 'all 0.3s ease',
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                transform: hovered ? 'scale(1.1)' : 'none',
-                transition: 'transform 0.3s ease',
-              }}
-            >
-              {card.icon}
-            </div>
-          </div>
-
-          {/* Badge + arrow */}
-          <div className="flex items-center gap-2">
-            <Badge
-              style={{
-                borderColor: hovered ? `${card.accent}35` : 'rgba(255,255,255,0.08)',
-                background: hovered ? `${card.accent}10` : 'transparent',
-                color: hovered ? card.accent : 'rgba(255,255,255,0.25)',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              {card.badge}
-            </Badge>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                border: `1px solid ${hovered ? `${card.accent}50` : 'rgba(255,255,255,0.08)'}`,
-                color: hovered ? card.accent : 'rgba(255,255,255,0.25)',
-                fontSize: 12,
-                transition: 'all 0.3s ease',
-                transform: hovered ? 'translate(2px, -2px)' : 'none',
-              }}
-              aria-hidden="true"
-            >
-              →
-            </span>
-          </div>
-        </div>
-
-        {/* Default content — fades on hover */}
-        <div
-          className="px-5 pb-5"
-          style={{
-            opacity: hovered ? 0 : 1,
-            transform: hovered ? 'translateY(6px)' : 'none',
-            transition: 'opacity 0.25s ease, transform 0.25s ease',
+            background: active ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)',
+            border: `1px solid ${active ? `${card.accent}22` : 'rgba(255,255,255,0.05)'}`,
+            transition: 'background 320ms ease, border-color 320ms ease',
           }}
         >
+          {card.visual(active)}
+        </div>
+      </div>
+
+      {/* ── Texto ─────────────────────────────────────────────── */}
+      <div className="flex flex-1 flex-col gap-2 p-5">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+            style={{
+              background: active ? `${card.accent}1a` : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${active ? `${card.accent}40` : 'rgba(255,255,255,0.07)'}`,
+              color: active ? card.accent : 'rgba(255,255,255,0.4)',
+              transition: 'all 320ms ease',
+            }}
+          >
+            {card.icon}
+          </span>
+
           <h3
-            className="font-sans font-semibold mb-1.5"
-            style={{ fontSize: '0.95rem', color: '#f0f0f5', letterSpacing: '-0.01em' }}
+            className="font-sans text-[0.95rem] font-semibold leading-tight"
+            style={{ color: '#f0f0f5', letterSpacing: '-0.01em' }}
           >
             {card.title}
           </h3>
-          <p
-            className="font-sans"
-            style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.45)', lineHeight: 1.65 }}
+
+          <span
+            className="ml-auto flex-shrink-0 rounded-full px-2.5 py-1 font-sans text-[0.65rem] font-medium uppercase tracking-wide"
+            style={{
+              border: `1px solid ${active ? `${card.accent}35` : 'rgba(255,255,255,0.08)'}`,
+              background: active ? `${card.accent}12` : 'transparent',
+              color: active ? card.accent : 'rgba(255,255,255,0.3)',
+              transition: 'all 320ms ease',
+            }}
           >
-            {card.description}
-          </p>
+            {card.badge}
+          </span>
         </div>
 
-        {/* Hover overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            opacity: hovered ? 1 : 0,
-            transform: hovered ? 'translateY(0)' : 'translateY(8px)',
-            transition: 'opacity 0.3s ease, transform 0.3s cubic-bezier(.22,1,.36,1)',
-            pointerEvents: hovered ? 'auto' : 'none',
-          }}
+        <p
+          className="font-sans text-[0.83rem] leading-relaxed"
+          style={{ color: 'rgba(255,255,255,0.5)' }}
         >
-          {hovered && card.overlay}
-        </div>
+          {card.description}
+        </p>
       </div>
-    </div>
+    </article>
   );
 }
