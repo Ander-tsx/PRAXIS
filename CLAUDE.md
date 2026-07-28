@@ -40,7 +40,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 1. Toda respuesta viene envuelta en `{ success, data, meta }`. Los errores en `{ success: false, error: { code, message, details } }`.
 2. `login`/`register` devuelven `{ userId, accessToken, refreshToken }` en camelCase — **no** `access_token`.
-3. `forbidNonWhitelisted: true`: un campo de más en el body → 400.
+3. ⚠️ **La validación del gateway casi nunca se aplica.** Solo validan los 6 endpoints cuyo `@Body()` declara una clase DTO (`/auth/login`, `/auth/register`, los 3 de `/permissions`, `GET /users`). Los otros 22 usan `@Body() body: Omit<XDto, ...>`, que en runtime es `Object`: el `ValidationPipe` se desentiende y **no valida nada**. Verificado: `POST /projects` con un campo inventado devuelve 201, y `PATCH /users/:id` con el casing equivocado devuelve **200 sin cambiar nada**. Consecuencia: valida en el frontend y **confirma contra el `data` de la respuesta, no contra el status**.
 4. Toda mutación de tarea o checklist necesita `projectId` en el body o el guard responde 403.
 5. `GET /api/projects` y `GET /api/users` esperan filtros por **body en un GET** → inalcanzable desde `fetch`.
 6. `GET /api/projects` no filtra por usuario: devuelve todos los proyectos del sistema.

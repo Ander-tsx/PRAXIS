@@ -598,6 +598,57 @@ Ninguno tiene workaround limpio desde el frontend. Ordenados por impacto:
 | 6 | No hay endpoint de permisos efectivos por proyecto | gateway | La UI no sabe qué botones ocultar sin provocar 403 |
 | 7 | Reportes y logs no existen | — | `reports-front` y la sección de logs quedan fuera de alcance |
 
+### 🔴 Añadido el 2026-07-29 — Control de acceso roto en `/api/users/:id`
+
+**Cualquier usuario autenticado puede editar o eliminar la cuenta de cualquier
+otro.** `PATCH` y `DELETE /api/users/:id` solo llevan `JwtGuard`: no comprueban
+que el `:id` sea el del token ni exigen rol global.
+
+Reproducido con dos cuentas recién creadas:
+
+```
+PATCH  /api/users/{id_de_otro}   con el token del atacante → 200, perfil modificado
+DELETE /api/users/{id_de_otro}   con el token del atacante → 200, cuenta eliminada
+```
+
+Existe además una segunda vía por si se añade la comprobación solo en la ruta:
+el gateway compone el payload como `{ id, ...body }` —el body se expande
+**después**— así que un `id` en el cuerpo pisa el parámetro de ruta. Compárese
+con `projects`/`tasks`, que inyectan después del spread y no tienen ese
+problema.
+
+Ambas cosas se apoyan en el hallazgo siguiente: sin validación, el `id` de más
+en el body no se descarta.
+
+### 🔴 Añadido el 2026-07-29 — El `ValidationPipe` del gateway no se aplica en 22 de 28 endpoints
+
+Solo validan los que declaran una **clase** DTO en `@Body()`: `/auth/login`,
+`/auth/register`, los tres de `/permissions` y `GET /users`. El resto usa
+`@Body() body: Omit<XDto, '...'>`, y un tipo de TypeScript no existe en runtime:
+el metatype llega como `Object` y el pipe se desentiende.
+
+Verificado:
+
+| Petición | Esperado | Real |
+|---|---|---|
+| `POST /projects` con campo inventado | 400 | **201** |
+| `POST /projects` con `name` de 1 char (DTO exige 2) | 400 | **201** |
+| `PATCH /users/:id` con `firstName` (casing malo) | 400 | **200 sin cambiar nada** |
+| `POST /auth/register` con campo inventado | 400 | 400 ✅ |
+
+Los microservicios sí reciben clases DTO con `whitelist` y
+`forbidNonWhitelisted`, pero en la práctica tampoco frenan estos payloads.
+
+**Consecuencia para el frontend:** el backend no es una red de seguridad.
+Toda validación tiene que hacerse en el cliente, y las pantallas de edición
+deben confirmar el resultado **contra el `data` de la respuesta**, nunca contra
+el status: un 200 no significa que se haya guardado.
+
+Esto invalida la trampa #3 que teníamos documentada («un campo de más → 400»):
+solo se cumple en esos 6 endpoints.
+
+---
+
 El punto 3 comparte causa con un problema de diseño: **el nombre de proyecto es
 único a nivel global**, no por usuario ni por organización, así que dos equipos
 distintos no pueden tener un proyecto llamado "Sprint 1".
