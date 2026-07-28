@@ -29,8 +29,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 **Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
 
 - servidor → `getSession()` de `@praxis/commons/auth`
-- cliente → `createApiClient({ proxyPath: '/<zona>/api/proxy' })` de `@praxis/commons/api`
-- cada zona monta `src/app/api/proxy/[...path]/route.ts` con `createGatewayProxy()`
+- cliente → `createApiClient({ gatewayPath: '/<zona>/api/gateway' })` de `@praxis/commons/api`
+- cada zona monta `src/app/api/gateway/[...path]/route.ts` con `createGatewayProxy()`
 
 `@praxis/commons/auth` es código de servidor: **nunca** lo importes desde el índice raíz ni desde un componente cliente. Detalle en ESTADO-ACTUAL §14.
 

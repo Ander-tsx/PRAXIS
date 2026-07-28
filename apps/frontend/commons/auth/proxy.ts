@@ -13,8 +13,8 @@ import {
  *
  * El token vive en una cookie httpOnly, así que el navegador no puede añadir
  * la cabecera Authorization por su cuenta. Cada zona monta este handler en
- * `src/app/api/proxy/[...path]/route.ts` y el cliente llama a
- * `/<zona>/api/proxy/<ruta-del-gateway>` en lugar de al gateway directamente.
+ * `src/app/api/gateway/[...path]/route.ts` y el cliente llama a
+ * `/<zona>/api/gateway/<ruta-del-gateway>` en lugar de al gateway directamente.
  *
  * Qué resuelve:
  * - Añade `Authorization: Bearer` leyendo la cookie de sesión.

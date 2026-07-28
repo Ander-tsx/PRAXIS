@@ -11,3 +11,4 @@
 export * from './cookies';
 export * from './session';
 export * from './proxy';
+export * from './zone';

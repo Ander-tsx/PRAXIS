@@ -363,7 +363,7 @@ Esta es la "fase 0". Sin esto, cada zona nueva reimplementa lo mismo y mal.
 5. `theme.css` — un solo archivo de tokens importado por todas las zonas, para matar la duplicación.
 
 **Patrón de proxy autenticado** (a estandarizar y replicar en cada zona):
-`/<zona>/api/proxy/[...path]/route.ts` → lee cookie `praxis_session` → reenvía a `${GATEWAY_URL}/api/<path>` con `Authorization: Bearer` → devuelve el sobre desenvuelto.
+`/<zona>/api/gateway/[...path]/route.ts` → lee cookie `praxis_session` → reenvía a `${GATEWAY_URL}/api/<path>` con `Authorization: Bearer` → devuelve el sobre desenvuelto.
 
 **Roadmap sugerido de microfrontends** (de menos a más dependencias):
 
@@ -509,8 +509,8 @@ gateway tiene que pasar por código de servidor de la propia zona.
 
 ```
 Componente cliente
-   └─ createApiClient({ proxyPath: '/<zona>/api/proxy' })
-        └─ fetch → /<zona>/api/proxy/<ruta>        (cookie httpOnly viaja sola)
+   └─ createApiClient({ gatewayPath: '/<zona>/api/gateway' })
+        └─ fetch → /<zona>/api/gateway/<ruta>      (cookie httpOnly viaja sola)
              └─ createGatewayProxy()               (route handler de la zona)
                   └─ fetch → GATEWAY_URL/api/<ruta>   con Authorization: Bearer
 ```
@@ -526,7 +526,7 @@ El proxy:
 
 ### Qué añadir en una zona nueva
 
-1. `src/app/api/proxy/[...path]/route.ts` — tres líneas:
+1. `src/app/api/gateway/[...path]/route.ts` — dos líneas:
 
    ```ts
    import { createGatewayProxy } from '@praxis/commons/auth';
@@ -555,10 +555,10 @@ el gateway en cada petición.
 
 | Caso | Resultado |
 |---|---|
-| `GET /api/proxy/users/:id` con sesión | 200 con el `data` real |
+| `GET /api/gateway/users/:id` con sesión | 200 con el `data` real |
 | Sin cookie de sesión | 401 `UNAUTHORIZED` "No hay sesión activa." |
-| `PATCH /api/proxy/users/:id` (nombre y apellido) | 200 |
-| `POST /api/proxy/projects` | 201 |
+| `PATCH /api/gateway/users/:id` (nombre y apellido) | 200 |
+| `POST /api/gateway/projects` | 201 |
 | Recurso inexistente | 404 `NOT_FOUND` con el mensaje del backend |
 | Access token caducado + refresh válido | **200**, cookie renovada sola |
 | Access token caducado + refresh inválido | 401 limpio, sin reintentos en bucle |
@@ -582,3 +582,63 @@ Ninguno tiene workaround limpio desde el frontend. Ordenados por impacto:
 El punto 3 comparte causa con un problema de diseño: **el nombre de proyecto es
 único a nivel global**, no por usuario ni por organización, así que dos equipos
 distintos no pueden tener un proyecto llamado "Sprint 1".
+
+---
+
+## 16. Navegación entre zonas — la trampa del `basePath`
+
+Cada zona declara `basePath: '/<zona>'`, y **Next aplica ese prefijo
+automáticamente** a `next/link`, `useRouter()` y `redirect()`:
+
+```ts
+// dentro de auth-front (basePath: '/auth')
+router.push('/')        // → /auth/    ❌ no sale de la zona
+<Link href="/signup" /> // → /auth/signup  ✅ correcto, misma zona
+```
+
+Eso provocaba un bucle real: tras iniciar sesión, `router.push('/')` llevaba a
+`/auth/`, cuyo `page.tsx` hace `redirect('/login')` → `/auth/login`. El usuario
+se quedaba en el login con la sesión ya creada.
+
+**Regla:** dentro de la zona, `next/link` y el router. Para salir de la zona,
+navegación dura.
+
+```ts
+// cliente — apps/frontend/auth-front/src/lib/navigation.ts
+window.location.assign('/');
+
+// servidor (proxy.ts) — @praxis/commons/auth
+return redirectToZone(request, '/');
+```
+
+`redirectToZone` existe porque Next exige una URL **absoluta** al redirigir
+desde `proxy.ts`, y `request.url` apunta al puerto interno de la zona
+(`localhost:4101`), no al del shell. El origen público correcto viaja en
+`x-forwarded-host`, que añade el rewrite del shell.
+
+### Guard de rutas: `proxy.ts`, no `middleware.ts`
+
+> En Next 16 `middleware.ts` está **deprecado y renombrado a `proxy.ts`**, con
+> la función exportada como `proxy`. Codemod:
+> `npx @next/codemod@canary middleware-to-proxy .`
+> Verificado en `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`
+
+`auth-front/src/proxy.ts` expulsa a `/` a quien ya tiene sesión y entra a
+`/login` o `/signup`.
+
+⚠️ **Verifica la firma del token, no te limites a comprobar que la cookie
+existe.** Con un token caducado el usuario *necesita* llegar al login; si el
+guard solo mira la presencia de la cookie, lo deja encerrado fuera de su propia
+cuenta.
+
+### Verificado en navegador real
+
+| Caso | Resultado |
+|---|---|
+| Registro → destino | Aterriza en `localhost:4100/` (landing del shell) |
+| Con sesión → `/auth/login` | 307 → `/` |
+| Con sesión → `/auth/signup` | 307 → `/` |
+| Token caducado → `/auth/login` | 200, accesible |
+| Cookie corrupta → `/auth/login` | 200, accesible |
+| `document.cookie` desde la consola | vacío — httpOnly funcionando |
+| `fetch('/api/gateway/users/:id')` desde la página | 200 con datos reales |

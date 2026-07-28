@@ -5,7 +5,7 @@ import { ApiError, unwrapEnvelope } from './envelope';
  *
  * No habla con el gateway directamente: el token vive en una cookie httpOnly
  * que el navegador no puede leer, así que toda petición pasa por
- * `/<zona>/api/proxy/...`, que es quien añade el Bearer.
+ * `/<zona>/api/gateway/...`, que es quien añade el Bearer.
  *
  * Devuelve el `data` ya desenvuelto y lanza `ApiError` con el código y el
  * mensaje reales del backend.
@@ -14,12 +14,12 @@ import { ApiError, unwrapEnvelope } from './envelope';
 export interface ApiClientOptions {
   /**
    * Ruta del proxy de la zona, con su basePath incluido.
-   * Ej: '/projects/api/proxy' para projects-front.
+   * Ej: '/projects/api/gateway' para projects-front.
    *
-   * Hace falta el basePath porque `fetch` con una URL relativa no lo aplica:
-   * eso solo lo hacen `next/link` y el router.
+   * Hace falta escribir el basePath porque `fetch` con una URL relativa no lo
+   * aplica: eso solo lo hacen `next/link` y el router.
    */
-  proxyPath: string;
+  gatewayPath: string;
 }
 
 export interface ApiClient {
@@ -30,8 +30,8 @@ export interface ApiClient {
   delete<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
 }
 
-export function createApiClient({ proxyPath }: ApiClientOptions): ApiClient {
-  const base = proxyPath.replace(/\/$/, '');
+export function createApiClient({ gatewayPath }: ApiClientOptions): ApiClient {
+  const base = gatewayPath.replace(/\/$/, '');
 
   async function request<T>(
     method: string,
