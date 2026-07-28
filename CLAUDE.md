@@ -26,7 +26,13 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 **Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Dark-only. Cada `globals.css` de zona necesita `@source` apuntando a `commons/` o las clases de los átomos se purgan.
 
-**Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por un route handler server-side que lee la cookie y añade `Authorization: Bearer`.
+**Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
+
+- servidor → `getSession()` de `@praxis/commons/auth`
+- cliente → `createApiClient({ proxyPath: '/<zona>/api/proxy' })` de `@praxis/commons/api`
+- cada zona monta `src/app/api/proxy/[...path]/route.ts` con `createGatewayProxy()`
+
+`@praxis/commons/auth` es código de servidor: **nunca** lo importes desde el índice raíz ni desde un componente cliente. Detalle en ESTADO-ACTUAL §14.
 
 ## Trampas del backend que ya nos han mordido
 
@@ -40,18 +46,25 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 ## Estado
 
-Bloqueantes abiertos (detalle y orden en ESTADO-ACTUAL §9):
-`apps/frontend/*` no está en `pnpm-workspace.yaml` · login roto · puertos frontend chocan con los TCP del backend · no existe el proxy autenticado hacia el gateway.
+Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
+
+**Puertos:** gateway 3000 · microservicios TCP 3001-3004 · web-shell 4100 · auth-front 4101 · 4102+ para zonas nuevas.
 
 ## Comandos
 
 ```bash
+pnpm install
 pnpm docker:up            # Postgres + Redis
+pnpm --filter @praxis/contracts --filter @praxis/observability run build
 pnpm prisma:reset         # recrea las tablas de los 4 servicios
 pnpm prisma:seed
 pnpm dev:backend
-pnpm dev:frontend         # ⚠️ hoy no matchea nada — ver ESTADO-ACTUAL §4.1
+pnpm dev:frontend
 ```
+
+⚠️ El `build` de `contracts` y `observability` no está en el README pero es imprescindible: publican `dist/` y sin él los 4 microservicios fallan con `Cannot find module '@praxis/contracts'`.
+
+Los `.env` no se versionan. El `JWT_SECRET` debe ser idéntico en gateway, credentials-service y el `.env.local` de cada zona.
 
 Swagger: `http://localhost:3000/api/docs`
 
