@@ -191,7 +191,7 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 | `GET /api/projects/:id/roles` | ➖ innecesario: vienen embebidos en el detalle |
 | `GET /api/boards/:id/columns` | ➖ ídem |
 | `GET /api/users/me` | ❌ **falta** |
-| `GET /api/me/tasks` (mis tareas) | ✅ `PENDIENTE` — no como `?assigneeId=`, ver abajo |
+| `GET /api/me/tasks` (mis tareas) | ✅ `0a444f0` — no como `?assigneeId=`, ver abajo |
 
 - ✅ **Permisos efectivos: resuelto** en `477616f`. Nueva ruta
   `GET /projects/:projectId/permissions/me`, que devuelve el mapa completo ya
@@ -200,7 +200,7 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 
   (`POST /api/permissions/check` no servía: solo verifica **roles globales**.)
 
-- ✅ **Mis tareas: resuelto** en `PENDIENTE`, pero como **`GET /me/tasks`** y no
+- ✅ **Mis tareas: resuelto** en `0a444f0`, pero como **`GET /me/tasks`** y no
   como `GET /tasks?assigneeId=…`. Con el id de encargado como parámetro,
   cualquiera consultaría las tareas de cualquiera y habría que inventar un
   permiso para cerrarlo; derivándolo del token no hay nada que cerrar. Cuelga de
