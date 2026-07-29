@@ -49,7 +49,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `48a0058` |
 | 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
 | 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `48a0058` |
-| 15 | 🟠 | Borrar un tablero dejaba sus tareas huérfanas para siempre | `PENDIENTE` |
+| 15 | 🟠 | Borrar un tablero dejaba sus tareas huérfanas para siempre | `8fa3263` |
 | 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
 | 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
@@ -555,7 +555,7 @@ completo de una sola petición.
 
 ## ✅ 15. ~~Borrar un tablero dejaba sus tareas en la base para siempre~~
 
-> **Resuelto** en `PENDIENTE`. El gateway avisa a tasks-service (`task_purge`)
+> **Resuelto** en `8fa3263`. El gateway avisa a tasks-service (`task_purge`)
 > después de borrar un proyecto, un espacio o un tablero. Al borrar un espacio
 > los tableros se leen **antes**, porque el cascade interno de projects-service
 > los arrastra y después ya no habría forma de saber qué tareas quedaron sin
