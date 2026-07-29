@@ -101,7 +101,8 @@
 |---|---|---|---|---|
 | 21 | **Create** | `POST` | `/projects/:projectId/workspaces` | `201` · Guardar el `id` del workspace |
 | 22 | **Find All** | `GET` | `/projects/:projectId/workspaces` | `200` · El workspace aparece en la lista |
-| 23 | **Update** | `PATCH` | `/projects/:projectId/workspaces/:id` | `200` · Nombre actualizado |
+| 22-1 | **Find One** | `GET` | `/workspaces/:workspaceId` | `200` · Detalle del workspace |
+| 23 | **Update** | `PATCH` | `/workspaces/:workspaceId` | `200` · Nombre actualizado |
 
 ---
 
@@ -113,7 +114,8 @@
 |---|---|---|---|---|
 | 24 | **Create** | `POST` | `/workspaces/:workspaceId/boards` | `201` · Guardar el `id` del board |
 | 25 | **Find All** | `GET` | `/workspaces/:workspaceId/boards` | `200` · El board aparece en la lista |
-| 26 | **Update** | `PATCH` | `/workspaces/:workspaceId/boards/:id` | `200` · Nombre del board actualizado |
+| 25-1 | **Find One** | `GET` | `/boards/:boardId` | `200` · Detalle del board |
+| 26 | **Update** | `PATCH` | `/boards/:boardId` | `200` · Nombre del board actualizado |
 
 ---
 
@@ -138,7 +140,7 @@
 |---|---|---|---|---|
 | 31 | **Create Task** | `POST` | `/boards/:boardId/tasks` | `201` · Guardar `id` de la tarea |
 | 32 | **Find All** | `GET` | `/boards/:boardId/tasks` | `200` · La tarea aparece en la lista |
-| 33 | **Find One** | `GET` | `/tasks/:taskId?projectId=…` | `200` · Datos completos de la tarea |
+| 33 | **Find One** | `GET` | `/tasks/:taskId` | `200` · Datos completos de la tarea |
 | 34 | **Update** | `PATCH` | `/tasks/:taskId` | `200` · Campos actualizados |
 | 35 | **Assign** | `POST` | `/tasks/:taskId/assign` | `200` · Asignee actualizado |
 | 36 | **Move** | `POST` | `/tasks/:taskId/move` | `200` · Tarea en nueva columna/estado |
@@ -153,8 +155,8 @@
 | # | Request | Método | Endpoint | Qué verificar |
 |---|---|---|---|---|
 | 38 | **Create Item** | `POST` | `/tasks/:taskId/checklists` | `201` · Ítem creado con `id` |
-| 39 | **Toggle Item** | `POST` | `/checklists/:id/toggle` | `200` · Estado `checked` cambiado |
-| 40 | **Delete Item** | `DELETE` | `/checklists/:id` | `200` · Ítem eliminado |
+| 39 | **Toggle Item** | `POST` | `/tasks/:taskId/checklists/:id/toggle` | `200` · Estado `checked` cambiado |
+| 40 | **Delete Item** | `DELETE` | `/tasks/:taskId/checklists/:id` | `200` · Ítem eliminado |
 
 ---
 
@@ -166,8 +168,8 @@
 |---|---|---|---|
 | 41 | **Delete Task** | `DELETE` | `/tasks/:taskId` |
 | 42 | **Delete Column** | `DELETE` | `/boards/:boardId/columns/:id` |
-| 43 | **Delete Board** | `DELETE` | `/workspaces/:workspaceId/boards/:id` |
-| 44 | **Delete Workspace** | `DELETE` | `/projects/:projectId/workspaces/:id` |
+| 43 | **Delete Board** | `DELETE` | `/boards/:boardId` |
+| 44 | **Delete Workspace** | `DELETE` | `/workspaces/:workspaceId` |
 | 45 | **Remove Member** | `DELETE` | `/projects/:projectId/members` |
 | 46 | **Delete Project Role** | `DELETE` | `/projects/:projectId/roles/:id` |
 | 47 | **Delete Project** | `DELETE` | `/projects/:id` |

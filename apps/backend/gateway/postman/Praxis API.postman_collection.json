@@ -687,23 +687,17 @@
                   }
                 },
                 "url": {
-                  "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+                  "raw": "{{base_url}}/workspaces/:workspaceId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
-                    "projects",
-                    ":projectId",
                     "workspaces",
-                    ":id"
+                    ":workspaceId"
                   ],
                   "variable": [
                     {
-                      "key": "projectId",
-                      "value": "project-uuid-here"
-                    },
-                    {
-                      "key": "id",
+                      "key": "workspaceId",
                       "value": "workspace-uuid-here"
                     }
                   ]
@@ -717,23 +711,41 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+                  "raw": "{{base_url}}/workspaces/:workspaceId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
-                    "projects",
-                    ":projectId",
                     "workspaces",
-                    ":id"
+                    ":workspaceId"
                   ],
                   "variable": [
                     {
-                      "key": "projectId",
-                      "value": "project-uuid-here"
-                    },
+                      "key": "workspaceId",
+                      "value": "workspace-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find One",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/workspaces/:workspaceId",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "workspaces",
+                    ":workspaceId"
+                  ],
+                  "variable": [
                     {
-                      "key": "id",
+                      "key": "workspaceId",
                       "value": "workspace-uuid-here"
                     }
                   ]
@@ -830,23 +842,17 @@
                   }
                 },
                 "url": {
-                  "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+                  "raw": "{{base_url}}/boards/:boardId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
-                    "workspaces",
-                    ":workspaceId",
                     "boards",
-                    ":id"
+                    ":boardId"
                   ],
                   "variable": [
                     {
-                      "key": "workspaceId",
-                      "value": "workspace-uuid-here"
-                    },
-                    {
-                      "key": "id",
+                      "key": "boardId",
                       "value": "board-uuid-here"
                     }
                   ]
@@ -860,23 +866,41 @@
                 "method": "DELETE",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+                  "raw": "{{base_url}}/boards/:boardId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
-                    "workspaces",
-                    ":workspaceId",
                     "boards",
-                    ":id"
+                    ":boardId"
                   ],
                   "variable": [
                     {
-                      "key": "workspaceId",
-                      "value": "workspace-uuid-here"
-                    },
+                      "key": "boardId",
+                      "value": "board-uuid-here"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Find One",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/boards/:boardId",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "boards",
+                    ":boardId"
+                  ],
+                  "variable": [
                     {
-                      "key": "id",
+                      "key": "boardId",
                       "value": "board-uuid-here"
                     }
                   ]
@@ -1360,19 +1384,13 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{base_url}}/tasks/:taskId?projectId=project-uuid-here",
+                  "raw": "{{base_url}}/tasks/:taskId",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "tasks",
                     ":taskId"
-                  ],
-                  "query": [
-                    {
-                      "key": "projectId",
-                      "value": "project-uuid-here"
-                    }
                   ],
                   "variable": [
                     {
@@ -1602,16 +1620,22 @@
                   }
                 },
                 "url": {
-                  "raw": "{{base_url}}/checklists/:id/toggle",
+                  "raw": "{{base_url}}/tasks/:taskId/checklists/:id/toggle",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
+                    "tasks",
+                    ":taskId",
                     "checklists",
                     ":id",
                     "toggle"
                   ],
                   "variable": [
+                    {
+                      "key": "taskId",
+                      "value": "task-uuid-here"
+                    },
                     {
                       "key": "id",
                       "value": "checklist-uuid-here"
@@ -1641,15 +1665,21 @@
                   }
                 },
                 "url": {
-                  "raw": "{{base_url}}/checklists/:id",
+                  "raw": "{{base_url}}/tasks/:taskId/checklists/:id",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
+                    "tasks",
+                    ":taskId",
                     "checklists",
                     ":id"
                   ],
                   "variable": [
+                    {
+                      "key": "taskId",
+                      "value": "task-uuid-here"
+                    },
                     {
                       "key": "id",
                       "value": "checklist-uuid-here"

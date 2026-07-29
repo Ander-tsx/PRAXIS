@@ -30,10 +30,11 @@
               "    console.error(\"Register failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
               "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
-              "    pm.collectionVariables.set('userId', res.userId);",
+              "    pm.collectionVariables.set('userId', res.userId || res.id);",
               "}"
             ],
             "type": "text/javascript"
@@ -84,7 +85,8 @@
               "    console.error(\"Login failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
               "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
               "}"
@@ -137,10 +139,11 @@
               "    console.error(\"Admin Login failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('admin_access_token', res.accessToken || res.access_token);",
               "    pm.collectionVariables.set('admin_refresh_token', res.refreshToken || res.refresh_token);",
-              "    pm.collectionVariables.set('adminId', res.userId);",
+              "    pm.collectionVariables.set('adminId', res.userId || res.id);",
               "}"
             ],
             "type": "text/javascript"
@@ -191,7 +194,8 @@
               "    console.error(\"Refresh failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
               "}"
             ],
@@ -648,7 +652,8 @@
               "    console.error(\"Create Project failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('projectId', res.id);",
               "}"
             ],
@@ -851,7 +856,8 @@
               "    console.error(\"Create Project Role failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('projectRoleId', res.id);",
               "}"
             ],
@@ -1111,7 +1117,8 @@
               "    console.error(\"Create Workspace failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('workspaceId', res.id);",
               "}"
             ],
@@ -1163,6 +1170,47 @@
       ]
     },
     {
+      "name": "22-1. Find One Workspace",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find One Workspace failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/workspaces/:workspaceId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "workspaces",
+            ":workspaceId"
+          ],
+          "variable": [
+            {
+              "key": "workspaceId",
+              "value": "{{workspaceId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "23. Update Workspace",
       "request": {
         "method": "PATCH",
@@ -1182,23 +1230,17 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+          "raw": "{{base_url}}/workspaces/:workspaceId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
-            "projects",
-            ":projectId",
             "workspaces",
-            ":id"
+            ":workspaceId"
           ],
           "variable": [
             {
-              "key": "projectId",
-              "value": "{{projectId}}"
-            },
-            {
-              "key": "id",
+              "key": "workspaceId",
               "value": "{{workspaceId}}"
             }
           ]
@@ -1273,7 +1315,8 @@
               "    console.error(\"Create Board failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('boardId', res.id);",
               "}"
             ],
@@ -1325,6 +1368,47 @@
       ]
     },
     {
+      "name": "25-1. Find One Board",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (pm.response.code !== 200) {",
+              "    console.error(\"Find One Board failed: \" + pm.response.text());",
+              "    postman.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/boards/:boardId",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "boards",
+            ":boardId"
+          ],
+          "variable": [
+            {
+              "key": "boardId",
+              "value": "{{boardId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "26. Update Board",
       "request": {
         "method": "PATCH",
@@ -1344,23 +1428,17 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+          "raw": "{{base_url}}/boards/:boardId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
-            "workspaces",
-            ":workspaceId",
             "boards",
-            ":id"
+            ":boardId"
           ],
           "variable": [
             {
-              "key": "workspaceId",
-              "value": "{{workspaceId}}"
-            },
-            {
-              "key": "id",
+              "key": "boardId",
               "value": "{{boardId}}"
             }
           ]
@@ -1435,7 +1513,8 @@
               "    console.error(\"Create Column To Do failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('columnId1', res.id);",
               "}"
             ],
@@ -1494,7 +1573,8 @@
               "    console.error(\"Create Column In Progress failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('columnId2', res.id);",
               "}"
             ],
@@ -1553,7 +1633,8 @@
               "    console.error(\"Create Column Done failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('columnId3', res.id);",
               "}"
             ],
@@ -1669,7 +1750,8 @@
               "    console.error(\"Create Task failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('taskId', res.id);",
               "}"
             ],
@@ -1743,19 +1825,13 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/tasks/:taskId?projectId=project-uuid-here",
+          "raw": "{{base_url}}/tasks/:taskId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
             "tasks",
             ":taskId"
-          ],
-          "query": [
-            {
-              "key": "projectId",
-              "value": "{{projectId}}"
-            }
           ],
           "variable": [
             {
@@ -2060,7 +2136,8 @@
               "    console.error(\"Create Checklist Item failed: \" + pm.response.text());",
               "    postman.setNextRequest(null);",
               "} else {",
-              "    const res = pm.response.json();",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
               "    pm.collectionVariables.set('checklistId', res.id);",
               "}"
             ],
@@ -2089,16 +2166,22 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/checklists/:id/toggle",
+          "raw": "{{base_url}}/tasks/:taskId/checklists/:id/toggle",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "tasks",
+            ":taskId",
             "checklists",
             ":id",
             "toggle"
           ],
           "variable": [
+            {
+              "key": "taskId",
+              "value": "{{taskId}}"
+            },
             {
               "key": "id",
               "value": "{{checklistId}}"
@@ -2145,15 +2228,21 @@
           }
         },
         "url": {
-          "raw": "{{base_url}}/checklists/:id",
+          "raw": "{{base_url}}/tasks/:taskId/checklists/:id",
           "host": [
             "{{base_url}}"
           ],
           "path": [
+            "tasks",
+            ":taskId",
             "checklists",
             ":id"
           ],
           "variable": [
+            {
+              "key": "taskId",
+              "value": "{{taskId}}"
+            },
             {
               "key": "id",
               "value": "{{checklistId}}"
@@ -2288,23 +2377,17 @@
         "method": "DELETE",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/workspaces/:workspaceId/boards/:id",
+          "raw": "{{base_url}}/boards/:boardId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
-            "workspaces",
-            ":workspaceId",
             "boards",
-            ":id"
+            ":boardId"
           ],
           "variable": [
             {
-              "key": "workspaceId",
-              "value": "{{workspaceId}}"
-            },
-            {
-              "key": "id",
+              "key": "boardId",
               "value": "{{boardId}}"
             }
           ]
@@ -2335,23 +2418,17 @@
         "method": "DELETE",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/projects/:projectId/workspaces/:id",
+          "raw": "{{base_url}}/workspaces/:workspaceId",
           "host": [
             "{{base_url}}"
           ],
           "path": [
-            "projects",
-            ":projectId",
             "workspaces",
-            ":id"
+            ":workspaceId"
           ],
           "variable": [
             {
-              "key": "projectId",
-              "value": "{{projectId}}"
-            },
-            {
-              "key": "id",
+              "key": "workspaceId",
               "value": "{{workspaceId}}"
             }
           ]
