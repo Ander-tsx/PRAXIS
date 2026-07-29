@@ -46,9 +46,9 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 |---|---|---|---|
 | 1 | 🔴 | Cualquiera podía editar o borrar la cuenta de otro | `94721d8` |
 | 2 | 🔴 | El `ValidationPipe` no se aplicaba en 22 de 28 endpoints | `94721d8` `477616f` `2bad47c` |
-| 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `ed88c63` |
+| 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `48a0058` |
 | 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
-| 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `ed88c63` |
+| 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `48a0058` |
 | 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
 | 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
@@ -290,7 +290,7 @@ Y `canDeleteProject` sigue sin existir: borrar un proyecto entero exige
 
 ## ✅ 9. ~~Las rutas de tarea usan `:id` pero el guard busca `taskId`~~
 
-> **Resuelto** en `ed88c63`, y **subió de 🟡 a 🔴 al reproducirlo**: no era una
+> **Resuelto** en `48a0058`, y **subió de 🟡 a 🔴 al reproducirlo**: no era una
 > fragilidad, era un bypass de autorización completo.
 >
 > El guard resuelve ahora el `projectId` **solo desde la ruta** (`params.id` en
@@ -522,7 +522,7 @@ observador acaba pudiendo crear tableros.
 
 ## ✅ 14. ~~Los dos `GET` de tareas no exigían ningún permiso~~
 
-> **Resuelto** en `ed88c63`. Los dos declaran ahora
+> **Resuelto** en `48a0058`. Los dos declaran ahora
 > `@RequireProjectPermission(CAN_VIEW_PROJECT)`, que es el permiso que existe
 > desde el punto 13 justo para esto.
 >
@@ -565,7 +565,7 @@ alguno de estos archivos, avisad para evitar conflictos.
 | `2bad47c` | Cuerpos tipados en tareas y checklists |
 | `a88e804` | Modelo e infraestructura de invitaciones, y salir de un proyecto |
 | `fb4a758` | 409 al repetir el nombre de un espacio |
-| `ed88c63` | El `projectId` de las tareas se resuelve desde la ruta, y los `GET` piden `canViewProject` |
+| `48a0058` | El `projectId` de las tareas se resuelve desde la ruta, y los `GET` piden `canViewProject` |
 | `3cbe735` `c276067` `9c03e87` | Invalidación de caché al tocar roles, miembros, tableros y columnas |
 
 ### Un patrón que apareció cuatro veces
