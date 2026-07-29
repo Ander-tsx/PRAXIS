@@ -26,13 +26,13 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import {
-  AssignTaskDto,
-  CreateTaskDto,
-  DeleteTaskDto,
+  AssignTaskBodyDto,
+  CreateTaskBodyDto,
+  DeleteTaskBodyDto,
   FindTasksDto,
-  MoveTaskDto,
+  MoveTaskBodyDto,
   ProjectPermission,
-  UpdateTaskDto,
+  UpdateTaskBodyDto,
 } from '@praxis/contracts';
 
 @ApiTags('Tasks')
@@ -53,7 +53,7 @@ export class TasksController {
   create(
     @Param('boardId') boardId: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<CreateTaskDto, 'requesterId' | 'boardId'>,
+    @Body() body: CreateTaskBodyDto,
   ) {
     const cmd = body.parentTaskId ? 'subtask_create' : 'task_create';
     return firstValueFrom(
@@ -117,7 +117,7 @@ export class TasksController {
   update(
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<UpdateTaskDto, 'id' | 'requesterId'>,
+    @Body() body: UpdateTaskBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -140,7 +140,7 @@ export class TasksController {
   move(
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<MoveTaskDto, 'id' | 'requesterId'>,
+    @Body() body: MoveTaskBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -163,7 +163,7 @@ export class TasksController {
   delete(
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<DeleteTaskDto, 'id' | 'requesterId'>,
+    @Body() body: DeleteTaskBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -186,7 +186,7 @@ export class TasksController {
   assign(
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<AssignTaskDto, 'id' | 'requesterId'>,
+    @Body() body: AssignTaskBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(

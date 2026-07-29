@@ -22,10 +22,10 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import {
-  CreateChecklistDto,
-  DeleteChecklistDto,
+  CreateChecklistBodyDto,
+  DeleteChecklistBodyDto,
   ProjectPermission,
-  ToggleChecklistDto,
+  ToggleChecklistBodyDto,
 } from '@praxis/contracts';
 
 @ApiTags('Task Checklists')
@@ -46,7 +46,7 @@ export class ChecklistsController {
   create(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<CreateChecklistDto, 'taskId' | 'requesterId'>,
+    @Body() body: CreateChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -70,7 +70,7 @@ export class ChecklistsController {
     @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<ToggleChecklistDto, 'id' | 'requesterId'>,
+    @Body() body: ToggleChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -94,7 +94,7 @@ export class ChecklistsController {
     @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<DeleteChecklistDto, 'id' | 'requesterId'>,
+    @Body() body: DeleteChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
