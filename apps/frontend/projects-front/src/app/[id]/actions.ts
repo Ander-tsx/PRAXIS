@@ -3,6 +3,7 @@
 import {
   ApiError,
   type Board,
+  type ChecklistItem,
   type Column,
   type PermissionMap,
   type ProjectInvitation,
@@ -23,6 +24,7 @@ import type {
 } from '@/lib/action-state';
 import {
   validateBoard,
+  validateChecklistItem,
   validateColumn,
   validateRole,
   validateTask,
@@ -571,6 +573,103 @@ export async function deleteTaskAction(_prev: TaskState, formData: FormData): Pr
     await api.delete(`/tasks/${taskId}`);
   } catch (error) {
     return { error: describe(error, 'No se pudo eliminar la tarea.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'deleted' };
+}
+
+/* ─── Checklist ─────────────────────────────────────────────────────── */
+
+/**
+ * Acciones del checklist de una tarea.
+ *
+ * Las tres cuelgan de `/tasks/:taskId/checklists` y exigen `canEditTask`: el
+ * checklist es parte de la tarea, no un recurso con permisos propios.
+ *
+ * Ninguna manda `projectId`; el `projectId` del formulario solo sirve para
+ * revalidar la página.
+ */
+export async function addChecklistItemAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const text = String(formData.get('text') ?? '').trim();
+  /* Va al final: el DTO declara `order` opcional, pero sin él todos valdrían 0
+     y el orden dependería de la inserción. */
+  const order = Number(formData.get('order') ?? 0);
+
+  const invalid = validateChecklistItem(text);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const created = await api.post<ChecklistItem>(`/tasks/${taskId}/checklists`, { text, order });
+    if (!created?.id || created.text !== text) {
+      return { error: 'El servidor no guardó el ítem.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo añadir el ítem.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'added' };
+}
+
+/**
+ * Alterna un ítem.
+ *
+ * ⚠️ Es un **toggle sin cuerpo**: no se manda el estado deseado, sino que el
+ * backend invierte el que tenga. Dos clics rápidos sobre el mismo ítem se
+ * cancelan entre sí, que es lo esperable, pero también significa que no se
+ * puede forzar «marcado» de forma idempotente.
+ */
+export async function toggleChecklistItemAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const itemId = String(formData.get('itemId') ?? '');
+
+  try {
+    const updated = await api.post<ChecklistItem>(
+      `/tasks/${taskId}/checklists/${itemId}/toggle`,
+      {},
+    );
+    if (!updated?.id) {
+      return { error: 'El servidor no cambió el ítem.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo cambiar el ítem.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'toggled' };
+}
+
+export async function deleteChecklistItemAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const itemId = String(formData.get('itemId') ?? '');
+
+  try {
+    await api.delete(`/tasks/${taskId}/checklists/${itemId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el ítem.'), done: null };
   }
 
   revalidateProject(projectId);
