@@ -3,6 +3,10 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
   AssignTaskDto,
+  CreateAttachmentDto,
+  DeleteAttachmentDto,
+  FindAttachmentsDto,
+  GetAttachmentDto,
   CreateChecklistDto,
   CreateCommentDto,
   CreateLabelDto,
@@ -24,6 +28,7 @@ import {
   UpdateTaskDto,
 } from '@praxis/contracts';
 
+import { AttachmentsService } from './attachments.service';
 import { CommentsService } from './comments.service';
 import { LabelsService } from './labels.service';
 import { TasksService } from './tasks.service';
@@ -34,6 +39,7 @@ export class TasksController {
     private readonly tasksService: TasksService,
     private readonly labelsService: LabelsService,
     private readonly commentsService: CommentsService,
+    private readonly attachmentsService: AttachmentsService,
   ) {}
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
@@ -127,6 +133,29 @@ export class TasksController {
   @MessagePattern({ cmd: 'comment_delete' })
   deleteComment(@Payload() dto: DeleteCommentDto) {
     return this.commentsService.deleteComment(dto);
+  }
+
+  // ─── Adjuntos ─────────────────────────────────────────────────────────────
+
+  @MessagePattern({ cmd: 'attachment_find_all' })
+  findAttachments(@Payload() dto: FindAttachmentsDto) {
+    return this.attachmentsService.findAttachments(dto);
+  }
+
+  @MessagePattern({ cmd: 'attachment_create' })
+  createAttachment(@Payload() dto: CreateAttachmentDto) {
+    return this.attachmentsService.createAttachment(dto);
+  }
+
+  /** Los bytes, solo para la ruta de descarga. */
+  @MessagePattern({ cmd: 'attachment_get_content' })
+  getAttachmentContent(@Payload() dto: GetAttachmentDto) {
+    return this.attachmentsService.getContent(dto);
+  }
+
+  @MessagePattern({ cmd: 'attachment_delete' })
+  deleteAttachment(@Payload() dto: DeleteAttachmentDto) {
+    return this.attachmentsService.deleteAttachment(dto);
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────

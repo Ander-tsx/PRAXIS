@@ -22,7 +22,9 @@
         "strictBindCallApply": false,
         "noFallthroughCasesInSwitch": false,
         "strictPropertyInitialization": false,
-        "types": ["node", "jest"]
+        // `multer` va explícito: `types` es una lista cerrada, y sin él
+        // `Express.Multer.File` no existe al compilar los adjuntos.
+        "types": ["node", "jest", "multer"]
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules", "dist"]

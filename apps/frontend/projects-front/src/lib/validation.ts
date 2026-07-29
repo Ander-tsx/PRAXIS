@@ -1,4 +1,9 @@
-import { LABEL_COLORS } from '@praxis/commons';
+import {
+  ATTACHMENT_ALLOWED_MIME,
+  ATTACHMENT_MAX_BYTES,
+  LABEL_COLORS,
+  formatBytes,
+} from '@praxis/commons';
 
 /**
  * Validación del cliente, espejo de la del gateway.
@@ -155,6 +160,22 @@ export function validateChecklistItem(text: string): string | null {
   if (trimmed.length === 0) return 'Escribe qué hay que hacer.';
   if (trimmed.length > CHECKLIST_TEXT_MAX) {
     return `El ítem no puede superar ${CHECKLIST_TEXT_MAX} caracteres.`;
+  }
+  return null;
+}
+
+/**
+ * Valida un archivo antes de subirlo.
+ *
+ * El backend valida igual, pero comprobarlo aquí evita mandar diez megas por la
+ * red para que los rechacen: el aviso llega antes de empezar a subir.
+ */
+export function validateAttachment(mimeType: string, size: number): string | null {
+  if (!ATTACHMENT_ALLOWED_MIME.includes(mimeType as (typeof ATTACHMENT_ALLOWED_MIME)[number])) {
+    return 'Ese tipo de archivo no se admite. Puedes subir imágenes, PDF, texto, hojas de cálculo, documentos y ZIP.';
+  }
+  if (size > ATTACHMENT_MAX_BYTES) {
+    return `El archivo pesa ${formatBytes(size)} y el máximo son ${formatBytes(ATTACHMENT_MAX_BYTES)}.`;
   }
   return null;
 }

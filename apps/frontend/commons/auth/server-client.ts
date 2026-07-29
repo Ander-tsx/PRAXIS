@@ -41,6 +41,15 @@ export interface ServerApiClient {
   put<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
   patch<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
   delete<T>(path: string, body?: unknown, init?: RequestInit): Promise<T>;
+  /**
+   * Envía un `FormData` tal cual, para subir archivos.
+   *
+   * Va aparte de `post` porque ahí el cuerpo se serializa a JSON, y un archivo
+   * no sobrevive a eso. Aquí **no se fija `Content-Type` a propósito**: lo pone
+   * `fetch` con el `boundary` que genera, y escribirlo a mano rompe el envío de
+   * una forma que solo se ve en el servidor, como un multipart sin separador.
+   */
+  postForm<T>(path: string, form: FormData): Promise<T>;
 }
 
 export function createServerApiClient(options: ServerApiClientOptions = {}): ServerApiClient {
@@ -87,11 +96,37 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
     return unwrapEnvelope<T>(response);
   }
 
+  async function requestForm<T>(path: string, form: FormData): Promise<T> {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE)?.value;
+
+    if (!token) {
+      throw new ApiError(401, 'UNAUTHORIZED', 'No hay sesión activa.');
+    }
+
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+
+    let response: Response;
+    try {
+      response = await fetch(`${gatewayUrl}/api${normalized}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+        cache: 'no-store',
+      });
+    } catch {
+      throw new ApiError(503, 'BAD_GATEWAY', 'No se pudo conectar con el servidor.');
+    }
+
+    return unwrapEnvelope<T>(response);
+  }
+
   return {
     get: (path, init) => request('GET', path, undefined, init),
     post: (path, body, init) => request('POST', path, body, init),
     put: (path, body, init) => request('PUT', path, body, init),
     patch: (path, body, init) => request('PATCH', path, body, init),
     delete: (path, body, init) => request('DELETE', path, body, init),
+    postForm: (path, form) => requestForm(path, form),
   };
 }

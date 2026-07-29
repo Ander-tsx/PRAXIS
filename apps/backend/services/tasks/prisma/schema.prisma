@@ -26,6 +26,7 @@ model Task {
   assignees    TaskAssignee[]
   labels       TaskLabel[]
   comments     TaskComment[]
+  attachments  TaskAttachment[]
   dueDate      DateTime?
   priority     Priority       @default(MEDIUM)
   order        Int            @default(0)
@@ -75,6 +76,50 @@ model Checklist {
 
   @@schema("tasks")
   @@map("checklists")
+}
+
+/// Metadatos de un archivo adjunto a una tarea.
+///
+/// **Los bytes no están aquí**: viven en `AttachmentBlob`, en una fila aparte.
+/// Es la única protección que de verdad funciona contra arrastrar megabytes sin
+/// querer — un `SELECT` sobre esta tabla, o un `include` distraído desde la
+/// tarea, no puede traerse el contenido porque no está en ella.
+///
+/// Se guardan en Postgres y no en almacenamiento de objetos porque la infra son
+/// Postgres y Redis: la alternativa era meter otro servicio en el compose. Con
+/// cientos de adjuntos va sobrado; a decenas de miles, el sitio por donde
+/// cortar es `AttachmentBlob`, y la API pública no cambiaría.
+model TaskAttachment {
+  id         String          @id @default(uuid())
+  taskId     String
+  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// Nombre con el que se subió, saneado. Es lo que se ofrece al descargar.
+  filename   String
+  mimeType   String
+  /// Bytes reales del archivo, medidos en el servidor y no declarados por el cliente.
+  size       Int
+  uploadedBy String
+  createdAt  DateTime        @default(now())
+  blob       AttachmentBlob?
+
+  @@index([taskId, createdAt])
+  @@schema("tasks")
+  @@map("task_attachments")
+}
+
+/// Los bytes de un adjunto, en su propia fila.
+///
+/// Uno a uno con `TaskAttachment`. Separarlos es lo que permite listar adjuntos
+/// sin tocar el contenido: el listado consulta la tabla de metadatos y esta solo
+/// se lee en la ruta de descarga.
+model AttachmentBlob {
+  attachmentId String         @id
+  attachment   TaskAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  /// `bytea`. Postgres lo saca del bloque principal vía TOAST.
+  data         Bytes
+
+  @@schema("tasks")
+  @@map("attachment_blobs")
 }
 
 /// Comentario en una tarea.

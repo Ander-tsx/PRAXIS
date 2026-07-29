@@ -53,6 +53,25 @@ const TASK_INCLUDE = {
    * cortar es este: sacarlos de aquí, dejar solo `_count`, y pedirlos al abrir.
    */
   comments:   { orderBy: { createdAt: 'asc' } },
+  /**
+   * Adjuntos: **solo los metadatos**.
+   *
+   * El `select` explícito no es cosmético. Los bytes viven en `AttachmentBlob`,
+   * y esta es la línea que garantiza que nadie los arrastre por accidente al
+   * pedir una tarea: aquí no hay forma de nombrarlos.
+   */
+  attachments: {
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      taskId: true,
+      filename: true,
+      mimeType: true,
+      size: true,
+      uploadedBy: true,
+      createdAt: true,
+    },
+  },
 } satisfies Prisma.TaskInclude;
 
 @Injectable()

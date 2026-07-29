@@ -403,6 +403,49 @@ pesado.
 
 ---
 
+## Adjuntos 🔒
+
+| Método | Ruta | Cuerpo | Permiso |
+|---|---|---|---|
+| GET | `/tasks/:taskId/attachments` | — | `canViewProject` |
+| POST | `/tasks/:taskId/attachments` | **multipart**, campo `file` → 201 | `canEditTask` |
+| GET | `/tasks/:taskId/attachments/:id/content` | — | `canViewProject` |
+| DELETE | `/tasks/:taskId/attachments/:id` | — | `canEditTask` + quien lo subió **o** `canDeleteTask` |
+
+```ts
+TaskAttachment = { id, taskId, filename, mimeType, size, uploadedBy, createdAt }
+```
+
+**Los bytes nunca vienen en el listado ni en la tarea.** Viven en otra tabla y
+solo se leen en la ruta de `/content`. `task.attachments` trae los metadatos.
+
+- **Máximo 10 MB** por archivo. Pasarse da **413** `"File too large"`, que lo
+  corta multer antes de leerlo entero.
+- **Lista blanca de tipos**: PNG, JPEG, GIF, WebP, PDF, texto plano, CSV, ZIP,
+  Word y Excel. Otro tipo da 400 con el mime rechazado.
+- **El SVG no se admite**: es XML con scripts, y servirlo desde el mismo origen
+  que la aplicación sería XSS.
+
+### Cómo se sirve la descarga
+
+| Tipo | `Content-Disposition` |
+|---|---|
+| PNG · JPEG · GIF · WebP | `inline` — se puede usar en un `<img>` |
+| Todo lo demás, PDF incluido | `attachment` — descarga forzada |
+
+Siempre con `X-Content-Type-Options: nosniff` y `Cache-Control: private`.
+
+⚠️ **Enlaza al proxy de la zona, no al gateway.** El gateway está en otro puerto
+y la sesión es una cookie httpOnly del origen de la aplicación: un enlace a
+`:3000` iría sin credenciales y daría 401. Lo correcto es
+`/projects/api/gateway/tasks/:taskId/attachments/:id/content`.
+
+Se guardan en Postgres porque la infra son Postgres y Redis. Con cientos de
+archivos va sobrado; el punto por donde cortar si algún día pesa es la tabla
+`attachment_blobs`, y la API no cambiaría.
+
+---
+
 ## Mis tareas 🔒
 
 | Método | Ruta | Permiso |

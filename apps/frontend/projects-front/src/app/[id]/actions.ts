@@ -10,6 +10,7 @@ import {
   type ProjectInvitation,
   type ProjectRole,
   type Task,
+  type TaskAttachment,
   type TaskComment,
   type Workspace,
 } from '@praxis/commons';
@@ -29,6 +30,7 @@ import {
   validateChecklistItem,
   validateColumn,
   normalizeMultiline,
+  validateAttachment,
   validateComment,
   validateLabel,
   validateRole,
@@ -823,6 +825,74 @@ export async function deleteCommentAction(
     await api.delete(`/tasks/${taskId}/comments/${commentId}`);
   } catch (error) {
     return { error: describe(error, 'No se pudo eliminar el comentario.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'deleted' };
+}
+
+/* ─── Adjuntos ──────────────────────────────────────────────────────── */
+
+/**
+ * Sube un archivo a una tarea.
+ *
+ * El `FormData` se reenvía **tal cual** al gateway: reconstruirlo aquí
+ * significaría leer el archivo entero en memoria para volver a empaquetarlo.
+ * Solo se le quitan los campos que son nuestros y que el endpoint no declara.
+ */
+export async function uploadAttachmentAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const file = formData.get('file');
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'Elige un archivo.', done: null };
+  }
+
+  const invalid = validateAttachment(file.type, file.size);
+  if (invalid) return { error: invalid, done: null };
+
+  const upload = new FormData();
+  upload.append('file', file);
+
+  try {
+    const created = await api.postForm<TaskAttachment>(
+      `/tasks/${taskId}/attachments`,
+      upload,
+    );
+    if (!created?.id) {
+      return { error: 'El servidor no guardó el archivo.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo subir el archivo.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'uploaded' };
+}
+
+/** Lo borra quien lo subió, o quien pueda eliminar tareas. */
+export async function deleteAttachmentAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const attachmentId = String(formData.get('attachmentId') ?? '');
+
+  try {
+    await api.delete(`/tasks/${taskId}/attachments/${attachmentId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el archivo.'), done: null };
   }
 
   revalidateProject(projectId);

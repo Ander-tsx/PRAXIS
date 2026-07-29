@@ -19,6 +19,7 @@ import {
 import { useActionState, useEffect, useId, useState } from 'react';
 import { createTaskAction, deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskComments } from './TaskComments';
 
@@ -267,6 +268,15 @@ export function TaskDialog({
       {!isNew && (
         <>
           <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />
+          <TaskAttachments
+            projectId={projectId}
+            taskId={task.id}
+            attachments={task.attachments}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            canUpload={canEdit}
+            canModerate={canDelete}
+          />
           <TaskComments
             projectId={projectId}
             taskId={task.id}

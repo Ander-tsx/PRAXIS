@@ -7,6 +7,7 @@ import { ChecklistsController } from './checklists.controller';
 import { MyTasksController } from './my-tasks.controller';
 import { LabelsController } from './labels.controller';
 import { CommentsController } from './comments.controller';
+import { AttachmentsController } from './attachments.controller';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { CommentsController } from './comments.controller';
     ChecklistsController,
     LabelsController,
     CommentsController,
+    AttachmentsController,
   ],
 })
 export class TasksModule {}

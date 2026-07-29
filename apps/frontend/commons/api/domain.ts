@@ -200,6 +200,51 @@ export interface TaskComment {
   editedAt: string | null;
 }
 
+/** Tope por archivo, espejo de `ATTACHMENT_MAX_BYTES` en el backend. */
+export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Tipos admitidos. Lista blanca, igual que en el backend. */
+export const ATTACHMENT_ALLOWED_MIME = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const;
+
+/**
+ * Archivo adjunto a una tarea. **Sin los bytes**: viven en otra tabla y solo
+ * se leen en la ruta de descarga.
+ */
+export interface TaskAttachment {
+  id: string;
+  taskId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+/** ¿Se puede previsualizar como imagen? Solo rasterizadas; el SVG ni se admite. */
+export function isPreviewableImage(mimeType: string): boolean {
+  return ['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(mimeType);
+}
+
+/** `1536000` → `1,5 MB`. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+}
+
 export interface ChecklistItem {
   id: string;
   taskId: string;
@@ -238,6 +283,8 @@ export interface Task {
   labels: TaskLabel[];
   /** Del más antiguo al más nuevo. Vienen con la tarea, también en el listado. */
   comments: TaskComment[];
+  /** Metadatos de los adjuntos. Los bytes se piden aparte al descargar. */
+  attachments: TaskAttachment[];
   subtasks: Task[];
 }
 
