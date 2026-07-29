@@ -137,6 +137,45 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
   URGENT: 'Urgente',
 };
 
+/**
+ * Colores que puede tomar una etiqueta.
+ *
+ * Son **tokens del design system**, no hex libres: así las etiquetas siguen el
+ * tema. Espejo de `LABEL_COLORS` en `@praxis/contracts`.
+ */
+export const LABEL_COLORS = ['primary', 'accent', 'success', 'warning', 'error', 'info'] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+
+export const LABEL_COLOR_LABELS: Record<LabelColor, string> = {
+  primary: 'Violeta',
+  accent: 'Ámbar',
+  success: 'Verde',
+  warning: 'Amarillo',
+  error: 'Rojo',
+  info: 'Azul',
+};
+
+/**
+ * Etiqueta de un proyecto.
+ *
+ * Es del **proyecto**, no del tablero: la misma etiqueta vale para todos sus
+ * tableros.
+ */
+export interface Label {
+  id: string;
+  projectId: string;
+  name: string;
+  color: LabelColor;
+  createdAt: string;
+}
+
+/** Une una tarea con una etiqueta. Llega con la etiqueta entera embebida. */
+export interface TaskLabel {
+  taskId: string;
+  labelId: string;
+  label: Label;
+}
+
 /** Un encargado de una tarea. Son ids: tasks-service no conoce a los usuarios. */
 export interface TaskAssignee {
   id: string;
@@ -181,6 +220,7 @@ export interface Task {
   updatedAt: string;
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
+  labels: TaskLabel[];
   subtasks: Task[];
 }
 

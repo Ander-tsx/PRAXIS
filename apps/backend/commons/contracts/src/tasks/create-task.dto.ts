@@ -64,6 +64,14 @@ export class CreateTaskBodyDto {
   @Min(0)
   order?: number;
 
+  /** Etiquetas iniciales. Deben existir en el proyecto. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  labelIds?: string[];
+
   /** Si se proporciona, esta tarea se crea como subtarea */
   @ApiPropertyOptional()
   @IsOptional()

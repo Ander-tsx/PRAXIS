@@ -5,6 +5,7 @@ import {
   Checkbox,
   Dialog,
   Input,
+  type Label as LabelType,
   PRIORITIES,
   PRIORITY_LABELS,
   Select,
@@ -33,6 +34,8 @@ export interface TaskDialogProps {
   task: Task | null;
   /** Gente del proyecto, que es a quien se puede asignar. */
   members: UserProfile[];
+  /** Etiquetas del proyecto, que son las que se pueden poner. */
+  labels: LabelType[];
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -59,6 +62,7 @@ export function TaskDialog({
   columnName,
   task,
   members,
+  labels,
   canEdit,
   canDelete,
 }: TaskDialogProps) {
@@ -202,6 +206,25 @@ export function TaskDialog({
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
+          <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
+          {labels.length === 0 ? (
+            <p className="font-sans text-xs text-text-secondary">
+              Este proyecto no tiene etiquetas todavía. Se crean en la pestaña «Etiquetas».
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2 rounded-xl bg-background p-3">
+              {labels.map((label) => (
+                <LabelToggle
+                  key={label.id}
+                  label={label}
+                  defaultChecked={task?.labels.some((l) => l.labelId === label.id) ?? false}
+                />
+              ))}
+            </div>
+          )}
+        </fieldset>
+
+        <fieldset className="flex flex-col gap-2" disabled={readOnly}>
           <legend className="font-sans text-sm font-medium text-text-primary">Encargados</legend>
           {members.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
@@ -237,6 +260,33 @@ export function TaskDialog({
           así que la sección aparece en cuanto la tarea existe. */}
       {!isNew && <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />}
     </Dialog>
+  );
+}
+
+/**
+ * Una etiqueta marcable, con su color.
+ *
+ * Es un checkbox de verdad —oculto— y no un botón con estado: así el formulario
+ * recoge `labelIds` solo, sin JavaScript que sincronice nada, igual que los
+ * encargados.
+ */
+function LabelToggle({ label, defaultChecked }: { label: LabelType; defaultChecked: boolean }) {
+  const tone = colors[label.color];
+
+  return (
+    <label
+      className="flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 font-sans text-xs transition-opacity has-[:checked]:opacity-100 has-[:disabled]:cursor-not-allowed"
+      style={{ background: alpha(tone, 15), color: tone }}
+    >
+      <input
+        type="checkbox"
+        name="labelIds"
+        value={label.id}
+        defaultChecked={defaultChecked}
+        className="h-3 w-3 accent-current"
+      />
+      {label.name}
+    </label>
   );
 }
 

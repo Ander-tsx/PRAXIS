@@ -104,6 +104,22 @@ export function TaskCard({
         <h6 className="font-sans text-sm leading-snug text-text-primary">{task.title}</h6>
       </div>
 
+      {/* Las etiquetas van arriba del todo: son el filtro visual con el que se
+          barre un tablero, antes que cualquier metadato de la tarea. */}
+      {task.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {task.labels.map(({ label }) => (
+            <span
+              key={label.id}
+              className="rounded px-1.5 py-0.5 font-sans text-[10px] font-medium"
+              style={{ background: alpha(colors[label.color], 18), color: colors[label.color] }}
+            >
+              {label.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-1.5">
         <Chip color={priorityColor}>{PRIORITY_LABELS[task.priority]}</Chip>
 

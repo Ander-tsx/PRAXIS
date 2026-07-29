@@ -37,6 +37,9 @@ const TASK_INCLUDE = {
   subtasks:   { include: { checklists: { orderBy: { order: 'asc' } } } },
   checklists: { orderBy: { order: 'asc' } },
   assignees:  { orderBy: { assignedAt: 'asc' } },
+  /* La etiqueta entera, no solo su id: la tarjeta necesita nombre y color y no
+     tiene de dónde sacarlos si solo llega la relación. */
+  labels:     { include: { label: true } },
 } satisfies Prisma.TaskInclude;
 
 @Injectable()
@@ -156,6 +159,43 @@ export class TasksService {
   }
 
   /**
+   * Comprueba que todas las etiquetas existan y sean del proyecto.
+   *
+   * Sin esto se puede colgar de una tarea la etiqueta de otro proyecto: la
+   * clave foránea solo exige que la etiqueta exista, no que sea de aquí.
+   */
+  private async resolveLabels(projectId: string, labelIds: string[]): Promise<string[]> {
+    const unique = [...new Set(labelIds)];
+    if (unique.length === 0) return [];
+
+    const found = await this.prisma.label.findMany({
+      where: { id: { in: unique }, projectId },
+      select: { id: true },
+    });
+
+    if (found.length !== unique.length) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Alguna etiqueta no existe o no es de este proyecto',
+      });
+    }
+
+    return unique;
+  }
+
+  /** Deja las etiquetas de una tarea exactamente en `labelIds`. */
+  private async replaceLabels(
+    tx: Prisma.TransactionClient,
+    taskId: string,
+    labelIds: string[],
+  ) {
+    await tx.taskLabel.deleteMany({ where: { taskId } });
+    if (labelIds.length > 0) {
+      await tx.taskLabel.createMany({ data: labelIds.map((labelId) => ({ taskId, labelId })) });
+    }
+  }
+
+  /**
    * Deja los encargados de una tarea exactamente en `userIds`.
    *
    * Borra y vuelve a insertar en vez de calcular el diferencial: la lista es de
@@ -181,6 +221,7 @@ export class TasksService {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canCreateTask');
 
     const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds ?? []);
+    const labels = await this.resolveLabels(dto.projectId, dto.labelIds ?? []);
 
     const task = await this.prisma.task.create({
       data: {
@@ -197,6 +238,9 @@ export class TasksService {
         order:        dto.order ?? 0,
         assignees: {
           create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
+        },
+        labels: {
+          create: labels.map((labelId) => ({ labelId })),
         },
       },
       include: TASK_INCLUDE,
@@ -306,10 +350,17 @@ export class TasksService {
       dto.assigneeIds !== undefined
         ? await this.resolveAssignees(dto.projectId, dto.assigneeIds)
         : undefined;
+    const labels =
+      dto.labelIds !== undefined
+        ? await this.resolveLabels(dto.projectId, dto.labelIds)
+        : undefined;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (assignees !== undefined) {
         await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
+      }
+      if (labels !== undefined) {
+        await this.replaceLabels(tx, dto.id, labels);
       }
 
       return tx.task.update({
@@ -417,6 +468,20 @@ export class TasksService {
 
     // Sin criterio no se borra nada: un `where` vacío vaciaría la tabla entera.
     if (!where) return { deleted: 0 };
+
+    /**
+     * Las etiquetas del proyecto se van con él.
+     *
+     * Va **antes** de la salida por «no hay tareas»: un proyecto puede tener
+     * etiquetas y ninguna tarea, y saliendo antes se quedarían para siempre.
+     *
+     * Solo al borrar el proyecto entero: borrar un tablero no debe llevarse las
+     * etiquetas, que son del proyecto y las usan los demás tableros.
+     */
+    if (dto.projectId) {
+      await this.prisma.label.deleteMany({ where: { projectId: dto.projectId } });
+      await this.redis.del(`labels:project:${dto.projectId}`);
+    }
 
     // Se leen antes para saber qué claves de caché invalidar; después del
     // borrado ya no hay forma de saberlo.

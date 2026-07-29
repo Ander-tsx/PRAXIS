@@ -1,3 +1,5 @@
+import { LABEL_COLORS } from '@praxis/commons';
+
 /**
  * Validación del cliente, espejo de la del gateway.
  *
@@ -124,6 +126,24 @@ export function validateTask(title: string): string | null {
   if (trimmed.length < TASK_TITLE_MIN) return 'La tarea necesita un título.';
   if (trimmed.length > TASK_TITLE_MAX) {
     return `El título no puede superar ${TASK_TITLE_MAX} caracteres.`;
+  }
+  return null;
+}
+
+export const LABEL_NAME_MAX = 40;
+
+/**
+ * El color no es libre: es un token del design system. Se valida aquí también
+ * porque un `<select>` manipulado mandaría cualquier cosa.
+ */
+export function validateLabel(name: string, color: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return 'La etiqueta necesita un nombre.';
+  if (trimmed.length > LABEL_NAME_MAX) {
+    return `El nombre no puede superar ${LABEL_NAME_MAX} caracteres.`;
+  }
+  if (!LABEL_COLORS.includes(color as (typeof LABEL_COLORS)[number])) {
+    return 'Elige uno de los colores disponibles.';
   }
   return null;
 }

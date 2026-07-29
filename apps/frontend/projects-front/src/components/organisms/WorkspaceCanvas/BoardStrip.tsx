@@ -1,4 +1,4 @@
-import type { Board, Task, UserProfile } from '@praxis/commons';
+import type { Board, Label, Task, UserProfile } from '@praxis/commons';
 import { BoardColumns } from './BoardColumns';
 
 export interface BoardStripProps {
@@ -7,6 +7,7 @@ export interface BoardStripProps {
   canManage: boolean;
   tasks: Task[];
   members: UserProfile[];
+  labels: Label[];
   usersById: Map<string, UserProfile>;
   canCreateTask: boolean;
   canEditTask: boolean;
@@ -25,6 +26,7 @@ export function BoardStrip({
   canManage,
   tasks,
   members,
+  labels,
   usersById,
   canCreateTask,
   canEditTask,
@@ -54,6 +56,7 @@ export function BoardStrip({
         canManage={canManage}
         tasks={tasks}
         members={members}
+        labels={labels}
         usersById={usersById}
         canCreateTask={canCreateTask}
         canEditTask={canEditTask}

@@ -5,6 +5,7 @@ import {
   type Board,
   type ChecklistItem,
   type Column,
+  type Label,
   type PermissionMap,
   type ProjectInvitation,
   type ProjectRole,
@@ -26,6 +27,7 @@ import {
   validateBoard,
   validateChecklistItem,
   validateColumn,
+  validateLabel,
   validateRole,
   validateTask,
   validateWorkspace,
@@ -444,8 +446,9 @@ function readTaskFields(formData: FormData) {
   const dueDate = String(formData.get('dueDate') ?? '').trim();
   const priority = String(formData.get('priority') ?? '').trim();
   const assigneeIds = formData.getAll('assigneeIds').map(String).filter(Boolean);
+  const labelIds = formData.getAll('labelIds').map(String).filter(Boolean);
 
-  return { title, description, dueDate, priority, assigneeIds };
+  return { title, description, dueDate, priority, assigneeIds, labelIds };
 }
 
 /**
@@ -470,7 +473,8 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   const columnId = String(formData.get('columnId') ?? '');
   /** El nombre de la columna: `status` tiene que igualarlo (trampa #2). */
   const status = String(formData.get('status') ?? '');
-  const { title, description, dueDate, priority, assigneeIds } = readTaskFields(formData);
+  const { title, description, dueDate, priority, assigneeIds, labelIds } =
+    readTaskFields(formData);
 
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
@@ -484,6 +488,7 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
       ...(dueDate && { dueDate: toIsoDueDate(dueDate) }),
       ...(priority && { priority }),
       ...(assigneeIds.length > 0 && { assigneeIds }),
+      ...(labelIds.length > 0 && { labelIds }),
     });
 
     if (!created?.id || created.title !== title) {
@@ -503,7 +508,8 @@ export async function updateTaskAction(_prev: TaskState, formData: FormData): Pr
 
   const projectId = String(formData.get('projectId') ?? '');
   const taskId = String(formData.get('taskId') ?? '');
-  const { title, description, dueDate, priority, assigneeIds } = readTaskFields(formData);
+  const { title, description, dueDate, priority, assigneeIds, labelIds } =
+    readTaskFields(formData);
 
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
@@ -519,6 +525,9 @@ export async function updateTaskAction(_prev: TaskState, formData: FormData): Pr
       /* Siempre se manda: el diálogo enseña la lista completa, así que lo que
          venga es la lista que debe quedar. Omitirlo no borraría a nadie. */
       assigneeIds,
+      /* Mismo motivo que los encargados: el diálogo enseña todas, así que lo
+         que venga marcado es lo que debe quedar. */
+      labelIds,
     });
 
     if (!saved?.id || saved.title !== title) {
@@ -670,6 +679,67 @@ export async function deleteChecklistItemAction(
     await api.delete(`/tasks/${taskId}/checklists/${itemId}`);
   } catch (error) {
     return { error: describe(error, 'No se pudo eliminar el ítem.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'deleted' };
+}
+
+/* ─── Etiquetas ─────────────────────────────────────────────────────── */
+
+/**
+ * Las etiquetas son del **proyecto**, no del tablero, así que sus rutas cuelgan
+ * de `/projects/:id/labels`.
+ *
+ * ⚠️ Gestionarlas exige `canEditTask`: no hay un permiso propio de etiquetas.
+ * Quien puede editar tareas puede definir con qué se etiquetan.
+ */
+export async function saveLabelAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const labelId = String(formData.get('labelId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const color = String(formData.get('color') ?? '');
+
+  const invalid = validateLabel(name, color);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const saved = labelId
+      ? await api.patch<Label>(`/projects/${projectId}/labels/${labelId}`, { name, color })
+      : await api.post<Label>(`/projects/${projectId}/labels`, { name, color });
+
+    if (!saved?.id || saved.name !== name) {
+      return { error: 'El servidor no guardó la etiqueta.', done: null };
+    }
+  } catch (error) {
+    // El backend distingue el nombre repetido con un 409 y su propio mensaje.
+    return { error: describe(error, 'No se pudo guardar la etiqueta.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'saved' };
+}
+
+/**
+ * Elimina una etiqueta.
+ *
+ * ⚠️ Se la quita a todas las tareas que la llevaban: la relación cascadea.
+ * Quien llama debe haberlo advertido antes.
+ */
+export async function deleteLabelAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const labelId = String(formData.get('labelId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}/labels/${labelId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar la etiqueta.'), done: null };
   }
 
   revalidateProject(projectId);

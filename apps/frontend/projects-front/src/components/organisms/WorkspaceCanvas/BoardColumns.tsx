@@ -3,6 +3,7 @@
 import {
   type Board,
   type Column,
+  type Label,
   type Task,
   type UserProfile,
   alpha,
@@ -22,6 +23,8 @@ export interface BoardColumnsProps {
   tasks: Task[];
   /** Gente del proyecto: a quién se puede asignar. */
   members: UserProfile[];
+  /** Etiquetas del proyecto: las que se pueden poner. */
+  labels: Label[];
   usersById: Map<string, UserProfile>;
   canCreateTask: boolean;
   canEditTask: boolean;
@@ -56,6 +59,7 @@ export function BoardColumns({
   canManage,
   tasks,
   members,
+  labels,
   usersById,
   canCreateTask,
   canEditTask,
@@ -324,6 +328,7 @@ export function BoardColumns({
                   column={column}
                   tasks={tasksByColumn.get(column.id) ?? []}
                   members={members}
+                  labels={labels}
                   usersById={usersById}
                   canCreate={canCreateTask}
                   canEdit={canEditTask}

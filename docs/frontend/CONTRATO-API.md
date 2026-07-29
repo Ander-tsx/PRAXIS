@@ -330,6 +330,45 @@ la interfaz no tiene que saber de dónde salió cada tarea.
 
 ---
 
+## Etiquetas 🔒
+
+| Método | Ruta | Body | Permiso |
+|---|---|---|---|
+| GET | `/projects/:projectId/labels` | — | `canViewProject` |
+| POST | `/projects/:projectId/labels` | `{ name, color }` → 201 | `canEditTask` |
+| PATCH | `/projects/:projectId/labels/:id` | `{ name?, color? }` | `canEditTask` |
+| DELETE | `/projects/:projectId/labels/:id` | — | `canEditTask` |
+
+```ts
+Label = { id, projectId, name, color, createdAt }
+```
+
+- Son del **proyecto**, no del tablero: la misma etiqueta sirve en todos sus
+  tableros.
+- `color` es un **token del design system**, no un hex:
+  `primary` · `accent` · `success` · `warning` · `error` · `info`. Cualquier
+  otra cosa da 400 con la lista de válidos.
+- `name` es único por proyecto: repetirlo da **409** con su mensaje.
+- Borrarla la quita de todas las tareas que la llevaban (la relación cascadea).
+  La respuesta trae `removedFrom` con cuántas eran.
+
+Para poner etiquetas en una tarea se usa `labelIds` en crear y actualizar, con
+la misma semántica que `assigneeIds`: **conjunto completo**, sustituye. Una
+etiqueta de otro proyecto da `400 "Alguna etiqueta no existe o no es de este
+proyecto"`.
+
+La tarea sale con `labels`, que trae la etiqueta entera embebida:
+
+```ts
+labels: [{ taskId, labelId, label: Label }]
+```
+
+⚠️ **Gestionarlas exige `canEditTask`**, no un permiso propio: no existe uno de
+etiquetas y no lo inventamos por nuestra cuenta. Anotado en
+`PENDIENTES-BACKEND.md §16`.
+
+---
+
 ## Mis tareas 🔒
 
 | Método | Ruta | Permiso |

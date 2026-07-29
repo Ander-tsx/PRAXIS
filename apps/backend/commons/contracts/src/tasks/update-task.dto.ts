@@ -51,6 +51,14 @@ export class UpdateTaskBodyDto {
   @IsUUID('4', { each: true })
   assigneeIds?: string[];
 
+  /** Conjunto completo de etiquetas. Omitirlo las deja como están. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  labelIds?: string[];
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsISO8601()

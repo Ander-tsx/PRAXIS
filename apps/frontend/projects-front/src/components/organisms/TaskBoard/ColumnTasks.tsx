@@ -1,6 +1,6 @@
 'use client';
 
-import type { Column, Task, UserProfile } from '@praxis/commons';
+import type { Column, Label, Task, UserProfile } from '@praxis/commons';
 import { alpha, colors } from '@praxis/commons';
 import { useEffect, useState } from 'react';
 import { TaskCard } from './TaskCard';
@@ -12,6 +12,7 @@ export interface ColumnTasksProps {
   column: Column;
   tasks: Task[];
   members: UserProfile[];
+  labels: Label[];
   usersById: Map<string, UserProfile>;
   canCreate: boolean;
   canEdit: boolean;
@@ -36,6 +37,7 @@ export function ColumnTasks({
   column,
   tasks,
   members,
+  labels,
   usersById,
   canCreate,
   canEdit,
@@ -142,6 +144,7 @@ export function ColumnTasks({
           columnName={column.name}
           task={null}
           members={members}
+          labels={labels}
           canEdit={canCreate}
           canDelete={false}
         />
@@ -160,6 +163,7 @@ export function ColumnTasks({
           columnName={column.name}
           task={openTask}
           members={members}
+          labels={labels}
           canEdit={canEdit}
           canDelete={canDelete}
         />

@@ -8,7 +8,7 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 12 de 15 resueltos.** El equipo de frontend recibió autorización para
+> **Estado: 12 de 16 resueltos.** El equipo de frontend recibió autorización para
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
 > commit y cómo se verificó. Lo que queda abierto está al principio.
 
@@ -39,6 +39,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
 | 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
 | 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
+| 16 | 🔵 | Las etiquetas usan `canEditTask`; no hay permiso propio | decisión |
 
 ### Resueltos
 
@@ -592,6 +593,23 @@ Tres consecuencias, por orden de gravedad:
    pendientes y venciendo eternamente.
 3. Son invisibles e irrecuperables: no aparecen en ningún listado y no se pueden
    abrir ni borrar por la API.
+
+---
+
+## 🔵 16. Las etiquetas se gestionan con `canEditTask`, sin permiso propio
+
+**Decisión nuestra, anotada para que no sorprenda.** Al añadir etiquetas de
+proyecto hacía falta un permiso para crearlas, editarlas y borrarlas. El enum
+`ProjectPermission` no tiene ninguno que encaje, y **no inventamos uno** por
+nuestra cuenta: añadir un permiso cambia el modelo y es decisión vuestra.
+
+Lo que hicimos: leerlas exige `canViewProject` y gestionarlas `canEditTask`.
+La lógica es que quien puede editar tareas puede definir con qué se etiquetan.
+
+**Dónde se nota:** un perfil que deba etiquetar sin poder tocar el contenido de
+las tareas —o al revés— hoy no se puede representar. Si os parece que merece un
+`canManageLabels`, es un permiso más en el enum y un cambio de una línea en
+`labels.controller.ts`.
 
 ---
 

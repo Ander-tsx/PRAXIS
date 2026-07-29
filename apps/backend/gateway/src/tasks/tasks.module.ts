@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { TasksController } from './tasks.controller';
 import { ChecklistsController } from './checklists.controller';
 import { MyTasksController } from './my-tasks.controller';
+import { LabelsController } from './labels.controller';
 
 @Module({
   imports: [
@@ -41,6 +42,6 @@ import { MyTasksController } from './my-tasks.controller';
    * `@Get('tasks/:id')` sin prefijo de controlador, y aunque hoy no colisiona
    * con `me/tasks`, el orden deja claro cuál es la ruta más específica.
    */
-  controllers: [MyTasksController, TasksController, ChecklistsController],
+  controllers: [MyTasksController, TasksController, ChecklistsController, LabelsController],
 })
 export class TasksModule {}

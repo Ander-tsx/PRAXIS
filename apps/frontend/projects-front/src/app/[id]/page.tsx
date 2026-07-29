@@ -2,6 +2,7 @@ import {
   APP_NAV_ITEMS,
   AppLayout,
   type EffectivePermissions,
+  type Label,
   LogoutButton,
   type Paginated,
   type ProjectDetail,
@@ -17,6 +18,7 @@ import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
+import { ProjectLabels } from '@/components/organisms/ProjectLabels';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
 import { ProjectRoles } from '@/components/organisms/ProjectRoles';
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
@@ -39,6 +41,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 const TABS = [
   { id: 'espacios', label: 'Espacios' },
   { id: 'equipo', label: 'Equipo' },
+  { id: 'etiquetas', label: 'Etiquetas' },
   { id: 'roles', label: 'Roles' },
 ] as const;
 
@@ -67,10 +70,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
 
   const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'espacios';
 
-  const [project, effective, members] = await Promise.all([
+  const [project, effective, members, labels] = await Promise.all([
     api.get<ProjectDetail>(`/projects/${id}`),
     api.get<EffectivePermissions>(`/projects/${id}/permissions/me`),
     api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => [] as ProjectMember[]),
+    /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
+       tarea—, así que se piden siempre; son una fila por etiqueta. */
+    api.get<Label[]>(`/projects/${id}/labels`).catch(() => [] as Label[]),
   ]);
 
   const can = effective.permissions;
@@ -138,6 +144,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const counts: Record<TabId, number> = {
     espacios: project.workspaces.length,
     equipo: members.length,
+    etiquetas: labels.length,
     roles: project.roles.length,
   };
 
@@ -184,6 +191,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             canManage={can.canCreateBoard}
             tasksByBoard={tasksByBoard}
             members={assignableMembers}
+            labels={labels}
             usersById={usersById}
             canCreateTask={can.canCreateTask}
             canEditTask={can.canEditTask}
@@ -204,6 +212,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             projectName={project.name}
             currentUserId={userId}
           />
+        )}
+
+        {activeTab === 'etiquetas' && (
+          <ProjectLabels projectId={project.id} labels={labels} canManage={can.canEditTask} />
         )}
 
         {activeTab === 'roles' && (

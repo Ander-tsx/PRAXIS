@@ -24,6 +24,7 @@ model Task {
   subtasks     Task[]         @relation("Subtasks")
   checklists   Checklist[]
   assignees    TaskAssignee[]
+  labels       TaskLabel[]
   dueDate      DateTime?
   priority     Priority       @default(MEDIUM)
   order        Int            @default(0)
@@ -73,6 +74,45 @@ model Checklist {
 
   @@schema("tasks")
   @@map("checklists")
+}
+
+/// Etiqueta de un proyecto.
+///
+/// Es **del proyecto y no del tablero**: así se reutiliza la misma etiqueta en
+/// todos los tableros del proyecto, que es como funcionan las de Trello. Por
+/// tablero quedarían aisladas y habría que recrearlas en cada uno.
+///
+/// No hay clave foránea hacia `Project`: vive en otro microservicio. Al borrar
+/// un proyecto las limpia `task_purge`, igual que a las tareas.
+model Label {
+  id        String      @id @default(uuid())
+  projectId String
+  name      String
+  /// Token de color del design system (`primary`, `error`, …), no un hex: así
+  /// las etiquetas siguen el tema y no se salen de la paleta.
+  color     String
+  tasks     TaskLabel[]
+  createdAt DateTime    @default(now())
+
+  /// Dos etiquetas con el mismo nombre en un proyecto no distinguirían nada.
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@schema("tasks")
+  @@map("labels")
+}
+
+/// Une una etiqueta con una tarea.
+model TaskLabel {
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  /// Clave compuesta: no hace falta un id propio y evita duplicados por diseño.
+  @@id([taskId, labelId])
+  @@index([labelId])
+  @@schema("tasks")
+  @@map("task_labels")
 }
 
 enum Priority {

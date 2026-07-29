@@ -4,9 +4,13 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   AssignTaskDto,
   CreateChecklistDto,
+  CreateLabelDto,
   CreateTaskDto,
   DeleteChecklistDto,
+  DeleteLabelDto,
   DeleteTaskDto,
+  FindLabelsDto,
+  UpdateLabelDto,
   FindMyTasksDto,
   FindOneTaskDto,
   FindTasksDto,
@@ -16,11 +20,15 @@ import {
   UpdateTaskDto,
 } from '@praxis/contracts';
 
+import { LabelsService } from './labels.service';
 import { TasksService } from './tasks.service';
 
 @Controller()
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly labelsService: LabelsService,
+  ) {}
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
 
@@ -69,6 +77,28 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_purge' })
   purge(@Payload() dto: PurgeTasksDto) {
     return this.tasksService.purgeTasks(dto);
+  }
+
+  // ─── Etiquetas ────────────────────────────────────────────────────────────
+
+  @MessagePattern({ cmd: 'label_find_all' })
+  findLabels(@Payload() dto: FindLabelsDto) {
+    return this.labelsService.findLabels(dto);
+  }
+
+  @MessagePattern({ cmd: 'label_create' })
+  createLabel(@Payload() dto: CreateLabelDto) {
+    return this.labelsService.createLabel(dto);
+  }
+
+  @MessagePattern({ cmd: 'label_update' })
+  updateLabel(@Payload() dto: UpdateLabelDto) {
+    return this.labelsService.updateLabel(dto);
+  }
+
+  @MessagePattern({ cmd: 'label_delete' })
+  deleteLabel(@Payload() dto: DeleteLabelDto) {
+    return this.labelsService.deleteLabel(dto);
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────
