@@ -5,15 +5,18 @@ export class FindOneWorkspaceDto {
   id: string;
 }
 
-export class UpdateWorkspaceDto {
-  @IsUUID('4')
-  id: string;
-
+/** Cuerpo de `PATCH /workspaces/:workspaceId`. */
+export class UpdateWorkspaceBodyDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(100)
   name?: string;
+}
+
+export class UpdateWorkspaceDto extends UpdateWorkspaceBodyDto {
+  @IsUUID('4')
+  id: string;
 }
 
 export class DeleteWorkspaceDto {

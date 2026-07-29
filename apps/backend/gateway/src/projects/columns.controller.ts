@@ -18,9 +18,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateColumnDto,
-  ReorderColumnsDto,
+  CreateColumnBodyDto,
   ProjectPermission,
+  ReorderColumnsBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -44,7 +44,7 @@ export class ColumnsController {
   @ApiResponse({ status: 201, description: 'Columna agregada exitosamente' })
   create(
     @Param('boardId') boardId: string,
-    @Body() body: Omit<CreateColumnDto, 'boardId'>,
+    @Body() body: CreateColumnBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'column_create' }, { boardId, ...body }),
@@ -59,7 +59,7 @@ export class ColumnsController {
   @ApiResponse({ status: 200, description: 'Columnas reordenadas exitosamente' })
   reorder(
     @Param('boardId') boardId: string,
-    @Body() body: Omit<ReorderColumnsDto, 'boardId'>,
+    @Body() body: ReorderColumnsBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'column_reorder' }, { boardId, ...body }),

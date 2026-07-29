@@ -7,5 +7,11 @@ export * from './workspace.dto';
 export * from './board.dto';
 export * from './column.dto';
 export * from './project-role.dto';
-// member.dto se importa con alias para evitar colisión con permissions/CheckPermissionDto
-export { AddMemberDto, RemoveMemberDto } from './member.dto';
+// member.dto se exporta selectivamente para evitar colisión con
+// permissions/CheckPermissionDto, que comparte nombre.
+export {
+  AddMemberBodyDto,
+  AddMemberDto,
+  RemoveMemberBodyDto,
+  RemoveMemberDto,
+} from './member.dto';

@@ -12,16 +12,10 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
-export class CreateTaskDto {
-  /** ID del usuario que realiza la operación (inyectado por el gateway) */
-  @IsUUID('4')
-  requesterId: string;
-
+/** Cuerpo que envía el cliente. El resto lo pone el gateway. */
+export class CreateTaskBodyDto {
   @IsUUID('4')
   projectId: string;
-
-  @IsUUID('4')
-  boardId: string;
 
   @IsUUID('4')
   columnId: string;
@@ -66,4 +60,14 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID('4')
   parentTaskId?: string;
+}
+
+/** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
+export class CreateTaskDto extends CreateTaskBodyDto {
+  /** ID del usuario que realiza la operación (inyectado por el gateway) */
+  @IsUUID('4')
+  requesterId: string;
+
+  @IsUUID('4')
+  boardId: string;
 }

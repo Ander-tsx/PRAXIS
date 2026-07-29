@@ -6,6 +6,7 @@ import {
   CreateProjectRoleDto,
   UpdateProjectRoleDto,
   CheckProjectPermissionDto,
+  PROJECT_PERMISSIONS,
 } from '@praxis/contracts';
 
 const PERMISSION_CACHE_TTL = 300;
@@ -31,6 +32,25 @@ const PERMISSION_HIERARCHY: Record<string, string[]> = {
   canEditTask:   ['canCreateTask'],
   // Roles y miembros no tienen jerarquía adicional
 };
+
+/**
+ * `canViewProject` es el suelo de la jerarquía: cualquier permiso lo implica.
+ *
+ * Se resuelve aparte y no en la tabla porque no depende de un permiso concreto
+ * sino de tener **alguno**. Enumerarlo en cada entrada se olvidaría en cuanto
+ * alguien añadiera un permiso nuevo.
+ */
+const VIEW_PERMISSION = 'canViewProject';
+
+/** Mapa con todos los permisos conocidos al mismo valor. */
+function fullPermissionMap(value: boolean): Record<string, boolean> {
+  return Object.fromEntries(PROJECT_PERMISSIONS.map((p) => [p, value]));
+}
+
+/** Fuerza booleanos: en BD los permisos son Json y podrían llegar sucios. */
+function normalizeBooleans(map: Record<string, unknown>): Record<string, boolean> {
+  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, !!v]));
+}
 
 @Injectable()
 export class ProjectRolesService {
@@ -132,6 +152,50 @@ export class ProjectRolesService {
     return { allowed: !!effective[dto.permission] };
   }
 
+  /**
+   * Todos los permisos efectivos de un usuario en un proyecto, ya expandidos.
+   *
+   * Es lo que necesita la interfaz para saber qué enseñar. Sin esto solo podía
+   * descubrir que no tenía permiso **después** de que la acción fallara con un
+   * 403, que es la peor forma de enterarse.
+   *
+   * Devuelve el mapa completo con todos los permisos conocidos, explícitamente
+   * a `false` los que no tiene: así el cliente no tiene que distinguir entre
+   * "ausente" y "denegado".
+   */
+  async getEffectivePermissions(dto: {
+    userId: string;
+    projectId: string;
+  }): Promise<{ isOwner: boolean; permissions: Record<string, boolean> }> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.projectId },
+      select: { ownerId: true },
+    });
+
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    const isOwner = project.ownerId === dto.userId;
+
+    // El dueño tiene bypass en el guard, así que aquí se refleja igual.
+    if (isOwner) {
+      return { isOwner, permissions: fullPermissionMap(true) };
+    }
+
+    const cacheKey = `project:${dto.projectId}:user:${dto.userId}:permissions`;
+    const cached = await this.redis.get<Record<string, boolean>>(cacheKey);
+    const rawPerms =
+      cached ?? (await this.loadPermissions(dto.userId, dto.projectId, cacheKey));
+
+    const effective = this.expandPermissions(rawPerms);
+
+    return {
+      isOwner,
+      permissions: { ...fullPermissionMap(false), ...normalizeBooleans(effective) },
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers privados
   // ---------------------------------------------------------------------------
@@ -154,6 +218,11 @@ export class ProjectRolesService {
           expanded[impliedPerm] = true;
         }
       }
+    }
+
+    // Quien puede hacer algo en el proyecto, puede verlo.
+    if (Object.values(expanded).some(Boolean)) {
+      expanded[VIEW_PERMISSION] = true;
     }
 
     return expanded;

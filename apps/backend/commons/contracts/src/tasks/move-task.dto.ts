@@ -1,12 +1,7 @@
 import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
-export class MoveTaskDto {
-  @IsUUID('4')
-  id: string;
-
-  @IsUUID('4')
-  requesterId: string;
-
+/** Cuerpo que envía el cliente. El resto lo pone el gateway. */
+export class MoveTaskBodyDto {
   @IsUUID('4')
   projectId: string;
 
@@ -21,4 +16,13 @@ export class MoveTaskDto {
   @IsInt()
   @Min(0)
   order?: number;
+}
+
+/** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
+export class MoveTaskDto extends MoveTaskBodyDto {
+  @IsUUID('4')
+  id: string;
+
+  @IsUUID('4')
+  requesterId: string;
 }

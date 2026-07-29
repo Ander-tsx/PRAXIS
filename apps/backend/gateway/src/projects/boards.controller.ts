@@ -19,9 +19,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateBoardDto,
-  UpdateBoardDto,
+  CreateBoardBodyDto,
   ProjectPermission,
+  UpdateBoardBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -47,7 +47,7 @@ export class BoardsController {
   @ApiResponse({ status: 201, description: 'Board creado exitosamente' })
   create(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: Omit<CreateBoardDto, 'workspaceId'>,
+    @Body() body: CreateBoardBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_create' }, { workspaceId, ...body }),
@@ -95,7 +95,7 @@ export class BoardsResourceController {
   @ApiResponse({ status: 200, description: 'Board actualizado exitosamente' })
   update(
     @Param('boardId') boardId: string,
-    @Body() body: Omit<UpdateBoardDto, 'id'>,
+    @Body() body: UpdateBoardBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_update' }, { id: boardId, ...body }),

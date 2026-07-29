@@ -19,9 +19,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateWorkspaceDto,
-  UpdateWorkspaceDto,
+  CreateWorkspaceBodyDto,
   ProjectPermission,
+  UpdateWorkspaceBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -58,7 +58,7 @@ export class WorkspacesController {
   @ApiResponse({ status: 201, description: 'Workspace creado exitosamente' })
   create(
     @Param('projectId') projectId: string,
-    @Body() body: Omit<CreateWorkspaceDto, 'projectId'>,
+    @Body() body: CreateWorkspaceBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_create' }, { projectId, ...body }),
@@ -95,7 +95,7 @@ export class WorkspacesResourceController {
   @ApiResponse({ status: 200, description: 'Workspace actualizado exitosamente' })
   update(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: Omit<UpdateWorkspaceDto, 'id'>,
+    @Body() body: UpdateWorkspaceBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_update' }, { id: workspaceId, ...body }),

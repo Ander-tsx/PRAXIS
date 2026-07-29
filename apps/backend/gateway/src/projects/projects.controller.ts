@@ -7,8 +7,10 @@ import {
   HttpStatus,
   Inject,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -20,10 +22,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateProjectDto,
-  FindProjectsDto,
-  UpdateProjectDto,
+  CreateProjectBodyDto,
+  FindProjectsQueryDto,
   ProjectPermission,
+  UpdateProjectBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -44,7 +46,8 @@ export class ProjectsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Crea un nuevo proyecto' })
   @ApiResponse({ status: 201, description: 'Proyecto creado exitosamente' })
-  create(@Request() req: Express.Request, @Body() body: Omit<CreateProjectDto, 'ownerId'>) {
+  @ApiResponse({ status: 409, description: 'Ya existe un proyecto con ese nombre' })
+  create(@Request() req: Express.Request, @Body() body: CreateProjectBodyDto) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_create' }, {
         ...body,
@@ -58,21 +61,21 @@ export class ProjectsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Lista proyectos del usuario autenticado' })
   @ApiResponse({ status: 200, description: 'Lista de proyectos recuperada' })
-  findAll(@Request() req: Express.Request, @Body() body: Omit<FindProjectsDto, 'userId'>) {
+  findAll(@Request() req: Express.Request, @Query() query: FindProjectsQueryDto) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_find_all' }, {
-        ...body,
-        userId: req.user!.userId,
-      }),
+      this.projectsClient.send(
+        { cmd: 'project_find_all' },
+        query.toFindProjectsDto(req.user!.userId),
+      ),
     );
   }
 
-  /** Detalle de un proyecto (requiere ser miembro con cualquier rol) */
+  /** Detalle de un proyecto. Basta con poder verlo. */
   @Get(':id')
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de un proyecto' })
   @ApiResponse({ status: 200, description: 'Detalle del proyecto recuperado' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_find_one' }, { id }),
     );
@@ -83,9 +86,13 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   @ApiOperation({ summary: 'Actualiza un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto actualizado exitosamente' })
-  update(@Param('id') id: string, @Body() body: Omit<UpdateProjectDto, 'id'>) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateProjectBodyDto,
+  ) {
+    // El id va después del spread: uno colado en el cuerpo no debe pisar la ruta.
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_update' }, { id, ...body }),
+      this.projectsClient.send({ cmd: 'project_update' }, { ...body, id }),
     );
   }
 
@@ -94,7 +101,7 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
-  delete(@Param('id') id: string) {
+  delete(@Param('id', ParseUUIDPipe) id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_delete' }, { id }),
     );

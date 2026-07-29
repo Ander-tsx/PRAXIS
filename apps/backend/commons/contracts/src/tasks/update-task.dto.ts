@@ -10,13 +10,8 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
-export class UpdateTaskDto {
-  @IsUUID('4')
-  id: string;
-
-  @IsUUID('4')
-  requesterId: string;
-
+/** Cuerpo que envía el cliente. El resto lo pone el gateway. */
+export class UpdateTaskBodyDto {
   @IsUUID('4')
   projectId: string;
 
@@ -56,4 +51,13 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+}
+
+/** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
+export class UpdateTaskDto extends UpdateTaskBodyDto {
+  @IsUUID('4')
+  id: string;
+
+  @IsUUID('4')
+  requesterId: string;
 }

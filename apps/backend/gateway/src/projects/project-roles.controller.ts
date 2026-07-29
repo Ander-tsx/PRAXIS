@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Inject,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -18,9 +21,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateProjectRoleDto,
-  UpdateProjectRoleDto,
+  CreateProjectRoleBodyDto,
   ProjectPermission,
+  UpdateProjectRoleBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -42,12 +45,13 @@ export class ProjectRolesController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   @ApiOperation({ summary: 'Crea un rol local dentro de un proyecto' })
   @ApiResponse({ status: 201, description: 'Rol creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'permissions mal formado o con claves desconocidas' })
   create(
-    @Param('projectId') projectId: string,
-    @Body() body: Omit<CreateProjectRoleDto, 'projectId'>,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Body() body: CreateProjectRoleBodyDto,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_role_create' }, { projectId, ...body }),
+      this.projectsClient.send({ cmd: 'project_role_create' }, { ...body, projectId }),
     );
   }
 
@@ -57,11 +61,11 @@ export class ProjectRolesController {
   @ApiOperation({ summary: 'Actualiza un rol local de un proyecto' })
   @ApiResponse({ status: 200, description: 'Rol actualizado exitosamente' })
   update(
-    @Param('id') id: string,
-    @Body() body: Omit<UpdateProjectRoleDto, 'id'>,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateProjectRoleBodyDto,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_role_update' }, { id, ...body }),
+      this.projectsClient.send({ cmd: 'project_role_update' }, { ...body, id }),
     );
   }
 
@@ -70,7 +74,7 @@ export class ProjectRolesController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   @ApiOperation({ summary: 'Elimina un rol local del proyecto' })
   @ApiResponse({ status: 200, description: 'Rol eliminado exitosamente' })
-  delete(@Param('id') id: string) {
+  delete(@Param('id', ParseUUIDPipe) id: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_role_delete' }, { id }),
     );
