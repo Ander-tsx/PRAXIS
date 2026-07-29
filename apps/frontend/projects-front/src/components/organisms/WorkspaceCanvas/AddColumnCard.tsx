@@ -44,8 +44,8 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex w-72 shrink-0 items-center gap-2 rounded-2xl px-4 py-4 text-left font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
-        style={{ background: alpha(colors.surface, 60) }}
+        className="flex w-72 shrink-0 items-center gap-2 rounded-2xl px-4 py-4 text-left font-sans text-sm text-text-secondary transition-all duration-200 ease-out hover:bg-surface hover:text-text-primary"
+        style={{ background: alpha(colors.surface, 55) }}
       >
         <span
           className="flex h-6 w-6 items-center justify-center rounded-lg font-sans text-base leading-none"

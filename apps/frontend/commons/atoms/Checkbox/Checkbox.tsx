@@ -27,7 +27,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           'flex items-start gap-3 rounded-lg border p-3 transition-colors',
           isDisabled
             ? 'cursor-not-allowed border-border-subtle'
-            : 'cursor-pointer border-border hover:border-border-strong hover:bg-surface-elevated',
+            : 'border-border hover:border-border-strong hover:bg-surface-elevated',
           className,
         ]
           .filter(Boolean)

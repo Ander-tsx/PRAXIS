@@ -108,6 +108,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Tailwind v4 dejó de poner `cursor: pointer` en los botones: su preflight usa
+   el valor por defecto del navegador, que en <button> es `default`. Se repone
+   aquí una vez en lugar de recordar la clase en cada botón —que era justo lo
+   que se nos olvidaba— y se marca el deshabilitado como no permitido. */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+label:has(> input[type='checkbox']:not(:disabled)) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
 /* Scrollbar personalizado */
 ::-webkit-scrollbar {
   width: 6px;
