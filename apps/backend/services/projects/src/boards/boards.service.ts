@@ -28,6 +28,7 @@ export class BoardsService {
 
     await this.redis.del(`boards:workspace:${dto.workspaceId}`);
     await this.redis.del(`workspaces:project:${workspace.projectId}`);
+    await this.invalidateProjectCache(dto.workspaceId);
     return board;
   }
 
@@ -77,6 +78,7 @@ export class BoardsService {
     });
 
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await this.invalidateProjectCache(board.workspaceId);
     return updated;
   }
 
@@ -88,6 +90,23 @@ export class BoardsService {
 
     await this.prisma.board.delete({ where: { id } });
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await this.invalidateProjectCache(board.workspaceId);
     return { success: true };
+  }
+
+  /**
+   * Invalida el detalle cacheado del proyecto al que pertenece el espacio.
+   *
+   * `findOneProject` guarda el proyecto entero en `project:<id>` durante 5
+   * minutos, y ese árbol incluye **espacios → tableros → columnas**. Sin esto,
+   * crear un tablero no se veía en el detalle del proyecto hasta que expiraba
+   * la caché: la escritura funcionaba y la pantalla no se enteraba.
+   */
+  private async invalidateProjectCache(workspaceId: string) {
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { projectId: true },
+    });
+    if (workspace) await this.redis.del(`project:${workspace.projectId}`);
   }
 }

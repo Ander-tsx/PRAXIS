@@ -25,6 +25,7 @@ export class ColumnsService {
     });
 
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await this.invalidateProjectCache(board.workspaceId);
     return column;
   }
 
@@ -43,6 +44,7 @@ export class ColumnsService {
 
     const columns = await this.prisma.$transaction(updates);
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
+    await this.invalidateProjectCache(board.workspaceId);
     return columns;
   }
 
@@ -57,6 +59,16 @@ export class ColumnsService {
 
     await this.prisma.boardColumn.delete({ where: { id } });
     await this.redis.del(`boards:workspace:${column.board.workspaceId}`);
+    await this.invalidateProjectCache(column.board.workspaceId);
     return { success: true };
+  }
+
+  /** Ver la nota en boards.service: el detalle del proyecto trae las columnas. */
+  private async invalidateProjectCache(workspaceId: string) {
+    const workspace = await this.prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { projectId: true },
+    });
+    if (workspace) await this.redis.del(`project:${workspace.projectId}`);
   }
 }
