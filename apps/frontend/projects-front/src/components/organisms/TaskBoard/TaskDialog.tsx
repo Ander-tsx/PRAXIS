@@ -2,7 +2,6 @@
 
 import {
   Button,
-  Checkbox,
   Dialog,
   Input,
   type Label as LabelType,
@@ -19,6 +18,7 @@ import {
 import { useActionState, useEffect, useId, useState } from 'react';
 import { deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { SECTION_PANEL } from './section-panel';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskComments } from './TaskComments';
@@ -200,7 +200,7 @@ export function TaskDialog({
           <Input
             name="dueDate"
             type="date"
-            label="Fecha límite"
+            label="Fecha límite (opcional)"
             defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
           />
@@ -213,7 +213,7 @@ export function TaskDialog({
               Este proyecto no tiene etiquetas todavía. Se crean en la pestaña «Etiquetas».
             </p>
           ) : (
-            <div className="flex flex-wrap gap-2 rounded-xl bg-background p-3">
+            <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
               {labels.map((label) => (
                 <LabelToggle
                   key={label.id}
@@ -232,13 +232,11 @@ export function TaskDialog({
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
-            <div className="flex flex-col gap-1.5 rounded-xl bg-background p-3">
+            <div className="flex flex-col gap-0.5 rounded-xl p-2" style={SECTION_PANEL}>
               {members.map((member) => (
-                <Checkbox
+                <AssigneeToggle
                   key={member.id}
-                  name="assigneeIds"
-                  value={member.id}
-                  label={personLabel(member)}
+                  member={member}
                   defaultChecked={task.assignees.some((a) => a.userId === member.id)}
                 />
               ))}
@@ -278,6 +276,63 @@ export function TaskDialog({
         canModerate={canDelete}
       />
     </Dialog>
+  );
+}
+
+/**
+ * Una persona a la que asignar la tarea.
+ *
+ * Usaba el átomo `Checkbox` de commons, que es una caja con borde y `p-3`
+ * pensada para el formulario de roles, donde cada permiso necesita sitio para su
+ * explicación. Para una lista de nombres pesaba demasiado: cinco miembros eran
+ * cinco rectángulos ocupando media ventana.
+ *
+ * Toma el lenguaje del **checklist**: una fila que se ilumina al pasar por
+ * encima y un cuadrito de 16 px que se rellena al marcar. La diferencia es que
+ * aquí el estado lo lleva el formulario, no el servidor, así que sí es un
+ * `<input type="checkbox">` de verdad —oculto— y el cuadro se pinta con
+ * `peer-checked`. Con un botón habría que sincronizar `assigneeIds` a mano.
+ *
+ * El input va `sr-only` en vez de `hidden`: oculto del todo dejaría de recibir
+ * foco y la lista no se podría recorrer con el teclado. De ahí que el anillo de
+ * foco lo pinte el cuadro con `peer-focus-visible`.
+ */
+function AssigneeToggle({
+  member,
+  defaultChecked,
+}: {
+  member: UserProfile;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="group flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-surface-elevated has-[:disabled]:cursor-not-allowed">
+      <input
+        type="checkbox"
+        name="assigneeIds"
+        value={member.id}
+        defaultChecked={defaultChecked}
+        className="peer sr-only"
+      />
+
+      {/* La marca se enciende con `[&>svg]`: los variantes `peer-*` solo miran
+          hermanos, y el icono es hijo de este span, no hermano del input. */}
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
+        <svg
+          className="h-3 w-3 text-primary opacity-0 transition-opacity"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+
+      <span className="min-w-0 flex-1 truncate font-sans text-xs text-text-primary peer-disabled:text-text-secondary">
+        {personLabel(member)}
+      </span>
+    </label>
   );
 }
 

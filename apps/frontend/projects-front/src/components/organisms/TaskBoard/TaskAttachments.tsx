@@ -14,6 +14,7 @@ import {
 import { useActionState, useEffect, useRef } from 'react';
 import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { SECTION_PANEL } from './section-panel';
 
 export interface TaskAttachmentsProps {
   projectId: string;
@@ -146,7 +147,7 @@ function AttachmentRow({
   const preview = isPreviewableImage(file.mimeType);
 
   return (
-    <li className="flex items-center gap-3 rounded-xl bg-background p-2.5">
+    <li className="flex items-center gap-3 rounded-xl p-2.5" style={SECTION_PANEL}>
       <a
         href={href}
         target="_blank"

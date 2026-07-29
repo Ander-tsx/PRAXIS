@@ -14,6 +14,16 @@ import {
   editCommentAction,
 } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { SECTION_PANEL } from './section-panel';
+
+/**
+ * «Editar» y «Eliminar» de un comentario: mismo tamaño y mismo relleno.
+ *
+ * Compartir la clase es la mitad del arreglo de la alineación; la otra es que el
+ * formulario de «Eliminar» no ocupe caja (ver `contents` más abajo).
+ */
+const ACTION_BUTTON =
+  'cursor-pointer rounded px-1 py-0.5 font-sans text-[11px] leading-none text-text-disabled transition-colors hover:text-text-primary';
 
 export interface TaskCommentsProps {
   projectId: string;
@@ -156,7 +166,7 @@ function CommentRow({
   const error = editState.error ?? deleteState.error;
 
   return (
-    <li className="flex flex-col gap-1.5 rounded-xl bg-background p-3">
+    <li className="flex flex-col gap-1.5 rounded-xl p-3" style={SECTION_PANEL}>
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="font-sans text-xs font-semibold text-text-primary">{name}</span>
         <span className="font-sans text-[11px] text-text-disabled">
@@ -166,23 +176,29 @@ function CommentRow({
 
         <span className="ml-auto flex items-center gap-1">
           {canEdit && !editing && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="cursor-pointer rounded px-1 font-sans text-[11px] text-text-disabled transition-colors hover:text-text-primary"
-            >
+            <button type="button" onClick={() => setEditing(true)} className={ACTION_BUTTON}>
               Editar
             </button>
           )}
           {canDelete && (
-            <form action={deleteAction}>
+            /**
+             * `contents`: el formulario desaparece de la maquetación y su botón
+             * pasa a ser hijo directo del flex de fuera.
+             *
+             * «Eliminar» necesita un formulario —tiene su propia acción de
+             * servidor— y «Editar» no, así que uno era un bloque y el otro un
+             * botón suelto: no compartían línea y «Editar» quedaba más arriba.
+             * Con esto los dos son el mismo tipo de hijo y se alinean solos, sin
+             * márgenes de compensación que se descuadran al cambiar el texto.
+             */
+            <form action={deleteAction} className="contents">
               <input type="hidden" name="projectId" value={projectId} />
               <input type="hidden" name="taskId" value={taskId} />
               <input type="hidden" name="commentId" value={comment.id} />
               <button
                 type="submit"
                 disabled={deleting}
-                className="cursor-pointer rounded px-1 font-sans text-[11px] text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed"
+                className={`${ACTION_BUTTON} hover:text-error disabled:cursor-not-allowed`}
               >
                 {deleting ? '…' : 'Eliminar'}
               </button>
