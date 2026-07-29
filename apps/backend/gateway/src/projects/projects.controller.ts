@@ -29,6 +29,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -39,6 +40,7 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 export class ProjectsController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Crea un nuevo proyecto (el ownerId viene del token) */
@@ -101,9 +103,12 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
-  delete(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(
+  async delete(@Param('id', ParseUUIDPipe) id: string) {
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'project_delete' }, { id }),
     );
+    // Las tareas viven en otro microservicio: el cascade no llega hasta ellas.
+    await this.taskPurge.afterProjectDeleted(id);
+    return result;
   }
 }

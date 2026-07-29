@@ -14,6 +14,7 @@ import {
   ProjectInvitationsController,
   ProjectMembershipController,
 } from './invitations.controller';
+import { TaskPurgeService } from './task-purge.service';
 
 
 @Module({
@@ -60,5 +61,6 @@ import {
     MyInvitationsController,
     ProjectMembershipController,
   ],
+  providers: [TaskPurgeService],
 })
 export class ProjectsModule {}

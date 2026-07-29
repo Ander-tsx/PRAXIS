@@ -16,6 +16,7 @@ import {
   FindOneTaskDto,
   FindTasksDto,
   MoveTaskDto,
+  PurgeTasksDto,
   ToggleChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
@@ -353,6 +354,43 @@ export class TasksService {
     ]);
 
     return updated;
+  }
+
+  /**
+   * Borra las tareas que se quedan sin sitio al eliminar un proyecto, un
+   * espacio o un tablero. Ver `PurgeTasksDto`.
+   *
+   * No comprueba permisos: la comprobación la hizo el gateway al autorizar el
+   * borrado del recurso padre, y para entonces ese recurso ya no existe, así
+   * que aquí no habría nada contra lo que comprobar.
+   */
+  async purgeTasks(dto: PurgeTasksDto) {
+    const where: Prisma.TaskWhereInput | null = dto.projectId
+      ? { projectId: dto.projectId }
+      : dto.boardIds && dto.boardIds.length > 0
+        ? { boardId: { in: dto.boardIds } }
+        : null;
+
+    // Sin criterio no se borra nada: un `where` vacío vaciaría la tabla entera.
+    if (!where) return { deleted: 0 };
+
+    // Se leen antes para saber qué claves de caché invalidar; después del
+    // borrado ya no hay forma de saberlo.
+    const affected = await this.prisma.task.findMany({
+      where,
+      select: { id: true, boardId: true },
+    });
+    if (affected.length === 0) return { deleted: 0 };
+
+    const { count } = await this.prisma.task.deleteMany({ where });
+
+    const boardIds = [...new Set(affected.map((t) => t.boardId))];
+    await Promise.all([
+      ...affected.map((t) => this.redis.del(`task:${t.id}`)),
+      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+    ]);
+
+    return { deleted: count };
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────

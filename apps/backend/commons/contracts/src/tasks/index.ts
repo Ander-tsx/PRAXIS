@@ -5,6 +5,7 @@ export * from './find-one-task.dto';
 export * from './update-task.dto';
 export * from './move-task.dto';
 export * from './delete-task.dto';
+export * from './purge-tasks.dto';
 export * from './assign-task.dto';
 export * from './create-checklist.dto';
 export * from './toggle-checklist.dto';

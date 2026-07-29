@@ -25,6 +25,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -75,6 +76,7 @@ export class BoardsController {
 export class BoardsResourceController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Detalle de un board por ID (la membresía basta) */
@@ -107,9 +109,12 @@ export class BoardsResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un board' })
   @ApiResponse({ status: 200, description: 'Board eliminado exitosamente' })
-  delete(@Param('boardId') boardId: string) {
-    return firstValueFrom(
+  async delete(@Param('boardId') boardId: string) {
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'board_delete' }, { id: boardId }),
     );
+    // Las tareas viven en otro microservicio: el cascade no llega hasta ellas.
+    await this.taskPurge.afterBoardsDeleted([boardId]);
+    return result;
   }
 }

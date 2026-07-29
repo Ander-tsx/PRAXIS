@@ -8,7 +8,7 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 11 de 14 resueltos.** El equipo de frontend recibió autorización para
+> **Estado: 12 de 15 resueltos.** El equipo de frontend recibió autorización para
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
 > commit y cómo se verificó. Lo que queda abierto está al principio.
 
@@ -49,6 +49,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `48a0058` |
 | 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
 | 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `48a0058` |
+| 15 | 🟠 | Borrar un tablero dejaba sus tareas huérfanas para siempre | `PENDIENTE` |
 | 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
 | 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
@@ -549,6 +550,41 @@ entero de un proyecto al que no pertenece. Y con el `boardId`, el tablero
 completo de una sola petición.
 
 `apps/backend/gateway/src/tasks/tasks.controller.ts`
+
+---
+
+## ✅ 15. ~~Borrar un tablero dejaba sus tareas en la base para siempre~~
+
+> **Resuelto** en `PENDIENTE`. El gateway avisa a tasks-service (`task_purge`)
+> después de borrar un proyecto, un espacio o un tablero. Al borrar un espacio
+> los tableros se leen **antes**, porque el cascade interno de projects-service
+> los arrastra y después ya no habría forma de saber qué tareas quedaron sin
+> sitio.
+>
+> Va en el gateway y no en projects-service: hacer que projects llamara a tasks
+> montaría un ciclo entre los dos, y el gateway ya habla con ambos.
+>
+> Verificado: borrar un tablero se lleva solo sus tareas y deja las del vecino;
+> borrar el espacio se lleva las de todos sus tableros; borrar el proyecto se
+> lleva las suyas. Se limpiaron además las 8 que ya estaban sueltas.
+
+**Verificado en runtime (2026-07-29).** `Board` vive en projects-service y
+`Task` en tasks-service, en esquemas distintos y sin clave foránea entre ellos:
+el `ON DELETE CASCADE` de Postgres **no cruza ese límite**, y nadie avisaba.
+
+Se encontró al comprobar la migración de encargados: las 7 tareas que había en
+la base tenían el tablero borrado. Todas devolvían
+`403 "Tarea no encontrada o no se pudo resolver el proyecto"`, porque el guard
+resuelve el proyecto a través del tablero y el tablero ya no existía.
+
+Tres consecuencias, por orden de gravedad:
+
+1. **Se acumulan para siempre.** Nada las borra nunca.
+2. **Habrían salido en «mis tareas»** (punto 5), que consulta por `projectId` y
+   encargado, no por tablero: tareas imposibles de abrir, contando como
+   pendientes y venciendo eternamente.
+3. Son invisibles e irrecuperables: no aparecen en ningún listado y no se pueden
+   abrir ni borrar por la API.
 
 ---
 

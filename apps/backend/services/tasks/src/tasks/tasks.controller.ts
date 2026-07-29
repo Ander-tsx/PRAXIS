@@ -10,6 +10,7 @@ import {
   FindOneTaskDto,
   FindTasksDto,
   MoveTaskDto,
+  PurgeTasksDto,
   ToggleChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
@@ -55,6 +56,12 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_assign' })
   assign(@Payload() dto: AssignTaskDto) {
     return this.tasksService.assignTask(dto);
+  }
+
+  /** Limpieza al borrar un proyecto, un espacio o un tablero. */
+  @MessagePattern({ cmd: 'task_purge' })
+  purge(@Payload() dto: PurgeTasksDto) {
+    return this.tasksService.purgeTasks(dto);
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────

@@ -25,6 +25,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -75,6 +76,7 @@ export class WorkspacesController {
 export class WorkspacesResourceController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Detalle de un workspace por ID (la membresía basta) */
@@ -107,9 +109,21 @@ export class WorkspacesResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un workspace' })
   @ApiResponse({ status: 200, description: 'Workspace eliminado exitosamente' })
-  delete(@Param('workspaceId') workspaceId: string) {
-    return firstValueFrom(
+  async delete(@Param('workspaceId') workspaceId: string) {
+    /**
+     * Los tableros se leen **antes** de borrar el espacio: el borrado los
+     * arrastra en cascada dentro de projects-service, y después ya no habría
+     * forma de saber qué tareas se quedaron sin sitio.
+     */
+    const boards = await firstValueFrom(
+      this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
+    ).catch(() => [] as Array<{ id: string }>);
+
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_delete' }, { id: workspaceId }),
     );
+
+    await this.taskPurge.afterBoardsDeleted((boards ?? []).map((b) => b.id));
+    return result;
   }
 }
