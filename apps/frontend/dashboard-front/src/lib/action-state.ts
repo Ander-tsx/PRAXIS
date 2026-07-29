@@ -30,3 +30,14 @@ export const UPDATE_PROFILE_INITIAL_STATE: UpdateProfileState = {
   error: null,
   savedName: null,
 };
+
+export interface InvitationResponseState {
+  error: string | null;
+  /** 'accept' o 'reject' cuando el servidor confirma. */
+  done: string | null;
+}
+
+export const INVITATION_RESPONSE_INITIAL_STATE: InvitationResponseState = {
+  error: null,
+  done: null,
+};

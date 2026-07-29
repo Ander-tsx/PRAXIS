@@ -126,6 +126,32 @@ export interface Workspace {
   boards: Board[];
 }
 
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+
+/**
+ * Invitación a un proyecto.
+ *
+ * Mientras está `PENDING` **no hay membresía**: quien la recibe no tiene
+ * permisos ni ve el proyecto en su lista. El `ProjectMember` se crea al
+ * aceptar.
+ */
+export interface ProjectInvitation {
+  id: string;
+  projectId: string;
+  userId: string;
+  projectRoleId: string;
+  invitedBy: string;
+  status: InvitationStatus;
+  createdAt: string;
+  respondedAt: string | null;
+  projectRole: ProjectRole;
+}
+
+/** `GET /api/me/invitations` trae además el proyecto, para poder nombrarlo. */
+export interface MyInvitation extends ProjectInvitation {
+  project: Pick<Project, 'id' | 'name' | 'description' | 'ownerId'>;
+}
+
 /** `GET /api/projects/:id` — trae espacios y roles embebidos. */
 export interface ProjectDetail extends Project {
   workspaces: Workspace[];

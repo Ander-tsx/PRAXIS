@@ -1,0 +1,67 @@
+'use client';
+
+import { Button, Dialog, alpha, colors } from '@praxis/commons';
+import { useActionState, useState } from 'react';
+import { leaveProjectAction } from '@/app/[id]/actions';
+import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
+
+export interface LeaveProjectButtonProps {
+  projectId: string;
+  projectName: string;
+}
+
+/**
+ * Salir del proyecto.
+ *
+ * Solo aparece para quien es miembro y no es el dueño: el dueño perdería su
+ * propio proyecto sin forma de recuperarlo, y el backend lo rechaza igualmente.
+ *
+ * Tras salir, la acción redirige a la lista: esta página deja de ser accesible.
+ */
+export function LeaveProjectButton({ projectId, projectName }: LeaveProjectButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(leaveProjectAction, MEMBER_INITIAL_STATE);
+
+  return (
+    <>
+      <Button variant="ghost" onClick={() => setOpen(true)}>
+        Salir del proyecto
+      </Button>
+
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        size="sm"
+        title="Salir del proyecto"
+        description={`Dejarás de ver «${projectName}» y de tener acceso a su contenido.`}
+      >
+        <form action={formAction} className="flex flex-col gap-4">
+          <input type="hidden" name="projectId" value={projectId} />
+
+          <p className="font-sans text-sm text-text-secondary">
+            Quien administre el proyecto tendrá que volver a invitarte si quieres regresar.
+          </p>
+
+          {state.error && (
+            <p
+              role="alert"
+              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
+              style={{ background: alpha(colors.error, 10), borderColor: alpha(colors.error, 30) }}
+            >
+              {state.error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="danger" isLoading={pending}>
+              Salir
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </>
+  );
+}

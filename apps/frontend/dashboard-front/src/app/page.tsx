@@ -2,6 +2,7 @@ import {
   APP_NAV_ITEMS,
   AppLayout,
   LogoutButton,
+  type MyInvitation,
   type Paginated,
   type Project,
   displayName,
@@ -11,6 +12,7 @@ import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog'
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
+import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { ProjectList } from '@/components/organisms/ProjectList';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
@@ -37,7 +39,11 @@ export default async function DashboardPage() {
    * devolvía todos los del sistema, y el coste era que no aparecían los
    * proyectos a los que te habían añadido.
    */
-  const page = await api.get<Paginated<Project>>('/projects');
+  const [page, invitations] = await Promise.all([
+    api.get<Paginated<Project>>('/projects'),
+    /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
+    api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
+  ]);
   const projects = page.items;
 
   const owned = projects.filter((project) => project.ownerId === userId);
@@ -63,6 +69,10 @@ export default async function DashboardPage() {
     >
       <div className="flex flex-col gap-8">
         <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
+
+        {/* Antes que nada: es lo único que espera una decisión, y el único
+            sitio donde se entera de que le han invitado. */}
+        <MyInvitations invitations={invitations} />
 
         {projects.length === 0 ? (
           <DashboardEmptyState

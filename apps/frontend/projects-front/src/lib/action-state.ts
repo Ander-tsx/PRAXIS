@@ -29,7 +29,7 @@ export const ROLE_INITIAL_STATE: RoleState = { error: null, savedName: null };
 
 export interface MemberState {
   error: string | null;
-  /** Se rellena cuando el servidor confirma el alta o la baja. */
+  /** Se rellena cuando el servidor confirma la operación. */
   done: string | null;
 }
 

@@ -1,5 +1,6 @@
 import {
   Badge,
+  type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
@@ -7,7 +8,9 @@ import {
   colors,
   personLabel,
 } from '@praxis/commons';
-import { AddMemberDialog } from './AddMemberDialog';
+import { InviteMemberDialog } from './InviteMemberDialog';
+import { LeaveProjectButton } from './LeaveProjectButton';
+import { PendingInvitations } from './PendingInvitations';
 import { RemoveMemberButton } from './RemoveMemberButton';
 
 export interface ProjectMembersProps {
@@ -20,6 +23,11 @@ export interface ProjectMembersProps {
   candidates: UserProfile[];
   ownerId: string;
   canManage: boolean;
+  /** Enviadas y sin responder: todavía no son miembros. */
+  invitations: ProjectInvitation[];
+  projectName: string;
+  /** Para ofrecer «salir»: solo a quien es miembro y no es el dueño. */
+  currentUserId: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -43,9 +51,20 @@ export function ProjectMembers({
   candidates,
   ownerId,
   canManage,
+  invitations,
+  projectName,
+  currentUserId,
 }: ProjectMembersProps) {
   const memberIds = new Set(members.map((member) => member.userId));
-  const available = candidates.filter((user) => !memberIds.has(user.id));
+  const invitedIds = new Set(invitations.map((invitation) => invitation.userId));
+
+  /** Ni quienes ya están dentro ni quienes tienen una invitación sin responder. */
+  const available = candidates.filter(
+    (user) => !memberIds.has(user.id) && !invitedIds.has(user.id) && user.id !== ownerId,
+  );
+
+  const isMember = memberIds.has(currentUserId);
+  const canLeave = isMember && currentUserId !== ownerId;
 
   return (
     <section className="flex flex-col gap-4" aria-label="Equipo del proyecto">
@@ -53,14 +72,24 @@ export function ProjectMembers({
         <div className="flex flex-col gap-1">
           <h3 className="font-display text-2xl text-text-primary">Equipo</h3>
           <p className="font-sans text-sm text-text-secondary">
-            Quien añadas entra al momento: todavía no hay invitaciones que aceptar.
+            Quien invites entra al aceptar la invitación, con el rol que le des.
           </p>
         </div>
 
-        {canManage && (
-          <AddMemberDialog projectId={projectId} roles={roles} candidates={available} />
-        )}
+        <div className="flex items-center gap-2">
+          {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
+          {canManage && (
+            <InviteMemberDialog projectId={projectId} roles={roles} candidates={available} />
+          )}
+        </div>
       </div>
+
+      <PendingInvitations
+        projectId={projectId}
+        invitations={invitations}
+        usersById={usersById}
+        canManage={canManage}
+      />
 
       {members.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">

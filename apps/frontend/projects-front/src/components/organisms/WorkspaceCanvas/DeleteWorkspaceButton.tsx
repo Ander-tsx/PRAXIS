@@ -44,7 +44,9 @@ export function DeleteWorkspaceButton({ projectId, workspace }: DeleteWorkspaceB
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      {/* Mismo tamaño que «Nuevo tablero», que va a su lado: con `size="sm"`
+          las dos alturas no cuadraban y la fila se veía torcida. */}
+      <Button variant="ghost" onClick={() => setOpen(true)}>
         Eliminar espacio
       </Button>
 

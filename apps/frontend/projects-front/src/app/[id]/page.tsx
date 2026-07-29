@@ -5,6 +5,7 @@ import {
   LogoutButton,
   type Paginated,
   type ProjectDetail,
+  type ProjectInvitation,
   type ProjectMember,
   TabNav,
   type UserProfile,
@@ -60,7 +61,7 @@ type TabId = (typeof TABS)[number]['id'];
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const { tab, ws } = await searchParams;
-  const { profile } = await loadCurrentUser();
+  const { userId, profile } = await loadCurrentUser();
   const api = createServerApiClient();
 
   const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'espacios';
@@ -77,12 +78,19 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * El directorio solo hace falta para la pestaña de equipo: cruzar `userId`
    * con nombre y correo, y ofrecer candidatos. Se pide únicamente ahí.
    */
-  const directory =
+  const [directory, invitations] =
     activeTab === 'equipo'
-      ? await api
-          .get<Paginated<UserProfile>>('/users?limit=100')
-          .catch(() => ({ items: [] as UserProfile[], total: 0 }))
-      : { items: [] as UserProfile[], total: 0 };
+      ? await Promise.all([
+          api
+            .get<Paginated<UserProfile>>('/users?limit=100')
+            .catch(() => ({ items: [] as UserProfile[], total: 0 })),
+          /* Solo quien gestiona el equipo puede listarlas; para el resto es un
+             403 esperado y la sección simplemente no las muestra. */
+          api
+            .get<ProjectInvitation[]>(`/projects/${id}/invitations`)
+            .catch(() => [] as ProjectInvitation[]),
+        ])
+      : [{ items: [] as UserProfile[], total: 0 }, [] as ProjectInvitation[]];
 
   const boardCount = project.workspaces.reduce(
     (total, workspace) => total + workspace.boards.length,
@@ -156,6 +164,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             candidates={directory.items}
             ownerId={project.ownerId}
             canManage={can.canManageMembers}
+            invitations={invitations}
+            projectName={project.name}
+            currentUserId={userId}
           />
         )}
 

@@ -5,12 +5,13 @@ import {
   type Board,
   type Column,
   type PermissionMap,
-  type ProjectMember,
+  type ProjectInvitation,
   type ProjectRole,
   type Workspace,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import type {
   BoardState,
   ColumnState,
@@ -127,16 +128,15 @@ export async function deleteRoleAction(
 /* ─── Miembros ──────────────────────────────────────────────────────── */
 
 /**
- * Añade a alguien al proyecto.
+ * Invita a alguien al proyecto.
  *
- * ⚠️ **No es invitar.** El backend no tiene invitaciones: ni tabla, ni estados,
- * ni aviso. Esta persona entra directamente y se entera al abrir el proyecto.
- * La interfaz lo llama "añadir" a propósito. Ver PENDIENTES-BACKEND §12.
+ * La invitación queda **pendiente**: quien la recibe todavía no es miembro, no
+ * tiene permisos y no ve el proyecto. Entra cuando la acepta.
  *
- * Recibe un `userId`, así que quien llama tiene que resolver antes el correo
- * contra `GET /users`.
+ * Recibe un `userId`, así que quien llama resuelve antes el correo contra
+ * `GET /users`.
  */
-export async function addMemberAction(
+export async function inviteMemberAction(
   _prev: MemberState,
   formData: FormData,
 ): Promise<MemberState> {
@@ -148,22 +148,67 @@ export async function addMemberAction(
   const projectRoleId = String(formData.get('projectRoleId') ?? '');
 
   if (!userId) return { error: 'Elige a una persona.', done: null };
-  if (!projectRoleId) return { error: 'Elige el rol con el que entra.', done: null };
+  if (!projectRoleId) return { error: 'Elige el rol con el que entrará.', done: null };
 
   try {
-    const member = await api.post<ProjectMember>(`/projects/${projectId}/members`, {
-      userId,
-      projectRoleId,
-    });
-    if (!member?.id) {
-      return { error: 'El servidor no guardó el alta. Inténtalo de nuevo.', done: null };
+    const invitation = await api.post<ProjectInvitation>(
+      `/projects/${projectId}/invitations`,
+      { userId, projectRoleId },
+    );
+    if (!invitation?.id) {
+      return { error: 'El servidor no registró la invitación.', done: null };
     }
   } catch (error) {
-    return { error: describe(error, 'No se pudo añadir a esa persona.'), done: null };
+    return { error: describe(error, 'No se pudo enviar la invitación.'), done: null };
   }
 
   revalidateProject(projectId);
-  return { error: null, done: 'added' };
+  return { error: null, done: 'invited' };
+}
+
+/** Retira una invitación que todavía no han respondido. */
+export async function cancelInvitationAction(
+  _prev: MemberState,
+  formData: FormData,
+): Promise<MemberState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const invitationId = String(formData.get('invitationId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}/invitations/${invitationId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo retirar la invitación.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'cancelled' };
+}
+
+/**
+ * Salir del proyecto por voluntad propia.
+ *
+ * Tras salir se vuelve a la lista: la página del proyecto ya no es accesible.
+ */
+export async function leaveProjectAction(
+  _prev: MemberState,
+  formData: FormData,
+): Promise<MemberState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}/membership/me`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo salir del proyecto.'), done: null };
+  }
+
+  revalidatePath('/');
+  redirect('/');
 }
 
 export async function removeMemberAction(
@@ -336,6 +381,40 @@ export async function deleteColumnAction(
 
   revalidateProject(projectId);
   return { error: null, savedName: 'eliminada' };
+}
+
+/**
+ * Reordena las columnas de un tablero.
+ *
+ * El endpoint recibe la lista **completa** de ids ya ordenada, no un
+ * intercambio de posiciones. Los ids viajan separados por comas en un campo
+ * oculto porque el arrastre ocurre en el cliente y el formulario se envía solo.
+ */
+export async function reorderColumnsAction(
+  _prev: ColumnState,
+  formData: FormData,
+): Promise<ColumnState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const boardId = String(formData.get('boardId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const columnIds = String(formData.get('columnIds') ?? '')
+    .split(',')
+    .filter(Boolean);
+
+  if (columnIds.length === 0) {
+    return { error: 'No hay columnas que reordenar.', savedName: null };
+  }
+
+  try {
+    await api.patch(`/boards/${boardId}/columns/reorder`, { columnIds });
+  } catch (error) {
+    return { error: describe(error, 'No se pudo guardar el nuevo orden.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: 'reordenado' };
 }
 
 /* ─── Utilidades ────────────────────────────────────────────────────── */
