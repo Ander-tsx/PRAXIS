@@ -7,6 +7,7 @@ export * from './update-task.dto';
 export * from './move-task.dto';
 export * from './delete-task.dto';
 export * from './purge-tasks.dto';
+export * from './restatus-tasks.dto';
 export * from './label.dto';
 export * from './comment.dto';
 export * from './attachment.dto';

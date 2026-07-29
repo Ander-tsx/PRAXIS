@@ -21,9 +21,11 @@ import {
   CreateColumnBodyDto,
   ProjectPermission,
   ReorderColumnsBodyDto,
+  UpdateColumnBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { ColumnStatusSyncService } from './column-status-sync.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -34,6 +36,7 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 export class ColumnsController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly columnStatusSync: ColumnStatusSyncService,
   ) {}
 
   /** Agrega una columna a un board (requiere canCreateColumn) */
@@ -64,6 +67,40 @@ export class ColumnsController {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'column_reorder' }, { boardId, ...body }),
     );
+  }
+
+  /**
+   * Renombra una columna o le cambia el color (requiere canEditColumn).
+   *
+   * Va **después** de `reorder`: Nest resuelve las rutas en orden de
+   * declaración, y `:id` de primero se comería `PATCH .../columns/reorder`
+   * tratando «reorder» como un id.
+   *
+   * ⚠️ Renombrar arrastra el `status` de las tareas de la columna, porque ese
+   * campo guarda el nombre y no el id. La cascada la hace `ColumnStatusSyncService`
+   * después de que projects-service confirme el cambio: el nombre que se
+   * propaga es el que devolvió el servicio, no el que pidió el cliente.
+   */
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_COLUMN)
+  @ApiOperation({ summary: 'Renombra una columna o le cambia el color' })
+  @ApiResponse({ status: 200, description: 'Columna actualizada exitosamente' })
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateColumnBodyDto,
+  ) {
+    const updated = await firstValueFrom(
+      this.projectsClient.send({ cmd: 'column_update' }, { id, ...body }),
+    );
+
+    // Solo si el nombre entraba en el cambio: un cambio de color no toca el
+    // `status` de nada y la llamada sería trabajo tirado.
+    if (body.name !== undefined && updated?.name) {
+      await this.columnStatusSync.afterColumnRenamed(id, updated.name);
+    }
+
+    return updated;
   }
 
   /** Elimina una columna (requiere canDeleteColumn) */

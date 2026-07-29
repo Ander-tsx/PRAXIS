@@ -14,6 +14,7 @@ import {
   ProjectInvitationsController,
   ProjectMembershipController,
 } from './invitations.controller';
+import { ColumnStatusSyncService } from './column-status-sync.service';
 import { TaskPurgeService } from './task-purge.service';
 
 
@@ -61,6 +62,6 @@ import { TaskPurgeService } from './task-purge.service';
     MyInvitationsController,
     ProjectMembershipController,
   ],
-  providers: [TaskPurgeService],
+  providers: [ColumnStatusSyncService, TaskPurgeService],
 })
 export class ProjectsModule {}

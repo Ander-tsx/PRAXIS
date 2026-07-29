@@ -4,6 +4,7 @@ import {
   CreateColumnDto,
   ReorderColumnsDto,
   DeleteColumnDto,
+  UpdateColumnDto,
 } from '@praxis/contracts';
 import { ColumnsService } from './columns.service';
 
@@ -19,6 +20,11 @@ export class ColumnsController {
   @MessagePattern({ cmd: 'column_reorder' })
   reorderColumns(@Payload() dto: ReorderColumnsDto) {
     return this.columnsService.reorderColumns(dto);
+  }
+
+  @MessagePattern({ cmd: 'column_update' })
+  updateColumn(@Payload() dto: UpdateColumnDto) {
+    return this.columnsService.updateColumn(dto);
   }
 
   @MessagePattern({ cmd: 'column_delete' })

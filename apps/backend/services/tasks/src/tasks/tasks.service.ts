@@ -18,6 +18,7 @@ import {
   FindTasksDto,
   MoveTaskDto,
   PurgeTasksDto,
+  RestatusTasksDto,
   ToggleChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
@@ -532,6 +533,44 @@ export class TasksService {
     ]);
 
     return { deleted: count };
+  }
+
+  /**
+   * Pone al día el `status` de las tareas de una columna renombrada.
+   *
+   * No comprueba permisos, igual que `purgeTasks` y por el mismo motivo: la
+   * comprobación (`canEditColumn`) la hizo el gateway al autorizar el cambio de
+   * nombre de la columna, que es el recurso sobre el que se actúa.
+   *
+   * Solo toca las filas que no coinciden ya, así que es idempotente y un
+   * renombrado que no cambia nada no escribe nada.
+   */
+  async restatusTasks(dto: RestatusTasksDto) {
+    // Se leen antes: después del update ya no hay forma de saber cuáles eran
+    // para invalidar sus claves de caché.
+    const affected = await this.prisma.task.findMany({
+      where: { columnId: dto.columnId, status: { not: dto.status } },
+      select: { id: true, boardId: true },
+    });
+    if (affected.length === 0) return { updated: 0 };
+
+    const { count } = await this.prisma.task.updateMany({
+      where: { columnId: dto.columnId, status: { not: dto.status } },
+      data: { status: dto.status },
+    });
+
+    /**
+     * ⚠️ Las dos claves. `tasks:board:` es la que se olvida: el `status` viaja
+     * dentro de la tarea también en el listado del tablero, así que sin
+     * invalidarla la pantalla enseña el estado viejo durante un minuto.
+     */
+    const boardIds = [...new Set(affected.map((task) => task.boardId))];
+    await Promise.all([
+      ...affected.map((task) => this.redis.del(`task:${task.id}`)),
+      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+    ]);
+
+    return { updated: count };
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────

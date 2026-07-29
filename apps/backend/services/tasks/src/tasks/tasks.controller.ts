@@ -24,6 +24,7 @@ import {
   FindTasksDto,
   MoveTaskDto,
   PurgeTasksDto,
+  RestatusTasksDto,
   ToggleChecklistDto,
   UpdateTaskDto,
 } from '@praxis/contracts';
@@ -89,6 +90,12 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_purge' })
   purge(@Payload() dto: PurgeTasksDto) {
     return this.tasksService.purgeTasks(dto);
+  }
+
+  /** Cascada del renombrado de una columna: el `status` guarda su nombre. */
+  @MessagePattern({ cmd: 'task_restatus' })
+  restatus(@Payload() dto: RestatusTasksDto) {
+    return this.tasksService.restatusTasks(dto);
   }
 
   // ─── Etiquetas ────────────────────────────────────────────────────────────

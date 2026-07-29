@@ -54,6 +54,11 @@ model BoardColumn {
   id      String @id @default(uuid())
   name    String
   order   Int
+  /// Token del design system (`COLUMN_COLORS`), no un hex: así el punto de la
+  /// columna sigue el tema. Antes el color lo elegía la interfaz **por
+  /// posición**, así que reordenar una columna le cambiaba el color; guardándolo
+  /// aquí el color es de la columna y viaja con ella.
+  color   String @default("primary")
   boardId String
   board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
 

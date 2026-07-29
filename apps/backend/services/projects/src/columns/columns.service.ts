@@ -5,6 +5,8 @@ import { RedisService } from '../redis/redis.service';
 import {
   CreateColumnDto,
   ReorderColumnsDto,
+  UpdateColumnDto,
+  defaultColumnColor,
 } from '@praxis/contracts';
 
 @Injectable()
@@ -21,11 +23,54 @@ export class ColumnsService {
     }
 
     const column = await this.prisma.boardColumn.create({
-      data: { name: dto.name, order: dto.order, boardId: dto.boardId },
+      data: {
+        name: dto.name,
+        order: dto.order,
+        // Sin color explícito se reparte por posición, como hacía la interfaz.
+        color: dto.color ?? defaultColumnColor(dto.order),
+        boardId: dto.boardId,
+      },
     });
 
     await this.invalidateBoardCaches(board.id, board.workspaceId);
     return column;
+  }
+
+  /**
+   * Renombra una columna o le cambia el color.
+   *
+   * ⚠️ **Renombrar deja el `status` de sus tareas apuntando al nombre viejo.**
+   * `Task.status` guarda el nombre de la columna, no su id, y la tarea vive en
+   * otro microservicio: la cascada la coordina el gateway
+   * (`ColumnStatusSyncService`) llamando a `task_restatus` después de esto. Aquí
+   * solo se cambia la columna.
+   */
+  async updateColumn(dto: UpdateColumnDto) {
+    if (dto.name === undefined && dto.color === undefined) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'No hay nada que cambiar: manda al menos un nombre o un color',
+      });
+    }
+
+    const column = await this.prisma.boardColumn.findUnique({
+      where: { id: dto.id },
+      include: { board: true },
+    });
+    if (!column) {
+      throw new RpcException({ statusCode: 404, message: 'Columna no encontrada' });
+    }
+
+    const updated = await this.prisma.boardColumn.update({
+      where: { id: dto.id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.color !== undefined && { color: dto.color }),
+      },
+    });
+
+    await this.invalidateBoardCaches(column.board.id, column.board.workspaceId);
+    return updated;
   }
 
   async reorderColumns(dto: ReorderColumnsDto) {
