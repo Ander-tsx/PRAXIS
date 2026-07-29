@@ -937,3 +937,72 @@ Checklist, salida de montar esta:
 | Escape / clic en el fondo | cierran el diálogo; el foco vuelve al disparador |
 | Móvil (375px) | cajón lateral, métricas apiladas |
 | Cerrar sesión desde la zona | landing del shell en estado anónimo |
+
+---
+
+## 18. Dominio de tareas (implementado)
+
+> Lo que faltaba: las columnas ya no dicen «Tareas: pronto». Tarjetas con
+> prioridad, vencimiento, encargados, etiquetas, checklist, comentarios y
+> archivos, más avisos en el panel.
+
+### 18.1 Lo que se arregló antes de construir
+
+**El `projectId` del cuerpo era una credencial que elegía el cliente.**
+Reproducido con dos cuentas: bastaba con declarar el id de un proyecto propio
+para leer, editar y borrar tareas de un proyecto ajeno. Y los dos `GET` de
+tareas no pedían permiso ninguno. Detalle en PENDIENTES §9 y §14.
+
+**Borrar un tablero dejaba sus tareas en la base para siempre.** `Board` vive en
+projects-service y `Task` en tasks-service: el cascade de Postgres no cruza esa
+frontera. Las siete tareas que había estaban huérfanas y devolvían 403. Habrían
+salido en «mis tareas», que consulta por proyecto y no por tablero. PENDIENTES
+§15.
+
+Los dos van **antes** del resto a propósito: construir encima habría multiplicado
+el primero por cada ruta nueva, y el segundo habría contaminado el panel.
+
+### 18.2 Decisiones de modelo
+
+| Decisión | Por qué |
+|---|---|
+| `TaskAssignee` sustituye a `assigneeId`, no convive con él | Dos fuentes para el mismo hecho divergen; ya pasó con los permisos como array |
+| `assigneeIds` y `labelIds` **sustituyen el conjunto**, no acumulan | Es lo que hace un selector múltiple al cerrarse, y hace la operación idempotente |
+| Etiquetas del **proyecto**, no del tablero | La misma etiqueta vale en todos sus tableros; por tablero habría que recrearlas |
+| Color de etiqueta = token del sistema, no hex | Con hex libre acabas con veintitrés verdes y ninguno es el del tema |
+| Bytes de adjunto en **tabla aparte** | Es lo único que impide de verdad que un listado se los arrastre |
+| Comentarios **dentro** de la tarea | Pedirlos aparte obligaba a un segundo camino de datos que las Server Actions no revalidan |
+
+### 18.3 Las trampas que reaparecieron
+
+**La caché, otra vez, y dos veces.** Al meter los comentarios en la tarea, el
+listado del tablero (`tasks:board:<id>`, un minuto) dejó de reflejarlos: se
+guardaban y la pantalla seguía enseñando el hilo viejo. Lo mismo al renombrar
+una etiqueta, que se pinta en las tarjetas. **Regla ampliada: si un dato viaja
+dentro de la tarea, tocarlo obliga a invalidar también `tasks:board:`.**
+
+**`TASK_CONTROLLERS` del guard es una lista que hay que mantener.** Un
+controlador nuevo que cuelgue de `tasks/:taskId` y no se apunte ahí recibe
+`403 "Contexto de proyecto no encontrado"`. Pasó con los comentarios. Está
+avisado en el propio guard.
+
+**`types` del tsconfig del gateway es una lista cerrada.** `@types/multer`
+instalado no basta: sin añadir `"multer"` ahí, `Express.Multer.File` no existe
+al compilar.
+
+**Los `<textarea>` envían `\r\n`.** Es la especificación, y el `\r` suelto se
+cuela al pintar el texto. Se normalizan en la acción.
+
+### 18.4 Verificado en navegador real
+
+| Caso | Resultado |
+|---|---|
+| Crear tarea desde una columna | 201 con el `status` igual al nombre de la columna |
+| Arrastrar entre columnas | Movida, y los 7 `status` coherentes con su columna en la base |
+| Editar prioridad y encargados | Guardado y reflejado en la tarjeta |
+| Rol de solo `canViewProject` | Ve las tareas; sin botones, sin arrastre, diálogo con los seis campos desactivados |
+| Checklist | 3 ítems, 2 marcados, barra al 67 % y el `2/3` en la tarjeta |
+| Etiquetas | Creadas, nombre repetido 409, color inválido 400, tres chips en la tarjeta |
+| Comentarios | Hilo ordenado, editar ajeno 403, el dueño moderando, refresco inmediato |
+| Adjuntos | PNG y TXT admitidos, SVG 400, 11 MB 413, ida y vuelta idéntica, miniatura en el diálogo |
+| Panel | Una vencida y una próxima, en bloques separados |
