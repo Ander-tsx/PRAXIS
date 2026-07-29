@@ -1,5 +1,4 @@
-import { Badge, alpha, colors } from '@praxis/commons';
-import type { Project } from '@/lib/domain';
+import { Badge, type Project, alpha, colors } from '@praxis/commons';
 
 export interface ProjectListProps {
   projects: Project[];

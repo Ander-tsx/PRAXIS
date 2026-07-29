@@ -1,5 +1,6 @@
-import { createServerApiClient, requireSession } from '@praxis/commons/auth';
-import type { GlobalRole, UserProfile } from './domain';
+import type { GlobalRole, UserProfile } from '../api/domain';
+import { createServerApiClient } from './server-client';
+import { requireSession } from './session';
 
 export interface CurrentUser {
   userId: string;

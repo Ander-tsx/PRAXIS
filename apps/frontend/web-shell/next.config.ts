@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     const authFrontUrl = process.env.AUTH_FRONT_URL ?? 'http://localhost:4101';
     const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
+    const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
 
     return [
       {
@@ -42,6 +43,11 @@ const nextConfig: NextConfig = {
       {
         source: '/dashboard/:path*',
         destination: `${dashboardFrontUrl}/dashboard/:path*`,
+      },
+      { source: '/projects', destination: `${projectsFrontUrl}/projects` },
+      {
+        source: '/projects/:path*',
+        destination: `${projectsFrontUrl}/projects/:path*`,
       },
     ];
   },

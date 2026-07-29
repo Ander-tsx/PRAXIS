@@ -1,14 +1,18 @@
-import { APP_NAV_ITEMS, AppLayout, type Paginated } from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
+import {
+  APP_NAV_ITEMS,
+  AppLayout,
+  LogoutButton,
+  type Paginated,
+  type Project,
+  displayName,
+} from '@praxis/commons';
 import type { Metadata } from 'next';
 import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
-import { LogoutButton } from '@/components/organisms/LogoutButton';
 import { ProjectList } from '@/components/organisms/ProjectList';
-import { loadCurrentUser } from '@/lib/current-user';
-import { type Project, displayName } from '@/lib/domain';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Panel',

@@ -1,10 +1,8 @@
-import { APP_NAV_ITEMS, AppLayout, Badge } from '@praxis/commons';
+import { APP_NAV_ITEMS, AppLayout, Badge, LogoutButton, displayName } from '@praxis/commons';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { LogoutButton } from '@/components/organisms/LogoutButton';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
-import { loadCurrentUser } from '@/lib/current-user';
-import { displayName } from '@/lib/domain';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Tus datos',

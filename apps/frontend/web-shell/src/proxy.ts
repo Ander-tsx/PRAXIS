@@ -19,7 +19,7 @@ export const config = {
    * Solo las páginas **del shell**.
    *
    * Se excluyen los assets de Next, el favicon, las rutas de API y **los
-   * prefijos de las zonas**: `/auth/*` y `/dashboard/*` los sirve otra app, que
+   * prefijos de las zonas**: `/auth/*`, `/dashboard/*` y `/projects/*` los sirve otra app, que
    * ya renueva la sesión en su propio proxy. Sin esta exclusión pagaríamos el
    * salto de red al gateway dos veces por navegación.
    */
@@ -31,6 +31,6 @@ export const config = {
      * minutos y que el navbar siga diciendo "Ir al panel".
      */
     '/',
-    '/((?!_next/static|_next/image|favicon.ico|api/|auth(?:/|$)|dashboard(?:/|$)).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|auth(?:/|$)|dashboard(?:/|$)|projects(?:/|$)).*)',
   ],
 };

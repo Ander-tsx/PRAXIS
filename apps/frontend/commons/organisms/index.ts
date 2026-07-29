@@ -7,3 +7,4 @@
  */
 
 export * from './AppLayout';
+export * from './LogoutButton';

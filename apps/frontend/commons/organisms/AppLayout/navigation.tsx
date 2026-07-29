@@ -66,8 +66,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
-    // La zona projects-front todavía no existe.
-    disabled: true,
   },
   {
     label: 'Reportes',

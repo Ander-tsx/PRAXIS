@@ -4,7 +4,7 @@ import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 import type { UpdateProfileState } from '@/lib/action-state';
-import type { UserProfile } from '@/lib/domain';
+import type { UserProfile } from '@praxis/commons';
 import { validateProfile } from '@/lib/validation';
 
 /**
