@@ -17,7 +17,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { createTaskAction, deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
+import { deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
@@ -28,12 +28,11 @@ export interface TaskDialogProps {
   onClose: () => void;
   projectId: string;
   boardId: string;
-  /** Columna destino al crear, o la actual al editar. */
+  /** Columna en la que está la tarea. */
   columnId: string;
-  /** Nombre de esa columna: `status` tiene que igualarlo. */
+  /** Nombre de esa columna, para situarla en la cabecera. */
   columnName: string;
-  /** `null` para crear. */
-  task: Task | null;
+  task: Task;
   /** Gente del proyecto, que es a quien se puede asignar. */
   members: UserProfile[];
   /** Etiquetas del proyecto, que son las que se pueden poner. */
@@ -46,12 +45,12 @@ export interface TaskDialogProps {
 }
 
 /**
- * Detalle de una tarea, y también el formulario de creación.
+ * Detalle de una tarea: todo lo que no cabe en la tarjeta.
  *
- * Es el mismo diálogo para las dos cosas porque los campos son los mismos y
- * mantener dos formularios en paralelo acaba con uno de los dos desactualizado.
- * Lo que cambia es la acción, el título y que al crear todavía no hay checklist
- * a la que colgar ítems: sin `taskId` no hay ruta donde ponerlos.
+ * **Ya no crea tareas.** Lo hacía, y abrir esta ventana entera para escribir un
+ * título era justo lo que sobraba: ahora la tarea nace desde la columna con
+ * solo el título y aquí se le pone el resto. Mantener el modo de creación
+ * después de eso habría sido código muerto pretendiendo estar vivo.
  *
  * Los campos son **no controlados** (`defaultValue`) y el formulario se
  * remonta con `key` al cambiar de tarea. Controlarlos obligaba a sincronizar
@@ -73,11 +72,7 @@ export function TaskDialog({
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const isNew = task === null;
-  const [state, formAction, pending] = useActionState(
-    isNew ? createTaskAction : updateTaskAction,
-    TASK_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useActionState(updateTaskAction, TASK_INITIAL_STATE);
   const [deleteState, deleteAction, deleting] = useActionState(
     deleteTaskAction,
     TASK_INITIAL_STATE,
@@ -102,7 +97,7 @@ export function TaskDialog({
       open={open}
       onClose={onClose}
       size="lg"
-      title={isNew ? 'Nueva tarea' : task.title}
+      title={task.title}
       description={
         <span className="flex items-center gap-2">
           <span
@@ -111,13 +106,13 @@ export function TaskDialog({
           >
             {columnName}
           </span>
-          {!isNew && <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>}
+          <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
         </span>
       }
       footer={
         <div className="flex w-full items-center justify-between gap-2">
           <div>
-            {!isNew && canDelete && (
+            {canDelete && (
               <form action={deleteAction}>
                 <input type="hidden" name="projectId" value={projectId} />
                 <input type="hidden" name="taskId" value={task.id} />
@@ -156,7 +151,7 @@ export function TaskDialog({
             </Button>
             {canEdit && (
               <Button type="submit" form={formId} disabled={pending}>
-                {pending ? 'Guardando…' : isNew ? 'Crear tarea' : 'Guardar'}
+                {pending ? 'Guardando…' : 'Guardar'}
               </Button>
             )}
           </div>
@@ -169,23 +164,22 @@ export function TaskDialog({
         <input type="hidden" name="columnId" value={columnId} />
         {/* `status` debe igualar el nombre de la columna, no su id. */}
         <input type="hidden" name="status" value={columnName} />
-        {!isNew && <input type="hidden" name="taskId" value={task.id} />}
+        <input type="hidden" name="taskId" value={task.id} />
 
         <Input
           name="title"
           label="Título"
-          defaultValue={task?.title ?? ''}
+          defaultValue={task.title}
           placeholder="Qué hay que hacer"
           maxLength={255}
           disabled={readOnly}
           required
-          autoFocus={isNew}
         />
 
         <Textarea
           name="description"
           label="Descripción"
-          defaultValue={task?.description ?? ''}
+          defaultValue={task.description ?? ''}
           placeholder="Contexto, criterios de aceptación, enlaces…"
           rows={4}
           disabled={readOnly}
@@ -195,7 +189,7 @@ export function TaskDialog({
           <Select
             name="priority"
             label="Prioridad"
-            defaultValue={task?.priority ?? 'MEDIUM'}
+            defaultValue={task.priority}
             disabled={readOnly}
             options={PRIORITIES.map((priority) => ({
               value: priority,
@@ -207,7 +201,7 @@ export function TaskDialog({
             name="dueDate"
             type="date"
             label="Fecha límite"
-            defaultValue={toDateInput(task?.dueDate ?? null)}
+            defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
           />
         </div>
@@ -224,7 +218,7 @@ export function TaskDialog({
                 <LabelToggle
                   key={label.id}
                   label={label}
-                  defaultChecked={task?.labels.some((l) => l.labelId === label.id) ?? false}
+                  defaultChecked={task.labels.some((l) => l.labelId === label.id)}
                 />
               ))}
             </div>
@@ -245,7 +239,7 @@ export function TaskDialog({
                   name="assigneeIds"
                   value={member.id}
                   label={personLabel(member)}
-                  defaultChecked={task?.assignees.some((a) => a.userId === member.id) ?? false}
+                  defaultChecked={task.assignees.some((a) => a.userId === member.id)}
                 />
               ))}
             </div>
@@ -263,31 +257,26 @@ export function TaskDialog({
       </form>
 
       {/* Fuera del formulario: cada ítem tiene su propia acción y un <form>
-          dentro de otro no es HTML válido. Al crear no hay `taskId` todavía,
-          así que la sección aparece en cuanto la tarea existe. */}
-      {!isNew && (
-        <>
-          <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />
-          <TaskAttachments
-            projectId={projectId}
-            taskId={task.id}
-            attachments={task.attachments}
-            usersById={usersById}
-            currentUserId={currentUserId}
-            canUpload={canEdit}
-            canModerate={canDelete}
-          />
-          <TaskComments
-            projectId={projectId}
-            taskId={task.id}
-            comments={task.comments}
-            usersById={usersById}
-            currentUserId={currentUserId}
-            canComment={canEdit}
-            canModerate={canDelete}
-          />
-        </>
-      )}
+          dentro de otro no es HTML válido. */}
+      <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />
+      <TaskAttachments
+        projectId={projectId}
+        taskId={task.id}
+        attachments={task.attachments}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canUpload={canEdit}
+        canModerate={canDelete}
+      />
+      <TaskComments
+        projectId={projectId}
+        taskId={task.id}
+        comments={task.comments}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canComment={canEdit}
+        canModerate={canDelete}
+      />
     </Dialog>
   );
 }

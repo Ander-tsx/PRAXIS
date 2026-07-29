@@ -38,10 +38,21 @@ const PRIORITY_COLORS: Record<Priority, string> = {
  * límite si está cerca o pasada, avance del checklist y quién la lleva. Todo lo
  * demás —descripción, subtareas— vive en el diálogo.
  *
- * Es un `<article>` con un botón dentro y no un `<button>` entero: el botón
- * sería un ancestro de las iniciales y los contadores, y un botón con contenido
- * estructurado se anuncia fatal en un lector de pantalla. El botón cubre la
- * tarjeta con `absolute inset-0` y el resto queda como contenido.
+ * Es un `<article>`, no un `<button>` entero: un botón sería ancestro de las
+ * iniciales y los contadores, y un botón con contenido estructurado se anuncia
+ * fatal en un lector de pantalla.
+ *
+ * **El diálogo se abre con el icono de configuración, no pulsando la tarjeta.**
+ * Antes un botón invisible la cubría entera con `absolute inset-0`, y eso
+ * competía con el gesto principal del tablero: un arrastre que se queda en dos
+ * píxeles cuenta como clic, y abrías un modal cuando lo que querías era mover la
+ * tarjeta. Además no había ninguna pista visual de que la tarjeta se pudiera
+ * abrir. Ahora hay un control explícito, y la superficie queda libre para
+ * arrastrar y para seleccionar el texto.
+ *
+ * El icono se ve siempre, tenue, y sube a opacidad plena al pasar por encima o
+ * al recibir el foco. Enseñarlo solo en `hover` lo dejaría inalcanzable en una
+ * pantalla táctil.
  */
 export function TaskCard({
   task,
@@ -80,28 +91,48 @@ export function TaskCard({
       className={[
         'group relative flex flex-col gap-2 rounded-xl bg-background p-3 text-left',
         'transition-[transform,box-shadow,opacity] duration-150 ease-out',
-        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+        /* Sin permiso para mover, el cursor no promete nada: la tarjeta ya no se
+           pulsa entera, el que abre es el icono. */
+        draggable ? 'cursor-grab active:cursor-grabbing' : '',
         isDragging ? 'scale-[1.02] opacity-60' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
     >
-      {/* Cubre la tarjeta: el objetivo de clic es toda ella, no solo el título. */}
-      <button
-        type="button"
-        onClick={onOpen}
-        className="absolute inset-0 z-10 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        aria-label={`Abrir la tarea ${task.title}`}
-      />
-
       <div className="flex items-start gap-2">
         <span
           className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
           style={{ background: priorityColor }}
           aria-hidden="true"
         />
-        <h6 className="font-sans text-sm leading-snug text-text-primary">{task.title}</h6>
+        <h6 className="min-w-0 flex-1 font-sans text-sm leading-snug text-text-primary">
+          {task.title}
+        </h6>
+
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`Abrir los detalles de la tarea ${task.title}`}
+          title="Detalles de la tarea"
+          className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1 text-text-disabled opacity-50 transition-[opacity,color] hover:bg-surface hover:text-text-primary hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
       </div>
 
       {/* Las etiquetas van arriba del todo: son el filtro visual con el que se

@@ -282,6 +282,20 @@ export function ColumnMenu({
                 onChange={(event) => setName(event.target.value)}
                 maxLength={COLUMN_NAME_MAX}
                 autoComplete="off"
+                /* Enter guarda, igual que en el campo de tarea nueva y por lo
+                   mismo: es la tecla natural aquí y no se deja al envío
+                   implícito del navegador. */
+                onKeyDown={(event) => {
+                  if (
+                    event.key === 'Enter' &&
+                    name.trim() &&
+                    name.trim() !== columnName &&
+                    !updating
+                  ) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-sm text-text-primary outline-none focus:border-primary"
               />
 

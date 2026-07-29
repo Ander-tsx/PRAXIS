@@ -2,7 +2,9 @@
 
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
 import { alpha, colors } from '@praxis/commons';
-import { useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import { createTaskAction } from '@/app/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
 
@@ -49,7 +51,6 @@ export function ColumnTasks({
   onDropTask,
 }: ColumnTasksProps) {
   const [openTask, setOpenTask] = useState<Task | null>(null);
-  const [creating, setCreating] = useState(false);
   const [isOver, setIsOver] = useState(false);
 
   /**
@@ -116,43 +117,14 @@ export function ColumnTasks({
         )}
 
         {canCreate && (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Añadir tarea
-          </button>
+          <NewTaskInline
+            projectId={projectId}
+            boardId={boardId}
+            columnId={column.id}
+            columnName={column.name}
+          />
         )}
       </div>
-
-      {creating && (
-        <TaskDialog
-          open
-          onClose={() => setCreating(false)}
-          projectId={projectId}
-          boardId={boardId}
-          columnId={column.id}
-          columnName={column.name}
-          task={null}
-          members={members}
-          labels={labels}
-          usersById={usersById}
-          currentUserId={currentUserId}
-          canEdit={canCreate}
-          canDelete={false}
-        />
-      )}
 
       {openTask && (
         <TaskDialog
@@ -175,5 +147,147 @@ export function ColumnTasks({
         />
       )}
     </>
+  );
+}
+
+/**
+ * Crear una tarea desde la propia columna: solo el título.
+ *
+ * Antes «Añadir tarea» abría el diálogo completo, con descripción, prioridad,
+ * fecha, etiquetas y encargados. Para anotar tres cosas seguidas eso es una
+ * ventana modal por tarea, y las tareas se apuntan en ráfaga: primero se
+ * vuelcan, luego se detallan. El resto se rellena abriendo la tarjeta.
+ *
+ * Nace con prioridad **media**, que ya es el valor por defecto del backend, así
+ * que `priority` no se manda: mandarlo obligaría a mantener aquí un valor que ya
+ * está definido en el DTO, y los dos se desincronizarían.
+ *
+ * Igual que en `AddColumnCard`: el campo se vacía y **mantiene el foco** cuando
+ * el servidor confirma, para escribir la siguiente sin tocar el ratón. Vaciarlo
+ * al enviar perdería lo escrito si la petición falla.
+ */
+function NewTaskInline({
+  projectId,
+  boardId,
+  columnId,
+  columnName,
+}: {
+  projectId: string;
+  boardId: string;
+  columnId: string;
+  /** `status` tiene que igualar el nombre de la columna, no su id. */
+  columnName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [state, formAction, pending] = useActionState(createTaskAction, TASK_INITIAL_STATE);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) inputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (state.done) {
+      setTitle('');
+      inputRef.current?.focus();
+    }
+  }, [state.done]);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
+      >
+        <svg
+          className="h-3.5 w-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        Añadir tarea
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={formAction}
+      className="flex flex-col gap-2 rounded-xl bg-background p-2"
+      style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
+      noValidate
+    >
+      <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="boardId" value={boardId} />
+      <input type="hidden" name="columnId" value={columnId} />
+      <input type="hidden" name="status" value={columnName} />
+
+      <input
+        ref={inputRef}
+        name="title"
+        value={title}
+        onChange={(event) => setTitle(event.target.value)}
+        /* Sin nada escrito, salir del campo cierra: dejar un formulario abierto
+           y vacío en la columna solo estorba. */
+        onBlur={() => !title.trim() && setOpen(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            setOpen(false);
+            return;
+          }
+          /**
+           * Enter envía, explícitamente.
+           *
+           * Un `<input>` en un formulario con botón de envío ya lo hace solo
+           * («implicit submission»), pero aquí es la tecla que sostiene todo el
+           * gesto —escribir varias tareas seguidas sin tocar el ratón—, así que
+           * no se deja a un comportamiento implícito. `preventDefault` evita que
+           * en un navegador normal se envíe dos veces.
+           */
+          if (event.key === 'Enter' && title.trim() && !pending) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        maxLength={255}
+        placeholder="Qué hay que hacer"
+        autoComplete="off"
+        aria-label={`Título de la tarea nueva en ${columnName}`}
+        className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-xs text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
+      />
+
+      <div className="flex items-center gap-1.5">
+        <button
+          type="submit"
+          disabled={!title.trim() || pending}
+          className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs font-semibold text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          style={{ background: colors.primary }}
+        >
+          {pending ? 'Creando…' : 'Crear'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+        >
+          Cancelar
+        </button>
+        <span className="ml-auto pr-1 font-sans text-[10px] text-text-disabled">
+          Prioridad media
+        </span>
+      </div>
+
+      {state.error && (
+        <p role="alert" className="font-sans text-[11px]" style={{ color: colors.error }}>
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }
