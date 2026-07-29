@@ -30,4 +30,18 @@ export class PurgeTasksDto {
   @ArrayMaxSize(500)
   @IsUUID('4', { each: true })
   boardIds?: string[];
+
+  /**
+   * Borra las tareas de una columna. Para cuando se borra la columna.
+   *
+   * Este caso era el más engañoso de los tres: la tarea conserva `boardId` y
+   * `projectId`, así que el guard **sí** le resuelve el proyecto y sigue
+   * abriéndose por su ruta. Simplemente no se pinta en ninguna parte —el
+   * tablero agrupa por `columnId` y esa columna ya no existe— mientras sigue
+   * contando en «mis tareas». Verificado: tras borrar la columna, la fila viva y
+   * la tarea saliendo aún en `GET /boards/:id/tasks`.
+   */
+  @IsOptional()
+  @IsUUID('4')
+  columnId?: string;
 }

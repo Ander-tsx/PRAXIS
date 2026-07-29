@@ -497,7 +497,9 @@ export class TasksService {
       ? { projectId: dto.projectId }
       : dto.boardIds && dto.boardIds.length > 0
         ? { boardId: { in: dto.boardIds } }
-        : null;
+        : dto.columnId
+          ? { columnId: dto.columnId }
+          : null;
 
     // Sin criterio no se borra nada: un `where` vacío vaciaría la tabla entera.
     if (!where) return { deleted: 0 };

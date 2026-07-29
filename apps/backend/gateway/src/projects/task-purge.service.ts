@@ -41,7 +41,23 @@ export class TaskPurgeService {
     await this.purge({ boardIds }, `tableros ${boardIds.join(', ')}`);
   }
 
-  private async purge(payload: { projectId?: string; boardIds?: string[] }, what: string) {
+  /**
+   * Tras borrar una columna: se van sus tareas.
+   *
+   * Es el caso más engañoso de los tres. Al borrar un tablero la tarea quedaba
+   * imposible de abrir, así que se notaba; aquí conserva `boardId` y
+   * `projectId`, el guard le resuelve el proyecto y sigue respondiendo por su
+   * ruta — solo deja de pintarse, porque el tablero agrupa por `columnId`.
+   * Invisible y viva, contando en «mis tareas».
+   */
+  async afterColumnDeleted(columnId: string) {
+    await this.purge({ columnId }, `columna ${columnId}`);
+  }
+
+  private async purge(
+    payload: { projectId?: string; boardIds?: string[]; columnId?: string },
+    what: string,
+  ) {
     try {
       const result = await firstValueFrom(
         this.tasksClient.send({ cmd: 'task_purge' }, payload),

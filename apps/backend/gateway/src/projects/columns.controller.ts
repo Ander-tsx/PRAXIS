@@ -26,6 +26,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ColumnStatusSyncService } from './column-status-sync.service';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -37,6 +38,7 @@ export class ColumnsController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly columnStatusSync: ColumnStatusSyncService,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Agrega una columna a un board (requiere canCreateColumn) */
@@ -103,14 +105,22 @@ export class ColumnsController {
     return updated;
   }
 
-  /** Elimina una columna (requiere canDeleteColumn) */
+  /**
+   * Elimina una columna y las tareas que tenía dentro (requiere canDeleteColumn).
+   *
+   * Las tareas viven en otro microservicio: el cascade de Postgres no cruza esa
+   * frontera y sin esta limpieza se quedaban vivas apuntando a una columna que
+   * ya no existe — sin pintarse en ningún tablero y contando en «mis tareas».
+   */
   @Delete(':id')
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_COLUMN)
-  @ApiOperation({ summary: 'Elimina una columna' })
+  @ApiOperation({ summary: 'Elimina una columna y sus tareas' })
   @ApiResponse({ status: 200, description: 'Columna eliminada exitosamente' })
-  delete(@Param('id') id: string) {
-    return firstValueFrom(
+  async delete(@Param('id') id: string) {
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'column_delete' }, { id }),
     );
+    await this.taskPurge.afterColumnDeleted(id);
+    return result;
   }
 }
