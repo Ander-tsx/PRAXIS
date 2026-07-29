@@ -50,15 +50,22 @@ export async function createProjectAction(
   } catch (error) {
     if (error instanceof ApiError) {
       /**
-       * TODO: cuando el backend capture el P2002 de Prisma, distinguir aquí el
-       * 409 y decir "ya existe un proyecto con ese nombre". Hoy el nombre es
-       * `@unique` **global** y un duplicado sale como 500, así que no podemos
-       * separarlo de una caída real. Ver PENDIENTES-BACKEND.md §6.
+       * El backend ya distingue el nombre duplicado (409) de una caída real,
+       * así que aquí se puede decir exactamente qué pasa en vez de un genérico.
+       *
+       * Queda un detalle de diseño del backend: `Project.name` es único a nivel
+       * **global**, no por usuario ni por organización, así que el nombre puede
+       * chocar con el proyecto de un equipo que no conoces. De ahí la coletilla.
        */
+      if (error.code === 'CONFLICT') {
+        return {
+          error: `${error.message} Los nombres son únicos en toda la plataforma, así que prueba con uno más específico.`,
+          createdName: null,
+        };
+      }
       if (error.status >= 500) {
         return {
-          error:
-            'No se pudo crear el proyecto. Puede que ya exista otro con ese nombre; prueba con uno distinto.',
+          error: 'No se pudo crear el proyecto. Inténtalo de nuevo en un momento.',
           createdName: null,
         };
       }

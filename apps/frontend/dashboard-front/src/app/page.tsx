@@ -28,21 +28,15 @@ export default async function DashboardPage() {
   const api = createServerApiClient();
 
   /**
-   * ⚠️ Filtro temporal en el cliente.
-   *
-   * `GET /projects` devuelve **todos los proyectos del sistema**: el gateway
-   * manda `{ userId }` pero `FindProjectsDto` solo declara `ownerId`, así que
-   * el `where` acaba vacío. Sin este filtro estaríamos enseñando los proyectos
-   * de otras personas, que es una fuga de información.
-   *
-   * Cuando el backend filtre por membresía (PENDIENTES-BACKEND.md §3), esta
-   * línea se cae y ya está.
-   *
-   * Coste honesto mientras tanto: **no aparecen los proyectos en los que el
-   * usuario es miembro pero no dueño.** No hay forma de saberlo desde aquí.
+   * Ya viene filtrado por el backend: proyectos donde el usuario es **dueño o
+   * miembro**. Antes había que filtrar aquí por `ownerId` porque `GET /projects`
+   * devolvía todos los del sistema, y el coste era que no aparecían los
+   * proyectos a los que te habían añadido.
    */
   const page = await api.get<Paginated<Project>>('/projects');
-  const projects = page.items.filter((project) => project.ownerId === userId);
+  const projects = page.items;
+
+  const owned = projects.filter((project) => project.ownerId === userId);
 
   const totals = projects.reduce(
     (acc, project) => ({
@@ -74,10 +68,11 @@ export default async function DashboardPage() {
           <>
             <DashboardMetrics
               projects={projects.length}
+              owned={owned.length}
               workspaces={totals.workspaces}
               members={totals.members}
             />
-            <ProjectList projects={projects} />
+            <ProjectList projects={projects} currentUserId={userId} />
           </>
         )}
       </div>

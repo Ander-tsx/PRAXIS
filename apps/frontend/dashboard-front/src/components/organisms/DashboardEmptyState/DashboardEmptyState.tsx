@@ -12,26 +12,26 @@ export interface DashboardEmptyStateProps {
  * Una cuenta nueva no tiene proyectos, así que **esta pantalla se ve más que
  * la llena**: es la primera impresión del producto.
  *
- * Enseña el orden que el backend impone hoy: un proyecto nace sin roles y sin
- * miembros, y `POST /projects/:id/members` exige un `projectRoleId` que
- * todavía no existe. Así que hay que crear el rol antes de invitar a nadie.
- * Ver PENDIENTES-BACKEND.md §7.
+ * Los pasos describen lo que pasa de verdad. Antes advertían de que había que
+ * crear un rol antes de poder añadir a nadie, porque un proyecto nacía sin
+ * roles ni miembros; ahora el backend lo crea al vuelo y esa advertencia
+ * sobraba. Si vuelve a cambiar, esto se actualiza con ello.
  */
 
 const STEPS = [
   {
     title: 'Crea tu proyecto',
-    body: 'Solo necesita un nombre. La descripción puedes añadirla después.',
+    body: 'Solo necesita un nombre. Nace contigo dentro y con un rol de administrador listo.',
     available: true,
   },
   {
-    title: 'Define un rol',
-    body: 'Un proyecto nace sin roles. Tienes que crear al menos uno antes de invitar a nadie.',
+    title: 'Añade a tu equipo',
+    body: 'Cada persona entra con un rol, y ese rol decide lo que puede hacer.',
     available: false,
   },
   {
-    title: 'Invita a tu equipo',
-    body: 'Cada persona entra con el rol que le asignes, y ese rol decide lo que puede hacer.',
+    title: 'Abre espacios y tableros',
+    body: 'Los espacios agrupan tableros, y los tableros ordenan el trabajo en columnas.',
     available: false,
   },
 ];

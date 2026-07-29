@@ -2,7 +2,10 @@ import { alpha, colors } from '@praxis/commons';
 import type { ReactNode } from 'react';
 
 export interface DashboardMetricsProps {
+  /** Proyectos donde participa: propios más aquellos donde es miembro. */
   projects: number;
+  /** De los anteriores, cuántos son suyos. */
+  owned: number;
   workspaces: number;
   members: number;
 }
@@ -54,13 +57,30 @@ const iconProps = {
  * agregados en `_count` de cada proyecto, así que sumarlos no cuesta ninguna
  * petición extra.
  */
-export function DashboardMetrics({ projects, workspaces, members }: DashboardMetricsProps) {
+export function DashboardMetrics({
+  projects,
+  owned,
+  workspaces,
+  members,
+}: DashboardMetricsProps) {
+  /**
+   * Desde que el backend filtra por membresía, la lista mezcla proyectos
+   * propios con aquellos donde solo eres miembro. Si no todos son tuyos, el pie
+   * lo desglosa en vez de dar un número que no dice de qué.
+   */
+  const projectsHint =
+    owned === projects
+      ? projects === 1
+        ? 'Proyecto del que eres dueño'
+        : 'Proyectos de los que eres dueño'
+      : `${owned} ${owned === 1 ? 'propio' : 'propios'} · ${projects - owned} como miembro`;
+
   return (
     <section className="grid grid-cols-1 gap-4 sm:grid-cols-3" aria-label="Resumen">
       <Metric
         value={projects}
         label="Proyectos"
-        hint={projects === 1 ? 'Proyecto del que eres dueño' : 'Proyectos de los que eres dueño'}
+        hint={projectsHint}
         tint={colors.primary}
         icon={
           <svg {...iconProps} aria-hidden="true">
@@ -75,7 +95,7 @@ export function DashboardMetrics({ projects, workspaces, members }: DashboardMet
       <Metric
         value={workspaces}
         label="Espacios"
-        hint="Espacios de trabajo dentro de tus proyectos"
+        hint="Espacios de trabajo de tus proyectos"
         tint={colors.accent}
         icon={
           <svg {...iconProps} aria-hidden="true">
@@ -90,7 +110,7 @@ export function DashboardMetrics({ projects, workspaces, members }: DashboardMet
       <Metric
         value={members}
         label="Miembros"
-        hint="Personas invitadas a tus proyectos"
+        hint="Personas en tus proyectos"
         tint={colors.info}
         icon={
           <svg {...iconProps} aria-hidden="true">

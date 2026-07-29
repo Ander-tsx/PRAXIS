@@ -1,8 +1,10 @@
-import { alpha, colors } from '@praxis/commons';
+import { Badge, alpha, colors } from '@praxis/commons';
 import type { Project } from '@/lib/domain';
 
 export interface ProjectListProps {
   projects: Project[];
+  /** Para distinguir los proyectos propios de aquellos donde solo es miembro. */
+  currentUserId: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -31,7 +33,7 @@ function Count({ value, singular, plural }: { value: number; singular: string; p
  * Recibe la lista ya filtrada: quién puede verlos lo decide la page, no este
  * componente.
  */
-export function ProjectList({ projects }: ProjectListProps) {
+export function ProjectList({ projects, currentUserId }: ProjectListProps) {
   return (
     <section className="flex flex-col gap-4" aria-label="Mis proyectos">
       <h3 className="font-display text-2xl text-text-primary">Mis proyectos</h3>
@@ -43,9 +45,19 @@ export function ProjectList({ projects }: ProjectListProps) {
             className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-border-strong"
           >
             <div className="flex flex-col gap-1.5">
-              <h4 className="font-sans text-base font-semibold text-text-primary">
-                {project.name}
-              </h4>
+              <div className="flex items-start justify-between gap-2">
+                <h4 className="font-sans text-base font-semibold text-text-primary">
+                  {project.name}
+                </h4>
+
+                {/* Desde que la lista incluye proyectos ajenos, conviene decir
+                    cuáles no son tuyos. */}
+                {project.ownerId !== currentUserId && (
+                  <Badge variant="info" className="shrink-0">
+                    MIEMBRO
+                  </Badge>
+                )}
+              </div>
 
               {project.description ? (
                 <p className="line-clamp-2 font-sans text-sm text-text-secondary">
