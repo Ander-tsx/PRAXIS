@@ -17,6 +17,7 @@ model Project {
   workspaces  Workspace[]
   members     ProjectMember[]
   roles       ProjectRole[]
+  invitations ProjectInvitation[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -67,10 +68,53 @@ model ProjectRole {
   project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   permissions Json
   members     ProjectMember[]
+  invitations ProjectInvitation[]
 
   @@unique([projectId, name])
   @@schema("projects")
   @@map("project_roles")
+}
+
+/// Estados de una invitación a un proyecto.
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+
+  @@schema("projects")
+}
+
+/// Invitación a un proyecto.
+///
+/// Existe porque antes no había ninguna: `POST /projects/:id/members` daba de
+/// alta directamente y la persona se enteraba al abrir el proyecto. Ahora el
+/// alta solo ocurre cuando quien recibe la invitación la acepta.
+///
+/// El `ProjectMember` se crea **al aceptar**, no aquí: mientras está pendiente
+/// no hay membresía y por tanto no hay permisos.
+model ProjectInvitation {
+  id            String           @id @default(uuid())
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  /// A quién se invita.
+  userId        String
+  /// Rol con el que entrará si acepta.
+  projectRole   ProjectRole      @relation(fields: [projectRoleId], references: [id], onDelete: Cascade)
+  projectRoleId String
+  /// Quién la envió, para poder decirlo en la interfaz.
+  invitedBy     String
+  status        InvitationStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  respondedAt   DateTime?
+
+  /// Una sola invitación viva por persona y proyecto. Las resueltas se
+  /// conservan como historial, así que la unicidad se aplica en el servicio
+  /// solo sobre las pendientes.
+  @@index([userId, status])
+  @@index([projectId, status])
+  @@schema("projects")
+  @@map("project_invitations")
 }
 
 model ProjectMember {

@@ -9,6 +9,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BoardsModule } from './boards/boards.module';
 import { ColumnsModule } from './columns/columns.module';
+import { InvitationsModule } from './invitations/invitations.module';
 import { MembersModule } from './members/members.module';
 import { ProjectRolesModule } from './project-roles/project-roles.module';
 
@@ -35,6 +36,7 @@ import { ProjectRolesModule } from './project-roles/project-roles.module';
     WorkspacesModule,
     BoardsModule,
     ColumnsModule,
+    InvitationsModule,
     MembersModule,
     ProjectRolesModule,
   ],

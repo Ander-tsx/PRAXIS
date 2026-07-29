@@ -9,6 +9,11 @@ import { ColumnsController } from './columns.controller';
 import { MembersController } from './members.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectPermissionsController } from './project-permissions.controller';
+import {
+  MyInvitationsController,
+  ProjectInvitationsController,
+  ProjectMembershipController,
+} from './invitations.controller';
 
 
 @Module({
@@ -51,6 +56,9 @@ import { ProjectPermissionsController } from './project-permissions.controller';
     MembersController,
     ProjectRolesController,
     ProjectPermissionsController,
+    ProjectInvitationsController,
+    MyInvitationsController,
+    ProjectMembershipController,
   ],
 })
 export class ProjectsModule {}

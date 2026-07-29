@@ -12,6 +12,7 @@ export * from './project-role.dto';
 export {
   AddMemberBodyDto,
   AddMemberDto,
+  InviteMemberBodyDto,
   RemoveMemberBodyDto,
   RemoveMemberDto,
 } from './member.dto';
