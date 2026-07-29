@@ -39,6 +39,7 @@ En validación fallida el `message` es literalmente `"Validation failed"` y los 
 
 1. **Ninguna ruta de tarea o checklist acepta `projectId` en el body.** Es al revés de como estuvo: el guard lo resuelve desde la ruta y mandarlo responde `400 "property projectId should not exist"`. Se quitó porque, mientras lo elegía el cliente, bastaba con declarar el id de un proyecto propio para leer, editar y borrar tareas de un proyecto ajeno (PENDIENTES-BACKEND §9).
 2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el **nombre** de la columna destino, no su id. Quien mueva necesita la correspondencia nombre ↔ id; en la interfaz la resuelve `BoardColumns`, que ya tiene las columnas.
+   El mismo hecho por el otro lado: **renombrar una columna cambia el `status` de sus tareas**, y lo hace el backend en cascada. Ver «Columns».
 3. **Listar y paginar `/projects` y `/users` requiere body en un GET** — imposible desde `fetch`. Sin filtros solo se obtiene la página 1 por defecto (limit 20).
 4. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
 
@@ -115,7 +116,7 @@ Project = {
   id, name, description, ownerId, createdAt, updatedAt,
   workspaces: [{ id, name, projectId, createdAt,
                  boards: [{ id, name, workspaceId, createdAt,
-                            columns: [{ id, name, order, boardId }] }] }],   // ordenadas por `order`
+                            columns: [{ id, name, order, color, boardId }] }] }],   // ordenadas por `order`
   roles: ProjectRole[],
   _count: { members: number }
 }
@@ -155,12 +156,56 @@ Cacheado en Redis 5 min — un cambio puede tardar en reflejarse.
 
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
-| POST | `/boards/:boardId/columns` | `{ name, order }` | `canCreateColumn` |
+| POST | `/boards/:boardId/columns` | `{ name, order, color? }` | `canCreateColumn` |
 | PATCH | `/boards/:boardId/columns/reorder` | `{ columnIds: string[] }` | `canCreateColumn` ⚠️ |
+| PATCH | `/boards/:boardId/columns/:id` | `{ name?, color? }` | `canEditColumn` |
 | DELETE | `/boards/:boardId/columns/:id` | — | `canDeleteColumn` |
+
+```ts
+Column = { id, name, order, color, boardId }
+```
 
 **No hay `GET` de columnas.** Se obtienen embebidas en `GET /projects/:id`.
 `reorder` recibe el array completo de IDs en el orden nuevo.
+
+### Color: token del sistema, y de la columna
+
+`color` es un token del design system, igual que en las etiquetas:
+`primary` · `accent` · `info` · `success` · `warning` · `error`. Un hex da 400
+con la lista de válidos.
+
+Si no se manda al crear, el backend lo reparte **por posición**, rotando entre
+los cinco primeros (`error` queda fuera del reparto: un rojo por defecto se lee
+como una alarma). A partir de ahí el color es de la columna y **viaja con ella al
+reordenarla** — antes lo elegía la interfaz por índice y moverla le cambiaba el
+color.
+
+### ⚠️ Renombrar arrastra el `status` de las tareas
+
+`Task.status` guarda el **nombre** de la columna, no su id, así que renombrar
+dejaría el estado de todas sus tareas apuntando a un nombre que ya no existe.
+El `PATCH` lo resuelve en cascada: si el cuerpo lleva `name`, el gateway avisa a
+tasks-service (`task_restatus`) después de confirmar el cambio, y las tareas de
+esa columna pasan al nombre nuevo.
+
+Consecuencias para quien llama:
+
+- **Manda solo el campo que cambias.** Un `color` suelto no dispara la cascada;
+  mandar `name` sin necesidad provoca una llamada extra entre microservicios.
+- Es **idempotente**: solo toca las filas cuyo `status` no coincide ya.
+- Es **best-effort**: si tasks-service no responde, la columna ya se renombró y
+  el `PATCH` devuelve 200. Se registra en el log del gateway y el siguiente
+  renombrado lo cuadra.
+- Un cuerpo **vacío** (`{}`) da `400 "No hay nada que cambiar…"`: no describe
+  ningún cambio.
+
+### ⚠️ Borrar una columna se lleva sus tareas
+
+Igual que borrar un tablero, un espacio o un proyecto. Antes no: la tarea
+conservaba `boardId` y `projectId`, así que seguía abriéndose por su ruta y
+contando en «mis tareas», pero no se pintaba en ningún tablero porque su columna
+ya no existía. Si la interfaz avisa de cuántas tareas se van, ese número es
+real.
 
 ---
 
@@ -205,7 +250,10 @@ quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
 }
 ```
 
-> El DTO también admite `canEditColumn`, pero **no existe en el enum `ProjectPermission`** ni lo usa ningún endpoint. No lo uses.
+> `canEditColumn` **sí existe y sí se usa**: es el permiso de
+> `PATCH /boards/:boardId/columns/:id` (renombrar y recolorear), su primer y
+> único consumidor. `reorder` sigue pidiendo `canCreateColumn`
+> (PENDIENTES-BACKEND §8).
 
 ### 🔴 Un array se acepta con 201 y no concede NADA
 

@@ -37,7 +37,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 |---|---|---|---|
 | 5 | 🟡 | Falta `GET /users/me`. «Mis tareas» ya está (`GET /me/tasks`) | código |
 | 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
-| 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
+| 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn`. **`canEditColumn` ya se usa** (`667c1cb`) | código |
 | 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
 | 16 | 🔵 | Las etiquetas usan `canEditTask`; no hay permiso propio | decisión |
 | 17 | 🔵 | Comentar exige `canEditTask`: el observador lee pero no responde | decisión |
@@ -51,7 +51,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `48a0058` |
 | 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
 | 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `48a0058` |
-| 15 | 🟠 | Borrar un tablero dejaba sus tareas huérfanas para siempre | `8fa3263` |
+| 15 | 🟠 | Borrar un tablero —o una columna— dejaba sus tareas huérfanas para siempre | `8fa3263` `fce78c5` |
 | 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
 | 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
@@ -287,11 +287,16 @@ backend define plantillas, habrá dos fuentes de verdad.
 |---|---|---|---|
 | `GET /projects/:id` (ver) | ~~`canEditBoard`~~ → `canViewProject` | — | ✅ `477616f` |
 | `DELETE /projects/:id` | `canDeleteBoard` | `canDeleteProject` (no existe) | ❌ abierto |
+| `PATCH /boards/:id/columns/:id` | `canEditColumn` | — | ✅ `667c1cb` |
 | `PATCH /boards/:id/columns/reorder` | `canCreateColumn` | `canEditColumn` | ❌ abierto |
 
-`canEditColumn` ya **está en el enum** (`477616f`), pero sigue sin usarlo ningún
-endpoint: el `reorder` continúa pidiendo `canCreateColumn`, así que quien puede
-crear columnas puede reordenarlas aunque no debiera poder editarlas.
+**`canEditColumn` ya lo usa un endpoint.** Estaba en el enum desde `477616f` sin
+que nadie lo pidiera; el `PATCH` de columna que se añadió en `667c1cb` —renombrar
+y recolorear— es su primer uso.
+
+Queda abierto el `reorder`, que sigue pidiendo `canCreateColumn`: quien puede
+crear columnas puede reordenarlas aunque no debiera poder editarlas. Mover una
+columna de sitio se parece más a editarla que a crearla.
 
 Y `canDeleteProject` sigue sin existir: borrar un proyecto entero exige
 `canDeleteBoard`, un permiso de otra cosa y de menor alcance.
@@ -576,6 +581,17 @@ completo de una sola petición.
 > Verificado: borrar un tablero se lleva solo sus tareas y deja las del vecino;
 > borrar el espacio se lleva las de todos sus tableros; borrar el proyecto se
 > lleva las suyas. Se limpiaron además las 8 que ya estaban sueltas.
+>
+> **Ampliado en `fce78c5`: faltaba el cuarto caso, borrar una columna.** Era el
+> más engañoso de la familia y por eso sobrevivió al primer arreglo: la tarea
+> conserva `boardId` y `projectId`, así que el guard **sí** le resuelve el
+> proyecto y sigue respondiendo por `GET /tasks/:id`. Simplemente deja de
+> pintarse —el tablero agrupa por `columnId` y esa columna ya no existe— mientras
+> sigue contando en «mis tareas». Reproducido antes de arreglarlo: columna con una
+> tarea, `DELETE` de la columna, y la fila viva saliendo aún en
+> `GET /boards/:id/tasks`. `PurgeTasksDto` gana `columnId` y el gateway llama a
+> la limpieza tras el borrado. Verificado con una columna de 2 tareas: 0 filas
+> después.
 
 **Verificado en runtime (2026-07-29).** `Board` vive en projects-service y
 `Task` en tasks-service, en esquemas distintos y sin clave foránea entre ellos:

@@ -1006,3 +1006,114 @@ cuela al pintar el texto. Se normalizan en la acción.
 | Comentarios | Hilo ordenado, editar ajeno 403, el dueño moderando, refresco inmediato |
 | Adjuntos | PNG y TXT admitidos, SVG 400, 11 MB 413, ida y vuelta idéntica, miniatura en el diálogo |
 | Panel | Una vencida y una próxima, en bloques separados |
+
+---
+
+## 19. Columnas y tarjetas: los gestos del tablero
+
+> Segunda pasada sobre el tablero, ya con el dominio de tareas funcionando. Lo
+> que cambia son los **gestos**: cómo se toca una columna y cómo nace una tarea.
+
+### 19.1 La columna tiene menú, y el color es suyo
+
+La «×» que borraba directo se cambió por un menú de tres puntos con **cambiar
+color**, **renombrar** y **eliminar**. Las dos primeras no existían en el
+backend: se añadió `PATCH /boards/:boardId/columns/:id` (`667c1cb`), que además
+es el **primer y único uso de `canEditColumn`** — estaba en el enum desde
+`477616f` sin que ningún endpoint lo pidiera.
+
+El color pasó a ser un campo de `BoardColumn`, token del sistema como en las
+etiquetas. Antes salía de `COLUMN_TINTS`, un array **por posición**: reordenar
+una columna le cambiaba el color, porque el color no era de la columna sino de su
+sitio. La migración reparte con esa misma rotación el color de las que ya
+existían, para no perder la distinción visual que tenían.
+
+### 19.2 El `status` huérfano: por qué la cascada vive en el gateway
+
+`Task.status` guarda el **nombre** de la columna, no su id (§6.1: el estado está
+denormalizado a propósito, así el listado del tablero no cruza con
+projects-service). Consecuencia directa de añadir el renombrado: el `status` de
+todas las tareas de esa columna queda apuntando a un nombre que ya no existe.
+
+Lo que se rompía, si se hubiera dejado así:
+
+- `GET /me/tasks?status=` dejaba de encontrarlas, y es como el panel separa lo
+  terminado de lo pendiente;
+- mover la tarea a su propia columna lo «arreglaba» sola, así que el problema
+  desaparecía justo al intentar reproducirlo.
+
+La cascada la coordina el **gateway** con `ColumnStatusSyncService`, por el mismo
+camino que `TaskPurgeService` y por el mismo motivo: la columna está en
+projects-service y la tarea en tasks-service, y hacer que projects llamara a
+tasks montaría un ciclo entre los dos microservicios. Es idempotente —solo toca
+las filas que no coinciden ya—, best-effort —si tasks-service no responde la
+columna ya se renombró, y decir que falló sería mentir— e invalida `task:<id>`
+**y** `tasks:board:<id>`, que es la que se olvida.
+
+Y la interfaz lo dice: al renombrar avisa de cuántas tareas cambian de estado.
+No es un detalle de implementación que se pueda esconder.
+
+### 19.3 Borrar una columna también dejaba tareas huérfanas
+
+Cuarto caso de la familia de `8fa3263`, y el que sobrevivió al primer arreglo por
+ser el más engañoso: al borrar un tablero la tarea quedaba imposible de abrir y
+se notaba, pero al borrar una columna conserva `boardId` y `projectId`, así que
+el guard le resuelve el proyecto y sigue respondiendo por su ruta. Solo deja de
+pintarse —el tablero agrupa por `columnId`—, mientras cuenta en «mis tareas».
+
+Se arregló (`fce78c5`) **porque el menú iba a prometerlo**: la confirmación dice
+cuántas tareas se van, y esa frase tenía que ser verdad. La confirmación aparece
+solo si hay tareas dentro; para una columna vacía preguntar es ceremonia sin
+riesgo.
+
+### 19.4 La tarea nace en la columna
+
+«Añadir tarea» abría el `TaskDialog` completo para escribir un título. Las tareas
+se apuntan en ráfaga —primero se vuelcan, luego se detallan—, así que ahora se
+escriben en un campo dentro de la columna y nacen con prioridad media, que ya es
+el default del backend. `TaskDialog` perdió el modo de creación, que con eso
+quedaba muerto.
+
+La tarjeta cambió de gesto: antes un botón invisible la cubría entera
+(`absolute inset-0`), y eso competía con el arrastre, que es la interacción
+principal de un tablero —un arrastre que se queda en dos píxeles cuenta como
+clic y abría un modal—, además de no dar ninguna pista de que se pudiera abrir.
+Ahora abre un icono de configuración y la superficie queda libre.
+
+### 19.5 Tres trampas nuevas, verificadas en el navegador
+
+**Dentro de un ancestro `draggable` no se puede seleccionar texto con el ratón.**
+El campo de renombrar vive en una columna arrastrable: sin desactivar el arrastre
+mientras el menú está abierto, no se podía ni marcar una letra para corregirla.
+
+**Los variantes `peer-*` de Tailwind solo miran hermanos.** El cuadro del
+checkbox de encargados se pinta con `peer-checked`, pero la marca de dentro es
+**hijo** del cuadro, no hermano del input: se enciende con
+`peer-checked:[&>svg]:opacity-100`.
+
+**`display: contents` alinea un botón que va dentro de un `<form>`.** En los
+comentarios, «Eliminar» necesita formulario —tiene su propia acción— y «Editar»
+no, así que uno era un bloque y el otro un botón suelto y no compartían línea.
+Con `contents` el formulario desaparece de la maquetación y su botón es hijo
+directo del flex de fuera.
+
+**Y una del entorno, no del código:** el navegador de automatización **no dispara
+el envío implícito de un formulario** (inyecta `keydown` sin `keypress`), así que
+«Enter para enviar» no se puede verificar ahí. Los dos campos donde Enter sostiene
+el gesto —tarea nueva y renombrar columna— lo hacen explícito con
+`requestSubmit()`, que además es lo que permitió comprobarlo.
+
+### 19.6 Permisos de columna, cada uno en su sitio
+
+Todo colgaba de `canCreateBoard`. Ahora:
+
+| Acción | Permiso |
+|---|---|
+| Crear columna · reordenar | `canCreateColumn` |
+| Renombrar · cambiar color | `canEditColumn` |
+| Eliminar (con sus tareas) | `canDeleteColumn` |
+
+Verificado con el rol «Colaborador» (`canEditColumn` sí, `canDeleteColumn` no):
+ve color y renombrar, no ve eliminar, ve «Nueva columna» y las flechas de
+reordenar, y no ve «Nuevo tablero». Con el permiso quitado del rol, el `PATCH`
+responde 403.
