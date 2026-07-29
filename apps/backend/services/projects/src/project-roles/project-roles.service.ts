@@ -52,6 +52,32 @@ function normalizeBooleans(map: Record<string, unknown>): Record<string, boolean
   return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, !!v]));
 }
 
+/**
+ * Normaliza lo que hay guardado en `ProjectRole.permissions`.
+ *
+ * El campo es `Json`, y antes de que el DTO validara se colaron roles con un
+ * **array** de nombres en vez del diccionario. Sobre un array, `permisos[clave]`
+ * da `undefined`, así que esos roles no concedían nada: el rol existía, se veía
+ * en la lista con sus permisos y no servía para nada.
+ *
+ * La entrada ya está cerrada (`IsPermissionMap`), pero los roles creados antes
+ * siguen en la base. Convertirlos aquí les devuelve el significado que tenían
+ * al crearlos, sin necesidad de una migración de datos.
+ */
+function normalizePermissions(stored: unknown): Record<string, boolean> {
+  if (Array.isArray(stored)) {
+    return Object.fromEntries(
+      stored.filter((key): key is string => typeof key === 'string').map((key) => [key, true]),
+    );
+  }
+
+  if (stored && typeof stored === 'object') {
+    return normalizeBooleans(stored as Record<string, unknown>);
+  }
+
+  return {};
+}
+
 @Injectable()
 export class ProjectRolesService {
   constructor(
@@ -243,9 +269,7 @@ export class ProjectRolesService {
       include: { projectRole: true },
     });
 
-    const permissions: Record<string, boolean> = member
-      ? (member.projectRole.permissions as Record<string, boolean>)
-      : {};
+    const permissions = member ? normalizePermissions(member.projectRole.permissions) : {};
 
     await this.redis.set(cacheKey, permissions, PERMISSION_CACHE_TTL);
     return permissions;

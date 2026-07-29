@@ -24,8 +24,7 @@ export class ColumnsService {
       data: { name: dto.name, order: dto.order, boardId: dto.boardId },
     });
 
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
-    await this.invalidateProjectCache(board.workspaceId);
+    await this.invalidateBoardCaches(board.id, board.workspaceId);
     return column;
   }
 
@@ -43,8 +42,7 @@ export class ColumnsService {
     );
 
     const columns = await this.prisma.$transaction(updates);
-    await this.redis.del(`boards:workspace:${board.workspaceId}`);
-    await this.invalidateProjectCache(board.workspaceId);
+    await this.invalidateBoardCaches(board.id, board.workspaceId);
     return columns;
   }
 
@@ -58,9 +56,25 @@ export class ColumnsService {
     }
 
     await this.prisma.boardColumn.delete({ where: { id } });
-    await this.redis.del(`boards:workspace:${column.board.workspaceId}`);
-    await this.invalidateProjectCache(column.board.workspaceId);
+    await this.invalidateBoardCaches(column.board.id, column.board.workspaceId);
     return { success: true };
+  }
+
+  /**
+   * Invalida las tres cachés que contienen columnas.
+   *
+   * Son tres claves distintas y hay que tocarlas todas:
+   *  - `board:<id>`               → `GET /boards/:id`, con sus columnas
+   *  - `boards:workspace:<id>`    → la lista de tableros del espacio
+   *  - `project:<id>`             → el detalle, que trae el árbol entero
+   *
+   * Faltaba la primera: reordenar guardaba bien y `GET /boards/:id` seguía
+   * devolviendo el orden viejo durante un minuto.
+   */
+  private async invalidateBoardCaches(boardId: string, workspaceId: string) {
+    await this.redis.del(`board:${boardId}`);
+    await this.redis.del(`boards:workspace:${workspaceId}`);
+    await this.invalidateProjectCache(workspaceId);
   }
 
   /** Ver la nota en boards.service: el detalle del proyecto trae las columnas. */

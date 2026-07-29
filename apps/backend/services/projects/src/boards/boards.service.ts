@@ -77,6 +77,7 @@ export class BoardsService {
       data:  { name: dto.name },
     });
 
+    await this.redis.del(`board:${board.id}`);
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
     await this.invalidateProjectCache(board.workspaceId);
     return updated;
@@ -89,6 +90,7 @@ export class BoardsService {
     }
 
     await this.prisma.board.delete({ where: { id } });
+    await this.redis.del(`board:${board.id}`);
     await this.redis.del(`boards:workspace:${board.workspaceId}`);
     await this.invalidateProjectCache(board.workspaceId);
     return { success: true };
