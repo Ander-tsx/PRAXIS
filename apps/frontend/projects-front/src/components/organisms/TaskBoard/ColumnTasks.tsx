@@ -14,6 +14,7 @@ export interface ColumnTasksProps {
   members: UserProfile[];
   labels: Label[];
   usersById: Map<string, UserProfile>;
+  currentUserId: string;
   canCreate: boolean;
   canEdit: boolean;
   canDelete: boolean;
@@ -39,6 +40,7 @@ export function ColumnTasks({
   members,
   labels,
   usersById,
+  currentUserId,
   canCreate,
   canEdit,
   canDelete,
@@ -145,6 +147,8 @@ export function ColumnTasks({
           task={null}
           members={members}
           labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
           canEdit={canCreate}
           canDelete={false}
         />
@@ -164,6 +168,8 @@ export function ColumnTasks({
           task={openTask}
           members={members}
           labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
           canEdit={canEdit}
           canDelete={canDelete}
         />

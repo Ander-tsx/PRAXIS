@@ -193,6 +193,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             members={assignableMembers}
             labels={labels}
             usersById={usersById}
+            currentUserId={userId}
             canCreateTask={can.canCreateTask}
             canEditTask={can.canEditTask}
             canDeleteTask={can.canDeleteTask}

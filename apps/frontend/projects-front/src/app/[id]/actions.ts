@@ -10,6 +10,7 @@ import {
   type ProjectInvitation,
   type ProjectRole,
   type Task,
+  type TaskComment,
   type Workspace,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
@@ -27,6 +28,8 @@ import {
   validateBoard,
   validateChecklistItem,
   validateColumn,
+  normalizeMultiline,
+  validateComment,
   validateLabel,
   validateRole,
   validateTask,
@@ -442,7 +445,7 @@ export async function reorderColumnsAction(
  */
 function readTaskFields(formData: FormData) {
   const title = String(formData.get('title') ?? '').trim();
-  const description = String(formData.get('description') ?? '').trim();
+  const description = normalizeMultiline(String(formData.get('description') ?? ''));
   const dueDate = String(formData.get('dueDate') ?? '').trim();
   const priority = String(formData.get('priority') ?? '').trim();
   const assigneeIds = formData.getAll('assigneeIds').map(String).filter(Boolean);
@@ -740,6 +743,86 @@ export async function deleteLabelAction(_prev: TaskState, formData: FormData): P
     await api.delete(`/projects/${projectId}/labels/${labelId}`);
   } catch (error) {
     return { error: describe(error, 'No se pudo eliminar la etiqueta.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'deleted' };
+}
+
+/* ─── Comentarios ───────────────────────────────────────────────────── */
+
+/**
+ * Comentar en una tarea.
+ *
+ * ⚠️ Exige `canEditTask`: no hay un permiso de comentar, así que un perfil de
+ * solo lectura puede leer el hilo pero no participar (PENDIENTES §17).
+ */
+export async function addCommentAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const body = normalizeMultiline(String(formData.get('body') ?? ''));
+
+  const invalid = validateComment(body);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const created = await api.post<TaskComment>(`/tasks/${taskId}/comments`, { body });
+    if (!created?.id || created.body !== body) {
+      return { error: 'El servidor no guardó el comentario.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo comentar.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'added' };
+}
+
+/** Editar es solo del autor; el backend lo comprueba y responde 403 si no. */
+export async function editCommentAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const commentId = String(formData.get('commentId') ?? '');
+  const body = normalizeMultiline(String(formData.get('body') ?? ''));
+
+  const invalid = validateComment(body);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const saved = await api.patch<TaskComment>(`/tasks/${taskId}/comments/${commentId}`, { body });
+    if (saved?.body !== body) {
+      return { error: 'El servidor no guardó el cambio.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo editar el comentario.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'edited' };
+}
+
+/** Lo borra su autor, o quien pueda eliminar tareas del proyecto. */
+export async function deleteCommentAction(
+  _prev: TaskState,
+  formData: FormData,
+): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const commentId = String(formData.get('commentId') ?? '');
+
+  try {
+    await api.delete(`/tasks/${taskId}/comments/${commentId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el comentario.'), done: null };
   }
 
   revalidateProject(projectId);

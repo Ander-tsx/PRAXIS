@@ -40,6 +40,19 @@ const TASK_INCLUDE = {
   /* La etiqueta entera, no solo su id: la tarjeta necesita nombre y color y no
      tiene de dónde sacarlos si solo llega la relación. */
   labels:     { include: { label: true } },
+  /**
+   * Los comentarios viajan **con la tarea**, también en el listado del tablero.
+   *
+   * Es la decisión menos elegante de este include y se toma a sabiendas: la
+   * alternativa era pedirlos aparte al abrir el diálogo, y entonces las
+   * Server Actions que revalidan la página no los refrescarían —habría que
+   * mantener a mano un segundo camino de datos solo para ellos.
+   *
+   * El coste es real pero acotado: el listado ya viene con `limit`, y una
+   * tarea con cien comentarios es rara. Si algún día pesa, el sitio por donde
+   * cortar es este: sacarlos de aquí, dejar solo `_count`, y pedirlos al abrir.
+   */
+  comments:   { orderBy: { createdAt: 'asc' } },
 } satisfies Prisma.TaskInclude;
 
 @Injectable()

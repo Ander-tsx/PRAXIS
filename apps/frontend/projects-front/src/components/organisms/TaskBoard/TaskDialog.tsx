@@ -20,6 +20,7 @@ import { useActionState, useEffect, useId, useState } from 'react';
 import { createTaskAction, deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { TaskChecklist } from './TaskChecklist';
+import { TaskComments } from './TaskComments';
 
 export interface TaskDialogProps {
   open: boolean;
@@ -36,6 +37,9 @@ export interface TaskDialogProps {
   members: UserProfile[];
   /** Etiquetas del proyecto, que son las que se pueden poner. */
   labels: LabelType[];
+  /** Para poner cara a los autores de los comentarios. */
+  usersById: Map<string, UserProfile>;
+  currentUserId: string;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -63,6 +67,8 @@ export function TaskDialog({
   task,
   members,
   labels,
+  usersById,
+  currentUserId,
   canEdit,
   canDelete,
 }: TaskDialogProps) {
@@ -258,7 +264,20 @@ export function TaskDialog({
       {/* Fuera del formulario: cada ítem tiene su propia acción y un <form>
           dentro de otro no es HTML válido. Al crear no hay `taskId` todavía,
           así que la sección aparece en cuanto la tarea existe. */}
-      {!isNew && <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />}
+      {!isNew && (
+        <>
+          <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />
+          <TaskComments
+            projectId={projectId}
+            taskId={task.id}
+            comments={task.comments}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            canComment={canEdit}
+            canModerate={canDelete}
+          />
+        </>
+      )}
     </Dialog>
   );
 }

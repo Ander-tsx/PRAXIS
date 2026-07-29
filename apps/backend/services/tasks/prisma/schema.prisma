@@ -25,6 +25,7 @@ model Task {
   checklists   Checklist[]
   assignees    TaskAssignee[]
   labels       TaskLabel[]
+  comments     TaskComment[]
   dueDate      DateTime?
   priority     Priority       @default(MEDIUM)
   order        Int            @default(0)
@@ -74,6 +75,29 @@ model Checklist {
 
   @@schema("tasks")
   @@map("checklists")
+}
+
+/// Comentario en una tarea.
+///
+/// `authorId` es un id sin clave foránea: el usuario vive en otro
+/// microservicio. El nombre lo resuelve la interfaz contra los miembros del
+/// proyecto, igual que con los encargados.
+///
+/// Se guarda `editedAt` aparte de `updatedAt` porque solo interesa marcar
+/// «editado» cuando cambió el **texto**, no cada vez que Prisma toca la fila.
+model TaskComment {
+  id        String    @id @default(uuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  body      String
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  /// El listado siempre va por tarea y en orden cronológico.
+  @@index([taskId, createdAt])
+  @@schema("tasks")
+  @@map("task_comments")
 }
 
 /// Etiqueta de un proyecto.

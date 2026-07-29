@@ -22,6 +22,7 @@ export interface WorkspaceCanvasProps {
   members: UserProfile[];
   labels: Label[];
   usersById: Map<string, UserProfile>;
+  currentUserId: string;
   canCreateTask: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
@@ -48,6 +49,7 @@ export function WorkspaceCanvas({
   members,
   labels,
   usersById,
+  currentUserId,
   canCreateTask,
   canEditTask,
   canDeleteTask,
@@ -122,6 +124,7 @@ export function WorkspaceCanvas({
               members={members}
               labels={labels}
               usersById={usersById}
+              currentUserId={currentUserId}
               canCreateTask={canCreateTask}
               canEditTask={canEditTask}
               canDeleteTask={canDeleteTask}

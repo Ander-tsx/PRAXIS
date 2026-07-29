@@ -8,7 +8,7 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 12 de 16 resueltos.** El equipo de frontend recibió autorización para
+> **Estado: 12 de 17 resueltos.** El equipo de frontend recibió autorización para
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
 > commit y cómo se verificó. Lo que queda abierto está al principio.
 
@@ -40,6 +40,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
 | 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
 | 16 | 🔵 | Las etiquetas usan `canEditTask`; no hay permiso propio | decisión |
+| 17 | 🔵 | Comentar exige `canEditTask`: el observador lee pero no responde | decisión |
 
 ### Resueltos
 
@@ -610,6 +611,22 @@ La lógica es que quien puede editar tareas puede definir con qué se etiquetan.
 las tareas —o al revés— hoy no se puede representar. Si os parece que merece un
 `canManageLabels`, es un permiso más en el enum y un cambio de una línea en
 `labels.controller.ts`.
+
+---
+
+## 🔵 17. Comentar exige `canEditTask`: no hay permiso de comentar
+
+**Decisión nuestra, del mismo tipo que el punto 16.** Los comentarios de tarea
+necesitaban un permiso para escribir. Leerlos exige `canViewProject`; escribir,
+editar y borrar exigen `canEditTask`, y borrar además admite `canDeleteTask`
+como vía de moderación.
+
+**Dónde se nota:** el rol observador que se añadió en el punto 13 —pensado para
+cliente, dirección o auditoría— puede **leer** un hilo pero no responder. En un
+tablero real, esa gente es justo la que más comenta sin tocar el trabajo.
+
+Si os parece que merece un `canComment`, es un permiso más en el enum y dos
+líneas en `comments.controller.ts`.
 
 ---
 

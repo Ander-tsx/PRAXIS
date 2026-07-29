@@ -26,6 +26,7 @@ export interface BoardColumnsProps {
   /** Etiquetas del proyecto: las que se pueden poner. */
   labels: Label[];
   usersById: Map<string, UserProfile>;
+  currentUserId: string;
   canCreateTask: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
@@ -61,6 +62,7 @@ export function BoardColumns({
   members,
   labels,
   usersById,
+  currentUserId,
   canCreateTask,
   canEditTask,
   canDeleteTask,
@@ -330,6 +332,7 @@ export function BoardColumns({
                   members={members}
                   labels={labels}
                   usersById={usersById}
+                  currentUserId={currentUserId}
                   canCreate={canCreateTask}
                   canEdit={canEditTask}
                   canDelete={canDeleteTask}

@@ -17,10 +17,21 @@ const PROJECT_ID_CONTROLLERS = new Set(['ProjectsController']);
 /**
  * Controladores donde un parámetro de ruta identifica una **tarea**.
  *
- * `TasksController` la nombra `:id` y `ChecklistsController` `:taskId` (ahí
- * `:id` es el ítem del checklist), así que se prueban en ese orden.
+ * `TasksController` la nombra `:id`; los que cuelgan de una tarea la nombran
+ * `:taskId` y usan `:id` para su propio recurso, así que se prueba `taskId`
+ * primero.
+ *
+ * ⚠️ **Un controlador nuevo que cuelgue de una tarea tiene que apuntarse
+ * aquí.** Si no, el guard no encuentra el proyecto y responde
+ * `403 "Contexto de proyecto no encontrado"` — que es exactamente lo que pasó
+ * al añadir los comentarios.
  */
-const TASK_CONTROLLERS = new Set(['TasksController', 'ChecklistsController']);
+const TASK_CONTROLLERS = new Set([
+  'TasksController',
+  'ChecklistsController',
+  'CommentsController',
+  'AttachmentsController',
+]);
 
 /**
  * Resuelve el proyecto de un recurso y comprueba el permiso pedido.

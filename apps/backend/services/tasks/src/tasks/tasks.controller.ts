@@ -4,12 +4,16 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   AssignTaskDto,
   CreateChecklistDto,
+  CreateCommentDto,
   CreateLabelDto,
   CreateTaskDto,
   DeleteChecklistDto,
+  DeleteCommentDto,
   DeleteLabelDto,
   DeleteTaskDto,
+  FindCommentsDto,
   FindLabelsDto,
+  UpdateCommentDto,
   UpdateLabelDto,
   FindMyTasksDto,
   FindOneTaskDto,
@@ -20,6 +24,7 @@ import {
   UpdateTaskDto,
 } from '@praxis/contracts';
 
+import { CommentsService } from './comments.service';
 import { LabelsService } from './labels.service';
 import { TasksService } from './tasks.service';
 
@@ -28,6 +33,7 @@ export class TasksController {
   constructor(
     private readonly tasksService: TasksService,
     private readonly labelsService: LabelsService,
+    private readonly commentsService: CommentsService,
   ) {}
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
@@ -99,6 +105,28 @@ export class TasksController {
   @MessagePattern({ cmd: 'label_delete' })
   deleteLabel(@Payload() dto: DeleteLabelDto) {
     return this.labelsService.deleteLabel(dto);
+  }
+
+  // ─── Comentarios ──────────────────────────────────────────────────────────
+
+  @MessagePattern({ cmd: 'comment_find_all' })
+  findComments(@Payload() dto: FindCommentsDto) {
+    return this.commentsService.findComments(dto);
+  }
+
+  @MessagePattern({ cmd: 'comment_create' })
+  createComment(@Payload() dto: CreateCommentDto) {
+    return this.commentsService.createComment(dto);
+  }
+
+  @MessagePattern({ cmd: 'comment_update' })
+  updateComment(@Payload() dto: UpdateCommentDto) {
+    return this.commentsService.updateComment(dto);
+  }
+
+  @MessagePattern({ cmd: 'comment_delete' })
+  deleteComment(@Payload() dto: DeleteCommentDto) {
+    return this.commentsService.deleteComment(dto);
   }
 
   // ─── Subtasks ─────────────────────────────────────────────────────────────

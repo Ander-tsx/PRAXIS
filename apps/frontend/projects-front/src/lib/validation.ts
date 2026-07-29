@@ -159,6 +159,28 @@ export function validateChecklistItem(text: string): string | null {
   return null;
 }
 
+export const COMMENT_MAX = 4000;
+
+/**
+ * Normaliza los saltos de línea de un `<textarea>`.
+ *
+ * Al enviar un formulario, el navegador convierte los saltos a `\r\n` por
+ * especificación. Guardarlos así deja un `\r` suelto que se cuela al pintar el
+ * texto y descuadra el recuento de caracteres.
+ */
+export function normalizeMultiline(value: string): string {
+  return value.replace(/\r\n/g, '\n').trim();
+}
+
+export function validateComment(body: string): string | null {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) return 'Escribe algo antes de enviar.';
+  if (trimmed.length > COMMENT_MAX) {
+    return `El comentario no puede superar ${COMMENT_MAX} caracteres.`;
+  }
+  return null;
+}
+
 export const COLUMN_NAME_MIN = 1;
 export const COLUMN_NAME_MAX = 100;
 

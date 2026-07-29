@@ -1,0 +1,251 @@
+'use client';
+
+import {
+  type TaskComment,
+  type UserProfile,
+  alpha,
+  colors,
+  personLabel,
+} from '@praxis/commons';
+import { useActionState, useEffect, useRef, useState } from 'react';
+import {
+  addCommentAction,
+  deleteCommentAction,
+  editCommentAction,
+} from '@/app/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
+
+export interface TaskCommentsProps {
+  projectId: string;
+  taskId: string;
+  comments: TaskComment[];
+  usersById: Map<string, UserProfile>;
+  currentUserId: string;
+  /** Quien no puede editar tareas tampoco puede comentar (PENDIENTES §17). */
+  canComment: boolean;
+  /** Quien puede eliminar tareas puede retirar comentarios ajenos. */
+  canModerate: boolean;
+}
+
+/**
+ * Hilo de comentarios de una tarea.
+ *
+ * Cada comentario es su propio formulario, como los ítems del checklist y por
+ * el mismo motivo: van fuera del formulario de la tarea y cada uno tiene su
+ * propio estado de envío.
+ *
+ * Se lee de arriba abajo, del más antiguo al más nuevo, con el campo de
+ * escritura al final: es donde acaba la vista después de leer el hilo.
+ */
+export function TaskComments({
+  projectId,
+  taskId,
+  comments,
+  usersById,
+  currentUserId,
+  canComment,
+  canModerate,
+}: TaskCommentsProps) {
+  const [state, formAction, pending] = useActionState(addCommentAction, TASK_INITIAL_STATE);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  /** Se vacía al confirmar, no al enviar: si falla, lo escrito sigue ahí. */
+  useEffect(() => {
+    if (state.done) formRef.current?.reset();
+  }, [state.done]);
+
+  return (
+    <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+      <h4 className="font-sans text-sm font-medium text-text-primary">
+        Comentarios{' '}
+        {comments.length > 0 && (
+          <span className="font-normal tabular-nums text-text-secondary">{comments.length}</span>
+        )}
+      </h4>
+
+      {comments.length === 0 && (
+        <p className="font-sans text-xs text-text-secondary">
+          {canComment
+            ? 'Todavía nadie ha comentado. Empieza tú.'
+            : 'Todavía nadie ha comentado.'}
+        </p>
+      )}
+
+      {comments.length > 0 && (
+        <ul className="flex flex-col gap-3">
+          {comments.map((comment) => (
+            <CommentRow
+              key={comment.id}
+              comment={comment}
+              author={usersById.get(comment.authorId)}
+              projectId={projectId}
+              taskId={taskId}
+              canEdit={comment.authorId === currentUserId}
+              canDelete={comment.authorId === currentUserId || canModerate}
+            />
+          ))}
+        </ul>
+      )}
+
+      {canComment ? (
+        <form ref={formRef} action={formAction} className="flex flex-col gap-2" noValidate>
+          <input type="hidden" name="projectId" value={projectId} />
+          <input type="hidden" name="taskId" value={taskId} />
+          <textarea
+            name="body"
+            rows={2}
+            maxLength={4000}
+            placeholder="Escribe un comentario…"
+            aria-label="Nuevo comentario"
+            className="w-full resize-y rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-xs text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <span className="flex justify-end">
+            <button
+              type="submit"
+              disabled={pending}
+              className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ background: alpha(colors.primary, 20) }}
+            >
+              {pending ? 'Enviando…' : 'Comentar'}
+            </button>
+          </span>
+        </form>
+      ) : (
+        <p className="font-sans text-xs text-text-disabled">
+          Puedes leer el hilo, pero comentar requiere permiso para editar tareas.
+        </p>
+      )}
+
+      {state.error && (
+        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
+          {state.error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function CommentRow({
+  comment,
+  author,
+  projectId,
+  taskId,
+  canEdit,
+  canDelete,
+}: {
+  comment: TaskComment;
+  author: UserProfile | undefined;
+  projectId: string;
+  taskId: string;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editState, editAction, saving] = useActionState(editCommentAction, TASK_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useActionState(
+    deleteCommentAction,
+    TASK_INITIAL_STATE,
+  );
+
+  /** Sale del modo edición cuando el servidor confirma, no al enviar. */
+  useEffect(() => {
+    if (editState.done) setEditing(false);
+  }, [editState.done]);
+
+  const name = author ? personLabel(author) : 'Alguien que ya no está en el proyecto';
+  const error = editState.error ?? deleteState.error;
+
+  return (
+    <li className="flex flex-col gap-1.5 rounded-xl bg-background p-3">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="font-sans text-xs font-semibold text-text-primary">{name}</span>
+        <span className="font-sans text-[11px] text-text-disabled">
+          {formatWhen(comment.createdAt)}
+          {comment.editedAt && ' · editado'}
+        </span>
+
+        <span className="ml-auto flex items-center gap-1">
+          {canEdit && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="cursor-pointer rounded px-1 font-sans text-[11px] text-text-disabled transition-colors hover:text-text-primary"
+            >
+              Editar
+            </button>
+          )}
+          {canDelete && (
+            <form action={deleteAction}>
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="taskId" value={taskId} />
+              <input type="hidden" name="commentId" value={comment.id} />
+              <button
+                type="submit"
+                disabled={deleting}
+                className="cursor-pointer rounded px-1 font-sans text-[11px] text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed"
+              >
+                {deleting ? '…' : 'Eliminar'}
+              </button>
+            </form>
+          )}
+        </span>
+      </div>
+
+      {editing ? (
+        <form action={editAction} className="flex flex-col gap-2" noValidate>
+          <input type="hidden" name="projectId" value={projectId} />
+          <input type="hidden" name="taskId" value={taskId} />
+          <input type="hidden" name="commentId" value={comment.id} />
+          <textarea
+            name="body"
+            rows={2}
+            maxLength={4000}
+            defaultValue={comment.body}
+            aria-label="Editar comentario"
+            className="w-full resize-y rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          />
+          <span className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] font-semibold text-text-primary disabled:opacity-50"
+              style={{ background: alpha(colors.primary, 20) }}
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] text-text-secondary"
+            >
+              Cancelar
+            </button>
+          </span>
+        </form>
+      ) : (
+        /* `whitespace-pre-wrap`: los saltos de línea que escribió la persona se
+           respetan sin interpretar nada más. Nunca se renderiza como HTML. */
+        <p className="whitespace-pre-wrap break-words font-sans text-xs text-text-primary">
+          {comment.body}
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="font-sans text-[11px]" style={{ color: colors.error }}>
+          {error}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** «hace un momento» pesa menos que una marca de tiempo completa. */
+function formatWhen(iso: string): string {
+  const then = new Date(iso).getTime();
+  const mins = Math.round((Date.now() - then) / 60_000);
+
+  if (mins < 1) return 'hace un momento';
+  if (mins < 60) return `hace ${mins} min`;
+  if (mins < 1440) return `hace ${Math.round(mins / 60)} h`;
+  return new Date(iso).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+}

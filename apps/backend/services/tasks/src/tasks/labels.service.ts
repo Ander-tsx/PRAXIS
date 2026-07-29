@@ -80,6 +80,10 @@ export class LabelsService {
         },
       });
       await this.invalidate(dto.projectId);
+      // El nombre y el color se pintan en las tarjetas, y esas salen del
+      // listado cacheado del tablero: sin esto, renombrar una etiqueta no se
+      // vería hasta que caducara el minuto de caché.
+      await this.invalidateTasksWithLabel(label.id);
       return updated;
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -102,12 +106,31 @@ export class LabelsService {
   async deleteLabel(dto: DeleteLabelDto) {
     const label = await this.loadInProject(dto.id, dto.projectId);
 
+    // Se cuentan y se invalidan **antes** de borrar: después la relación ya no
+    // existe y no habría forma de saber qué tableros repintar.
     const usos = await this.prisma.taskLabel.count({ where: { labelId: label.id } });
+    await this.invalidateTasksWithLabel(label.id);
+
     await this.prisma.label.delete({ where: { id: label.id } });
     await this.invalidate(dto.projectId);
 
     // Cuántas tareas la llevaban: la interfaz lo usa para decir qué pasó.
     return { success: true, removedFrom: usos };
+  }
+
+  /** Invalida la caché de las tareas que llevan una etiqueta, y de sus tableros. */
+  private async invalidateTasksWithLabel(labelId: string) {
+    const rows = await this.prisma.taskLabel.findMany({
+      where: { labelId },
+      select: { task: { select: { id: true, boardId: true } } },
+    });
+    if (rows.length === 0) return;
+
+    const boardIds = [...new Set(rows.map((row) => row.task.boardId))];
+    await Promise.all([
+      ...rows.map((row) => this.redis.del(`task:${row.task.id}`)),
+      ...boardIds.map((id) => this.redis.del(`tasks:board:${id}`)),
+    ]);
   }
 
   /** Comprueba que la etiqueta es del proyecto de la ruta. */

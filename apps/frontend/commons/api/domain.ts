@@ -185,6 +185,21 @@ export interface TaskAssignee {
   assignedAt: string;
 }
 
+/**
+ * Comentario en una tarea.
+ *
+ * `editedAt` es `null` mientras no se haya tocado el texto: solo se marca
+ * cuando cambia de verdad, no cada vez que la fila se actualiza.
+ */
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  editedAt: string | null;
+}
+
 export interface ChecklistItem {
   id: string;
   taskId: string;
@@ -221,6 +236,8 @@ export interface Task {
   assignees: TaskAssignee[];
   checklists: ChecklistItem[];
   labels: TaskLabel[];
+  /** Del más antiguo al más nuevo. Vienen con la tarea, también en el listado. */
+  comments: TaskComment[];
   subtasks: Task[];
 }
 

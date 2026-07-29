@@ -369,6 +369,40 @@ etiquetas y no lo inventamos por nuestra cuenta. Anotado en
 
 ---
 
+## Comentarios 🔒
+
+| Método | Ruta | Body | Permiso |
+|---|---|---|---|
+| GET | `/tasks/:taskId/comments` | — | `canViewProject` |
+| POST | `/tasks/:taskId/comments` | `{ body }` → 201 | `canEditTask` |
+| PATCH | `/tasks/:taskId/comments/:id` | `{ body }` | `canEditTask` + **ser el autor** |
+| DELETE | `/tasks/:taskId/comments/:id` | — | `canEditTask` + autor **o** `canDeleteTask` |
+
+```ts
+TaskComment = { id, taskId, authorId, body, createdAt, editedAt }
+```
+
+- Orden cronológico, del más antiguo al más nuevo.
+- `body`: 1–4000 caracteres.
+- `editedAt` es `null` mientras no se toque el texto; solo se marca al editarlo
+  de verdad, no en cada escritura de la fila.
+- **Editar es solo del autor**, aunque puedas moderar: moderar es poder retirar
+  lo que otro escribió, no reescribirlo con su nombre. Ajeno → `403 "Solo
+  puedes editar tus propios comentarios"`.
+- **Borrar** lo puede el autor o quien tenga `canDeleteTask`.
+- `authorId` es un id: el nombre lo resuelve la interfaz contra los miembros.
+
+⚠️ **Comentar exige `canEditTask`.** No hay permiso de comentar, así que un
+perfil de solo lectura lee el hilo pero no participa. Anotado en
+`PENDIENTES-BACKEND.md §17`.
+
+⚠️ Los comentarios **viajan dentro de la tarea** (`task.comments`), también en
+`GET /boards/:id/tasks`. Se decidió así para que la revalidación de la página
+los refresque sin un segundo camino de datos; el coste es un listado más
+pesado.
+
+---
+
 ## Mis tareas 🔒
 
 | Método | Ruta | Permiso |
