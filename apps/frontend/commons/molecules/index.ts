@@ -1,3 +1,4 @@
+export * from './Dialog';
 export * from './SectionHeader';
 export * from './ProgressBar';
 export * from './FeatureCard';
