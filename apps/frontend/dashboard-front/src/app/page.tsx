@@ -1,11 +1,14 @@
 import {
   APP_NAV_ITEMS,
   AppLayout,
+  DUE_SOON_DAYS,
   LogoutButton,
   type MyInvitation,
   type Paginated,
   type Project,
+  type Task,
   displayName,
+  dueState,
 } from '@praxis/commons';
 import type { Metadata } from 'next';
 import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
@@ -14,6 +17,7 @@ import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { ProjectList } from '@/components/organisms/ProjectList';
+import { TaskAlerts } from '@/components/organisms/TaskAlerts';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
@@ -39,12 +43,34 @@ export default async function DashboardPage() {
    * devolvía todos los del sistema, y el coste era que no aparecían los
    * proyectos a los que te habían añadido.
    */
-  const [page, invitations] = await Promise.all([
+  /**
+   * Una sola petición cubre los dos avisos.
+   *
+   * Se pide la ventana entera —hasta dentro de `DUE_SOON_DAYS` días— y el
+   * reparto entre «vencidas» y «vencen pronto» se hace aquí comparando con
+   * ahora. Pedirlas por separado serían dos viajes para los mismos datos.
+   */
+  const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
+
+  const [page, invitations, dueTasks] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
+    api
+      .get<Paginated<Task>>(`/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&limit=50`)
+      .catch(() => ({ items: [] as Task[], total: 0 })),
   ]);
   const projects = page.items;
+
+  /**
+   * Vencidas y por vencer, separadas.
+   *
+   * `dueState` decide con la misma regla que usa la tarjeta del tablero, así
+   * que un aviso y su tarjeta nunca se contradicen. Las sin fecha no llegan
+   * aquí: `dueBefore` ya las deja fuera en el backend.
+   */
+  const overdue = dueTasks.items.filter((task) => dueState(task.dueDate) === 'overdue');
+  const dueSoon = dueTasks.items.filter((task) => dueState(task.dueDate) === 'soon');
 
   const owned = projects.filter((project) => project.ownerId === userId);
 
@@ -73,6 +99,15 @@ export default async function DashboardPage() {
         {/* Antes que nada: es lo único que espera una decisión, y el único
             sitio donde se entera de que le han invitado. */}
         <MyInvitations invitations={invitations} />
+
+        {/* Después de las invitaciones: aquellas esperan una decisión, esto
+            solo avisa. Pero antes de las métricas, que no urgen. */}
+        <TaskAlerts
+          overdue={overdue}
+          soon={dueSoon}
+          projectsById={new Map(projects.map((project) => [project.id, project]))}
+          soonDays={DUE_SOON_DAYS}
+        />
 
         {projects.length === 0 ? (
           <DashboardEmptyState
