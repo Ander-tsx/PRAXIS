@@ -1,10 +1,16 @@
-import type { Board } from '@praxis/commons';
+import type { Board, Task, UserProfile } from '@praxis/commons';
 import { BoardColumns } from './BoardColumns';
 
 export interface BoardStripProps {
   board: Board;
   projectId: string;
   canManage: boolean;
+  tasks: Task[];
+  members: UserProfile[];
+  usersById: Map<string, UserProfile>;
+  canCreateTask: boolean;
+  canEditTask: boolean;
+  canDeleteTask: boolean;
 }
 
 /**
@@ -13,7 +19,17 @@ export interface BoardStripProps {
  * La tira de columnas vive en `BoardColumns`, que es cliente porque gestiona el
  * arrastre. Aquí solo va la cabecera, que no necesita JavaScript.
  */
-export function BoardStrip({ board, projectId, canManage }: BoardStripProps) {
+export function BoardStrip({
+  board,
+  projectId,
+  canManage,
+  tasks,
+  members,
+  usersById,
+  canCreateTask,
+  canEditTask,
+  canDeleteTask,
+}: BoardStripProps) {
   const columnCount = board.columns.length;
 
   return (
@@ -27,10 +43,22 @@ export function BoardStrip({ board, projectId, canManage }: BoardStripProps) {
           {columnCount === 0
             ? 'sin columnas'
             : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`}
+          {tasks.length > 0 &&
+            ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}`}
         </span>
       </header>
 
-      <BoardColumns board={board} projectId={projectId} canManage={canManage} />
+      <BoardColumns
+        board={board}
+        projectId={projectId}
+        canManage={canManage}
+        tasks={tasks}
+        members={members}
+        usersById={usersById}
+        canCreateTask={canCreateTask}
+        canEditTask={canEditTask}
+        canDeleteTask={canDeleteTask}
+      />
     </section>
   );
 }

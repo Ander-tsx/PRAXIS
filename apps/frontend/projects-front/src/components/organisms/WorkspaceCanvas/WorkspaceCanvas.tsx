@@ -1,4 +1,4 @@
-import { type Workspace, alpha, colors } from '@praxis/commons';
+import { type Task, type UserProfile, type Workspace, alpha, colors } from '@praxis/commons';
 import { BoardStrip } from './BoardStrip';
 import { CreateBoardButton } from './CreateBoardButton';
 import { DeleteWorkspaceButton } from './DeleteWorkspaceButton';
@@ -10,6 +10,13 @@ export interface WorkspaceCanvasProps {
   /** Espacio abierto, resuelto en la page desde `?ws=`. */
   activeWorkspace: Workspace | null;
   canManage: boolean;
+  /** Tareas del espacio abierto, agrupadas por tablero. */
+  tasksByBoard: Map<string, Task[]>;
+  members: UserProfile[];
+  usersById: Map<string, UserProfile>;
+  canCreateTask: boolean;
+  canEditTask: boolean;
+  canDeleteTask: boolean;
 }
 
 /**
@@ -29,6 +36,12 @@ export function WorkspaceCanvas({
   workspaces,
   activeWorkspace,
   canManage,
+  tasksByBoard,
+  members,
+  usersById,
+  canCreateTask,
+  canEditTask,
+  canDeleteTask,
 }: WorkspaceCanvasProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -96,6 +109,12 @@ export function WorkspaceCanvas({
               board={board}
               projectId={projectId}
               canManage={canManage}
+              tasks={tasksByBoard.get(board.id) ?? []}
+              members={members}
+              usersById={usersById}
+              canCreateTask={canCreateTask}
+              canEditTask={canEditTask}
+              canDeleteTask={canDeleteTask}
             />
           ))}
         </div>

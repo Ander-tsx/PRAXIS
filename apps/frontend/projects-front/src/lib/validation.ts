@@ -116,6 +116,29 @@ export function validateBoard(name: string): string | null {
   return null;
 }
 
+export const TASK_TITLE_MIN = 1;
+export const TASK_TITLE_MAX = 255;
+
+export function validateTask(title: string): string | null {
+  const trimmed = title.trim();
+  if (trimmed.length < TASK_TITLE_MIN) return 'La tarea necesita un título.';
+  if (trimmed.length > TASK_TITLE_MAX) {
+    return `El título no puede superar ${TASK_TITLE_MAX} caracteres.`;
+  }
+  return null;
+}
+
+export const CHECKLIST_TEXT_MAX = 500;
+
+export function validateChecklistItem(text: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) return 'Escribe qué hay que hacer.';
+  if (trimmed.length > CHECKLIST_TEXT_MAX) {
+    return `El ítem no puede superar ${CHECKLIST_TEXT_MAX} caracteres.`;
+  }
+  return null;
+}
+
 export const COLUMN_NAME_MIN = 1;
 export const COLUMN_NAME_MAX = 100;
 

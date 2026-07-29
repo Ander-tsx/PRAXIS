@@ -7,6 +7,7 @@ import {
   type PermissionMap,
   type ProjectInvitation,
   type ProjectRole,
+  type Task,
   type Workspace,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
@@ -17,9 +18,16 @@ import type {
   ColumnState,
   MemberState,
   RoleState,
+  TaskState,
   WorkspaceState,
 } from '@/lib/action-state';
-import { validateBoard, validateColumn, validateRole, validateWorkspace } from '@/lib/validation';
+import {
+  validateBoard,
+  validateColumn,
+  validateRole,
+  validateTask,
+  validateWorkspace,
+} from '@/lib/validation';
 
 /**
  * Acciones del detalle de proyecto.
@@ -415,6 +423,158 @@ export async function reorderColumnsAction(
 
   revalidateProject(projectId);
   return { error: null, savedName: 'reordenado' };
+}
+
+/* ─── Tareas ────────────────────────────────────────────────────────── */
+
+/**
+ * Lee los campos comunes del formulario de tarea.
+ *
+ * ⚠️ **Nada de `projectId` en el cuerpo.** Lo resuelve el guard desde la ruta y
+ * mandarlo responde 400. Aquí el `projectId` solo sirve para revalidar.
+ *
+ * Los campos vacíos se omiten en vez de mandarse como `''`: el DTO los valida
+ * con formato (UUID, ISO 8601, enum) y una cadena vacía da 400.
+ */
+function readTaskFields(formData: FormData) {
+  const title = String(formData.get('title') ?? '').trim();
+  const description = String(formData.get('description') ?? '').trim();
+  const dueDate = String(formData.get('dueDate') ?? '').trim();
+  const priority = String(formData.get('priority') ?? '').trim();
+  const assigneeIds = formData.getAll('assigneeIds').map(String).filter(Boolean);
+
+  return { title, description, dueDate, priority, assigneeIds };
+}
+
+/**
+ * Convierte lo que da un `<input type="date">` (`2026-08-01`) en ISO 8601.
+ *
+ * El DTO exige `@IsISO8601()` y `2026-08-01` a secas lo pasa, pero el backend
+ * lo interpretaría como medianoche UTC. Se fija al **final del día local**, que
+ * es lo que espera quien escribe una fecha límite: si pones hoy, no vence hace
+ * ocho horas.
+ */
+function toIsoDueDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59).toISOString();
+}
+
+export async function createTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const boardId = String(formData.get('boardId') ?? '');
+  const columnId = String(formData.get('columnId') ?? '');
+  /** El nombre de la columna: `status` tiene que igualarlo (trampa #2). */
+  const status = String(formData.get('status') ?? '');
+  const { title, description, dueDate, priority, assigneeIds } = readTaskFields(formData);
+
+  const invalid = validateTask(title);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const created = await api.post<Task>(`/boards/${boardId}/tasks`, {
+      columnId,
+      title,
+      status,
+      ...(description && { description }),
+      ...(dueDate && { dueDate: toIsoDueDate(dueDate) }),
+      ...(priority && { priority }),
+      ...(assigneeIds.length > 0 && { assigneeIds }),
+    });
+
+    if (!created?.id || created.title !== title) {
+      return { error: 'El servidor no guardó la tarea.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear la tarea.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'created' };
+}
+
+export async function updateTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const { title, description, dueDate, priority, assigneeIds } = readTaskFields(formData);
+
+  const invalid = validateTask(title);
+  if (invalid) return { error: invalid, done: null };
+
+  try {
+    const saved = await api.patch<Task>(`/tasks/${taskId}`, {
+      title,
+      /* Cadena vacía, no ausencia: es como se borra una descripción. */
+      description,
+      /* `null` explícito quita la fecha; omitirlo la dejaría como estaba. */
+      dueDate: dueDate ? toIsoDueDate(dueDate) : null,
+      priority,
+      /* Siempre se manda: el diálogo enseña la lista completa, así que lo que
+         venga es la lista que debe quedar. Omitirlo no borraría a nadie. */
+      assigneeIds,
+    });
+
+    if (!saved?.id || saved.title !== title) {
+      return { error: 'El servidor no guardó los cambios.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo guardar la tarea.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'updated' };
+}
+
+/**
+ * Mueve una tarea de columna.
+ *
+ * ⚠️ Manda `columnId` **y** `status` coherentes: `status` es un string que debe
+ * igualar el nombre de la columna destino, así que quien llama tiene que
+ * conocer la correspondencia nombre ↔ id.
+ */
+export async function moveTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+  const columnId = String(formData.get('columnId') ?? '');
+  const status = String(formData.get('status') ?? '');
+  const order = Number(formData.get('order') ?? 0);
+
+  try {
+    const moved = await api.post<Task>(`/tasks/${taskId}/move`, { columnId, status, order });
+    if (moved?.columnId !== columnId) {
+      return { error: 'El servidor no movió la tarea.', done: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo mover la tarea.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'moved' };
+}
+
+export async function deleteTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const taskId = String(formData.get('taskId') ?? '');
+
+  try {
+    await api.delete(`/tasks/${taskId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar la tarea.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'deleted' };
 }
 
 /* ─── Utilidades ────────────────────────────────────────────────────── */

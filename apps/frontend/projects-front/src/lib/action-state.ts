@@ -61,3 +61,11 @@ export interface ColumnState {
 }
 
 export const COLUMN_INITIAL_STATE: ColumnState = { error: null, savedName: null };
+
+export interface TaskState {
+  error: string | null;
+  /** Se rellena cuando el servidor confirma, con lo que confirmó. */
+  done: string | null;
+}
+
+export const TASK_INITIAL_STATE: TaskState = { error: null, done: null };

@@ -38,7 +38,7 @@ En validación fallida el `message` es literalmente `"Validation failed"` y los 
 ### ⚠️ Reglas que rompen cosas si se olvidan
 
 1. **Ninguna ruta de tarea o checklist acepta `projectId` en el body.** Es al revés de como estuvo: el guard lo resuelve desde la ruta y mandarlo responde `400 "property projectId should not exist"`. Se quitó porque, mientras lo elegía el cliente, bastaba con declarar el id de un proyecto propio para leer, editar y borrar tareas de un proyecto ajeno (PENDIENTES-BACKEND §9).
-2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el nombre de la columna destino.
+2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el **nombre** de la columna destino, no su id. Quien mueva necesita la correspondencia nombre ↔ id; en la interfaz la resuelve `BoardColumns`, que ya tiene las columnas.
 3. **Listar y paginar `/projects` y `/users` requiere body en un GET** — imposible desde `fetch`. Sin filtros solo se obtiene la página 1 por defecto (limit 20).
 4. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
 

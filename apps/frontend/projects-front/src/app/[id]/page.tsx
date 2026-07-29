@@ -8,6 +8,7 @@ import {
   type ProjectInvitation,
   type ProjectMember,
   TabNav,
+  type Task,
   type UserProfile,
   displayName,
   tabLinkClasses,
@@ -75,22 +76,25 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const can = effective.permissions;
 
   /**
-   * El directorio solo hace falta para la pestaña de equipo: cruzar `userId`
-   * con nombre y correo, y ofrecer candidatos. Se pide únicamente ahí.
+   * El directorio hace falta en las dos pestañas que enseñan personas: equipo
+   * cruza `userId` con nombre y correo, y espacios lo necesita para las
+   * iniciales de los encargados y para el selector del diálogo de tarea.
    */
-  const [directory, invitations] =
+  const directory =
+    activeTab === 'equipo' || activeTab === 'espacios'
+      ? await api
+          .get<Paginated<UserProfile>>('/users?limit=100')
+          .catch(() => ({ items: [] as UserProfile[], total: 0 }))
+      : { items: [] as UserProfile[], total: 0 };
+
+  const invitations =
     activeTab === 'equipo'
-      ? await Promise.all([
-          api
-            .get<Paginated<UserProfile>>('/users?limit=100')
-            .catch(() => ({ items: [] as UserProfile[], total: 0 })),
-          /* Solo quien gestiona el equipo puede listarlas; para el resto es un
-             403 esperado y la sección simplemente no las muestra. */
-          api
-            .get<ProjectInvitation[]>(`/projects/${id}/invitations`)
-            .catch(() => [] as ProjectInvitation[]),
-        ])
-      : [{ items: [] as UserProfile[], total: 0 }, [] as ProjectInvitation[]];
+      ? /* Solo quien gestiona el equipo puede listarlas; para el resto es un
+           403 esperado y la sección simplemente no las muestra. */
+        await api
+          .get<ProjectInvitation[]>(`/projects/${id}/invitations`)
+          .catch(() => [] as ProjectInvitation[])
+      : ([] as ProjectInvitation[]);
 
   const boardCount = project.workspaces.reduce(
     (total, workspace) => total + workspace.boards.length,
@@ -104,6 +108,32 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    */
   const activeWorkspace =
     project.workspaces.find((workspace) => workspace.id === ws) ?? project.workspaces[0] ?? null;
+
+  /**
+   * Tareas del espacio abierto, un `GET` por tablero.
+   *
+   * No hay una ruta que devuelva las de un espacio entero —las tareas cuelgan
+   * del tablero—, así que se piden en paralelo y solo las del espacio visible:
+   * pedir las de todos los espacios sería trabajo tirado, porque solo se ve uno.
+   *
+   * Un tablero que falle cae a lista vacía en vez de tumbar la página: perder
+   * un tablero es mucho mejor que perder el proyecto entero.
+   */
+  const visibleBoards = activeTab === 'espacios' ? (activeWorkspace?.boards ?? []) : [];
+  const boardTasks = await Promise.all(
+    visibleBoards.map((board) =>
+      api
+        .get<Paginated<Task>>(`/boards/${board.id}/tasks?limit=100`)
+        .then((page) => [board.id, page.items] as const)
+        .catch(() => [board.id, [] as Task[]] as const),
+    ),
+  );
+  const tasksByBoard = new Map(boardTasks);
+
+  /** Quién puede aparecer como encargado: los miembros más el dueño. */
+  const memberIds = new Set([...members.map((member) => member.userId), project.ownerId]);
+  const assignableMembers = directory.items.filter((user) => memberIds.has(user.id));
+  const usersById = new Map(directory.items.map((user) => [user.id, user]));
 
   const counts: Record<TabId, number> = {
     espacios: project.workspaces.length,
@@ -152,6 +182,12 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             workspaces={project.workspaces}
             activeWorkspace={activeWorkspace}
             canManage={can.canCreateBoard}
+            tasksByBoard={tasksByBoard}
+            members={assignableMembers}
+            usersById={usersById}
+            canCreateTask={can.canCreateTask}
+            canEditTask={can.canEditTask}
+            canDeleteTask={can.canDeleteTask}
           />
         )}
 
@@ -160,7 +196,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             projectId={project.id}
             members={members}
             roles={project.roles}
-            usersById={new Map(directory.items.map((user) => [user.id, user]))}
+            usersById={usersById}
             candidates={directory.items}
             ownerId={project.ownerId}
             canManage={can.canManageMembers}

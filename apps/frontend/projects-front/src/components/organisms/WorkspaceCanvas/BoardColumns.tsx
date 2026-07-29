@@ -1,15 +1,31 @@
 'use client';
 
-import { type Board, type Column, alpha, colors } from '@praxis/commons';
+import {
+  type Board,
+  type Column,
+  type Task,
+  type UserProfile,
+  alpha,
+  colors,
+} from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteColumnAction, reorderColumnsAction } from '@/app/[id]/actions';
-import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
+import { deleteColumnAction, moveTaskAction, reorderColumnsAction } from '@/app/[id]/actions';
+import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/action-state';
+import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
 
 export interface BoardColumnsProps {
   board: Board;
   projectId: string;
   canManage: boolean;
+  /** Tareas del tablero, ya cargadas por la page. */
+  tasks: Task[];
+  /** Gente del proyecto: a quién se puede asignar. */
+  members: UserProfile[];
+  usersById: Map<string, UserProfile>;
+  canCreateTask: boolean;
+  canEditTask: boolean;
+  canDeleteTask: boolean;
 }
 
 /** Un color por posición: ayuda a distinguir columnas de un vistazo. */
@@ -34,16 +50,88 @@ const COLUMN_TINTS = [colors.primary, colors.accent, colors.info, colors.success
  * una sola fila es el caso más simple del problema y no justifica la
  * dependencia.
  */
-export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps) {
+export function BoardColumns({
+  board,
+  projectId,
+  canManage,
+  tasks,
+  members,
+  usersById,
+  canCreateTask,
+  canEditTask,
+  canDeleteTask,
+}: BoardColumnsProps) {
   const [columns, setColumns] = useState<Column[]>(() =>
     [...board.columns].sort((a, b) => a.order - b.order),
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [, reorderAction] = useActionState(reorderColumnsAction, COLUMN_INITIAL_STATE);
 
+  /** Tarea en vuelo. Mientras haya una, el arrastre de columnas se desactiva. */
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  /** Movimiento pendiente de guardar; lo dispara el formulario oculto. */
+  const [pendingMove, setPendingMove] = useState<{
+    taskId: string;
+    columnId: string;
+    status: string;
+    order: number;
+  } | null>(null);
+  const [moveState, moveAction] = useActionState(moveTaskAction, TASK_INITIAL_STATE);
+  const moveFormRef = useRef<HTMLFormElement>(null);
+
   const formRef = useRef<HTMLFormElement>(null);
   /** Orden con el que empezó el arrastre: si no cambia, no se guarda nada. */
   const orderAtDragStart = useRef<string>('');
+
+  /**
+   * Envía el movimiento cuando el estado ya está pintado.
+   *
+   * Va por un formulario oculto, como el reordenado de columnas: el gesto
+   * termina en el cliente y no hay ningún botón que pulsar.
+   */
+  useEffect(() => {
+    if (!pendingMove) return;
+    queueMicrotask(() => moveFormRef.current?.requestSubmit());
+  }, [pendingMove]);
+
+  /** Agrupa por columna una sola vez, en vez de filtrar dentro del map. */
+  const tasksByColumn = new Map<string, Task[]>();
+  for (const task of tasks) {
+    const list = tasksByColumn.get(task.columnId);
+    if (list) list.push(task);
+    else tasksByColumn.set(task.columnId, [task]);
+  }
+  for (const list of tasksByColumn.values()) {
+    list.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
+  }
+
+  /**
+   * Suelta una tarea en una columna.
+   *
+   * ⚠️ Manda `columnId` **y** `status`, y `status` es el **nombre** de la
+   * columna destino, no su id: así lo modela el backend, y mandar el id dejaría
+   * la tarea con un estado que no corresponde a ninguna columna.
+   *
+   * Va al final de la columna destino. Reordenar dentro de una columna sería
+   * otro gesto y todavía no lo tenemos.
+   */
+  function dropTask(columnId: string) {
+    const taskId = draggingTaskId;
+    setDraggingTaskId(null);
+    if (!taskId) return;
+
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    const target = columns.find((column) => column.id === columnId);
+    if (!task || !target) return;
+    if (task.columnId === columnId) return;
+
+    setPendingMove({
+      taskId,
+      columnId,
+      status: target.name,
+      order: tasksByColumn.get(columnId)?.length ?? 0,
+    });
+  }
 
   /**
    * El servidor manda: cuando la página revalida, el orden que llega sustituye
@@ -106,6 +194,20 @@ export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps)
         <input type="hidden" name="columnIds" value={columns.map((c) => c.id).join(',')} />
       </form>
 
+      <form ref={moveFormRef} action={moveAction} className="hidden">
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="taskId" value={pendingMove?.taskId ?? ''} />
+        <input type="hidden" name="columnId" value={pendingMove?.columnId ?? ''} />
+        <input type="hidden" name="status" value={pendingMove?.status ?? ''} />
+        <input type="hidden" name="order" value={pendingMove?.order ?? 0} />
+      </form>
+
+      {moveState.error && (
+        <p role="alert" className="pb-2 font-sans text-xs" style={{ color: colors.error }}>
+          {moveState.error}
+        </p>
+      )}
+
       <div className="scrollbar-none -mx-1 flex items-start gap-4 overflow-x-auto px-1 pb-2">
         {columns.map((column, index) => {
           const isDragging = column.id === draggingId;
@@ -113,7 +215,9 @@ export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps)
           return (
             <div
               key={column.id}
-              draggable={canManage}
+              /* Mientras viaja una tarea la columna no se arrastra: si no, coger
+                 una tarjeta acabaría moviendo la columna entera. */
+              draggable={canManage && !draggingTaskId}
               onDragStart={(event) => {
                 /**
                  * El estado se marca **primero**. `dataTransfer` es opcional
@@ -138,12 +242,14 @@ export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps)
                 } catch {
                   // Irrelevante para el reordenado; solo cambia el cursor.
                 }
-                moveOver(column.id);
+                // Si lo que viaja es una tarea, el destino lo decide la zona de
+                // tareas: reordenar columnas aquí sería un efecto colateral.
+                if (!draggingTaskId) moveOver(column.id);
               }}
               onDrop={(event) => {
                 // El orden ya está aplicado; soltar solo cierra el gesto.
                 event.preventDefault();
-                endDrag();
+                if (!draggingTaskId) endDrag();
               }}
               className={[
                 'flex w-72 shrink-0 flex-col rounded-2xl bg-surface',
@@ -198,7 +304,7 @@ export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps)
                     className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
                     style={{ background: alpha(colors.border, 60) }}
                   >
-                    0
+                    {tasksByColumn.get(column.id)?.length ?? 0}
                   </span>
                   {canManage && (
                     <DeleteColumn
@@ -211,14 +317,21 @@ export function BoardColumns({ board, projectId, canManage }: BoardColumnsProps)
                 </span>
               </header>
 
-              {/* Hueco de tarjetas. Sin tareas todavía, se dice en vez de fingirlas. */}
-              <div className="px-4 pb-4">
-                <div
-                  className="flex min-h-40 items-center justify-center rounded-xl"
-                  style={{ background: alpha(colors.background, 50) }}
-                >
-                  <span className="font-sans text-xs text-text-disabled">Tareas: pronto</span>
-                </div>
+              <div className="px-2 pb-3">
+                <ColumnTasks
+                  projectId={projectId}
+                  boardId={board.id}
+                  column={column}
+                  tasks={tasksByColumn.get(column.id) ?? []}
+                  members={members}
+                  usersById={usersById}
+                  canCreate={canCreateTask}
+                  canEdit={canEditTask}
+                  canDelete={canDeleteTask}
+                  draggingTaskId={draggingTaskId}
+                  onDragTask={setDraggingTaskId}
+                  onDropTask={dropTask}
+                />
               </div>
             </div>
           );

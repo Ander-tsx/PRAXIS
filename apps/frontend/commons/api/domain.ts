@@ -126,6 +126,91 @@ export interface Workspace {
   boards: Board[];
 }
 
+export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+export type Priority = (typeof PRIORITIES)[number];
+
+/** Etiqueta y color de cada prioridad, para no repetirlos en cada pantalla. */
+export const PRIORITY_LABELS: Record<Priority, string> = {
+  LOW: 'Baja',
+  MEDIUM: 'Media',
+  HIGH: 'Alta',
+  URGENT: 'Urgente',
+};
+
+/** Un encargado de una tarea. Son ids: tasks-service no conoce a los usuarios. */
+export interface TaskAssignee {
+  id: string;
+  taskId: string;
+  userId: string;
+  assignedBy: string;
+  assignedAt: string;
+}
+
+export interface ChecklistItem {
+  id: string;
+  taskId: string;
+  text: string;
+  completed: boolean;
+  order: number;
+}
+
+/**
+ * Una tarea.
+ *
+ * ⚠️ `status` es un **string que debe igualar el nombre de una columna** del
+ * tablero, no un enum. Al mover una tarea hay que mandar `columnId` y `status`
+ * coherentes, así que quien mueva necesita la correspondencia nombre ↔ id.
+ *
+ * Las cinco rutas que devuelven tareas traen la misma forma: `assignees`,
+ * `subtasks` y `checklists` vienen siempre, también en el listado del tablero.
+ */
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  boardId: string;
+  columnId: string;
+  reporterId: string;
+  projectId: string;
+  parentTaskId: string | null;
+  dueDate: string | null;
+  priority: Priority;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+  assignees: TaskAssignee[];
+  checklists: ChecklistItem[];
+  subtasks: Task[];
+}
+
+/** Cuántos ítems del checklist están hechos. `total` 0 significa que no hay. */
+export function checklistProgress(task: Task): { done: number; total: number } {
+  return {
+    done: task.checklists.filter((item) => item.completed).length,
+    total: task.checklists.length,
+  };
+}
+
+/**
+ * Estado de una fecha límite respecto a ahora.
+ *
+ * Vencido y «vence pronto» son avisos **distintos** y no se mezclan en un
+ * contador único: uno es un problema y el otro una advertencia.
+ */
+export type DueState = 'none' | 'overdue' | 'soon' | 'later';
+
+/** Días a partir de los cuales una fecha deja de considerarse próxima. */
+export const DUE_SOON_DAYS = 7;
+
+export function dueState(dueDate: string | null, now: Date = new Date()): DueState {
+  if (!dueDate) return 'none';
+  const due = new Date(dueDate);
+  if (due.getTime() < now.getTime()) return 'overdue';
+  const days = (due.getTime() - now.getTime()) / 86_400_000;
+  return days <= DUE_SOON_DAYS ? 'soon' : 'later';
+}
+
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
 
 /**
