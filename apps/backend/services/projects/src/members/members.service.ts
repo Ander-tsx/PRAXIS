@@ -44,6 +44,8 @@ export class MembersService {
     });
 
     await this.redis.del(`members:project:${dto.projectId}`);
+    // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
+    await this.redis.del(`project:${dto.projectId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
     return member;
   }
@@ -58,6 +60,8 @@ export class MembersService {
 
     await this.prisma.projectMember.delete({ where: { id: member.id } });
     await this.redis.del(`members:project:${dto.projectId}`);
+    // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
+    await this.redis.del(`project:${dto.projectId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
     return { success: true };
   }

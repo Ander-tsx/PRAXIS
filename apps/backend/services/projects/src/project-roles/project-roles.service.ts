@@ -72,13 +72,16 @@ export class ProjectRolesService {
       throw new RpcException({ statusCode: 409, message: `Ya existe el rol '${dto.name}' en este proyecto` });
     }
 
-    return this.prisma.projectRole.create({
+    const created = await this.prisma.projectRole.create({
       data: {
         name:        dto.name,
         projectId:   dto.projectId,
         permissions: dto.permissions,
       },
     });
+
+    await this.invalidateProjectCache(dto.projectId);
+    return created;
   }
 
   async updateProjectRole(dto: UpdateProjectRoleDto) {
@@ -102,6 +105,7 @@ export class ProjectRolesService {
     await Promise.all(
       affected.map((m) => this.invalidatePermissionCache(m.userId, m.projectId)),
     );
+    await this.invalidateProjectCache(role.projectId);
 
     return updated;
   }
@@ -122,6 +126,7 @@ export class ProjectRolesService {
     }
 
     await this.prisma.projectRole.delete({ where: { id } });
+    await this.invalidateProjectCache(role.projectId);
     return { success: true };
   }
 
@@ -248,5 +253,17 @@ export class ProjectRolesService {
 
   async invalidatePermissionCache(userId: string, projectId: string) {
     await this.redis.del(`project:${projectId}:user:${userId}:permissions`);
+  }
+
+  /**
+   * Invalida el detalle cacheado del proyecto.
+   *
+   * `findOneProject` guarda el proyecto entero en `project:<id>` durante 5
+   * minutos, **con sus roles embebidos**. Sin esto, crear o editar un rol no se
+   * veía en pantalla hasta que expiraba la caché: la escritura funcionaba y la
+   * interfaz parecía no haber hecho nada.
+   */
+  private async invalidateProjectCache(projectId: string) {
+    await this.redis.del(`project:${projectId}`);
   }
 }
