@@ -3,6 +3,7 @@ import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestj
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 
+import { Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -21,6 +22,20 @@ import {
 
 const TASK_CACHE_TTL = 120;       // 2 min individual task
 const BOARD_TASKS_TTL = 60;       // 1 min board tasks list
+
+/**
+ * Lo que acompaña a una tarea al salir del servicio.
+ *
+ * En un solo sitio para que las cinco rutas que devuelven tareas tengan la
+ * misma forma: cuando cada una traía su propio `include`, la del listado no
+ * llevaba encargados y la del detalle sí, y la interfaz tenía que saber de
+ * dónde venía cada tarea.
+ */
+const TASK_INCLUDE = {
+  subtasks:   { include: { checklists: { orderBy: { order: 'asc' } } } },
+  checklists: { orderBy: { order: 'asc' } },
+  assignees:  { orderBy: { assignedAt: 'asc' } },
+} satisfies Prisma.TaskInclude;
 
 @Injectable()
 export class TasksService {
@@ -100,10 +115,70 @@ export class TasksService {
     return item;
   }
 
+  /**
+   * Comprueba que todos los encargados pertenezcan al proyecto, y devuelve la
+   * lista sin repetidos.
+   *
+   * Sin esto se puede asignar una tarea a un UUID cualquiera: el guardado
+   * funciona, y la interfaz acaba enseñando a alguien que no existe o que no
+   * está en el proyecto. Cuesta una consulta a projects-service, que ya cachea
+   * la lista de miembros.
+   *
+   * El dueño entra aunque no aparezca como miembro: los proyectos creados antes
+   * de `477616f` no tienen fila de `ProjectMember` para él.
+   */
+  private async resolveAssignees(projectId: string, userIds: string[]): Promise<string[]> {
+    const unique = [...new Set(userIds)];
+    if (unique.length === 0) return [];
+
+    const [members, project] = await Promise.all([
+      firstValueFrom(this.projectsClient.send({ cmd: 'member_find_all' }, { projectId })),
+      firstValueFrom(this.projectsClient.send({ cmd: 'project_find_one' }, { id: projectId })),
+    ]);
+
+    const allowed = new Set<string>((members ?? []).map((m: any) => m.userId));
+    if (project?.ownerId) allowed.add(project.ownerId);
+
+    const outsiders = unique.filter((id) => !allowed.has(id));
+    if (outsiders.length > 0) {
+      throw new RpcException({
+        statusCode: 400,
+        message:
+          outsiders.length === 1
+            ? 'Esa persona no es miembro del proyecto'
+            : `${outsiders.length} de los encargados no son miembros del proyecto`,
+      });
+    }
+
+    return unique;
+  }
+
+  /**
+   * Deja los encargados de una tarea exactamente en `userIds`.
+   *
+   * Borra y vuelve a insertar en vez de calcular el diferencial: la lista es de
+   * unos pocos elementos y así el resultado no depende del estado previo.
+   */
+  private async replaceAssignees(
+    tx: Prisma.TransactionClient,
+    taskId: string,
+    userIds: string[],
+    assignedBy: string,
+  ) {
+    await tx.taskAssignee.deleteMany({ where: { taskId } });
+    if (userIds.length > 0) {
+      await tx.taskAssignee.createMany({
+        data: userIds.map((userId) => ({ taskId, userId, assignedBy })),
+      });
+    }
+  }
+
   // ─── Tasks ────────────────────────────────────────────────────────────────
 
   async createTask(dto: CreateTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canCreateTask');
+
+    const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds ?? []);
 
     const task = await this.prisma.task.create({
       data: {
@@ -112,15 +187,17 @@ export class TasksService {
         status:       dto.status,
         boardId:      dto.boardId,
         columnId:     dto.columnId,
-        assigneeId:   dto.assigneeId,
         reporterId:   dto.requesterId,
         projectId:    dto.projectId,
         parentTaskId: dto.parentTaskId,
         dueDate:      dto.dueDate ? new Date(dto.dueDate) : undefined,
         priority:     dto.priority,
         order:        dto.order ?? 0,
+        assignees: {
+          create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
+        },
       },
-      include: { subtasks: true, checklists: true },
+      include: TASK_INCLUDE,
     });
 
     await this.redis.del(`tasks:board:${dto.boardId}`);
@@ -145,10 +222,7 @@ export class TasksService {
         skip,
         take: limit,
         orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-        include: {
-          subtasks: { include: { checklists: true } },
-          checklists: { orderBy: { order: 'asc' } },
-        },
+        include: TASK_INCLUDE,
       }),
       this.prisma.task.count({ where }),
     ]);
@@ -165,10 +239,7 @@ export class TasksService {
 
     const task = await this.prisma.task.findUnique({
       where: { id: dto.id },
-      include: {
-        subtasks: { include: { checklists: { orderBy: { order: 'asc' } } } },
-        checklists: { orderBy: { order: 'asc' } },
-      },
+      include: TASK_INCLUDE,
     });
 
     if (!task) {
@@ -184,18 +255,33 @@ export class TasksService {
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
-    const updated = await this.prisma.task.update({
-      where: { id: dto.id },
-      data: {
-        ...(dto.title       !== undefined && { title: dto.title }),
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.status      !== undefined && { status: dto.status }),
-        ...(dto.columnId    !== undefined && { columnId: dto.columnId }),
-        ...(dto.assigneeId  !== undefined && { assigneeId: dto.assigneeId }),
-        ...(dto.priority    !== undefined && { priority: dto.priority }),
-        ...(dto.dueDate     !== undefined && { dueDate: new Date(dto.dueDate) }),
-      },
-      include: { subtasks: true, checklists: true },
+    // Se validan antes de abrir la transacción: si alguien no es del proyecto,
+    // no se ha tocado nada todavía.
+    const assignees =
+      dto.assigneeIds !== undefined
+        ? await this.resolveAssignees(dto.projectId, dto.assigneeIds)
+        : undefined;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (assignees !== undefined) {
+        await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
+      }
+
+      return tx.task.update({
+        where: { id: dto.id },
+        data: {
+          ...(dto.title       !== undefined && { title: dto.title }),
+          ...(dto.description !== undefined && { description: dto.description }),
+          ...(dto.status      !== undefined && { status: dto.status }),
+          ...(dto.columnId    !== undefined && { columnId: dto.columnId }),
+          ...(dto.priority    !== undefined && { priority: dto.priority }),
+          // `null` limpia la fecha; sin esto no habría forma de quitarla.
+          ...(dto.dueDate     !== undefined && {
+            dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+          }),
+        },
+        include: TASK_INCLUDE,
+      });
     });
 
     await Promise.all([
@@ -218,7 +304,7 @@ export class TasksService {
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.order  !== undefined && { order: dto.order }),
       },
-      include: { subtasks: true, checklists: true },
+      include: TASK_INCLUDE,
     });
 
     await Promise.all([
@@ -244,15 +330,21 @@ export class TasksService {
     return { success: true };
   }
 
+  /**
+   * Deja los encargados de la tarea exactamente en `assigneeIds`.
+   *
+   * Sustituye, no acumula: la lista que llega es la lista que queda. Un array
+   * vacío desasigna a todo el mundo.
+   */
   async assignTask(dto: AssignTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
+    const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds);
 
-    const updated = await this.prisma.task.update({
-      where: { id: dto.id },
-      data: { assigneeId: dto.assigneeId ?? null },
-      include: { subtasks: true, checklists: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
+      return tx.task.findUniqueOrThrow({ where: { id: dto.id }, include: TASK_INCLUDE });
     });
 
     await Promise.all([

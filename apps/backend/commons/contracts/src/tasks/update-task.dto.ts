@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsISO8601,
   IsOptional,
@@ -38,10 +40,16 @@ export class UpdateTaskBodyDto {
   @IsUUID('4')
   columnId?: string;
 
-  @ApiPropertyOptional()
+  /**
+   * Conjunto completo de encargados. Omitirlo los deja como están; mandarlo
+   * vacío desasigna a todo el mundo. Ver `AssignTaskBodyDto`.
+   */
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsUUID('4')
-  assigneeId?: string;
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

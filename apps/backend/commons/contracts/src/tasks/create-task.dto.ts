@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsInt,
   IsISO8601,
@@ -38,10 +40,13 @@ export class CreateTaskBodyDto {
   @IsString()
   status: string;
 
-  @ApiPropertyOptional()
+  /** Encargados iniciales. Deben ser miembros del proyecto. */
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsUUID('4')
-  assigneeId?: string;
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -10,27 +10,57 @@ datasource db {
 }
 
 model Task {
-  id           String      @id @default(uuid())
+  id           String         @id @default(uuid())
   title        String
   description  String?
   status       String
   boardId      String
   columnId     String
-  assigneeId   String?
+  /// Quién creó la tarea. Los encargados están en `assignees`.
   reporterId   String
   projectId    String
   parentTaskId String?
-  parent       Task?       @relation("Subtasks", fields: [parentTaskId], references: [id])
-  subtasks     Task[]      @relation("Subtasks")
+  parent       Task?          @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]         @relation("Subtasks")
   checklists   Checklist[]
+  assignees    TaskAssignee[]
   dueDate      DateTime?
-  priority     Priority    @default(MEDIUM)
-  order        Int         @default(0)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  priority     Priority       @default(MEDIUM)
+  order        Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
+  /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
+  @@index([projectId, dueDate])
   @@schema("tasks")
   @@map("tasks")
+}
+
+/// Encargado de una tarea.
+///
+/// Sustituye al antiguo `Task.assigneeId`, que era un solo campo. Se migró en
+/// vez de mantener los dos porque dos fuentes para el mismo hecho acaban
+/// divergiendo, y «¿quién está asignado?» tendría dos respuestas: justo el
+/// problema que ya tuvimos con los permisos guardados como array.
+///
+/// No hay clave foránea hacia el usuario: vive en otro microservicio y en otro
+/// esquema. La comprobación de que es miembro del proyecto se hace en el
+/// servicio, preguntando a projects-service.
+model TaskAssignee {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String
+  /// Quién lo asignó, para poder decirlo en la interfaz.
+  assignedBy String
+  assignedAt DateTime @default(now())
+
+  /// Una persona no puede estar asignada dos veces a la misma tarea.
+  @@unique([taskId, userId])
+  /// El índice que hace barata la consulta de «mis tareas».
+  @@index([userId])
+  @@schema("tasks")
+  @@map("task_assignees")
 }
 
 model Checklist {

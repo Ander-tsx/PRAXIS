@@ -267,12 +267,36 @@ consistente; tenlo en cuenta si algo parece no aplicarse.
 | POST | `/boards/:boardId/tasks` | ver abajo → 201 | `canCreateTask` |
 | GET | `/boards/:boardId/tasks?columnId&page&limit` | — ✅ query params | `canViewProject` |
 | GET | `/tasks/:id` | — | `canViewProject` |
-| PATCH | `/tasks/:id` | `{ title?, description?, status?, columnId?, assigneeId?, priority?, dueDate? }` | `canEditTask` |
+| PATCH | `/tasks/:id` | `{ title?, description?, status?, columnId?, assigneeIds?, priority?, dueDate? }` | `canEditTask` |
 | POST | `/tasks/:id/move` | `{ columnId, status?, order? }` | `canEditTask` |
-| POST | `/tasks/:id/assign` | `{ assigneeId? }` | `canEditTask` |
+| POST | `/tasks/:id/assign` | `{ assigneeIds }` | `canEditTask` |
 | DELETE | `/tasks/:id` | — | `canDeleteTask` |
 
 ⚠️ **Ninguna lleva `projectId`.** Lo resuelve el guard desde la ruta; mandarlo da 400.
+
+### Encargados: `assigneeIds`, no `assigneeId`
+
+`Task.assigneeId` **ya no existe**. Una tarea puede tener varios encargados y
+viven en una tabla aparte. Mandar `assigneeId` da 400.
+
+- `assigneeIds` es el conjunto **completo**: sustituye a los que hubiera, no
+  añade. Es lo que hace un selector múltiple al cerrarse, y así repetir la
+  llamada no acumula. `[]` desasigna a todo el mundo.
+- En `PATCH`, **omitirlo** deja los encargados como estaban; mandarlo vacío los
+  quita. No es lo mismo.
+- Cada id tiene que ser **miembro del proyecto** (o el dueño). Si no:
+  `400 "Esa persona no es miembro del proyecto"`. Saca la lista de
+  `GET /projects/:id/members`.
+- Máximo 20 por tarea.
+
+La tarea sale con `assignees`, no con `assigneeIds`:
+
+```ts
+assignees: [{ id, taskId, userId, assignedBy, assignedAt }]
+```
+
+Son ids: tasks-service no conoce a los usuarios. El nombre lo resuelve la
+interfaz contra los miembros del proyecto, que ya carga.
 
 Body de creación:
 
@@ -282,7 +306,7 @@ Body de creación:
   title,              // 1–255
   status,             // requerido — debe coincidir con el nombre de la columna
   description?,
-  assigneeId?,
+  assigneeIds?,       // string[] — encargados iniciales, miembros del proyecto
   dueDate?,           // ISO 8601
   priority?,          // 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' (default MEDIUM)
   order?,             // int ≥ 0
@@ -293,12 +317,16 @@ Body de creación:
 `boardId`, `projectId` y `requesterId` los inyecta el gateway; **no los mandes** (`forbidNonWhitelisted` → 400).
 
 ```ts
-Task = { id, title, description, status, boardId, columnId, assigneeId, reporterId,
+Task = { id, title, description, status, boardId, columnId, reporterId,
          projectId, parentTaskId, dueDate, priority, order, createdAt, updatedAt,
-         subtasks?, checklists? }
+         assignees, subtasks, checklists }
 ```
 
-`assigneeId: null` para desasignar (el DTO lo declara opcional; verificar comportamiento real con `null` explícito).
+Las cinco rutas que devuelven tareas traen **la misma forma**: `assignees`,
+`subtasks` y `checklists` siempre vienen, también en el listado del tablero. Así
+la interfaz no tiene que saber de dónde salió cada tarea.
+
+`dueDate: null` en un `PATCH` quita la fecha límite.
 
 ---
 
