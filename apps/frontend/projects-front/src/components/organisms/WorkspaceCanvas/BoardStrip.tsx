@@ -4,7 +4,12 @@ import { BoardColumns } from './BoardColumns';
 export interface BoardStripProps {
   board: Board;
   projectId: string;
-  canManage: boolean;
+  /** Crear y reordenar columnas: `canCreateColumn`. */
+  canCreateColumn: boolean;
+  /** Renombrar y recolorear columnas: `canEditColumn`. */
+  canEditColumn: boolean;
+  /** Eliminar una columna con sus tareas: `canDeleteColumn`. */
+  canDeleteColumn: boolean;
   tasks: Task[];
   members: UserProfile[];
   labels: Label[];
@@ -24,7 +29,9 @@ export interface BoardStripProps {
 export function BoardStrip({
   board,
   projectId,
-  canManage,
+  canCreateColumn,
+  canEditColumn,
+  canDeleteColumn,
   tasks,
   members,
   labels,
@@ -55,7 +62,9 @@ export function BoardStrip({
       <BoardColumns
         board={board}
         projectId={projectId}
-        canManage={canManage}
+        canCreateColumn={canCreateColumn}
+        canEditColumn={canEditColumn}
+        canDeleteColumn={canDeleteColumn}
         tasks={tasks}
         members={members}
         labels={labels}

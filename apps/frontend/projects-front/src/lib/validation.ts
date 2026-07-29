@@ -1,6 +1,7 @@
 import {
   ATTACHMENT_ALLOWED_MIME,
   ATTACHMENT_MAX_BYTES,
+  COLUMN_COLORS,
   LABEL_COLORS,
   formatBytes,
 } from '@praxis/commons';
@@ -210,6 +211,19 @@ export function validateColumn(name: string): string | null {
   if (trimmed.length < COLUMN_NAME_MIN) return 'La columna necesita un nombre.';
   if (trimmed.length > COLUMN_NAME_MAX) {
     return `El nombre no puede superar ${COLUMN_NAME_MAX} caracteres.`;
+  }
+  return null;
+}
+
+/**
+ * Color de una columna: token del sistema, no hex.
+ *
+ * Mismo criterio que en las etiquetas. El backend responde 400 con la lista de
+ * válidos, pero llegar hasta allí para descubrirlo no aporta nada.
+ */
+export function validateColumnColor(color: string): string | null {
+  if (!COLUMN_COLORS.includes(color as (typeof COLUMN_COLORS)[number])) {
+    return 'Ese color no es del sistema.';
   }
   return null;
 }

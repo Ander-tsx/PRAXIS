@@ -101,10 +101,32 @@ export interface ProjectMember {
   projectRole: ProjectRole;
 }
 
+/**
+ * Colores que puede tomar una columna.
+ *
+ * Tokens del design system, como en las etiquetas. Espejo de `COLUMN_COLORS` en
+ * `@praxis/contracts`. Los cinco primeros son los que reparte el backend por
+ * posición al crear; `error` solo se elige a mano, porque un rojo por defecto se
+ * lee como una alarma.
+ */
+export const COLUMN_COLORS = ['primary', 'accent', 'info', 'success', 'warning', 'error'] as const;
+export type ColumnColor = (typeof COLUMN_COLORS)[number];
+
+export const COLUMN_COLOR_LABELS: Record<ColumnColor, string> = {
+  primary: 'Violeta',
+  accent: 'Ámbar',
+  info: 'Azul',
+  success: 'Verde',
+  warning: 'Amarillo',
+  error: 'Rojo',
+};
+
 export interface Column {
   id: string;
   name: string;
   order: number;
+  /** Token del design system, no un hex. Viaja con la columna al reordenar. */
+  color: ColumnColor;
   boardId: string;
 }
 

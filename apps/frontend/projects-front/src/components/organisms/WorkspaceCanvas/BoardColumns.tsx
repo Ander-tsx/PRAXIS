@@ -3,6 +3,7 @@
 import {
   type Board,
   type Column,
+  type ColumnColor,
   type Label,
   type Task,
   type UserProfile,
@@ -10,15 +11,27 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteColumnAction, moveTaskAction, reorderColumnsAction } from '@/app/[id]/actions';
+import { moveTaskAction, reorderColumnsAction } from '@/app/[id]/actions';
 import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/action-state';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
+import { ColumnMenu } from './ColumnMenu';
 
 export interface BoardColumnsProps {
   board: Board;
   projectId: string;
-  canManage: boolean;
+  /**
+   * Crear columnas y reordenarlas.
+   *
+   * Es `canCreateColumn`, no `canCreateBoard` como estaba: el backend pide ese
+   * permiso en `POST .../columns` y en `PATCH .../columns/reorder`, así que
+   * gatearlo con el de tableros ocultaba el botón a quien sí podía usarlo.
+   */
+  canCreateColumn: boolean;
+  /** Renombrar y recolorear: `canEditColumn`. */
+  canEditColumn: boolean;
+  /** Eliminar una columna, y con ella sus tareas: `canDeleteColumn`. */
+  canDeleteColumn: boolean;
   /** Tareas del tablero, ya cargadas por la page. */
   tasks: Task[];
   /** Gente del proyecto: a quién se puede asignar. */
@@ -32,8 +45,19 @@ export interface BoardColumnsProps {
   canDeleteTask: boolean;
 }
 
-/** Un color por posición: ayuda a distinguir columnas de un vistazo. */
+/**
+ * Reparto por posición, solo como red de seguridad.
+ *
+ * Era la fuente del color hasta que `BoardColumn.color` existió, y tenía el
+ * defecto de asignar **por índice**: reordenar una columna le cambiaba el color.
+ * Hoy el color viene de la base y viaja con la columna; esto solo cubre el caso
+ * de un valor que no reconozcamos, que no debería llegar.
+ */
 const COLUMN_TINTS = [colors.primary, colors.accent, colors.info, colors.success, colors.warning];
+
+function tintOf(color: ColumnColor, index: number): string {
+  return colors[color] ?? COLUMN_TINTS[index % COLUMN_TINTS.length];
+}
 
 /**
  * Columnas de un tablero, reordenables arrastrando.
@@ -57,7 +81,9 @@ const COLUMN_TINTS = [colors.primary, colors.accent, colors.info, colors.success
 export function BoardColumns({
   board,
   projectId,
-  canManage,
+  canCreateColumn,
+  canEditColumn,
+  canDeleteColumn,
   tasks,
   members,
   labels,
@@ -72,6 +98,15 @@ export function BoardColumns({
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [, reorderAction] = useActionState(reorderColumnsAction, COLUMN_INITIAL_STATE);
+
+  /**
+   * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
+   *
+   * Dentro de un ancestro `draggable` el navegador no deja seleccionar texto con
+   * el ratón: sin esto, el campo de renombrar no se podía ni marcar para
+   * corregir una letra.
+   */
+  const [menuOpenColumnId, setMenuOpenColumnId] = useState<string | null>(null);
 
   /** Tarea en vuelo. Mientras haya una, el arrastre de columnas se desactiva. */
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
@@ -222,8 +257,10 @@ export function BoardColumns({
             <div
               key={column.id}
               /* Mientras viaja una tarea la columna no se arrastra: si no, coger
-                 una tarjeta acabaría moviendo la columna entera. */
-              draggable={canManage && !draggingTaskId}
+                 una tarjeta acabaría moviendo la columna entera. Con el menú
+                 abierto tampoco: dentro de un ancestro arrastrable no se puede
+                 seleccionar texto, y el campo de renombrar está ahí dentro. */
+              draggable={canCreateColumn && !draggingTaskId && menuOpenColumnId !== column.id}
               onDragStart={(event) => {
                 /**
                  * El estado se marca **primero**. `dataTransfer` es opcional
@@ -262,7 +299,7 @@ export function BoardColumns({
                 /* La transición va sobre transform y sombra, no sobre layout:
                    animar posiciones aquí pelearía con el reordenado en vivo. */
                 'transition-[transform,box-shadow,opacity] duration-200 ease-out',
-                canManage ? 'cursor-grab active:cursor-grabbing' : '',
+                canCreateColumn ? 'cursor-grab active:cursor-grabbing' : '',
                 isDragging ? 'scale-[1.03] opacity-90' : 'scale-100',
               ]
                 .filter(Boolean)
@@ -279,7 +316,7 @@ export function BoardColumns({
                 <span className="flex min-w-0 items-center gap-2">
                   <span
                     className="h-2 w-2 shrink-0 rounded-full transition-colors"
-                    style={{ background: COLUMN_TINTS[index % COLUMN_TINTS.length] }}
+                    style={{ background: tintOf(column.color, index) }}
                   />
                   <h5 className="truncate font-sans text-sm font-semibold text-text-primary">
                     {column.name}
@@ -290,7 +327,7 @@ export function BoardColumns({
                   {/* Reordenar sin arrastrar: el arrastre no llega al teclado ni
                       a un lector de pantalla, así que no puede ser la única
                       forma de mover una columna. */}
-                  {canManage && columns.length > 1 && (
+                  {canCreateColumn && columns.length > 1 && (
                     <>
                       <NudgeButton
                         direction={-1}
@@ -312,14 +349,19 @@ export function BoardColumns({
                   >
                     {tasksByColumn.get(column.id)?.length ?? 0}
                   </span>
-                  {canManage && (
-                    <DeleteColumn
-                      boardId={board.id}
-                      columnId={column.id}
-                      columnName={column.name}
-                      projectId={projectId}
-                    />
-                  )}
+                  <ColumnMenu
+                    boardId={board.id}
+                    projectId={projectId}
+                    columnId={column.id}
+                    columnName={column.name}
+                    columnColor={column.color}
+                    taskCount={tasksByColumn.get(column.id)?.length ?? 0}
+                    canEdit={canEditColumn}
+                    canDelete={canDeleteColumn}
+                    onOpenChange={(isOpen) =>
+                      setMenuOpenColumnId(isOpen ? column.id : null)
+                    }
+                  />
                 </span>
               </header>
 
@@ -345,7 +387,7 @@ export function BoardColumns({
           );
         })}
 
-        {canManage && (
+        {canCreateColumn && (
           <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
         )}
       </div>
@@ -390,45 +432,5 @@ function NudgeButton({
         />
       </svg>
     </button>
-  );
-}
-
-function DeleteColumn({
-  boardId,
-  columnId,
-  columnName,
-  projectId,
-}: {
-  boardId: string;
-  columnId: string;
-  columnName: string;
-  projectId: string;
-}) {
-  const [state, formAction, pending] = useActionState(deleteColumnAction, COLUMN_INITIAL_STATE);
-
-  return (
-    <form action={formAction}>
-      <input type="hidden" name="boardId" value={boardId} />
-      <input type="hidden" name="columnId" value={columnId} />
-      <input type="hidden" name="projectId" value={projectId} />
-      <button
-        type="submit"
-        disabled={pending}
-        aria-label={`Eliminar la columna ${columnName}`}
-        title={state.error ?? `Eliminar «${columnName}»`}
-        className="cursor-pointer rounded p-1 text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <svg
-          className="h-3.5 w-3.5"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-          aria-hidden="true"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </form>
   );
 }

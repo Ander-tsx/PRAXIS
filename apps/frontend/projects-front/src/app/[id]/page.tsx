@@ -189,6 +189,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             workspaces={project.workspaces}
             activeWorkspace={activeWorkspace}
             canManage={can.canCreateBoard}
+            /* Las columnas tienen sus propios permisos, y hasta ahora todo
+               colgaba de `canCreateBoard`: quien podía crear columnas pero no
+               tableros no veía el botón. `canEditColumn` además estrena uso: no
+               lo pedía ningún endpoint hasta el `PATCH` de esta sesión. */
+            canCreateColumn={can.canCreateColumn}
+            canEditColumn={can.canEditColumn}
+            canDeleteColumn={can.canDeleteColumn}
             tasksByBoard={tasksByBoard}
             members={assignableMembers}
             labels={labels}

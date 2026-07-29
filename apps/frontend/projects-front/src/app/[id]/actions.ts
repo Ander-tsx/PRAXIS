@@ -29,6 +29,7 @@ import {
   validateBoard,
   validateChecklistItem,
   validateColumn,
+  validateColumnColor,
   normalizeMultiline,
   validateAttachment,
   validateComment,
@@ -377,6 +378,73 @@ export async function createColumnAction(
 
   revalidateProject(projectId);
   return { error: null, savedName: name };
+}
+
+/**
+ * Renombra una columna o le cambia el color.
+ *
+ * Exige `canEditColumn`, que hasta ahora no lo usaba ningún endpoint. Se manda
+ * **solo el campo que cambia**: mandar los dos siempre obligaría al backend a
+ * disparar la cascada del `status` en cada cambio de color, y esa cascada es una
+ * llamada a otro microservicio.
+ *
+ * ⚠️ Renombrar arrastra el `status` de las tareas de la columna, porque ese
+ * campo guarda el nombre y no el id. Lo hace el gateway; aquí solo hay que saber
+ * que un renombrado toca más filas de las que parece.
+ */
+export async function updateColumnAction(
+  _prev: ColumnState,
+  formData: FormData,
+): Promise<ColumnState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const boardId = String(formData.get('boardId') ?? '');
+  const columnId = String(formData.get('columnId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  /* Ausente, no vacío: el campo que no se toca no viaja, y una cadena vacía
+     sería un nombre inválido en vez de «no lo cambies». */
+  const rawName = formData.get('name');
+  const rawColor = formData.get('color');
+
+  const name = rawName === null ? null : String(rawName).trim();
+  const color = rawColor === null ? null : String(rawColor);
+
+  if (name === null && color === null) {
+    return { error: 'No hay nada que cambiar.', savedName: null };
+  }
+
+  if (name !== null) {
+    const invalid = validateColumn(name);
+    if (invalid) return { error: invalid, savedName: null };
+  }
+  if (color !== null) {
+    const invalid = validateColumnColor(color);
+    if (invalid) return { error: invalid, savedName: null };
+  }
+
+  try {
+    const saved = await api.patch<Column>(`/boards/${boardId}/columns/${columnId}`, {
+      ...(name !== null && { name }),
+      ...(color !== null && { color }),
+    });
+
+    // Confirmación contra el `data`, no contra el status.
+    if (!saved?.id) {
+      return { error: 'El servidor no guardó la columna.', savedName: null };
+    }
+    if (name !== null && saved.name !== name) {
+      return { error: 'El servidor no guardó el nombre nuevo.', savedName: null };
+    }
+    if (color !== null && saved.color !== color) {
+      return { error: 'El servidor no guardó el color.', savedName: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo cambiar la columna.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: name ?? 'recoloreada' };
 }
 
 export async function deleteColumnAction(

@@ -17,6 +17,12 @@ export interface WorkspaceCanvasProps {
   /** Espacio abierto, resuelto en la page desde `?ws=`. */
   activeWorkspace: Workspace | null;
   canManage: boolean;
+  /** Crear y reordenar columnas: `canCreateColumn`. */
+  canCreateColumn: boolean;
+  /** Renombrar y recolorear columnas: `canEditColumn`. */
+  canEditColumn: boolean;
+  /** Eliminar una columna con sus tareas: `canDeleteColumn`. */
+  canDeleteColumn: boolean;
   /** Tareas del espacio abierto, agrupadas por tablero. */
   tasksByBoard: Map<string, Task[]>;
   members: UserProfile[];
@@ -45,6 +51,9 @@ export function WorkspaceCanvas({
   workspaces,
   activeWorkspace,
   canManage,
+  canCreateColumn,
+  canEditColumn,
+  canDeleteColumn,
   tasksByBoard,
   members,
   labels,
@@ -119,7 +128,9 @@ export function WorkspaceCanvas({
               key={board.id}
               board={board}
               projectId={projectId}
-              canManage={canManage}
+              canCreateColumn={canCreateColumn}
+              canEditColumn={canEditColumn}
+              canDeleteColumn={canDeleteColumn}
               tasks={tasksByBoard.get(board.id) ?? []}
               members={members}
               labels={labels}
