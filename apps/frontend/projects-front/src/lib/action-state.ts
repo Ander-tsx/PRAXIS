@@ -41,3 +41,10 @@ export interface WorkspaceState {
 }
 
 export const WORKSPACE_INITIAL_STATE: WorkspaceState = { error: null, savedName: null };
+
+export interface BoardState {
+  error: string | null;
+  savedName: string | null;
+}
+
+export const BOARD_INITIAL_STATE: BoardState = { error: null, savedName: null };

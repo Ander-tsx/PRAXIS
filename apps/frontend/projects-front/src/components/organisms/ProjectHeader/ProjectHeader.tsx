@@ -5,6 +5,7 @@ export interface ProjectHeaderProps {
   project: ProjectDetail;
   isOwner: boolean;
   memberCount: number;
+  boardCount: number;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -13,7 +14,12 @@ const dateFormatter = new Intl.DateTimeFormat('es-MX', {
   year: 'numeric',
 });
 
-export function ProjectHeader({ project, isOwner, memberCount }: ProjectHeaderProps) {
+export function ProjectHeader({
+  project,
+  isOwner,
+  memberCount,
+  boardCount,
+}: ProjectHeaderProps) {
   return (
     <header className="flex flex-col gap-4">
       {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
@@ -37,11 +43,11 @@ export function ProjectHeader({ project, isOwner, memberCount }: ProjectHeaderPr
         <p className="font-serif text-lg italic text-text-disabled">Sin descripción</p>
       )}
 
+      {/* Los contadores de espacios, equipo y roles los llevan las pestañas;
+          aquí solo va lo que no aparece allí. */}
       <p className="font-sans text-sm text-text-disabled">
-        Creado el {dateFormatter.format(new Date(project.createdAt))} ·{' '}
-        {project.workspaces.length}{' '}
-        {project.workspaces.length === 1 ? 'espacio' : 'espacios'} · {project.roles.length}{' '}
-        {project.roles.length === 1 ? 'rol' : 'roles'} · {memberCount}{' '}
+        Creado el {dateFormatter.format(new Date(project.createdAt))} · {boardCount}{' '}
+        {boardCount === 1 ? 'tablero' : 'tableros'} · {memberCount}{' '}
         {memberCount === 1 ? 'persona' : 'personas'}
       </p>
     </header>

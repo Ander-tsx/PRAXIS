@@ -2,6 +2,7 @@
 
 import {
   ApiError,
+  type Board,
   type PermissionMap,
   type ProjectMember,
   type ProjectRole,
@@ -9,8 +10,8 @@ import {
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
-import type { MemberState, RoleState, WorkspaceState } from '@/lib/action-state';
-import { validateRole, validateWorkspace } from '@/lib/validation';
+import type { BoardState, MemberState, RoleState, WorkspaceState } from '@/lib/action-state';
+import { validateBoard, validateRole, validateWorkspace } from '@/lib/validation';
 
 /**
  * Acciones del detalle de proyecto.
@@ -201,6 +202,39 @@ export async function createWorkspaceAction(
     }
   } catch (error) {
     return { error: describe(error, 'No se pudo crear el espacio.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: name };
+}
+
+/**
+ * Crea un tablero dentro de un espacio.
+ *
+ * El `projectId` viaja aparte solo para revalidar: el endpoint cuelga del
+ * espacio (`POST /workspaces/:workspaceId/boards`) y no lo necesita.
+ */
+export async function createBoardAction(
+  _prev: BoardState,
+  formData: FormData,
+): Promise<BoardState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const workspaceId = String(formData.get('workspaceId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+
+  const invalid = validateBoard(name);
+  if (invalid) return { error: invalid, savedName: null };
+
+  try {
+    const created = await api.post<Board>(`/workspaces/${workspaceId}/boards`, { name });
+    if (!created?.id || created.name !== name) {
+      return { error: 'El servidor no guardó el tablero.', savedName: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear el tablero.'), savedName: null };
   }
 
   revalidateProject(projectId);

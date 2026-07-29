@@ -6,7 +6,16 @@ import { createWorkspaceAction } from '@/app/[id]/actions';
 import { WORKSPACE_INITIAL_STATE } from '@/lib/action-state';
 import { WORKSPACE_NAME_MAX, validateWorkspace } from '@/lib/validation';
 
-export function CreateWorkspaceDialog({ projectId }: { projectId: string }) {
+export interface CreateWorkspaceDialogProps {
+  projectId: string;
+  /** `lg` cuando es la acción principal del lienzo vacío. */
+  triggerSize?: 'md' | 'lg';
+}
+
+export function CreateWorkspaceDialog({
+  projectId,
+  triggerSize = 'md',
+}: CreateWorkspaceDialogProps) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(
     createWorkspaceAction,
@@ -29,7 +38,7 @@ export function CreateWorkspaceDialog({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
+      <Button variant="secondary" size={triggerSize} onClick={() => setOpen(true)}>
         Nuevo espacio
       </Button>
 

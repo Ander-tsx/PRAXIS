@@ -101,3 +101,17 @@ export function validateWorkspace(name: string): string | null {
   }
   return null;
 }
+
+export const BOARD_NAME_MIN = 2;
+export const BOARD_NAME_MAX = 100;
+
+export function validateBoard(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length < BOARD_NAME_MIN) {
+    return `El nombre debe tener al menos ${BOARD_NAME_MIN} caracteres.`;
+  }
+  if (trimmed.length > BOARD_NAME_MAX) {
+    return `El nombre no puede superar ${BOARD_NAME_MAX} caracteres.`;
+  }
+  return null;
+}

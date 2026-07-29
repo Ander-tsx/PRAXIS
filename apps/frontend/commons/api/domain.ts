@@ -101,12 +101,29 @@ export interface ProjectMember {
   projectRole: ProjectRole;
 }
 
+export interface Column {
+  id: string;
+  name: string;
+  order: number;
+  boardId: string;
+}
+
+export interface Board {
+  id: string;
+  name: string;
+  workspaceId: string;
+  createdAt: string;
+  columns: Column[];
+}
+
 export interface Workspace {
   id: string;
   name: string;
   projectId: string;
   createdAt: string;
   updatedAt: string;
+  /** `GET /projects/:id` los trae embebidos, con sus columnas. */
+  boards: Board[];
 }
 
 /** `GET /api/projects/:id` — trae espacios y roles embebidos. */
