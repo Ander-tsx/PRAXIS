@@ -35,7 +35,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 
 | # | Severidad | Qué | Verificado |
 |---|---|---|---|
-| 5 | 🟠 | Faltan `GET /users/me` y «mis tareas» (lo demás de este punto ya está) | código |
+| 5 | 🟡 | Falta `GET /users/me`. «Mis tareas» ya está (`GET /me/tasks`) | código |
 | 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
 | 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
 | 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
@@ -191,7 +191,7 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 | `GET /api/projects/:id/roles` | ➖ innecesario: vienen embebidos en el detalle |
 | `GET /api/boards/:id/columns` | ➖ ídem |
 | `GET /api/users/me` | ❌ **falta** |
-| `GET /api/tasks?assigneeId=…` (mis tareas) | ❌ **falta**, y es la que más duele |
+| `GET /api/me/tasks` (mis tareas) | ✅ `PENDIENTE` — no como `?assigneeId=`, ver abajo |
 
 - ✅ **Permisos efectivos: resuelto** en `477616f`. Nueva ruta
   `GET /projects/:projectId/permissions/me`, que devuelve el mapa completo ya
@@ -200,9 +200,16 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 
   (`POST /api/permissions/check` no servía: solo verifica **roles globales**.)
 
-- ❌ Sin **mis tareas**, el panel no puede mostrar en qué está trabajando cada
-  persona sin una cascada de peticiones por cada tablero de cada proyecto. Es la
-  pieza que falta para que el panel sea realmente útil, y **sigue abierta**.
+- ✅ **Mis tareas: resuelto** en `PENDIENTE`, pero como **`GET /me/tasks`** y no
+  como `GET /tasks?assigneeId=…`. Con el id de encargado como parámetro,
+  cualquiera consultaría las tareas de cualquiera y habría que inventar un
+  permiso para cerrarlo; derivándolo del token no hay nada que cerrar. Cuelga de
+  `/me` como las invitaciones y por el mismo motivo: no hay ningún proyecto en la
+  ruta contra el que comprobar permisos, porque la respuesta cruza todos.
+
+  Acota siempre a los proyectos donde la persona **sigue estando**: salir de un
+  proyecto no borra las filas de `TaskAssignee`, así que sin ese filtro seguiría
+  viendo tareas de un sitio del que ya salió.
 
 - ❌ `GET /users/me` **sigue faltando**: cada pantalla privada saca el `sub` del
   JWT y pide `/users/:id` aparte. Funciona, pero es una petición de más en cada

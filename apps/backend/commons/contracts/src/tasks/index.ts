@@ -2,6 +2,7 @@ export * from './priority.enum';
 export * from './create-task.dto';
 export * from './find-tasks.dto';
 export * from './find-one-task.dto';
+export * from './find-my-tasks.dto';
 export * from './update-task.dto';
 export * from './move-task.dto';
 export * from './delete-task.dto';

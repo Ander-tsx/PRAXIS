@@ -7,6 +7,7 @@ import {
   CreateTaskDto,
   DeleteChecklistDto,
   DeleteTaskDto,
+  FindMyTasksDto,
   FindOneTaskDto,
   FindTasksDto,
   MoveTaskDto,
@@ -36,6 +37,12 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_find_one' })
   findOne(@Payload() dto: FindOneTaskDto) {
     return this.tasksService.findOneTask(dto);
+  }
+
+  /** Tareas asignadas a una persona, para el panel. */
+  @MessagePattern({ cmd: 'task_find_mine' })
+  findMine(@Payload() dto: FindMyTasksDto) {
+    return this.tasksService.findMyTasks(dto);
   }
 
   @MessagePattern({ cmd: 'task_update' })

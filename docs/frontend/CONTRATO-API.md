@@ -330,6 +330,39 @@ la interfaz no tiene que saber de dónde salió cada tarea.
 
 ---
 
+## Mis tareas 🔒
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/me/tasks?dueBefore&status&priority&projectId&limit` | — (solo las tuyas) |
+
+Devuelve `{ items, total }` con la misma forma de `Task` que las demás rutas.
+
+**No existe `GET /tasks?assigneeId=`**, que era como lo pedía PENDIENTES §5:
+con el id como parámetro cualquiera consultaría las tareas de cualquiera. El
+usuario sale del token.
+
+| Parámetro | Qué hace |
+|---|---|
+| `dueBefore` | ISO 8601. Solo con fecha límite **anterior**. Las tareas **sin fecha quedan fuera** |
+| `status` | Nombre de la columna. Para dejar fuera lo terminado |
+| `priority` | `LOW` · `MEDIUM` · `HIGH` · `URGENT` |
+| `projectId` | Acota a un proyecto |
+| `limit` | Por defecto 50, máximo 100 |
+
+Orden: lo que vence antes primero, y a igualdad de fecha lo más urgente.
+
+**Para los avisos del panel, una sola petición basta.** Pide
+`?dueBefore=<hoy+7d>` y separa en cliente comparando con ahora: lo anterior es
+**vencido** y lo posterior **vence pronto**. Son dos avisos distintos y no se
+mezclan en un contador único.
+
+⚠️ Solo trae tareas de proyectos donde **sigues estando**. Salir de un proyecto
+no borra tus asignaciones —las filas siguen en la base—, pero dejan de salir
+aquí. Verificado: tras salir, 6 filas de asignación vivas y `items: []`.
+
+---
+
 ## Checklists 🔒
 
 | Método | Ruta | Body | Permiso |

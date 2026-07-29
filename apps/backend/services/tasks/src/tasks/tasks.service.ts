@@ -13,6 +13,7 @@ import {
   CreateTaskDto,
   DeleteChecklistDto,
   DeleteTaskDto,
+  FindMyTasksDto,
   FindOneTaskDto,
   FindTasksDto,
   MoveTaskDto,
@@ -231,6 +232,49 @@ export class TasksService {
     const result = { items, total };
     await this.redis.set(cacheKey, result, BOARD_TASKS_TTL);
     return result;
+  }
+
+  /**
+   * Tareas asignadas a una persona, dentro de los proyectos donde sigue estando.
+   *
+   * No se cachea: cambia con cada movimiento de cualquier tarea de cualquiera de
+   * sus proyectos, y la clave tendría que depender de la query entera. El
+   * índice `(projectId, dueDate)` y el de `TaskAssignee.userId` la hacen barata.
+   */
+  async findMyTasks(dto: FindMyTasksDto) {
+    // Sin proyectos visibles no hay nada que buscar, y un `in: []` traería 0
+    // igual pero pagando la consulta.
+    if (dto.projectIds.length === 0) return { items: [], total: 0 };
+
+    const projectIds = dto.projectId
+      ? dto.projectIds.filter((id) => id === dto.projectId)
+      : dto.projectIds;
+    if (projectIds.length === 0) return { items: [], total: 0 };
+
+    const where: Prisma.TaskWhereInput = {
+      projectId: { in: projectIds },
+      assignees: { some: { userId: dto.userId } },
+      ...(dto.status   !== undefined && { status: dto.status }),
+      ...(dto.priority !== undefined && { priority: dto.priority }),
+      // `not: null` explícito: sin él, las tareas sin fecha entrarían en un
+      // filtro que pregunta justamente por vencimiento.
+      ...(dto.dueBefore !== undefined && {
+        dueDate: { not: null, lt: new Date(dto.dueBefore) },
+      }),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        take: dto.limit ?? 50,
+        // Lo que vence antes primero, y a igualdad la más urgente.
+        orderBy: [{ dueDate: 'asc' }, { priority: 'desc' }, { createdAt: 'asc' }],
+        include: TASK_INCLUDE,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return { items, total };
   }
 
   async findOneTask(dto: FindOneTaskDto) {
