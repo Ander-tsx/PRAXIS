@@ -14,11 +14,10 @@ import { validateProfile } from '@/lib/validation';
  *
  * 1. **Entra en snake_case y sale en camelCase.** `PATCH /users/:id` acepta
  *    `first_name` / `last_name` y devuelve `firstName` / `lastName`.
- * 2. **No valida nada.** El `@Body()` está tipado con `Omit<UpdateUserDto,'id'>`,
- *    un tipo de TypeScript que en runtime no existe, así que el ValidationPipe
- *    se desentiende: mandar `firstName` en camelCase devuelve **200 sin haber
- *    guardado nada**. Por eso abajo se confirma contra el `data` y no contra el
- *    status. Ver PENDIENTES-BACKEND.md §2 y §10.
+ * 2. **Ahora sí valida**: mandar `firstName` en camelCase devuelve 400 con el
+ *    mensaje del campo. Antes devolvía 200 sin guardar nada, y de ahí viene la
+ *    costumbre de confirmar contra el `data` y no contra el status, que se
+ *    mantiene porque sigue siendo lo correcto. Ver PENDIENTES-BACKEND.md §10.
  *
  * Se manda el `:id` de la sesión, nunca uno que venga del formulario.
  */

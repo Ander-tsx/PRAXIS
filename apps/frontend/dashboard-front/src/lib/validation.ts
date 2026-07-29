@@ -1,13 +1,9 @@
 /**
  * Validación de proyecto, compartida por el formulario y la Server Action.
  *
- * Se valida en los dos sitios a propósito: el gateway **no valida** este
- * endpoint (`@Body() body: Omit<CreateProjectDto, 'ownerId'>` es un tipo de
- * TypeScript, que en runtime no existe), así que un `name` de un carácter se
- * guarda tal cual con un 201. Ver PENDIENTES-BACKEND.md §2.
- *
- * Los límites replican los de `CreateProjectDto` para que, el día que el
- * backend empiece a validar de verdad, no cambie nada.
+ * El gateway ya valida, pero seguimos validando aquí: el mensaje llega antes,
+ * sin ida y vuelta, y marca el campo concreto. Los límites replican los del DTO
+ * para que no digan cosas distintas.
  */
 
 export const PROJECT_NAME_MIN = 2;

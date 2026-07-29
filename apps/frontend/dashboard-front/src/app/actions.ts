@@ -16,8 +16,9 @@ import { validateProject } from '@/lib/validation';
  *    del spread del body (`{ ...body, ownerId }`), así que mandarlo no serviría
  *    de nada — y el DTO no lo declara para esta ruta. Regla de compatibilidad
  *    hacia adelante: solo los campos que el DTO declara, ni uno más.
- * 2. **Se confirma contra el `data`, no contra el status.** Un 2xx no garantiza
- *    que se haya guardado lo que mandamos (PENDIENTES-BACKEND.md §2).
+ * 2. **Se confirma contra el `data`, no contra el status.** El hábito viene de
+ *    cuando el gateway no validaba y devolvía 200 sin guardar; sigue siendo lo
+ *    correcto, porque un 2xx no promete que se guardara lo que mandamos.
  * 3. **Se comprueba la sesión aquí también.** Las Server Functions viajan como
  *    POST a la ruta donde se usan, y un cambio de `matcher` en `proxy.ts` puede
  *    dejarlas fuera del guard sin que nadie se entere.

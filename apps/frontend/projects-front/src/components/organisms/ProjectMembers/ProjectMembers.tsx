@@ -39,9 +39,9 @@ const dateFormatter = new Intl.DateTimeFormat('es-MX', {
 /**
  * Equipo del proyecto.
  *
- * ⚠️ Se llama **"añadir"** y no "invitar" a propósito: el backend no tiene
- * invitaciones. Quien añades entra directamente, sin aceptar nada y sin
- * enterarse hasta que abre el proyecto. Ver PENDIENTES-BACKEND §12.
+ * Las invitaciones son de verdad desde `a88e804`: se envían, quedan pendientes
+ * y la persona entra al aceptarlas. Lo único que sigue faltando es el aviso —no
+ * hay correo ni notificaciones—, así que se entera al abrir su panel.
  */
 export function ProjectMembers({
   projectId,

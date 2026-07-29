@@ -44,17 +44,20 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 
 1. Toda respuesta viene envuelta en `{ success, data, meta }`. Los errores en `{ success: false, error: { code, message, details } }`.
 2. `login`/`register` devuelven `{ userId, accessToken, refreshToken }` en camelCase — **no** `access_token`.
-3. ⚠️ **La validación del gateway casi nunca se aplica.** Solo validan los 6 endpoints cuyo `@Body()` declara una clase DTO (`/auth/login`, `/auth/register`, los 3 de `/permissions`, `GET /users`). Los otros 22 usan `@Body() body: Omit<XDto, ...>`, que en runtime es `Object`: el `ValidationPipe` se desentiende y **no valida nada**. Verificado: `POST /projects` con un campo inventado devuelve 201, y `PATCH /users/:id` con el casing equivocado devuelve **200 sin cambiar nada**. Consecuencia: valida en el frontend y **confirma contra el `data` de la respuesta, no contra el status**.
+3. ✅ **La validación del gateway ya se aplica en los 28 endpoints** (`94721d8`, `477616f`, `2bad47c`). Antes 22 de ellos tipaban el `@Body()` con `Omit<XDto,...>`, que en runtime es `Object`, y devolvían **200 sin guardar nada**. Aun así seguimos validando en el cliente —el mensaje llega antes y marca el campo— y **confirmando contra el `data` de la respuesta, no contra el status**.
 4. Toda mutación de tarea o checklist necesita `projectId` en el body o el guard responde 403.
-5. `GET /api/projects` y `GET /api/users` esperan filtros por **body en un GET** → inalcanzable desde `fetch`.
-6. `GET /api/projects` no filtra por usuario: devuelve todos los proyectos del sistema.
-7. Un proyecto nuevo no tiene roles ni miembros. Hay que crear un `ProjectRole` antes de invitar a nadie.
+5. ✅ `GET /api/projects` y `GET /api/users` aceptan **query params** (`page`, `limit`, `search`).
+6. ✅ `GET /api/projects` filtra por **dueño o miembro**.
+7. ✅ Un proyecto nuevo nace con rol "Administrador" y con el dueño dentro.
+8. ⚠️ `permissions` de un rol es un **diccionario de booleanos**, nunca un array. El backend lo valida; los roles creados antes del validador siguen guardados como array y se normalizan al leer.
+9. ⚠️ `Project.name` es único a nivel **global**, no por usuario. Un nombre puede chocar con el proyecto de un equipo que no conoces.
 
-**Regla de compatibilidad hacia adelante.** Como hoy el gateway apenas valida (trampa #3), es fácil escribir código que funciona ahora y se rompe cuando lo arreglen. Para evitarlo:
+**Reglas al escribir un fetch:**
 
-- Envía **solo los campos que el DTO declara**, ni uno más. Hoy sobrarían sin consecuencia; mañana darían 400.
-- **Valida siempre en el cliente**, sin delegar en el servidor.
+- Envía **solo los campos que el DTO declara**, ni uno más: uno de sobra ya da 400.
+- **Valida en el cliente** igualmente: el mensaje llega antes y señala el campo.
 - **Confirma el resultado contra el `data` de la respuesta, no contra el status.**
+- Para saber qué puede hacer el usuario, pide `GET /projects/:id/permissions/me` en vez de intentar la acción y reaccionar al 403.
 
 Lista completa de lo que falta por el lado del backend, con severidad y reproducción, en [PENDIENTES-BACKEND.md](docs/frontend/PENDIENTES-BACKEND.md).
 

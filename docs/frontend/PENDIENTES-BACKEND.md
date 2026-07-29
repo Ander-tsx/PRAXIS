@@ -6,7 +6,11 @@
 > Cada punto indica si está **verificado en runtime** (reproducido contra el
 > stack levantado) o **leído en el código**.
 >
-> Última revisión: 2026-07-28 · gateway en `localhost:3000`
+> Última revisión: 2026-07-29 · gateway en `localhost:3000`
+>
+> **Estado: 9 de 13 resueltos.** El equipo de frontend recibió autorización para
+> tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
+> commit y cómo se verificó. Lo que queda abierto está al principio.
 
 ---
 
@@ -27,28 +31,46 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 
 ## Resumen
 
+### Abiertos
+
 | # | Severidad | Qué | Verificado |
 |---|---|---|---|
-| 1 | 🔴 | Cualquiera puede editar o borrar la cuenta de otro | runtime |
-| 2 | 🔴 | El `ValidationPipe` no se aplica en 22 de 28 endpoints | runtime |
-| 11 | 🔴 | Un rol mal formado se crea con 201 y no concede nada | runtime |
-| 3 | 🟠 | `GET /projects` devuelve todos los del sistema | código |
-| 4 | 🟠 | Filtros por body en peticiones GET | código |
-| 5 | 🟠 | Faltan endpoints de lectura (incl. permisos efectivos) | código |
-| 12 | 🟠 | No existe ningún flujo de invitación | código |
-| 13 | 🟠 | Sin permiso de lectura: no hay rol observador | runtime |
-| 6 | 🟡 | Nombre de proyecto duplicado → 500 | runtime |
-| 7 | 🟡 | Un proyecto nace sin roles ni miembros | código |
-| 8 | 🟡 | Permisos con nombres que no corresponden | código |
-| 9 | 🟡 | Rutas de tarea `:id` vs guard `taskId` | código |
-| 10 | 🔵 | Inconsistencias de contrato | runtime |
+| 5 | 🟠 | Faltan `GET /users/me` y «mis tareas» (lo demás de este punto ya está) | código |
+| 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
+| 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
+| 9 | 🟡 | Rutas de tarea usan `:id` y el guard busca `taskId` | código |
+| 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
 
-**Si solo se arreglan tres:** el 1 (seguridad), el 11 (roles que mienten) y el 5
-exponiendo los permisos efectivos, que desbloquea toda la interfaz de permisos.
+### Resueltos
+
+| # | Severidad | Qué | Commit |
+|---|---|---|---|
+| 1 | 🔴 | Cualquiera podía editar o borrar la cuenta de otro | `94721d8` |
+| 2 | 🔴 | El `ValidationPipe` no se aplicaba en 22 de 28 endpoints | `94721d8` `477616f` `2bad47c` |
+| 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
+| 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
+| 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
+| 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
+| 13 | 🟠 | Sin permiso de lectura: no había rol observador | `477616f` |
+| 7 | 🟡 | Un proyecto nacía sin roles ni miembros | `477616f` |
+| — | 🟡 | Nombre duplicado devolvía 500 (proyectos y espacios) | `477616f` `fb4a758` |
+
+**Lo que más pesa de lo que queda:** el punto 6, porque es una decisión de
+diseño del modelo y no un arreglo; y el 9, que hoy funciona por casualidad.
 
 ---
 
-## 🔴 1. Cualquier usuario puede editar o eliminar la cuenta de otro
+## ✅ 1. ~~Cualquier usuario puede editar o eliminar la cuenta de otro~~
+
+> **Resuelto** en `94721d8`. `AccountOwnerGuard` deja pasar solo al dueño de la
+> cuenta o a un administrador global. La segunda vía también: el payload se
+> compone como `{ ...body, id }`, con el id de la ruta al final, así que un `id`
+> colado en el cuerpo ya no lo pisa —ahora ni siquiera llega, porque el DTO no
+> lo declara y el pipe responde 400.
+>
+> Verificado: miembro sobre cuenta ajena → 403 en `PATCH` y en `DELETE`; `id`
+> ajeno en el cuerpo → 400.
+
 
 **Verificado en runtime.** `PATCH` y `DELETE /api/users/:id` solo llevan
 `JwtGuard`. No comprueban que el `:id` coincida con el del token ni exigen rol
@@ -75,7 +97,17 @@ en este endpoint. No la publiquemos con esto abierto.
 
 ---
 
-## 🔴 2. El `ValidationPipe` no se aplica en 22 de los 28 endpoints
+## ✅ 2. ~~El `ValidationPipe` no se aplica en 22 de los 28 endpoints~~
+
+> **Resuelto** en `94721d8`, `477616f` y `2bad47c`. Todos los `@Body()` declaran
+> ahora una **clase** `*BodyDto` real en vez de `Omit<XDto, ...>`. El patrón
+> quedó: el DTO base es lo que manda el cliente, y el DTO completo lo extiende
+> añadiendo lo que inyecta el gateway (`requesterId`, ids de ruta).
+>
+> Verificado: `PATCH /users/:id` con `{"firstName":"X"}` → 400 "property
+> firstName should not exist"; con `{"first_name":"A"}` → 400 "al menos 2
+> caracteres". Se acabó el 200 mentiroso.
+
 
 **Verificado en runtime.** Solo validan los que declaran una **clase** DTO en
 `@Body()`. Los demás usan `@Body() body: Omit<XDto, '...'>`, y un tipo de
@@ -106,7 +138,15 @@ casing equivocado responde éxito sin haber guardado nada.
 
 ---
 
-## 🟠 3. `GET /api/projects` devuelve todos los proyectos del sistema
+## ✅ 3. ~~`GET /api/projects` devuelve todos los proyectos del sistema~~
+
+> **Resuelto** en `477616f`. `FindProjectsDto` declara `userId` y el servicio
+> filtra por **dueño o miembro** (`OR` sobre `ownerId` y `members.some`), que era
+> lo que hacía falta y no solo corregir el nombre del campo.
+>
+> Verificado con 7 proyectos en el sistema: admin ve 2, y el otro usuario ve 2
+> incluida una donde solo es miembro.
+
 
 **Leído en el código.** El gateway envía `{ userId }`, pero `FindProjectsDto`
 solo declara `ownerId`. El servicio hace `if (dto.ownerId) where.ownerId = …`,
@@ -122,7 +162,15 @@ podemos mostrar todo a todos, que es justo lo contrario del modelo de permisos.
 
 ---
 
-## 🟠 4. `GET /projects` y `GET /users` reciben filtros por body
+## ✅ 4. ~~`GET /projects` y `GET /users` reciben filtros por body~~
+
+> **Resuelto** en `94721d8` y `477616f`. Los dos aceptan query params
+> (`page`, `limit`, `sortBy`, `sortOrder`, `search`). Las clases `*QueryDto` los
+> aplanan para la URL y los pliegan a la forma anidada que espera el
+> microservicio, que no cambió de contrato.
+>
+> Verificado: `?search=admin` → 1 resultado; `?limit=999` → 400 (máximo 100).
+
 
 **Leído en el código.** Ambos usan `@Body()` en un `GET`. `fetch` no puede
 enviar cuerpo en un GET, así que desde el navegador **no hay forma de paginar ni
@@ -135,45 +183,71 @@ de buscar**: siempre recibimos la página 1 con el límite por defecto.
 
 ## 🟠 5. Faltan endpoints de lectura
 
-| Falta | Hoy hay que… |
+| Endpoint | Estado |
 |---|---|
-| `GET /api/users/me` | Sacar el `sub` del JWT y pedir `/users/:id` aparte |
-| `GET /api/projects/:id/roles` | Leerlos embebidos en `GET /projects/:id` |
-| `GET /api/boards/:id/columns` | Idem |
-| Permisos efectivos del usuario en un proyecto | Deducirlos cruzando `roles` y `members`, o provocar 403 y reaccionar |
-| `GET /api/tasks?assigneeId=…` (mis tareas) | No hay forma. `GET /boards/:boardId/tasks` exige un board, así que habría que recorrer proyectos → espacios → tableros → tareas y filtrar en el cliente |
+| Permisos efectivos en un proyecto | ✅ `GET /projects/:id/permissions/me` (`477616f`) |
+| `GET /api/projects/:id/roles` | ➖ innecesario: vienen embebidos en el detalle |
+| `GET /api/boards/:id/columns` | ➖ ídem |
+| `GET /api/users/me` | ❌ **falta** |
+| `GET /api/tasks?assigneeId=…` (mis tareas) | ❌ **falta**, y es la que más duele |
 
-Los dos últimos son los que más duelen:
+- ✅ **Permisos efectivos: resuelto** en `477616f`. Nueva ruta
+  `GET /projects/:projectId/permissions/me`, que devuelve el mapa completo ya
+  expandido por jerarquía, con los denegados en `false`, más `isOwner`. La
+  lógica ya existía en el microservicio; solo faltaba exponerla.
 
-- Sin los **permisos efectivos**, la interfaz no sabe qué botones ocultar y solo
-  descubre que no tiene permiso cuando la acción ya falló.
+  (`POST /api/permissions/check` no servía: solo verifica **roles globales**.)
 
-  > Comprobado: `POST /api/permissions/check` **no** cubre esto. Solo verifica
-  > si un usuario tiene un **rol global** (`Admin` / `User`); no evalúa permisos
-  > de proyecto. La lógica que sí queremos existe en el microservicio
-  > (`project_check_permission`, con jerarquía implícita y caché) pero **no está
-  > expuesta en el gateway**. Exponerla sería un cambio pequeño y nos
-  > desbloquearía toda la interfaz de permisos.
-- Sin **mis tareas**, el dashboard no puede mostrar en qué está trabajando cada
-  persona sin hacer una cascada de peticiones por cada tablero de cada proyecto.
-  Es la pieza que falta para que el panel de inicio sea realmente útil.
+- ❌ Sin **mis tareas**, el panel no puede mostrar en qué está trabajando cada
+  persona sin una cascada de peticiones por cada tablero de cada proyecto. Es la
+  pieza que falta para que el panel sea realmente útil, y **sigue abierta**.
 
----
+- ❌ `GET /users/me` **sigue faltando**: cada pantalla privada saca el `sub` del
+  JWT y pide `/users/:id` aparte. Funciona, pero es una petición de más en cada
+  carga.
 
-## 🟡 6. Crear un proyecto con nombre duplicado devuelve 500
-
-**Verificado en runtime.** `Project.name` es `@unique` y el servicio no captura
-el error `P2002` de Prisma, así que sale como error no controlado.
-
-Debajo hay un problema de diseño: **el nombre es único a nivel global**, no por
-usuario ni por organización. Dos equipos distintos no pueden tener un proyecto
-llamado "Sprint 1".
-
-**Impacto:** no podemos decir "ese nombre ya existe"; solo "algo salió mal".
+Los dos de tablero (`/projects/:id/roles`, `/boards/:id/columns`) dejaron de
+molestar en la práctica: el detalle del proyecto trae el árbol entero embebido,
+así que la interfaz no los necesita.
 
 ---
 
-## 🟡 7. Un proyecto nuevo nace sin roles ni miembros
+## 🟡 6. El nombre de proyecto es único a nivel global
+
+> El 500 **está resuelto** en `477616f`: se captura el P2002 y sale un 409 con
+> mensaje. Lo mismo para los espacios de trabajo en `fb4a758`.
+>
+> **Sigue abierto el problema de diseño que había debajo**, que es lo que ahora
+> da nombre a este punto.
+
+**Leído en el código.** `Project.name` es `@unique` **sin más**: no por
+propietario, no por organización. Dos equipos que no se conocen no pueden tener
+cada uno un proyecto llamado "Sprint 1", y el segundo recibe un conflicto que no
+puede entender porque el proyecto que choca no es visible para él.
+
+**Impacto:** hoy la interfaz dice "ya existe un proyecto con ese nombre; los
+nombres son únicos en toda la plataforma, prueba con uno más específico". Es lo
+más honesto que se puede decir, y sigue siendo una mala experiencia.
+
+**Arreglo:** `@@unique([ownerId, name])`, o por organización cuando exista ese
+concepto. Es un cambio de esquema con migración, así que es **decisión vuestra**
+y no algo que vayamos a tocar por nuestra cuenta.
+
+> Nota: `Workspace` sí lo hace bien —`@@unique([projectId, name])`— y ahí la
+> unicidad por proyecto es justo lo que se quiere.
+
+---
+
+## ✅ 7. ~~Un proyecto nuevo nace sin roles ni miembros~~
+
+> **Resuelto** en `477616f`. `createProject` va en transacción y crea también un
+> rol "Administrador" con los doce permisos y un `ProjectMember` para el dueño.
+> Un proyecto recién creado ya es usable: se puede invitar a alguien sin pasos
+> intermedios.
+>
+> Verificado: proyecto nuevo → 1 rol, 1 miembro, y `POST members` responde 201
+> acto seguido.
+
 
 **Leído en el código.** `createProject` solo inserta la fila: no crea un rol por
 defecto ni añade al owner como `ProjectMember`. El owner tiene acceso porque el
@@ -198,18 +272,18 @@ backend define plantillas, habrá dos fuentes de verdad.
 
 **Leído en el código.**
 
-| Endpoint | Exige | Debería |
-|---|---|---|
-| `GET /projects/:id` (ver) | `canEditBoard` | un permiso de lectura |
-| `DELETE /projects/:id` | `canDeleteBoard` | `canDeleteProject` (no existe) |
-| `PATCH /boards/:id/columns/reorder` | `canCreateColumn` | `canEditColumn` |
+| Endpoint | Exige | Debería | Estado |
+|---|---|---|---|
+| `GET /projects/:id` (ver) | ~~`canEditBoard`~~ → `canViewProject` | — | ✅ `477616f` |
+| `DELETE /projects/:id` | `canDeleteBoard` | `canDeleteProject` (no existe) | ❌ abierto |
+| `PATCH /boards/:id/columns/reorder` | `canCreateColumn` | `canEditColumn` | ❌ abierto |
 
-`canEditColumn` aparece en el DTO de roles pero **no está en el enum
-`ProjectPermission`** ni lo usa ningún endpoint — aunque la jerarquía implícita
-sí lo menciona.
+`canEditColumn` ya **está en el enum** (`477616f`), pero sigue sin usarlo ningún
+endpoint: el `reorder` continúa pidiendo `canCreateColumn`, así que quien puede
+crear columnas puede reordenarlas aunque no debiera poder editarlas.
 
-> Que `GET /projects/:id` exija `canEditBoard` no es solo un nombre feo: hace
-> imposible un rol de solo lectura. Desarrollado en el punto 13.
+Y `canDeleteProject` sigue sin existir: borrar un proyecto entero exige
+`canDeleteBoard`, un permiso de otra cosa y de menor alcance.
 
 ---
 
@@ -219,17 +293,25 @@ sí lo menciona.
 `ProjectPermissionGuard` busca `params.taskId` para resolver el proyecto. No lo
 encuentra y cae al fallback `body.projectId`.
 
-**Consecuencia para nosotros:** toda mutación de tarea y de checklist **debe**
-incluir `projectId` en el body o responde `403 "Contexto de proyecto no
-encontrado"`. Funciona, pero es frágil: el día que alguien renombre el parámetro,
-cambia el contrato sin avisar.
+**Sigue abierto.** Consecuencia para nosotros: toda mutación de tarea y de
+checklist **debe** incluir `projectId` en el body o responde `403 "Contexto de
+proyecto no encontrado"`.
+
+Funciona por casualidad —el fallback salva el caso—, y es frágil de dos maneras:
+el día que alguien renombre el parámetro cambia el contrato sin avisar, y el
+`projectId` lo pone el cliente, que es justo quien no debería decidir sobre qué
+proyecto se aplica un permiso.
+
+Es lo primero con lo que va a chocar la pantalla de tareas.
 
 ---
 
 ## 🔵 10. Inconsistencias de contrato
 
 - `PATCH /users/:id` **acepta** `first_name` / `last_name` (snake_case) y
-  **devuelve** `firstName` / `lastName` (camelCase).
+  **devuelve** `firstName` / `lastName` (camelCase). Sigue así a propósito:
+  cambiarlo rompería a cualquiera que ya lo use, y ahora al menos el pipe avisa
+  con un 400 claro si te equivocas de casing.
 - `AuthResponseDto` en `@praxis/contracts` declara `access_token`, pero
   credentials-service emite `accessToken`. El DTO está muerto y desorienta.
 - `POST /auth/register` no acepta nombre ni apellido: crea el perfil vacío.
@@ -238,7 +320,19 @@ cambia el contrato sin avisar.
 
 ---
 
-## 🔴 11. Un rol de proyecto mal formado se crea con 201 y no concede nada
+## ✅ 11. ~~Un rol de proyecto mal formado se crea con 201 y no concede nada~~
+
+> **Resuelto** en `477616f` (entrada) y `9c03e87` (datos ya guardados).
+>
+> `IsPermissionMap` rechaza arrays, claves fuera del enum y valores no
+> booleanos. Y como los roles creados **antes** seguían en la base con un array,
+> `normalizePermissions` los convierte al leer: recuperan el significado que
+> tenían al crearlos, sin migración de datos.
+>
+> Verificado: array / clave inventada / valor no booleano → 400 con mensaje que
+> dice qué falla. Un rol legado `["canCreateBoard","canEditBoard"]` pasó de
+> conceder solo `canViewProject` a conceder los tres.
+
 
 **Verificado en runtime (2026-07-28).** Es la forma más peligrosa del punto 2:
 aquí no se ignora un campo, se crea un **rol entero que parece existir y está
@@ -280,7 +374,36 @@ contra el enum `ProjectPermission`, rechazando arrays y claves desconocidas.
 
 ---
 
-## 🟠 12. No existe ningún flujo de invitación
+## ✅ 12. ~~No existe ningún flujo de invitación~~
+
+> **Resuelto** en `a88e804`. Modelo `ProjectInvitation` con estados
+> `PENDING` / `ACCEPTED` / `REJECTED` / `CANCELLED`.
+>
+> La regla que lo define: **la membresía se crea al aceptar, no al invitar.**
+> Mientras está pendiente no hay `ProjectMember`, así que no hay permisos y el
+> proyecto no aparece en la lista de esa persona.
+>
+> ```
+> POST   /projects/:id/invitations      invitar (canManageMembers)
+> GET    /projects/:id/invitations      pendientes del proyecto
+> DELETE /projects/:id/invitations/:id  retirar una pendiente
+> GET    /me/invitations                las mías
+> POST   /me/invitations/:id/accept     aceptar y entrar
+> POST   /me/invitations/:id/reject     rechazar
+> DELETE /projects/:id/membership/me    salir del proyecto
+> ```
+>
+> Responder cuelga de `/me` y no del proyecto: `ProjectPermissionGuard` exigiría
+> permisos sobre un proyecto en el que aún no estás, que es justo la situación de
+> una invitación pendiente.
+>
+> Verificado: invitar → 0 miembros y no ve el proyecto; aceptar → 1 miembro y ya
+> lo ve; aceptar dos veces → 409; salir → deja de verlo; el dueño intenta salir
+> → 409; aceptar la invitación de otro → 404.
+>
+> **Sigue sin haber aviso**: no hay correo ni notificaciones. La persona se
+> entera al entrar al panel, donde las invitaciones salen arriba.
+
 
 **Verificado en el código.** Buscado en todo `apps/backend`:
 
@@ -325,7 +448,17 @@ falta es el flujo alrededor.
 
 ---
 
-## 🟠 13. No existe permiso de lectura: el rol "observador" no se puede modelar
+## ✅ 13. ~~No existe permiso de lectura: el rol "observador" no se puede modelar~~
+
+> **Resuelto** en `477616f`. Se añade `canViewProject` al enum y `GET
+> /projects/:id` lo exige en vez de `canEditBoard`. Cualquier permiso lo implica,
+> y eso se resuelve en `expandPermissions` y no en la tabla de jerarquía, para
+> que no se olvide al añadir permisos nuevos. También se añadió `canEditColumn`,
+> que estaba en el DTO y en la jerarquía pero faltaba en el enum.
+>
+> Verificado con un rol de solo `canViewProject`: `GET` 200, `PATCH` 403, crear
+> rol 403.
+
 
 **Verificado en runtime y en el código.** El enum `ProjectPermission` tiene diez
 permisos y **todos son de escritura o de gestión**:
@@ -355,19 +488,40 @@ observador acaba pudiendo crear tableros.
 
 ---
 
-## ✅ Ya arreglado por el equipo de frontend, con autorización
+## Cambios que hicimos en `apps/backend/`, con autorización
 
-**`35013e3` — `apps/backend/gateway/src/common/filters/standard-exception.filter.ts`**
+Todos con permiso explícito y verificados contra el stack levantado. Si tocáis
+alguno de estos archivos, avisad para evitar conflictos.
 
-Todo error de negocio de un microservicio llegaba al cliente como **500**: 401 de
-credenciales, 409 de email duplicado, 404 de recurso inexistente. Cuando un
-microservicio lanza `RpcException` sobre TCP, el `ClientProxy` rechaza con el
-objeto plano ya deserializado, no con la instancia, y el filtro no lo reconocía.
+| Commit | Qué |
+|---|---|
+| `35013e3` | El filtro de excepciones del gateway degradaba **todo** error de microservicio a 500 |
+| `94721d8` | `AccountOwnerGuard`, DTO de usuario y query params en `GET /users` |
+| `477616f` | `canViewProject`, permisos efectivos, validador de roles, filtro por membresía, 409 en duplicado, rol por defecto al crear proyecto |
+| `2bad47c` | Cuerpos tipados en tareas y checklists |
+| `a88e804` | Modelo e infraestructura de invitaciones, y salir de un proyecto |
+| `fb4a758` | 409 al repetir el nombre de un espacio |
+| `3cbe735` `c276067` `9c03e87` | Invalidación de caché al tocar roles, miembros, tableros y columnas |
 
-El cambio es **aditivo** (una rama nueva antes del catch genérico) y está
-cubierto por dos tests en `response-normalization.spec.ts`. **Es el único
-cambio nuestro en `apps/backend/`.** Si tocáis ese archivo, avisad para evitar
-un conflicto.
+### Un patrón que apareció cuatro veces
+
+`findOneProject` cachea el proyecto entero durante 5 minutos **con su árbol
+dentro** (espacios → tableros → columnas, roles, `_count.members`). Cuatro
+mutaciones distintas no invalidaban esa clave, así que la escritura funcionaba y
+la pantalla seguía enseñando lo viejo: parecía que la acción no había hecho nada.
+
+Lo mismo con `board:<id>`, que tampoco se invalidaba al reordenar columnas.
+
+**Regla para quien añada mutaciones:** al tocar cualquier cosa que cuelgue de un
+proyecto, invalidad `project:<projectId>`; y si son columnas, también
+`board:<boardId>`.
+
+### Deuda que dejamos
+
+Los roles creados antes del validador siguen guardados con un **array** en
+`permissions`. `normalizePermissions` los interpreta al leer, así que funcionan,
+pero los datos están sucios. Una migración que los convierta de una vez estaría
+bien; no la hicimos por no tocar datos sin acordarlo.
 
 ---
 
@@ -375,13 +529,15 @@ un conflicto.
 
 Reglas que seguimos para que nada se rompa cuando estos puntos se arreglen:
 
-1. **Validamos siempre en el cliente.** No dependemos de que el gateway lo haga.
-2. **Enviamos solo los campos que el DTO declara**, ni uno de más. Hoy sobrarían
-   sin consecuencia, pero el día que el punto 2 se arregle darían 400.
+1. **Validamos siempre en el cliente.** El gateway ya valida, pero el mensaje
+   llega antes, sin ida y vuelta, y marca el campo concreto.
+2. **Enviamos solo los campos que el DTO declara**, ni uno de más. Antes sobraban
+   sin consecuencia; ahora dan 400, que es lo correcto.
 3. **Confirmamos el resultado contra el `data` de la respuesta, no contra el
-   status.** Un 200 no garantiza que se haya guardado (punto 2).
+   status.** El hábito viene de cuando el gateway no validaba y devolvía 200 sin
+   guardar; sigue siendo lo correcto.
 4. Toda mutación de tarea o checklist lleva `projectId` en el body (punto 9).
 5. `permissions` de un rol se envía **siempre como diccionario de booleanos**,
    nunca como array, y con claves del enum (punto 11).
-6. La interfaz dice **"añadir miembro"**, no "invitar": no hay invitación que
-   nadie reciba (punto 12).
+6. La interfaz decide qué enseñar con `GET /projects/:id/permissions/me`, no
+   probando y reaccionando al 403.
