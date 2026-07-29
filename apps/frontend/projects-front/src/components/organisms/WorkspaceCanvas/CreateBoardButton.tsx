@@ -12,7 +12,7 @@ export interface CreateBoardButtonProps {
   projectId: string;
 }
 
-/** Añade un tablero dentro de un espacio, sin salir del lienzo. */
+/** Añade un tablero dentro del espacio abierto. */
 export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonProps) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(createBoardAction, BOARD_INITIAL_STATE);
@@ -33,13 +33,9 @@ export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonP
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-sans text-xs text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-      >
-        <span aria-hidden="true">+</span> Nuevo tablero
-      </button>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        Nuevo tablero
+      </Button>
 
       <Dialog
         open={open}

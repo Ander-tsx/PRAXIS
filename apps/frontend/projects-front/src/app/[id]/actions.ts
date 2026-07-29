@@ -3,6 +3,7 @@
 import {
   ApiError,
   type Board,
+  type Column,
   type PermissionMap,
   type ProjectMember,
   type ProjectRole,
@@ -10,8 +11,14 @@ import {
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
-import type { BoardState, MemberState, RoleState, WorkspaceState } from '@/lib/action-state';
-import { validateBoard, validateRole, validateWorkspace } from '@/lib/validation';
+import type {
+  BoardState,
+  ColumnState,
+  MemberState,
+  RoleState,
+  WorkspaceState,
+} from '@/lib/action-state';
+import { validateBoard, validateColumn, validateRole, validateWorkspace } from '@/lib/validation';
 
 /**
  * Acciones del detalle de proyecto.
@@ -187,25 +194,32 @@ export async function createWorkspaceAction(
   formData: FormData,
 ): Promise<WorkspaceState> {
   const api = await requireApi();
-  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null, createdId: null };
 
   const projectId = String(formData.get('projectId') ?? '');
   const name = String(formData.get('name') ?? '').trim();
 
   const invalid = validateWorkspace(name);
-  if (invalid) return { error: invalid, savedName: null };
+  if (invalid) return { error: invalid, savedName: null, createdId: null };
 
+  let created: Workspace;
   try {
-    const created = await api.post<Workspace>(`/projects/${projectId}/workspaces`, { name });
+    created = await api.post<Workspace>(`/projects/${projectId}/workspaces`, { name });
     if (!created?.id || created.name !== name) {
-      return { error: 'El servidor no guardó el espacio.', savedName: null };
+      return { error: 'El servidor no guardó el espacio.', savedName: null, createdId: null };
     }
   } catch (error) {
-    return { error: describe(error, 'No se pudo crear el espacio.'), savedName: null };
+    // El backend distingue el nombre duplicado (409) con su propio mensaje.
+    return {
+      error: describe(error, 'No se pudo crear el espacio.'),
+      savedName: null,
+      createdId: null,
+    };
   }
 
   revalidateProject(projectId);
-  return { error: null, savedName: name };
+  // El id vuelve para que el selector entre directamente en el espacio nuevo.
+  return { error: null, savedName: name, createdId: created.id };
 }
 
 /**
@@ -239,6 +253,89 @@ export async function createBoardAction(
 
   revalidateProject(projectId);
   return { error: null, savedName: name };
+}
+
+/**
+ * Elimina un espacio de trabajo.
+ *
+ * ⚠️ Cascadea: `Board` y `BoardColumn` cuelgan con `onDelete: Cascade`, así que
+ * arrastra todos los tableros y columnas de dentro. Quien llama debe haberlo
+ * advertido; aquí solo se ejecuta.
+ */
+export async function deleteWorkspaceAction(
+  _prev: WorkspaceState,
+  formData: FormData,
+): Promise<WorkspaceState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null, createdId: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const workspaceId = String(formData.get('workspaceId') ?? '');
+
+  try {
+    await api.delete(`/workspaces/${workspaceId}`);
+  } catch (error) {
+    return {
+      error: describe(error, 'No se pudo eliminar el espacio.'),
+      savedName: null,
+      createdId: null,
+    };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: 'eliminado', createdId: null };
+}
+
+/* ─── Columnas ──────────────────────────────────────────────────────── */
+
+export async function createColumnAction(
+  _prev: ColumnState,
+  formData: FormData,
+): Promise<ColumnState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const boardId = String(formData.get('boardId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const order = Number(formData.get('order') ?? 0);
+
+  const invalid = validateColumn(name);
+  if (invalid) return { error: invalid, savedName: null };
+
+  try {
+    // `order` es obligatorio en el DTO: la nueva va al final de las que hay.
+    const created = await api.post<Column>(`/boards/${boardId}/columns`, { name, order });
+    if (!created?.id) {
+      return { error: 'El servidor no guardó la columna.', savedName: null };
+    }
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear la columna.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: name };
+}
+
+export async function deleteColumnAction(
+  _prev: ColumnState,
+  formData: FormData,
+): Promise<ColumnState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const boardId = String(formData.get('boardId') ?? '');
+  const columnId = String(formData.get('columnId') ?? '');
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    await api.delete(`/boards/${boardId}/columns/${columnId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar la columna.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: 'eliminada' };
 }
 
 /* ─── Utilidades ────────────────────────────────────────────────────── */

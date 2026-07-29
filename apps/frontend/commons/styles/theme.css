@@ -160,3 +160,14 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Oculta la barra de scroll sin perder el desplazamiento.
+   Para tiras horizontales (pestañas, lienzos) donde la barra estorba más de lo
+   que informa. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

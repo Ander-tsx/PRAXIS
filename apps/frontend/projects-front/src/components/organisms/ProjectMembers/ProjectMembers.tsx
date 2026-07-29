@@ -5,7 +5,7 @@ import {
   type UserProfile,
   alpha,
   colors,
-  displayName,
+  personLabel,
 } from '@praxis/commons';
 import { AddMemberDialog } from './AddMemberDialog';
 import { RemoveMemberButton } from './RemoveMemberButton';
@@ -70,7 +70,7 @@ export function ProjectMembers({
         <ul className="flex flex-col gap-2">
           {members.map((member) => {
             const user = usersById.get(member.userId);
-            const name = user ? displayName(user) : '';
+            const label = user ? personLabel(user) : member.userId;
             const isOwner = member.userId === ownerId;
 
             return (
@@ -85,18 +85,18 @@ export function ProjectMembers({
                     border: `1px solid ${alpha(colors.primary, 45)}`,
                   }}
                 >
-                  {(name || user?.credential.email || '?')[0]?.toUpperCase()}
+                  {label[0]?.toUpperCase() ?? '?'}
                 </span>
 
                 <div className="flex min-w-0 flex-1 flex-col">
-                  {name && (
-                    <span className="truncate font-sans text-sm font-semibold text-text-primary">
-                      {name}
-                    </span>
-                  )}
+                  {/* Siempre dos líneas, con o sin nombre: si no lo hay,
+                      `personLabel` usa la parte local del correo. */}
+                  <span className="truncate font-sans text-sm font-semibold text-text-primary">
+                    {label}
+                  </span>
                   <span className="truncate font-sans text-xs text-text-secondary">
                     {/* Puede faltar si el directorio se cortó por paginación. */}
-                    {user?.credential.email ?? member.userId}
+                    {user?.credential.email ?? 'Correo no disponible'}
                   </span>
                 </div>
 
@@ -112,7 +112,7 @@ export function ProjectMembers({
                     <RemoveMemberButton
                       projectId={projectId}
                       userId={member.userId}
-                      label={name || user?.credential.email || 'esta persona'}
+                      label={label}
                     />
                   )}
                 </div>

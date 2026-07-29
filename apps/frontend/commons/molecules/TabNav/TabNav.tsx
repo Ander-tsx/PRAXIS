@@ -30,7 +30,18 @@ export interface TabNavProps {
  */
 export function TabNav({ tabs, activeId, renderLink }: TabNavProps) {
   return (
-    <nav className="flex gap-1 overflow-x-auto border-b border-border" aria-label="Secciones">
+    /**
+     * `overflow-y-hidden` es imprescindible: con solo `overflow-x-auto` el
+     * contenedor se vuelve scrollable en los dos ejes y el navegador saca una
+     * barra vertical sobre una fila que nunca desborda a lo alto.
+     *
+     * `scrollbar-none` esconde también la horizontal: en escritorio no hace
+     * falta y en táctil se arrastra igual.
+     */
+    <nav
+      className="scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border"
+      aria-label="Secciones"
+    >
       {tabs.map((tab) => {
         const isActive = tab.id === activeId;
 

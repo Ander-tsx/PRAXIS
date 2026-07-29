@@ -115,3 +115,15 @@ export function validateBoard(name: string): string | null {
   }
   return null;
 }
+
+export const COLUMN_NAME_MIN = 1;
+export const COLUMN_NAME_MAX = 100;
+
+export function validateColumn(name: string): string | null {
+  const trimmed = name.trim();
+  if (trimmed.length < COLUMN_NAME_MIN) return 'La columna necesita un nombre.';
+  if (trimmed.length > COLUMN_NAME_MAX) {
+    return `El nombre no puede superar ${COLUMN_NAME_MAX} caracteres.`;
+  }
+  return null;
+}

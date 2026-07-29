@@ -1,132 +1,103 @@
 import { type Workspace, alpha, colors } from '@praxis/commons';
+import { BoardStrip } from './BoardStrip';
 import { CreateBoardButton } from './CreateBoardButton';
-import { CreateWorkspaceDialog } from './CreateWorkspaceDialog';
+import { DeleteWorkspaceButton } from './DeleteWorkspaceButton';
+import { WorkspacePicker } from './WorkspacePicker';
 
 export interface WorkspaceCanvasProps {
   projectId: string;
   workspaces: Workspace[];
+  /** Espacio abierto, resuelto en la page desde `?ws=`. */
+  activeWorkspace: Workspace | null;
   canManage: boolean;
 }
 
 /**
- * Espacios de trabajo como lienzo.
+ * Espacios de trabajo: se elige uno y se trabaja dentro.
  *
- * La jerarquía real es **proyecto → espacio → tablero → columna → tarea**, y
- * una lista plana de espacios no la deja ver: hay que entrar en cada uno para
- * saber qué contiene. Aquí cada espacio es una columna del lienzo con sus
- * tableros dentro, así que la estructura entera se lee de un vistazo y se
- * añade en el sitio.
+ * La primera versión ponía todos los espacios como tarjetas en una fila.
+ * Quedaban apretadas, con demasiado borde, y aun así había que entrar en cada
+ * una para ver qué contenía. Ahora el selector ocupa una línea y todo el
+ * espacio útil es el contenido del espacio abierto: sus tableros con sus
+ * columnas.
  *
  * Todo sale de `GET /projects/:id`, que ya trae espacios → tableros → columnas
- * embebidos: el lienzo no cuesta ninguna petición extra.
- *
- * El lienzo desplaza en horizontal; cada columna desplaza en vertical por su
- * cuenta. La página nunca desborda a lo ancho.
+ * embebidos: ninguna petición extra por cambiar de espacio.
  */
-export function WorkspaceCanvas({ projectId, workspaces, canManage }: WorkspaceCanvasProps) {
-  if (workspaces.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-5 rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
-        <span
-          className="flex h-14 w-14 items-center justify-center rounded-2xl"
-          style={{ background: alpha(colors.accent, 12), color: colors.accent }}
-        >
-          <svg
-            className="h-7 w-7"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-            />
-          </svg>
-        </span>
+export function WorkspaceCanvas({
+  projectId,
+  workspaces,
+  activeWorkspace,
+  canManage,
+}: WorkspaceCanvasProps) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <WorkspacePicker
+          projectId={projectId}
+          workspaces={workspaces}
+          activeId={activeWorkspace?.id ?? ''}
+          canManage={canManage}
+        />
 
-        <div className="flex flex-col gap-2">
-          <h3 className="font-display text-2xl text-text-primary">El lienzo está vacío</h3>
-          <p className="max-w-md font-sans text-sm text-text-secondary">
-            Un espacio agrupa tableros: uno por equipo, por fase o por lo que le convenga a este
-            proyecto. Dentro de cada tablero irán las columnas y las tareas.
-          </p>
-        </div>
-
-        {canManage ? (
-          <CreateWorkspaceDialog projectId={projectId} triggerSize="lg" />
-        ) : (
-          <p className="font-sans text-sm text-text-disabled">
-            Quien administre el proyecto puede crear el primero.
-          </p>
+        {activeWorkspace && canManage && (
+          <div className="flex items-center gap-2">
+            <CreateBoardButton workspaceId={activeWorkspace.id} projectId={projectId} />
+            <DeleteWorkspaceButton projectId={projectId} workspace={activeWorkspace} />
+          </div>
         )}
       </div>
-    );
-  }
 
-  return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
-      {workspaces.map((workspace) => (
-        <section
-          key={workspace.id}
-          aria-label={`Espacio ${workspace.name}`}
-          className="flex max-h-[65vh] w-72 shrink-0 flex-col rounded-2xl border border-border bg-surface"
-        >
-          <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
-            <h3 className="truncate font-sans text-sm font-semibold text-text-primary">
-              {workspace.name}
-            </h3>
-            <span
-              className="shrink-0 rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
-              style={{ background: alpha(colors.border, 60) }}
+      {!activeWorkspace ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+          <span
+            className="flex h-12 w-12 items-center justify-center rounded-xl"
+            style={{ background: alpha(colors.accent, 12), color: colors.accent }}
+          >
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              aria-hidden="true"
             >
-              {workspace.boards.length}
-            </span>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-3">
-            {workspace.boards.length === 0 ? (
-              <p className="px-1 py-3 font-sans text-xs text-text-disabled">
-                Sin tableros todavía.
-              </p>
-            ) : (
-              workspace.boards.map((board) => (
-                <article
-                  key={board.id}
-                  className="flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-elevated px-3 py-2.5"
-                >
-                  <span className="truncate font-sans text-sm text-text-primary">
-                    {board.name}
-                  </span>
-                  <span className="font-sans text-xs text-text-disabled">
-                    {board.columns.length === 0
-                      ? 'Sin columnas'
-                      : `${board.columns.length} ${board.columns.length === 1 ? 'columna' : 'columnas'}`}
-                  </span>
-                </article>
-              ))
-            )}
-          </div>
-
-          {canManage && (
-            <div className="border-t border-border p-3">
-              <CreateBoardButton workspaceId={workspace.id} projectId={projectId} />
-            </div>
-          )}
-        </section>
-      ))}
-
-      {/* Columna final: añadir otro espacio sin salir del lienzo. */}
-      {canManage && (
-        <div className="flex w-72 shrink-0 items-start">
-          <div className="flex w-full flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-4 py-6">
-            <p className="text-center font-sans text-xs text-text-disabled">
-              Agrupa tableros por equipo o por fase.
-            </p>
-            <CreateWorkspaceDialog projectId={projectId} />
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+              />
+            </svg>
+          </span>
+          <h3 className="font-display text-2xl text-text-primary">Ningún espacio todavía</h3>
+          <p className="max-w-md font-sans text-sm text-text-secondary">
+            Un espacio agrupa tableros: uno por equipo, por fase o por lo que le convenga a este
+            proyecto.{' '}
+            {canManage
+              ? 'Créalo desde el selector de arriba.'
+              : 'Quien administre el proyecto puede crear el primero.'}
+          </p>
+        </div>
+      ) : activeWorkspace.boards.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
+          <h3 className="font-display text-2xl text-text-primary">
+            «{activeWorkspace.name}» está vacío
+          </h3>
+          <p className="max-w-md font-sans text-sm text-text-secondary">
+            Un tablero organiza el trabajo en columnas.{' '}
+            {canManage ? 'Crea el primero desde el botón de arriba.' : ''}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {activeWorkspace.boards.map((board) => (
+            <BoardStrip
+              key={board.id}
+              board={board}
+              projectId={projectId}
+              canManage={canManage}
+            />
+          ))}
         </div>
       )}
     </div>

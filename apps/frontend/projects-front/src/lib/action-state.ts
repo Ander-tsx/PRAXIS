@@ -38,9 +38,15 @@ export const MEMBER_INITIAL_STATE: MemberState = { error: null, done: null };
 export interface WorkspaceState {
   error: string | null;
   savedName: string | null;
+  /** Id del espacio recién creado, para entrar en él sin otra petición. */
+  createdId: string | null;
 }
 
-export const WORKSPACE_INITIAL_STATE: WorkspaceState = { error: null, savedName: null };
+export const WORKSPACE_INITIAL_STATE: WorkspaceState = {
+  error: null,
+  savedName: null,
+  createdId: null,
+};
 
 export interface BoardState {
   error: string | null;
@@ -48,3 +54,10 @@ export interface BoardState {
 }
 
 export const BOARD_INITIAL_STATE: BoardState = { error: null, savedName: null };
+
+export interface ColumnState {
+  error: string | null;
+  savedName: string | null;
+}
+
+export const COLUMN_INITIAL_STATE: ColumnState = { error: null, savedName: null };

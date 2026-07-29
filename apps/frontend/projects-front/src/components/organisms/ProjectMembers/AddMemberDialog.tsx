@@ -9,7 +9,7 @@ import {
   type UserProfile,
   alpha,
   colors,
-  displayName,
+  personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useMemo, useState } from 'react';
 import { addMemberAction } from '@/app/[id]/actions';
@@ -54,8 +54,8 @@ export function AddMemberDialog({ projectId, roles, candidates }: AddMemberDialo
     const needle = query.trim().toLowerCase();
     const pool = needle
       ? candidates.filter((user) => {
-          const name = displayName(user).toLowerCase();
-          return user.credential.email.toLowerCase().includes(needle) || name.includes(needle);
+          const label = personLabel(user).toLowerCase();
+          return user.credential.email.toLowerCase().includes(needle) || label.includes(needle);
         })
       : candidates;
     return pool.slice(0, 8);
@@ -101,7 +101,6 @@ export function AddMemberDialog({ projectId, roles, candidates }: AddMemberDialo
               </p>
             ) : (
               matches.map((user) => {
-                const name = displayName(user);
                 const isSelected = userId === user.id;
                 return (
                   <button
@@ -116,9 +115,12 @@ export function AddMemberDialog({ projectId, roles, candidates }: AddMemberDialo
                     ].join(' ')}
                     style={isSelected ? { background: alpha(colors.primary, 10) } : undefined}
                   >
-                    {name && (
-                      <span className="font-sans text-sm text-text-primary">{name}</span>
-                    )}
+                    {/* `personLabel` siempre devuelve algo: sin nombre cae a la
+                        parte local del correo. Antes se omitía la línea y las
+                        filas quedaban de dos alturas distintas. */}
+                    <span className="font-sans text-sm text-text-primary">
+                      {personLabel(user)}
+                    </span>
                     <span className="font-sans text-xs text-text-secondary">
                       {user.credential.email}
                     </span>

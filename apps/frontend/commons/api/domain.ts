@@ -152,3 +152,16 @@ export function displayName(user: UserProfile): string {
     .filter(Boolean)
     .join(' ');
 }
+
+/**
+ * Etiqueta para una persona, siempre con algo que leer.
+ *
+ * Cuando no hay nombre —el caso normal en cuentas nuevas, porque el registro no
+ * lo pide— cae a la parte local del correo. Sin esto, las filas de un listado
+ * quedaban de dos alturas distintas según la cuenta tuviera nombre o no.
+ */
+export function personLabel(user: UserProfile): string {
+  const name = displayName(user);
+  if (name) return name;
+  return user.credential.email.split('@')[0] ?? user.credential.email;
+}

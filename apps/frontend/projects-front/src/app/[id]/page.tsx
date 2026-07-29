@@ -21,7 +21,7 @@ import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; ws?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -59,7 +59,7 @@ type TabId = (typeof TABS)[number]['id'];
  */
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tab } = await searchParams;
+  const { tab, ws } = await searchParams;
   const { profile } = await loadCurrentUser();
   const api = createServerApiClient();
 
@@ -84,7 +84,18 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           .catch(() => ({ items: [] as UserProfile[], total: 0 }))
       : { items: [] as UserProfile[], total: 0 };
 
-  const boardCount = project.workspaces.reduce((total, ws) => total + ws.boards.length, 0);
+  const boardCount = project.workspaces.reduce(
+    (total, workspace) => total + workspace.boards.length,
+    0,
+  );
+
+  /**
+   * Espacio abierto. Sin `?ws=` —o si apunta a uno que ya no existe, por
+   * ejemplo tras borrarlo— se cae al primero, para que la pestaña nunca quede
+   * en blanco teniendo espacios que enseñar.
+   */
+  const activeWorkspace =
+    project.workspaces.find((workspace) => workspace.id === ws) ?? project.workspaces[0] ?? null;
 
   const counts: Record<TabId, number> = {
     espacios: project.workspaces.length,
@@ -131,6 +142,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           <WorkspaceCanvas
             projectId={project.id}
             workspaces={project.workspaces}
+            activeWorkspace={activeWorkspace}
             canManage={can.canCreateBoard}
           />
         )}
