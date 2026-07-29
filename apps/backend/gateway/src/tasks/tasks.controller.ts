@@ -35,6 +35,14 @@ import {
   UpdateTaskBodyDto,
 } from '@praxis/contracts';
 
+/**
+ * Rutas de tarea.
+ *
+ * ⚠️ **El `projectId` sale de `req.projectId`**, que resuelve
+ * `ProjectPermissionGuard` desde la ruta, y se inyecta **después** del spread
+ * del cuerpo para que un valor del cliente no pueda ganar. El cuerpo ya no lo
+ * declara: mandarlo responde 400 (`PENDIENTES-BACKEND.md §9`).
+ */
 @ApiTags('Tasks')
 @ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
@@ -62,15 +70,17 @@ export class TasksController {
         {
           ...body,
           boardId,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
     );
   }
 
-  /** Lista tareas de un board (la membresía basta) */
+  /** Lista tareas de un board (requiere canViewProject) */
   @Get('boards/:boardId/tasks')
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Lista tareas de un board' })
   @ApiQuery({ name: 'columnId', required: false, description: 'Filtro por ID de columna' })
   @ApiQuery({ name: 'page', required: false, description: 'Número de página', type: Number })
@@ -95,9 +105,10 @@ export class TasksController {
     );
   }
 
-  /** Detalle de una tarea (la membresía basta) */
+  /** Detalle de una tarea (requiere canViewProject) */
   @Get('tasks/:id')
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de una tarea' })
   @ApiResponse({ status: 200, description: 'Detalle de la tarea recuperado' })
   findOne(
@@ -125,6 +136,7 @@ export class TasksController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -148,6 +160,7 @@ export class TasksController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -171,6 +184,7 @@ export class TasksController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -194,6 +208,7 @@ export class TasksController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),

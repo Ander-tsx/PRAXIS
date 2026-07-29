@@ -37,7 +37,7 @@ En validación fallida el `message` es literalmente `"Validation failed"` y los 
 
 ### ⚠️ Reglas que rompen cosas si se olvidan
 
-1. **Toda mutación de tarea o checklist debe llevar `projectId` en el body.** El guard de permisos no logra resolver el proyecto desde la ruta y depende de ese campo. Sin él: `403 "Contexto de proyecto no encontrado en la petición"`.
+1. **Ninguna ruta de tarea o checklist acepta `projectId` en el body.** Es al revés de como estuvo: el guard lo resuelve desde la ruta y mandarlo responde `400 "property projectId should not exist"`. Se quitó porque, mientras lo elegía el cliente, bastaba con declarar el id de un proyecto propio para leer, editar y borrar tareas de un proyecto ajeno (PENDIENTES-BACKEND §9).
 2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el nombre de la columna destino.
 3. **Listar y paginar `/projects` y `/users` requiere body en un GET** — imposible desde `fetch`. Sin filtros solo se obtiene la página 1 por defecto (limit 20).
 4. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
@@ -265,18 +265,19 @@ consistente; tenlo en cuenta si algo parece no aplicarse.
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | POST | `/boards/:boardId/tasks` | ver abajo → 201 | `canCreateTask` |
-| GET | `/boards/:boardId/tasks?columnId&page&limit` | — ✅ query params | — |
-| GET | `/tasks/:id` | — | — |
-| PATCH | `/tasks/:id` | `{ projectId, title?, description?, status?, columnId?, assigneeId?, priority?, dueDate? }` | `canEditTask` |
-| POST | `/tasks/:id/move` | `{ projectId, columnId, status?, order? }` | `canEditTask` |
-| POST | `/tasks/:id/assign` | `{ projectId, assigneeId? }` | `canEditTask` |
-| DELETE | `/tasks/:id` | `{ projectId }` | `canDeleteTask` |
+| GET | `/boards/:boardId/tasks?columnId&page&limit` | — ✅ query params | `canViewProject` |
+| GET | `/tasks/:id` | — | `canViewProject` |
+| PATCH | `/tasks/:id` | `{ title?, description?, status?, columnId?, assigneeId?, priority?, dueDate? }` | `canEditTask` |
+| POST | `/tasks/:id/move` | `{ columnId, status?, order? }` | `canEditTask` |
+| POST | `/tasks/:id/assign` | `{ assigneeId? }` | `canEditTask` |
+| DELETE | `/tasks/:id` | — | `canDeleteTask` |
+
+⚠️ **Ninguna lleva `projectId`.** Lo resuelve el guard desde la ruta; mandarlo da 400.
 
 Body de creación:
 
 ```ts
 {
-  projectId,          // requerido — UUID v4
   columnId,           // requerido
   title,              // 1–255
   status,             // requerido — debe coincidir con el nombre de la columna
@@ -289,7 +290,7 @@ Body de creación:
 }
 ```
 
-`boardId` y `requesterId` los inyecta el gateway; **no los mandes** (`forbidNonWhitelisted` → 400).
+`boardId`, `projectId` y `requesterId` los inyecta el gateway; **no los mandes** (`forbidNonWhitelisted` → 400).
 
 ```ts
 Task = { id, title, description, status, boardId, columnId, assigneeId, reporterId,
@@ -305,9 +306,11 @@ Task = { id, title, description, status, boardId, columnId, assigneeId, reporter
 
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
-| POST | `/tasks/:taskId/checklists` | `{ projectId, text, order }` | `canEditTask` |
-| POST | `/tasks/:taskId/checklists/:id/toggle` | `{ projectId }` | `canEditTask` |
-| DELETE | `/tasks/:taskId/checklists/:id` | `{ projectId }` | `canEditTask` |
+| POST | `/tasks/:taskId/checklists` | `{ text, order? }` | `canEditTask` |
+| POST | `/tasks/:taskId/checklists/:id/toggle` | — | `canEditTask` |
+| DELETE | `/tasks/:taskId/checklists/:id` | — | `canEditTask` |
+
+⚠️ Igual que en tareas: **sin `projectId`**, que lo pone el guard.
 
 ```ts
 Checklist = { id, taskId, text, completed, order }
@@ -327,7 +330,7 @@ POST /projects/:id/members     → { userId, projectRoleId }
 POST /projects/:id/workspaces  → workspaceId
 POST /workspaces/:wid/boards   → boardId
 POST /boards/:bid/columns  ×N  → columnIds       (guarda name ↔ id: `status` usa el name)
-POST /boards/:bid/tasks        → { projectId, columnId, title, status: <name de la columna> }
+POST /boards/:bid/tasks        → { columnId, title, status: <name de la columna> }
 ```
 
 ---

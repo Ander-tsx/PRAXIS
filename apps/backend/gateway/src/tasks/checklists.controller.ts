@@ -28,6 +28,13 @@ import {
   ToggleChecklistBodyDto,
 } from '@praxis/contracts';
 
+/**
+ * Ítems de checklist de una tarea.
+ *
+ * ⚠️ **El `projectId` sale de `req.projectId`**, resuelto por el guard desde
+ * el `:taskId` de la ruta. El cuerpo ya no lo declara: mandarlo responde 400
+ * (`PENDIENTES-BACKEND.md §9`).
+ */
 @ApiTags('Task Checklists')
 @ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
@@ -54,6 +61,7 @@ export class ChecklistsController {
         {
           ...body,
           taskId,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -78,6 +86,7 @@ export class ChecklistsController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -102,6 +111,7 @@ export class ChecklistsController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),

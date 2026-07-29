@@ -8,7 +8,7 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 9 de 13 resueltos.** El equipo de frontend recibió autorización para
+> **Estado: 11 de 14 resueltos.** El equipo de frontend recibió autorización para
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
 > commit y cómo se verificó. Lo que queda abierto está al principio.
 
@@ -38,7 +38,6 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 5 | 🟠 | Faltan `GET /users/me` y «mis tareas» (lo demás de este punto ya está) | código |
 | 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
 | 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn` | código |
-| 9 | 🟡 | Rutas de tarea usan `:id` y el guard busca `taskId` | código |
 | 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
 
 ### Resueltos
@@ -47,7 +46,9 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 |---|---|---|---|
 | 1 | 🔴 | Cualquiera podía editar o borrar la cuenta de otro | `94721d8` |
 | 2 | 🔴 | El `ValidationPipe` no se aplicaba en 22 de 28 endpoints | `94721d8` `477616f` `2bad47c` |
+| 9 | 🔴 | El `projectId` del body decidía el permiso: escritura entre proyectos | `ed88c63` |
 | 11 | 🔴 | Un rol mal formado se creaba con 201 y no concedía nada | `477616f` `9c03e87` |
+| 14 | 🔴 | Los dos `GET` de tareas no pedían ningún permiso | `ed88c63` |
 | 3 | 🟠 | `GET /projects` devolvía todos los del sistema | `477616f` |
 | 4 | 🟠 | Filtros por body en peticiones GET | `94721d8` `477616f` |
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
@@ -56,7 +57,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | — | 🟡 | Nombre duplicado devolvía 500 (proyectos y espacios) | `477616f` `fb4a758` |
 
 **Lo que más pesa de lo que queda:** el punto 6, porque es una decisión de
-diseño del modelo y no un arreglo; y el 9, que hoy funciona por casualidad.
+diseño del modelo y no un arreglo; y el 5, que bloquea los avisos del panel.
 
 ---
 
@@ -287,22 +288,53 @@ Y `canDeleteProject` sigue sin existir: borrar un proyecto entero exige
 
 ---
 
-## 🟡 9. Las rutas de tarea usan `:id` pero el guard busca `taskId`
+## ✅ 9. ~~Las rutas de tarea usan `:id` pero el guard busca `taskId`~~
 
-**Leído en el código.** `TasksController` declara `@Patch('tasks/:id')`, mientras
-`ProjectPermissionGuard` busca `params.taskId` para resolver el proyecto. No lo
-encuentra y cae al fallback `body.projectId`.
+> **Resuelto** en `ed88c63`, y **subió de 🟡 a 🔴 al reproducirlo**: no era una
+> fragilidad, era un bypass de autorización completo.
+>
+> El guard resuelve ahora el `projectId` **solo desde la ruta** (`params.id` en
+> `TasksController`, `params.taskId` en `ChecklistsController`) y lo deja en
+> `request.projectId`, que el controlador inyecta **después** del spread del
+> cuerpo. `projectId` desapareció de los DTO de cuerpo: mandarlo da 400.
+> Y tasks-service comprueba además que la tarea pertenezca de verdad a ese
+> proyecto, porque un microservicio no puede fiarse de quien lo llama.
+>
+> Verificado con dos cuentas: los cinco casos de abajo dan 403, el camino
+> legítimo sigue en 200 sin `projectId`, y mandarlo responde
+> `400 "property projectId should not exist"`.
 
-**Sigue abierto.** Consecuencia para nosotros: toda mutación de tarea y de
-checklist **debe** incluir `projectId` en el body o responde `403 "Contexto de
-proyecto no encontrado"`.
+**Verificado en runtime (2026-07-29).** El diagnóstico original —el guard busca
+`params.taskId` y `TasksController` declara `:id`, así que cae al fallback
+`body.projectId`— era correcto, pero se quedaba corto en la consecuencia.
 
-Funciona por casualidad —el fallback salva el caso—, y es frágil de dos maneras:
-el día que alguien renombre el parámetro cambia el contrato sin avisar, y el
-`projectId` lo pone el cliente, que es justo quien no debería decidir sobre qué
-proyecto se aplica un permiso.
+El fallback no era un apaño: era una **credencial que elegía el cliente**. El
+guard aceptaba el `projectId` del cuerpo, comprobaba el permiso sobre *ese*
+proyecto —concediéndolo por `ownerId` si era tuyo— y después nadie comparaba
+con el proyecto real de la tarea. Ni el guard ni tasks-service.
 
-Es lo primero con lo que va a chocar la pantalla de tareas.
+Reproducido con `A` (admin) y `B`, sobre un proyecto de `B` que `A` **no ve**
+en `GET /projects`:
+
+| Petición de `A` sobre la tarea de `B` | Antes | Ahora |
+|---|---|---|
+| `GET /tasks/:id` | 200, tarea completa | **403** |
+| `GET /boards/:boardId/tasks` | 200, el tablero entero | **403** |
+| `PATCH /tasks/:id` con `projectId` de un proyecto de `A` | 200, título cambiado | **403** |
+| `POST /tasks/:taskId/checklists` ídem | 201 | **403** |
+| `DELETE /tasks/:id` ídem | 200, tarea borrada | **403** |
+
+Las dos primeras filas son en realidad el **punto 14**, que es un fallo
+distinto: esas rutas no pedían ningún permiso, así que ni siquiera hacía falta
+el truco del `projectId`.
+
+El dato que cerró el diagnóstico: la misma llamada **sin** `projectId` en el
+cuerpo ya devolvía 403 correctamente. La vía de resolución buena existía desde
+el principio; el fallback del cuerpo la cortocircuitaba.
+
+> Comprobado también que un rol de solo `canViewProject` en el proyecto ajeno
+> lee (200) pero no escribe (403): el permiso se evalúa de verdad, no es que
+> todo pase por ser dueño.
 
 ---
 
@@ -488,6 +520,38 @@ observador acaba pudiendo crear tableros.
 
 ---
 
+## ✅ 14. ~~Los dos `GET` de tareas no exigían ningún permiso~~
+
+> **Resuelto** en `ed88c63`. Los dos declaran ahora
+> `@RequireProjectPermission(CAN_VIEW_PROJECT)`, que es el permiso que existe
+> desde el punto 13 justo para esto.
+>
+> Verificado: cuenta sin relación con el proyecto → 403 en las dos; miembro con
+> un rol de solo `canViewProject` → 200 en las dos y 403 al editar.
+
+**Verificado en runtime (2026-07-29).** Se encontró reproduciendo el punto 9,
+pero **es un fallo distinto** y por eso va aparte: aquí no hacía falta ningún
+truco con el `projectId`, bastaba un JWT válido.
+
+```
+GET /api/tasks/:id              → 200, la tarea de cualquiera
+GET /api/boards/:boardId/tasks  → 200, el tablero entero de cualquiera
+```
+
+Ninguna de las dos llevaba `@RequireProjectPermission`. El comentario del
+código decía «la membresía basta», pero **no había nada que comprobara la
+membresía**: `ProjectPermissionGuard` deja pasar de largo cuando el handler no
+declara permiso (`if (!requiredPermission) return true`).
+
+Con el id de una tarea —que viaja en cualquier URL de tablero— cualquier cuenta
+registrada leía el título, la descripción, la fecha, el encargado y el checklist
+entero de un proyecto al que no pertenece. Y con el `boardId`, el tablero
+completo de una sola petición.
+
+`apps/backend/gateway/src/tasks/tasks.controller.ts`
+
+---
+
 ## Cambios que hicimos en `apps/backend/`, con autorización
 
 Todos con permiso explícito y verificados contra el stack levantado. Si tocáis
@@ -501,6 +565,7 @@ alguno de estos archivos, avisad para evitar conflictos.
 | `2bad47c` | Cuerpos tipados en tareas y checklists |
 | `a88e804` | Modelo e infraestructura de invitaciones, y salir de un proyecto |
 | `fb4a758` | 409 al repetir el nombre de un espacio |
+| `ed88c63` | El `projectId` de las tareas se resuelve desde la ruta, y los `GET` piden `canViewProject` |
 | `3cbe735` `c276067` `9c03e87` | Invalidación de caché al tocar roles, miembros, tableros y columnas |
 
 ### Un patrón que apareció cuatro veces
@@ -536,7 +601,8 @@ Reglas que seguimos para que nada se rompa cuando estos puntos se arreglen:
 3. **Confirmamos el resultado contra el `data` de la respuesta, no contra el
    status.** El hábito viene de cuando el gateway no validaba y devolvía 200 sin
    guardar; sigue siendo lo correcto.
-4. Toda mutación de tarea o checklist lleva `projectId` en el body (punto 9).
+4. Ninguna llamada de tarea o checklist manda `projectId` en el body: lo pone
+   el guard desde la ruta y mandarlo da 400 (punto 9).
 5. `permissions` de un rol se envía **siempre como diccionario de booleanos**,
    nunca como array, y con claves del enum (punto 11).
 6. La interfaz decide qué enseñar con `GET /projects/:id/permissions/me`, no

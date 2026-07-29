@@ -10,11 +10,12 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
-/** Cuerpo que envía el cliente. El resto lo pone el gateway. */
+/**
+ * Cuerpo que envía el cliente.
+ *
+ * ⚠️ **No lleva `projectId`.** Ver `CreateTaskBodyDto`.
+ */
 export class UpdateTaskBodyDto {
-  @IsUUID('4')
-  projectId: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -57,6 +58,10 @@ export class UpdateTaskBodyDto {
 export class UpdateTaskDto extends UpdateTaskBodyDto {
   @IsUUID('4')
   id: string;
+
+  /** Resuelto por el guard desde la ruta, no por el cliente. */
+  @IsUUID('4')
+  projectId: string;
 
   @IsUUID('4')
   requesterId: string;

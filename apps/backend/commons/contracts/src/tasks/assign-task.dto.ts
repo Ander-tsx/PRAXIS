@@ -1,10 +1,11 @@
 import { IsOptional, IsUUID } from 'class-validator';
 
-/** Cuerpo que envía el cliente. El resto lo pone el gateway. */
+/**
+ * Cuerpo que envía el cliente.
+ *
+ * ⚠️ **No lleva `projectId`.** Ver `DeleteTaskBodyDto`.
+ */
 export class AssignTaskBodyDto {
-  @IsUUID('4')
-  projectId: string;
-
   @IsOptional()
   @IsUUID('4')
   assigneeId?: string;
@@ -14,6 +15,10 @@ export class AssignTaskBodyDto {
 export class AssignTaskDto extends AssignTaskBodyDto {
   @IsUUID('4')
   id: string;
+
+  /** Resuelto por el guard desde la ruta, no por el cliente. */
+  @IsUUID('4')
+  projectId: string;
 
   @IsUUID('4')
   requesterId: string;

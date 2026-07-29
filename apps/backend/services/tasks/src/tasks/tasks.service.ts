@@ -61,6 +61,45 @@ export class TasksService {
     }
   }
 
+  /**
+   * Carga una tarea y comprueba que pertenece al proyecto que dice el payload.
+   *
+   * El gateway ya resuelve el `projectId` desde la ruta, así que esto no
+   * debería fallar nunca desde la API pública. Está porque el microservicio no
+   * puede confiar en quien lo llame: sin esta comprobación, un `projectId`
+   * distinto del real convertía el permiso sobre *un* proyecto en permiso
+   * sobre las tareas de *cualquiera* (`PENDIENTES-BACKEND.md §9`).
+   */
+  private async loadTaskInProject(taskId: string, projectId: string) {
+    const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) {
+      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
+    }
+    if (task.projectId !== projectId) {
+      throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+    }
+    return task;
+  }
+
+  /**
+   * Carga un ítem de checklist con su tarea y comprueba el proyecto.
+   *
+   * El ítem no guarda `projectId`, así que la comprobación pasa por la tarea.
+   */
+  private async loadChecklistInProject(itemId: string, projectId: string) {
+    const item = await this.prisma.checklist.findUnique({
+      where: { id: itemId },
+      include: { task: true },
+    });
+    if (!item) {
+      throw new RpcException({ statusCode: 404, message: 'Ítem de checklist no encontrado' });
+    }
+    if (item.task.projectId !== projectId) {
+      throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+    }
+    return item;
+  }
+
   // ─── Tasks ────────────────────────────────────────────────────────────────
 
   async createTask(dto: CreateTaskDto) {
@@ -143,10 +182,7 @@ export class TasksService {
   async updateTask(dto: UpdateTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const task = await this.prisma.task.findUnique({ where: { id: dto.id } });
-    if (!task) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
-    }
+    const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
     const updated = await this.prisma.task.update({
       where: { id: dto.id },
@@ -173,10 +209,7 @@ export class TasksService {
   async moveTask(dto: MoveTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const task = await this.prisma.task.findUnique({ where: { id: dto.id } });
-    if (!task) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
-    }
+    const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
     const updated = await this.prisma.task.update({
       where: { id: dto.id },
@@ -199,10 +232,7 @@ export class TasksService {
   async deleteTask(dto: DeleteTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canDeleteTask');
 
-    const task = await this.prisma.task.findUnique({ where: { id: dto.id } });
-    if (!task) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
-    }
+    const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
     await this.prisma.task.delete({ where: { id: dto.id } });
 
@@ -217,10 +247,7 @@ export class TasksService {
   async assignTask(dto: AssignTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const task = await this.prisma.task.findUnique({ where: { id: dto.id } });
-    if (!task) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
-    }
+    const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
     const updated = await this.prisma.task.update({
       where: { id: dto.id },
@@ -243,10 +270,9 @@ export class TasksService {
       throw new RpcException({ statusCode: 400, message: 'Se requiere parentTaskId para crear una subtarea' });
     }
 
-    const parent = await this.prisma.task.findUnique({ where: { id: dto.parentTaskId } });
-    if (!parent) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea padre no encontrada' });
-    }
+    // La madre tiene que ser del mismo proyecto: si no, una subtarea sería una
+    // vía para colgar trabajo de un proyecto ajeno.
+    await this.loadTaskInProject(dto.parentTaskId, dto.projectId);
 
     // Delegate to createTask — permission included
     return this.createTask(dto);
@@ -257,10 +283,7 @@ export class TasksService {
   async createChecklist(dto: CreateChecklistDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const task = await this.prisma.task.findUnique({ where: { id: dto.taskId } });
-    if (!task) {
-      throw new RpcException({ statusCode: 404, message: 'Tarea no encontrada' });
-    }
+    const task = await this.loadTaskInProject(dto.taskId, dto.projectId);
 
     const item = await this.prisma.checklist.create({
       data: {
@@ -281,30 +304,34 @@ export class TasksService {
   async toggleChecklist(dto: ToggleChecklistDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const item = await this.prisma.checklist.findUnique({ where: { id: dto.id } });
-    if (!item) {
-      throw new RpcException({ statusCode: 404, message: 'Ítem de checklist no encontrado' });
-    }
+    const item = await this.loadChecklistInProject(dto.id, dto.projectId);
 
     const updated = await this.prisma.checklist.update({
       where: { id: dto.id },
       data: { completed: !item.completed },
     });
 
-    await this.redis.del(`task:${item.taskId}`);
+    // También la lista del tablero: la tarjeta enseña el avance del checklist,
+    // y sin esto se queda con el recuento viejo hasta que caduque (trampa #3).
+    await Promise.all([
+      this.redis.del(`task:${item.taskId}`),
+      this.redis.del(`tasks:board:${item.task.boardId}`),
+    ]);
+
     return updated;
   }
 
   async deleteChecklist(dto: DeleteChecklistDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
 
-    const item = await this.prisma.checklist.findUnique({ where: { id: dto.id } });
-    if (!item) {
-      throw new RpcException({ statusCode: 404, message: 'Ítem de checklist no encontrado' });
-    }
+    const item = await this.loadChecklistInProject(dto.id, dto.projectId);
 
     await this.prisma.checklist.delete({ where: { id: dto.id } });
-    await this.redis.del(`task:${item.taskId}`);
+
+    await Promise.all([
+      this.redis.del(`task:${item.taskId}`),
+      this.redis.del(`tasks:board:${item.task.boardId}`),
+    ]);
 
     return { success: true };
   }

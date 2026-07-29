@@ -45,7 +45,7 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 1. Toda respuesta viene envuelta en `{ success, data, meta }`. Los errores en `{ success: false, error: { code, message, details } }`.
 2. `login`/`register` devuelven `{ userId, accessToken, refreshToken }` en camelCase — **no** `access_token`.
 3. ✅ **La validación del gateway ya se aplica en los 28 endpoints** (`94721d8`, `477616f`, `2bad47c`). Antes 22 de ellos tipaban el `@Body()` con `Omit<XDto,...>`, que en runtime es `Object`, y devolvían **200 sin guardar nada**. Aun así seguimos validando en el cliente —el mensaje llega antes y marca el campo— y **confirmando contra el `data` de la respuesta, no contra el status**.
-4. Toda mutación de tarea o checklist necesita `projectId` en el body o el guard responde 403.
+4. ✅ Ninguna ruta de tarea o checklist acepta `projectId` en el body: mandarlo da **400**. El guard lo resuelve desde la ruta. Estuvo al revés, y mientras lo eligió el cliente era un bypass: declarar un proyecto propio daba acceso a las tareas de cualquier otro (`ed88c63`).
 5. ✅ `GET /api/projects` y `GET /api/users` aceptan **query params** (`page`, `limit`, `search`).
 6. ✅ `GET /api/projects` filtra por **dueño o miembro**.
 7. ✅ Un proyecto nuevo nace con rol "Administrador" y con el dueño dentro.
