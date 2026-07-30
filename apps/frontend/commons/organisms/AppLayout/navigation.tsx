@@ -103,4 +103,26 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
       </svg>
     ),
   },
+  {
+    /**
+     * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
+     * registro no pide— y por eso **absorbió `/dashboard/perfil`** en vez de
+     * enlazarla: una pantalla que solo llevara a otra es un salto de más.
+     *
+     * Va la última a propósito: es la entrada a la que se vuelve de vez en
+     * cuando, no una por la que se pasa a diario.
+     */
+    label: 'Configuración',
+    href: '/dashboard/configuracion',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M10.3 4.3a1 1 0 011-.8h1.4a1 1 0 011 .8l.2 1.4a6.5 6.5 0 011.5.9l1.3-.5a1 1 0 011.2.4l.7 1.2a1 1 0 01-.2 1.3l-1.1.9a6.6 6.6 0 010 1.7l1.1.9a1 1 0 01.2 1.3l-.7 1.2a1 1 0 01-1.2.4l-1.3-.5a6.5 6.5 0 01-1.5.9l-.2 1.4a1 1 0 01-1 .8h-1.4a1 1 0 01-1-.8l-.2-1.4a6.5 6.5 0 01-1.5-.9l-1.3.5a1 1 0 01-1.2-.4l-.7-1.2a1 1 0 01.2-1.3l1.1-.9a6.6 6.6 0 010-1.7l-1.1-.9a1 1 0 01-.2-1.3l.7-1.2a1 1 0 011.2-.4l1.3.5a6.5 6.5 0 011.5-.9l.2-1.4z"
+        />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 12a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+      </svg>
+    ),
+  },
 ];

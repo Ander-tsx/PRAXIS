@@ -1452,3 +1452,42 @@ Verificado con las dos cuentas contra el stack levantado:
 | Dueño | 200 (bypass por `ownerId`) |
 | Al mismo rol se le añade `canEditBoard` | `canEditProject: true`, `PATCH` **200** |
 | Y `canDeleteProject` con ese rol | sigue en `false` — no se concede de más |
+
+### 24.2 «Configuración» **absorbió** `/dashboard/perfil`
+
+La pantalla de datos del usuario existía y no tenía entrada en la barra lateral:
+se llegaba desde un enlace del panel que solo aparece cuando la cuenta **no**
+tiene nombre. Una vez puesto el nombre, la pantalla quedaba inalcanzable.
+
+Al darle entrada propia había dos caminos, y se eligió el primero:
+
+| Opción | Por qué no / sí |
+|---|---|
+| **Configuración se lleva la pantalla** | ✅ Un sitio para editar el perfil, y la entrada nueva lleva a contenido real |
+| Configuración enlaza a «Tus datos» | ❌ Una pantalla cuyo único contenido es un enlace a otra es un salto de más |
+| Las dos rutas, con el mismo formulario | ❌ Dos sitios donde editar lo mismo, y el segundo se queda atrás |
+
+`/dashboard/perfil` queda como **redirect** a `/dashboard/configuracion`. No es
+por compatibilidad con nadie de dentro —los enlaces internos ya apuntan al sitio
+nuevo— sino por los marcadores y los enlaces compartidos, que no se pueden
+corregir desde aquí.
+
+**Está montada para crecer**, que era el encargo: la page es una pila de
+`SettingsSection` con una sola sección dentro. La sección es un componente y no
+maquetación suelta precisamente porque hoy hay una: en cuanto llegue la segunda,
+dos bloques hechos a mano dejan de parecerse, y unificarlos después obliga a
+tocar los dos.
+
+Se cayó el «← Volver al panel»: con la entrada resaltada en la barra lateral, un
+enlace de vuelta a su lado sobra.
+
+⚠️ **El correo sigue sin editarse, y es del backend:** vive en `Credential`, en
+credentials-service, y no hay endpoint que lo cambie. El campo se enseña
+desactivado con el motivo escrito debajo, que es lo más honesto que se puede
+hacer sin inventar el endpoint.
+
+Verificado en el navegador: entrada nueva con su icono, resaltado correcto (la
+regla del prefijo más largo de `NavList` ya lo resolvía), `/dashboard/perfil`
+aterriza en `/dashboard/configuracion`, y guardar el apellido confirma contra el
+`data` y **actualiza el nombre de la barra lateral** — que vive en el layout, y
+lo alcanza `revalidatePath('/configuracion')`.

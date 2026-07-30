@@ -1,52 +1,17 @@
-import { AppHeader, Badge } from '@praxis/commons';
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { ProfileForm } from '@/components/organisms/ProfileForm';
-import { loadCurrentUser } from '@praxis/commons/auth';
-
-export const metadata: Metadata = {
-  title: 'Tus datos',
-};
+import { redirect } from 'next/navigation';
 
 /**
- * Datos del usuario.
+ * `/dashboard/perfil` se llama ahora `/dashboard/configuracion`.
  *
- * Existe porque el registro no pide nombre: sin esta pantalla, una cuenta
- * nueva no tendría forma de ponérselo. La escritura vive en `actions.ts`.
+ * La pantalla **se movió**, no se duplicó: Configuración es una entrada de la
+ * barra lateral y sus datos son la primera sección que contiene. Tener las dos
+ * rutas con el mismo formulario serían dos sitios donde editar lo mismo, y el
+ * segundo en enterarse de un cambio se quedaría atrás.
+ *
+ * Esto queda solo por los enlaces viejos: los de dentro ya apuntan al sitio
+ * nuevo, pero un marcador o un enlace compartido no se puede corregir.
  */
-export default async function ProfilePage() {
-  const { profile, roles } = await loadCurrentUser();
-
-  return (
-    <AppHeader
-      title="Tus datos"
-      headerSlot={roles.map((role) => (
-        <Badge key={role} variant={role === 'Admin' ? 'accent' : 'primary'}>
-          {role.toUpperCase()}
-        </Badge>
-      ))}
-    >
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          {/* Misma zona: `/` es el panel, Next añade el basePath. */}
-          <Link
-            href="/"
-            className="font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
-          >
-            ← Volver al panel
-          </Link>
-          <h2 className="font-display text-3xl text-text-primary">Tus datos</h2>
-          <p className="font-serif text-lg italic text-text-secondary">
-            Así te verá el resto de tu equipo.
-          </p>
-        </div>
-
-        <ProfileForm
-          email={profile.credential.email}
-          initialFirstName={profile.firstName ?? ''}
-          initialLastName={profile.lastName ?? ''}
-        />
-      </div>
-    </AppHeader>
-  );
+export default function ProfileRedirect() {
+  // Sin el basePath: es una ruta del App Router de esta app. Ver §17.4.
+  redirect('/configuracion');
 }

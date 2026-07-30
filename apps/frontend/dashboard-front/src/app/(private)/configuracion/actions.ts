@@ -63,9 +63,10 @@ export async function updateProfileAction(
   }
 
   // Sin el basePath: son rutas del App Router de esta app, donde el panel es
-  // `/` y esta pantalla `/perfil`. El nombre se ve en las dos.
+  // `/` y esta pantalla `/configuracion`. El nombre se ve en las dos, y también
+  // en la barra lateral, que vive en el layout y lo recibe del mismo perfil.
   revalidatePath('/');
-  revalidatePath('/perfil');
+  revalidatePath('/configuracion');
 
   return { error: null, savedName: firstName };
 }

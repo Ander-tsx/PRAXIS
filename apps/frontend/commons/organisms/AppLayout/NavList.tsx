@@ -10,8 +10,8 @@ import type { AppNavItem } from './navigation';
  * Con la comparación por prefijo a secas, en `/dashboard/notificaciones` se
  * encendían dos a la vez: «Panel» (`/dashboard`) y «Notificaciones». Ganar por
  * longitud resuelve el caso general —una sección dentro de otra— sin listar
- * excepciones, y mantiene lo que ya funcionaba: en `/dashboard/perfil`, que no
- * tiene entrada propia, sigue encendido «Panel».
+ * excepciones, y sigue haciendo lo correcto con una pantalla que **no** tiene
+ * entrada propia: ahí se queda encendido «Panel», el prefijo que sí la tiene.
  */
 function activeHrefOf(activePath: string, navItems: AppNavItem[]): string | null {
   let best: string | null = null;
