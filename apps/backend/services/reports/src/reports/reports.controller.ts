@@ -36,4 +36,16 @@ export class ReportsController {
   people(@Payload() dto: { projectId: string }) {
     return this.reports.people(dto.projectId);
   }
+
+  /**
+   * El contexto que lee el asistente. Lo consume `assistant-service`.
+   *
+   * ⚠️ `incluirPersonas` **no es una opción de formato**: es la línea de
+   * `canViewReports`. Lo decide el gateway, que es el único que sabe de
+   * permisos; aquí llega ya resuelto, como todo lo demás.
+   */
+  @MessagePattern({ cmd: 'report_briefing' })
+  briefing(@Payload() dto: { projectId: string; incluirPersonas?: boolean }) {
+    return this.reports.briefing(dto.projectId, dto.incluirPersonas === true);
+  }
 }
