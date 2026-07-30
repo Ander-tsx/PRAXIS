@@ -120,26 +120,36 @@ export class AssistantService {
        Ver `GeminiError`. */
     const cuota = await this.quota.consumir(payload.userId);
 
+    const proposals = respuesta.calls
+      .map((call) => this.validarPropuesta(call, briefing, payload))
+      .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
+
     return {
-      reply: respuesta.text || this.textoPorDefecto(respuesta.calls.length),
-      proposals: respuesta.calls
-        .map((call) => this.validarPropuesta(call, briefing, payload))
-        .filter((propuesta): propuesta is AssistantProposal => propuesta !== null),
+      reply: respuesta.text || this.textoPorDefecto(proposals),
+      proposals,
       cuota,
     };
   }
 
   /**
-   * Con function calling lo normal es que el texto venga vacío.
+   * Qué se dice cuando Gemini no manda texto.
    *
-   * Se rellena aquí y no en el frontend porque una burbuja en blanco encima de
-   * una tarjeta de propuesta se lee como un fallo.
+   * **Con function calling eso es lo normal, no la excepción:** el modelo
+   * devuelve la llamada y ni una palabra. Por eso el «por qué» es un parámetro
+   * obligatorio de la herramienta y no una petición en el prompt — pedirlo por
+   * prompt no funcionó— y por eso se puede usar aquí.
+   *
+   * Se rellena en el servidor y no en el frontend porque una burbuja en blanco
+   * encima de una tarjeta de propuesta se lee como un fallo.
    */
-  private textoPorDefecto(propuestas: number): string {
-    if (propuestas === 0) return 'No he sabido responder a eso.';
-    return propuestas === 1
-      ? 'Te propongo esto. Revisalo antes de aceptar.'
-      : 'Te propongo esto. Revisalo antes de aceptar.';
+  private textoPorDefecto(propuestas: AssistantProposal[]): string {
+    const razones = propuestas
+      .map((propuesta) => String(propuesta.args.porQue ?? '').trim())
+      .filter(Boolean);
+
+    if (razones.length > 0) return razones.join('\n\n');
+    if (propuestas.length > 0) return 'Te propongo esto. Revisalo antes de aceptar.';
+    return 'No he sabido responder a eso.';
   }
 
   /**
@@ -204,6 +214,7 @@ export class AssistantService {
           ...(this.fechaValida(call.args.dueDate) ? { dueDate: call.args.dueDate } : {}),
           ...(encargados.length > 0 ? { assigneeIds: encargados } : {}),
           ...(etiquetas.length > 0 ? { labelIds: etiquetas } : {}),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };
     }
@@ -217,7 +228,7 @@ export class AssistantService {
         args: {
           taskId,
           assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
-          ...(call.args.motivo ? { motivo: String(call.args.motivo) } : {}),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };
     }

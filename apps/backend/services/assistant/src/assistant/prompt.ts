@@ -57,6 +57,20 @@ const REGLAS = [
     'tiene que aceptar despues. Nunca digas que has creado, asignado o cambiado ' +
     'algo. Di que lo propones, y que lo revise.',
 
+  /**
+   * 7 bis — Sin esto, una propuesta llega muda.
+   *
+   * Con function calling lo normal es que el modelo devuelva la llamada y ni una
+   * palabra, y entonces la tarjeta aparece sin que nadie sepa por que se
+   * recomienda a esa persona ni por que esa etiqueta. Justo lo que la
+   * recomendacion tenia que aportar —el hecho que la sostiene— es lo que se
+   * pierde. La tarjeta enseña QUE se va a crear; el texto tiene que decir POR QUE.
+   */
+  'SIEMPRE que llames a una herramienta, escribe ADEMAS una o dos frases ' +
+    'explicando por que: de que trata la tarea y por que esa etiqueta, y si ' +
+    'recomiendas a alguien, con el dato que lo sostiene ("ha cerrado 3 de ' +
+    'frontend y ahora tiene 3 abiertas"). Una propuesta sin explicacion no vale.',
+
   /* 8 — Lo que sí decide el modelo, y es exactamente para lo que sirve. */
   'Para clasificar una tarea nueva usa SOLO las etiquetas que vienen en ' +
     '"etiquetas", con su id. Deduce de cual es por lo que cuenta la persona: ' +

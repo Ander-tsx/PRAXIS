@@ -75,8 +75,26 @@ const PROPONER_TAREA: FunctionDeclaration = {
         items: { type: 'STRING' },
         description: 'Opcional. id de "etiquetas" del contexto. Nunca inventes uno.',
       },
+      /**
+       * ⚠️ **Obligatorio, y aquí y no en el texto libre a propósito.**
+       *
+       * Con function calling el modelo devuelve la llamada y, casi siempre, ni
+       * una palabra: la tarjeta aparecía sin decir por qué esa etiqueta ni por
+       * qué esa persona. Justo lo que la recomendación tenía que aportar —el
+       * hecho que la sostiene— era lo que se perdía. Pedirlo por prompt no
+       * bastó; como parámetro obligatorio el modelo no puede omitirlo.
+       *
+       * La tarjeta enseña QUÉ se va a crear; esto dice POR QUÉ.
+       */
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Una o dos frases: de que trata y por que esa etiqueta, y si ' +
+          'recomiendas a alguien, con el hecho que lo sostiene ("ha cerrado 3 de ' +
+          'frontend y ahora tiene 3 abiertas"). Nunca digas que alguien es mas rapido.',
+      },
     },
-    required: ['title', 'columnId', 'priority'],
+    required: ['title', 'columnId', 'priority', 'porQue'],
   },
 };
 
@@ -100,12 +118,15 @@ const PROPONER_ASIGNACION: FunctionDeclaration = {
           'La lista COMPLETA de quien debe quedar asignado, no solo lo que se anade: ' +
           'lo que mandes es lo que queda.',
       },
-      motivo: {
+      /** Obligatorio por lo mismo que `porQue` en la otra. */
+      porQue: {
         type: 'STRING',
-        description: 'Una frase, con el hecho que la sostiene: experiencia y carga.',
+        description:
+          'Obligatorio. Una frase con el hecho que lo sostiene: experiencia y carga ' +
+          'actual. Nunca digas que alguien es mas rapido o mejor que otro.',
       },
     },
-    required: ['taskId', 'assigneeIds'],
+    required: ['taskId', 'assigneeIds', 'porQue'],
   },
 };
 
