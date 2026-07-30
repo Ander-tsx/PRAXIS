@@ -144,9 +144,17 @@ export class TasksController {
   }
 
   /** Mueve una tarea de columna u orden (requiere canEditTask) */
+  /**
+   * Mueve una tarea de columna (requiere canMoveTask).
+   *
+   * Es el único endpoint que pide `canMoveTask`: mover no es editar. Quien tiene
+   * `canEditTask` lo obtiene por jerarquía, así que ningún rol existente pierde
+   * capacidad. Ojo: `PATCH /tasks/:id` también acepta `columnId` y `status`, y
+   * ese sigue exigiendo `canEditTask` — el que solo mueve usa esta ruta.
+   */
   @Post('tasks/:id/move')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MOVE_TASK)
   @ApiOperation({ summary: 'Mueve una tarea de columna u orden' })
   @ApiResponse({ status: 200, description: 'Tarea movida exitosamente' })
   move(

@@ -11,6 +11,17 @@ export enum ProjectPermission {
   CAN_VIEW_PROJECT   = 'canViewProject',
 
   CAN_CREATE_TASK    = 'canCreateTask',
+  /**
+   * Mover una tarea de columna, sin poder tocar su contenido.
+   *
+   * Existe porque arrastrar una tarjeta de «En curso» a «Hecho» exigía
+   * `canEditTask`, que también deja reescribir el título, cambiar la prioridad y
+   * reasignar a quien sea. Quien ejecuta el trabajo tiene que poder decir que lo
+   * terminó sin poder redefinir en qué consistía.
+   *
+   * `canEditTask` lo implica por jerarquía: quien ya podía mover no pierde nada.
+   */
+  CAN_MOVE_TASK      = 'canMoveTask',
   CAN_EDIT_TASK      = 'canEditTask',
   CAN_DELETE_TASK    = 'canDeleteTask',
   CAN_CREATE_BOARD   = 'canCreateBoard',

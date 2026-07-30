@@ -24,6 +24,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canEditColumn: true,
   canDeleteColumn: true,
   canCreateTask: true,
+  canMoveTask: true,
   canEditTask: true,
   canDeleteTask: true,
   canManageMembers: true,

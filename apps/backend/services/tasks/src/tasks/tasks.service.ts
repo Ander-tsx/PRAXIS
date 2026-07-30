@@ -422,7 +422,9 @@ export class TasksService {
   }
 
   async moveTask(dto: MoveTaskDto) {
-    await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
+    // Mover no es editar: ver `CAN_MOVE_TASK` en el enum. `canEditTask` lo
+    // implica por jerarquía, así que quien podía mover sigue pudiendo.
+    await this.assertPermission(dto.requesterId, dto.projectId, 'canMoveTask');
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
