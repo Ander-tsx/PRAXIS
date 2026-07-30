@@ -14,9 +14,9 @@
         "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
         "docker:restart": "docker compose -f infra/docker/compose/docker-compose.yml down && docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
-        "prisma:reset": "pnpm --filter @praxis/credentials-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/projects-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/permissions-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/tasks-service exec prisma migrate reset --force --skip-seed",
+        "prisma:reset": "pnpm --filter @praxis/credentials-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/projects-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/permissions-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/tasks-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/assistant-service exec prisma migrate reset --force --skip-seed",
         "prisma:seed": "pnpm --filter @praxis/permissions-service run prisma:seed && pnpm --filter @praxis/credentials-service run prisma:seed && pnpm --filter @praxis/projects-service run prisma:seed && pnpm --filter @praxis/tasks-service run prisma:seed",
-        "prisma:deploy": "pnpm --filter @praxis/credentials-service exec prisma migrate deploy && pnpm --filter @praxis/projects-service exec prisma migrate deploy && pnpm --filter @praxis/permissions-service exec prisma migrate deploy && pnpm --filter @praxis/tasks-service exec prisma migrate deploy"
+        "prisma:deploy": "pnpm --filter @praxis/credentials-service exec prisma migrate deploy && pnpm --filter @praxis/projects-service exec prisma migrate deploy && pnpm --filter @praxis/permissions-service exec prisma migrate deploy && pnpm --filter @praxis/tasks-service exec prisma migrate deploy && pnpm --filter @praxis/assistant-service exec prisma migrate deploy"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",

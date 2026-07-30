@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["assistant"]
+  url      = env("DATABASE_URL")
+}
+
+/// Cuánto da cada plan al mes vive en `@praxis/contracts` (`ASSISTANT_LIMITS`),
+/// no aquí: el backend y el contador del chat tienen que leer el mismo número.
+enum AssistantPlan {
+  FREE
+  PRO
+
+  @@schema("assistant")
+}
+
+/// El plan de cada usuario.
+///
+/// **Sin fila = FREE.** No se crea nada al registrarse: una tabla que hay que
+/// rellenar para todo el mundo antes de que sirva de algo es una migración
+/// pendiente disfrazada, y el valor por defecto ya es el correcto.
+///
+/// No hay clave foránea hacia el usuario: vive en credentials-service, en otro
+/// esquema y bajo otro dueño. Es la misma regla que siguen `task_events` y
+/// `notifications`.
+///
+/// ⚠️ **No hay pasarela de pago.** Pasar a PRO es hoy un UPDATE a mano.
+model AssistantSubscription {
+  userId    String        @id
+  plan      AssistantPlan @default(FREE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@schema("assistant")
+  @@map("assistant_subscriptions")
+}
+
+/// Consumo de un usuario en un mes. `period` es 'YYYY-MM'.
+///
+/// **Una fila por mes en vez de un contador que se reinicia**, y no es un
+/// capricho: así queda el histórico de consumo, que es lo primero que hará
+/// falta el día que existan planes de verdad. Un contador que se pone a cero
+/// borra la única prueba de cuánto se usó esto.
+///
+/// Tampoco vive en Redis: un FLUSHALL regalaría 500 mensajes a todo el mundo, y
+/// un contador que gobierna un coste real no puede depender de una caché que es
+/// desechable por definición.
+model AssistantUsage {
+  id     String @id @default(uuid())
+  userId String
+  period String
+  used   Int    @default(0)
+
+  @@unique([userId, period])
+  @@index([period])
+  @@schema("assistant")
+  @@map("assistant_usage")
+}
