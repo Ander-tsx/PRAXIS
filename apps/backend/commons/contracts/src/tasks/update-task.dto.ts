@@ -1,6 +1,7 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsISO8601,
   IsOptional,
@@ -81,4 +82,14 @@ export class UpdateTaskDto extends UpdateTaskBodyDto {
 
   @IsUUID('4')
   requesterId: string;
+
+  /**
+   * ¿La columna destino es de cierre? Igual que en `MoveTaskDto`, y por el mismo
+   * motivo: este `PATCH` **también** acepta `columnId`, así que también puede
+   * cerrar una tarea. Si solo lo resolviera la ruta de mover, editar la columna
+   * desde aquí dejaría el `completedAt` sin poner y el reporte se lo perdería.
+   */
+  @IsOptional()
+  @IsBoolean()
+  isClosingColumn?: boolean;
 }

@@ -28,6 +28,22 @@ const TASK_CACHE_TTL = 120;       // 2 min individual task
 const BOARD_TASKS_TTL = 60;       // 1 min board tasks list
 
 /**
+ * Un evento a registrar, sin los campos que se repiten en todos.
+ *
+ * `taskId`, `projectId`, `boardId`, `actorId` y `taskTitle` los pone
+ * `recordEvents` a partir de la tarea, para que ningún sitio de llamada pueda
+ * olvidarse de uno.
+ */
+type TaskEventDraft = {
+  type: Prisma.TaskEventCreateManyInput['type'];
+  fromColumnId?: string | null;
+  toColumnId?: string | null;
+  fromPriority?: Prisma.TaskEventCreateManyInput['fromPriority'];
+  toPriority?: Prisma.TaskEventCreateManyInput['toPriority'];
+  subjectId?: string | null;
+};
+
+/**
  * Lo que acompaña a una tarea al salir del servicio.
  *
  * En un solo sitio para que las cinco rutas que devuelven tareas tengan la
@@ -133,6 +149,111 @@ export class TasksService {
       throw new RpcException({ statusCode: 403, message: 'Forbidden' });
     }
     return task;
+  }
+
+  /**
+   * Registra lo que le pasó a una tarea.
+   *
+   * ⚠️ **Recibe siempre el cliente de la transacción, nunca `this.prisma`.** El
+   * evento y la mutación que describe tienen que caer o entrar juntos.
+   *
+   * Es la decisión **contraria** a la de los avisos, que son best-effort a
+   * propósito (§22.2), y la diferencia importa: un aviso perdido se nota —falta
+   * en la bandeja— y no rompe nada. Un movimiento no registrado no se nota
+   * nunca, corrompe en silencio todos los tiempos de ciclo que se calculen
+   * después, y no hay forma de detectarlo ni de repararlo, porque el dato que
+   * faltaría es precisamente el que diría que falta. Aquí la escritura es local
+   * —misma base, mismo esquema, sin salto de red—, así que la transacción es
+   * barata; los avisos cruzan a otro microservicio y por eso no pueden serlo.
+   *
+   * Los campos comunes salen de la tarea y no de quien llama: así ningún sitio
+   * puede olvidarse del `projectId` o mandar un `taskTitle` desincronizado.
+   */
+  private async recordEvents(
+    tx: Prisma.TransactionClient,
+    task: { id: string; projectId: string; boardId: string; title: string },
+    actorId: string,
+    events: TaskEventDraft[],
+  ) {
+    if (events.length === 0) return;
+
+    await tx.taskEvent.createMany({
+      data: events.map((event) => ({
+        taskId:    task.id,
+        projectId: task.projectId,
+        boardId:   task.boardId,
+        actorId,
+        // Copia del momento: el evento sobrevive a la tarea.
+        taskTitle: task.title,
+        ...event,
+      })),
+    });
+  }
+
+  /**
+   * Quién entra y quién sale de los encargados, como eventos.
+   *
+   * Mismo cálculo que hace `notifyAssigneeChanges` para avisar, pero aquí no se
+   * puede reutilizar: aquel avisa **después** de la transacción y por RPC, y
+   * esto tiene que ocurrir **dentro**.
+   *
+   * `after` sin definir significa que el `PATCH` no tocó los encargados —que no
+   * es lo mismo que haberlos dejado vacíos—, así que no hay nada que registrar.
+   */
+  private assigneeEvents(before: string[], after?: string[]): TaskEventDraft[] {
+    if (after === undefined) return [];
+
+    const antes = new Set(before);
+    const despues = new Set(after);
+
+    return [
+      ...after
+        .filter((userId) => !antes.has(userId))
+        .map((userId): TaskEventDraft => ({ type: 'ASSIGNED', subjectId: userId })),
+      ...before
+        .filter((userId) => !despues.has(userId))
+        .map((userId): TaskEventDraft => ({ type: 'UNASSIGNED', subjectId: userId })),
+    ];
+  }
+
+  /**
+   * Qué eventos genera un cambio de columna, y qué pasa con `completedAt`.
+   *
+   * Vive aparte porque **las dos rutas que mueven una tarea comparten esta
+   * lógica**: `POST /tasks/:id/move` y el `PATCH` que también acepta `columnId`.
+   * Duplicarla garantizaba que una de las dos se quedara atrás.
+   *
+   * `isClosingColumn` llega del gateway (ver `MoveTaskDto`). Si llega
+   * `undefined` —el gateway no pudo resolver el color— **no se toca
+   * `completedAt`**: registrar un cierre falso ensucia el throughput para
+   * siempre, y no registrarlo solo lo deja incompleto.
+   */
+  private resolveColumnChange(params: {
+    fromColumnId: string;
+    toColumnId: string;
+    wasCompleted: boolean;
+    isClosingColumn?: boolean;
+  }): { events: TaskEventDraft[]; completedAt?: Date | null } {
+    const { fromColumnId, toColumnId, wasCompleted, isClosingColumn } = params;
+
+    if (fromColumnId === toColumnId) return { events: [] };
+
+    const events: TaskEventDraft[] = [{ type: 'MOVED', fromColumnId, toColumnId }];
+
+    if (isClosingColumn === undefined) return { events };
+
+    if (isClosingColumn && !wasCompleted) {
+      events.push({ type: 'COMPLETED', fromColumnId, toColumnId });
+      return { events, completedAt: new Date() };
+    }
+
+    if (!isClosingColumn && wasCompleted) {
+      events.push({ type: 'REOPENED', fromColumnId, toColumnId });
+      return { events, completedAt: null };
+    }
+
+    // De una columna de cierre a otra: sigue cerrada, y la fecha es la primera.
+    return { events };
   }
 
   /**
@@ -327,27 +448,40 @@ export class TasksService {
     const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds ?? []);
     const labels = await this.resolveLabels(dto.projectId, dto.labelIds ?? []);
 
-    const task = await this.prisma.task.create({
-      data: {
-        title:        dto.title,
-        description:  dto.description,
-        status:       dto.status,
-        boardId:      dto.boardId,
-        columnId:     dto.columnId,
-        reporterId:   dto.requesterId,
-        projectId:    dto.projectId,
-        parentTaskId: dto.parentTaskId,
-        dueDate:      dto.dueDate ? new Date(dto.dueDate) : undefined,
-        priority:     dto.priority,
-        order:        dto.order ?? 0,
-        assignees: {
-          create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
+    /* En transacción con su historial: una tarea que nace sin evento `CREATED`
+       no tiene principio, y su tiempo de entrega es incalculable para siempre. */
+    const task = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.task.create({
+        data: {
+          title:        dto.title,
+          description:  dto.description,
+          status:       dto.status,
+          boardId:      dto.boardId,
+          columnId:     dto.columnId,
+          reporterId:   dto.requesterId,
+          projectId:    dto.projectId,
+          parentTaskId: dto.parentTaskId,
+          dueDate:      dto.dueDate ? new Date(dto.dueDate) : undefined,
+          priority:     dto.priority,
+          order:        dto.order ?? 0,
+          assignees: {
+            create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
+          },
+          labels: {
+            create: labels.map((labelId) => ({ labelId })),
+          },
         },
-        labels: {
-          create: labels.map((labelId) => ({ labelId })),
-        },
-      },
-      include: TASK_INCLUDE,
+        include: TASK_INCLUDE,
+      });
+
+      await this.recordEvents(tx, created, dto.requesterId, [
+        { type: 'CREATED', toColumnId: created.columnId, toPriority: created.priority },
+        /* Los encargados iniciales cuentan como asignación: si no, una tarea
+           que nace con dueño no tendría registro de cuándo lo ganó. */
+        ...assignees.map((userId): TaskEventDraft => ({ type: 'ASSIGNED', subjectId: userId })),
+      ]);
+
+      return created;
     });
 
     await this.redis.del(`tasks:board:${dto.boardId}`);
@@ -473,6 +607,21 @@ export class TasksService {
        entonces no hay nada de qué avisar ni por qué consultarlo. */
     const before = assignees !== undefined ? await this.currentAssignees(dto.id) : [];
 
+    /**
+     * Este `PATCH` **también mueve**: acepta `columnId`. Se le da el mismo
+     * tratamiento que a la ruta de mover, con la misma función, o una tarea
+     * cerrada desde aquí no contaría como cerrada en ningún reporte.
+     */
+    const change =
+      dto.columnId !== undefined
+        ? this.resolveColumnChange({
+            fromColumnId: task.columnId,
+            toColumnId: dto.columnId,
+            wasCompleted: task.completedAt !== null,
+            isClosingColumn: dto.isClosingColumn,
+          })
+        : { events: [] as TaskEventDraft[], completedAt: undefined };
+
     const updated = await this.prisma.$transaction(async (tx) => {
       if (assignees !== undefined) {
         await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
@@ -481,7 +630,7 @@ export class TasksService {
         await this.replaceLabels(tx, dto.id, labels);
       }
 
-      return tx.task.update({
+      const saved = await tx.task.update({
         where: { id: dto.id },
         data: {
           ...(dto.title       !== undefined && { title: dto.title }),
@@ -493,9 +642,27 @@ export class TasksService {
           ...(dto.dueDate     !== undefined && {
             dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
           }),
+          ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
         },
         include: TASK_INCLUDE,
       });
+
+      await this.recordEvents(tx, saved, dto.requesterId, [
+        ...change.events,
+        /* Solo si cambió de verdad: el diálogo manda la prioridad siempre, así
+           que registrar cada `PATCH` llenaría el historial de cambios que no
+           fueron y desvirtuaría cualquier análisis de repriorización. */
+        ...(dto.priority !== undefined && dto.priority !== task.priority
+          ? [{
+              type: 'PRIORITY_CHANGED' as const,
+              fromPriority: task.priority,
+              toPriority: dto.priority,
+            }]
+          : []),
+        ...this.assigneeEvents(before, assignees),
+      ]);
+
+      return saved;
     });
 
     await Promise.all([
@@ -524,14 +691,29 @@ export class TasksService {
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
-    const updated = await this.prisma.task.update({
-      where: { id: dto.id },
-      data: {
-        columnId: dto.columnId,
-        ...(dto.status !== undefined && { status: dto.status }),
-        ...(dto.order  !== undefined && { order: dto.order }),
-      },
-      include: TASK_INCLUDE,
+    /* El único sitio donde de verdad se mide el flujo del tablero. Si esto no
+       queda registrado, no hay tiempo de ciclo que valga. */
+    const change = this.resolveColumnChange({
+      fromColumnId: task.columnId,
+      toColumnId: dto.columnId,
+      wasCompleted: task.completedAt !== null,
+      isClosingColumn: dto.isClosingColumn,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const moved = await tx.task.update({
+        where: { id: dto.id },
+        data: {
+          columnId: dto.columnId,
+          ...(dto.status !== undefined && { status: dto.status }),
+          ...(dto.order  !== undefined && { order: dto.order }),
+          ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
+        },
+        include: TASK_INCLUDE,
+      });
+
+      await this.recordEvents(tx, moved, dto.requesterId, change.events);
+      return moved;
     });
 
     await Promise.all([
@@ -547,7 +729,21 @@ export class TasksService {
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
-    await this.prisma.task.delete({ where: { id: dto.id } });
+    await this.prisma.$transaction(async (tx) => {
+      /**
+       * El evento **antes** del borrado, y sobrevive a él.
+       *
+       * Aquí se ve por qué `TaskEvent` no tiene clave foránea hacia `Task`: con
+       * `onDelete: Cascade` este registro —y todo el historial de la tarea— se
+       * borraría en la misma operación, así que una tarea que se cerró y luego
+       * se limpió del tablero desaparecería del throughput **retroactivamente**,
+       * cambiando cifras del pasado que ya se habían enseñado.
+       */
+      await this.recordEvents(tx, task, dto.requesterId, [
+        { type: 'DELETED', fromColumnId: task.columnId },
+      ]);
+      await tx.task.delete({ where: { id: dto.id } });
+    });
 
     await Promise.all([
       this.redis.del(`task:${dto.id}`),
@@ -575,7 +771,19 @@ export class TasksService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
-      return tx.task.findUniqueOrThrow({ where: { id: dto.id }, include: TASK_INCLUDE });
+      const saved = await tx.task.findUniqueOrThrow({
+        where: { id: dto.id },
+        include: TASK_INCLUDE,
+      });
+
+      await this.recordEvents(
+        tx,
+        saved,
+        dto.requesterId,
+        this.assigneeEvents(before, assignees),
+      );
+
+      return saved;
     });
 
     await Promise.all([
@@ -627,6 +835,20 @@ export class TasksService {
     if (dto.projectId) {
       await this.prisma.label.deleteMany({ where: { projectId: dto.projectId } });
       await this.redis.del(`labels:project:${dto.projectId}`);
+
+      /**
+       * Y el historial de eventos del proyecto.
+       *
+       * Es el **único** caso en que se borra: `TaskEvent` no tiene clave foránea
+       * precisamente para sobrevivir al borrado de su tarea, pero si el proyecto
+       * entero desaparece, sus eventos no describen ya nada consultable —no hay
+       * ninguna ruta desde la que pedirlos— y se quedarían acumulándose sin
+       * dueño. Es además lo que promete el diálogo de borrado: se va todo.
+       *
+       * Borrar un tablero o una columna **no** los toca: el proyecto sigue ahí y
+       * sus reportes deben seguir cuadrando con lo que pasó.
+       */
+      await this.prisma.taskEvent.deleteMany({ where: { projectId: dto.projectId } });
     }
 
     // Se leen antes para saber qué claves de caché invalidar; después del
@@ -657,6 +879,16 @@ export class TasksService {
    *
    * Solo toca las filas que no coinciden ya, así que es idempotente y un
    * renombrado que no cambia nada no escribe nada.
+   *
+   * ⚠️ **No emite ningún `TaskEvent`, y es deliberado.** Renombrar una columna
+   * no mueve ninguna tarea: cambia la etiqueta del sitio donde ya estaban.
+   * Emitir `MOVED` aquí fabricaría un movimiento por cada tarea de la columna,
+   * todos con la misma marca de tiempo, y el tiempo de ciclo de un tablero
+   * quedaría destrozado por un cambio de nombre.
+   *
+   * Es también la razón de que los eventos guarden **`columnId` y nunca
+   * `status`**: el `status` es un nombre y cambia sin que nada se mueva, así que
+   * un historial apoyado en él registraría movimientos que no ocurrieron.
    */
   async restatusTasks(dto: RestatusTasksDto) {
     // Se leen antes: después del update ya no hay forma de saber cuáles eran

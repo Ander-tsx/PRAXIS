@@ -1710,3 +1710,107 @@ barra lateral acepta la quinta entrada sin apretarse.
 > grupo `(private)`, y como el `tsconfig` incluye `.next/types/**/*.ts`, un `tsc
 > --noEmit` a mano informa de dos módulos que no existen. Está en `.gitignore` y
 > desaparece borrando `.next`; no afecta a `next dev` ni al build.
+
+---
+
+## 25. Reportes: primero el historial que nunca se guardó
+
+> Sección nueva de arriba abajo —microservicio y microfrontend propios— para
+> análisis, tiempos y predicción. Empieza por el backend porque **el dato que
+> hace falta no existe**, y solo se puede capturar hacia adelante.
+
+### 25.1 El hallazgo que decidió el alcance
+
+Antes de diseñar nada se inventarió qué datos hay. Resultado: **no existe ningún
+registro histórico en todo el sistema.** Cero tablas de auditoría, eventos o
+transiciones de estado, en los cuatro esquemas. Además:
+
+- `Task` no tenía `completedAt` ni estimación de esfuerzo.
+- `Checklist` solo tiene `completed: Boolean`, sin fecha de marcado.
+- **`Task.updatedAt` no aproxima nada**: lo pisa cualquier `PATCH` —título,
+  prioridad, una etiqueta— y también `restatusTasks`, la cascada que reescribe el
+  `status` al renombrar una columna.
+- No había ni un solo `groupBy` ni `aggregate` en el backend.
+
+Traducido: **«análisis» y «reportes estadísticos» eran posibles; «predicción de
+tiempos» y «rendimiento» no**, y no por falta de interfaz sino porque el dato
+nunca se guardó. De ahí el orden: la captura sale **antes** que cualquier
+pantalla, porque cada día sin ella es un día que no tendremos nunca.
+
+### 25.2 `TaskEvent`, y por qué guarda `columnId` y no `status`
+
+Tabla nueva en tasks-service, más `Task.completedAt`. Ocho tipos de evento:
+`CREATED`, `MOVED`, `COMPLETED`, `REOPENED`, `ASSIGNED`, `UNASSIGNED`,
+`PRIORITY_CHANGED`, `DELETED`.
+
+⚠️ **El movimiento se guarda por id de columna, nunca por `status`.** El `status`
+es el *nombre* de la columna, y renombrarla lo cambia en todas sus tareas sin que
+ninguna se mueva. Un historial apoyado en el nombre registraría movimientos que
+no ocurrieron. Por lo mismo, **`restatusTasks` no emite ningún evento**: renombrar
+no es mover, y emitir ahí fabricaría un movimiento por tarea, todos con la misma
+marca de tiempo.
+
+Se vio en la verificación: tras renombrar «Hecho» → «Terminado», los cuatro
+`MOVED` resuelven correctamente sus columnas actuales, y no apareció ninguno de
+más.
+
+**Sin clave foránea hacia `Task`**, igual que `notifications` (§22.2): un evento
+es un hecho del pasado. Con `onDelete: Cascade`, limpiar una tarea del tablero
+borraría su historial y el throughput del mes pasado cambiaría retroactivamente.
+Solo se borran al borrar el **proyecto**, donde ya no hay ruta desde la que
+pedirlos.
+
+### 25.3 La transacción, al revés que en los avisos
+
+El evento y la mutación que describe van en **un `prisma.$transaction`**. Si falla
+el evento, **se pierde la mutación**.
+
+Es la decisión contraria a la de los avisos, que son best-effort a propósito
+(§22.2), y la diferencia está en cómo fallan:
+
+| | Aviso perdido | Movimiento no registrado |
+|---|---|---|
+| ¿Se nota? | Sí, falta en la bandeja | **Nunca** |
+| ¿Se puede reparar? | Sí, el hecho sigue ahí | No, el dato que faltaría es el que diría que falta |
+| Coste de la garantía | Salto a otro microservicio | Misma base, mismo esquema |
+
+Un tiempo de ciclo calculado sobre un historial con huecos silenciosos es peor
+que no tener tiempo de ciclo.
+
+### 25.4 Quién sabe que una columna es verde
+
+`tasks-service` no conoce los colores: son un campo de `BoardColumn`, en
+projects-service. Lo resuelve el **gateway**, con `column_find_by_ids` —el mismo
+comando que ya usa `excludeDone`— y le pasa `isClosingColumn` a tasks-service.
+
+Es el **cuarto** cruce de esa frontera que se resuelve en el gateway, y por el
+mismo motivo que los tres anteriores: hacer que tasks llamara a projects
+encadenaría dos saltos en una ruta que se ejecuta al arrastrar cada tarjeta.
+
+Se aplica en **las dos** rutas que mueven: `POST /tasks/:id/move` y el `PATCH`,
+que también acepta `columnId`. Si solo lo hiciera la primera, cerrar una tarea
+editándola no contaría en ningún reporte.
+
+Si el gateway no puede resolver el color, llega `undefined` y **no se toca
+`completedAt`**: un cierre falso ensucia el throughput para siempre; no
+registrarlo solo deja el dato incompleto, que es reparable.
+
+### 25.5 Verificado contra el stack
+
+Proyecto de usar y tirar, once eventos, comprobados en `psql`:
+
+| Caso | Resultado |
+|---|---|
+| Crear | `CREATED` con la prioridad inicial, y `ASSIGNED` por cada encargado de origen |
+| Mover entre columnas normales | Un `MOVED`, sin tocar `completedAt` |
+| Mover a la verde | `MOVED` + `COMPLETED`, y `completedAt` puesto |
+| Sacarla de la verde | `MOVED` + `REOPENED`, y `completedAt` de vuelta a `null` |
+| Cerrarla otra vez | `completedAt` nuevo, no el de la primera vez |
+| **Renombrar la columna** | **Cero eventos** |
+| `PATCH` de prioridad, dos veces con el mismo valor | **Un** `PRIORITY_CHANGED`, no dos |
+| Borrar la tarea | `DELETED`, y sus 11 eventos siguen ahí con la fila ya borrada |
+| Borrar el proyecto | Los 11 desaparecen |
+
+⚠️ Las tres tareas que ya estaban en «Hecho» en el proyecto de demostración
+tienen `completedAt: null`, y así se quedan: nunca se guardó cuándo llegaron.
+Es la forma más concreta de ver que el historial solo existe hacia adelante.

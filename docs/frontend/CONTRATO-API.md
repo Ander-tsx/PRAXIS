@@ -431,8 +431,28 @@ ninguna pantalla. Ver ESTADO-ACTUAL §24.5.
 ```ts
 Task = { id, title, description, status, boardId, columnId, reporterId,
          projectId, parentTaskId, dueDate, priority, order, createdAt, updatedAt,
-         assignees, subtasks, checklists }
+         completedAt, assignees, subtasks, checklists }
 ```
+
+### `completedAt`: cuándo se cerró
+
+`null` mientras la tarea siga abierta. Se pone al entrar en una **columna de
+cierre** (la verde) y **vuelve a `null`** si alguien la saca de ahí.
+
+Lo resuelve el backend solo: quien mueve la tarea no manda nada extra. El gateway
+mira el color de la columna destino y se lo dice a tasks-service, que es lo mismo
+que ya hacía `excludeDone`.
+
+⚠️ **Solo existe hacia adelante.** Las tareas que ya estaban en una columna verde
+antes de que esto se implementara tienen `completedAt: null` y **no se pueden
+rellenar**: nunca se guardó cuándo llegaron ahí. Una interfaz que las cuente como
+«cerradas» debe seguir mirando el color de su columna, no este campo.
+
+### El historial de la tarea
+
+Cada movimiento, cierre, reapertura, asignación y cambio de prioridad queda
+registrado con su fecha y su autor. **Todavía no hay endpoint que lo exponga**:
+existe para alimentar la sección de Reportes. Detalle en ESTADO-ACTUAL §25.
 
 Las cinco rutas que devuelven tareas traen **la misma forma**: `assignees` y
 `checklists` siempre vienen, también en el listado del tablero. Así la interfaz no

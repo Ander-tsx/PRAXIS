@@ -33,10 +33,88 @@ model Task {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
+  /// Cuándo entró en una **columna de cierre** (la verde). `null` mientras siga
+  /// abierta, y se vuelve a `null` si alguien la saca de ahí.
+  ///
+  /// Está denormalizado a propósito. Se podría deducir del último evento
+  /// `COMPLETED` de `TaskEvent`, pero entonces cada consulta de «¿qué está
+  /// cerrado?» tendría que recorrer el historial, y esa pregunta la hacen casi
+  /// todos los reportes.
+  ///
+  /// ⚠️ Quién decide si la columna cierra es el **gateway**, no este servicio:
+  /// el color vive en projects-service. Ver `isClosingColumn` en `MoveTaskDto`.
+  completedAt  DateTime?
+
   /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
   @@index([projectId, dueDate])
+  /// Para el throughput: cuántas se cerraron en cada tramo de fechas.
+  @@index([projectId, completedAt])
   @@schema("tasks")
   @@map("tasks")
+}
+
+/// Qué le pasó a una tarea, y cuándo.
+///
+/// Es la tabla que **no existía** y sin la cual no hay analítica posible: hasta
+/// ahora el sistema solo guardaba el estado actual, así que no había forma de
+/// saber cuánto tardó nada. `Task.updatedAt` no servía de aproximación porque lo
+/// pisa cualquier edición —cambiar el título, la prioridad, una etiqueta— y
+/// también la cascada que renombra el `status` al renombrar la columna.
+///
+/// ⚠️ **El historial solo se puede capturar hacia adelante.** Lo anterior a esta
+/// tabla no existe y no se puede reconstruir.
+enum TaskEventType {
+  CREATED
+  MOVED
+  /// Entró en una columna de cierre.
+  COMPLETED
+  /// Salió de una columna de cierre estando cerrada.
+  REOPENED
+  ASSIGNED
+  UNASSIGNED
+  PRIORITY_CHANGED
+  DELETED
+
+  @@schema("tasks")
+}
+
+model TaskEvent {
+  id           String        @id @default(uuid())
+  taskId       String
+  projectId    String
+  boardId      String
+  type         TaskEventType
+
+  /// Movimiento, **por id de columna y nunca por `status`**.
+  ///
+  /// El `status` es el *nombre* de la columna, y renombrar una columna lo cambia
+  /// en todas sus tareas sin que ninguna se haya movido. Un historial apoyado en
+  /// el nombre registraría movimientos que no ocurrieron.
+  fromColumnId String?
+  toColumnId   String?
+
+  fromPriority Priority?
+  toPriority   Priority?
+
+  /// A quién se asignó o desasignó. `actorId` es quien lo hizo; no coinciden.
+  subjectId    String?
+  actorId      String
+
+  /// Copia del momento, igual que en `notifications`: el evento tiene que poder
+  /// leerse cuando la tarea de la que habla ya no existe.
+  taskTitle    String
+
+  occurredAt   DateTime      @default(now())
+
+  /// Sin clave foránea a `Task`, y es deliberado: un evento es un hecho del
+  /// pasado. Con `onDelete: Cascade` el throughput histórico se borraría solo al
+  /// limpiar el tablero, que es justo cuando más interesa conservarlo. Los
+  /// borra explícitamente `TaskPurgeService` cuando desaparece el proyecto.
+  @@index([projectId, occurredAt])
+  @@index([taskId, occurredAt])
+  @@index([projectId, type, occurredAt])
+  @@schema("tasks")
+  @@map("task_events")
 }
 
 /// Encargado de una tarea.

@@ -29,6 +29,7 @@ import {
   AssignTaskBodyDto,
   CreateTaskBodyDto,
   DeleteTaskBodyDto,
+  DONE_COLUMN_COLOR,
   FindTasksDto,
   MoveTaskBodyDto,
   ProjectPermission,
@@ -50,7 +51,37 @@ import {
 export class TasksController {
   constructor(
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
+
+  /**
+   * ¿Esa columna es de **cierre** (la verde)?
+   *
+   * Se resuelve aquí y no en tasks-service porque el color es un campo de
+   * `BoardColumn`, que vive en projects-service. Es el cuarto cruce de esta
+   * frontera que se resuelve en el gateway, por el mismo motivo que los otros
+   * tres (`TaskPurgeService`, `ColumnStatusSyncService` y el `excludeDone` de
+   * `/me/tasks`): hacer que tasks llamara a projects encadenaría dos saltos en
+   * una ruta que se llama al arrastrar cada tarjeta.
+   *
+   * Devuelve `undefined` si no se pudo averiguar, y tasks-service lo interpreta
+   * como «no toques `completedAt`». Un cierre falso ensucia el throughput para
+   * siempre; no registrarlo solo deja el dato incompleto, que es reparable.
+   */
+  private async isClosingColumn(columnId?: string): Promise<boolean | undefined> {
+    if (!columnId) return undefined;
+
+    try {
+      const columns = await firstValueFrom(
+        this.projectsClient.send({ cmd: 'column_find_by_ids' }, { ids: [columnId] }),
+      );
+      const column = (columns ?? [])[0] as { color?: string } | undefined;
+      if (!column) return undefined;
+      return column.color === DONE_COLUMN_COLOR;
+    } catch {
+      return undefined;
+    }
+  }
 
   /** Crea una tarea en un board (requiere canCreateTask) */
   @Post('boards/:boardId/tasks')
@@ -125,11 +156,15 @@ export class TasksController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
   @ApiOperation({ summary: 'Actualiza una tarea' })
   @ApiResponse({ status: 200, description: 'Tarea actualizada exitosamente' })
-  update(
+  async update(
     @Param('id') id: string,
     @Request() req: Express.Request,
     @Body() body: UpdateTaskBodyDto,
   ) {
+    /* Este `PATCH` también acepta `columnId`, así que también puede cerrar una
+       tarea. Solo se pregunta si el cuerpo trae columna. */
+    const isClosingColumn = await this.isClosingColumn(body.columnId);
+
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'task_update' },
@@ -138,6 +173,7 @@ export class TasksController {
           id,
           projectId: req.projectId,
           requesterId: req.user!.userId,
+          isClosingColumn,
         },
       ),
     );
@@ -157,11 +193,16 @@ export class TasksController {
   @RequireProjectPermission(ProjectPermission.CAN_MOVE_TASK)
   @ApiOperation({ summary: 'Mueve una tarea de columna u orden' })
   @ApiResponse({ status: 200, description: 'Tarea movida exitosamente' })
-  move(
+  async move(
     @Param('id') id: string,
     @Request() req: Express.Request,
     @Body() body: MoveTaskBodyDto,
   ) {
+    /* Lo que convierte «arrastrar a Hecho» en un cierre medible: sin esto, la
+       tarea llegaría a la columna verde sin `completedAt` y no contaría en
+       ningún tiempo de ciclo. */
+    const isClosingColumn = await this.isClosingColumn(body.columnId);
+
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'task_move' },
@@ -170,6 +211,7 @@ export class TasksController {
           id,
           projectId: req.projectId,
           requesterId: req.user!.userId,
+          isClosingColumn,
         },
       ),
     );
