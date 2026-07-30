@@ -299,6 +299,11 @@ export interface ChecklistItem {
  *
  * Las cinco rutas que devuelven tareas traen la misma forma: `assignees`,
  * `subtasks` y `checklists` vienen siempre, también en el listado del tablero.
+ *
+ * ⚠️ `subtasks` y `parentTaskId` están declarados porque **el backend los manda**,
+ * no porque los usemos: decidimos no exponer subtareas (ESTADO-ACTUAL §24.5). En
+ * la práctica `subtasks` llega siempre vacío. Quitarlos del tipo obligaría a
+ * mentir sobre la forma de la respuesta.
  */
 export interface Task {
   id: string;

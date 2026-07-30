@@ -416,11 +416,17 @@ Body de creación:
   dueDate?,           // ISO 8601
   priority?,          // 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT' (default MEDIUM)
   order?,             // int ≥ 0
-  parentTaskId?       // si viene → se crea como SUBTAREA (el gateway usa otro comando interno)
+  parentTaskId?       // si viene → se crea como SUBTAREA. La interfaz NO lo manda nunca
 }
 ```
 
 `boardId`, `projectId` y `requesterId` los inyecta el gateway; **no los mandes** (`forbidNonWhitelisted` → 400).
+
+⚠️ **`parentTaskId` no se usa desde la interfaz, y es una decisión, no un olvido.**
+El backend soporta subtareas porque venían del modelo original del otro equipo;
+el checklist ya cubre «partir una tarea en pasos» con mucha menos ceremonia. La
+tarea sigue trayendo `subtasks` en la respuesta —siempre `[]`— y no se pinta en
+ninguna pantalla. Ver ESTADO-ACTUAL §24.5.
 
 ```ts
 Task = { id, title, description, status, boardId, columnId, reporterId,

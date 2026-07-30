@@ -1214,9 +1214,12 @@ accesible distingue los dos casos.
 ## 21. Los permisos, terminados
 
 > Con esta pasada se cierran **los diecisiete pendientes** de
-> `PENDIENTES-BACKEND.md`. Lo que queda no es de esa lista: subtareas sin
-> interfaz, tareas que no se reordenan dentro de su columna y el dominio de
-> notificaciones, que no existe en ninguna capa.
+> `PENDIENTES-BACKEND.md`. Lo que queda no es de esa lista: tareas que no se
+> reordenan dentro de su columna y el dominio de notificaciones, que entonces no
+> existía en ninguna capa y se construyó justo después (§22).
+>
+> Las subtareas **salieron de la lista de huecos**: existen en el backend y
+> decidimos no exponerlas. Ver §24.5.
 
 ### 21.1 El eje que faltaba: ejecutar ≠ definir
 
@@ -1658,3 +1661,35 @@ Los campos miden **lo que mide su texto** con una rejilla de una celda: un
 | Descripción de dos líneas | El campo crece, sin barra y sin recorte |
 | Reposo | Indistinguible del texto que había antes |
 | Rol «Colaborador» (sin `canEditProject`) | `<h2>` y párrafo, **cero campos** |
+
+### 24.5 Las subtareas: capacidad heredada que decidimos **no** usar
+
+`Task.parentTaskId`, la autorrelación y el comando `subtask_create` existen en el
+backend porque venían del modelo original del otro equipo. Llevaban desde
+entonces apuntadas como «hueco de producto: existen y no tienen interfaz».
+
+**Salen de esa lista. No las vamos a exponer.**
+
+El checklist ya cubre «partir una tarea en pasos», y con mucha menos ceremonia:
+un campo de texto dentro de la tarea contra una tarea entera con su título, su
+columna, su `status`, sus encargados y su propio diálogo. Una subtarea solo
+aportaría algo si cada paso necesitara **dueño y fecha propios** — y para eso son
+mejores dos tareas normales relacionadas por etiqueta, que además caben en el
+tablero y cuentan en «mis tareas».
+
+Lo que eso implica, escrito para que nadie lo «arregle» por error:
+
+| Sitio | Qué pasa |
+|---|---|
+| `POST /boards/:id/tasks` | Acepta `parentTaskId`; **la interfaz no lo manda nunca** |
+| `Task.subtasks` en la respuesta | Sigue viniendo, siempre `[]`. Declarado en el tipo porque el backend lo manda |
+| Chip «N subtareas» de `TaskCard` | **Retirado** |
+| PENDIENTES-BACKEND | Ya no figura como hueco |
+
+El chip se va y no se queda «porque no molesta»: nada en la interfaz puede crear
+una subtarea, así que era un contador condenado a decir siempre cero y a prometer
+una función que no existe. Un elemento que solo aparecería si alguien tocara la
+API a mano no es información, es una pista falsa.
+
+No se toca nada del backend: quitar el soporte sería una migración con borrado de
+una columna para no ganar nada.

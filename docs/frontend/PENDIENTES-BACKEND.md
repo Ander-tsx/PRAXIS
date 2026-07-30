@@ -12,10 +12,13 @@
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
 > commit y cómo se verificó.
 >
-> Lo que queda no es de esta lista: son **huecos de producto** —las subtareas
-> existen en backend y no tienen interfaz, y no se pueden reordenar tareas dentro
-> de una columna— y el dominio de **notificaciones**, que no existe en ninguna
-> capa.
+> Lo que queda no es de esta lista. Hoy es un solo hueco de producto: **no se
+> pueden reordenar tareas dentro de una columna**.
+>
+> **Las subtareas no son un pendiente.** `Task.parentTaskId` y `subtask_create`
+> existen porque venían del modelo original, y **decidimos no exponerlas**: el
+> checklist ya cubre partir una tarea en pasos con mucha menos ceremonia. Es
+> capacidad heredada que no usamos, no un hueco. Ver ESTADO-ACTUAL §24.5.
 
 ---
 
@@ -63,9 +66,10 @@ Ninguno. Los seis que quedaban se cerraron el 2026-07-30; ver la tabla de abajo.
 | 17 | 🔵 | Comentar exigía `canEditTask`; ahora `canComment` | `ee8be65` |
 | — | 🟡 | Nombre duplicado devolvía 500 (proyectos y espacios) | `477616f` `fb4a758` |
 
-**Lo que queda no está en esta lista.** Son huecos de producto: las subtareas
-existen en el backend y no tienen interfaz, no se pueden reordenar tareas dentro
-de una columna, y no hay dominio de notificaciones.
+**Lo que queda no está en esta lista.** Es un hueco de producto: no se pueden
+reordenar tareas dentro de una columna. El dominio de notificaciones, que también
+faltaba, se construyó en `8177ac3`. Y las subtareas **no cuentan como hueco**:
+existen en el backend y decidimos no exponerlas (ESTADO-ACTUAL §24.5).
 
 ---
 

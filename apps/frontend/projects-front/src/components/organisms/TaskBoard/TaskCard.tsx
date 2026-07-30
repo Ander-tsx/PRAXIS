@@ -205,11 +205,11 @@ export function TaskCard({
           </Chip>
         )}
 
-        {task.subtasks.length > 0 && (
-          <Chip color={colors.textSecondary}>
-            {task.subtasks.length} {task.subtasks.length === 1 ? 'subtarea' : 'subtareas'}
-          </Chip>
-        )}
+        {/* Había aquí un chip «N subtareas». Se fue con la decisión de **no
+            exponer subtareas**: nada en la interfaz puede crear una, así que era
+            un contador que siempre dice cero y que promete una función que no
+            existe. El backend las soporta; es capacidad heredada que decidimos
+            no usar. Ver ESTADO-ACTUAL §24.5. */}
       </div>
 
       {task.assignees.length > 0 && (
