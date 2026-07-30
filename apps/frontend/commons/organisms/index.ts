@@ -1,9 +1,9 @@
 /**
  * Organismos compartidos.
  *
- * Un organismo sube aquí cuando lo consumen ≥2 zonas. `AppLayout` cumple por
- * construcción: en multi-zones cada zona privada es una app Next independiente
- * y renderiza su propio armazón, así que todas lo necesitan.
+ * Un organismo sube aquí cuando lo consumen ≥2 zonas. El armazón del área
+ * privada cumple por construcción: en multi-zones cada zona es una app Next
+ * independiente y renderiza el suyo, así que todas lo necesitan.
  */
 
 export * from './AppLayout';

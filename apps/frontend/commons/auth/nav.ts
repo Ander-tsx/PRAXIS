@@ -9,9 +9,9 @@ const NOTIFICATIONS_HREF = '/dashboard/notificaciones';
  * La navegación del área privada con el contador de notificaciones puesto.
  *
  * Existe porque **la insignia tiene que verse desde cualquier pantalla**, no
- * solo desde las dos que ya pedían la bandeja. Cada página que monta `AppLayout`
- * llama aquí, y así ni se duplica el `fetch` ni se olvida en la siguiente
- * pantalla que alguien añada.
+ * solo desde las dos que ya pedían la bandeja. Lo llama el `layout.tsx` de cada
+ * zona, una vez por visita, y desde ahí la insignia acompaña a todas sus
+ * pantallas.
  *
  * Es una petición mínima —`unreadOnly` con `limit=1`, solo interesa el
  * contador— y **degrada a la navegación sin número** si falla: no saber cuántas
