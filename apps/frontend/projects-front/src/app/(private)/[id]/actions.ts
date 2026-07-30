@@ -6,7 +6,9 @@ import {
   type ChecklistItem,
   type Column,
   type Label,
+  type Paginated,
   type PermissionMap,
+  type ProjectDetail,
   type ProjectInvitation,
   type ProjectRole,
   type Task,
@@ -20,6 +22,7 @@ import { redirect } from 'next/navigation';
 import type {
   BoardState,
   ColumnState,
+  DeleteProjectState,
   MemberState,
   RoleState,
   TaskState,
@@ -73,6 +76,99 @@ function readPermissions(formData: FormData): PermissionMap {
     map[String(key) as keyof PermissionMap] = true;
   }
   return map;
+}
+
+/* ─── El proyecto ───────────────────────────────────────────────────── */
+
+/**
+ * Lo que se lleva por delante el borrado de un proyecto.
+ *
+ * No es una Server Action de formulario: es una **lectura**, y la llama el
+ * diálogo de confirmación al abrirse. Se hace así y no en el render de la página
+ * porque contar las tareas obliga a una petición por tablero, y sería trabajo
+ * tirado en las visitas —casi todas— donde nadie va a borrar nada.
+ *
+ * Los ids de los tableros se vuelven a resolver **aquí**, desde el `projectId`,
+ * en vez de recibirlos del cliente: el detalle está cacheado en Redis 5 minutos,
+ * así que es barato, y así ningún id que llegue de fuera decide qué se consulta.
+ *
+ * ⚠️ **Las tareas se piden con `limit=100`, el mismo que usa la página, y no con
+ * `limit=1` aunque solo interese el `total`.** La clave de caché del backend
+ * (`tasks:board:<id>`) **no incluye la paginación**: una petición con `limit=1`
+ * deja cacheado un tablero de una sola tarea durante 60 s y el tablero se pinta
+ * casi vacío. Reproducido. Ver §24.3.
+ *
+ * Un fallo devuelve `null` en el contador, no cero: «no lo sé» y «ninguna» son
+ * cosas distintas, y en una confirmación de borrado decir cero de más es peor
+ * que no decir nada.
+ */
+export interface ProjectInventory {
+  tasks: number | null;
+  pendingInvitations: number | null;
+}
+
+export async function projectInventoryAction(projectId: string): Promise<ProjectInventory> {
+  const api = await requireApi();
+  if (!api) return { tasks: null, pendingInvitations: null };
+
+  const project = await api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null);
+  if (!project) return { tasks: null, pendingInvitations: null };
+
+  const boardIds = project.workspaces.flatMap((workspace) =>
+    workspace.boards.map((board) => board.id),
+  );
+
+  const [taskTotals, invitations] = await Promise.all([
+    Promise.all(
+      boardIds.map((boardId) =>
+        api
+          .get<Paginated<Task>>(`/boards/${boardId}/tasks?limit=100`)
+          .then((page) => page.total)
+          .catch(() => null),
+      ),
+    ),
+    api
+      .get<ProjectInvitation[]>(`/projects/${projectId}/invitations`)
+      .then((list) => list.filter((invitation) => invitation.status === 'PENDING').length)
+      .catch(() => null),
+  ]);
+
+  return {
+    // Si algún tablero falló no se puede sumar: el total sería más bajo del real.
+    tasks: taskTotals.includes(null) ? null : taskTotals.reduce((a, b) => a! + b!, 0),
+    pendingInvitations: invitations,
+  };
+}
+
+/**
+ * Elimina un proyecto entero.
+ *
+ * La cascada **ya está resuelta en el backend y no se reimplementa aquí**:
+ * Postgres arrastra espacios → tableros → columnas dentro de projects-service, y
+ * `TaskPurgeService` borra las tareas, que viven en tasks-service y a las que el
+ * `ON DELETE CASCADE` no llega. Verificado contando filas antes y después.
+ *
+ * Tras borrar **hay que salir**: la página del proyecto acaba de dejar de
+ * existir, así que la acción redirige a la lista en vez de devolver un estado
+ * que nadie podría leer.
+ */
+export async function deleteProjectAction(
+  _prev: DeleteProjectState,
+  formData: FormData,
+): Promise<DeleteProjectState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.' };
+
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el proyecto.') };
+  }
+
+  revalidatePath('/');
+  redirect('/');
 }
 
 /* ─── Roles ─────────────────────────────────────────────────────────── */

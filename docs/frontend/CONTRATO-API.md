@@ -428,9 +428,31 @@ Task = { id, title, description, status, boardId, columnId, reporterId,
          assignees, subtasks, checklists }
 ```
 
-Las cinco rutas que devuelven tareas traen **la misma forma**: `assignees`,
-`subtasks` y `checklists` siempre vienen, también en el listado del tablero. Así
-la interfaz no tiene que saber de dónde salió cada tarea.
+Las cinco rutas que devuelven tareas traen **la misma forma**: `assignees` y
+`checklists` siempre vienen, también en el listado del tablero. Así la interfaz no
+tiene que saber de dónde salió cada tarea.
+
+### 🔴 `GET /boards/:boardId/tasks` cachea sin la paginación en la clave
+
+La respuesta se guarda en `tasks:board:<boardId>` durante 60 s, y **la clave no
+incluye `page` ni `limit`**. Consecuencia directa, reproducida:
+
+```
+GET /boards/<id>/tasks?limit=1    → items: 1, total: 7   ← se cachea así
+GET /boards/<id>/tasks?limit=100  → items: 1, total: 7   ← durante 60 s
+```
+
+**Pide siempre con el mismo `limit` que use el resto de la interfaz** (hoy 100).
+Una petición con otro límite —típicamente `limit=1` para leer solo el `total`—
+deja el tablero pintándose con una sola tarjeta por columna.
+
+El `total` es un `count` aparte y **sí es correcto** en cualquier caso, así que
+para contar sirve la respuesta de `limit=100`, que además comparte la entrada de
+caché en vez de envenenarla.
+
+⚠️ No está arreglado a propósito: la clave se invalida con `del` exacto en catorce
+sitios de tasks-service, y meterle la paginación los dejaría todos sin efecto en
+silencio. Ver ESTADO-ACTUAL §24.3.
 
 `dueDate: null` en un `PATCH` quita la fecha límite.
 

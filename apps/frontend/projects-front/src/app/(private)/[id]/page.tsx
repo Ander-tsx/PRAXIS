@@ -133,6 +133,20 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   );
 
   /**
+   * Las columnas del proyecto entero.
+   *
+   * Solo la necesita la confirmación de borrado, que tiene que decir cuánto se
+   * va con números reales. Sale del árbol que ya está en memoria, así que no
+   * cuesta ninguna petición; las tareas sí, y por eso se cuentan al abrir el
+   * diálogo y no aquí (§24.3).
+   */
+  const columnCount = project.workspaces.reduce(
+    (total, workspace) =>
+      total + workspace.boards.reduce((sum, board) => sum + board.columns.length, 0),
+    0,
+  );
+
+  /**
    * Espacio abierto.
    *
    * Tres formas de decidirlo, en orden:
@@ -222,6 +236,12 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           isOwner={effective.isOwner}
           memberCount={members.length}
           boardCount={boardCount}
+          columnCount={columnCount}
+          labelCount={labels.length}
+          /* Se lee del mapa efectivo, no de `isOwner`: un rol con
+             `canDeleteProject` también puede, y no vamos a provocar un 403 para
+             averiguarlo. */
+          canDelete={can.canDeleteProject}
         />
 
         <TabNav

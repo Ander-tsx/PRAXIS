@@ -1491,3 +1491,74 @@ regla del prefijo más largo de `NavList` ya lo resolvía), `/dashboard/perfil`
 aterriza en `/dashboard/configuracion`, y guardar el apellido confirma contra el
 `data` y **actualiza el nombre de la barra lateral** — que vive en el layout, y
 lo alcanza `revalidatePath('/configuracion')`.
+
+### 24.3 Borrar un proyecto, y el contador que destapó un bug de caché
+
+`canDeleteProject` existía desde `ee8be65` y `DELETE /projects/:id` funcionaba,
+pero **no había forma de borrar un proyecto desde ninguna pantalla**: se podía
+crear y no deshacer. El botón vive en la cabecera del detalle, en la misma fila
+que «← Todos los proyectos» —las dos acciones sobre el proyecto entero, ninguna
+del título— y solo aparece con `canDeleteProject`, leído de
+`GET /projects/:id/permissions/me` y **no deducido de `isOwner`**: un rol con ese
+permiso también puede.
+
+La confirmación es la pieza que importa, y no es un «¿seguro?»:
+
+| Decisión | Por qué |
+|---|---|
+| Dice cuánto se va, con **números reales** | Es la única frase que convierte «se borra todo» en algo que se puede sopesar |
+| Hay que **escribir el nombre** | Un «¿seguro?» se pulsa sin leer. Igual que `DeleteWorkspaceButton`, pero **siempre**: un proyecto nunca está lo bastante vacío |
+| Un cero **no se enseña** | Lo que no existe no se puede perder, y ocho líneas con ceros esconden las que importan |
+| Lo que no se pudo contar dice **«no se pudieron contar»** | En una confirmación de borrado, un cero falso es peor que admitir que no se sabe |
+
+**El inventario se pide al abrir el diálogo, no al renderizar la página.** Los
+contadores del árbol —espacios, tableros, columnas, roles— salen de
+`GET /projects/:id`, que la página ya tiene. Las tareas y las invitaciones
+pendientes no, y contar tareas cuesta **una petición por tablero**: pagarlas en
+cada visita al proyecto para una acción que casi nadie ejecuta es trabajo tirado.
+Los ids de los tableros se vuelven a resolver dentro de la acción, desde el
+`projectId`, y no se reciben del cliente.
+
+#### 🔴 La clave `tasks:board:<id>` no incluye la paginación
+
+Contar tareas con `?limit=1` —solo hace falta el `total`— parecía lo barato.
+Reproducido contra el stack:
+
+```
+DEL tasks:board:<id>
+GET /boards/<id>/tasks?limit=1    → items: 1, total: 7   ← se cachea así
+GET /boards/<id>/tasks?limit=100  → items: 1, total: 7   ← el tablero sale con 1 tarea
+```
+
+`findAllTasks` cachea bajo `tasks:board:<boardId>` **sin la página ni el límite
+en la clave**, 60 s. Cualquier petición con otra paginación envenena el listado
+del tablero, y la página lo pide con `limit=100`.
+
+**No se arregla en esta pasada, y el motivo es la trampa de siempre:** la clave se
+invalida con `del` exacto en **catorce sitios** de tasks-service. Meterle la
+paginación los dejaría a todos sin efecto, en silencio, que es exactamente cómo se
+rompió seis veces la invalidación del tablero. El arreglo bueno es borrado por
+patrón (`SCAN` + `del`), y eso es rediseñar la capa de caché, no una línea.
+
+> Nota: la variante `tasks:board:<id>:col:<columnId>` que ya existía tiene el
+> mismo problema y **nadie la borra nunca**: los catorce `del` son de la clave sin
+> sufijo. Vive lo que dure su TTL.
+
+Mientras tanto, el inventario **pide con el mismo `limit=100` que la página**, así
+que comparte la entrada de caché en vez de envenenarla, y el `total` viene gratis
+en esa misma respuesta.
+
+#### Verificado en navegador y en la base
+
+Proyecto de sacrificio con 2 espacios, 2 tableros, 4 columnas, 8 tareas, 2
+etiquetas, 1 persona, 1 rol y 1 invitación pendiente:
+
+| Caso | Resultado |
+|---|---|
+| Inventario del diálogo | Las ocho cifras cuadran fila por fila con `psql` |
+| Singulares | «1 persona», «1 rol», «1 invitación sin responder» |
+| «proyecto de sacrificio» en minúscula | Botón **desactivado** |
+| Nombre exacto | Borrado, y aterriza en la lista de proyectos |
+| Filas después, en los **dos** esquemas | Todo a 0, tareas incluidas — `TaskPurgeService` cruza el límite entre microservicios |
+| Proyecto demo | Intacto |
+| La misma pantalla con el rol «Colaborador» | **No** aparece «Eliminar proyecto» |

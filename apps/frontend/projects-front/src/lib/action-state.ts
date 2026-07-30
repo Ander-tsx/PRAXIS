@@ -70,6 +70,32 @@ export interface TaskState {
 
 export const TASK_INITIAL_STATE: TaskState = { error: null, done: null };
 
+/**
+ * Estado del borrado de un proyecto.
+ *
+ * Solo lleva error: cuando sale bien, la acción **redirige** a la lista, así que
+ * no hay ninguna pantalla que pueda leer un `done`. La página que confirmó el
+ * borrado deja de existir.
+ */
+export interface DeleteProjectState {
+  error: string | null;
+}
+
+export const DELETE_PROJECT_INITIAL_STATE: DeleteProjectState = { error: null };
+
+/**
+ * Estado de la edición en línea del nombre y la descripción.
+ *
+ * Devuelve **lo que confirmó el servidor**, no lo que se mandó: es lo que
+ * permite comprobar contra el `data` desde el cliente, y lo que se escribe en
+ * `document.title` cuando el nombre cambia de verdad.
+ */
+export interface ProjectFieldState {
+  error: string | null;
+  savedName: string | null;
+  savedDescription: string | null;
+}
+
 /** Estado de la respuesta a una invitación desde la página del proyecto. */
 export interface InvitationResponseState {
   error: string | null;

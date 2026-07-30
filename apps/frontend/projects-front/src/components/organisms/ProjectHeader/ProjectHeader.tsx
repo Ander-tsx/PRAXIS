@@ -1,11 +1,20 @@
 import { Badge, type ProjectDetail } from '@praxis/commons';
 import Link from 'next/link';
+import { DeleteProjectButton } from './DeleteProjectButton';
 
 export interface ProjectHeaderProps {
   project: ProjectDetail;
   isOwner: boolean;
   memberCount: number;
   boardCount: number;
+  columnCount: number;
+  labelCount: number;
+  /**
+   * Se lee de `GET /projects/:id/permissions/me`, no se deduce de `isOwner`: el
+   * dueño lo tiene por bypass, pero un rol con `canDeleteProject` también, y
+   * probar y comerse un 403 no es forma de decidir qué se enseña.
+   */
+  canDelete: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -19,16 +28,36 @@ export function ProjectHeader({
   isOwner,
   memberCount,
   boardCount,
+  columnCount,
+  labelCount,
+  canDelete,
 }: ProjectHeaderProps) {
   return (
     <header className="flex flex-col gap-4">
-      {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
-      <Link
-        href="/"
-        className="w-fit font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
-      >
-        ← Todos los proyectos
-      </Link>
+      {/* Volver y eliminar comparten fila: son las dos acciones sobre el
+          proyecto entero, y ninguna pertenece al título. */}
+      <div className="flex items-center justify-between gap-4">
+        {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
+        <Link
+          href="/"
+          className="w-fit font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+        >
+          ← Todos los proyectos
+        </Link>
+
+        {canDelete && (
+          <DeleteProjectButton
+            projectId={project.id}
+            projectName={project.name}
+            workspaceCount={project.workspaces.length}
+            boardCount={boardCount}
+            columnCount={columnCount}
+            labelCount={labelCount}
+            memberCount={memberCount}
+            roleCount={project.roles.length}
+          />
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="font-display text-3xl text-text-primary sm:text-4xl">{project.name}</h2>
