@@ -3,6 +3,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
+ * `actorId` con el que la semilla marca los eventos que fabricó.
+ *
+ * Espejo de `ACTOR_SINTETICO` en `prisma/seed-events.ts`. Es el UUID de ceros,
+ * que no puede ser el id de nadie, y sirve para que la interfaz pueda avisar de
+ * que un proyecto no mide trabajo real. Un gráfico fabricado sin etiquetar es el
+ * peor resultado posible de esta sección.
+ */
+const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
+
+/**
  * Agregación sobre las tareas y su historial.
  *
  * Vive **aquí y no en reports-service** porque los datos son de este servicio.
@@ -74,21 +84,38 @@ export class StatsService {
   private async totals(projectId: string) {
     const ahora = new Date();
 
-    const [total, completed, overdue, unassigned, checklistItems, checklistDone] =
-      await Promise.all([
-        this.prisma.task.count({ where: { projectId } }),
-        this.prisma.task.count({ where: { projectId, completedAt: { not: null } } }),
-        /* Vencidas: con fecha pasada y **sin cerrar**. Una tarea entregada no
-           vence, que es la misma regla que ya aplica la tarjeta del tablero. */
-        this.prisma.task.count({
-          where: { projectId, completedAt: null, dueDate: { lt: ahora } },
-        }),
-        this.prisma.task.count({ where: { projectId, assignees: { none: {} } } }),
-        this.prisma.checklist.count({ where: { task: { projectId } } }),
-        this.prisma.checklist.count({ where: { task: { projectId }, completed: true } }),
-      ]);
+    const [
+      total,
+      completed,
+      overdue,
+      unassigned,
+      checklistItems,
+      checklistDone,
+      eventosSinteticos,
+    ] = await Promise.all([
+      this.prisma.task.count({ where: { projectId } }),
+      this.prisma.task.count({ where: { projectId, completedAt: { not: null } } }),
+      /* Vencidas: con fecha pasada y **sin cerrar**. Una tarea entregada no
+         vence, que es la misma regla que ya aplica la tarjeta del tablero. */
+      this.prisma.task.count({
+        where: { projectId, completedAt: null, dueDate: { lt: ahora } },
+      }),
+      this.prisma.task.count({ where: { projectId, assignees: { none: {} } } }),
+      this.prisma.checklist.count({ where: { task: { projectId } } }),
+      this.prisma.checklist.count({ where: { task: { projectId }, completed: true } }),
+      /* Para que la pantalla pueda decir «esto es historial fabricado». */
+      this.prisma.taskEvent.count({ where: { projectId, actorId: ACTOR_SINTETICO } }),
+    ]);
 
-    return { total, completed, overdue, unassigned, checklistItems, checklistDone };
+    return {
+      total,
+      completed,
+      overdue,
+      unassigned,
+      checklistItems,
+      checklistDone,
+      eventosSinteticos,
+    };
   }
 
   /**

@@ -1924,3 +1924,58 @@ cuatrocientas, y es la forma más rápida de perder la confianza de quien la lee
 | `people` como «Colaborador» | **403** |
 | `snapshot` como «Colaborador» | **200** — la línea cae donde debe |
 | `permissions/me` | `canViewReports`: dueño `true`, colaborador `false` |
+
+### 25.10 La semilla, y por qué crea un proyecto aparte
+
+El historial nace vacío, así que sin esto la sección enseña estados vacíos
+durante semanas. La semilla (`tasks/prisma/seed-events.ts`) fabrica **8 semanas
+de flujo** con 60 tareas.
+
+**No retro-rellena el proyecto real, y no es pereza:** nadie guardó cuándo se
+movió cada tarea de «Rediseño del panel», y fabricar ese dato encima del real
+sería mentir sobre trabajo que sí ocurrió. Crea un proyecto **aparte**, llamado
+«Sprint histórico (datos de demostración)», y el de siempre se queda intacto.
+
+**Marcado en el dato:** todos los eventos llevan
+`actorId = 00000000-0000-0000-0000-000000000000`, que no puede ser el id de
+nadie. `snapshot` devuelve `eventosSinteticos`, para que la pantalla pueda
+avisar. Verificado: 246 en el proyecto sembrado, **0 en el real**.
+
+#### Dos ajustes que hicieron falta al mirar el resultado
+
+**El primer intento cerraba solo 15 de 60**, porque el destino de cada tarea se
+elegía uniforme. Salía un ritmo de 0,25 tareas/día y una predicción de **180
+días**: aritméticamente correcto y pésimo como demostración, porque lo que se
+quiere enseñar es cómo se lee un equipo que funciona. Ahora dos tercios llegan al
+final: 38 cerradas, ritmo 0,62/día, predicción 36–45 días.
+
+**Los tiempos salen de una distribución con cola**, no uniformes, y los fines de
+semana pesan menos. Con un ritmo constante los percentiles 50 y 85 salían casi
+pegados y el gráfico parecía de mentira — que es lo que era.
+
+#### Tres trampas del propio script
+
+- ⚠️ **`interval '${VARIABLE} weeks'` no funciona en `$queryRaw`.** El template
+  etiquetado de Prisma convierte cualquier `${}` en un parámetro, así que eso
+  genera `interval '$4 weeks'` y Postgres rechaza la consulta por número de
+  parámetros. Las fechas se calculan en JavaScript y se pasan como parámetro.
+- `projects.workspaces` y `projects.boards` **no tienen `updatedAt`**, aunque
+  `projects.projects` sí. Copiar el INSERT de uno a otro falla.
+- El esquema `projects` se toca con SQL crudo desde el cliente de tasks: es la
+  misma conexión y la misma base, y el cliente tipado solo restringe lo tipado.
+
+### 25.11 Resultado con historial de verdad
+
+| Informe | Con el proyecto sembrado |
+|---|---|
+| Instantánea | 60 tareas · 38 cerradas · En curso 10, En revisión 12, Hecho 38 |
+| Entrega | p50 **5,8 d** · p85 **11,5 d** |
+| Ciclo | p50 **3,2 d** · p85 **8,7 d** |
+| Predicción | 22 pendientes a 0,62/día → p50 **36 d**, p85 **45 d** |
+| Flujo | 44 días de serie, cuatro bandas |
+| Por persona | 5 personas con carga, cerradas, vencidas y mediana |
+
+Los números cuadran entre sí, que es la comprobación que importa: el ciclo es
+**menor** que la entrega —por definición, empieza más tarde—, el p85 es mayor que
+el p50 en ambos, y 22 pendientes a 0,62/día son ~35 días, que es lo que dice la
+simulación.

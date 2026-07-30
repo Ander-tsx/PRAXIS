@@ -1,0 +1,318 @@
+/**
+ * Semilla de **historial sintético** para poder ver la sección de Reportes.
+ *
+ * ## Por qué existe
+ *
+ * El historial de tareas solo se puede capturar hacia adelante: antes de que
+ * existiera `TaskEvent` no se guardaba nada, así que el día que se implementó
+ * había cero tiempos de ciclo y cero throughput. Sin esto, la sección de
+ * Reportes enseña estados vacíos durante semanas y no hay nada que enseñar ni
+ * que defender.
+ *
+ * ## Lo que NO hace
+ *
+ * **No retro-rellena el proyecto real.** No se puede: nadie guardó cuándo se
+ * movió cada tarea de «Rediseño del panel», y fabricar ese dato encima del real
+ * sería mentir sobre trabajo que de verdad ocurrió.
+ *
+ * En su lugar crea un **proyecto aparte**, con el nombre puesto para que se lea
+ * de qué es, y ahí sí fabrica ocho semanas de flujo plausible. El proyecto de
+ * demostración de siempre se queda intacto.
+ *
+ * ## Cómo queda marcado
+ *
+ * Todos los eventos llevan `actorId = ACTOR_SINTETICO` (el UUID de ceros), que
+ * no puede colisionar con ninguna persona real. Con eso la API sabe contarlos y
+ * la interfaz puede avisar de que ese proyecto no mide trabajo real.
+ *
+ * Se ejecuta a mano:
+ *   pnpm --filter @praxis/tasks-service exec ts-node -r tsconfig-paths/register prisma/seed-events.ts
+ */
+
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../src/generated/prisma-client';
+
+/**
+ * Marca de «esto lo fabricó un script».
+ *
+ * Va en `actorId` y no en una columna nueva a propósito: añadir un booleano a
+ * `TaskEvent` haría que **toda** la tabla cargue con un campo que solo importa
+ * en la demostración, y el UUID de ceros no puede ser el id de nadie.
+ */
+const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
+
+const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
+const SEMANAS = 8;
+const TAREAS = 60;
+
+const DIA = 86_400_000;
+
+const COLUMNAS = [
+  { name: 'Por hacer',   color: 'primary', order: 0 },
+  { name: 'En curso',    color: 'accent',  order: 1 },
+  { name: 'En revisión', color: 'info',    order: 2 },
+  { name: 'Hecho',       color: 'success', order: 3 }, // verde = columna de cierre
+];
+
+const TITULOS = [
+  'Ajustar el contraste de los estados deshabilitados',
+  'Migrar el selector de fechas a la versión nueva',
+  'Cachear el listado del tablero',
+  'Corregir el desbordamiento en pantallas de 320 px',
+  'Añadir el índice que faltaba en la consulta de vencimientos',
+  'Revisar los textos de los estados vacíos',
+  'Unificar los espaciados de las tarjetas',
+  'Quitar la dependencia muerta del paquete de iconos',
+  'Documentar el flujo de invitaciones',
+  'Reducir el tamaño del paquete de la landing',
+  'Arreglar el foco al cerrar el diálogo',
+  'Normalizar los saltos de línea en los comentarios',
+];
+
+const PRIORIDADES = ['LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'HIGH', 'URGENT'] as const;
+
+const azar = <T>(lista: readonly T[]): T => lista[Math.floor(Math.random() * lista.length)];
+const entre = (min: number, max: number) => min + Math.random() * (max - min);
+
+/**
+ * Reparte los cierres de forma **desigual**, que es como ocurren de verdad.
+ *
+ * Con un ritmo constante la predicción de Monte Carlo sale con un intervalo
+ * absurdamente estrecho y el gráfico parece de mentira — que es exactamente lo
+ * que es. Los fines de semana bajan y hay semanas mejores que otras.
+ */
+function pesoDelDia(fecha: Date): number {
+  const dia = fecha.getDay();
+  if (dia === 0 || dia === 6) return 0.15;
+  return entre(0.6, 1.4);
+}
+
+async function main() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('Falta DATABASE_URL');
+
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+
+  /**
+   * El dueño y los miembros salen del proyecto de demostración que ya existe:
+   * así las tareas se asignan a personas reales y la pestaña de equipo enseña
+   * nombres en vez de UUID sueltos.
+   */
+  const personas = await prisma.$queryRaw<{ userId: string }[]>`
+    SELECT DISTINCT "userId" FROM projects.project_members LIMIT 5
+  `;
+  if (personas.length === 0) {
+    throw new Error('No hay ningún miembro de proyecto en la base. Ejecuta antes el seed normal.');
+  }
+  const dueno = personas[0].userId;
+
+  /* El esquema `projects` se toca con SQL crudo: el cliente tipado de este
+     servicio solo conoce el esquema `tasks`. Es la misma conexión y la misma
+     base, así que no hace falta un segundo cliente. */
+  /**
+   * ⚠️ Las fechas se calculan **en JavaScript** y se pasan como parámetro.
+   *
+   * Escribir `interval '${SEMANAS} weeks'` no funciona: el template etiquetado
+   * de Prisma convierte cualquier `${}` en un bind, así que eso genera
+   * `interval '$4 weeks'` —un texto literal con un dólar dentro— y Postgres
+   * rechaza la consulta por número de parámetros. No es un problema de comillas:
+   * es que ahí dentro no se puede interpolar nada.
+   */
+  const arranque = new Date(Date.now() - SEMANAS * 7 * DIA);
+
+  const existentes = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT id FROM projects.projects WHERE name = ${NOMBRE_PROYECTO}
+  `;
+
+  let projectId: string;
+
+  if (existentes.length > 0) {
+    projectId = existentes[0].id;
+    console.log(`Reutilizando el proyecto ${projectId} y limpiando su historial…`);
+    await prisma.taskEvent.deleteMany({ where: { projectId } });
+    await prisma.task.deleteMany({ where: { projectId } });
+  } else {
+    const creado = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO projects.projects (id, name, description, "ownerId", "createdAt", "updatedAt")
+      VALUES (gen_random_uuid(), ${NOMBRE_PROYECTO},
+              ${'Historial fabricado para poder enseñar los reportes. No mide trabajo real.'},
+              ${dueno}, ${arranque}, now())
+      RETURNING id
+    `;
+    projectId = creado[0].id;
+    console.log(`Proyecto creado: ${projectId}`);
+
+    const rol = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO projects.project_roles (id, name, "projectId", permissions)
+      VALUES (gen_random_uuid(), 'Administrador', ${projectId}::text,
+              ${JSON.stringify({
+                canViewProject: true, canCreateTask: true, canEditTask: true,
+                canDeleteTask: true, canMoveTask: true, canComment: true,
+                canCreateBoard: true, canEditBoard: true, canDeleteBoard: true,
+                canCreateColumn: true, canEditColumn: true, canDeleteColumn: true,
+                canManageMembers: true, canManageRoles: true, canManageLabels: true,
+                canEditProject: true, canViewReports: true, canDeleteProject: true,
+              })}::jsonb)
+      RETURNING id
+    `;
+
+    for (const persona of personas) {
+      await prisma.$executeRaw`
+        INSERT INTO projects.project_members (id, "projectId", "userId", "projectRoleId", "joinedAt")
+        VALUES (gen_random_uuid(), ${projectId}::text, ${persona.userId}::text, ${rol[0].id}::text,
+                ${arranque})
+        ON CONFLICT DO NOTHING
+      `;
+    }
+  }
+
+  /* Espacio, tablero y columnas: se recrean solo si no están. */
+  let columnas = await prisma.$queryRaw<{ id: string; name: string; order: number }[]>`
+    SELECT c.id, c.name, c."order" FROM projects.board_columns c
+      JOIN projects.boards b ON b.id = c."boardId"
+      JOIN projects.workspaces w ON w.id = b."workspaceId"
+     WHERE w."projectId" = ${projectId}::text
+     ORDER BY c."order"
+  `;
+
+  let boardId: string;
+
+  if (columnas.length === 0) {
+    const ws = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO projects.workspaces (id, name, "projectId", "createdAt")
+      VALUES (gen_random_uuid(), 'Sprint', ${projectId}::text, ${arranque}) RETURNING id
+    `;
+    const board = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO projects.boards (id, name, "workspaceId", "createdAt")
+      VALUES (gen_random_uuid(), 'Tablero del sprint', ${ws[0].id}::text, ${arranque}) RETURNING id
+    `;
+    boardId = board[0].id;
+    for (const col of COLUMNAS) {
+      await prisma.$executeRaw`
+        INSERT INTO projects.board_columns (id, name, "order", color, "boardId")
+        VALUES (gen_random_uuid(), ${col.name}, ${col.order}, ${col.color}, ${boardId}::text)
+      `;
+    }
+    columnas = await prisma.$queryRaw`
+      SELECT id, name, "order" FROM projects.board_columns
+       WHERE "boardId" = ${boardId}::text ORDER BY "order"
+    `;
+  } else {
+    const b = await prisma.$queryRaw<{ boardId: string }[]>`
+      SELECT c."boardId" FROM projects.board_columns c
+        JOIN projects.boards b ON b.id = c."boardId"
+        JOIN projects.workspaces w ON w.id = b."workspaceId"
+       WHERE w."projectId" = ${projectId}::text LIMIT 1
+    `;
+    boardId = b[0].boardId;
+  }
+
+  const cierre = columnas[columnas.length - 1];
+  const inicio = new Date(Date.now() - SEMANAS * 7 * DIA);
+
+  let creadas = 0;
+  let cerradas = 0;
+
+  for (let i = 0; i < TAREAS; i++) {
+    /* Nacimiento repartido por las primeras seis semanas, para que siempre haya
+       trabajo entrando y el flujo acumulado no sea un escalón. */
+    const nacida = new Date(inicio.getTime() + entre(0, SEMANAS * 0.75 * 7) * DIA);
+    const titulo = `${azar(TITULOS)} (${i + 1})`;
+    const prioridad = azar(PRIORIDADES);
+
+    /**
+     * El recorrido: hasta dónde llega la tarea.
+     *
+     * **Sesgado hacia terminar.** Con un destino uniforme solo una cuarta parte
+     * llegaba a la columna de cierre, y salía un tablero donde nada acaba: el
+     * ritmo daba 0,25 tareas/día y la predicción, seis meses. Aritméticamente
+     * correcto y pésimo como demostración, porque lo que se quiere enseñar es
+     * cómo se lee un equipo que funciona.
+     *
+     * Dos tercios llegan al final; el resto se queda por el camino, que es lo
+     * que da volumen a las bandas intermedias del flujo acumulado.
+     */
+    const llegaAlFinal = Math.random() < 0.66;
+    const hasta = llegaAlFinal
+      ? columnas.length
+      : 1 + Math.floor(entre(1, columnas.length - 1));
+    const paradas = columnas.slice(1, hasta);
+    const eventos: {
+      type: string; fromColumnId?: string; toColumnId?: string; occurredAt: Date;
+    }[] = [{ type: 'CREATED', toColumnId: columnas[0].id, occurredAt: nacida }];
+
+    let momento = nacida;
+    let actual = columnas[0];
+
+    for (const parada of paradas) {
+      /* El tiempo en cada columna sale de una distribución con cola: casi
+         siempre poco, a veces mucho. Es lo que hace que los percentiles 50 y 85
+         se separen, que es justo lo que la pantalla quiere enseñar. */
+      const espera = Math.exp(entre(0, 2.2)) * pesoDelDia(momento);
+      momento = new Date(momento.getTime() + espera * DIA);
+      if (momento.getTime() > Date.now()) break;
+
+      eventos.push({
+        type: 'MOVED',
+        fromColumnId: actual.id,
+        toColumnId: parada.id,
+        occurredAt: momento,
+      });
+      actual = parada;
+    }
+
+    const estaCerrada = actual.id === cierre.id;
+
+    const tarea = await prisma.task.create({
+      data: {
+        title:       titulo,
+        status:      actual.name,
+        boardId,
+        columnId:    actual.id,
+        reporterId:  dueno,
+        projectId,
+        priority:    prioridad,
+        order:       i,
+        createdAt:   nacida,
+        completedAt: estaCerrada ? momento : null,
+        dueDate:     new Date(nacida.getTime() + entre(3, 20) * DIA),
+        assignees: {
+          create: [{ userId: azar(personas).userId, assignedBy: dueno, assignedAt: nacida }],
+        },
+      },
+    });
+
+    if (estaCerrada) {
+      eventos.push({ type: 'COMPLETED', toColumnId: cierre.id, occurredAt: momento });
+      cerradas++;
+    }
+
+    await prisma.taskEvent.createMany({
+      data: eventos.map((evento) => ({
+        taskId:    tarea.id,
+        projectId,
+        boardId,
+        type:      evento.type as never,
+        fromColumnId: evento.fromColumnId ?? null,
+        toColumnId:   evento.toColumnId ?? null,
+        actorId:   ACTOR_SINTETICO,
+        taskTitle: titulo,
+        occurredAt: evento.occurredAt,
+      })),
+    });
+
+    creadas++;
+  }
+
+  console.log(`\n  ${creadas} tareas, ${cerradas} cerradas, ${SEMANAS} semanas de historial.`);
+  console.log(`  Proyecto: ${NOMBRE_PROYECTO}`);
+  console.log(`  ⚠️  Todos los eventos llevan actorId=${ACTOR_SINTETICO}: son fabricados.`);
+
+  await prisma.$disconnect();
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
