@@ -1,6 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { Priority } from './priority.enum';
 
 /**
@@ -44,6 +54,28 @@ export class FindMyTasksQueryDto {
   @IsOptional()
   @IsUUID('4')
   projectId?: string;
+
+  /**
+   * Deja fuera las tareas que ya están en una **columna de cierre**.
+   *
+   * Una columna de cierre es la que está pintada de verde (`DONE_COLUMN_COLOR`);
+   * ver `COLUMN_COLORS` en `projects/column.dto`. Hace falta porque el `status`
+   * de una tarea es el nombre de su columna, y ese nombre lo elige cada
+   * proyecto: «Hecho», «Finalizado», «Cerrado», «Done»… No hay forma de saber
+   * desde aquí cuál significa terminado, así que una tarea acabada seguía
+   * contando como pendiente en el panel.
+   *
+   * Lo resuelve el **gateway**, no tasks-service: las columnas viven en
+   * projects-service y hacer que tasks las pidiera encadenaría dos saltos, el
+   * mismo motivo por el que `projectIds` también se resuelve arriba.
+   */
+  @ApiPropertyOptional({ description: 'Excluye las tareas en una columna verde (de cierre)' })
+  @IsOptional()
+  /* `Boolean('false')` es `true`, así que un `@Type(() => Boolean)` convertiría
+     `?excludeDone=false` en un sí. En una query todo llega como texto. */
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  excludeDone?: boolean;
 
   @ApiPropertyOptional({ default: 50, maximum: 100 })
   @IsOptional()

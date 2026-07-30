@@ -91,6 +91,21 @@ export class ColumnsService {
     return columns;
   }
 
+  /**
+   * Columnas por id, sin caché.
+   *
+   * Es una consulta puntual del gateway para componer `/me/tasks`, con los ids
+   * que ya trae en la mano; cachearla obligaría a invalidar por columna en cada
+   * cambio de color a cambio de ahorrar una consulta por clave primaria.
+   */
+  async findColumnsByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.boardColumn.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, color: true, boardId: true },
+    });
+  }
+
   async deleteColumn(id: string) {
     const column = await this.prisma.boardColumn.findUnique({
       where: { id },

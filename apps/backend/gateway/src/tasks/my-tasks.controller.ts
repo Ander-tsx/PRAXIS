@@ -12,7 +12,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { FindMyTasksQueryDto } from '@praxis/contracts';
+import { DONE_COLUMN_COLOR, FindMyTasksQueryDto } from '@praxis/contracts';
 
 /** Suficiente para cubrir a quien esté en muchos proyectos sin paginar aquí. */
 const MAX_PROJECTS = 100;
@@ -64,8 +64,65 @@ export class MyTasksController {
 
     const projectIds = (projects?.items ?? []).map((p: { id: string }) => p.id);
 
-    return firstValueFrom(
+    const result = await firstValueFrom(
       this.tasksClient.send({ cmd: 'task_find_mine' }, { ...query, userId, projectIds }),
     );
+
+    if (!query.excludeDone) return result;
+    return this.withoutFinishedTasks(result);
   }
+
+  /**
+   * Quita las tareas que ya están en una **columna de cierre** (la verde).
+   *
+   * Se hace aquí y no en tasks-service porque la tarea guarda `columnId` pero
+   * las columnas viven en projects-service, y hacer que tasks las pidiera
+   * encadenaría gateway → tasks → projects en una ruta que el panel llama en
+   * cada carga. El gateway ya habla con los dos.
+   *
+   * Se filtra **después** de consultar, no antes: para saber qué columnas
+   * excluir hay que conocer las de las tareas que salieron, y ese conjunto solo
+   * existe una vez hecha la consulta. La consecuencia es que `limit` se aplica
+   * antes del filtro, así que se puede devolver menos de lo pedido. Es preferible
+   * a la alternativa —traer las columnas de todos sus proyectos por si acaso—
+   * para un panel que pide 50.
+   *
+   * Si projects-service falla, se devuelven las tareas **sin filtrar**: enseñar
+   * de más en un aviso es mucho mejor que tumbar el panel entero.
+   */
+  private async withoutFinishedTasks(result: { items?: Task[]; total?: number }) {
+    const items: Task[] = result?.items ?? [];
+    if (items.length === 0) return result;
+
+    const columnIds = [...new Set(items.map((task) => task.columnId).filter(Boolean))];
+
+    let doneColumnIds: Set<string>;
+    try {
+      const columns = await firstValueFrom(
+        this.projectsClient.send({ cmd: 'column_find_by_ids' }, { ids: columnIds }),
+      );
+      doneColumnIds = new Set(
+        (columns ?? [])
+          .filter((column: { color: string }) => column.color === DONE_COLUMN_COLOR)
+          .map((column: { id: string }) => column.id),
+      );
+    } catch {
+      return result;
+    }
+
+    if (doneColumnIds.size === 0) return result;
+
+    const remaining = items.filter((task) => !doneColumnIds.has(task.columnId));
+    return {
+      items: remaining,
+      // El total describe lo que se devuelve; dejar el de antes diría que hay
+      // pendientes escondidas detrás de una paginación que no existe.
+      total: remaining.length,
+    };
+  }
+}
+
+/** Lo único que hace falta de una tarea para decidir si sigue pendiente. */
+interface Task {
+  columnId: string;
 }

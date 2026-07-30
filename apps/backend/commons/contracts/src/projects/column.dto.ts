@@ -22,12 +22,31 @@ export const COLUMN_COLORS = [
   'primary',
   'accent',
   'info',
-  'success',
   'warning',
   'error',
+  /* El verde va **el último** y significa algo: ver `DONE_COLUMN_COLOR`. */
+  'success',
 ] as const;
 
 export type ColumnColor = (typeof COLUMN_COLORS)[number];
+
+/**
+ * El verde marca la **columna de cierre**: las tareas que llegan ahí dejan de
+ * contar como pendientes.
+ *
+ * Hacía falta alguna forma de saberlo. El `status` de una tarea es el nombre de
+ * su columna, y ese nombre lo elige cada proyecto —«Hecho», «Finalizado»,
+ * «Cerrado», «Done»—, así que nada permitía distinguir la columna que termina el
+ * trabajo: una tarea acabada seguía saliendo como pendiente en el panel.
+ *
+ * ⚠️ **Es color y significado a la vez, y se eligió a sabiendas.** La
+ * alternativa limpia es un campo aparte (`isFinal`) y dejar el color en
+ * decoración; el coste de esto es que no se puede tener una columna verde que no
+ * cierre, ni una columna de cierre de otro color. A cambio no hay estado oculto:
+ * lo que la pantalla enseña es toda la regla. Cambiarlo más adelante es añadir
+ * la columna a la tabla y mover esta constante a una consulta.
+ */
+export const DONE_COLUMN_COLOR: ColumnColor = 'success';
 
 /**
  * Color por defecto de una columna nueva, repartido por posición.
@@ -36,13 +55,20 @@ export type ColumnColor = (typeof COLUMN_COLORS)[number];
  * color **por índice** y por tanto lo cambiaba al reordenar. Aquí solo decide el
  * valor inicial: a partir de ahí el color es de la columna y viaja con ella.
  *
- * `error` queda fuera del reparto automático: un rojo por defecto se lee como
- * una alarma. Elegirlo a mano para un «Bloqueado» sí tiene sentido.
+ * El reparto deja fuera el verde y el rojo: ver `COLUMN_ROTATION`.
  */
 export function defaultColumnColor(order: number): ColumnColor {
-  const rotation = COLUMN_COLORS.slice(0, 5);
-  return rotation[Math.abs(Math.trunc(order)) % rotation.length];
+  return COLUMN_ROTATION[Math.abs(Math.trunc(order)) % COLUMN_ROTATION.length];
 }
+
+/**
+ * Colores que reparte `defaultColumnColor`.
+ *
+ * Ni verde ni rojo: el verde **cierra la tarea** y repartirlo por posición
+ * marcaría como terminada la cuarta columna de cualquier tablero; el rojo se lee
+ * como una alarma. Los dos se eligen a mano.
+ */
+const COLUMN_ROTATION = ['primary', 'accent', 'info', 'warning'] as const;
 
 /** Cuerpo de `POST /boards/:boardId/columns`. */
 export class CreateColumnBodyDto {
@@ -103,6 +129,19 @@ export class ReorderColumnsBodyDto {
 export class ReorderColumnsDto extends ReorderColumnsBodyDto {
   @IsUUID('4')
   boardId: string;
+}
+
+/**
+ * Columnas por id, para que el gateway pueda componer.
+ *
+ * La usa `GET /me/tasks?excludeDone=true`: la tarea guarda `columnId` pero las
+ * columnas viven en otro microservicio, así que sin esto no hay forma de saber
+ * cuál de ellas es la de cierre.
+ */
+export class FindColumnsByIdsDto {
+  @IsArray()
+  @IsUUID('4', { each: true })
+  ids: string[];
 }
 
 export class DeleteColumnDto {
