@@ -39,19 +39,18 @@ export interface BoardStripProps {
  * arrastre. Aquí solo va la cabecera, que no necesita JavaScript.
  */
 /**
- * Superficie del tablero: el mismo tono que el selector de espacio, con una
- * retícula de puntos encima.
+ * Superficie del tablero: `surface-elevated` con una retícula de puntos encima.
  *
- * El `surface-elevated` de antes lo hacía flotar por delante de todo lo demás
- * de la pantalla cuando lo que es, en realidad, es el lienzo **sobre el que**
- * flotan las columnas. Bajarlo al tono del selector lo devuelve al fondo, y la
- * retícula —la de cualquier pizarra— dice que ahí dentro las cosas se mueven.
+ * La retícula es la de cualquier pizarra y hace el trabajo sola: dice que ahí
+ * dentro las cosas se mueven, sin necesidad de bajar el tono del lienzo. Se
+ * probó con el color del selector de espacio y el tablero perdía presencia
+ * frente al resto de la pantalla.
  *
  * Van los dos fondos en una sola propiedad porque el orden importa: la retícula
  * primero y el color detrás, o el color taparía los puntos.
  */
 const BOARD_SURFACE = {
-  background: `radial-gradient(${alpha(colors.borderStrong, 60)} 1px, transparent 1px), ${colors.surface}`,
+  background: `radial-gradient(${alpha(colors.borderStrong, 60)} 1px, transparent 1px), ${colors.surfaceElevated}`,
   backgroundSize: '22px 22px',
   /* Medio paso: así ningún punto cae justo en la esquina redondeada. */
   backgroundPosition: '11px 11px',
