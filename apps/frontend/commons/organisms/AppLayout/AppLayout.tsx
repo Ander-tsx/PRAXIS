@@ -42,8 +42,28 @@ export interface AppLayoutProps {
   children: ReactNode;
 }
 
-function isActive(activePath: string, href: string): boolean {
-  return activePath === href || activePath.startsWith(`${href}/`);
+/**
+ * El enlace activo es el que **más** coincide con la ruta, no cualquiera que sea
+ * prefijo suyo.
+ *
+ * Con la comparación por prefijo a secas, en `/dashboard/notificaciones` se
+ * encendían dos a la vez: «Panel» (`/dashboard`) y «Notificaciones». Ganar por
+ * longitud resuelve el caso general —una sección dentro de otra— sin listar
+ * excepciones, y mantiene lo que ya funcionaba: en `/dashboard/perfil`, que no
+ * tiene entrada propia, sigue encendido «Panel».
+ */
+function activeHrefOf(activePath: string, navItems: AppNavItem[]): string | null {
+  let best: string | null = null;
+
+  for (const item of navItems) {
+    if (item.disabled) continue;
+    const matches = activePath === item.href || activePath.startsWith(`${item.href}/`);
+    if (matches && (best === null || item.href.length > best.length)) {
+      best = item.href;
+    }
+  }
+
+  return best;
 }
 
 /** Inicial del avatar: del nombre si lo hay, si no del email. */
@@ -61,10 +81,12 @@ function NavList({
   activePath: string;
   onNavigate?: () => void;
 }) {
+  const activeHref = activeHrefOf(activePath, navItems);
+
   return (
     <nav className="flex flex-col gap-1.5" aria-label="Secciones">
       {navItems.map((item) => {
-        const active = !item.disabled && isActive(activePath, item.href);
+        const active = !item.disabled && item.href === activeHref;
 
         if (item.disabled) {
           return (

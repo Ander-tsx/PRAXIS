@@ -10,6 +10,7 @@
 
 export * from './cookies';
 export * from './current-user';
+export * from './nav';
 export * from './session';
 export * from './proxy';
 export * from './refresh-proxy';

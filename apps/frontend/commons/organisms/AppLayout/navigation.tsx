@@ -76,7 +76,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    label: 'Avisos',
+    label: 'Notificaciones',
     href: '/dashboard/notificaciones',
     icon: (
       <svg {...iconProps} aria-hidden="true">

@@ -69,6 +69,10 @@ export function Dialog({
       }}
       className={[
         'm-auto w-full rounded-2xl border border-border bg-surface p-6 text-left text-text-primary',
+        /* Sin barra de scroll: en un diálogo alto la barra parte el borde
+           redondeado y pesa más de lo que informa. Se sigue desplazando con la
+           rueda y con el teclado. */
+        'scrollbar-none',
         'backdrop:bg-overlay/75 backdrop:backdrop-blur-sm',
         sizeClasses[size],
       ].join(' ')}
