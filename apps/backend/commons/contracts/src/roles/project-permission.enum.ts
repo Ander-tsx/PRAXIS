@@ -66,6 +66,28 @@ export enum ProjectPermission {
   CAN_EDIT_PROJECT   = 'canEditProject',
 
   /**
+   * Ver los reportes **desglosados por persona**.
+   *
+   * Los agregados que no nombran a nadie —flujo del tablero, tiempos de ciclo,
+   * reparto por prioridad— piden `canViewProject` y los ve cualquiera que pueda
+   * ver el proyecto. Este permiso cubre lo otro: cuánto lleva cada cual, cuánto
+   * ha cerrado y en cuánto tiempo.
+   *
+   * Es una línea de privacidad, no de seguridad: son datos del trabajo, no
+   * secretos. Pero un tablero con las cifras de todo el mundo a la vista se
+   * convierte en una clasificación aunque nadie lo pretenda, así que enseñarlas
+   * es una decisión que alguien tiene que tomar a propósito.
+   *
+   * Cada persona ve **siempre** sus propios números, sin ningún permiso, en
+   * `/me/reports`.
+   *
+   * Entra implicado por `canManageMembers`, `canEditProject` y
+   * `canDeleteProject`: así los roles «Administrador» que ya existen lo reciben
+   * sin migración, y un «Colaborador» no.
+   */
+  CAN_VIEW_REPORTS   = 'canViewReports',
+
+  /**
    * Eliminar el proyecto entero.
    *
    * Borrarlo exigía `canDeleteBoard`, un permiso de **otra cosa y de menor

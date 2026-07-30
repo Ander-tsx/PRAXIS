@@ -30,6 +30,9 @@ const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Boards
   canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
   canEditBoard:   ['canCreateBoard', 'canEditProject'],
+  // Quien administra el proyecto ve los reportes por persona.
+  canEditProject:   ['canViewReports'],
+  canManageMembers: ['canViewReports'],
   // Columns
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn:   ['canCreateColumn'],
@@ -45,6 +48,7 @@ const PERMISSION_HIERARCHY: Record<string, string[]> = {
     'canEditBoard',
     'canCreateBoard',
     'canEditProject',
+    'canViewReports',
   ],
   // Roles y miembros no tienen jerarquía adicional
 };

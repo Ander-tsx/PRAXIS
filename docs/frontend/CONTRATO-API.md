@@ -116,6 +116,7 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 - `name`: 2–100 chars, único **por dueño**. Repetirlo en tu propia cuenta da 409
   («Ya tienes un proyecto llamado X»); otro equipo puede llamar igual al suyo.
 - `GET /projects` → `{ items, total }`, filtrado por **dueño o miembro**.
+- `GET /projects/:id` viene con todo el árbol embebido (ver abajo).
 
 ### `PATCH` exige `canEditProject`, no `canEditBoard`
 
@@ -130,7 +131,8 @@ se enseñe **sin perder lo escrito**: el nombre a medias («Redis» camino de
 «Rediseño») puede chocar con otro proyecto tuyo.
 
 Un cuerpo vacío no describe ningún cambio: manda solo el campo que cambia.
-- `GET /projects/:id` viene con todo el árbol embebido:
+
+### El árbol embebido de `GET /projects/:id`
 
 ```ts
 Project = {
@@ -722,3 +724,97 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 - **Logs / auditoría**
 - Subida de avatar (`avatarUrl` existe en el modelo, no hay endpoint)
 - **Tiempo real** para los avisos: hoy la bandeja reconsulta cada 60 s
+
+---
+
+## Reportes 🔒
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/projects/:projectId/reports/snapshot` | `canViewProject` |
+| GET | `/projects/:projectId/reports/flow?days` | `canViewProject` |
+| GET | `/projects/:projectId/reports/cycle-time?days` | `canViewProject` |
+| GET | `/projects/:projectId/reports/forecast?days` | `canViewProject` |
+| GET | `/projects/:projectId/reports/people` | **`canViewReports`** |
+
+`days` va acotado a 1–365 en el gateway; por defecto 60.
+
+### La línea de permisos
+
+Los agregados **que no nombran a nadie** piden `canViewProject`: son el estado
+del trabajo y los ve cualquiera que pueda ver el proyecto. Todo lo desglosado
+**por persona** pide `canViewReports`.
+
+No es una línea de seguridad —son datos del trabajo, no secretos— sino de
+privacidad: un tablero con las cifras de todo el mundo a la vista se convierte en
+una clasificación aunque nadie lo pretenda, así que enseñarlas tiene que ser una
+decisión de alguien.
+
+`canViewReports` entra **implicado por `canManageMembers`, `canEditProject` y
+`canDeleteProject`**, así que los roles «Administrador» ya existentes lo reciben
+sin migración y un «Colaborador» no.
+
+### `snapshot` — el único que funciona sin historial
+
+```ts
+{
+  total, completed, overdue, unassigned, checklistItems, checklistDone,
+  byPriority: [{ priority, count }],
+  byColumn:   [{ columnId, name, color, order, count }],   // ordenado
+  byLabel:    [{ labelId, count }],
+  byAssignee: [{ userId, count }],
+}
+```
+
+⚠️ `completed` cuenta lo que tiene `completedAt`, y eso **solo existe desde que
+se captura el historial**. Una tarea que ya estaba en la columna verde de antes
+cuenta como abierta. Si la pantalla necesita «lo que está en una columna de
+cierre», eso es `byColumn` cruzado con el color, no `completed`.
+
+### `cycle-time` — percentiles, nunca la media
+
+```ts
+{
+  suficiencia: { suficiente, tareasCerradas, faltanTareas, diasDeHistorial, faltanDias },
+  muestras: [{ taskId, completedAt, leadHours, cycleHours }],
+  lead:  { p50, p85 },                          // de crear a cerrar
+  cycle: { p50, p85, muestrasConMovimiento },    // del primer movimiento a cerrar
+}
+```
+
+`cycleHours` es `null` si la tarea nunca se movió antes de cerrarse, y esas
+muestras no entran en el percentil: por eso `muestrasConMovimiento` puede ser
+menor que `muestras.length`.
+
+⚠️ **No se devuelve ninguna media, a propósito.** El tiempo de ciclo tiene cola
+larga y la media se va detrás de las pocas tareas que se eternizan: acaba
+describiendo un caso que no existe. Si hace falta un número, es `p50`.
+
+### `forecast` — se niega a predecir sin datos
+
+```ts
+{ suficiencia, pendientes, throughputDiario: { media }, prediccion: { p50, p85, p95 } | null }
+```
+
+**`prediccion` es `null` mientras no haya 10 tareas cerradas y 14 días de
+historial**, y `suficiencia` dice cuánto falta. La interfaz debe enseñar eso, no
+un gráfico vacío: una predicción sacada de cuatro tareas parece igual de seria
+que una sacada de cuatrocientas.
+
+El número sale de **Monte Carlo sobre el ritmo observado** —se remuestrean los
+cierres por día, incluidos los días de cero— y no de estimaciones de esfuerzo,
+que no existen en el modelo.
+
+### `flow` — flujo acumulado
+
+```ts
+{ columnas: [{ id, name, color }], serie: [{ day, porColumna: { [columnId]: n } }] }
+```
+
+`porColumna` es el **acumulado** —cuántas hay ese día—, no el movimiento del día.
+
+### ⚠️ `COUNT(*)` de Postgres es `bigint`, y un BigInt no se serializa a JSON
+
+Costó un rato: las consultas agregadas devolvían 500 sin más pista que «Internal
+server error». Todas las cuentas se castean a `::int` en el propio SQL. Si añades
+una consulta agregada nueva, hazlo también.

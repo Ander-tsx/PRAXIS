@@ -1814,3 +1814,113 @@ Proyecto de usar y tirar, once eventos, comprobados en `psql`:
 ⚠️ Las tres tareas que ya estaban en «Hecho» en el proyecto de demostración
 tienen `completedAt: null`, y así se quedan: nunca se guardó cuándo llegaron.
 Es la forma más concreta de ver que el historial solo existe hacia adelante.
+
+### 25.6 El quinto microservicio, y el primero sin base de datos
+
+`reports-service` en TCP **3005**. Es el único de los cinco **sin Prisma y sin
+`DATABASE_URL`**: no guarda nada. Lee de tasks-service y projects-service por
+TCP, hace la matemática y responde. Darle un esquema vacío en Postgres solo
+habría añadido una migración que no migra nada.
+
+Lo único que persiste es la caché de resultados en Redis (60 s), que es
+desechable por definición.
+
+⚠️ `docs/backend/examples/README.md` asignaba el 3005 a un «Notifications
+Service» que **nunca existió** —las notificaciones viven dentro de
+projects-service— y el puerto estaba libre. Corregido de paso.
+
+#### La frontera, y lo que cuesta
+
+De las tres opciones, se eligió que **la agregación viva en el servicio dueño del
+dato**: `tasks-service` gana un `StatsService` con los primeros `groupBy` del
+backend, y `reports` orquesta y calcula.
+
+| Opción | Por qué no / sí |
+|---|---|
+| **Agregar en el servicio dueño** | ✅ Cada servicio sigue mandando sobre su esquema |
+| `reports` lee los esquemas ajenos | ❌ Menos código, pero un cambio de esquema en `tasks` rompería los reportes **en silencio** |
+| Tablas de hechos propias | ❌ El triple de trabajo y un modo de fallo nuevo: la copia se desincroniza |
+
+El coste real de la elegida, dicho sin adornos: **cada métrica nueva necesita un
+comando nuevo en el servicio dueño**, y los cruces entre dominios —ponerle nombre
+y color a un `columnId`— se hacen en memoria dentro de `reports`.
+
+#### 🔴 `COUNT(*)` es `bigint`, y un BigInt no se serializa a JSON
+
+Las tres consultas agregadas devolvían **500 sin ninguna pista**: «Internal
+server error» y nada más. El error real —`Do not know how to serialize a
+BigInt`— ocurría al cruzar el TCP, después de que la consulta hubiera ido
+perfectamente.
+
+Se arregla casteando a `::int` **en el propio SQL**, que es donde nace el
+problema. Vale la pena recordarlo: cualquier consulta agregada nueva lo necesita.
+
+> Y una lección de método: el mismo SQL corría sin problema en `psql`, así que
+> durante un rato pareció que el fallo estaba en la consulta. No lo estaba: la
+> consulta era correcta y lo que fallaba era serializar su resultado.
+
+#### Otra que costó, y era mía
+
+Un comentario SQL dentro de un `$queryRaw` llevaba **acentos graves** alrededor
+de un nombre de función. Dentro de un template literal eso cierra la cadena: el
+servicio dejó de compilar, `nest start --watch` **siguió sirviendo el `dist`
+anterior**, y el síntoma fue un endpoint que fallaba mientras los demás
+funcionaban. Sin acentos graves dentro de un `$queryRaw`.
+
+### 25.7 Las rutas, y dónde se pone la línea
+
+```
+GET /projects/:projectId/reports/snapshot     canViewProject
+GET /projects/:projectId/reports/flow         canViewProject
+GET /projects/:projectId/reports/cycle-time   canViewProject
+GET /projects/:projectId/reports/forecast     canViewProject
+GET /projects/:projectId/reports/people       canViewReports   ← por persona
+```
+
+`ProjectPermissionGuard` **no se tocó**: al colgar de `/projects/:projectId/...`
+resuelve el proyecto de `params` directamente. No hizo falta apuntar el
+controlador en `TASK_CONTROLLERS` ni en ninguna otra lista, al contrario que los
+de tarea.
+
+`canViewReports` es el octavo permiso que entra **implicado por el que ya
+existía** —`canManageMembers`, `canEditProject` y `canDeleteProject`—, así que
+los «Administrador» ya creados lo tienen sin migración.
+
+**Por qué existe:** no es seguridad, es privacidad. Los datos del trabajo no son
+secretos, pero un tablero con las cifras de todo el mundo a la vista se lee como
+una clasificación aunque nadie lo pretenda. Enseñarlas debería ser una decisión
+de alguien, no el estado por defecto.
+
+### 25.8 Nada de medias, y una predicción que se niega a predecir
+
+**Ningún reporte de tiempos devuelve una media.** La distribución de un tiempo de
+ciclo tiene cola larga —unas pocas tareas que se eternizan— y la media se va
+detrás de esa cola: acaba describiendo un caso que no le pasa a nadie. Se usan
+percentiles 50 y 85.
+
+La predicción es **Monte Carlo sobre el ritmo observado**: se remuestrea con
+reemplazo cuántas tareas se cerraron cada día —**incluidos los días de cero**, o
+el ritmo saldría inflado y la predicción sistemáticamente optimista— y se cuenta
+cuántos días hacen falta para vaciar lo abierto, 5 000 veces.
+
+Se eligió esto en vez de burndown porque **no hay ningún campo de esfuerzo** en
+la tarea, y añadirlo habría significado pedirle a alguien que mantenga un número
+en cada tarjeta. Aquí el dato se recoge solo: es el propio flujo del tablero.
+
+⚠️ **Por debajo de 10 tareas cerradas y 14 días, `prediccion` es `null`** y la
+respuesta dice cuánto falta. Es la regla más importante de la sección: una
+predicción sacada de cuatro tareas parece igual de seria que una sacada de
+cuatrocientas, y es la forma más rápida de perder la confianza de quien la lee.
+
+### 25.9 Verificado contra el stack
+
+| Caso | Resultado |
+|---|---|
+| `snapshot` con el proyecto demo | 8 tareas, 1 vencida, 2 sin asignar, checklist 2/3, reparto por columna con nombre y color |
+| `flow` | Serie diaria con las cuatro columnas |
+| `cycle-time` | `suficiente: false`, percentiles `null` — **0 cerradas desde que hay historial** |
+| `forecast` | **`prediccion: null`** y «faltan 10 tareas» |
+| `people` como dueño | 200, dos personas con carga y vencidas |
+| `people` como «Colaborador» | **403** |
+| `snapshot` como «Colaborador» | **200** — la línea cae donde debe |
+| `permissions/me` | `canViewReports`: dueño `true`, colaborador `false` |

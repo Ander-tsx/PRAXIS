@@ -32,6 +32,7 @@ import {
 import { AttachmentsService } from './attachments.service';
 import { CommentsService } from './comments.service';
 import { LabelsService } from './labels.service';
+import { StatsService } from './stats.service';
 import { TasksService } from './tasks.service';
 
 @Controller()
@@ -41,6 +42,7 @@ export class TasksController {
     private readonly labelsService: LabelsService,
     private readonly commentsService: CommentsService,
     private readonly attachmentsService: AttachmentsService,
+    private readonly statsService: StatsService,
   ) {}
 
   // ─── Tasks ────────────────────────────────────────────────────────────────
@@ -187,5 +189,31 @@ export class TasksController {
   @MessagePattern({ cmd: 'checklist_delete' })
   deleteChecklist(@Payload() dto: DeleteChecklistDto) {
     return this.tasksService.deleteChecklist(dto);
+  }
+
+  // ─── Estadísticas ─────────────────────────────────────────────────────────
+  //
+  // Las consume reports-service. Ninguna comprueba permisos: lo hizo el gateway
+  // contra el `projectId` de la ruta antes de llegar hasta aquí, igual que en
+  // `task_purge` y `task_restatus`.
+
+  @MessagePattern({ cmd: 'task_stats_snapshot' })
+  statsSnapshot(@Payload() dto: { projectId: string }) {
+    return this.statsService.snapshot(dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'task_stats_cycle' })
+  statsCycle(@Payload() dto: { projectId: string; from?: string }) {
+    return this.statsService.cycleTimes(dto.projectId, dto.from ? new Date(dto.from) : undefined);
+  }
+
+  @MessagePattern({ cmd: 'task_stats_flow' })
+  statsFlow(@Payload() dto: { projectId: string; from: string }) {
+    return this.statsService.dailyFlow(dto.projectId, new Date(dto.from));
+  }
+
+  @MessagePattern({ cmd: 'task_stats_people' })
+  statsPeople(@Payload() dto: { projectId: string }) {
+    return this.statsService.byPerson(dto.projectId);
   }
 }

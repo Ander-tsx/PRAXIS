@@ -18,6 +18,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canComment: 'Comentar en las tareas',
   canManageLabels: 'Gestionar las etiquetas',
   canEditProject: 'Renombrar el proyecto y cambiar su descripción',
+  canViewReports: 'Ver los reportes por persona',
   canDeleteProject: 'Eliminar el proyecto',
 };
 
@@ -42,6 +43,7 @@ export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[
     permissions: [
       'canManageMembers',
       'canManageRoles',
+      'canViewReports',
       'canEditProject',
       'canDeleteProject',
     ],

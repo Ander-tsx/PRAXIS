@@ -59,6 +59,7 @@ export const PROJECT_PERMISSIONS = [
   'canComment',
   'canManageLabels',
   'canEditProject',
+  'canViewReports',
   'canDeleteProject',
 ] as const;
 
@@ -82,11 +83,19 @@ export type PermissionMap = Partial<Record<ProjectPermission, boolean>>;
 export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermission[]>> = {
   canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
   canEditBoard: ['canCreateBoard', 'canEditProject'],
+  canEditProject: ['canViewReports'],
+  canManageMembers: ['canViewReports'],
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
   canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
-  canDeleteProject: ['canDeleteBoard', 'canEditBoard', 'canCreateBoard', 'canEditProject'],
+  canDeleteProject: [
+    'canDeleteBoard',
+    'canEditBoard',
+    'canCreateBoard',
+    'canEditProject',
+    'canViewReports',
+  ],
 };
 
 /** `GET /api/projects/:projectId/roles` viene embebido en el detalle. */
