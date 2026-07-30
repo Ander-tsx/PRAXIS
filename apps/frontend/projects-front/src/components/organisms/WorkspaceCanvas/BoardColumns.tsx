@@ -309,10 +309,14 @@ export function BoardColumns({
                 'flex w-72 shrink-0 flex-col rounded-2xl bg-surface',
                 /* La transición va sobre transform y sombra, no sobre layout:
                    animar posiciones aquí pelearía con el reordenado en vivo. */
-                'transition-[transform,box-shadow,opacity] duration-200 ease-out',
+                /* Sin `transform`: la columna arrastrada **no cambia de
+                   tamaño**. Crecer la desalinea de sus vecinas y hace que el
+                   hueco donde va a caer parezca de otra medida. La sombra y el
+                   borde ya dicen cuál se está moviendo. */
+                'transition-[box-shadow,opacity] duration-200 ease-out',
                 /* Reordenar es editar la columna, igual que en el endpoint. */
                 canEditColumn ? 'cursor-grab active:cursor-grabbing' : '',
-                isDragging ? 'scale-[1.03] opacity-90' : 'scale-100',
+                isDragging ? 'opacity-90' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}

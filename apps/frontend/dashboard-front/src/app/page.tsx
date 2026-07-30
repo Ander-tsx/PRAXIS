@@ -1,10 +1,8 @@
 import {
-  APP_NAV_ITEMS,
   AppLayout,
   DUE_SOON_DAYS,
   LogoutButton,
   type MyInvitation,
-  type NotificationPage,
   type Paginated,
   type Project,
   type Task,
@@ -19,7 +17,7 @@ import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { ProjectList } from '@/components/organisms/ProjectList';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Panel',
@@ -53,7 +51,7 @@ export default async function DashboardPage() {
    */
   const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
 
-  const [page, invitations, dueTasks, inbox] = await Promise.all([
+  const [page, invitations, dueTasks, navItems] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
@@ -65,11 +63,9 @@ export default async function DashboardPage() {
         `/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&excludeDone=true&limit=50`,
       )
       .catch(() => ({ items: [] as Task[], total: 0 })),
-    /* Solo para la insignia de la barra lateral. Si falla, se queda sin número:
-       no saber cuántos avisos hay no es motivo para tumbar el panel. */
-    api
-      .get<NotificationPage>('/me/notifications?unreadOnly=true&limit=1')
-      .catch(() => ({ items: [], total: 0, unread: 0 }) as NotificationPage),
+    /* La navegación con su insignia. Va en el mismo `Promise.all` para no
+       encadenar una petición más antes de pintar. */
+    loadAppNavItems(),
   ]);
   const projects = page.items;
 
@@ -97,9 +93,7 @@ export default async function DashboardPage() {
 
   return (
     <AppLayout
-      navItems={APP_NAV_ITEMS.map((item) =>
-        item.href === '/dashboard/notificaciones' ? { ...item, badge: inbox.unread } : item,
-      )}
+      navItems={navItems}
       activePath="/dashboard"
       title="Panel"
       user={{ name, email: profile.credential.email }}

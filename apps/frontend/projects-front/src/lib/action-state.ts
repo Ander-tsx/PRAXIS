@@ -69,3 +69,15 @@ export interface TaskState {
 }
 
 export const TASK_INITIAL_STATE: TaskState = { error: null, done: null };
+
+/** Estado de la respuesta a una invitación desde la página del proyecto. */
+export interface InvitationResponseState {
+  error: string | null;
+  /** `accept` cuando el servidor lo confirma. Rechazar sale de la página. */
+  done: string | null;
+}
+
+export const INVITATION_RESPONSE_INITIAL_STATE: InvitationResponseState = {
+  error: null,
+  done: null,
+};

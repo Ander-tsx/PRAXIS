@@ -23,7 +23,7 @@ export interface NotificationListProps {
 }
 
 /**
- * La bandeja de avisos.
+ * La bandeja de notificaciones.
  *
  * Cada aviso cuenta **algo que ya pasó**, así que no hay nada que decidir: se
  * lee y, como mucho, se va al sitio del que habla. Lo que sí espera una decisión
@@ -52,14 +52,14 @@ export function NotificationList({ notifications, unread, usersById }: Notificat
   }
 
   return (
-    <section className="flex flex-col gap-3" aria-label="Avisos">
+    <section className="flex flex-col gap-3" aria-label="Notificaciones">
       <header className="flex items-center justify-between gap-3">
         <p className="font-sans text-sm text-text-secondary">
           {unread === 0
             ? 'Todo leído.'
             : unread === 1
-              ? 'Tienes un aviso sin leer.'
-              : `Tienes ${unread} avisos sin leer.`}
+              ? 'Tienes una notificación sin leer.'
+              : `Tienes ${unread} notificaciones sin leer.`}
         </p>
 
         {unread > 0 && (

@@ -1,8 +1,8 @@
-import { APP_NAV_ITEMS, AppLayout, Badge, LogoutButton, displayName } from '@praxis/commons';
+import { AppLayout, Badge, LogoutButton, displayName } from '@praxis/commons';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Tus datos',
@@ -19,7 +19,7 @@ export default async function ProfilePage() {
 
   return (
     <AppLayout
-      navItems={APP_NAV_ITEMS}
+      navItems={await loadAppNavItems()}
       /**
        * Ruta **pública**, con el basePath: `AppLayout` la compara con enlaces
        * del shell. Y lleva a que se resalte "Panel", que es lo correcto:

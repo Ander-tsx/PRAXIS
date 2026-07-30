@@ -1,5 +1,4 @@
 import {
-  APP_NAV_ITEMS,
   AppLayout,
   LogoutButton,
   type NotificationPage,
@@ -7,20 +6,20 @@ import {
   type UserProfile,
   displayName,
 } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { AutoRefresh } from '@/components/molecules/AutoRefresh';
 import { NotificationList } from '@/components/organisms/NotificationList';
 
 export const metadata: Metadata = {
-  title: 'Avisos',
+  title: 'Notificaciones',
 };
 
 /** Cada cuánto se vuelve a pedir la bandeja. Ver `AutoRefresh`. */
 const REFRESH_SECONDS = 60;
 
 /**
- * Bandeja de avisos.
+ * Bandeja de notificaciones.
  *
  * Es una página del panel y no una zona propia: son una lista y dos botones, y
  * montar una zona son nueve pasos de checklist (§17.7) para servir eso. La
@@ -51,15 +50,13 @@ export default async function NotificationsPage() {
 
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
 
-  const navItems = APP_NAV_ITEMS.map((item) =>
-    item.href === '/dashboard/notificaciones' ? { ...item, badge: inbox.unread } : item,
-  );
+  const navItems = await loadAppNavItems();
 
   return (
     <AppLayout
       navItems={navItems}
       activePath="/dashboard/notificaciones"
-      title="Avisos"
+      title="Notificaciones"
       user={{ name: displayName(profile), email: profile.credential.email }}
       footerSlot={<LogoutButton />}
     >

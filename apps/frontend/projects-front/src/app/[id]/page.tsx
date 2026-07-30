@@ -1,9 +1,9 @@
 import {
-  APP_NAV_ITEMS,
   AppLayout,
   type EffectivePermissions,
   type Label,
   LogoutButton,
+  type MyInvitation,
   type Paginated,
   type ProjectDetail,
   type ProjectInvitation,
@@ -14,9 +14,11 @@ import {
   displayName,
   tabLinkClasses,
 } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
 import { ProjectLabels } from '@/components/organisms/ProjectLabels';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
@@ -66,12 +68,44 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const { id } = await params;
   const { tab, ws, board, task } = await searchParams;
   const { userId, profile } = await loadCurrentUser();
+  const navItems = await loadAppNavItems();
   const api = createServerApiClient();
 
   const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'espacios';
 
-  const [project, effective, members, labels] = await Promise.all([
-    api.get<ProjectDetail>(`/projects/${id}`),
+  /**
+   * El proyecto, o la puerta de la invitación.
+   *
+   * Un enlace de invitación apunta aquí, pero **la membresía se crea al
+   * aceptar**: hasta entonces `GET /projects/:id` responde 403 y la página
+   * moría con un error por algo que no lo era. Si el fallo coincide con una
+   * invitación pendiente, lo que toca no es un error sino el botón de aceptar.
+   */
+  const project = await api.get<ProjectDetail>(`/projects/${id}`).catch(() => null);
+
+  if (!project) {
+    const invitation = await api
+      .get<MyInvitation[]>('/me/invitations')
+      .then((list) => list.find((candidate) => candidate.project.id === id))
+      .catch(() => undefined);
+
+    // Sin invitación no hay nada que ofrecer: que suba el error de siempre.
+    if (!invitation) return notFound();
+
+    return (
+      <AppLayout
+        navItems={navItems}
+        activePath="/projects"
+        title="Invitación"
+        user={{ name: displayName(profile), email: profile.credential.email }}
+        footerSlot={<LogoutButton />}
+      >
+        <PendingInvitationGate invitation={invitation} />
+      </AppLayout>
+    );
+  }
+
+  const [effective, members, labels] = await Promise.all([
     api.get<EffectivePermissions>(`/projects/${id}/permissions/me`),
     api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
@@ -122,9 +156,31 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * `?ws=` gana sobre `?board=` porque si los dos vienen, el explícito es el
    * que acaba de pulsar quien mira.
    */
-  const workspaceOfBoard = board
+  /**
+   * ⚠️ **Si llega `?task=` sin `?board=`, hay que preguntar por la tarea.**
+   *
+   * Los avisos de vencimiento mandan los dos porque conocen el tablero. Los de
+   * notificación solo guardan la tarea, y sin el tablero se abría siempre el
+   * primer espacio: una tarea del espacio «QA» aterrizaba en «Desarrollo» y sin
+   * diálogo, porque `ColumnTasks` solo abre la tarea si está en su columna.
+   *
+   * Se resuelve aquí y no guardando el `boardId` en el aviso: así funciona
+   * cualquier enlace con `?task=`, venga de donde venga, y una tarea que cambió
+   * de tablero sigue llevando al sitio correcto en vez de al de entonces.
+   */
+  const boardOfTask =
+    task && !board
+      ? await api
+          .get<Task>(`/tasks/${task}`)
+          .then((found) => found.boardId)
+          .catch(() => undefined)
+      : undefined;
+
+  const targetBoard = board ?? boardOfTask;
+
+  const workspaceOfBoard = targetBoard
     ? project.workspaces.find((workspace) =>
-        workspace.boards.some((candidate) => candidate.id === board),
+        workspace.boards.some((candidate) => candidate.id === targetBoard),
       )
     : undefined;
 
@@ -169,7 +225,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
 
   return (
     <AppLayout
-      navItems={APP_NAV_ITEMS}
+      navItems={navItems}
       activePath="/projects"
       title={project.name}
       user={{ name: displayName(profile), email: profile.credential.email }}

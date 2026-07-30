@@ -1,12 +1,11 @@
 import {
-  APP_NAV_ITEMS,
   AppLayout,
   LogoutButton,
   type Paginated,
   type Project,
   displayName,
 } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
 import { ProjectGrid } from '@/components/organisms/ProjectGrid';
@@ -32,6 +31,7 @@ interface PageProps {
 export default async function ProjectsPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
   const { userId, profile } = await loadCurrentUser();
+  const navItems = await loadAppNavItems();
   const api = createServerApiClient();
 
   const search = q?.trim() ?? '';
@@ -41,7 +41,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   return (
     <AppLayout
-      navItems={APP_NAV_ITEMS}
+      navItems={navItems}
       activePath="/projects"
       title="Proyectos"
       user={{ name: displayName(profile), email: profile.credential.email }}
