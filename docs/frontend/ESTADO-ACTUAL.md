@@ -815,17 +815,21 @@ por navegación.
 La verificación de firma vive en `hasValidSessionToken` (`@praxis/commons/auth`):
 las zonas hacían el mismo guard duplicado y así ninguna necesita declarar `jose`.
 
-### 17.3 `AppLayout` en `commons/organisms`
+### 17.3 El armazón en `commons/organisms`
 
 Sube a commons por construcción, no por apuesta: en multi-zones cada zona
 privada es una app Next independiente y renderiza su propio armazón, así que
 los ≥2 consumidores están garantizados.
 
-⚠️ **El resaltado del ítem activo llega en `activePath`, no de
-`usePathname()`.** Cada zona tiene su propio `basePath`, así que dentro de la
-zona `usePathname()` devuelve la ruta *sin* prefijo y no casa con los enlaces de
-la barra lateral, que son rutas del **shell**. Por eso también son `<a>` y no
-`next/link`.
+> **Actualizado (§23):** era un solo `AppLayout` dentro de cada page. Hoy son
+> dos piezas —`AppShell` en el `layout.tsx` de la zona y `AppHeader` en cada
+> page— y `activePath` se calcula dentro del armazón. Lo de abajo se conserva
+> porque la trampa del basePath sigue siendo la misma.
+
+⚠️ **El resaltado del ítem activo no puede salir de `usePathname()` a secas.**
+Cada zona tiene su propio `basePath`, así que dentro de la zona `usePathname()`
+devuelve la ruta *sin* prefijo y no casa con los enlaces de la barra lateral, que
+son rutas del **shell**. Por eso también son `<a>` y no `next/link`.
 
 `Proyectos` y `Reportes` salen apagados con "Pronto": sus zonas no existen y no
 tiene sentido prometer una pantalla que daría 404.
@@ -1349,3 +1353,55 @@ panel del navegador de automatización mantiene el documento como `hidden`, así
 que el intervalo no llega a dispararse allí. Lo que sí se puede comprobar —y se
 comprobó— es el camino entero al volver a visible: el aviso nuevo aparece solo y
 la insignia se actualiza con él.
+
+---
+
+## 23. El armazón, en dos piezas
+
+> Cambio de estructura, no de aspecto: la pantalla se ve igual. Lo que cambia es
+> **cuándo se vuelve a dibujar**.
+
+### 23.1 Por qué se partió
+
+`AppLayout` vivía dentro de cada page. Navegar entre pantallas de la misma zona
+lo desmontaba entero, así que el `loading.tsx` tenía que reproducirlo — y lo
+reproducía con esqueletos: parpadeaban los enlaces de la barra lateral, el nombre
+y el correo de quien ya estaba identificado, y hasta el botón de cerrar sesión.
+Ninguna de esas cosas depende de la pantalla.
+
+| Pieza | Dónde vive | Qué contiene |
+|---|---|---|
+| `AppShell` | `layout.tsx` de la zona | barra lateral, cajón móvil, usuario, cerrar sesión |
+| `AppHeader` | cada page | título, acción de la pantalla, contenido |
+
+Next conserva los layouts entre navegaciones del mismo segmento, así que el
+armazón no se vuelve a renderizar ni vuelve a pedir el contador de
+notificaciones: **una vez por visita a la zona**, no una por pantalla. El
+`loading.tsx` pasa a cubrir solo la cabecera y el contenido.
+
+Las pantallas cuelgan de un grupo de rutas `(private)`, que envuelve sin
+aparecer en la URL.
+
+### 23.2 Lo que costó el corte
+
+**`activePath` se calcula dentro**, con `usePathname()` más un `zonePath` que
+declara la zona. La trampa del basePath (§16) no desaparece —`usePathname()`
+sigue devolviendo la ruta sin prefijo— pero ahora se resuelve en un sitio en vez
+de en cada page.
+
+**El botón del menú móvil quedó separado del cajón que abre:** uno está en la
+cabecera y el otro en el armazón. Viaja por contexto, y es el único estado que
+cruza esa frontera.
+
+### 23.3 Dos detalles del tablero
+
+**La columna tiene tope de altura** y se desplaza por dentro, sin barra visible.
+El desplazamiento va en la lista de tarjetas y no en la zona de suelta, para que
+«Añadir tarea» quede fijo abajo: es cuando la columna está llena cuando más
+molesta tener que bajar hasta el final para añadir una.
+
+**El tablero es un lienzo, no una tarjeta.** Estaba en `surface-elevated`, que lo
+ponía por delante de todo lo demás cuando en realidad es la superficie sobre la
+que flotan las columnas. Baja al tono del selector de espacio y lleva una
+retícula de puntos —la de cualquier pizarra— que dice sin palabras que ahí dentro
+las cosas se mueven.
