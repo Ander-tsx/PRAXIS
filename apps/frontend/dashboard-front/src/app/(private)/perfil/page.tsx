@@ -1,8 +1,8 @@
-import { AppLayout, Badge, LogoutButton, displayName } from '@praxis/commons';
+import { AppHeader, Badge } from '@praxis/commons';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
-import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Tus datos',
@@ -18,22 +18,13 @@ export default async function ProfilePage() {
   const { profile, roles } = await loadCurrentUser();
 
   return (
-    <AppLayout
-      navItems={await loadAppNavItems()}
-      /**
-       * Ruta **pública**, con el basePath: `AppLayout` la compara con enlaces
-       * del shell. Y lleva a que se resalte "Panel", que es lo correcto:
-       * esta pantalla cuelga de esa sección.
-       */
-      activePath="/dashboard/perfil"
+    <AppHeader
       title="Tus datos"
-      user={{ name: displayName(profile), email: profile.credential.email }}
       headerSlot={roles.map((role) => (
         <Badge key={role} variant={role === 'Admin' ? 'accent' : 'primary'}>
           {role.toUpperCase()}
         </Badge>
       ))}
-      footerSlot={<LogoutButton />}
     >
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
@@ -56,6 +47,6 @@ export default async function ProfilePage() {
           initialLastName={profile.lastName ?? ''}
         />
       </div>
-    </AppLayout>
+    </AppHeader>
   );
 }

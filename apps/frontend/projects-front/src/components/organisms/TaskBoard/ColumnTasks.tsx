@@ -3,7 +3,7 @@
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
 import { DONE_COLUMN_COLOR, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { createTaskAction } from '@/app/[id]/actions';
+import { createTaskAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
@@ -111,31 +111,48 @@ export function ColumnTasks({
           outline: isOver ? `1px dashed ${alpha(colors.primary, 45)}` : 'none',
         }}
       >
-        {tasks.length === 0 ? (
-          <div
-            className="flex min-h-24 items-center justify-center rounded-lg"
-            style={{ background: alpha(colors.background, 50) }}
-          >
-            <span className="font-sans text-xs text-text-disabled">
-              {isOver ? 'Suelta aquí' : 'Sin tareas'}
-            </span>
-          </div>
-        ) : (
-          tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              usersById={usersById}
-              onOpen={() => setOpenTask(task)}
-              canEdit={canEdit}
-              isDone={isDoneColumn}
-              draggable={canMove}
-              isDragging={draggingTaskId === task.id}
-              onDragStart={() => onDragTask(task.id)}
-              onDragEnd={() => onDragTask(null)}
-            />
-          ))
-        )}
+        {/**
+         * ⚠️ **La lista de tarjetas tiene tope de altura y se desplaza sola.**
+         *
+         * Sin tope, una columna con treinta tareas estiraba el tablero hasta que
+         * las demás quedaban en una franja arriba y había que recorrer la página
+         * entera para ver el final de una sola.
+         *
+         * El desplazamiento va **aquí y no en la zona de suelta**: así «Añadir
+         * tarea» se queda fijo abajo en vez de irse con el scroll, que es lo
+         * único que hace falta cuando la columna está llena. La zona de suelta
+         * sigue cubriendo las dos cosas.
+         *
+         * `scrollbar-none`: en una columna de 288 px la barra se come el ancho
+         * útil y parte el borde redondeado. Rueda y teclado siguen funcionando.
+         */}
+        <div className="scrollbar-none flex max-h-[55vh] flex-col gap-2 overflow-y-auto">
+          {tasks.length === 0 ? (
+            <div
+              className="flex min-h-24 items-center justify-center rounded-lg"
+              style={{ background: alpha(colors.background, 50) }}
+            >
+              <span className="font-sans text-xs text-text-disabled">
+                {isOver ? 'Suelta aquí' : 'Sin tareas'}
+              </span>
+            </div>
+          ) : (
+            tasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                usersById={usersById}
+                onOpen={() => setOpenTask(task)}
+                canEdit={canEdit}
+                isDone={isDoneColumn}
+                draggable={canMove}
+                isDragging={draggingTaskId === task.id}
+                onDragStart={() => onDragTask(task.id)}
+                onDragEnd={() => onDragTask(null)}
+              />
+            ))
+          )}
+        </div>
 
         {canCreate && (
           <NewTaskInline

@@ -9,7 +9,7 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteColumnAction, updateColumnAction } from '@/app/[id]/actions';
+import { deleteColumnAction, updateColumnAction } from '@/app/(private)/[id]/actions';
 import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
 import { COLUMN_NAME_MAX } from '@/lib/validation';
 

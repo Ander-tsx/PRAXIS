@@ -2,7 +2,7 @@
 
 import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
 import { useActionState } from 'react';
-import { respondInvitationAction } from '@/app/[id]/invitation-actions';
+import { respondInvitationAction } from '@/app/(private)/[id]/invitation-actions';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
 
 export interface PendingInvitationGateProps {

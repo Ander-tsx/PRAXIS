@@ -1,12 +1,10 @@
 import {
-  AppLayout,
-  LogoutButton,
+  AppHeader,
   type NotificationPage,
   type Paginated,
   type UserProfile,
-  displayName,
 } from '@praxis/commons';
-import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { AutoRefresh } from '@/components/molecules/AutoRefresh';
 import { NotificationList } from '@/components/organisms/NotificationList';
@@ -30,7 +28,6 @@ const REFRESH_SECONDS = 60;
  * crearía dos sitios donde aceptar lo mismo y el segundo en enterarse fallaría.
  */
 export default async function NotificationsPage() {
-  const { profile } = await loadCurrentUser();
   const api = createServerApiClient();
 
   const inbox = await api
@@ -50,16 +47,8 @@ export default async function NotificationsPage() {
 
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
 
-  const navItems = await loadAppNavItems();
-
   return (
-    <AppLayout
-      navItems={navItems}
-      activePath="/dashboard/notificaciones"
-      title="Notificaciones"
-      user={{ name: displayName(profile), email: profile.credential.email }}
-      footerSlot={<LogoutButton />}
-    >
+    <AppHeader title="Notificaciones">
       <AutoRefresh seconds={REFRESH_SECONDS} />
 
       <NotificationList
@@ -67,6 +56,6 @@ export default async function NotificationsPage() {
         unread={inbox.unread}
         usersById={usersById}
       />
-    </AppLayout>
+    </AppHeader>
   );
 }

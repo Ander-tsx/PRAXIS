@@ -11,7 +11,7 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { saveRoleAction } from '@/app/[id]/actions';
+import { saveRoleAction } from '@/app/(private)/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/action-state';
 import { ROLE_NAME_MAX, validateRole } from '@/lib/validation';
 import { PERMISSION_GROUPS, PERMISSION_LABELS, impliedFrom, selectedFrom } from './permissions';

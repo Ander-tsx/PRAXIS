@@ -16,7 +16,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { deleteTaskAction, updateTaskAction } from '@/app/[id]/actions';
+import { deleteTaskAction, updateTaskAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { SECTION_PANEL } from './section-panel';
 import { TaskAttachments } from './TaskAttachments';

@@ -1,7 +1,6 @@
 import {
-  AppLayout,
+  AppHeader,
   DUE_SOON_DAYS,
-  LogoutButton,
   type MyInvitation,
   type Paginated,
   type Project,
@@ -17,7 +16,7 @@ import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { ProjectList } from '@/components/organisms/ProjectList';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
-import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
   title: 'Panel',
@@ -51,7 +50,7 @@ export default async function DashboardPage() {
    */
   const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
 
-  const [page, invitations, dueTasks, navItems] = await Promise.all([
+  const [page, invitations, dueTasks] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
@@ -63,9 +62,6 @@ export default async function DashboardPage() {
         `/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&excludeDone=true&limit=50`,
       )
       .catch(() => ({ items: [] as Task[], total: 0 })),
-    /* La navegación con su insignia. Va en el mismo `Promise.all` para no
-       encadenar una petición más antes de pintar. */
-    loadAppNavItems(),
   ]);
   const projects = page.items;
 
@@ -92,13 +88,9 @@ export default async function DashboardPage() {
   const name = displayName(profile);
 
   return (
-    <AppLayout
-      navItems={navItems}
-      activePath="/dashboard"
+    <AppHeader
       title="Panel"
-      user={{ name, email: profile.credential.email }}
       headerSlot={projects.length > 0 ? <CreateProjectDialog /> : undefined}
-      footerSlot={<LogoutButton />}
     >
       <div className="flex flex-col gap-8">
         <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
@@ -132,6 +124,6 @@ export default async function DashboardPage() {
           </>
         )}
       </div>
-    </AppLayout>
+    </AppHeader>
   );
 }

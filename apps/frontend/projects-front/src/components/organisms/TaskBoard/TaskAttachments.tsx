@@ -12,7 +12,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef } from 'react';
-import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/[id]/actions';
+import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { SECTION_PANEL } from './section-panel';
 

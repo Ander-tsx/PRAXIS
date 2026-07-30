@@ -2,7 +2,7 @@
 
 import { Button, Dialog, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useState } from 'react';
-import { removeMemberAction } from '@/app/[id]/actions';
+import { removeMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
 export interface RemoveMemberButtonProps {

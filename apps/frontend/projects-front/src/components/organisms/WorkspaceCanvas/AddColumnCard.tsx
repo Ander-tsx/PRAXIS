@@ -2,7 +2,7 @@
 
 import { alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { createColumnAction } from '@/app/[id]/actions';
+import { createColumnAction } from '@/app/(private)/[id]/actions';
 import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
 import { COLUMN_NAME_MAX } from '@/lib/validation';
 

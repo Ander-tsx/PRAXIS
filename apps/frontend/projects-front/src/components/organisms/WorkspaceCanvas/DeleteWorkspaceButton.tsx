@@ -2,7 +2,7 @@
 
 import { Button, Dialog, Input, type Workspace, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { deleteWorkspaceAction } from '@/app/[id]/actions';
+import { deleteWorkspaceAction } from '@/app/(private)/[id]/actions';
 import { WORKSPACE_INITIAL_STATE } from '@/lib/action-state';
 
 export interface DeleteWorkspaceButtonProps {

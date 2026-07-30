@@ -2,7 +2,7 @@
 
 import { Badge, type ProjectInvitation, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
 import { useActionState } from 'react';
-import { cancelInvitationAction } from '@/app/[id]/actions';
+import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
 export interface PendingInvitationsProps {

@@ -1,11 +1,9 @@
 import {
-  AppLayout,
-  LogoutButton,
+  AppHeader,
   type Paginated,
   type Project,
-  displayName,
 } from '@praxis/commons';
-import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
 import { ProjectGrid } from '@/components/organisms/ProjectGrid';
@@ -30,8 +28,7 @@ interface PageProps {
  */
 export default async function ProjectsPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
-  const { userId, profile } = await loadCurrentUser();
-  const navItems = await loadAppNavItems();
+  const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
   const search = q?.trim() ?? '';
@@ -40,14 +37,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   );
 
   return (
-    <AppLayout
-      navItems={navItems}
-      activePath="/projects"
-      title="Proyectos"
-      user={{ name: displayName(profile), email: profile.credential.email }}
-      headerSlot={<CreateProjectDialog />}
-      footerSlot={<LogoutButton />}
-    >
+    <AppHeader title="Proyectos" headerSlot={<CreateProjectDialog />}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-3xl text-text-primary">Tus proyectos</h2>
@@ -67,6 +57,6 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
           />
         )}
       </div>
-    </AppLayout>
+    </AppHeader>
   );
 }

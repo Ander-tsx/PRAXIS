@@ -12,7 +12,7 @@ import {
   addCommentAction,
   deleteCommentAction,
   editCommentAction,
-} from '@/app/[id]/actions';
+} from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { SECTION_PANEL } from './section-panel';
 

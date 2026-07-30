@@ -1,12 +1,11 @@
 /**
- * Esqueleto del panel.
+ * Esqueleto del contenido, **sin la barra lateral**.
  *
- * Reproduce el armazón de `AppLayout` (barra lateral + cabecera + rejilla) en
- * lugar de un spinner centrado: así la transición no da un salto y la pantalla
- * ya comunica lo que va a aparecer.
- *
- * No usa `AppLayout` porque ese componente exige datos del usuario que todavía
- * estamos esperando.
+ * Antes reproducía el armazón entero, porque el armazón vivía dentro de cada
+ * page: al navegar se desmontaba y había que dibujarlo de nuevo. Ahora vive en
+ * el layout y Next lo conserva, así que este fallback solo cubre lo que de
+ * verdad está cargando. Dibujar aquí unos enlaces y un nombre de mentira, sobre
+ * los de verdad que ya están en pantalla, era puro parpadeo.
  */
 
 function Block({ className = '' }: { className?: string }) {
@@ -15,49 +14,33 @@ function Block({ className = '' }: { className?: string }) {
 
 export default function DashboardLoading() {
   return (
-    <div className="flex h-screen overflow-hidden bg-background" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Cargando el panel</span>
+    <>
+      <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-4 sm:px-6">
+        <Block className="h-6 w-32" />
+      </header>
 
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
-        <div className="flex h-16 items-center border-b border-border px-6">
-          <span className="select-none font-serif text-xl font-black tracking-tight text-primary">
-            PRAXIS
-          </span>
-        </div>
-        <div className="flex flex-col gap-1.5 p-4 pt-6">
-          <Block className="h-11" />
-          <Block className="h-11 opacity-60" />
-          <Block className="h-11 opacity-40" />
-        </div>
-      </aside>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center border-b border-border bg-surface px-4 sm:px-6">
-          <Block className="h-6 w-32" />
-        </header>
+      <main className="relative flex-1 overflow-y-auto bg-background" aria-busy="true">
+        <span className="sr-only">Cargando</span>
 
         <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-4 sm:p-6">
           <div className="flex flex-col gap-3">
-            <Block className="h-10 w-72 max-w-full" />
-            <Block className="h-5 w-56 max-w-full opacity-60" />
+            <Block className="h-9 w-72" />
+            <Block className="h-5 w-52 opacity-60" />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <Block className="h-32" />
-            <Block className="h-32" />
-            <Block className="h-32" />
+            <Block className="h-32 opacity-80" />
+            <Block className="h-32 opacity-60" />
           </div>
 
-          <div className="flex flex-col gap-4">
-            <Block className="h-8 w-48" />
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <Block className="h-36" />
-              <Block className="h-36 opacity-70" />
-              <Block className="h-36 opacity-40" />
-            </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Block className="h-40" />
+            <Block className="h-40 opacity-80" />
+            <Block className="h-40 opacity-60" />
           </div>
         </div>
-      </div>
-    </div>
+      </main>
+    </>
   );
 }

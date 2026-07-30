@@ -3,7 +3,7 @@
 import { Button, type Workspace, alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
-import { createWorkspaceAction } from '@/app/[id]/actions';
+import { createWorkspaceAction } from '@/app/(private)/[id]/actions';
 import { WORKSPACE_INITIAL_STATE } from '@/lib/action-state';
 import { WORKSPACE_NAME_MAX, validateWorkspace } from '@/lib/validation';
 

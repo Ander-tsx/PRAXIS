@@ -12,7 +12,7 @@ import { useActionState } from 'react';
 import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
-} from '@/app/notificaciones/actions';
+} from '@/app/(private)/notificaciones/actions';
 import { NOTIFICATION_INITIAL_STATE } from '@/lib/action-state';
 
 export interface NotificationListProps {

@@ -11,7 +11,7 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { moveTaskAction, reorderColumnsAction } from '@/app/[id]/actions';
+import { moveTaskAction, reorderColumnsAction } from '@/app/(private)/[id]/actions';
 import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/action-state';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';

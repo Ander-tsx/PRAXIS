@@ -12,7 +12,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { inviteMemberAction } from '@/app/[id]/actions';
+import { inviteMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
 export interface InviteMemberDialogProps {

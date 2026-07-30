@@ -1,8 +1,7 @@
 import {
-  AppLayout,
+  AppHeader,
   type EffectivePermissions,
   type Label,
-  LogoutButton,
   type MyInvitation,
   type Paginated,
   type ProjectDetail,
@@ -11,10 +10,9 @@ import {
   TabNav,
   type Task,
   type UserProfile,
-  displayName,
   tabLinkClasses,
 } from '@praxis/commons';
-import { createServerApiClient, loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -67,8 +65,7 @@ type TabId = (typeof TABS)[number]['id'];
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
   const { tab, ws, board, task } = await searchParams;
-  const { userId, profile } = await loadCurrentUser();
-  const navItems = await loadAppNavItems();
+  const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
   const activeTab: TabId = TABS.some((t) => t.id === tab) ? (tab as TabId) : 'espacios';
@@ -93,15 +90,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     if (!invitation) return notFound();
 
     return (
-      <AppLayout
-        navItems={navItems}
-        activePath="/projects"
-        title="Invitación"
-        user={{ name: displayName(profile), email: profile.credential.email }}
-        footerSlot={<LogoutButton />}
-      >
+      <AppHeader title="Invitación">
         <PendingInvitationGate invitation={invitation} />
-      </AppLayout>
+      </AppHeader>
     );
   }
 
@@ -224,13 +215,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   };
 
   return (
-    <AppLayout
-      navItems={navItems}
-      activePath="/projects"
-      title={project.name}
-      user={{ name: displayName(profile), email: profile.credential.email }}
-      footerSlot={<LogoutButton />}
-    >
+    <AppHeader title={project.name}>
       <div className="flex flex-col gap-6">
         <ProjectHeader
           project={project}
@@ -320,6 +305,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           />
         )}
       </div>
-    </AppLayout>
+    </AppHeader>
   );
 }

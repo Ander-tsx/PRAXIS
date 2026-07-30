@@ -6,7 +6,7 @@ import {
   addChecklistItemAction,
   deleteChecklistItemAction,
   toggleChecklistItemAction,
-} from '@/app/[id]/actions';
+} from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 
 export interface TaskChecklistProps {

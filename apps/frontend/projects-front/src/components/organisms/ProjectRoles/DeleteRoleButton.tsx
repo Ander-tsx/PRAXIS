@@ -2,7 +2,7 @@
 
 import { Button, Dialog, type ProjectRole, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useState } from 'react';
-import { deleteRoleAction } from '@/app/[id]/actions';
+import { deleteRoleAction } from '@/app/(private)/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/action-state';
 
 export interface DeleteRoleButtonProps {

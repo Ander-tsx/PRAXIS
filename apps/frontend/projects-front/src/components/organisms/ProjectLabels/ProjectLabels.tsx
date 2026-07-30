@@ -12,7 +12,7 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteLabelAction, saveLabelAction } from '@/app/[id]/actions';
+import { deleteLabelAction, saveLabelAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 
 export interface ProjectLabelsProps {

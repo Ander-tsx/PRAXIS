@@ -1,4 +1,5 @@
 import type { Board, Label, Task, UserProfile } from '@praxis/commons';
+import { alpha, colors } from '@praxis/commons';
 import { BoardColumns } from './BoardColumns';
 
 export interface BoardStripProps {
@@ -37,6 +38,25 @@ export interface BoardStripProps {
  * La tira de columnas vive en `BoardColumns`, que es cliente porque gestiona el
  * arrastre. Aquí solo va la cabecera, que no necesita JavaScript.
  */
+/**
+ * Superficie del tablero: el mismo tono que el selector de espacio, con una
+ * retícula de puntos encima.
+ *
+ * El `surface-elevated` de antes lo hacía flotar por delante de todo lo demás
+ * de la pantalla cuando lo que es, en realidad, es el lienzo **sobre el que**
+ * flotan las columnas. Bajarlo al tono del selector lo devuelve al fondo, y la
+ * retícula —la de cualquier pizarra— dice que ahí dentro las cosas se mueven.
+ *
+ * Van los dos fondos en una sola propiedad porque el orden importa: la retícula
+ * primero y el color detrás, o el color taparía los puntos.
+ */
+const BOARD_SURFACE = {
+  background: `radial-gradient(${alpha(colors.borderStrong, 60)} 1px, transparent 1px), ${colors.surface}`,
+  backgroundSize: '22px 22px',
+  /* Medio paso: así ningún punto cae justo en la esquina redondeada. */
+  backgroundPosition: '11px 11px',
+} as const;
+
 export function BoardStrip({
   board,
   projectId,
@@ -60,11 +80,14 @@ export function BoardStrip({
   return (
     <section
       aria-label={`Tablero ${board.name}`}
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-elevated p-5"
+      className="flex flex-col gap-4 rounded-2xl border border-border p-5"
+      style={BOARD_SURFACE}
     >
       <header className="flex flex-wrap items-baseline gap-3">
         <h4 className="font-sans text-base font-semibold text-text-primary">{board.name}</h4>
-        <span className="font-sans text-xs text-text-disabled">
+        {/* Más contraste que antes: sobre el fondo del lienzo, `text-disabled`
+            se leía como un borrón. */}
+        <span className="font-sans text-xs text-text-secondary">
           {columnCount === 0
             ? 'sin columnas'
             : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`}
