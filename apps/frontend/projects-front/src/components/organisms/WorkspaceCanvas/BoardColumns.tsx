@@ -21,10 +21,7 @@ export interface BoardColumnsProps {
   board: Board;
   projectId: string;
   /**
-   * Crear columnas y reordenarlas.
-   *
-   * Es `canCreateColumn`, no `canCreateBoard` como estaba: el backend pide ese
-   * permiso en `POST .../columns` y en `PATCH .../columns/reorder`, así que
+   * Crear columnas. Es `canCreateColumn`, no `canCreateBoard` como estaba:
    * gatearlo con el de tableros ocultaba el botón a quien sí podía usarlo.
    */
   canCreateColumn: boolean;
@@ -274,7 +271,7 @@ export function BoardColumns({
                  una tarjeta acabaría moviendo la columna entera. Con el menú
                  abierto tampoco: dentro de un ancestro arrastrable no se puede
                  seleccionar texto, y el campo de renombrar está ahí dentro. */
-              draggable={canCreateColumn && !draggingTaskId && menuOpenColumnId !== column.id}
+              draggable={canEditColumn && !draggingTaskId && menuOpenColumnId !== column.id}
               onDragStart={(event) => {
                 /**
                  * El estado se marca **primero**. `dataTransfer` es opcional
@@ -313,7 +310,8 @@ export function BoardColumns({
                 /* La transición va sobre transform y sombra, no sobre layout:
                    animar posiciones aquí pelearía con el reordenado en vivo. */
                 'transition-[transform,box-shadow,opacity] duration-200 ease-out',
-                canCreateColumn ? 'cursor-grab active:cursor-grabbing' : '',
+                /* Reordenar es editar la columna, igual que en el endpoint. */
+                canEditColumn ? 'cursor-grab active:cursor-grabbing' : '',
                 isDragging ? 'scale-[1.03] opacity-90' : 'scale-100',
               ]
                 .filter(Boolean)
@@ -341,7 +339,7 @@ export function BoardColumns({
                   {/* Reordenar sin arrastrar: el arrastre no llega al teclado ni
                       a un lector de pantalla, así que no puede ser la única
                       forma de mover una columna. */}
-                  {canCreateColumn && columns.length > 1 && (
+                  {canEditColumn && columns.length > 1 && (
                     <>
                       <NudgeButton
                         direction={-1}

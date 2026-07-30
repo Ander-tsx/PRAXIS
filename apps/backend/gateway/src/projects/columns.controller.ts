@@ -56,10 +56,17 @@ export class ColumnsController {
     );
   }
 
-  /** Reordena las columnas de un board (requiere canCreateColumn) */
+  /**
+   * Reordena las columnas de un board (requiere canEditColumn).
+   *
+   * Pedía `canCreateColumn` por no existir `canEditColumn`. Mover una columna de
+   * sitio se parece mucho más a editarla que a crearla, y con el permiso viejo
+   * quien solo podía añadir columnas podía además reorganizar el tablero entero.
+   * `canDeleteColumn` lo implica por jerarquía.
+   */
   @Patch('reorder')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_CREATE_COLUMN)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_COLUMN)
   @ApiOperation({ summary: 'Reordena las columnas de un board' })
   @ApiResponse({ status: 200, description: 'Columnas reordenadas exitosamente' })
   reorder(
