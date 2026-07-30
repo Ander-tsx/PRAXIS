@@ -416,3 +416,54 @@ export function personLabel(user: UserProfile): string {
   if (name) return name;
   return user.credential.email.split('@')[0] ?? user.credential.email;
 }
+
+/**
+ * Tipos de aviso. Espejo de `NotificationType` en `@praxis/contracts`.
+ *
+ * Todos describen **algo que ya pasó**. Las invitaciones sin responder no están
+ * aquí: siguen en su propia tabla y el panel las enseña aparte porque esperan
+ * una decisión, no una lectura.
+ */
+export const NOTIFICATION_TYPES = [
+  'INVITATION_RECEIVED',
+  'INVITATION_ACCEPTED',
+  'INVITATION_REJECTED',
+  'MEMBER_LEFT',
+  'MEMBER_REMOVED',
+  'TASK_ASSIGNED',
+  'TASK_UNASSIGNED',
+] as const;
+
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Un aviso.
+ *
+ * `projectName` y `taskTitle` son **copias del momento**, no referencias: el
+ * aviso sobrevive al borrado del proyecto o la tarea de los que habla, y por eso
+ * se pintan tal cual en vez de resolverse contra nada.
+ *
+ * `actorId` es un id: el nombre lo resuelve la pantalla contra el directorio,
+ * igual que en encargados y comentarios.
+ */
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  actorId: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  /** `null` mientras no se haya leído. */
+  readAt: string | null;
+  createdAt: string;
+}
+
+/** Lo que devuelve `GET /api/me/notifications`. */
+export interface NotificationPage {
+  items: AppNotification[];
+  total: number;
+  /** No leídas en total, **sin recortar por `limit`**: es lo que pinta la insignia. */
+  unread: number;
+}

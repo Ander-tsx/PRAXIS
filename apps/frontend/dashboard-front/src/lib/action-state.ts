@@ -41,3 +41,11 @@ export const INVITATION_RESPONSE_INITIAL_STATE: InvitationResponseState = {
   error: null,
   done: null,
 };
+
+/** Estado de las acciones de la bandeja de avisos. */
+export interface NotificationState {
+  error: string | null;
+  done: string | null;
+}
+
+export const NOTIFICATION_INITIAL_STATE: NotificationState = { error: null, done: null };

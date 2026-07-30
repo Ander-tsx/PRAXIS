@@ -103,7 +103,21 @@ function NavList({
             style={active ? { boxShadow: `0 8px 24px ${alpha(colors.primary, 20)}` } : undefined}
           >
             {item.icon}
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {/* Sin no leídos no hay insignia: un cero no informa de nada. */}
+            {item.badge !== undefined && item.badge > 0 && (
+              <span
+                aria-label={`${item.badge} sin leer`}
+                className="min-w-5 rounded-full px-1.5 py-0.5 text-center font-sans text-[11px] font-semibold tabular-nums"
+                style={
+                  active
+                    ? { background: alpha(colors.overlay, 30), color: colors.primaryForeground }
+                    : { background: colors.primary, color: colors.primaryForeground }
+                }
+              >
+                {item.badge > 99 ? '99+' : item.badge}
+              </span>
+            )}
           </a>
         );
       })}
