@@ -1404,9 +1404,11 @@ molesta tener que bajar hasta el final para añadir una.
 pizarra. No tiene color propio: se ve el fondo de la página, y lo delimitan los
 puntos y el borde.
 
-Los puntos se **difuminan hacia los bordes** con una máscara, no con un
-degradado de color: lo que se atenúa son los puntos y debajo queda el fondo real,
-así que sigue encajando si ese fondo cambia. El radio va en porcentaje para
-escalar con la caja. Y la retícula vive en una **capa aparte**, porque
-`mask-image` recorta también a los hijos: en el `<section>` habría desvanecido
-las tarjetas de los extremos.
+Los bordes se hunden con **dos sombras `inset`**, una corta y densa y otra larga
+y suave. Antes era una máscara que desvanecía los puntos y no se notaba: los
+puntos ya son tenues, así que atenuar algo tenue no se ve; oscurecer el fondo sí.
+
+La sombra `inset` además cabe en el propio `<section>`, porque se pinta **encima
+del fondo y debajo del contenido**: apaga los puntos del borde sin tocar las
+tarjetas. Una máscara no podía —`mask-image` recorta también a los hijos— y por
+eso necesitaba una capa aparte que ya no hace falta.
