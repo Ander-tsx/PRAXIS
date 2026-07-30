@@ -30,6 +30,15 @@ export interface WorkspaceCanvasProps {
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canCreateTask: boolean;
+  /**
+   * Tarea que hay que abrir nada más entrar, si llega en la URL.
+   *
+   * Viene de un aviso del panel: aterrizar en el tablero correcto y tener que
+   * buscar la tarjeta a ojo deja el trabajo a medias.
+   */
+  openTaskId?: string | null;
+  /** Arrastrar una tarjeta a otra columna: `canMoveTask`. */
+  canMoveTask: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -60,6 +69,8 @@ export function WorkspaceCanvas({
   usersById,
   currentUserId,
   canCreateTask,
+  canMoveTask,
+  openTaskId,
   canEditTask,
   canDeleteTask,
 }: WorkspaceCanvasProps) {
@@ -137,6 +148,8 @@ export function WorkspaceCanvas({
               usersById={usersById}
               currentUserId={currentUserId}
               canCreateTask={canCreateTask}
+              canMoveTask={canMoveTask}
+              openTaskId={openTaskId}
               canEditTask={canEditTask}
               canDeleteTask={canDeleteTask}
             />

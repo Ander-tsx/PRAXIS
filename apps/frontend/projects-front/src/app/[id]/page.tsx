@@ -25,7 +25,7 @@ import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; ws?: string }>;
+  searchParams: Promise<{ tab?: string; ws?: string; board?: string; task?: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -64,7 +64,7 @@ type TabId = (typeof TABS)[number]['id'];
  */
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tab, ws } = await searchParams;
+  const { tab, ws, board, task } = await searchParams;
   const { userId, profile } = await loadCurrentUser();
   const api = createServerApiClient();
 
@@ -108,12 +108,31 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   );
 
   /**
-   * Espacio abierto. Sin `?ws=` —o si apunta a uno que ya no existe, por
-   * ejemplo tras borrarlo— se cae al primero, para que la pestaña nunca quede
-   * en blanco teniendo espacios que enseñar.
+   * Espacio abierto.
+   *
+   * Tres formas de decidirlo, en orden:
+   *
+   * 1. `?ws=` — lo eligió la persona en el selector.
+   * 2. `?board=` — **viene de fuera**, típicamente de un aviso del panel. El
+   *    aviso solo conoce el tablero de la tarea, así que el espacio se resuelve
+   *    aquí buscando cuál lo contiene. Sin esto, una tarea del espacio B abría
+   *    el espacio A y parecía que el enlace estaba roto.
+   * 3. El primero, para que la pestaña nunca quede en blanco teniendo espacios.
+   *
+   * `?ws=` gana sobre `?board=` porque si los dos vienen, el explícito es el
+   * que acaba de pulsar quien mira.
    */
+  const workspaceOfBoard = board
+    ? project.workspaces.find((workspace) =>
+        workspace.boards.some((candidate) => candidate.id === board),
+      )
+    : undefined;
+
   const activeWorkspace =
-    project.workspaces.find((workspace) => workspace.id === ws) ?? project.workspaces[0] ?? null;
+    project.workspaces.find((workspace) => workspace.id === ws) ??
+    workspaceOfBoard ??
+    project.workspaces[0] ??
+    null;
 
   /**
    * Tareas del espacio abierto, un `GET` por tablero.
@@ -202,6 +221,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             usersById={usersById}
             currentUserId={userId}
             canCreateTask={can.canCreateTask}
+            /* Mover no es editar: quien solo tiene `canMoveTask` arrastra
+               tarjetas pero abre el diálogo en modo lectura. */
+            canMoveTask={can.canMoveTask}
+            /* Llega de un aviso del panel: la tarea se abre sola al aterrizar. */
+            openTaskId={task ?? null}
             canEditTask={can.canEditTask}
             canDeleteTask={can.canDeleteTask}
           />

@@ -18,6 +18,10 @@ export interface ColumnTasksProps {
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canCreate: boolean;
+  /** Arrastrar la tarjeta a otra columna: `canMoveTask`. */
+  canMove: boolean;
+  /** Tarea a abrir al entrar, si está en esta columna. Llega de la URL. */
+  openTaskId?: string | null;
   canEdit: boolean;
   canDelete: boolean;
   /** Tarea que se está arrastrando, compartida por todas las columnas. */
@@ -44,13 +48,22 @@ export function ColumnTasks({
   usersById,
   currentUserId,
   canCreate,
+  canMove,
+  openTaskId,
   canEdit,
   canDelete,
   draggingTaskId,
   onDragTask,
   onDropTask,
 }: ColumnTasksProps) {
-  const [openTask, setOpenTask] = useState<Task | null>(null);
+  /**
+   * Si la URL pide una tarea y está en esta columna, se abre ya en el primer
+   * render: hacerlo en un `useEffect` mostraría el tablero y el diálogo saltando
+   * encima un instante después.
+   */
+  const [openTask, setOpenTask] = useState<Task | null>(
+    () => tasks.find((task) => task.id === openTaskId) ?? null,
+  );
   const [isOver, setIsOver] = useState(false);
 
   /**
@@ -108,7 +121,8 @@ export function ColumnTasks({
               task={task}
               usersById={usersById}
               onOpen={() => setOpenTask(task)}
-              draggable={canEdit}
+              canEdit={canEdit}
+              draggable={canMove}
               isDragging={draggingTaskId === task.id}
               onDragStart={() => onDragTask(task.id)}
               onDragEnd={() => onDragTask(null)}

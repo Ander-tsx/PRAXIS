@@ -3,6 +3,7 @@
 import {
   COLUMN_COLORS,
   COLUMN_COLOR_LABELS,
+  DONE_COLUMN_COLOR,
   type ColumnColor,
   alpha,
   colors,
@@ -191,6 +192,11 @@ export function ColumnMenu({
                       aria-hidden="true"
                     />
                     Cambiar color
+                    {columnColor === DONE_COLUMN_COLOR && (
+                      <span className="ml-auto font-sans text-[10px] text-text-disabled">
+                        cierre
+                      </span>
+                    )}
                   </MenuItem>
                   <MenuItem onClick={() => show('rename')}>
                     <PencilIcon />
@@ -257,6 +263,30 @@ export function ColumnMenu({
                   </button>
                 ))}
               </div>
+
+              {/**
+               * El verde no es solo un color y hay que decirlo **donde se
+               * elige**, no en la documentación: una tarea que llega a una
+               * columna verde deja de contar como pendiente en el panel. Por eso
+               * va el último de la fila, separado del resto por su significado.
+               */}
+              <span
+                className="flex items-start gap-1.5 rounded-lg p-1.5 font-sans text-[11px] leading-snug"
+                style={{
+                  background: alpha(colors[DONE_COLUMN_COLOR], 10),
+                  color: colors.textSecondary,
+                }}
+              >
+                <span
+                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: colors[DONE_COLUMN_COLOR] }}
+                  aria-hidden="true"
+                />
+                <span>
+                  El verde marca la columna de cierre: sus tareas dejan de contar como
+                  pendientes.
+                </span>
+              </span>
 
               <MenuBack onClick={() => show('menu')} />
             </form>

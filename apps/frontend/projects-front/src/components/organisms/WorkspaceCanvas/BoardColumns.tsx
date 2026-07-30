@@ -41,6 +41,15 @@ export interface BoardColumnsProps {
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canCreateTask: boolean;
+  /**
+   * Tarea que hay que abrir nada más entrar, si llega en la URL.
+   *
+   * Viene de un aviso del panel: aterrizar en el tablero correcto y tener que
+   * buscar la tarjeta a ojo deja el trabajo a medias.
+   */
+  openTaskId?: string | null;
+  /** Arrastrar una tarjeta a otra columna: `canMoveTask`, no `canEditTask`. */
+  canMoveTask: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -90,6 +99,8 @@ export function BoardColumns({
   usersById,
   currentUserId,
   canCreateTask,
+  canMoveTask,
+  openTaskId,
   canEditTask,
   canDeleteTask,
 }: BoardColumnsProps) {
@@ -376,6 +387,8 @@ export function BoardColumns({
                   usersById={usersById}
                   currentUserId={currentUserId}
                   canCreate={canCreateTask}
+                  canMove={canMoveTask}
+                  openTaskId={openTaskId}
                   canEdit={canEditTask}
                   canDelete={canDeleteTask}
                   draggingTaskId={draggingTaskId}
