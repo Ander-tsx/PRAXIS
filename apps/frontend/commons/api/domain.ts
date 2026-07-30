@@ -45,6 +45,7 @@ export interface Project {
 export const PROJECT_PERMISSIONS = [
   'canViewProject',
   'canCreateTask',
+  'canMoveTask',
   'canEditTask',
   'canDeleteTask',
   'canCreateBoard',
@@ -79,8 +80,8 @@ export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermis
   canEditBoard: ['canCreateBoard'],
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
-  canDeleteTask: ['canEditTask', 'canCreateTask'],
-  canEditTask: ['canCreateTask'],
+  canDeleteTask: ['canEditTask', 'canMoveTask', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canCreateTask'],
 };
 
 /** `GET /api/projects/:projectId/roles` viene embebido en el detalle. */
@@ -105,20 +106,29 @@ export interface ProjectMember {
  * Colores que puede tomar una columna.
  *
  * Tokens del design system, como en las etiquetas. Espejo de `COLUMN_COLORS` en
- * `@praxis/contracts`. Los cinco primeros son los que reparte el backend por
- * posición al crear; `error` solo se elige a mano, porque un rojo por defecto se
- * lee como una alarma.
+ * `@praxis/contracts`, **incluido el orden**: el verde va el último porque
+ * significa «columna de cierre» (ver `DONE_COLUMN_COLOR`). El backend reparte
+ * por posición solo los cuatro primeros; verde y rojo se eligen a mano.
  */
-export const COLUMN_COLORS = ['primary', 'accent', 'info', 'success', 'warning', 'error'] as const;
+export const COLUMN_COLORS = ['primary', 'accent', 'info', 'warning', 'error', 'success'] as const;
 export type ColumnColor = (typeof COLUMN_COLORS)[number];
+
+/**
+ * El verde marca la **columna de cierre**: las tareas que llegan ahí dejan de
+ * contar como pendientes en el panel.
+ *
+ * Va el último de la lista a propósito, porque es el único que significa algo
+ * además de pintar. Espejo de `DONE_COLUMN_COLOR` en `@praxis/contracts`.
+ */
+export const DONE_COLUMN_COLOR: ColumnColor = 'success';
 
 export const COLUMN_COLOR_LABELS: Record<ColumnColor, string> = {
   primary: 'Violeta',
   accent: 'Ámbar',
   info: 'Azul',
-  success: 'Verde',
   warning: 'Amarillo',
   error: 'Rojo',
+  success: 'Verde — columna de cierre',
 };
 
 export interface Column {
