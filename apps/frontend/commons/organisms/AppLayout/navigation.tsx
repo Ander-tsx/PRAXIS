@@ -87,8 +87,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
-    // No hay backend de reportes. Ver PENDIENTES-BACKEND.md.
-    disabled: true,
+    /* Estuvo apagado con «Pronto» desde el principio porque no había backend.
+       Ya lo hay: reports-service en el 3005 y la zona en el 4104. */
   },
   {
     label: 'Notificaciones',

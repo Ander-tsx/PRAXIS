@@ -1979,3 +1979,80 @@ Los números cuadran entre sí, que es la comprobación que importa: el ciclo es
 **menor** que la entrega —por definición, empieza más tarde—, el p85 es mayor que
 el p50 en ambos, y 22 pendientes a 0,62/día son ~35 días, que es lo que dice la
 simulación.
+
+### 25.12 `reports-front`, la cuarta zona
+
+Puerto **4104**, `basePath: '/reports'`, checklist de §17.7 completo. La entrada
+«Reportes» de la barra lateral deja de estar apagada después de haberlo estado
+desde el principio.
+
+**Recharts 3.10 vive solo aquí**, y esa es la ventaja de multi-zone que el
+proyecto llevaba defendiendo sin cobrarla: `dashboard-front` y `projects-front`
+siguen con cero dependencias más allá de `commons`, `next` y `react`. Solo la
+zona que dibuja gráficos paga la librería, igual que solo el shell paga `three`.
+Se verificó el peer de React —Recharts 3.x declara `^19.0.0`— antes de construir
+nada encima.
+
+⚠️ **Tailwind no llega dentro del SVG de Recharts.** Los colores van como
+**valores** a `fill` y `stroke`, tomados de `commons/tokens`. Funcionan porque
+son `var(--color-*)` y el SVG está dentro del documento, así que hereda las
+variables; una clase de utilidad ahí no pinta nada.
+
+Cada gráfico es una isla `'use client'` que **recibe la serie ya calculada por
+props**: el `fetch` vive en la page, que es la regla del repo y además impide que
+la librería se cuele en el árbol de servidor.
+
+#### Las pestañas piden solo lo suyo
+
+`Instantánea` · `Flujo` · `Tiempos` · `Equipo`. Cada una carga únicamente sus
+datos: el flujo y los tiempos recorren el historial entero, y pedirlos siempre
+haría lenta la instantánea —la única que funciona sin historial— por culpa de dos
+pantallas que quizá no se abran.
+
+La pestaña de equipo **no aparece** sin `canViewReports`, y sus datos ni se
+piden: el 403 sería esperado, y pedirlo para descartarlo es justo lo que evita
+`permissions/me`.
+
+#### Dos decisiones de la interfaz
+
+**`description` es obligatoria en `ChartCard`.** Un gráfico sin una frase que
+diga qué mide se interpreta mal con muchísima seguridad: quien lo mira inventa la
+explicación que le encaja. Hacerla opcional habría bastado para que la mitad se
+quedara sin ella.
+
+**El aviso de historial fabricado no se puede cerrar** y va arriba del todo.
+Durante una demostración nadie distingue un dato medido de uno generado, y quien
+lo vea se llevaría una conclusión falsa sobre gente real.
+
+#### Los reportes son de un proyecto, y no por pereza
+
+No hay agregado global. No es una limitación de la pantalla sino del modelo de
+permisos: no existe ningún permiso comprobable sobre «todos tus proyectos a la
+vez» —el mismo motivo por el que `/me/tasks` y `/me/notifications` cuelgan de
+`/me`— y un agregado que cruzara proyectos mezclaría equipos que no se conocen.
+
+#### Verificado en el navegador
+
+| Caso | Resultado |
+|---|---|
+| Instantánea del proyecto sembrado | 60 tareas · 22 abiertas · 21 vencidas, barras con el color real de cada columna |
+| Flujo | Cuatro bandas apiladas en el orden del tablero, 44 días |
+| Tiempos | Nube de puntos con p50 5,8 d y p85 11,5 d dibujados como líneas |
+| Predicción | «36 días la mitad de las veces, 45 en 85 de cada 100» |
+| **Tiempos en el proyecto real** | **«Faltan 10 tareas cerradas más»** — no dibuja nada |
+| Aviso de historial fabricado | Sale en el sembrado, **no** en el real |
+| Pestaña «Equipo» como dueño | Visible, y `/reports/people` responde 200 |
+| Pestaña «Equipo» como «Colaborador» | **No se pinta**, y la ruta responde **403** |
+| A través del shell (`:4100/reports`) | 200 |
+
+⚠️ **Los gráficos animan al entrar**, así que una captura tomada de inmediato los
+enseña vacíos. Costó un rato de sospecha infundada: el DOM ya tenía las barras
+con su ancho y su color correctos, solo que a mitad de la transición.
+
+#### Una del entorno, para la próxima
+
+`<Legend>` de Recharts 3 **ya no acepta `payload`**, así que no hay forma de
+corregirle el orden. Ordenaba distinto de como apila —empezaba por la segunda
+columna—, y una leyenda que no sigue el orden del gráfico hace leer mal las
+bandas. Se pinta en HTML: el orden es el del tablero por construcción y hereda
+los estilos del sistema.
