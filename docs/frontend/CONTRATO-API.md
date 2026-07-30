@@ -573,6 +573,43 @@ aquí. Verificado: tras salir, 6 filas de asignación vivas y `items: []`.
 
 ---
 
+## Avisos 🔒
+
+| Método | Ruta | Entrada | Notas |
+|---|---|---|---|
+| GET | `/me/notifications?limit&unreadOnly` | — | `{ items, total, unread }` |
+| PATCH | `/me/notifications/:id/read` | — | Solo las tuyas |
+| POST | `/me/notifications/read-all` | — | → `{ marked }` |
+
+```ts
+Notification = { id, userId, type, actorId, projectId, projectName,
+                 taskId, taskTitle, readAt, createdAt }
+
+type: 'INVITATION_RECEIVED' | 'INVITATION_ACCEPTED' | 'INVITATION_REJECTED'
+    | 'MEMBER_LEFT' | 'MEMBER_REMOVED' | 'TASK_ASSIGNED' | 'TASK_UNASSIGNED'
+```
+
+Cuelga de `/me` como las tareas y las invitaciones: **el usuario sale del token**,
+nunca de la petición. No existe una ruta con `userId` por parámetro porque sería
+leer la bandeja de cualquiera.
+
+- **`unread` viaja siempre**, también con `unreadOnly=true`: es lo que pinta la
+  insignia, y sacarlo de `items.length` daría un número recortado por el `limit`.
+- **Nadie recibe aviso de lo que hizo él.** Se filtra al crear, así que un evento
+  que solo te afecta a ti no genera nada.
+- **`projectName` y `taskTitle` son copias del momento**, no referencias: el
+  aviso sobrevive al borrado del proyecto o la tarea. Píntalos tal cual; no
+  intentes resolverlos.
+- `actorId` es un id, como en encargados y comentarios: el nombre lo resuelve la
+  pantalla contra el directorio.
+- Marcar una ajena responde **404**, no 403: no se confirma que exista.
+- No hay `TASK_EDITED` a propósito: emitirlo en cada `PATCH` llenaría la bandeja
+  de ruido y el aviso útil se perdería.
+
+⚠️ **No hay tiempo real.** Ni WebSocket ni SSE: la interfaz reconsulta cada 60 s.
+
+---
+
 ## Checklists 🔒
 
 | Método | Ruta | Body | Permiso |
@@ -613,7 +650,6 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 
 - `GET /projects/:projectId/roles`
 - `GET /boards/:boardId/columns`
-- **Notificaciones**: no hay modelo, ni tabla, ni endpoint en ninguna capa
 - `POST /projects/:id/members` que acepte **email**
 - Dominio de **reportes** completo
 - **Logs / auditoría**

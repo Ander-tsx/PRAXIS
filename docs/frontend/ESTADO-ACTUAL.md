@@ -1276,3 +1276,76 @@ tarjeta decía «Completada» y «Venció hace 2 d» a la vez.
 
 Se decide por el **color de la columna**, no por su nombre, así que funciona con
 varias columnas de cierre y con cualquier nombre.
+
+---
+
+## 22. Avisos (implementado)
+
+> Dominio nuevo de arriba abajo: no había modelo, ni tabla, ni endpoint. Siete
+> tipos de aviso, bandeja en el panel y una insignia en la barra lateral.
+
+### 22.1 Dónde vive cada cosa, y por qué
+
+La tabla está en **projects-service**, dueño ya de membresías e invitaciones —
+cinco de los siete eventos. Los dos de tarea los emite **tasks-service**, que ya
+llama a projects en cada comprobación de permiso: no añade dependencia ni ciclo.
+
+Y los emite tasks, no el gateway, por una razón concreta: **aquí es donde se sabe
+el cambio**. Quién estaba asignado antes y quién queda después solo se puede
+comparar dentro de la operación; el gateway tendría que pedir la tarea antes de
+tocarla solo para poder diferenciar.
+
+Es la cuarta pieza que cruza el límite entre microservicios, y la primera que no
+pasa por el gateway:
+
+| Pieza | Quién llama | A quién |
+|---|---|---|
+| `TaskPurgeService` | gateway | tasks |
+| `ColumnStatusSyncService` | gateway | tasks |
+| `excludeDone` de `/me/tasks` | gateway | projects |
+| **avisos de tarea** | **tasks** | **projects** |
+
+### 22.2 Cuatro decisiones del modelo
+
+**Nunca se avisa a quien provocó el hecho**, y el filtro vive en el servicio, no
+en cada emisor: son seis sitios y bastaba olvidarlo en uno para que la bandeja
+empezara a contarte tu propio trabajo.
+
+**Sin claves foráneas, con copias.** Un aviso es un hecho del pasado: guarda
+`projectName` y `taskTitle` del momento y sobrevive al borrado de aquello de lo
+que habla. Verificado: tras borrar el proyecto, sus tres avisos siguen legibles.
+
+**El `userId` va en el `where` al marcar como leída**, no en una comprobación
+previa: no existe el hueco entre leer y escribir, y la ajena responde 404 sin
+confirmar que existe.
+
+**Los avisos de tarea son best-effort.** Si projects no responde, la asignación
+ya ocurrió: quedarse sin aviso es mucho menos grave que devolver un error por
+algo que sí pasó.
+
+### 22.3 Qué **no** es la bandeja
+
+No es una lista de tareas pendientes. Todos los avisos cuentan algo consumado, y
+por eso no llevan botones: se leen y, como mucho, llevan al sitio del que hablan.
+
+**Las invitaciones sin responder siguen en el panel**, con sus botones de aceptar
+y rechazar. En la bandeja aparece el aviso de que llegaron, y nada más:
+duplicar los botones crearía dos sitios donde aceptar lo mismo, y el segundo en
+enterarse fallaría.
+
+Tampoco hay `TASK_EDITED`. Se descartó a propósito: emitirlo en cada `PATCH`
+—marcar un paso, cambiar una etiqueta— llenaría la bandeja de ruido y el aviso
+útil se perdería entre los demás.
+
+### 22.4 El refresco, y su trampa
+
+No hay tiempo real: los avisos nacen de acciones ajenas y no hay canal abierto.
+`AutoRefresh` reconsulta cada 60 s con `router.refresh()`, que revalida el Server
+Component **conservando el estado del cliente** — `location.reload()` perdería lo
+que hubiera escrito y saltaría el scroll.
+
+⚠️ **Se pausa con la pestaña oculta**, y eso tiene consecuencia al verificar: el
+panel del navegador de automatización mantiene el documento como `hidden`, así
+que el intervalo no llega a dispararse allí. Lo que sí se puede comprobar —y se
+comprobó— es el camino entero al volver a visible: el aviso nuevo aparece solo y
+la insignia se actualiza con él.
