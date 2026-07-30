@@ -1400,8 +1400,7 @@ El desplazamiento va en la lista de tarjetas y no en la zona de suelta, para que
 «Añadir tarea» quede fijo abajo: es cuando la columna está llena cuando más
 molesta tener que bajar hasta el final para añadir una.
 
-**El tablero es un lienzo, no una tarjeta.** Estaba en `surface-elevated`, que lo
-ponía por delante de todo lo demás cuando en realidad es la superficie sobre la
-que flotan las columnas. Baja al tono del selector de espacio y lleva una
-retícula de puntos —la de cualquier pizarra— que dice sin palabras que ahí dentro
-las cosas se mueven.
+**El tablero lleva retícula de puntos**, la de cualquier pizarra: dice sin
+palabras que ahí dentro las cosas se mueven. Conserva su `surface-elevated`; se
+probó bajándolo al tono del selector de espacio y perdía presencia frente al
+resto de la pantalla, así que el patrón hace el trabajo solo.
