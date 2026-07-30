@@ -190,13 +190,33 @@ export class ProjectsService {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
     }
 
-    const updated = await this.prisma.project.update({
-      where: { id: dto.id },
-      data: {
-        ...(dto.name        !== undefined && { name: dto.name }),
-        ...(dto.description !== undefined && { description: dto.description }),
-      },
-    });
+    let updated: Awaited<ReturnType<typeof this.prisma.project.update>>;
+    try {
+      updated = await this.prisma.project.update({
+        where: { id: dto.id },
+        data: {
+          ...(dto.name        !== undefined && { name: dto.name }),
+          ...(dto.description !== undefined && { description: dto.description }),
+        },
+      });
+    } catch (error) {
+      /**
+       * El mismo 409 que `createProject`, que **faltaba aquí**.
+       *
+       * `477616f` capturó el P2002 al crear y se olvidó de renombrar, así que un
+       * nombre repetido en un `PATCH` salía como error no controlado → **500
+       * «Internal server error»**, sin nada que enseñar a quien renombra. Se ve
+       * enseguida ahora que el nombre se edita en línea: se guarda mientras se
+       * escribe, y un nombre a medias choca con cualquiera de los tuyos.
+       */
+      if (isUniqueViolation(error)) {
+        throw new RpcException({
+          statusCode: 409,
+          message: `Ya tienes un proyecto llamado "${dto.name}".`,
+        });
+      }
+      throw error;
+    }
 
     await this.redis.del(`project:${dto.id}`);
     return updated;

@@ -1562,3 +1562,99 @@ etiquetas, 1 persona, 1 rol y 1 invitación pendiente:
 | Filas después, en los **dos** esquemas | Todo a 0, tareas incluidas — `TaskPurgeService` cruza el límite entre microservicios |
 | Proyecto demo | Intacto |
 | La misma pantalla con el rol «Colaborador» | **No** aparece «Eliminar proyecto» |
+
+### 24.4 Nombre y descripción, editables donde se leen
+
+Eran texto plano y solo se podían cambiar con `curl`. Ahora se comportan como en
+un documento compartido: **parecen texto, al hacer clic son un campo, y se
+guardan solos** tras 700 ms de silencio.
+
+**Son campos siempre, no texto que se convierte al pulsar.** Cambiar el `<h2>`
+por un `<input>` en el clic obliga a devolver el foco a mano y a acertar con el
+momento —el primer carácter se pierde si el `focus()` llega tarde— y deja al
+teclado sin forma de entrar. Aquí el campo está desde el principio y lo único que
+cambia es cómo se pinta: sin borde en reposo, con borde al pasar por encima, con
+fondo al enfocar. Sin `canEditProject` la cabecera es el `<h2>` y el párrafo de
+siempre: quien solo mira no debe encontrarse campos, ni desactivados.
+
+#### El error que estaba en el planteamiento: `revalidatePath` sí re-renderiza
+
+La primera versión revalidaba solo `/` —la lista— desde la acción de guardado, y
+**no** el detalle, apoyándose en lo que dice la documentación de Next:
+
+> **Server Functions**: Updates the UI immediately (if viewing the affected path).
+
+De ahí se deduce que revalidar `/` mientras se ve `/<id>` no cuesta nada. **Es
+falso**, y se vio en el navegador con un `MutationObserver` sobre el `<h1>` de
+`AppHeader`: cambiaba **antes de salir del campo**, es decir el detalle se estaba
+re-renderizando en cada guardado, con su árbol y una petición de tareas por
+tablero. La frase de la documentación describe cuándo se **ve** el efecto, no
+cuándo se paga el render.
+
+Cómo queda:
+
+| Momento | Qué ocurre |
+|---|---|
+| Cada 700 ms de silencio | `PATCH` del campo que cambió. **Cero revalidación** |
+| Al confirmar el guardado | Se escribe `document.title` a mano |
+| Al salir del campo | **Una** llamada a `settleProjectAction`, que revalida `/<id>` y `/` |
+| Al salir sin haber cambiado nada | Nada |
+
+Medido: escribiendo el nombre completo, el `<h1>` registra **0 cambios** hasta
+salir del campo y **1** al salir.
+
+#### `flush()` no era la señal correcta
+
+Primer intento: `flush()` devolvía «acabé de guardar» y con eso se decidía si
+revalidar. Al salir del campo el debounce **ya había guardado**, así que `flush()`
+no tenía nada que hacer, devolvía `false`, y la revalidación no llegaba nunca —el
+`<h1>` se quedaba con el nombre viejo. «Acabo de guardar ahora» y «hay algo que
+poner al día» no son la misma pregunta: la segunda vive en un `ref` que enciende
+cada guardado y apaga la revalidación.
+
+#### La pestaña se escribe a mano
+
+El título vive en tres sitios: el campo, el `<h1>` de `AppHeader` y la pestaña
+(`generateMetadata`). Los dos primeros los arregla la revalidación; el tercero no,
+porque `generateMetadata` solo se vuelve a evaluar al navegar. Se asigna
+`document.title` con **lo que confirmó el servidor**, no con lo que se escribió.
+
+#### 🟠 `PATCH` con nombre repetido devolvía 500
+
+`477616f` capturó el P2002 al **crear** un proyecto y se olvidó de **renombrar**,
+así que un nombre duplicado en el `PATCH` salía como error no controlado: **500
+«Internal server error»**, sin nada que enseñar. Con el nombre editable en línea
+deja de ser un caso raro: se guarda mientras se escribe, y un nombre a medias
+choca con cualquiera de los tuyos. Arreglado igual que al crear.
+
+Y el 409 **no toca el texto**: el mensaje del backend sale al lado del campo, lo
+escrito sigue donde estaba y el `<h1>` conserva el último nombre bueno.
+Sustituirlo por el valor del servidor borraría lo que la persona está escribiendo
+justo cuando más le importa.
+
+#### Dos detalles de maquetación que costaron entenderlos
+
+Los campos miden **lo que mide su texto** con una rejilla de una celda: un
+`<span>` invisible con el mismo texto ocupa el hueco y dicta el tamaño. Sin eso el
+`<input>` abarcaría la fila entera y se leería como un formulario en reposo.
+
+- ⚠️ **`size={1}` en el `<input>`.** Al medir la columna cuenta también el ancho
+  intrínseco del campo, que por defecto son **20 caracteres** — en `text-4xl`,
+  media pantalla. Con el nombre largo no se notaba; con «X9573» el campo salía
+  cinco veces más ancho que su texto.
+- ⚠️ **El fantasma lleva el mismo `border` que el campo**, aunque sea
+  transparente. Sin él mide 2 px menos y el `<textarea>` se desborda: `scrollHeight`
+  92 contra `clientHeight` 90, con la última línea recortada.
+
+#### Verificado en navegador
+
+| Caso | Resultado |
+|---|---|
+| Escribir el nombre | Guarda una vez tras el silencio, «Guardado» en verde |
+| `<h1>` mientras se escribe | **0 cambios**; 1 al salir del campo |
+| Pestaña del navegador | Se actualiza con el nombre confirmado |
+| Nombre de otro proyecto propio | **409** con el mensaje del backend, texto intacto, `aria-invalid` |
+| Seguir escribiendo tras el 409 | Guarda al llegar a un nombre libre |
+| Descripción de dos líneas | El campo crece, sin barra y sin recorte |
+| Reposo | Indistinguible del texto que había antes |
+| Rol «Colaborador» (sin `canEditProject`) | `<h2>` y párrafo, **cero campos** |

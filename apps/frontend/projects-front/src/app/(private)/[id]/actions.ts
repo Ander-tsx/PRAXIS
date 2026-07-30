@@ -24,6 +24,7 @@ import type {
   ColumnState,
   DeleteProjectState,
   MemberState,
+  ProjectFieldState,
   RoleState,
   TaskState,
   WorkspaceState,
@@ -37,6 +38,7 @@ import {
   validateAttachment,
   validateComment,
   validateLabel,
+  validateProject,
   validateRole,
   validateTask,
   validateWorkspace,
@@ -169,6 +171,108 @@ export async function deleteProjectAction(
 
   revalidatePath('/');
   redirect('/');
+}
+
+/**
+ * Guarda el nombre o la descripción del proyecto, **un campo a la vez**.
+ *
+ * No recibe `FormData` como el resto, y es a propósito: no la dispara un
+ * formulario sino el editor en línea de la cabecera, con **debounce**, mientras
+ * alguien escribe. Envolverlo en un `<form>` invisible para poder mandar
+ * `FormData` sería ceremonia por parecerse a las demás.
+ *
+ * De que se ejecute mientras se teclea salen sus tres reglas:
+ *
+ * 1. **Manda solo el campo que cambia.** Con los dos en el cuerpo, escribir en la
+ *    descripción arrastraría el nombre a la comprobación de unicidad en cada
+ *    pulsación.
+ * 2. **No revalida nada, ni siquiera `/`.** Esto se creyó primero al revés,
+ *    apoyándose en que la documentación dice que un `revalidatePath` en una
+ *    Server Function «actualiza la interfaz si estás viendo esa ruta». Falso en
+ *    la práctica: con `revalidatePath('/')` desde el detalle, **el detalle se
+ *    volvía a renderizar igual** —se vio en el navegador, el `<h1>` de
+ *    `AppHeader` cambiaba antes de salir del campo—, así que cada pulsación
+ *    pagaba el árbol entero del proyecto y una petición de tareas por tablero.
+ *    Quien llama revalida **una vez**, al terminar, con `settleProjectAction`.
+ * 3. **Devuelve lo que confirmó el servidor**, no lo que se mandó: es lo que
+ *    permite comprobar contra el `data`, y lo que el cliente escribe en el título
+ *    de la pestaña.
+ *
+ * ⚠️ Un nombre repetido responde **409**, y el mensaje del backend sube tal cual.
+ * Hasta esta sesión respondía 500 «Internal server error»: el P2002 se capturaba
+ * al crear y no al renombrar. Lo escrito no se pierde porque el texto lo tiene el
+ * cliente y esta acción no revalida nada que lo pise.
+ *
+ * ⚠️ Exige `canEditProject`, permiso propio desde esta sesión.
+ */
+export async function saveProjectFieldAction(input: {
+  projectId: string;
+  name?: string;
+  description?: string;
+}): Promise<ProjectFieldState> {
+  const empty = { savedName: null, savedDescription: null };
+
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', ...empty };
+
+  const name = input.name === undefined ? undefined : input.name.trim();
+  /* La descripción vacía **es** un valor: así se borra. Por eso `undefined`
+     (no lo toques) y `''` (déjala en blanco) no son lo mismo. */
+  const description =
+    input.description === undefined ? undefined : normalizeMultiline(input.description);
+
+  if (name === undefined && description === undefined) {
+    return { error: 'No hay nada que cambiar.', ...empty };
+  }
+
+  const invalid = validateProject({
+    /* `validateProject` valida los dos campos a la vez y el nombre es
+       obligatorio; cuando solo viaja la descripción se le pasa un nombre válido
+       de relleno para no inventar una segunda función de validación. */
+    name: name ?? 'ok',
+    ...(description !== undefined && { description }),
+  });
+  if (invalid) return { error: invalid, ...empty };
+
+  try {
+    const saved = await api.patch<ProjectDetail>(`/projects/${input.projectId}`, {
+      ...(name !== undefined && { name }),
+      ...(description !== undefined && { description }),
+    });
+
+    // Confirmación contra el `data`, no contra el status.
+    if (!saved?.id) return { error: 'El servidor no guardó el cambio.', ...empty };
+    if (name !== undefined && saved.name !== name) {
+      return { error: 'El servidor no guardó el nombre nuevo.', ...empty };
+    }
+    if (description !== undefined && (saved.description ?? '') !== description) {
+      return { error: 'El servidor no guardó la descripción.', ...empty };
+    }
+
+    return { error: null, savedName: saved.name, savedDescription: saved.description ?? '' };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo guardar el cambio.'), ...empty };
+  }
+}
+
+/**
+ * Pone al día las pantallas después de editar la cabecera, **una sola vez**.
+ *
+ * Es la contrapartida de que `saveProjectFieldAction` no revalide: la escritura
+ * ya está hecha y confirmada, y esto solo sirve para que lo que se lee en otros
+ * sitios deje de estar viejo — el `<h1>` de `AppHeader` y la tarjeta de la lista.
+ *
+ * La llama el editor al salir del campo, y **solo si algo cambió de verdad**.
+ * Existe como acción aparte, y no como un `router.refresh()` del cliente, porque
+ * `refresh()` no alcanza la lista: revalida la ruta que se está viendo y nada
+ * más.
+ */
+export async function settleProjectAction(projectId: string): Promise<void> {
+  const session = await getSession();
+  if (!session) return;
+
+  revalidatePath(`/${projectId}`);
+  revalidatePath('/');
 }
 
 /* ─── Roles ─────────────────────────────────────────────────────────── */

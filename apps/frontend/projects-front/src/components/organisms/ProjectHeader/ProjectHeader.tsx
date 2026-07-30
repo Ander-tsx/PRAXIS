@@ -1,6 +1,7 @@
 import { Badge, type ProjectDetail } from '@praxis/commons';
 import Link from 'next/link';
 import { DeleteProjectButton } from './DeleteProjectButton';
+import { EditableProjectFields } from './EditableProjectFields';
 
 export interface ProjectHeaderProps {
   project: ProjectDetail;
@@ -15,6 +16,12 @@ export interface ProjectHeaderProps {
    * probar y comerse un 403 no es forma de decidir qué se enseña.
    */
   canDelete: boolean;
+  /**
+   * `canEditProject`. Sin él la cabecera es texto plano, con su `<h2>` y su
+   * párrafo: quien solo mira no debe encontrarse campos, ni siquiera
+   * desactivados.
+   */
+  canEdit: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -31,6 +38,7 @@ export function ProjectHeader({
   columnCount,
   labelCount,
   canDelete,
+  canEdit,
 }: ProjectHeaderProps) {
   return (
     <header className="flex flex-col gap-4">
@@ -59,17 +67,40 @@ export function ProjectHeader({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h2 className="font-display text-3xl text-text-primary sm:text-4xl">{project.name}</h2>
-        <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
-      </div>
-
-      {project.description ? (
-        <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
-          {project.description}
-        </p>
+      {canEdit ? (
+        /**
+         * Con permiso, el nombre y la descripción **son** los campos: parecen
+         * texto y se guardan solos. La insignia se queda dentro para que siga
+         * en la misma línea que el título.
+         *
+         * Se le pasa `key={project.id}`: sin ella, navegar de un proyecto a
+         * otro reutilizaría el componente y su estado inicial —el texto de
+         * antes— porque el valor de las props no vuelve a leerse a propósito.
+         */
+        <EditableProjectFields
+          key={project.id}
+          projectId={project.id}
+          initialName={project.name}
+          initialDescription={project.description ?? ''}
+          badgeSlot={
+            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
+          }
+        />
       ) : (
-        <p className="font-serif text-lg italic text-text-disabled">Sin descripción</p>
+        <>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 className="font-display text-3xl text-text-primary sm:text-4xl">{project.name}</h2>
+            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
+          </div>
+
+          {project.description ? (
+            <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+              {project.description}
+            </p>
+          ) : (
+            <p className="font-serif text-lg italic text-text-disabled">Sin descripción</p>
+          )}
+        </>
       )}
 
       {/* Los contadores de espacios, equipo y roles los llevan las pestañas;

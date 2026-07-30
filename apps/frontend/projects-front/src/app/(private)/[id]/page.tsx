@@ -242,6 +242,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
              `canDeleteProject` también puede, y no vamos a provocar un 403 para
              averiguarlo. */
           canDelete={can.canDeleteProject}
+          /* `canEditProject`, permiso propio desde esta sesión: el `PATCH`
+             pedía `canEditBoard`, que es de otra cosa. */
+          canEdit={can.canEditProject}
         />
 
         <TabNav
