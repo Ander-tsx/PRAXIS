@@ -100,7 +100,7 @@ export class ProjectsController {
 
   /** Elimina un proyecto (requiere poder eliminar boards) */
   @Delete(':id')
-  @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
+  @RequireProjectPermission(ProjectPermission.CAN_DELETE_PROJECT)
   @ApiOperation({ summary: 'Elimina un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
   async delete(@Param('id', ParseUUIDPipe) id: string) {

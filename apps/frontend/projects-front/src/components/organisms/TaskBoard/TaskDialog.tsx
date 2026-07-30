@@ -42,6 +42,8 @@ export interface TaskDialogProps {
   currentUserId: string;
   /** Marcar pasos del checklist: `canMoveTask`, no `canEditTask`. */
   canToggleChecklist: boolean;
+  /** Escribir en el hilo: `canComment`, no `canEditTask`. */
+  canComment: boolean;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -72,6 +74,7 @@ export function TaskDialog({
   usersById,
   currentUserId,
   canToggleChecklist,
+  canComment,
   canEdit,
   canDelete,
 }: TaskDialogProps) {
@@ -280,7 +283,7 @@ export function TaskDialog({
         comments={task.comments}
         usersById={usersById}
         currentUserId={currentUserId}
-        canComment={canEdit}
+        canComment={canComment}
         canModerate={canDelete}
       />
     </Dialog>

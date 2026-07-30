@@ -227,6 +227,8 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             /* Llega de un aviso del panel: la tarea se abre sola al aterrizar. */
             openTaskId={task ?? null}
             canEditTask={can.canEditTask}
+            /* Comentar deja de exigir editar: el observador ya puede responder. */
+            canComment={can.canComment}
             canDeleteTask={can.canDeleteTask}
           />
         )}
@@ -247,7 +249,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         )}
 
         {activeTab === 'etiquetas' && (
-          <ProjectLabels projectId={project.id} labels={labels} canManage={can.canEditTask} />
+          /* Etiquetas con su propio permiso: hasta ahora las gestionaba
+             `canEditTask`, así que quien tocaba una tarea rehacía el vocabulario
+             del proyecto entero. */
+          <ProjectLabels projectId={project.id} labels={labels} canManage={can.canManageLabels} />
         )}
 
         {activeTab === 'roles' && (

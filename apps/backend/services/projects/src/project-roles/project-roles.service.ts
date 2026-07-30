@@ -28,10 +28,12 @@ const PERMISSION_HIERARCHY: Record<string, string[]> = {
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn:   ['canCreateColumn'],
   // Tasks
-  canDeleteTask: ['canEditTask', 'canMoveTask', 'canCreateTask'],
-  // Editar implica mover: quien puede reescribir la tarea entera puede, con
-  // más razón, cambiarla de columna. Al revés no.
-  canEditTask:   ['canMoveTask', 'canCreateTask'],
+  canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
+  // Editar implica mover y comentar: quien puede reescribir la tarea entera
+  // puede, con más razón, cambiarla de columna o dejar una nota. Al revés no.
+  canEditTask:   ['canMoveTask', 'canComment', 'canCreateTask'],
+  // Borrar el proyecto se lleva todos sus tableros por delante.
+  canDeleteProject: ['canDeleteBoard', 'canEditBoard', 'canCreateBoard'],
   // Roles y miembros no tienen jerarquía adicional
 };
 

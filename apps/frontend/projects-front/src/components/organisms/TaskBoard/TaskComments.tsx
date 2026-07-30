@@ -31,7 +31,7 @@ export interface TaskCommentsProps {
   comments: TaskComment[];
   usersById: Map<string, UserProfile>;
   currentUserId: string;
-  /** Quien no puede editar tareas tampoco puede comentar (PENDIENTES §17). */
+  /** `canComment`, que desde `d0c67f2` es un permiso propio y no `canEditTask`. */
   canComment: boolean;
   /** Quien puede eliminar tareas puede retirar comentarios ajenos. */
   canModerate: boolean;
@@ -122,7 +122,7 @@ export function TaskComments({
         </form>
       ) : (
         <p className="font-sans text-xs text-text-disabled">
-          Puedes leer el hilo, pero comentar requiere permiso para editar tareas.
+          Puedes leer el hilo, pero no tienes permiso para comentar.
         </p>
       )}
 

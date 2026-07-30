@@ -58,7 +58,7 @@ export class CommentsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_COMMENT)
   @ApiOperation({ summary: 'Comenta en una tarea' })
   @ApiResponse({ status: 201, description: 'Comentario creado' })
   create(
@@ -77,7 +77,7 @@ export class CommentsController {
   /** Editar es solo del autor; el microservicio lo comprueba. */
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_COMMENT)
   @ApiOperation({ summary: 'Edita un comentario propio' })
   @ApiResponse({ status: 200, description: 'Comentario actualizado' })
   update(
@@ -103,7 +103,7 @@ export class CommentsController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_COMMENT)
   @ApiOperation({ summary: 'Elimina un comentario propio, o cualquiera si puedes moderar' })
   @ApiResponse({ status: 200, description: 'Comentario eliminado' })
   async delete(@Param('id') id: string, @Request() req: Express.Request) {

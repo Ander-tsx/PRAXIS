@@ -33,6 +33,33 @@ export enum ProjectPermission {
   CAN_DELETE_COLUMN  = 'canDeleteColumn',
   CAN_MANAGE_MEMBERS = 'canManageMembers',
   CAN_MANAGE_ROLES   = 'canManageRoles',
+
+  /**
+   * Comentar en una tarea.
+   *
+   * Comentar exigía `canEditTask`, así que un perfil de solo lectura —cliente,
+   * dirección, auditoría— leía el hilo y no podía responder. Leer y opinar no es
+   * editar el trabajo de nadie. `canEditTask` lo implica por jerarquía.
+   */
+  CAN_COMMENT        = 'canComment',
+
+  /**
+   * Crear, renombrar y borrar las etiquetas del proyecto.
+   *
+   * Las gestionaba `canEditTask` por no existir este: quien podía tocar una
+   * tarea podía rehacer el vocabulario del proyecto entero, y al revés, quien
+   * organiza las etiquetas tenía que poder editar tareas.
+   */
+  CAN_MANAGE_LABELS  = 'canManageLabels',
+
+  /**
+   * Eliminar el proyecto entero.
+   *
+   * Borrarlo exigía `canDeleteBoard`, un permiso de **otra cosa y de menor
+   * alcance**: quien podía borrar un tablero podía borrar el proyecto con todos
+   * sus tableros, espacios, tareas y miembros.
+   */
+  CAN_DELETE_PROJECT = 'canDeleteProject',
 }
 
 /** Claves válidas de un mapa de permisos. Se usa para validar lo que llega. */

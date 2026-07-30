@@ -54,7 +54,7 @@ export class LabelsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_LABELS)
   @ApiOperation({ summary: 'Crea una etiqueta' })
   @ApiResponse({ status: 201, description: 'Etiqueta creada' })
   create(
@@ -72,7 +72,7 @@ export class LabelsController {
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_LABELS)
   @ApiOperation({ summary: 'Actualiza una etiqueta' })
   @ApiResponse({ status: 200, description: 'Etiqueta actualizada' })
   update(
@@ -92,7 +92,7 @@ export class LabelsController {
   /** Eliminar una etiqueta la quita de todas las tareas que la llevaban. */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_LABELS)
   @ApiOperation({ summary: 'Elimina una etiqueta y la quita de sus tareas' })
   @ApiResponse({ status: 200, description: 'Etiqueta eliminada' })
   delete(

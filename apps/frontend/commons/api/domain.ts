@@ -41,7 +41,7 @@ export interface Project {
   };
 }
 
-/** Los doce permisos de proyecto. Espejo del enum `ProjectPermission`. */
+/** Los permisos de proyecto. Espejo del enum `ProjectPermission`. */
 export const PROJECT_PERMISSIONS = [
   'canViewProject',
   'canCreateTask',
@@ -56,6 +56,9 @@ export const PROJECT_PERMISSIONS = [
   'canDeleteColumn',
   'canManageMembers',
   'canManageRoles',
+  'canComment',
+  'canManageLabels',
+  'canDeleteProject',
 ] as const;
 
 export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
@@ -80,8 +83,9 @@ export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermis
   canEditBoard: ['canCreateBoard'],
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
-  canDeleteTask: ['canEditTask', 'canMoveTask', 'canCreateTask'],
-  canEditTask: ['canMoveTask', 'canCreateTask'],
+  canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
+  canDeleteProject: ['canDeleteBoard', 'canEditBoard', 'canCreateBoard'],
 };
 
 /** `GET /api/projects/:projectId/roles` viene embebido en el detalle. */

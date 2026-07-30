@@ -29,6 +29,9 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canDeleteTask: true,
   canManageMembers: true,
   canManageRoles: true,
+  canComment: true,
+  canManageLabels: true,
+  canDeleteProject: true,
 };
 
 /** P2002 de Prisma: violación de restricción única. */

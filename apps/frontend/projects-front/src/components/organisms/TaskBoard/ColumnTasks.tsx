@@ -20,6 +20,8 @@ export interface ColumnTasksProps {
   canCreate: boolean;
   /** Arrastrar la tarjeta a otra columna: `canMoveTask`. */
   canMove: boolean;
+  /** Comentar: `canComment`. Un perfil de solo lectura ya puede responder. */
+  canComment: boolean;
   /** Tarea a abrir al entrar, si está en esta columna. Llega de la URL. */
   openTaskId?: string | null;
   canEdit: boolean;
@@ -49,6 +51,7 @@ export function ColumnTasks({
   currentUserId,
   canCreate,
   canMove,
+  canComment,
   openTaskId,
   canEdit,
   canDelete,
@@ -162,6 +165,7 @@ export function ColumnTasks({
           currentUserId={currentUserId}
           /* Marcar pasos va con mover: las dos son ejecutar la tarea. */
           canToggleChecklist={canMove}
+          canComment={canComment}
           canEdit={canEdit}
           canDelete={canDelete}
         />

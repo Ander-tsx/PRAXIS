@@ -39,6 +39,8 @@ export interface WorkspaceCanvasProps {
   openTaskId?: string | null;
   /** Arrastrar una tarjeta a otra columna: `canMoveTask`. */
   canMoveTask: boolean;
+  /** Comentar en una tarea: `canComment`, no `canEditTask`. */
+  canComment: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -71,6 +73,7 @@ export function WorkspaceCanvas({
   canCreateTask,
   canMoveTask,
   openTaskId,
+  canComment,
   canEditTask,
   canDeleteTask,
 }: WorkspaceCanvasProps) {
@@ -150,7 +153,8 @@ export function WorkspaceCanvas({
               canCreateTask={canCreateTask}
               canMoveTask={canMoveTask}
               openTaskId={openTaskId}
-              canEditTask={canEditTask}
+              canComment={canComment}
+        canEditTask={canEditTask}
               canDeleteTask={canDeleteTask}
             />
           ))}

@@ -50,6 +50,8 @@ export interface BoardColumnsProps {
   openTaskId?: string | null;
   /** Arrastrar una tarjeta a otra columna: `canMoveTask`, no `canEditTask`. */
   canMoveTask: boolean;
+  /** Comentar en una tarea: `canComment`, no `canEditTask`. */
+  canComment: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -101,6 +103,7 @@ export function BoardColumns({
   canCreateTask,
   canMoveTask,
   openTaskId,
+  canComment,
   canEditTask,
   canDeleteTask,
 }: BoardColumnsProps) {
@@ -389,6 +392,7 @@ export function BoardColumns({
                   canCreate={canCreateTask}
                   canMove={canMoveTask}
                   openTaskId={openTaskId}
+                  canComment={canComment}
                   canEdit={canEditTask}
                   canDelete={canDeleteTask}
                   draggingTaskId={draggingTaskId}

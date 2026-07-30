@@ -25,6 +25,8 @@ export interface BoardStripProps {
   openTaskId?: string | null;
   /** Arrastrar una tarjeta a otra columna: `canMoveTask`. */
   canMoveTask: boolean;
+  /** Comentar en una tarea: `canComment`, no `canEditTask`. */
+  canComment: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -49,6 +51,7 @@ export function BoardStrip({
   canCreateTask,
   canMoveTask,
   openTaskId,
+  canComment,
   canEditTask,
   canDeleteTask,
 }: BoardStripProps) {
@@ -84,6 +87,7 @@ export function BoardStrip({
         canCreateTask={canCreateTask}
         canMoveTask={canMoveTask}
         openTaskId={openTaskId}
+        canComment={canComment}
         canEditTask={canEditTask}
         canDeleteTask={canDeleteTask}
       />
