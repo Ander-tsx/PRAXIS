@@ -57,7 +57,12 @@ export default async function DashboardPage() {
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
     api
-      .get<Paginated<Task>>(`/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&limit=50`)
+      /* `excludeDone`: una tarea que ya está en la columna de cierre —la verde—
+         no es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar
+         el trabajo no quitaba el aviso y el panel mentía. */
+      .get<Paginated<Task>>(
+        `/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&excludeDone=true&limit=50`,
+      )
       .catch(() => ({ items: [] as Task[], total: 0 })),
   ]);
   const projects = page.items;

@@ -3,6 +3,7 @@
 import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
 import { useActionState } from 'react';
 import { respondInvitationAction } from '@/app/invitations-actions';
+import { NoticePanel } from '@/components/molecules/NoticePanel';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
 
 export interface MyInvitationsProps {
@@ -18,36 +19,28 @@ export interface MyInvitationsProps {
  *
  * Mientras no responda no es miembro: el proyecto no aparece en su lista y no
  * tiene ningún permiso sobre él.
+ *
+ * Comparte `NoticePanel` con los avisos de tareas: son la misma clase de cosa
+ * —algo que reclama atención al entrar— y antes cada uno tenía su propio
+ * rectángulo teñido con una franja de color a la izquierda.
  */
 export function MyInvitations({ invitations }: MyInvitationsProps) {
   if (invitations.length === 0) return null;
 
   return (
-    <section
-      aria-label="Invitaciones pendientes"
-      className="flex flex-col gap-4 rounded-2xl p-5"
-      style={{
-        background: alpha(colors.accent, 7),
-        boxShadow: `inset 3px 0 0 ${colors.accent}`,
-      }}
+    <NoticePanel
+      tone={colors.accent}
+      icon={<InvitationIcon />}
+      count={invitations.length > 1 ? invitations.length : undefined}
+      title={invitations.length === 1 ? 'Tienes una invitación' : 'Tienes invitaciones'}
+      hint="Entrarás al proyecto solo si aceptas."
     >
-      <div className="flex flex-col gap-1">
-        <h3 className="font-display text-xl text-text-primary">
-          {invitations.length === 1
-            ? 'Tienes una invitación'
-            : `Tienes ${invitations.length} invitaciones`}
-        </h3>
-        <p className="font-sans text-sm text-text-secondary">
-          Entrarás al proyecto solo si aceptas.
-        </p>
-      </div>
-
-      <ul className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-2">
         {invitations.map((invitation) => (
           <InvitationRow key={invitation.id} invitation={invitation} />
         ))}
       </ul>
-    </section>
+    </NoticePanel>
   );
 }
 
@@ -58,7 +51,10 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
   );
 
   return (
-    <li className="flex flex-col gap-3 rounded-xl bg-surface p-4 sm:flex-row sm:items-center">
+    <li
+      className="flex flex-col gap-3 rounded-xl p-3.5 sm:flex-row sm:items-center"
+      style={{ background: alpha(colors.border, 30) }}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate font-sans text-sm font-semibold text-text-primary">
@@ -98,5 +94,25 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
         </Button>
       </form>
     </li>
+  );
+}
+
+/** Sobre: dice de qué va el aviso antes de leer una palabra. */
+function InvitationIcon() {
+  return (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 8l7.9 5.3a2 2 0 002.2 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      />
+    </svg>
   );
 }

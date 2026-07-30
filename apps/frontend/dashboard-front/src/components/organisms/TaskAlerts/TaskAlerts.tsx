@@ -7,6 +7,7 @@ import {
   checklistProgress,
   colors,
 } from '@praxis/commons';
+import { NoticePanel } from '@/components/molecules/NoticePanel';
 
 export interface TaskAlertsProps {
   /** Vencidas: la fecha ya pasó. */
@@ -29,7 +30,8 @@ export interface TaskAlertsProps {
  * van primero.
  *
  * Todo sale de `GET /me/tasks`, que solo devuelve tareas de proyectos donde
- * sigues estando: no aparecen las de un proyecto del que ya saliste.
+ * sigues estando, y con `excludeDone`: una tarea que ya llegó a la columna de
+ * cierre no es un pendiente por mucho que su fecha haya pasado.
  */
 export function TaskAlerts({ overdue, soon, projectsById, soonDays }: TaskAlertsProps) {
   if (overdue.length === 0 && soon.length === 0) return null;
@@ -37,112 +39,112 @@ export function TaskAlerts({ overdue, soon, projectsById, soonDays }: TaskAlerts
   return (
     <div className="flex flex-col gap-4">
       {overdue.length > 0 && (
-        <AlertGroup
+        <NoticePanel
           tone={colors.error}
-          title={
-            overdue.length === 1
-              ? 'Una tarea tuya venció'
-              : `${overdue.length} tareas tuyas vencieron`
-          }
+          icon={<OverdueIcon />}
+          /* Con una sola, el título ya lo dice: el número sería la misma
+             información dos veces y en un cuerpo enorme. */
+          count={overdue.length > 1 ? overdue.length : undefined}
+          title={overdue.length === 1 ? 'Una tarea tuya venció' : 'Tareas tuyas vencidas'}
           hint="La fecha límite ya pasó."
-          tasks={overdue}
-          projectsById={projectsById}
-        />
+        >
+          <TaskRows tasks={overdue} tone={colors.error} projectsById={projectsById} />
+        </NoticePanel>
       )}
 
       {soon.length > 0 && (
-        <AlertGroup
+        <NoticePanel
           tone={colors.warning}
-          title={
-            soon.length === 1
-              ? 'Una tarea tuya vence pronto'
-              : `${soon.length} tareas tuyas vencen pronto`
-          }
+          icon={<SoonIcon />}
+          count={soon.length > 1 ? soon.length : undefined}
+          title={soon.length === 1 ? 'Una tarea tuya vence pronto' : 'Tareas tuyas por vencer'}
           hint={`En los próximos ${soonDays} días.`}
-          tasks={soon}
-          projectsById={projectsById}
-        />
+        >
+          <TaskRows tasks={soon} tone={colors.warning} projectsById={projectsById} />
+        </NoticePanel>
       )}
     </div>
   );
 }
 
-function AlertGroup({
-  tone,
-  title,
-  hint,
+function TaskRows({
   tasks,
+  tone,
   projectsById,
 }: {
-  tone: string;
-  title: string;
-  hint: string;
   tasks: Task[];
+  tone: string;
   projectsById: Map<string, Project>;
 }) {
   return (
-    <section
-      aria-label={title}
-      className="flex flex-col gap-3 rounded-2xl p-5"
-      style={{ background: alpha(tone, 7), boxShadow: `inset 3px 0 0 ${tone}` }}
+    <ul className="flex flex-col gap-1.5">
+      {tasks.map((task) => {
+        const project = projectsById.get(task.projectId);
+        const { done, total } = checklistProgress(task);
+
+        return (
+          <li key={task.id}>
+            {/**
+             * Enlace duro con `<a>` y no `next/link`: el panel es una zona y el
+             * proyecto otra, así que es una navegación entre apps del
+             * multi-zone y `next/link` le añadiría el basePath del panel.
+             *
+             * ⚠️ **Lleva `board` y `task`, no solo el proyecto.** Con el
+             * proyecto a secas se aterrizaba siempre en el primer espacio,
+             * aunque la tarea viviera en el tercero: el aviso te dejaba en la
+             * puerta y a buscar. El `board` deja que la página resuelva qué
+             * espacio abrir —solo ella tiene el árbol— y el `task` abre la
+             * tarea directamente.
+             */}
+            <a
+              href={`/projects/${task.projectId}?board=${task.boardId}&task=${task.id}`}
+              className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              style={{ background: alpha(colors.border, 30) }}
+            >
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: tone }}
+              />
+
+              <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
+                {task.title}
+              </span>
+
+              <Chip tone={tone}>{formatDueDate(task.dueDate)}</Chip>
+              <Chip tone={PRIORITY_COLORS[task.priority]}>{PRIORITY_LABELS[task.priority]}</Chip>
+
+              {total > 0 && (
+                <span className="font-sans text-[11px] tabular-nums text-text-secondary">
+                  {done}/{total}
+                </span>
+              )}
+
+              <span className="flex shrink-0 items-center gap-1 font-sans text-xs text-text-disabled">
+                {project?.name ?? 'Proyecto'}
+                <span
+                  aria-hidden="true"
+                  className="opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  →
+                </span>
+              </span>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Chip({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return (
+    <span
+      className="shrink-0 rounded-full px-2 py-0.5 font-sans text-[11px]"
+      style={{ background: alpha(tone, 15), color: tone }}
     >
-      <div className="flex flex-col gap-1">
-        <h3 className="font-display text-xl text-text-primary">{title}</h3>
-        <p className="font-sans text-sm text-text-secondary">{hint}</p>
-      </div>
-
-      <ul className="flex flex-col gap-2">
-        {tasks.map((task) => {
-          const project = projectsById.get(task.projectId);
-          const { done, total } = checklistProgress(task);
-
-          return (
-            <li key={task.id}>
-              {/**
-               * Enlace duro con `<a>` y no `next/link`: el panel es una zona y
-               * el proyecto otra, así que es una navegación entre apps del
-               * multi-zone y `next/link` le añadiría el basePath del panel.
-               */}
-              <a
-                href={`/projects/${task.projectId}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-surface px-4 py-3 transition-colors hover:bg-surface-elevated"
-              >
-                <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary">
-                  {task.title}
-                </span>
-
-                <span
-                  className="rounded-full px-2 py-0.5 font-sans text-[11px]"
-                  style={{ background: alpha(tone, 15), color: tone }}
-                >
-                  {formatDueDate(task.dueDate)}
-                </span>
-
-                <span
-                  className="rounded-full px-2 py-0.5 font-sans text-[11px]"
-                  style={{
-                    background: alpha(PRIORITY_COLORS[task.priority], 15),
-                    color: PRIORITY_COLORS[task.priority],
-                  }}
-                >
-                  {PRIORITY_LABELS[task.priority]}
-                </span>
-
-                {total > 0 && (
-                  <span className="font-sans text-[11px] tabular-nums text-text-secondary">
-                    {done}/{total}
-                  </span>
-                )}
-
-                <span className="truncate font-sans text-xs text-text-disabled">
-                  {project?.name ?? 'Proyecto'}
-                </span>
-              </a>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+      {children}
+    </span>
   );
 }
 
@@ -152,6 +154,43 @@ const PRIORITY_COLORS: Record<Priority, string> = {
   HIGH: colors.warning,
   URGENT: colors.error,
 };
+
+/** Reloj con el aspa: la fecha pasó. */
+function OverdueIcon() {
+  return (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
+
+/** Campana: todavía hay tiempo, pero conviene mirarlo. */
+function SoonIcon() {
+  return (
+    <svg
+      className="h-5 w-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+      />
+    </svg>
+  );
+}
 
 /** Fecha corta; el «hace» o «en» ya lo da el bloque en el que está. */
 function formatDueDate(iso: string | null): string {
