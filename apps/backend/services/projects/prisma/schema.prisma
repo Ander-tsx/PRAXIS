@@ -11,7 +11,10 @@ datasource db {
 
 model Project {
   id          String          @id @default(uuid())
-  name        String          @unique
+  /// Único **por dueño**, no globalmente: dos equipos distintos pueden tener
+  /// cada uno su "Sprint 1". Antes era `@unique` a secas y el nombre chocaba con
+  /// el proyecto de gente que no conoces, sin forma de saber por qué.
+  name        String
   description String?
   ownerId     String
   workspaces  Workspace[]
@@ -21,6 +24,7 @@ model Project {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  @@unique([ownerId, name])
   @@schema("projects")
   @@map("projects")
 }

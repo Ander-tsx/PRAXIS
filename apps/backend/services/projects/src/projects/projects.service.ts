@@ -100,13 +100,15 @@ export class ProjectsService {
        * otro equipo salía como error no controlado → 500. Ahora es un 409 con
        * mensaje útil.
        *
-       * (La unicidad global sigue siendo un problema de diseño: dos equipos
-       * distintos no pueden tener un proyecto llamado "Sprint 1".)
+       * La unicidad es **por dueño** desde la migración
+       * `project_name_unique_per_owner`: antes era global y el nombre chocaba con
+       * el proyecto de un equipo que no conoces, con un mensaje que no había
+       * forma de entender.
        */
       if (isUniqueViolation(error)) {
         throw new RpcException({
           statusCode: 409,
-          message: `Ya existe un proyecto llamado "${dto.name}".`,
+          message: `Ya tienes un proyecto llamado "${dto.name}".`,
         });
       }
       throw error;
