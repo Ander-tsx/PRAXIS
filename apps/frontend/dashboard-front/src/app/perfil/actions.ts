@@ -10,14 +10,14 @@ import { validateProfile } from '@/lib/validation';
 /**
  * Guarda nombre y apellido del usuario identificado.
  *
- * Dos trampas de este endpoint, las dos verificadas contra el stack:
+ * **Entra y sale en camelCase.** Era el único endpoint que recibía `first_name`
+ * y devolvía `firstName`, así que leer un usuario y devolver el mismo objeto
+ * cambiado daba 200 sin guardar nada (PENDIENTES-BACKEND §10, cerrado). El
+ * backend sigue aceptando la forma vieja, marcada como obsoleta, pero desde aquí
+ * ya se manda la buena.
  *
- * 1. **Entra en snake_case y sale en camelCase.** `PATCH /users/:id` acepta
- *    `first_name` / `last_name` y devuelve `firstName` / `lastName`.
- * 2. **Ahora sí valida**: mandar `firstName` en camelCase devuelve 400 con el
- *    mensaje del campo. Antes devolvía 200 sin guardar nada, y de ahí viene la
- *    costumbre de confirmar contra el `data` y no contra el status, que se
- *    mantiene porque sigue siendo lo correcto. Ver PENDIENTES-BACKEND.md §10.
+ * Se sigue confirmando contra el `data` y no contra el status: la costumbre nace
+ * justo de aquel 200 mentiroso y sigue siendo lo correcto.
  *
  * Se manda el `:id` de la sesión, nunca uno que venga del formulario.
  */
@@ -42,10 +42,10 @@ export async function updateProfileAction(
 
   let updated: UserProfile;
   try {
-    // snake_case, y solo los dos campos que el DTO declara.
+    // camelCase, y solo los dos campos que el DTO declara.
     updated = await api.patch<UserProfile>(`/users/${session.userId}`, {
-      first_name: firstName,
-      last_name: lastName,
+      firstName,
+      lastName,
     });
   } catch (error) {
     if (error instanceof ApiError) {

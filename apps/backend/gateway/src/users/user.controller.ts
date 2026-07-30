@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Query,
+  Request,
   UseGuards,
   Body,
 } from '@nestjs/common';
@@ -48,6 +49,27 @@ export class UserController {
   findAll(@Query() query: FindUsersQueryDto) {
     return firstValueFrom(
       this.credentialsClient.send({ cmd: 'user_find_all' }, query.toFindUsersDto()),
+    );
+  }
+
+  /**
+   * El perfil de quien pregunta.
+   *
+   * ⚠️ Va **antes** de `@Get(':id')`: Nest resuelve por orden de declaración y
+   * la ruta con parámetro se comería «me» tratándolo como un id —que además
+   * fallaría en `ParseUUIDPipe` con un 400 de lo más confuso.
+   *
+   * Existe para que el frontend no tenga que sacar el `sub` del JWT y pedir
+   * `/users/:id` por su cuenta: eso obligaba a cada zona a saber leer un token
+   * que, por diseño, es una cookie httpOnly que el navegador no puede abrir.
+   */
+  @Get('me')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Perfil de quien hace la petición' })
+  @ApiResponse({ status: 200, description: 'Perfil recuperado' })
+  findMe(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_find_one' }, { id: req.user!.userId }),
     );
   }
 

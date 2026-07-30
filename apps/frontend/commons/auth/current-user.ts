@@ -12,19 +12,24 @@ export interface CurrentUser {
 /**
  * Usuario identificado, tal como lo necesita el área privada.
  *
- * Hacen falta dos peticiones porque **no existe `GET /users/me`**: el JWT solo
- * lleva `{ sub, iat, exp }`, así que sacamos el id de la sesión y pedimos el
- * perfil aparte. Ver PENDIENTES-BACKEND.md §5.
+ * El perfil sale de **`GET /users/me`**, que resuelve el usuario desde el token.
+ * Antes había que sacar el `sub` de la sesión y pedir `/users/:id`, lo que
+ * obligaba a cada zona a saber leer un JWT que —por diseño— vive en una cookie
+ * httpOnly (PENDIENTES-BACKEND §5, cerrado).
  *
- * Las dos van en paralelo, y los roles degradan a lista vacía si fallan: no
- * poder pintar una insignia no es motivo para tumbar el panel entero.
+ * `requireSession()` se conserva: decide si hay que redirigir al login **antes**
+ * de tocar la red, y de ahí sale el `userId` que las páginas usan para comparar
+ * con `ownerId`, autores de comentarios y encargados.
+ *
+ * Las dos peticiones van en paralelo, y los roles degradan a lista vacía si
+ * fallan: no poder pintar una insignia no es motivo para tumbar el panel entero.
  */
 export async function loadCurrentUser(): Promise<CurrentUser> {
   const session = await requireSession();
   const api = createServerApiClient();
 
   const [profile, roles] = await Promise.all([
-    api.get<UserProfile>(`/users/${session.userId}`),
+    api.get<UserProfile>('/users/me'),
     api
       .get<GlobalRole[]>(`/permissions/user/${session.userId}`)
       .then((list) => list.map((role) => role.name))
