@@ -68,10 +68,20 @@ export class ChecklistsController {
     );
   }
 
-  /** Alterna el estado completado de un ítem de checklist */
+  /**
+   * Alterna el estado completado de un ítem (requiere canMoveTask).
+   *
+   * **Marcar un paso es ejecutar el trabajo, no redefinirlo.** Quien puede
+   * arrastrar la tarjeta a «Hecho» tiene que poder ir marcando los pasos por el
+   * camino; exigir `canEditTask` dejaba a esa persona con un checklist de solo
+   * lectura sobre su propia tarea.
+   *
+   * Añadir y borrar ítems sí siguen siendo `canEditTask`: eso es decidir en qué
+   * consiste la tarea.
+   */
   @Post(':id/toggle')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MOVE_TASK)
   @ApiOperation({ summary: 'Alterna el estado completado de un ítem' })
   @ApiResponse({ status: 200, description: 'Estado de ítem cambiado' })
   toggle(

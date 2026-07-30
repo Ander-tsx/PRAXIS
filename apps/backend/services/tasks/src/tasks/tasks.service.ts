@@ -616,7 +616,9 @@ export class TasksService {
   }
 
   async toggleChecklist(dto: ToggleChecklistDto) {
-    await this.assertPermission(dto.requesterId, dto.projectId, 'canEditTask');
+    // Marcar un paso es ejecutar, no editar: ver la nota del controlador del
+    // gateway. `canEditTask` lo implica por jerarquía.
+    await this.assertPermission(dto.requesterId, dto.projectId, 'canMoveTask');
 
     const item = await this.loadChecklistInProject(dto.id, dto.projectId);
 
