@@ -653,5 +653,5 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 - `POST /projects/:id/members` que acepte **email**
 - Dominio de **reportes** completo
 - **Logs / auditoría**
-- Notificaciones
 - Subida de avatar (`avatarUrl` existe en el modelo, no hay endpoint)
+- **Tiempo real** para los avisos: hoy la bandeja reconsulta cada 60 s
