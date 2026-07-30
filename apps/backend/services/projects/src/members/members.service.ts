@@ -4,8 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
   AddMemberDto,
+  NotificationType,
   RemoveMemberDto,
 } from '@praxis/contracts';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
 
 const LIST_CACHE_TTL = 60;
@@ -16,6 +18,7 @@ export class MembersService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly projectRolesService: ProjectRolesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async addMember(dto: AddMemberDto) {
@@ -58,11 +61,27 @@ export class MembersService {
       throw new RpcException({ statusCode: 404, message: 'El usuario no es miembro del proyecto' });
     }
 
+    /* El nombre se lee **antes** de borrar, para guardarlo como copia en el
+       aviso: quien deja de ser miembro ya no puede consultarlo después. */
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.projectId },
+      select: { name: true },
+    });
+
     await this.prisma.projectMember.delete({ where: { id: member.id } });
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
+
+    await this.notifications.emit({
+      userId: dto.userId,
+      type: NotificationType.MEMBER_REMOVED,
+      actorId: dto.requesterId,
+      projectId: dto.projectId,
+      projectName: project?.name,
+    });
+
     return { success: true };
   }
 

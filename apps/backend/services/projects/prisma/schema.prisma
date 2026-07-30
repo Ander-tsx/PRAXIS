@@ -139,3 +139,58 @@ model ProjectMember {
   @@schema("projects")
   @@map("project_members")
 }
+
+/// Tipos de aviso. Cada uno describe **algo que ya pasó**, no una tarea
+/// pendiente: las invitaciones por responder siguen viviendo en su propia tabla
+/// y el panel las enseña aparte, porque esperan una decisión.
+enum NotificationType {
+  /// Te han invitado a un proyecto.
+  INVITATION_RECEIVED
+  /// Quien invitaste aceptó. Le llega a quien invitó.
+  INVITATION_ACCEPTED
+  /// Quien invitaste rechazó. Le llega a quien invitó.
+  INVITATION_REJECTED
+  /// Alguien se fue por su cuenta. Le llega al dueño.
+  MEMBER_LEFT
+  /// Te sacaron de un proyecto.
+  MEMBER_REMOVED
+  /// Te asignaron una tarea.
+  TASK_ASSIGNED
+  /// Te quitaron de una tarea.
+  TASK_UNASSIGNED
+
+  @@schema("projects")
+}
+
+/// Un aviso para una persona.
+///
+/// Vive en projects-service porque este servicio ya es dueño de las membresías y
+/// las invitaciones, que son la mayoría de los eventos. Los de tarea los emite
+/// tasks-service, que **ya habla con projects** para comprobar permisos: no
+/// añade ninguna dependencia nueva ni ningún ciclo.
+///
+/// ⚠️ **No tiene clave foránea con `Project` ni con nada.** Es a propósito: un
+/// aviso es un hecho del pasado y tiene que sobrevivir al borrado de aquello de
+/// lo que habla. Por eso guarda `projectName` y `taskTitle` como **copia del
+/// momento**; si el proyecto desaparece, el aviso sigue leyéndose.
+model Notification {
+  id          String           @id @default(uuid())
+  /// Quién lo recibe.
+  userId      String
+  type        NotificationType
+  /// Quién lo provocó. Nunca es `userId`: a nadie se le avisa de lo que hizo.
+  actorId     String?
+  projectId   String?
+  projectName String?
+  taskId      String?
+  taskTitle   String?
+  /// `null` mientras no se haya leído. Guarda el cuándo, no solo el si.
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  /// Los dos accesos reales: la lista de alguien y su contador de no leídos.
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@schema("projects")
+  @@map("notifications")
+}

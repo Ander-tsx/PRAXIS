@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MembersController } from './members.controller';
 import { MembersService } from './members.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectRolesModule } from '../project-roles/project-roles.module';
 
 @Module({
-  imports: [ProjectRolesModule],
+  imports: [NotificationsModule, ProjectRolesModule],
   controllers: [MembersController],
   providers: [MembersService],
 })

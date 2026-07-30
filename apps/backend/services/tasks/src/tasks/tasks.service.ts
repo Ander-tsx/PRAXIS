@@ -9,6 +9,7 @@ import { RedisService } from '../redis/redis.service';
 
 import {
   AssignTaskDto,
+  NotificationType,
   CreateChecklistDto,
   CreateTaskDto,
   DeleteChecklistDto,
@@ -234,6 +235,15 @@ export class TasksService {
    * Borra y vuelve a insertar en vez de calcular el diferencial: la lista es de
    * unos pocos elementos y así el resultado no depende del estado previo.
    */
+  /** Los encargados que tiene ahora mismo. Se lee antes de sustituirlos. */
+  private async currentAssignees(taskId: string): Promise<string[]> {
+    const rows = await this.prisma.taskAssignee.findMany({
+      where: { taskId },
+      select: { userId: true },
+    });
+    return rows.map((row) => row.userId);
+  }
+
   private async replaceAssignees(
     tx: Prisma.TransactionClient,
     taskId: string,
@@ -245,6 +255,67 @@ export class TasksService {
       await tx.taskAssignee.createMany({
         data: userIds.map((userId) => ({ taskId, userId, assignedBy })),
       });
+    }
+  }
+
+  /**
+   * Avisa a quien entra y a quien sale de una tarea.
+   *
+   * Lo emite **tasks-service**, aunque la tabla viva en projects-service, porque
+   * aquí es donde se sabe el **cambio**: quién estaba antes y quién queda
+   * después. El gateway tendría que pedir la tarea antes de tocarla solo para
+   * poder comparar. Y no añade dependencia: este servicio ya llama a projects en
+   * cada comprobación de permiso.
+   *
+   * Es **best-effort**. Si projects no responde, la asignación ya ocurrió;
+   * devolver un error diría que falló algo que sí pasó, y quedarse sin aviso es
+   * mucho menos grave que quedarse sin asignar.
+   */
+  private async notifyAssigneeChanges(params: {
+    taskId: string;
+    taskTitle: string;
+    projectId: string;
+    actorId: string;
+    before: string[];
+    after: string[];
+  }) {
+    const before = new Set(params.before);
+    const after = new Set(params.after);
+
+    const added = params.after.filter((userId) => !before.has(userId));
+    const removed = params.before.filter((userId) => !after.has(userId));
+    if (added.length === 0 && removed.length === 0) return;
+
+    // El nombre del proyecto se guarda como copia en el aviso; projects-service
+    // lo tiene cacheado, así que es barato.
+    let projectName: string | undefined;
+    try {
+      const project = await firstValueFrom(
+        this.projectsClient.send({ cmd: 'project_find_one' }, { id: params.projectId }),
+      );
+      projectName = project?.name;
+    } catch {
+      // Sin nombre el aviso se lee igual: dice la tarea, que es lo que importa.
+    }
+
+    const notifications = [
+      ...added.map((userId) => ({ userId, type: NotificationType.TASK_ASSIGNED })),
+      ...removed.map((userId) => ({ userId, type: NotificationType.TASK_UNASSIGNED })),
+    ].map((base) => ({
+      ...base,
+      actorId: params.actorId,
+      projectId: params.projectId,
+      projectName,
+      taskId: params.taskId,
+      taskTitle: params.taskTitle,
+    }));
+
+    try {
+      await firstValueFrom(
+        this.projectsClient.send({ cmd: 'notification_create' }, { notifications }),
+      );
+    } catch {
+      // Ver la nota de arriba: el trabajo ya está hecho.
     }
   }
 
@@ -280,6 +351,16 @@ export class TasksService {
     });
 
     await this.redis.del(`tasks:board:${dto.boardId}`);
+
+    await this.notifyAssigneeChanges({
+      taskId: task.id,
+      taskTitle: task.title,
+      projectId: dto.projectId,
+      actorId: dto.requesterId,
+      before: [],
+      after: assignees,
+    });
+
     return task;
   }
 
@@ -388,6 +469,10 @@ export class TasksService {
         ? await this.resolveLabels(dto.projectId, dto.labelIds)
         : undefined;
 
+    /* Solo si el `PATCH` toca encargados. Omitirlos los deja como estaban, y
+       entonces no hay nada de qué avisar ni por qué consultarlo. */
+    const before = assignees !== undefined ? await this.currentAssignees(dto.id) : [];
+
     const updated = await this.prisma.$transaction(async (tx) => {
       if (assignees !== undefined) {
         await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
@@ -417,6 +502,17 @@ export class TasksService {
       this.redis.del(`task:${dto.id}`),
       this.redis.del(`tasks:board:${task.boardId}`),
     ]);
+
+    if (assignees !== undefined) {
+      await this.notifyAssigneeChanges({
+        taskId: dto.id,
+        taskTitle: updated.title,
+        projectId: dto.projectId,
+        actorId: dto.requesterId,
+        before,
+        after: assignees,
+      });
+    }
 
     return updated;
   }
@@ -473,6 +569,10 @@ export class TasksService {
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
     const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds);
 
+    /* Quién había **antes**: es la única forma de saber a quién avisar de que
+       entra y a quién de que sale. Después del reemplazo ya no existe. */
+    const before = await this.currentAssignees(dto.id);
+
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
       return tx.task.findUniqueOrThrow({ where: { id: dto.id }, include: TASK_INCLUDE });
@@ -482,6 +582,15 @@ export class TasksService {
       this.redis.del(`task:${dto.id}`),
       this.redis.del(`tasks:board:${task.boardId}`),
     ]);
+
+    await this.notifyAssigneeChanges({
+      taskId: task.id,
+      taskTitle: updated.title,
+      projectId: dto.projectId,
+      actorId: dto.requesterId,
+      before,
+      after: assignees,
+    });
 
     return updated;
   }

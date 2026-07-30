@@ -8,6 +8,7 @@ import {
   Inject,
   Param,
   Post,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -70,10 +71,15 @@ export class MembersController {
   @ApiResponse({ status: 200, description: 'Miembro eliminado exitosamente' })
   remove(
     @Param('projectId') projectId: string,
+    @Request() req: Express.Request,
     @Body() body: RemoveMemberBodyDto,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'member_remove' }, { projectId, ...body }),
+      this.projectsClient.send(
+        { cmd: 'member_remove' },
+        // `requesterId` solo para poder decir en el aviso quién la sacó.
+        { projectId, ...body, requesterId: req.user!.userId },
+      ),
     );
   }
 }

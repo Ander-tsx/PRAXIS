@@ -1,4 +1,4 @@
-import { IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 /**
  * Cuerpo de `POST /projects/:projectId/members`.
@@ -43,6 +43,16 @@ export class RemoveMemberBodyDto {
 export class RemoveMemberDto extends RemoveMemberBodyDto {
   @IsUUID('4')
   projectId: string;
+
+  /**
+   * Quién saca a la persona. Lo inyecta el gateway desde el token.
+   *
+   * Solo sirve para poder decirlo en el aviso: «X te sacó de Y». Sin esto el
+   * aviso quedaba en pasiva y sin responsable.
+   */
+  @IsOptional()
+  @IsUUID('4')
+  requesterId?: string;
 }
 
 export class CheckPermissionDto {

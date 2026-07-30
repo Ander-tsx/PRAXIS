@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { NotificationType } from '@praxis/contracts';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
 
 /**
@@ -20,6 +22,7 @@ export class InvitationsService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly projectRolesService: ProjectRolesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async invite(dto: {
@@ -79,6 +82,15 @@ export class InvitationsService {
     });
 
     await this.redis.del(`invitations:project:${dto.projectId}`);
+
+    await this.notifications.emit({
+      userId: dto.userId,
+      type: NotificationType.INVITATION_RECEIVED,
+      actorId: dto.invitedBy,
+      projectId: project.id,
+      projectName: project.name,
+    });
+
     return invitation;
   }
 
@@ -131,6 +143,11 @@ export class InvitationsService {
     });
 
     await this.invalidate(invitation.projectId, invitation.userId);
+
+    /* El aviso va a **quien invitó**, no a quien acepta: el que acepta acaba de
+       hacerlo y no necesita que se lo cuenten. */
+    await this.notifyInviter(invitation, NotificationType.INVITATION_ACCEPTED);
+
     return member;
   }
 
@@ -143,6 +160,8 @@ export class InvitationsService {
     });
 
     await this.redis.del(`invitations:project:${invitation.projectId}`);
+    await this.notifyInviter(invitation, NotificationType.INVITATION_REJECTED);
+
     return { success: true };
   }
 
@@ -180,7 +199,7 @@ export class InvitationsService {
   async leave(dto: { projectId: string; userId: string }) {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
-      select: { ownerId: true },
+      select: { ownerId: true, name: true },
     });
 
     if (!project) throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
@@ -201,6 +220,18 @@ export class InvitationsService {
 
     await this.prisma.projectMember.delete({ where: { id: member.id } });
     await this.invalidate(dto.projectId, dto.userId);
+
+    /* Al dueño: es quien tiene que enterarse de que su equipo mengua. Avisar a
+       todo el que administre pediría saber quién tiene `canManageMembers`, y eso
+       es una consulta de permisos por cada salida. */
+    await this.notifications.emit({
+      userId: project.ownerId,
+      type: NotificationType.MEMBER_LEFT,
+      actorId: dto.userId,
+      projectId: dto.projectId,
+      projectName: project.name,
+    });
+
     return { success: true };
   }
 
@@ -223,6 +254,30 @@ export class InvitationsService {
     }
 
     return invitation;
+  }
+
+  /**
+   * Avisa a quien mandó la invitación de que ya la respondieron.
+   *
+   * El nombre del proyecto se lee aquí para guardarlo como copia: el aviso tiene
+   * que seguir leyéndose aunque el proyecto desaparezca.
+   */
+  private async notifyInviter(
+    invitation: { projectId: string; userId: string; invitedBy: string },
+    type: NotificationType,
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: invitation.projectId },
+      select: { name: true },
+    });
+
+    await this.notifications.emit({
+      userId: invitation.invitedBy,
+      type,
+      actorId: invitation.userId,
+      projectId: invitation.projectId,
+      projectName: project?.name,
+    });
   }
 
   private async invalidate(projectId: string, userId: string) {
