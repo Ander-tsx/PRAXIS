@@ -72,8 +72,55 @@ const TITULOS = [
 
 const PRIORIDADES = ['LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'HIGH', 'URGENT'] as const;
 
+/**
+ * El vocabulario del proyecto sembrado.
+ *
+ * Sin etiquetas, «de qué trata cada tarea» no está en ninguna parte: el
+ * historial sabe cuándo se movió cada cosa y quién la llevaba, pero no de qué
+ * era. El asistente recomienda a alguien cruzando **experiencia y carga**, y la
+ * experiencia solo existe si las tareas dicen de qué son.
+ */
+const ETIQUETAS = [
+  { name: 'frontend', color: 'primary' },
+  { name: 'backend',  color: 'accent'  },
+  { name: 'diseño',   color: 'info'    },
+  { name: 'infra',    color: 'warning' },
+  { name: 'datos',    color: 'error'   },
+] as const;
+
+/**
+ * A qué se dedica cada persona, por orden en la lista de miembros.
+ *
+ * ⚠️ **El sesgo es el punto de todo esto, no un adorno.** Con las etiquetas
+ * repartidas al azar todo el mundo acaba con más o menos lo mismo de cada cosa,
+ * y entonces «¿a quién le encaja esta tarea?» no tiene respuesta: cualquiera
+ * vale, así que la recomendación no recomienda nada. Cada persona tiene una
+ * especialidad clara y una segunda ocupación, que es como se reparte el trabajo
+ * en un equipo de verdad —nadie hace solo una cosa.
+ *
+ * Los pesos son «de cada 10 tareas suyas, cuántas de esta etiqueta».
+ */
+const ESPECIALIDAD: Record<string, number>[] = [
+  { frontend: 6, diseño: 3, backend: 1 },
+  { backend:  6, datos:  3, infra:   1 },
+  { diseño:   6, frontend: 3, datos: 1 },
+  { infra:    6, backend: 3, datos:  1 },
+  { datos:    5, backend: 3, frontend: 2 },
+];
+
 const azar = <T>(lista: readonly T[]): T => lista[Math.floor(Math.random() * lista.length)];
 const entre = (min: number, max: number) => min + Math.random() * (max - min);
+
+/** Saca una clave del reparto respetando sus pesos. */
+function azarConPesos(pesos: Record<string, number>): string {
+  const total = Object.values(pesos).reduce((a, b) => a + b, 0);
+  let tirada = Math.random() * total;
+  for (const [clave, peso] of Object.entries(pesos)) {
+    tirada -= peso;
+    if (tirada <= 0) return clave;
+  }
+  return Object.keys(pesos)[0];
+}
 
 /**
  * Reparte los cierres de forma **desigual**, que es como ocurren de verdad.
@@ -211,6 +258,19 @@ async function main() {
   const cierre = columnas[columnas.length - 1];
   const inicio = new Date(Date.now() - SEMANAS * 7 * DIA);
 
+  /* Las etiquetas se crean una vez y sobreviven a las re-ejecuciones: borrar las
+     tareas se lleva sus `task_labels` por cascada, pero no las etiquetas, que
+     son del proyecto. `upsert` sobre la clave (projectId, name). */
+  const etiquetasPorNombre = new Map<string, string>();
+  for (const etiqueta of ETIQUETAS) {
+    const fila = await prisma.label.upsert({
+      where:  { projectId_name: { projectId, name: etiqueta.name } },
+      update: { color: etiqueta.color },
+      create: { projectId, name: etiqueta.name, color: etiqueta.color, createdAt: arranque },
+    });
+    etiquetasPorNombre.set(etiqueta.name, fila.id);
+  }
+
   let creadas = 0;
   let cerradas = 0;
 
@@ -264,6 +324,25 @@ async function main() {
 
     const estaCerrada = actual.id === cierre.id;
 
+    /**
+     * El encargado se elige **antes** que la etiqueta, y no al revés.
+     *
+     * La etiqueta sale del reparto de esa persona, así que la correlación entre
+     * quién lleva algo y de qué es queda en el dato. Sorteadas por separado no
+     * habría nada que aprender: todo el mundo tendría de todo.
+     */
+    const encargado = personas[Math.floor(Math.random() * personas.length)];
+    const reparto = ESPECIALIDAD[personas.indexOf(encargado) % ESPECIALIDAD.length];
+
+    /* Casi siempre una etiqueta, a veces dos: una tarea puede ser de frontend y
+       de diseño a la vez, y el modelo tiene que ver que eso pasa. Un 15 % se
+       queda sin etiquetar, que también es la realidad de cualquier tablero. */
+    const etiquetas = new Set<string>();
+    if (Math.random() > 0.15) {
+      etiquetas.add(azarConPesos(reparto));
+      if (Math.random() < 0.25) etiquetas.add(azarConPesos(reparto));
+    }
+
     const tarea = await prisma.task.create({
       data: {
         title:       titulo,
@@ -278,7 +357,12 @@ async function main() {
         completedAt: estaCerrada ? momento : null,
         dueDate:     new Date(nacida.getTime() + entre(3, 20) * DIA),
         assignees: {
-          create: [{ userId: azar(personas).userId, assignedBy: dueno, assignedAt: nacida }],
+          create: [{ userId: encargado.userId, assignedBy: dueno, assignedAt: nacida }],
+        },
+        labels: {
+          create: [...etiquetas].map((nombre) => ({
+            labelId: etiquetasPorNombre.get(nombre)!,
+          })),
         },
       },
     });
@@ -306,6 +390,7 @@ async function main() {
   }
 
   console.log(`\n  ${creadas} tareas, ${cerradas} cerradas, ${SEMANAS} semanas de historial.`);
+  console.log(`  ${ETIQUETAS.length} etiquetas repartidas con sesgo por persona.`);
   console.log(`  Proyecto: ${NOMBRE_PROYECTO}`);
   console.log(`  ⚠️  Todos los eventos llevan actorId=${ACTOR_SINTETICO}: son fabricados.`);
 

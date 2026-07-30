@@ -243,4 +243,57 @@ export class StatsService {
        GROUP BY a."userId"
     `;
   }
+
+  /**
+   * Qué ha hecho cada persona, **desglosado por etiqueta**.
+   *
+   * Es lo que le falta a `byPerson` para poder recomendar a alguien: aquella
+   * dice cuánto lleva cada cual, esta dice **de qué**. «Ha cerrado 5 tareas de
+   * frontend» es un hecho sobre qué ha hecho alguien; sin la etiqueta solo queda
+   * «ha cerrado 5 tareas», que no distingue a quién le encaja la siguiente.
+   *
+   * ⚠️ **No hay aquí ninguna medida de velocidad, y es deliberado.** La
+   * `medianaHoras` está para poder decir «suele tardar 2 días en las de
+   * frontend», que es contexto; no para ordenar a nadie. La regla de la sección
+   * de Reportes se mantiene: se enseña reparto y experiencia, no clasificación.
+   *
+   * Solo salen las tareas **con etiqueta**: una sin etiquetar no dice de qué
+   * trata, así que no cuenta como experiencia en nada. Con un tablero sin
+   * etiquetas esto devuelve un array vacío, que es la respuesta correcta —quien
+   * la lea tiene que decir que no hay base, no inventarse una.
+   *
+   * `medianaHoras` es de crear a cerrar, la misma unidad que en `byPerson`.
+   */
+  async byPersonAndLabel(projectId: string) {
+    return this.prisma.$queryRaw<
+      {
+        userId: string;
+        labelId: string;
+        etiqueta: string;
+        asignadas: number;
+        cerradas: number;
+        medianaHoras: number | null;
+      }[]
+    >`
+      SELECT a."userId",
+             l.id   AS "labelId",
+             l.name AS etiqueta,
+             -- ::int por lo mismo que en las otras dos: COUNT(*) es bigint y un
+             -- BigInt no se serializa a JSON, así que reventaria al cruzar el
+             -- TCP con un 500 sin ninguna pista. (Sin acentos graves aqui
+             -- dentro: estamos en un template literal.)
+             COUNT(*)::int                                            AS asignadas,
+             COUNT(*) FILTER (WHERE t."completedAt" IS NOT NULL)::int AS cerradas,
+             percentile_cont(0.5) WITHIN GROUP (
+               ORDER BY EXTRACT(EPOCH FROM (t."completedAt" - t."createdAt")) / 3600
+             ) FILTER (WHERE t."completedAt" IS NOT NULL)             AS "medianaHoras"
+        FROM tasks.task_assignees a
+        JOIN tasks.tasks t        ON t.id = a."taskId"
+        JOIN tasks.task_labels tl ON tl."taskId" = t.id
+        JOIN tasks.labels l       ON l.id = tl."labelId"
+       WHERE t."projectId" = ${projectId}::text
+       GROUP BY a."userId", l.id, l.name
+       ORDER BY cerradas DESC
+    `;
+  }
 }

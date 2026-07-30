@@ -216,4 +216,13 @@ export class TasksController {
   statsPeople(@Payload() dto: { projectId: string }) {
     return this.statsService.byPerson(dto.projectId);
   }
+
+  /**
+   * Experiencia por persona **y etiqueta**. La consume el asistente para poder
+   * recomendar a alguien por lo que ha hecho, no por lo rápido que va.
+   */
+  @MessagePattern({ cmd: 'task_stats_experience' })
+  statsExperience(@Payload() dto: { projectId: string }) {
+    return this.statsService.byPersonAndLabel(dto.projectId);
+  }
 }
