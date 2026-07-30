@@ -2002,16 +2002,45 @@ Cada gráfico es una isla `'use client'` que **recibe la serie ya calculada por
 props**: el `fetch` vive en la page, que es la regla del repo y además impide que
 la librería se cuele en el árbol de servidor.
 
-#### Las pestañas piden solo lo suyo
+#### Una sola página, y el proyecto en un desplegable
 
-`Instantánea` · `Flujo` · `Tiempos` · `Equipo`. Cada una carga únicamente sus
-datos: el flujo y los tiempos recorren el historial entero, y pedirlos siempre
-haría lenta la instantánea —la única que funciona sin historial— por culpa de dos
-pantallas que quizá no se abran.
+> Reescrito: la primera versión tenía cuatro pestañas y una pantalla aparte para
+> elegir proyecto. Se juntó todo.
 
-La pestaña de equipo **no aparece** sin `canViewReports`, y sus datos ni se
-piden: el 403 sería esperado, y pedirlo para descartarlo es justo lo que evita
+Las cuatro secciones cuentan **partes de una misma historia** —cuánto trabajo
+hay, cómo se mueve, cuánto tarda y qué cabe esperar—, y separadas en pestañas
+comparar dos obligaba a recordar la primera mientras cargaba la segunda, que es
+justo lo que un informe debería ahorrar. Van apiladas en ese orden, que es el de
+la pregunta que responden.
+
+El coste se acepta y se dice: **se piden los cinco informes en cada carga**,
+también los que recorren el historial. Van en paralelo y el servicio los cachea
+60 s, así que la espera es la del más lento, no la suma.
+
+Elegir proyecto es ahora un **desplegable con el mismo gesto que el selector de
+espacios** del tablero: cambiar de proyecto no cambia de pantalla, y comparar dos
+dejó de ser un viaje de ida y vuelta. La ruta raíz `/reports` entra directa al
+primer proyecto; solo queda pantalla propia para quien no está en ninguno.
+
+La sección de equipo **no se pinta** sin `canViewReports`, y sus datos ni se
+piden: el 403 sería esperado, y pedirlo para descartarlo es lo que evita
 `permissions/me`.
+
+#### «Cómo se lee esto», en cada gráfico
+
+Cada sección lleva un desplegable cerrado que explica **qué mira y qué decisión
+permite tomar**: qué significa que una banda engorde, por qué el p85 sirve para
+prometer una fecha y la media no, por qué la tabla de personas no es una
+clasificación.
+
+Es un `<details>` nativo, no estado de React: el navegador ya da apertura con
+teclado, anuncio correcto al lector de pantalla y búsqueda dentro de la página
+aunque esté cerrado.
+
+Cerrado por defecto, y esa es la decisión: la explicación no puede competir con
+el gráfico ni empujarlo fuera de la pantalla, pero tampoco puede vivir en una
+documentación aparte que nadie abrirá. Quien ya lo entiende no lo abre nunca;
+quien no, lo tiene a un clic sin salir de la pantalla.
 
 #### Dos decisiones de la interfaz
 
