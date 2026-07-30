@@ -8,9 +8,14 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 12 de 17 resueltos.** El equipo de frontend recibió autorización para
+> **Estado: 17 de 17 resueltos.** El equipo de frontend recibió autorización para
 > tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
-> commit y cómo se verificó. Lo que queda abierto está al principio.
+> commit y cómo se verificó.
+>
+> Lo que queda no es de esta lista: son **huecos de producto** —las subtareas
+> existen en backend y no tienen interfaz, y no se pueden reordenar tareas dentro
+> de una columna— y el dominio de **notificaciones**, que no existe en ninguna
+> capa.
 
 ---
 
@@ -33,14 +38,7 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 
 ### Abiertos
 
-| # | Severidad | Qué | Verificado |
-|---|---|---|---|
-| 5 | 🟡 | Falta `GET /users/me`. «Mis tareas» ya está (`GET /me/tasks`) | código |
-| 6 | 🟡 | `Project.name` es único **global**: dos equipos no pueden tener un "Sprint 1" | diseño |
-| 8 | 🟡 | Falta `canDeleteProject`; `reorder` de columnas exige `canCreateColumn`. **`canEditColumn` ya se usa** (`667c1cb`) | código |
-| 10 | 🔵 | `PATCH /users/:id` entra en snake_case y sale en camelCase; `AuthResponseDto` muerto | runtime |
-| 16 | 🔵 | Las etiquetas usan `canEditTask`; no hay permiso propio | decisión |
-| 17 | 🔵 | Comentar exige `canEditTask`: el observador lee pero no responde | decisión |
+Ninguno. Los seis que quedaban se cerraron el 2026-07-30; ver la tabla de abajo.
 
 ### Resueltos
 
@@ -57,10 +55,17 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 | 12 | 🟠 | No existía ningún flujo de invitación | `a88e804` |
 | 13 | 🟠 | Sin permiso de lectura: no había rol observador | `477616f` |
 | 7 | 🟡 | Un proyecto nacía sin roles ni miembros | `477616f` |
+| 6 | 🟡 | `Project.name` era único **global**: dos equipos no podían tener un "Sprint 1" | `b9c17fa` |
+| 5 | 🟡 | Faltaba `GET /users/me` | `b974030` |
+| 8 | 🟡 | Faltaban `canEditColumn`, `canMoveTask` y `canDeleteProject`; `reorder` pedía crear | `667c1cb` `7cab9a2` `ee8be65` `0d3afb5` |
+| 10 | 🔵 | `PATCH /users/:id` entraba en snake_case y salía en camelCase | `b974030` |
+| 16 | 🔵 | Las etiquetas usaban `canEditTask`; ahora `canManageLabels` | `ee8be65` |
+| 17 | 🔵 | Comentar exigía `canEditTask`; ahora `canComment` | `ee8be65` |
 | — | 🟡 | Nombre duplicado devolvía 500 (proyectos y espacios) | `477616f` `fb4a758` |
 
-**Lo que más pesa de lo que queda:** el punto 6, porque es una decisión de
-diseño del modelo y no un arreglo; y el 5, que bloquea los avisos del panel.
+**Lo que queda no está en esta lista.** Son huecos de producto: las subtareas
+existen en el backend y no tienen interfaz, no se pueden reordenar tareas dentro
+de una columna, y no hay dominio de notificaciones.
 
 ---
 

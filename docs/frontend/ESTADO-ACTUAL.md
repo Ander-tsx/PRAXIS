@@ -1204,3 +1204,75 @@ Era un engranaje, y un engranaje promete ajustes. Para quien no tiene
 `canEditTask` el diálogo es lo contrario: seis campos desactivados que solo se
 leen. El ojo describe lo único que el botón garantiza —abrir y ver— y el texto
 accesible distingue los dos casos.
+
+---
+
+## 21. Los permisos, terminados
+
+> Con esta pasada se cierran **los diecisiete pendientes** de
+> `PENDIENTES-BACKEND.md`. Lo que queda no es de esa lista: subtareas sin
+> interfaz, tareas que no se reordenan dentro de su columna y el dominio de
+> notificaciones, que no existe en ninguna capa.
+
+### 21.1 El eje que faltaba: ejecutar ≠ definir
+
+Los permisos de tarea eran un solo eje —crear, editar, borrar— y todo lo que no
+fuera crear caía en `canEditTask`. Eso metía en el mismo saco dos cosas
+distintas: **hacer** el trabajo y **decidir en qué consiste**.
+
+| Ejecutar (`canMoveTask`, `canComment`) | Definir (`canEditTask`) |
+|---|---|
+| Arrastrar la tarjeta a otra columna | Reescribir el título o la descripción |
+| Marcar y desmarcar pasos del checklist | Añadir o borrar pasos |
+| Comentar en el hilo | Cambiar prioridad, fecha o encargados |
+
+El agrupado del formulario de roles lo refleja: «Acceso y ejecución» junta ver,
+mover y comentar, que es el perfil de quien trabaja en el tablero sin
+redefinirlo.
+
+⚠️ Marcar un paso del checklist va con **mover**, no con editar. Es el detalle
+que menos se ve y el que más molestaba: quien podía arrastrar su tarjeta a
+«Hecho» se encontraba un checklist de solo lectura sobre su propia tarea.
+
+### 21.2 Tres endpoints que pedían el permiso de otro
+
+Todos por lo mismo: el suyo no existía.
+
+| Endpoint | Pedía | Pide | Por qué importaba |
+|---|---|---|---|
+| `POST /tasks/:id/move` | `canEditTask` | `canMoveTask` | mover obligaba a poder reescribir |
+| `POST .../checklists/:id/toggle` | `canEditTask` | `canMoveTask` | ídem, sobre los pasos |
+| `POST /tasks/:id/comments` | `canEditTask` | `canComment` | el observador leía y no podía responder |
+| `POST /projects/:id/labels` | `canEditTask` | `canManageLabels` | tocar una tarea rehacía el vocabulario del proyecto |
+| `DELETE /projects/:id` | `canDeleteBoard` | `canDeleteProject` | borrar **un tablero** habilitaba borrar el proyecto entero |
+| `PATCH .../columns/reorder` | `canCreateColumn` | `canEditColumn` | añadir una columna habilitaba reorganizar el tablero |
+
+Todos los permisos nuevos entran **implicados por el que se usaba antes**, así
+que ningún rol existente perdió capacidad. Es la única forma de añadir permisos a
+un sistema en uso sin romper a nadie.
+
+### 21.3 Dos arreglos que no son de permisos
+
+**`GET /users/me`.** El frontend sacaba el `sub` del JWT y pedía `/users/:id`.
+Eso obliga a cada zona a saber leer un token que, por diseño, vive en una cookie
+httpOnly que el navegador no puede abrir. Va declarado **antes** de `:id` o Nest
+se come «me» y lo estrella contra `ParseUUIDPipe`.
+
+**`PATCH /users/:id` en camelCase.** Era el único endpoint que entraba en
+snake_case y salía en camelCase, así que devolverle el objeto que acababas de
+leer daba 200 **sin guardar nada**: el `whitelist` descartaba en silencio lo que
+no reconocía. De ahí viene la costumbre de confirmar contra el `data` y no contra
+el status, que se mantiene.
+
+**`Project.name` es único por dueño.** Era global: dos equipos que no se conocen
+no podían tener cada uno su "Sprint 1", y el segundo recibía un conflicto sobre
+una fila que no puede ver.
+
+### 21.4 Una tarea entregada no vence
+
+La tarjeta de una tarea en columna de cierre enseña **«Completada»** en verde en
+lugar de su vencimiento. La píldora sustituye, no se suma: con las dos, la
+tarjeta decía «Completada» y «Venció hace 2 d» a la vez.
+
+Se decide por el **color de la columna**, no por su nombre, así que funciona con
+varias columnas de cierre y con cualquier nombre.

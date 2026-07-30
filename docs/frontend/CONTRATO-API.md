@@ -66,9 +66,10 @@ En validación fallida el `message` es literalmente `"Validation failed"` y los 
 
 | Método | Ruta | Entrada | Notas |
 |---|---|---|---|
-| GET | `/users` | `@Body FindUsersDto` ⚠️ | `{ query:{page,limit,sortBy,sortOrder}, filters:{search,createdFrom,createdTo} }`. **Body en GET.** |
+| GET | `/users` | query params | `page`, `limit`, `search`… |
+| GET | `/users/me` | — | **Tu perfil**, resuelto desde el token |
 | GET | `/users/:id` | — | Incluye `credential.email` |
-| PATCH | `/users/:id` | `{ first_name?, last_name? }` ⚠️ | **Entra snake_case, sale camelCase** |
+| PATCH | `/users/:id` | `{ firstName?, lastName? }` | camelCase de entrada y de salida |
 | DELETE | `/users/:id` | — | Borra usuario + credencial + sesión Redis |
 
 `data` de listado: `{ items: User[], total: number }`.
@@ -79,7 +80,13 @@ User = { id, credentialId, firstName, lastName, avatarUrl, status, createdAt, up
 status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
 ```
 
-No existe `GET /users/me`.
+`GET /users/me` evita tener que sacar el `sub` del JWT: la sesión es una cookie
+httpOnly y el navegador no puede abrirla.
+
+`PATCH /users/:id` **entra en camelCase**, igual que sale. Aceptaba `first_name`
+y devolvía `firstName`, así que devolverle el objeto que acababas de leer daba
+**200 sin guardar nada**. Las claves viejas se siguen aceptando marcadas como
+obsoletas.
 
 ---
 
@@ -105,9 +112,10 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 | GET | `/projects` | `@Body FindProjectsDto` ⚠️ | — |
 | GET | `/projects/:id` | — | `canEditBoard` ⚠️ |
 | PATCH | `/projects/:id` | `{ name?, description? }` | `canEditBoard` |
-| DELETE | `/projects/:id` | — | `canDeleteBoard` ⚠️ |
+| DELETE | `/projects/:id` | — | `canDeleteProject` |
 
-- `name`: 2–100 chars y **único a nivel global**, no por usuario → colisiones entre equipos.
+- `name`: 2–100 chars, único **por dueño**. Repetirlo en tu propia cuenta da 409
+  («Ya tienes un proyecto llamado X»); otro equipo puede llamar igual al suyo.
 - `GET /projects` → `{ items, total }`. **Devuelve todos los proyectos del sistema** (el filtro por usuario está roto).
 - `GET /projects/:id` viene con todo el árbol embebido:
 
@@ -157,7 +165,7 @@ Cacheado en Redis 5 min — un cambio puede tardar en reflejarse.
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | POST | `/boards/:boardId/columns` | `{ name, order, color? }` | `canCreateColumn` |
-| PATCH | `/boards/:boardId/columns/reorder` | `{ columnIds: string[] }` | `canCreateColumn` ⚠️ |
+| PATCH | `/boards/:boardId/columns/reorder` | `{ columnIds: string[] }` | `canEditColumn` |
 | PATCH | `/boards/:boardId/columns/:id` | `{ name?, color? }` | `canEditColumn` |
 | DELETE | `/boards/:boardId/columns/:id` | — | `canDeleteColumn` |
 
@@ -259,10 +267,11 @@ quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
 
 ```ts
 {
-  canCreateTask?, canMoveTask?, canEditTask?, canDeleteTask?,
+  canViewProject?,
+  canCreateTask?, canMoveTask?, canEditTask?, canDeleteTask?, canComment?,
   canCreateBoard?, canEditBoard?, canDeleteBoard?,
-  canCreateColumn?, canDeleteColumn?,
-  canManageMembers?, canManageRoles?
+  canCreateColumn?, canEditColumn?, canDeleteColumn?,
+  canManageLabels?, canManageMembers?, canManageRoles?, canDeleteProject?
 }
 ```
 
@@ -303,8 +312,9 @@ Al evaluar, el backend expande los permisos hacia abajo
 | `canEditBoard` | `canCreateBoard` |
 | `canDeleteColumn` | `canEditColumn`, `canCreateColumn` |
 | `canEditColumn` | `canCreateColumn` |
-| `canDeleteTask` | `canEditTask`, `canMoveTask`, `canCreateTask` |
-| `canEditTask` | `canMoveTask`, `canCreateTask` |
+| `canDeleteTask` | `canEditTask`, `canMoveTask`, `canComment`, `canCreateTask` |
+| `canEditTask` | `canMoveTask`, `canComment`, `canCreateTask` |
+| `canDeleteProject` | `canDeleteBoard`, `canEditBoard`, `canCreateBoard` |
 
 `canManageMembers` y `canManageRoles` no arrastran nada.
 
@@ -412,9 +422,9 @@ la interfaz no tiene que saber de dónde salió cada tarea.
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | GET | `/projects/:projectId/labels` | — | `canViewProject` |
-| POST | `/projects/:projectId/labels` | `{ name, color }` → 201 | `canEditTask` |
-| PATCH | `/projects/:projectId/labels/:id` | `{ name?, color? }` | `canEditTask` |
-| DELETE | `/projects/:projectId/labels/:id` | — | `canEditTask` |
+| POST | `/projects/:projectId/labels` | `{ name, color }` → 201 | `canManageLabels` |
+| PATCH | `/projects/:projectId/labels/:id` | `{ name?, color? }` | `canManageLabels` |
+| DELETE | `/projects/:projectId/labels/:id` | — | `canManageLabels` |
 
 ```ts
 Label = { id, projectId, name, color, createdAt }
@@ -440,9 +450,9 @@ La tarea sale con `labels`, que trae la etiqueta entera embebida:
 labels: [{ taskId, labelId, label: Label }]
 ```
 
-⚠️ **Gestionarlas exige `canEditTask`**, no un permiso propio: no existe uno de
-etiquetas y no lo inventamos por nuestra cuenta. Anotado en
-`PENDIENTES-BACKEND.md §16`.
+Gestionarlas exige **`canManageLabels`**, su permiso propio desde `ee8be65`.
+Antes las gobernaba `canEditTask`: quien podía tocar una tarea rehacía el
+vocabulario del proyecto entero.
 
 ---
 
@@ -451,9 +461,9 @@ etiquetas y no lo inventamos por nuestra cuenta. Anotado en
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | GET | `/tasks/:taskId/comments` | — | `canViewProject` |
-| POST | `/tasks/:taskId/comments` | `{ body }` → 201 | `canEditTask` |
-| PATCH | `/tasks/:taskId/comments/:id` | `{ body }` | `canEditTask` + **ser el autor** |
-| DELETE | `/tasks/:taskId/comments/:id` | — | `canEditTask` + autor **o** `canDeleteTask` |
+| POST | `/tasks/:taskId/comments` | `{ body }` → 201 | `canComment` |
+| PATCH | `/tasks/:taskId/comments/:id` | `{ body }` | `canComment` + **ser el autor** |
+| DELETE | `/tasks/:taskId/comments/:id` | — | `canComment` + autor **o** `canDeleteTask` |
 
 ```ts
 TaskComment = { id, taskId, authorId, body, createdAt, editedAt }
@@ -469,9 +479,9 @@ TaskComment = { id, taskId, authorId, body, createdAt, editedAt }
 - **Borrar** lo puede el autor o quien tenga `canDeleteTask`.
 - `authorId` es un id: el nombre lo resuelve la interfaz contra los miembros.
 
-⚠️ **Comentar exige `canEditTask`.** No hay permiso de comentar, así que un
-perfil de solo lectura lee el hilo pero no participa. Anotado en
-`PENDIENTES-BACKEND.md §17`.
+Comentar exige **`canComment`**, su permiso propio desde `ee8be65`. Antes pedía
+`canEditTask`, así que un perfil de solo lectura leía el hilo y no podía
+responder.
 
 ⚠️ Los comentarios **viajan dentro de la tarea** (`task.comments`), también en
 `GET /boards/:id/tasks`. Se decidió así para que la revalidación de la página
@@ -568,8 +578,11 @@ aquí. Verificado: tras salir, 6 filas de asignación vivas y `items: []`.
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | POST | `/tasks/:taskId/checklists` | `{ text, order? }` | `canEditTask` |
-| POST | `/tasks/:taskId/checklists/:id/toggle` | — | `canEditTask` |
+| POST | `/tasks/:taskId/checklists/:id/toggle` | — | `canMoveTask` ⚠️ |
 | DELETE | `/tasks/:taskId/checklists/:id` | — | `canEditTask` |
+
+⚠️ **Marcar un paso pide `canMoveTask`, no `canEditTask`:** marcarlo es ejecutar
+el trabajo, no redefinirlo. Añadir y borrar pasos sí es definir la tarea.
 
 ⚠️ Igual que en tareas: **sin `projectId`**, que lo pone el guard.
 
@@ -598,13 +611,9 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 
 ## No existe (y lo necesitamos)
 
-- `GET /users/me` · `GET /auth/me`
-- `GET /projects` filtrado por membresía real
 - `GET /projects/:projectId/roles`
 - `GET /boards/:boardId/columns`
-- Mis permisos efectivos en un proyecto (la lógica existe en el microservicio, no está expuesta)
-- **Invitaciones**: modelo, estados, token y canal de aviso (§12)
-- **Permiso de lectura** de proyecto: hoy ver exige `canEditBoard` (§13)
+- **Notificaciones**: no hay modelo, ni tabla, ni endpoint en ninguna capa
 - `POST /projects/:id/members` que acepte **email**
 - Dominio de **reportes** completo
 - **Logs / auditoría**
