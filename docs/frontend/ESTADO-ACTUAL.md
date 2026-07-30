@@ -1693,3 +1693,20 @@ API a mano no es información, es una pista falsa.
 
 No se toca nada del backend: quitar el soporte sería una migración con borrado de
 una columna para no ganar nada.
+
+Y un sitio que la decisión dejaba mintiendo: **la landing prometía subtareas** en
+dos textos —un paso del recorrido del miembro y una tarjeta titulada «Subtareas y
+checklists»—. Es la página pública: prometía una función que no existe en ninguna
+pantalla. Reescritos en términos del checklist, que es lo que sí hay.
+
+### 24.6 Estado del móvil y del árbol
+
+Comprobado a 375 px: la fila nueva de la cabecera —«← Todos los proyectos» y
+«Eliminar proyecto»— cabe sin desbordar, el título y su insignia envuelven, y la
+barra lateral acepta la quinta entrada sin apretarse.
+
+> Nota de entorno, no del código: `apps/frontend/dashboard-front/.next/` guarda un
+> `types/validator.ts` de una build anterior a que las pantallas se movieran al
+> grupo `(private)`, y como el `tsconfig` incluye `.next/types/**/*.ts`, un `tsc
+> --noEmit` a mano informa de dos módulos que no existen. Está en `.gitignore` y
+> desaparece borrando `.next`; no afecta a `next dev` ni al build.

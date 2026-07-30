@@ -172,7 +172,9 @@ const ROLES: RoleData[] = [
     steps: [
       'Entra directamente a los tableros de los proyectos donde participa',
       'Mueve sus tareas entre columnas y actualiza prioridad y fecha límite',
-      'Desglosa el trabajo en subtareas y marca los ítems del checklist',
+      /* Decía «subtareas», y no las exponemos: la landing prometía una función
+         que no existe en ninguna pantalla. Ver ESTADO-ACTUAL §24.5. */
+      'Desglosa el trabajo en pasos y los va marcando en el checklist',
       'Solo ve las acciones que su rol le permite: la interfaz se adapta a sus permisos',
     ],
     visual: <MemberTasksPanel />,

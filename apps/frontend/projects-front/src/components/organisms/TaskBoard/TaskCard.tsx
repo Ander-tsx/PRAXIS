@@ -46,7 +46,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
  *
  * Enseña de un vistazo lo que decide si hay que abrirla: prioridad, fecha
  * límite si está cerca o pasada, avance del checklist y quién la lleva. Todo lo
- * demás —descripción, subtareas— vive en el diálogo.
+ * demás —descripción, comentarios, adjuntos— vive en el diálogo.
  *
  * Es un `<article>`, no un `<button>` entero: un botón sería ancestro de las
  * iniciales y los contadores, y un botón con contenido estructurado se anuncia

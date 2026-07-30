@@ -473,9 +473,11 @@ const CARDS: FeatureCardData[] = [
     id: 2,
     accent: '#34d399',
     badge: 'Detalle',
-    title: 'Subtareas y checklists',
+    /* Decía «Subtareas y checklists», y las subtareas no se exponen: la landing
+       prometía una función que no existe en ninguna pantalla. §24.5. */
+    title: 'Checklists por tarea',
     description:
-      'Divide el trabajo grande en pasos verificables. Cada tarea admite subtareas y su propia lista de comprobación.',
+      'Divide el trabajo grande en pasos verificables. Cada tarea lleva su propia lista de comprobación, y lo que falta se ve desde el tablero.',
     icon: icon(
       <path
         strokeLinecap="round"
