@@ -83,9 +83,16 @@ export class ProjectsController {
     );
   }
 
-  /** Actualiza un proyecto (requiere poder editar boards) */
+  /**
+   * Actualiza el nombre y la descripción de un proyecto.
+   *
+   * Exige `canEditProject`. Pedía `canEditBoard`, el permiso de otra cosa: es la
+   * misma familia de rarezas que `canMoveTask`, `canComment` y
+   * `canDeleteProject`, y se cierra igual — el permiso nuevo entra implicado por
+   * el que se usaba antes, así que ningún rol existente pierde capacidad.
+   */
   @Patch(':id')
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
+  @RequireProjectPermission(ProjectPermission.CAN_EDIT_PROJECT)
   @ApiOperation({ summary: 'Actualiza un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto actualizado exitosamente' })
   update(

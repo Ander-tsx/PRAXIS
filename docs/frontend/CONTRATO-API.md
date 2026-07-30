@@ -40,8 +40,7 @@ En validación fallida el `message` es literalmente `"Validation failed"` y los 
 1. **Ninguna ruta de tarea o checklist acepta `projectId` en el body.** Es al revés de como estuvo: el guard lo resuelve desde la ruta y mandarlo responde `400 "property projectId should not exist"`. Se quitó porque, mientras lo elegía el cliente, bastaba con declarar el id de un proyecto propio para leer, editar y borrar tareas de un proyecto ajeno (PENDIENTES-BACKEND §9).
 2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el **nombre** de la columna destino, no su id. Quien mueva necesita la correspondencia nombre ↔ id; en la interfaz la resuelve `BoardColumns`, que ya tiene las columnas.
    El mismo hecho por el otro lado: **renombrar una columna cambia el `status` de sus tareas**, y lo hace el backend en cascada. Ver «Columns».
-3. **Listar y paginar `/projects` y `/users` requiere body en un GET** — imposible desde `fetch`. Sin filtros solo se obtiene la página 1 por defecto (limit 20).
-4. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
+3. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
 
 ---
 
@@ -109,14 +108,28 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | POST | `/projects` | `{ name, description? }` | — (`ownerId` sale del token) |
-| GET | `/projects` | `@Body FindProjectsDto` ⚠️ | — |
-| GET | `/projects/:id` | — | `canEditBoard` ⚠️ |
-| PATCH | `/projects/:id` | `{ name?, description? }` | `canEditBoard` |
+| GET | `/projects` | query params (`page`, `limit`, `search`…) | — |
+| GET | `/projects/:id` | — | `canViewProject` |
+| PATCH | `/projects/:id` | `{ name?, description? }` | `canEditProject` |
 | DELETE | `/projects/:id` | — | `canDeleteProject` |
 
 - `name`: 2–100 chars, único **por dueño**. Repetirlo en tu propia cuenta da 409
   («Ya tienes un proyecto llamado X»); otro equipo puede llamar igual al suyo.
-- `GET /projects` → `{ items, total }`. **Devuelve todos los proyectos del sistema** (el filtro por usuario está roto).
+- `GET /projects` → `{ items, total }`, filtrado por **dueño o miembro**.
+
+### `PATCH` exige `canEditProject`, no `canEditBoard`
+
+Pedía `canEditBoard`, que es el permiso de otra cosa: renombrar el proyecto no
+tiene nada que ver con editar uno de sus tableros. `canEditProject` entra
+**implicado por `canEditBoard`**, así que ningún rol existente perdió capacidad
+—el mismo movimiento que `canMoveTask`, `canComment` y `canDeleteProject`.
+
+⚠️ **`name` es único por dueño, así que un `PATCH` puede dar 409 a medio texto.**
+Si guardas mientras se escribe, hace falta debounce y hace falta que el conflicto
+se enseñe **sin perder lo escrito**: el nombre a medias («Redis» camino de
+«Rediseño») puede chocar con otro proyecto tuyo.
+
+Un cuerpo vacío no describe ningún cambio: manda solo el campo que cambia.
 - `GET /projects/:id` viene con todo el árbol embebido:
 
 ```ts
@@ -271,7 +284,8 @@ quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
   canCreateTask?, canMoveTask?, canEditTask?, canDeleteTask?, canComment?,
   canCreateBoard?, canEditBoard?, canDeleteBoard?,
   canCreateColumn?, canEditColumn?, canDeleteColumn?,
-  canManageLabels?, canManageMembers?, canManageRoles?, canDeleteProject?
+  canManageLabels?, canManageMembers?, canManageRoles?,
+  canEditProject?, canDeleteProject?
 }
 ```
 
@@ -308,23 +322,28 @@ Al evaluar, el backend expande los permisos hacia abajo
 
 | Si concedes | También concede |
 |---|---|
-| `canDeleteBoard` | `canEditBoard`, `canCreateBoard` |
-| `canEditBoard` | `canCreateBoard` |
+| `canDeleteBoard` | `canEditBoard`, `canCreateBoard`, `canEditProject` |
+| `canEditBoard` | `canCreateBoard`, `canEditProject` |
 | `canDeleteColumn` | `canEditColumn`, `canCreateColumn` |
 | `canEditColumn` | `canCreateColumn` |
 | `canDeleteTask` | `canEditTask`, `canMoveTask`, `canComment`, `canCreateTask` |
 | `canEditTask` | `canMoveTask`, `canComment`, `canCreateTask` |
-| `canDeleteProject` | `canDeleteBoard`, `canEditBoard`, `canCreateBoard` |
+| `canDeleteProject` | `canDeleteBoard`, `canEditBoard`, `canCreateBoard`, `canEditProject` |
 
 `canManageMembers` y `canManageRoles` no arrastran nada.
+
+⚠️ **`expandPermissions` recorre la tabla una sola vez**, así que la expansión no
+es transitiva por sí sola: hoy sale bien porque el orden de inserción va de mayor
+a menor alcance. Por eso `canEditProject` está escrito en las **tres** entradas
+que deben concederlo, aunque quede repetido.
 
 No hace falta guardar los implicados: el backend los deduce al comprobar. Pero
 el formulario de roles **debe enseñarlo** —marcar "eliminar" implica "editar" y
 "crear"— o el usuario creerá que está dando menos permiso del que da.
 
-⚠️ **No hay ningún permiso de lectura.** Ver un proyecto exige `canEditBoard`,
-que además arrastra `canCreateBoard`. Un rol de solo lectura no se puede
-modelar hoy. Ver PENDIENTES-BACKEND §13.
+✅ **Hay permiso de lectura.** `canViewProject` es el suelo de la jerarquía
+—cualquier permiso lo implica— y es lo que exige `GET /projects/:id`, así que un
+rol de solo lectura se modela con él y nada más.
 
 ### Los permisos se cachean 5 minutos
 

@@ -53,6 +53,19 @@ export enum ProjectPermission {
   CAN_MANAGE_LABELS  = 'canManageLabels',
 
   /**
+   * Cambiar el nombre y la descripción del proyecto.
+   *
+   * Lo pedía `canEditBoard`, que es el permiso de **otra cosa**: renombrar el
+   * proyecto no tiene nada que ver con editar un tablero suyo, y al revés, quien
+   * organiza los tableros no tiene por qué poder rebautizar el proyecto entero.
+   *
+   * `canEditBoard` lo implica por jerarquía, así que ningún rol existente pierde
+   * capacidad — es el mismo movimiento que `canMoveTask`, `canComment`,
+   * `canManageLabels` y `canDeleteProject`.
+   */
+  CAN_EDIT_PROJECT   = 'canEditProject',
+
+  /**
    * Eliminar el proyecto entero.
    *
    * Borrarlo exigía `canDeleteBoard`, un permiso de **otra cosa y de menor

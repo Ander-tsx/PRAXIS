@@ -17,6 +17,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canManageRoles: 'Gestionar los roles',
   canComment: 'Comentar en las tareas',
   canManageLabels: 'Gestionar las etiquetas',
+  canEditProject: 'Renombrar el proyecto y cambiar su descripción',
   canDeleteProject: 'Eliminar el proyecto',
 };
 
@@ -33,9 +34,17 @@ export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[
   { title: 'Etiquetas', permissions: ['canManageLabels'] },
   { title: 'Columnas', permissions: ['canCreateColumn', 'canEditColumn', 'canDeleteColumn'] },
   { title: 'Tareas', permissions: ['canCreateTask', 'canEditTask', 'canDeleteTask'] },
+  /* Los dos del proyecto van juntos y al final: son los de mayor alcance, y
+     `canEditProject` sin `canDeleteProject` al lado se leía como un permiso de
+     tablero más. */
   {
     title: 'Administración',
-    permissions: ['canManageMembers', 'canManageRoles', 'canDeleteProject'],
+    permissions: [
+      'canManageMembers',
+      'canManageRoles',
+      'canEditProject',
+      'canDeleteProject',
+    ],
   },
 ];
 

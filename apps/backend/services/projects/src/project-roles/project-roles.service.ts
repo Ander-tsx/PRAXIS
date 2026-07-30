@@ -19,11 +19,17 @@ const PERMISSION_CACHE_TTL = 300;
  * Regla general:
  *   canDelete* → implica canEdit* + canCreate*
  *   canEdit*   → implica canCreate*
+ *
+ * ⚠️ `expandPermissions` recorre este mapa **una sola vez**, así que la
+ * expansión no es transitiva por sí misma: hoy funciona porque el orden de
+ * inserción va de mayor a menor alcance. Para no depender de eso, un permiso
+ * implicado se escribe en **todas** las entradas que deban concederlo, aunque
+ * quede repetido — ver `canEditProject`.
  */
 const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Boards
-  canDeleteBoard: ['canEditBoard', 'canCreateBoard'],
-  canEditBoard:   ['canCreateBoard'],
+  canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
+  canEditBoard:   ['canCreateBoard', 'canEditProject'],
   // Columns
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn:   ['canCreateColumn'],
@@ -32,8 +38,14 @@ const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Editar implica mover y comentar: quien puede reescribir la tarea entera
   // puede, con más razón, cambiarla de columna o dejar una nota. Al revés no.
   canEditTask:   ['canMoveTask', 'canComment', 'canCreateTask'],
-  // Borrar el proyecto se lleva todos sus tableros por delante.
-  canDeleteProject: ['canDeleteBoard', 'canEditBoard', 'canCreateBoard'],
+  // Borrar el proyecto se lleva todos sus tableros por delante, así que quien
+  // puede borrarlo puede, con mucha más razón, renombrarlo.
+  canDeleteProject: [
+    'canDeleteBoard',
+    'canEditBoard',
+    'canCreateBoard',
+    'canEditProject',
+  ],
   // Roles y miembros no tienen jerarquía adicional
 };
 

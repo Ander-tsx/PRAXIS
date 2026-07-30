@@ -1412,3 +1412,43 @@ La sombra `inset` además cabe en el propio `<section>`, porque se pinta **encim
 del fondo y debajo del contenido**: apaga los puntos del borde sin tocar las
 tarjetas. Una máscara no podía —`mask-image` recorta también a los hijos— y por
 eso necesitaba una capa aparte que ya no hace falta.
+
+---
+
+## 24. Administrar el proyecto, y la pantalla de ajustes
+
+> Tercera pasada. Lo que faltaba no era una función nueva del dominio: era poder
+> **administrar lo que ya existe** —renombrar un proyecto, borrarlo, editar tus
+> datos— desde la interfaz en vez de con `curl`.
+
+### 24.1 `canEditProject`: el séptimo endpoint que pedía el permiso de otro
+
+`PATCH /projects/:id` exigía **`canEditBoard`**. Es la misma familia que se cerró
+en §21.2, con la misma forma: el permiso propio no existía, así que se usó el más
+parecido. Y aquí el parecido era poco — renombrar el proyecto no tiene nada que
+ver con editar uno de sus tableros, y al revés, quien organiza los tableros no
+tiene por qué poder rebautizar el proyecto entero.
+
+| Endpoint | Pedía | Pide |
+|---|---|---|
+| `PATCH /projects/:id` | `canEditBoard` | `canEditProject` |
+
+Entra **implicado por `canEditBoard`**, que es la única forma de añadir un permiso
+a un sistema en uso sin romper a nadie. Séptima vez que se aplica el patrón.
+
+⚠️ **`expandPermissions` recorre `PERMISSION_HIERARCHY` una sola vez**, así que la
+expansión **no es transitiva**: `canDeleteProject → canDeleteBoard → canEditBoard
+→ canEditProject` solo funciona porque el orden de inserción va de mayor a menor
+alcance. Es una dependencia del orden de las claves de un objeto, que nadie
+espera. Por eso `canEditProject` se escribe en las **tres** entradas que deben
+concederlo aunque quede repetido: repetir es barato, y depender del orden de
+inserción se rompe el día que alguien reordene el mapa por estética.
+
+Verificado con las dos cuentas contra el stack levantado:
+
+| Caso | Resultado |
+|---|---|
+| Miembro con rol `canDeleteTask` + `canEditColumn` | `canEditProject: false`, `PATCH` **403** |
+| Dueño | 200 (bypass por `ownerId`) |
+| Al mismo rol se le añade `canEditBoard` | `canEditProject: true`, `PATCH` **200** |
+| Y `canDeleteProject` con ese rol | sigue en `false` — no se concede de más |
