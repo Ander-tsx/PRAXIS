@@ -17,6 +17,8 @@ export interface TaskCardProps {
   /** Para poner cara a los `userId` de los encargados. */
   usersById: Map<string, UserProfile>;
   onOpen: () => void;
+  /** Solo cambia cómo se nombra el botón: el diálogo decide qué deja tocar. */
+  canEdit: boolean;
   draggable: boolean;
   isDragging: boolean;
   onDragStart: () => void;
@@ -42,7 +44,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
  * iniciales y los contadores, y un botón con contenido estructurado se anuncia
  * fatal en un lector de pantalla.
  *
- * **El diálogo se abre con el icono de configuración, no pulsando la tarjeta.**
+ * **El diálogo se abre con el icono, no pulsando la tarjeta.**
  * Antes un botón invisible la cubría entera con `absolute inset-0`, y eso
  * competía con el gesto principal del tablero: un arrastre que se queda en dos
  * píxeles cuenta como clic, y abrías un modal cuando lo que querías era mover la
@@ -53,11 +55,17 @@ const PRIORITY_COLORS: Record<Priority, string> = {
  * El icono se ve siempre, tenue, y sube a opacidad plena al pasar por encima o
  * al recibir el foco. Enseñarlo solo en `hover` lo dejaría inalcanzable en una
  * pantalla táctil.
+ *
+ * Es un **ojo**, no un engranaje. Un engranaje promete ajustes, y para quien no
+ * puede editar tareas el diálogo es exactamente lo contrario: seis campos
+ * desactivados que solo se leen. El ojo describe lo único que el botón garantiza
+ * —abrir y ver—, y el texto accesible sí distingue los dos casos.
  */
 export function TaskCard({
   task,
   usersById,
   onOpen,
+  canEdit,
   draggable,
   isDragging,
   onDragStart,
@@ -113,8 +121,12 @@ export function TaskCard({
         <button
           type="button"
           onClick={onOpen}
-          aria-label={`Abrir los detalles de la tarea ${task.title}`}
-          title="Detalles de la tarea"
+          aria-label={
+            canEdit
+              ? `Ver y editar la tarea ${task.title}`
+              : `Ver los detalles de la tarea ${task.title}`
+          }
+          title={canEdit ? 'Ver y editar' : 'Ver los detalles'}
           className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1 text-text-disabled opacity-50 transition-[opacity,color] hover:bg-surface hover:text-text-primary hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
         >
           <svg
@@ -128,9 +140,13 @@ export function TaskCard({
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
             />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+            />
           </svg>
         </button>
       </div>

@@ -10,6 +10,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canEditColumn: 'Editar columnas',
   canDeleteColumn: 'Eliminar columnas',
   canCreateTask: 'Crear tareas',
+  canMoveTask: 'Mover tareas de columna',
   canEditTask: 'Editar tareas',
   canDeleteTask: 'Eliminar tareas',
   canManageMembers: 'Gestionar el equipo',
@@ -21,7 +22,10 @@ export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[
   { title: 'Acceso', permissions: ['canViewProject'] },
   { title: 'Tableros', permissions: ['canCreateBoard', 'canEditBoard', 'canDeleteBoard'] },
   { title: 'Columnas', permissions: ['canCreateColumn', 'canEditColumn', 'canDeleteColumn'] },
-  { title: 'Tareas', permissions: ['canCreateTask', 'canEditTask', 'canDeleteTask'] },
+  {
+    title: 'Tareas',
+    permissions: ['canCreateTask', 'canMoveTask', 'canEditTask', 'canDeleteTask'],
+  },
   { title: 'Administración', permissions: ['canManageMembers', 'canManageRoles'] },
 ];
 
