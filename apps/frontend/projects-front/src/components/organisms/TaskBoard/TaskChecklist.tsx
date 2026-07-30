@@ -12,7 +12,16 @@ import { TASK_INITIAL_STATE } from '@/lib/action-state';
 export interface TaskChecklistProps {
   projectId: string;
   task: Task;
+  /** Añadir y borrar pasos: `canEditTask`. Es definir la tarea. */
   canEdit: boolean;
+  /**
+   * Marcar y desmarcar: `canMoveTask`. Es ejecutarla.
+   *
+   * Quien puede arrastrar la tarjeta a «Hecho» tiene que poder ir marcando los
+   * pasos por el camino; con `canEditTask` para todo, esa persona se quedaba con
+   * un checklist de solo lectura sobre su propia tarea.
+   */
+  canToggle: boolean;
 }
 
 /**
@@ -27,7 +36,7 @@ export interface TaskChecklistProps {
  * `pending` de cada uno es suyo: con una sola acción compartida, marcar un ítem
  * dejaba en estado de espera a toda la lista.
  */
-export function TaskChecklist({ projectId, task, canEdit }: TaskChecklistProps) {
+export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskChecklistProps) {
   const { done, total } = checklistProgress(task);
   const [addState, addAction, adding] = useActionState(
     addChecklistItemAction,
@@ -87,6 +96,7 @@ export function TaskChecklist({ projectId, task, canEdit }: TaskChecklistProps) 
               text={item.text}
               completed={item.completed}
               canEdit={canEdit}
+              canToggle={canToggle}
             />
           ))}
         </ul>
@@ -134,6 +144,7 @@ function ChecklistRow({
   text,
   completed,
   canEdit,
+  canToggle,
 }: {
   projectId: string;
   taskId: string;
@@ -141,6 +152,7 @@ function ChecklistRow({
   text: string;
   completed: boolean;
   canEdit: boolean;
+  canToggle: boolean;
 }) {
   const [toggleState, toggleAction, toggling] = useActionState(
     toggleChecklistItemAction,
@@ -165,14 +177,14 @@ function ChecklistRow({
          */}
         <button
           type="submit"
-          disabled={!canEdit || toggling}
+          disabled={!canToggle || toggling}
           aria-pressed={completed}
           aria-label={completed ? `Desmarcar «${text}»` : `Marcar «${text}»`}
           className="flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed"
           style={{
             borderColor: completed ? colors.success : colors.border,
             background: completed ? alpha(colors.success, 25) : 'transparent',
-            cursor: canEdit && !toggling ? 'pointer' : undefined,
+            cursor: canToggle && !toggling ? 'pointer' : undefined,
           }}
         >
           {completed && (

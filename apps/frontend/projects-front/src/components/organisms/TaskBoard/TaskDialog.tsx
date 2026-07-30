@@ -40,6 +40,8 @@ export interface TaskDialogProps {
   /** Para poner cara a los autores de los comentarios. */
   usersById: Map<string, UserProfile>;
   currentUserId: string;
+  /** Marcar pasos del checklist: `canMoveTask`, no `canEditTask`. */
+  canToggleChecklist: boolean;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -69,6 +71,7 @@ export function TaskDialog({
   labels,
   usersById,
   currentUserId,
+  canToggleChecklist,
   canEdit,
   canDelete,
 }: TaskDialogProps) {
@@ -256,7 +259,12 @@ export function TaskDialog({
 
       {/* Fuera del formulario: cada ítem tiene su propia acción y un <form>
           dentro de otro no es HTML válido. */}
-      <TaskChecklist projectId={projectId} task={task} canEdit={canEdit} />
+      <TaskChecklist
+        projectId={projectId}
+        task={task}
+        canEdit={canEdit}
+        canToggle={canToggleChecklist}
+      />
       <TaskAttachments
         projectId={projectId}
         taskId={task.id}

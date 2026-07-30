@@ -1,7 +1,7 @@
 'use client';
 
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
-import { alpha, colors } from '@praxis/commons';
+import { DONE_COLUMN_COLOR, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { createTaskAction } from '@/app/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
@@ -66,6 +66,9 @@ export function ColumnTasks({
   );
   const [isOver, setIsOver] = useState(false);
 
+  /** Columna de cierre: lo que hay dentro está entregado. Ver `DONE_COLUMN_COLOR`. */
+  const isDoneColumn = column.color === DONE_COLUMN_COLOR;
+
   /**
    * El diálogo abierto se reengancha a la tarea recién revalidada.
    *
@@ -122,6 +125,7 @@ export function ColumnTasks({
               usersById={usersById}
               onOpen={() => setOpenTask(task)}
               canEdit={canEdit}
+              isDone={isDoneColumn}
               draggable={canMove}
               isDragging={draggingTaskId === task.id}
               onDragStart={() => onDragTask(task.id)}
@@ -156,6 +160,8 @@ export function ColumnTasks({
           labels={labels}
           usersById={usersById}
           currentUserId={currentUserId}
+          /* Marcar pasos va con mover: las dos son ejecutar la tarea. */
+          canToggleChecklist={canMove}
           canEdit={canEdit}
           canDelete={canDelete}
         />

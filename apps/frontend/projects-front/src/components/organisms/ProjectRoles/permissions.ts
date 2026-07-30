@@ -10,7 +10,7 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canEditColumn: 'Editar columnas',
   canDeleteColumn: 'Eliminar columnas',
   canCreateTask: 'Crear tareas',
-  canMoveTask: 'Mover tareas de columna',
+  canMoveTask: 'Mover tareas y marcar pasos del checklist',
   canEditTask: 'Editar tareas',
   canDeleteTask: 'Eliminar tareas',
   canManageMembers: 'Gestionar el equipo',
@@ -19,13 +19,13 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
 
 /** Agrupados como los piensa quien reparte permisos, no como los guarda la BD. */
 export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[] }[] = [
-  { title: 'Acceso', permissions: ['canViewProject'] },
+  /* Mover y marcar pasos van con «ver»: son lo que necesita quien ejecuta el
+     trabajo, no quien lo define. Puestos con crear/editar/eliminar parecían un
+     escalón del mismo eje, y no lo son. */
+  { title: 'Acceso y ejecución', permissions: ['canViewProject', 'canMoveTask'] },
   { title: 'Tableros', permissions: ['canCreateBoard', 'canEditBoard', 'canDeleteBoard'] },
   { title: 'Columnas', permissions: ['canCreateColumn', 'canEditColumn', 'canDeleteColumn'] },
-  {
-    title: 'Tareas',
-    permissions: ['canCreateTask', 'canMoveTask', 'canEditTask', 'canDeleteTask'],
-  },
+  { title: 'Tareas', permissions: ['canCreateTask', 'canEditTask', 'canDeleteTask'] },
   { title: 'Administración', permissions: ['canManageMembers', 'canManageRoles'] },
 ];
 

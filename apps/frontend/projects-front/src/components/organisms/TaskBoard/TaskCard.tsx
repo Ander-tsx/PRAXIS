@@ -19,6 +19,14 @@ export interface TaskCardProps {
   onOpen: () => void;
   /** Solo cambia cómo se nombra el botón: el diálogo decide qué deja tocar. */
   canEdit: boolean;
+  /**
+   * La tarea está en una columna de cierre (verde).
+   *
+   * Cambia lo que la tarjeta cuenta: una tarea entregada **no vence**. Seguir
+   * enseñándole «venció hace 2 d» a algo ya terminado es la contradicción que
+   * hacía desconfiar del tablero entero.
+   */
+  isDone: boolean;
   draggable: boolean;
   isDragging: boolean;
   onDragStart: () => void;
@@ -66,6 +74,7 @@ export function TaskCard({
   usersById,
   onOpen,
   canEdit,
+  isDone,
   draggable,
   isDragging,
   onDragStart,
@@ -168,14 +177,27 @@ export function TaskCard({
       )}
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <Chip color={priorityColor}>{PRIORITY_LABELS[task.priority]}</Chip>
-
-        {task.dueDate && due !== 'later' && (
-          <Chip color={due === 'overdue' ? colors.error : colors.warning}>
-            {due === 'overdue' ? 'Venció ' : 'Vence '}
-            {formatDue(task.dueDate)}
-          </Chip>
+        {/**
+         * Entregada: la píldora verde sustituye a la de vencimiento, no se suma.
+         * Con las dos juntas la tarjeta diría «completado» y «venció hace 2 d» a
+         * la vez, que es exactamente la confusión que esto viene a quitar.
+         *
+         * Se decide por el **color de la columna**, no por su nombre, así que
+         * funciona con varias columnas de cierre y con cualquier nombre.
+         */}
+        {isDone ? (
+          <Chip color={colors.success}>Completada</Chip>
+        ) : (
+          task.dueDate &&
+          due !== 'later' && (
+            <Chip color={due === 'overdue' ? colors.error : colors.warning}>
+              {due === 'overdue' ? 'Venció ' : 'Vence '}
+              {formatDue(task.dueDate)}
+            </Chip>
+          )
         )}
+
+        <Chip color={priorityColor}>{PRIORITY_LABELS[task.priority]}</Chip>
 
         {total > 0 && (
           <Chip color={done === total ? colors.success : colors.textSecondary}>
