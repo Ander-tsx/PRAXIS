@@ -289,6 +289,7 @@ backend define plantillas, habrá dos fuentes de verdad.
 | `DELETE /projects/:id` | `canDeleteBoard` | `canDeleteProject` (no existe) | ❌ abierto |
 | `PATCH /boards/:id/columns/:id` | `canEditColumn` | — | ✅ `667c1cb` |
 | `PATCH /boards/:id/columns/reorder` | `canCreateColumn` | `canEditColumn` | ❌ abierto |
+| `POST /tasks/:id/move` | ~~`canEditTask`~~ → `canMoveTask` | — | ✅ `7cab9a2` |
 
 **`canEditColumn` ya lo usa un endpoint.** Estaba en el enum desde `477616f` sin
 que nadie lo pidiera; el `PATCH` de columna que se añadió en `667c1cb` —renombrar
@@ -297,6 +298,12 @@ y recolorear— es su primer uso.
 Queda abierto el `reorder`, que sigue pidiendo `canCreateColumn`: quien puede
 crear columnas puede reordenarlas aunque no debiera poder editarlas. Mover una
 columna de sitio se parece más a editarla que a crearla.
+
+**Mover una tarea ya no exige poder editarla.** `canMoveTask` es nuevo en el
+enum (`7cab9a2`) y lo pide la ruta de mover; `canEditTask` lo implica por
+jerarquía, así que ningún rol existente perdió nada. Era el caso más molesto de
+esta familia: para arrastrar una tarjeta a «Hecho» había que poder reescribir la
+tarea entera.
 
 Y `canDeleteProject` sigue sin existir: borrar un proyecto entero exige
 `canDeleteBoard`, un permiso de otra cosa y de menor alcance.

@@ -1117,3 +1117,90 @@ Verificado con el rol «Colaborador» (`canEditColumn` sí, `canDeleteColumn` no
 ve color y renombrar, no ve eliminar, ve «Nueva columna» y las flechas de
 reordenar, y no ve «Nuevo tablero». Con el permiso quitado del rol, el `PATCH`
 responde 403.
+
+---
+
+## 20. Segunda pasada: permisos, cierre y avisos
+
+### 20.1 `canMoveTask` — mover no es editar
+
+Arrastrar una tarjeta a «Hecho» exigía `canEditTask`, el mismo permiso que deja
+reescribir el título, cambiar la prioridad y reasignar a quien sea. Quien ejecuta
+el trabajo tenía que poder redefinirlo para poder declararlo terminado.
+
+`canMoveTask` entra en el enum y lo pide `POST /tasks/:id/move`. La jerarquía
+`canEditTask → canMoveTask` hace el cambio **retrocompatible**: ningún rol
+existente pierde capacidad.
+
+Queda una puerta abierta a propósito: `PATCH /tasks/:id` también acepta
+`columnId` y `status` y sigue pidiendo `canEditTask`. No es un agujero —editar
+implica mover— pero conviene saber que el permiso describe la ruta, no el campo.
+
+| Acción | Permiso |
+|---|---|
+| Crear tarea | `canCreateTask` |
+| Arrastrar entre columnas | `canMoveTask` |
+| Editar contenido, etiquetas, encargados, comentar | `canEditTask` |
+| Eliminar, moderar comentarios y adjuntos ajenos | `canDeleteTask` |
+
+### 20.2 La columna verde cierra la tarea
+
+Una tarea en la columna «Finalizado» seguía contando como pendiente en el panel,
+y no había forma de arreglarlo desde fuera: `Task.status` guarda el **nombre** de
+la columna, que cada proyecto elige («Hecho», «Finalizado», «Cerrado», «Done»),
+así que nada permitía saber cuál termina el trabajo.
+
+El verde pasa a significarlo (`DONE_COLUMN_COLOR`) y `GET /me/tasks` acepta
+`excludeDone=true`.
+
+⚠️ **Es color y significado a la vez, y se eligió a sabiendas.** La alternativa
+limpia es un campo `isFinal` con el color en decoración; el coste de esto es que
+no se puede tener una columna verde que no cierre ni una de cierre de otro color.
+A cambio no hay estado oculto y la regla entera cabe en una frase, que además se
+dice **en el selector de color**: un color que cambia el comportamiento y no lo
+anuncia donde se elige es una trampa, y la documentación no la desactiva.
+
+El filtro vive en el **gateway**, tercer caso del mismo patrón (con
+`TaskPurgeService` y `ColumnStatusSyncService`): la tarea guarda `columnId` pero
+las columnas están en projects-service. Si projects-service falla, devuelve las
+tareas **sin filtrar** — enseñar de más en un aviso es mejor que quedarse sin
+panel.
+
+### 20.3 El aviso lleva a la tarea, no a la puerta del proyecto
+
+El enlace de un aviso apuntaba a `/projects/:id`, y la página abre siempre el
+primer espacio: una tarea del tercer espacio te dejaba en el primero, a buscarla
+a ojo.
+
+Ahora el enlace lleva `?board=` y `?task=`. **El panel no puede resolver el
+espacio** —solo conoce el `boardId` de la tarea, y el árbol del proyecto lo tiene
+la otra zona—, así que manda el tablero y la página de proyecto decide:
+
+| Parámetro | Quién lo pone | Para qué |
+|---|---|---|
+| `?ws=` | el selector de espacios | espacio elegido a mano; gana sobre los demás |
+| `?board=` | un aviso del panel | la página busca qué espacio contiene ese tablero |
+| `?task=` | un aviso del panel | `ColumnTasks` abre el diálogo en el primer render |
+
+La tarea se abre en el estado inicial de `useState`, no en un `useEffect`: así no
+se ve el tablero un instante antes de que el diálogo salte encima.
+
+### 20.4 Los avisos del panel, sin la franja de color
+
+Invitaciones, vencidas y por vencer eran tres rectángulos teñidos con un
+`inset 3px 0 0` a la izquierda —una barra dura que competía con el contenido sin
+añadir nada al color de fondo—. Los tres comparten ahora `NoticePanel`
+(`dashboard-front/src/components/molecules/`): disco con el icono del asunto,
+número grande a la derecha **solo si hay más de uno** (con una sola, el título ya
+lo dice) y un tinte en diagonal desde la esquina en lugar de fondo plano. El
+borde es el de las tarjetas de proyecto, para que el panel se lea como una pieza.
+
+Y las tarjetas de «Mis proyectos» son enlaces: la pantalla que nombra tus
+proyectos era justo la que no dejaba abrirlos.
+
+### 20.5 El icono de la tarjeta es un ojo
+
+Era un engranaje, y un engranaje promete ajustes. Para quien no tiene
+`canEditTask` el diálogo es lo contrario: seis campos desactivados que solo se
+leen. El ojo describe lo único que el botón garantiza —abrir y ver— y el texto
+accesible distingue los dos casos.

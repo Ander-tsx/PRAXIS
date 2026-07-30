@@ -171,14 +171,30 @@ Column = { id, name, order, color, boardId }
 ### Color: token del sistema, y de la columna
 
 `color` es un token del design system, igual que en las etiquetas:
-`primary` · `accent` · `info` · `success` · `warning` · `error`. Un hex da 400
+`primary` · `accent` · `info` · `warning` · `error` · `success`. Un hex da 400
 con la lista de válidos.
 
 Si no se manda al crear, el backend lo reparte **por posición**, rotando entre
-los cinco primeros (`error` queda fuera del reparto: un rojo por defecto se lee
-como una alarma). A partir de ahí el color es de la columna y **viaja con ella al
-reordenarla** — antes lo elegía la interfaz por índice y moverla le cambiaba el
-color.
+los cuatro primeros. Verde y rojo quedan fuera del reparto: el rojo se lee como
+una alarma y el verde **significa algo** (ver abajo). A partir de ahí el color es
+de la columna y **viaja con ella al reordenarla** — antes lo elegía la interfaz
+por índice y moverla le cambiaba el color.
+
+### 🟢 El verde es la columna de cierre
+
+`success` no es solo un color: marca la columna donde el trabajo termina. Las
+tareas que están ahí **dejan de contar como pendientes** en
+`GET /me/tasks?excludeDone=true`.
+
+Hacía falta porque el `status` de una tarea es el **nombre** de su columna, y ese
+nombre lo elige cada proyecto —«Hecho», «Finalizado», «Cerrado», «Done»—, así que
+no había forma de saber cuál termina el trabajo: una tarea acabada seguía
+contando como pendiente.
+
+⚠️ Es color y significado a la vez, decidido a sabiendas. No se puede tener una
+columna verde que no cierre ni una de cierre de otro color. La alternativa limpia
+es un campo `isFinal` aparte; el día que haga falta, es una columna más en la
+tabla. **Si lo enseñas en una interfaz, dilo donde se elige el color.**
 
 ### ⚠️ Renombrar arrastra el `status` de las tareas
 
@@ -243,7 +259,7 @@ quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
 
 ```ts
 {
-  canCreateTask?, canEditTask?, canDeleteTask?,
+  canCreateTask?, canMoveTask?, canEditTask?, canDeleteTask?,
   canCreateBoard?, canEditBoard?, canDeleteBoard?,
   canCreateColumn?, canDeleteColumn?,
   canManageMembers?, canManageRoles?
@@ -287,8 +303,8 @@ Al evaluar, el backend expande los permisos hacia abajo
 | `canEditBoard` | `canCreateBoard` |
 | `canDeleteColumn` | `canEditColumn`, `canCreateColumn` |
 | `canEditColumn` | `canCreateColumn` |
-| `canDeleteTask` | `canEditTask`, `canCreateTask` |
-| `canEditTask` | `canCreateTask` |
+| `canDeleteTask` | `canEditTask`, `canMoveTask`, `canCreateTask` |
+| `canEditTask` | `canMoveTask`, `canCreateTask` |
 
 `canManageMembers` y `canManageRoles` no arrastran nada.
 
@@ -316,11 +332,24 @@ consistente; tenlo en cuenta si algo parece no aplicarse.
 | GET | `/boards/:boardId/tasks?columnId&page&limit` | — ✅ query params | `canViewProject` |
 | GET | `/tasks/:id` | — | `canViewProject` |
 | PATCH | `/tasks/:id` | `{ title?, description?, status?, columnId?, assigneeIds?, priority?, dueDate? }` | `canEditTask` |
-| POST | `/tasks/:id/move` | `{ columnId, status?, order? }` | `canEditTask` |
+| POST | `/tasks/:id/move` | `{ columnId, status?, order? }` | `canMoveTask` ⚠️ |
 | POST | `/tasks/:id/assign` | `{ assigneeIds }` | `canEditTask` |
 | DELETE | `/tasks/:id` | — | `canDeleteTask` |
 
 ⚠️ **Ninguna lleva `projectId`.** Lo resuelve el guard desde la ruta; mandarlo da 400.
+
+### Mover no es editar
+
+`POST /tasks/:id/move` es el único endpoint que pide **`canMoveTask`**. Existe
+porque arrastrar una tarjeta a «Hecho» exigía `canEditTask`, que también deja
+reescribir el título, cambiar la prioridad y reasignar a quien sea: quien ejecuta
+el trabajo no podía decir que lo terminó sin poder redefinir en qué consistía.
+
+La jerarquía dice `canEditTask → canMoveTask`, así que ningún rol pierde nada.
+
+⚠️ `PATCH /tasks/:id` **también** acepta `columnId` y `status`, y sigue exigiendo
+`canEditTask`. No es un agujero —quien edita puede mover por definición—, pero si
+lo que quieres es solo mover, usa la ruta de mover.
 
 ### Encargados: `assigneeIds`, no `assigneeId`
 
@@ -512,14 +541,21 @@ usuario sale del token.
 | `status` | Nombre de la columna. Para dejar fuera lo terminado |
 | `priority` | `LOW` · `MEDIUM` · `HIGH` · `URGENT` |
 | `projectId` | Acota a un proyecto |
+| `excludeDone` | `true` deja fuera las tareas que están en una **columna verde** (de cierre) |
 | `limit` | Por defecto 50, máximo 100 |
 
 Orden: lo que vence antes primero, y a igualdad de fecha lo más urgente.
 
 **Para los avisos del panel, una sola petición basta.** Pide
-`?dueBefore=<hoy+7d>` y separa en cliente comparando con ahora: lo anterior es
-**vencido** y lo posterior **vence pronto**. Son dos avisos distintos y no se
-mezclan en un contador único.
+`?dueBefore=<hoy+7d>&excludeDone=true` y separa en cliente comparando con ahora:
+lo anterior es **vencido** y lo posterior **vence pronto**. Son dos avisos
+distintos y no se mezclan en un contador único.
+
+⚠️ `excludeDone` filtra **después** de aplicar `limit`, porque para saber qué
+columnas excluir hay que conocer las de las tareas que ya salieron. Puede
+devolver menos de lo pedido. Y si projects-service no responde, devuelve las
+tareas **sin filtrar** en vez de fallar: enseñar de más en un aviso es mejor que
+quedarse sin panel.
 
 ⚠️ Solo trae tareas de proyectos donde **sigues estando**. Salir de un proyecto
 no borra tus asignaciones —las filas siguen en la base—, pero dejan de salir
