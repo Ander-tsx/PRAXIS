@@ -130,12 +130,12 @@ export function TaskCard({
         .join(' ')}
       style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
     >
+      {/* Aquí había un punto de color por prioridad, a la izquierda del título.
+          Se fue porque **toda** tarea tiene prioridad: el punto no marcaba las
+          urgentes, pintaba las cuatro familias a la vez y una columna llena se
+          leía como un arcoíris sin jerarquía. La prioridad no se pierde — sigue
+          abajo, en su chip, escrita con palabras y con el mismo color. */}
       <div className="flex items-start gap-2">
-        <span
-          className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{ background: priorityColor }}
-          aria-hidden="true"
-        />
         <h6 className="min-w-0 flex-1 font-sans text-sm leading-snug text-text-primary">
           {task.title}
         </h6>
