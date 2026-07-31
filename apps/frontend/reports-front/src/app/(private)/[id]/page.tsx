@@ -38,9 +38,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params;
   try {
     const project = await createServerApiClient().get<ProjectDetail>(`/projects/${id}`);
-    return { title: `Reportes · ${project.name}` };
+    return { title: `${project.name}` };
   } catch {
-    return { title: 'Reportes' };
+    return { title: 'Análisis' };
   }
 }
 
@@ -86,7 +86,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   const effective = await api.get<EffectivePermissions>(`/projects/${id}/permissions/me`);
   if (!effective.permissions.canViewReports) {
     return (
-      <AppHeader title={`Reportes · ${project.name}`}>
+      <AppHeader title={`${project.name}`}>
         <NoReportsAccess projectName={project.name} />
       </AppHeader>
     );
@@ -148,7 +148,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       : null;
 
   return (
-    <AppHeader title={`Reportes · ${project.name}`}>
+    <AppHeader title={`${project.name}`}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -524,9 +524,8 @@ export default async function ProjectReportsPage({ params }: PageProps) {
                           {persona.cerradas}
                         </td>
                         <td
-                          className={`py-3 font-sans text-sm tabular-nums ${
-                            persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
-                          }`}
+                          className={`py-3 font-sans text-sm tabular-nums ${persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
+                            }`}
                         >
                           {persona.vencidas}
                         </td>
