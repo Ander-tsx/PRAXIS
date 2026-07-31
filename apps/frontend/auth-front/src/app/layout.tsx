@@ -1,3 +1,4 @@
+import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 import { Inter, Lora } from 'next/font/google';
 import './globals.css';
@@ -29,13 +30,20 @@ export const metadata: Metadata = {
   description: 'Inicia sesión o crea tu cuenta en PRAXIS.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getTheme();
+
   return (
-    <html lang="es" className={`${inter.variable} ${lora.variable}`} suppressHydrationWarning>
+    <html
+      lang="es"
+      data-theme={theme}
+      className={`${inter.variable} ${lora.variable}`}
+      suppressHydrationWarning
+    >
       <body>{children}</body>
     </html>
   );

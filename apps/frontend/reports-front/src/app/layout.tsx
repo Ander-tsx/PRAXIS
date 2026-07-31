@@ -1,3 +1,4 @@
+import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 import { Inter, Lora } from 'next/font/google';
 import './globals.css';
@@ -30,13 +31,15 @@ export const metadata: Metadata = {
   description: 'Cómo fluye el trabajo, cuánto tarda y qué cabe esperar.',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getTheme();
+
   return (
-    <html lang="es" className={`${inter.variable} ${lora.variable} h-full`}>
+    <html lang="es" data-theme={theme} className={`${inter.variable} ${lora.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );

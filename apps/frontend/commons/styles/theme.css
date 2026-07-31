@@ -89,6 +89,68 @@
   --radius-full: 9999px;
 }
 
+/* ============================================================
+   TEMA CLARO — mismas variables, otro valor.
+
+   El bloque `@theme` de arriba es el default (oscuro): sin `data-theme` en el
+   `<html>`, la app se ve exactamente igual que antes de que existiera esto.
+   Cada zona estampa `data-theme="light"` en el servidor —desde una cookie,
+   nunca desde `localStorage` a secas— para que no haya parpadeo al navegar
+   entre zonas ni al recargar.
+
+   `:root[data-theme='light']` no vive dentro de `@theme` a propósito: ese
+   bloque es sintaxis especial de Tailwind v4 para *declarar* tokens y generar
+   utilidades a partir de ellos, no para condicionarlos. Redefinir las mismas
+   variables en un selector normal, con más especificidad que el `:root` que
+   `@theme` genera, es lo que permite que las utilidades (`bg-background`,
+   `text-primary`, …) seleccionen el valor nuevo sin regenerar nada.
+
+   `--color-overlay` y los cuatro estados (`success/warning/error/info`) se
+   oscurecen un poco respecto al tema oscuro: ahí funcionan como sombra o como
+   texto sobre blanco, y el mismo tono pastel que se lee bien sobre
+   `#0d0f14` pierde casi todo el contraste sobre una superficie clara.
+   ============================================================ */
+:root[data-theme='light'] {
+  /* ── FONDOS ─────────────────────────────────────────────── */
+  --color-background: #f3f4f9;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #eceef5;
+  --color-overlay: #0d0f14;
+
+  /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
+  --color-primary: #5b52e0;
+  --color-primary-hover: #4740bd;
+  --color-primary-muted: rgba(91, 82, 224, 0.1);
+  --color-primary-foreground: #ffffff;
+
+  /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
+  --color-accent: #93670f;
+  --color-accent-hover: #7a560c;
+  --color-accent-muted: rgba(147, 103, 15, 0.1);
+  --color-accent-foreground: #ffffff;
+
+  /* ── TEXTO ───────────────────────────────────────────────── */
+  --color-text-primary: #171922;
+  --color-text-secondary: #565c72;
+  --color-text-disabled: #a4a9ba;
+  --color-text-inverse: #ffffff;
+
+  /* ── BORDES ─────────────────────────────────────────────── */
+  --color-border: #dde1ea;
+  --color-border-subtle: #eceef3;
+  --color-border-strong: #c3c9d9;
+
+  /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
+  --color-success: #15803d;
+  --color-success-muted: rgba(21, 128, 61, 0.1);
+  --color-warning: #a16207;
+  --color-warning-muted: rgba(161, 98, 7, 0.1);
+  --color-error: #dc2626;
+  --color-error-muted: rgba(220, 38, 38, 0.1);
+  --color-info: #2563eb;
+  --color-info-muted: rgba(37, 99, 235, 0.1);
+}
+
 /* ── BASE STYLES ──────────────────────────────────────────── */
 *,
 *::before,
