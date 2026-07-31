@@ -33,6 +33,8 @@ interface ChatPayload {
 interface Briefing {
   columnas: { id: string; nombre: string; orden: number }[];
   etiquetas: { id: string; nombre: string }[];
+  /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
+  tareas?: { id: string; titulo: string; cerrada: boolean }[];
 }
 
 @Injectable()
@@ -229,10 +231,31 @@ export class AssistantService {
       const taskId = String(call.args.taskId ?? '');
       if (!taskId) return null;
 
+      /**
+       * El `taskId` se comprueba contra el inventario, que antes no existía.
+       *
+       * Mientras el id tenía que darlo la persona a mano, aquí no había con qué
+       * contrastarlo y pasaba tal cual: un id mal copiado llegaba a la tarjeta y
+       * moría en el 404 al aceptar. Ahora el contexto trae las tareas del
+       * proyecto, así que una propuesta sobre algo que no existe —o sobre una
+       * tarea de otro proyecto— se descarta antes de pintarse.
+       *
+       * Se descarta la propuesta entera y no solo el campo: sin tarea válida no
+       * queda nada que proponer, al revés que con una etiqueta inventada.
+       */
+      const tarea = briefing.tareas?.find((t) => t.id === taskId);
+      if (briefing.tareas && !tarea) {
+        this.log.warn(`El modelo propuso asignar ${taskId}, que no esta en el proyecto`);
+        return null;
+      }
+
       return {
         tool: call.name,
         args: {
           taskId,
+          /* El título viaja con la propuesta para que la tarjeta pueda decir
+             sobre qué tarea es sin ir a buscarla. */
+          ...(tarea ? { taskTitle: tarea.titulo } : {}),
           assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },

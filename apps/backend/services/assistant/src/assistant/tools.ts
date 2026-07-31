@@ -102,14 +102,17 @@ const PROPONER_ASIGNACION: FunctionDeclaration = {
   name: 'proponer_asignacion',
   description:
     'Prepara una propuesta para cambiar quien lleva una tarea que YA existe. NO la ' +
-    'cambia: la persona tiene que aceptarla. Solo si te dan el id de la tarea; si no ' +
-    'lo tienes, pidelo en vez de adivinarlo.',
+    'cambia: la persona tiene que aceptarla. Busca la tarea en "tareas" del ' +
+    'contexto por su titulo. Puedes llamarla VARIAS VECES en la misma respuesta si ' +
+    'hay que repartir varias tareas: una llamada por tarea.',
   parameters: {
     type: 'OBJECT',
     properties: {
       taskId: {
         type: 'STRING',
-        description: 'id de la tarea. Tiene que darlo la persona: no esta en el contexto.',
+        description:
+          'id de una tarea de "tareas" del contexto. Nunca lo inventes ni lo ' +
+          'construyas: si no encuentras la tarea en esa lista, dilo y no llames.',
       },
       assigneeIds: {
         type: 'ARRAY',

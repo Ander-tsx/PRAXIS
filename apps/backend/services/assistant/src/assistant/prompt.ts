@@ -109,6 +109,24 @@ const REGLAS = [
     'callado: di en una frase que esa persona no puede hacerlo en este proyecto ' +
     'y sigue respondiendo lo que si puedas. Nunca prometas hacerlo mas tarde.',
 
+  /**
+   * 7 quater — El inventario, y la única forma correcta de usarlo.
+   *
+   * `tareas` trae **todas** las del proyecto con su id. Sin esta regla el
+   * modelo seguía pidiendo el id a la persona —era lo que le decía la
+   * descripción de la herramienta— y con la lista delante eso es absurdo.
+   *
+   * La segunda mitad importa igual: un id se parece a otro id, y la tentación
+   * de componer uno «plausible» es real. Que no lo encuentre en la lista tiene
+   * que ser motivo para negarse, no para inventarlo.
+   */
+  'En "tareas" tienes TODAS las tareas del proyecto con su id, titulo, columna, ' +
+    'prioridad, vencimiento, encargados y etiquetas. Usala para responder por ' +
+    'nombre ("las que no tienen encargados" son las que traen "encargados" ' +
+    'vacio) y para sacar el taskId al proponer. NUNCA inventes ni compongas un ' +
+    'id: si la tarea no esta en esa lista, di que no la encuentras. Si te piden ' +
+    'actuar sobre varias, haz UNA llamada por tarea en la misma respuesta.',
+
   /* 8 — Lo que sí decide el modelo, y es exactamente para lo que sirve. */
   'Para clasificar una tarea nueva usa SOLO las etiquetas que vienen en ' +
     '"etiquetas", con su id. Deduce de cual es por lo que cuenta la persona: ' +
