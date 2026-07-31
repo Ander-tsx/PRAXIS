@@ -149,13 +149,13 @@ export function AssistantChat({
               className="inline-flex items-center gap-1 uppercase"
               style={{
                 borderRadius: 4,
-                background: colors.accent,
-                color: colors.accentForeground,
+                background: alpha(colors.accent, 15),
+                border: `1px solid ${alpha(colors.accent, 40)}`,
+                color: colors.accent,
                 fontWeight: 700,
               }}
             >
-
-              AI Powered
+              AI
             </Badge>
           </div>
           <p className="font-sans text-sm text-text-secondary">
