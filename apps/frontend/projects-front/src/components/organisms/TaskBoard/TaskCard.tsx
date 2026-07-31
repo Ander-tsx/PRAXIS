@@ -2,8 +2,8 @@
 
 import {
   Avatar,
+  PRIORITY_COLORS,
   PRIORITY_LABELS,
-  type Priority,
   type Task,
   type UserProfile,
   alpha,
@@ -40,14 +40,6 @@ export interface TaskCardProps {
   onDragStart: () => void;
   onDragEnd: () => void;
 }
-
-/** Un color por prioridad. Urgente y alta comparten familia, para que se lean juntas. */
-const PRIORITY_COLORS: Record<Priority, string> = {
-  LOW: colors.textDisabled,
-  MEDIUM: colors.info,
-  HIGH: colors.warning,
-  URGENT: colors.error,
-};
 
 /**
  * Una tarea dentro de su columna.

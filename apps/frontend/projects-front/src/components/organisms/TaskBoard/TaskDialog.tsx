@@ -6,6 +6,7 @@ import {
   Input,
   type Label as LabelType,
   PRIORITIES,
+  PRIORITY_COLORS,
   PRIORITY_LABELS,
   Select,
   type Task,
@@ -197,9 +198,12 @@ export function TaskDialog({
             label="Prioridad"
             defaultValue={task.priority}
             disabled={readOnly}
+            /* Con el color delante, «Urgente» no hay que leerlo: se reconoce
+               por el mismo rojo que lleva su chip en la tarjeta. */
             options={PRIORITIES.map((priority) => ({
               value: priority,
               label: PRIORITY_LABELS[priority],
+              color: PRIORITY_COLORS[priority],
             }))}
           />
 

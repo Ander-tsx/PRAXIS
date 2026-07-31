@@ -181,7 +181,7 @@ export function InviteMemberDialog({ projectId, roles, candidates }: InviteMembe
             name="projectRoleId"
             label="Rol con el que entrará"
             value={roleId}
-            onChange={(event) => setRoleId(event.target.value)}
+            onValueChange={setRoleId}
             options={roles.map((role) => ({ value: role.id, label: role.name }))}
             message="Decide lo que podrá hacer dentro del proyecto."
             fullWidth
