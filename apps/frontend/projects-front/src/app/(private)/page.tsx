@@ -1,5 +1,6 @@
 import {
   AppHeader,
+  Pagination,
   type Paginated,
   type Project,
 } from '@praxis/commons';
@@ -14,8 +15,19 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
+
+/**
+ * Cuántos proyectos por página.
+ *
+ * ⚠️ **Antes se pedía sin `limit` y no era gratis.** El backend cae a 20 por
+ * defecto, así que con 21 proyectos el último no se veía y no había forma de
+ * llegar a él: no era una precaución para el futuro, era una lista truncada en
+ * silencio. Se manda explícito para que el número esté a la vista de quien lea
+ * esto y no escondido en un `?? 20` de otro repositorio.
+ */
+const POR_PAGINA = 12;
 
 /**
  * Lista de proyectos.
@@ -27,14 +39,31 @@ interface PageProps {
  * ⚠️ En Next 16 `searchParams` es una promesa y hay que esperarla.
  */
 export default async function ProjectsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
   const search = q?.trim() ?? '';
-  const page = await api.get<Paginated<Project>>(
-    search ? `/projects?search=${encodeURIComponent(search)}` : '/projects',
-  );
+  /* Un `?page=abc` o `?page=-1` escrito a mano cae a la primera en vez de
+     llegar al backend y dar un 400 sobre una pantalla en blanco. */
+  const pagina = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1);
+
+  const params = new URLSearchParams({
+    page: String(pagina),
+    limit: String(POR_PAGINA),
+  });
+  if (search) params.set('search', search);
+
+  const page = await api.get<Paginated<Project>>(`/projects?${params}`);
+
+  /** El `href` de cada salto, conservando la búsqueda. Perderla es el fallo clásico. */
+  const hrefDePagina = (n: number) => {
+    const otros = new URLSearchParams();
+    if (search) otros.set('q', search);
+    if (n > 1) otros.set('page', String(n));
+    const cadena = otros.toString();
+    return cadena ? `/projects?${cadena}` : '/projects';
+  };
 
   return (
     <AppHeader title="Proyectos" headerSlot={<CreateProjectDialog />}>
@@ -49,12 +78,21 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         {page.items.length === 0 && !search ? (
           <ProjectsEmptyState action={<CreateProjectDialog triggerLabel="Crear mi primer proyecto" triggerSize="lg" />} />
         ) : (
-          <ProjectGrid
-            projects={page.items}
-            total={page.total}
-            currentUserId={userId}
-            search={search}
-          />
+          <>
+            <ProjectGrid
+              projects={page.items}
+              total={page.total}
+              currentUserId={userId}
+              search={search}
+            />
+            <Pagination
+              page={pagina}
+              limit={POR_PAGINA}
+              total={page.total}
+              hrefFor={hrefDePagina}
+              nombre="proyectos"
+            />
+          </>
         )}
       </div>
     </AppHeader>
