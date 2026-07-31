@@ -25,7 +25,7 @@ const lora = Lora({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Reportes | Praxis',
+    default: 'Análisis | Praxis',
     template: '%s | Praxis',
   },
   description: 'Cómo fluye el trabajo, cuánto tarda y qué cabe esperar.',
