@@ -225,4 +225,19 @@ export class TasksController {
   statsExperience(@Payload() dto: { projectId: string }) {
     return this.statsService.byPersonAndLabel(dto.projectId);
   }
+
+  /** Entradas y cierres por semana, para «¿cómo estuvo la semana?». */
+  @MessagePattern({ cmd: 'task_stats_weekly' })
+  statsWeekly(@Payload() dto: { projectId: string; semanas?: number }) {
+    return this.statsService.weeklyThroughput(dto.projectId, dto.semanas);
+  }
+
+  /**
+   * Abiertas que llevan `dias` sin cambiar de columna. No hay estado
+   * «bloqueada» en el modelo: se deduce del historial.
+   */
+  @MessagePattern({ cmd: 'task_stats_stale' })
+  statsStale(@Payload() dto: { projectId: string; dias?: number; limite?: number }) {
+    return this.statsService.sinMovimiento(dto.projectId, dto.dias, dto.limite);
+  }
 }

@@ -37,6 +37,18 @@ export class ReportsController {
     return this.reports.people(dto.projectId);
   }
 
+  /** Cierres y entradas de esta semana, con la anterior al lado. */
+  @MessagePattern({ cmd: 'report_weekly' })
+  weekly(@Payload() dto: { projectId: string; weeks?: number }) {
+    return this.reports.weekly(dto.projectId, dto.weeks);
+  }
+
+  /** Abiertas que llevan `days` sin cambiar de columna. */
+  @MessagePattern({ cmd: 'report_blocked' })
+  blocked(@Payload() dto: { projectId: string; days?: number }) {
+    return this.reports.blocked(dto.projectId, dto.days);
+  }
+
   /**
    * El contexto que lee el asistente. Lo consume `assistant-service`.
    *

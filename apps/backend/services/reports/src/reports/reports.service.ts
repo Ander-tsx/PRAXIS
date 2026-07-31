@@ -235,6 +235,110 @@ export class ReportsService {
   }
 
   /**
+   * Cómo fue **la semana**, con la anterior al lado.
+   *
+   * Un número suelto —«5 cerradas»— no dice si eso está bien. La comparación es
+   * el informe entero: sin ella, quien pregunta «¿cómo estuvo la semana?» se
+   * queda igual que antes de preguntar.
+   *
+   * ⚠️ **La semana en curso está a medias.** Un lunes por la mañana la
+   * comparación con la semana pasada completa siempre sale catastrófica, así que
+   * viaja `diasTranscurridos` y el ritmo diario de las dos: quien lo lea puede
+   * comparar ritmos en vez de totales, que es lo honesto. La variación se calcula
+   * igualmente sobre los totales porque es lo que la gente espera ver, pero nunca
+   * se enseña sola.
+   *
+   * `variacion` es `null` cuando la semana pasada fue de cero: dividir entre cero
+   * daría «infinito por ciento», y «se pasó de 0 a 3» ya se dice con los totales.
+   */
+  async weekly(projectId: string, semanas = 8) {
+    return this.cached(`reports:${projectId}:weekly:${semanas}`, async () => {
+      const filas = await this.ask<{ semana: string; cerradas: number; creadas: number }[]>(
+        this.tasksClient,
+        'task_stats_weekly',
+        { projectId, semanas },
+      );
+
+      const serie = filas.map((fila) => ({
+        semana: new Date(fila.semana).toISOString().slice(0, 10),
+        cerradas: fila.cerradas,
+        creadas: fila.creadas,
+      }));
+
+      const actual = serie[serie.length - 1] ?? { semana: '', cerradas: 0, creadas: 0 };
+      const anterior = serie[serie.length - 2] ?? { semana: '', cerradas: 0, creadas: 0 };
+
+      /* Lunes = 1 … domingo = 7, como la semana de Postgres. */
+      const hoy = new Date();
+      const diasTranscurridos = ((hoy.getDay() + 6) % 7) + 1;
+
+      return {
+        semana: { ...actual, diasTranscurridos },
+        anterior,
+        variacion:
+          anterior.cerradas > 0
+            ? Math.round(((actual.cerradas - anterior.cerradas) / anterior.cerradas) * 100)
+            : null,
+        /* Ritmo por día transcurrido, que es lo que se puede comparar con una
+           semana entera sin que la comparación mienta. */
+        ritmoDiario: {
+          semana: Number((actual.cerradas / diasTranscurridos).toFixed(2)),
+          anterior: Number((anterior.cerradas / 7).toFixed(2)),
+        },
+        serie,
+      };
+    });
+  }
+
+  /**
+   * Lo que está **parado**: abiertas que llevan días sin cambiar de columna.
+   *
+   * No hay ningún estado «bloqueada» en el modelo y no se inventa uno: se
+   * deduce del historial, que es exactamente para lo que se empezó a capturar.
+   * Una tarea que lleva doce días en «En revisión» está parada aunque nadie la
+   * haya marcado.
+   *
+   * `dias` es el umbral, no un dato del dominio: siete días es una semana entera
+   * sin que se mueva, y quien pregunte otra cosa lo cambia por query.
+   *
+   * ⚠️ Las que salen con `sinHistorial: true` **no son necesariamente antiguas**:
+   * son anteriores a la captura de eventos, así que lo que se cuenta es su edad,
+   * no su parón. Se marcan para poder decirlo en vez de acusarlas de estar
+   * paradas.
+   */
+  async blocked(projectId: string, dias = 7) {
+    return this.cached(`reports:${projectId}:blocked:${dias}`, async () => {
+      const [tareas, columns] = await Promise.all([
+        this.ask<
+          {
+            taskId: string;
+            titulo: string;
+            columna: string;
+            columnId: string;
+            diasParada: number;
+            sinHistorial: boolean;
+            vencida: boolean;
+          }[]
+        >(this.tasksClient, 'task_stats_stale', { projectId, dias }),
+        this.columnas(projectId),
+      ]);
+
+      const porId = new Map(columns.map((c) => [c.id, c]));
+
+      return {
+        dias,
+        total: tareas.length,
+        /* Con el nombre actual de la columna, no con el `status` congelado en la
+           tarea: si alguien renombró la columna, el nombre viejo despistaría. */
+        tareas: tareas.map((tarea) => ({
+          ...tarea,
+          columna: porId.get(tarea.columnId)?.name ?? tarea.columna,
+        })),
+      };
+    });
+  }
+
+  /**
    * El **briefing** que ve el asistente: todo lo que necesita, y nada más.
    *
    * ### Por qué vive aquí
@@ -281,39 +385,55 @@ export class ReportsService {
    * gráficos que tiene al lado.
    */
   async briefing(projectId: string, incluirPersonas = false) {
-    const [proyecto, columnas, snapshot, cycle, forecast, people, experiencia, etiquetas] =
-      await Promise.all([
-        this.ask<{ name: string; description: string | null }>(
-          this.projectsClient,
-          'project_find_one',
-          { id: projectId },
-        ),
-        this.columnas(projectId),
-        this.snapshot(projectId),
-        this.cycleTime(projectId),
-        this.forecast(projectId),
-        /* Sin `canViewReports` ni se piden: el mismo criterio que ya usa la
-           pantalla de Reportes, que tampoco pide `/people` para descartarlo
-           luego. Lo que no se trae no se puede filtrar mal más adelante. */
-        incluirPersonas ? this.people(projectId) : Promise.resolve([]),
-        incluirPersonas
-          ? this.ask<
-              {
-                userId: string;
-                labelId: string;
-                etiqueta: string;
-                asignadas: number;
-                cerradas: number;
-                medianaHoras: number | null;
-              }[]
-            >(this.tasksClient, 'task_stats_experience', { projectId })
-          : Promise.resolve([]),
-        this.ask<{ id: string; name: string; color: string }[]>(
-          this.tasksClient,
-          'label_find_all',
-          { projectId },
-        ),
-      ]);
+    const [
+      proyecto,
+      columnas,
+      snapshot,
+      cycle,
+      forecast,
+      people,
+      experiencia,
+      etiquetas,
+      semana,
+      paradas,
+    ] = await Promise.all([
+      this.ask<{ name: string; description: string | null }>(
+        this.projectsClient,
+        'project_find_one',
+        { id: projectId },
+      ),
+      this.columnas(projectId),
+      this.snapshot(projectId),
+      this.cycleTime(projectId),
+      this.forecast(projectId),
+      /* Sin `canViewReports` ni se piden: el mismo criterio que ya usa la
+         pantalla de Reportes, que tampoco pide `/people` para descartarlo
+         luego. Lo que no se trae no se puede filtrar mal más adelante. */
+      incluirPersonas ? this.people(projectId) : Promise.resolve([]),
+      incluirPersonas
+        ? this.ask<
+            {
+              userId: string;
+              labelId: string;
+              etiqueta: string;
+              asignadas: number;
+              cerradas: number;
+              medianaHoras: number | null;
+            }[]
+          >(this.tasksClient, 'task_stats_experience', { projectId })
+        : Promise.resolve([]),
+      this.ask<{ id: string; name: string; color: string }[]>(
+        this.tasksClient,
+        'label_find_all',
+        { projectId },
+      ),
+      /* Los dos informes que contestan «¿cómo estuvo la semana?» y «¿hay algo
+         bloqueado?». Van en el briefing y además tienen ruta propia: el
+         asistente los necesita aquí, y quien construya otro cliente —la skill
+         de voz, sin ir más lejos— los necesita por HTTP. */
+      this.weekly(projectId),
+      this.blocked(projectId),
+    ]);
 
     const ordenadas = [...columnas].sort((a, b) => a.order - b.order);
 
@@ -332,6 +452,48 @@ export class ReportsService {
         orden: c.order,
       })),
       etiquetas: (etiquetas ?? []).map((l) => ({ id: l.id, nombre: l.name })),
+      /**
+       * El avance, **ya calculado aquí**.
+       *
+       * La regla de la sección es que el modelo no hace aritmética, y una
+       * división es aritmética: pedirle «35 de 62» y esperar «56 %» funciona
+       * hasta el día que no funciona, y un porcentaje mal contado sobre el
+       * trabajo de un equipo se repite en una reunión antes de que nadie lo
+       * compruebe. Se calcula donde se calculan los percentiles.
+       *
+       * Se dan **dos** medidas porque miden cosas distintas y las dos se usan:
+       * `porCierre` cuenta lo que está en una columna de cierre —lo que se ve en
+       * el tablero, y funciona desde el primer día— y `porCompletado` cuenta lo
+       * que tiene `completedAt`, que **solo existe desde que hay historial**
+       * (§25). En un proyecto viejo la segunda sale más baja, y no porque se
+       * haya avanzado menos.
+       */
+      avance: this.avance(snapshot),
+      /**
+       * La semana, con la anterior al lado y el ritmo diario de las dos.
+       *
+       * Responde «¿cómo estuvo la semana?» sin que el modelo tenga que restar
+       * fechas, que es justo lo que hace mal.
+       */
+      semana,
+      /**
+       * Lo que está parado: abiertas sin cambiar de columna en 7 días o más.
+       *
+       * Sin esto, «¿hay tareas bloqueadas?» solo se podía contestar con «no
+       * tengo ese dato», que era cierto y no servía de nada.
+       */
+      bloqueadas: {
+        umbralDias: paradas.dias,
+        total: paradas.total,
+        tareas: paradas.tareas.map((tarea) => ({
+          titulo: tarea.titulo,
+          columna: tarea.columna,
+          diasParada: tarea.diasParada,
+          vencida: tarea.vencida,
+          /* Anterior a la captura: lo que se cuenta es su edad, no su parón. */
+          sinHistorial: tarea.sinHistorial,
+        })),
+      },
       instantanea: {
         total: snapshot.total,
         cerradas: snapshot.completed,
@@ -383,6 +545,44 @@ export class ReportsService {
             medianaHoras: fila.medianaHoras,
           })),
       })),
+    };
+  }
+
+  /**
+   * El porcentaje de avance, en las dos medidas que tienen sentido.
+   *
+   * **La aritmética se hace aquí y no en el modelo.** Es una división, sí, pero
+   * es la cifra que se repite en una reunión antes de que a nadie se le ocurra
+   * comprobarla, y el mismo argumento que impide dejarle estimar duraciones vale
+   * para dejarle dividir.
+   *
+   * - `porCierre`: cuántas están en una columna **verde** (`DONE_COLUMN_COLOR`).
+   *   Es lo que se ve mirando el tablero y **funciona desde el primer día**.
+   * - `porCompletado`: cuántas tienen `completedAt`, que solo existe desde que se
+   *   captura el historial. En un proyecto anterior a la captura sale más bajo, y
+   *   no porque se haya avanzado menos.
+   *
+   * Con cero tareas el porcentaje es `null` y no `0`: un tablero vacío no está
+   * al 0 % de nada, y un cero ahí se leería como «no habéis hecho nada».
+   */
+  private avance(snapshot: {
+    total: number;
+    completed: number;
+    byColumn: { count: number; color: string | null }[];
+  }) {
+    const enCierre = snapshot.byColumn
+      .filter((columna) => columna.color === 'success')
+      .reduce((suma, columna) => suma + columna.count, 0);
+
+    const porcentaje = (parte: number) =>
+      snapshot.total > 0 ? Math.round((parte / snapshot.total) * 100) : null;
+
+    return {
+      total: snapshot.total,
+      enColumnaDeCierre: enCierre,
+      conFechaDeCierre: snapshot.completed,
+      porCierre: porcentaje(enCierre),
+      porCompletado: porcentaje(snapshot.completed),
     };
   }
 

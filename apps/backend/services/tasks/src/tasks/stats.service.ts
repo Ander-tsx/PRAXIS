@@ -208,6 +208,112 @@ export class StatsService {
   }
 
   /**
+   * Cuánto entró y cuánto se cerró **cada semana**.
+   *
+   * Es lo que hace falta para responder «¿cómo estuvo la semana?», que no se
+   * puede sacar del flujo acumulado: aquel dice dónde está el trabajo cada día,
+   * no cuánto se cerró en un tramo. Y sin la semana anterior al lado, un número
+   * suelto —«5 tareas»— no dice si eso es bueno o malo.
+   *
+   * La semana es **la de Postgres**: `date_trunc('week')` empieza en lunes. Se
+   * devuelven también las semanas en las que no se cerró nada, con cero: si se
+   * omitieran, el ritmo saldría inflado y la comparación mentiría en cuanto
+   * hubiera un festivo por medio.
+   *
+   * ⚠️ `cerradas` cuenta por `completedAt`, así que **solo ve lo cerrado desde
+   * que existe el historial** (§25). `creadas` va por `createdAt` y sí es
+   * completo. Quien lo pinte tiene que saber que no miden lo mismo.
+   *
+   * Van como subconsultas correlacionadas y no como dos `GROUP BY` cruzados
+   * porque los dos agregados miran **columnas de fecha distintas**: unirlos
+   * obligaría a un `FULL OUTER JOIN` por semana para ganar nada a esta escala.
+   */
+  async weeklyThroughput(projectId: string, semanas = 8) {
+    return this.prisma.$queryRaw<{ semana: Date; cerradas: number; creadas: number }[]>`
+      WITH s AS (
+        SELECT generate_series(
+                 date_trunc('week', now()) - make_interval(weeks => ${semanas - 1}::int),
+                 date_trunc('week', now()),
+                 interval '1 week'
+               ) AS semana
+      )
+      SELECT s.semana,
+             -- ::int por lo de siempre: COUNT(*) es bigint y un BigInt no se
+             -- serializa a JSON, asi que reventaria al cruzar el TCP.
+             (SELECT COUNT(*)::int
+                FROM tasks.tasks t
+               WHERE t."projectId" = ${projectId}::text
+                 AND t."completedAt" >= s.semana
+                 AND t."completedAt" <  s.semana + interval '1 week') AS cerradas,
+             (SELECT COUNT(*)::int
+                FROM tasks.tasks t
+               WHERE t."projectId" = ${projectId}::text
+                 AND t."createdAt" >= s.semana
+                 AND t."createdAt" <  s.semana + interval '1 week') AS creadas
+        FROM s
+       ORDER BY s.semana
+    `;
+  }
+
+  /**
+   * Tareas abiertas que **llevan tiempo sin moverse de columna**.
+   *
+   * Es la respuesta a «¿hay algo bloqueado?», y el sistema no tiene ningún
+   * estado «bloqueada»: se deduce del historial, que es justo para lo que se
+   * empezó a capturar. Una tarea que lleva doce días en «En revisión» está
+   * parada aunque nadie lo haya marcado en ninguna parte.
+   *
+   * ⚠️ **Se mira el último `CREATED` o `MOVED`, no `updatedAt`.** `updatedAt` lo
+   * pisa cualquier `PATCH` —cambiar el título, añadir una etiqueta— y también la
+   * cascada que reescribe el `status` al renombrar una columna: una tarea parada
+   * desde hace un mes parecería recién tocada por haberle cambiado la prioridad.
+   * Es el mismo motivo por el que el historial guarda `columnId` y no `status`
+   * (§25.2).
+   *
+   * Sin ningún evento se cae a `createdAt`, y la fila lo dice en `sinHistorial`:
+   * una tarea anterior a la captura no está necesariamente parada, simplemente no
+   * sabemos cuándo se movió por última vez. Prometer lo contrario sería inventar.
+   *
+   * `columna` sale de `status`, que es el **nombre** de la columna donde está: se
+   * puede leer en voz alta sin cruzarlo con projects-service.
+   */
+  async sinMovimiento(projectId: string, dias = 7, limite = 20) {
+    return this.prisma.$queryRaw<
+      {
+        taskId: string;
+        titulo: string;
+        columna: string;
+        columnId: string;
+        diasParada: number;
+        sinHistorial: boolean;
+        vencida: boolean;
+      }[]
+    >`
+      SELECT t.id                AS "taskId",
+             t.title             AS titulo,
+             t.status            AS columna,
+             t."columnId"        AS "columnId",
+             floor(
+               EXTRACT(EPOCH FROM (now() - COALESCE(MAX(e."occurredAt"), t."createdAt"))) / 86400
+             )::int              AS "diasParada",
+             (MAX(e."occurredAt") IS NULL)                           AS "sinHistorial",
+             (t."dueDate" IS NOT NULL AND t."dueDate" < now())       AS vencida
+        FROM tasks.tasks t
+        LEFT JOIN tasks.task_events e
+               ON e."taskId" = t.id
+              AND e.type IN ('CREATED', 'MOVED')
+       WHERE t."projectId" = ${projectId}::text
+         AND t."completedAt" IS NULL
+       GROUP BY t.id, t.title, t.status, t."columnId", t."createdAt", t."dueDate"
+      HAVING floor(
+               EXTRACT(EPOCH FROM (now() - COALESCE(MAX(e."occurredAt"), t."createdAt"))) / 86400
+             ) >= ${dias}::int
+       ORDER BY "diasParada" DESC
+       LIMIT ${limite}::int
+    `;
+  }
+
+  /**
    * Carga y flujo **por persona**.
    *
    * Se enseña como reparto, no como clasificación: quién lleva cuánto abierto,
