@@ -4,8 +4,9 @@ import { IsOptional, IsString, IsUUID } from 'class-validator';
  * Cuerpo de `POST /projects/:projectId/members`.
  *
  * ⚠️ Esto **no es invitar, es dar de alta**: recibe un `userId` y surte efecto
- * inmediato, sin aceptación ni estado pendiente. No existe flujo de invitación
- * en el backend. Ver docs/frontend/PENDIENTES-BACKEND.md §12.
+ * inmediato, sin aceptación ni estado pendiente. La interfaz usa las
+ * invitaciones (`InviteMemberBodyDto`); esta ruta queda para altas
+ * administrativas.
  */
 export class AddMemberBodyDto {
   @IsUUID('4')
@@ -32,6 +33,31 @@ export class InviteMemberBodyDto {
 
   @IsUUID('4')
   projectRoleId: string;
+}
+
+/**
+ * Cuerpo de `PATCH /projects/:projectId/members/:userId`.
+ *
+ * Cambiar el rol de alguien que **ya es miembro**. No existía: la única forma
+ * era sacarlo del proyecto y volver a meterlo, que le borraba la fecha de
+ * entrada, le mandaba dos avisos y, entre las dos operaciones, lo dejaba sin
+ * ningún permiso.
+ */
+export class ChangeMemberRoleBodyDto {
+  @IsUUID('4')
+  projectRoleId: string;
+}
+
+export class ChangeMemberRoleDto extends ChangeMemberRoleBodyDto {
+  @IsUUID('4')
+  projectId: string;
+
+  @IsUUID('4')
+  userId: string;
+
+  /** Quién lo cambia. Lo inyecta el gateway desde el token. */
+  @IsUUID('4')
+  requesterId: string;
 }
 
 /** Cuerpo de `DELETE /projects/:projectId/members`. */

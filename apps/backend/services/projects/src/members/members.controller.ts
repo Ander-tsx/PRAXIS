@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   AddMemberDto,
+  ChangeMemberRoleDto,
   RemoveMemberDto,
 } from '@praxis/contracts';
 import { MembersService } from './members.service';
@@ -13,6 +14,11 @@ export class MembersController {
   @MessagePattern({ cmd: 'member_add' })
   addMember(@Payload() dto: AddMemberDto) {
     return this.membersService.addMember(dto);
+  }
+
+  @MessagePattern({ cmd: 'member_change_role' })
+  changeMemberRole(@Payload() dto: ChangeMemberRoleDto) {
+    return this.membersService.changeMemberRole(dto);
   }
 
   @MessagePattern({ cmd: 'member_remove' })
