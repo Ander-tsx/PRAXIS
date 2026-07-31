@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { AssistantController } from './assistant.controller';
+import { MyAssistantController } from './my-assistant.controller';
 
 /**
  * ⚠️ Registra **cuatro** clientes y el controlador usa tres.
@@ -68,6 +69,6 @@ import { AssistantController } from './assistant.controller';
       },
     ]),
   ],
-  controllers: [AssistantController],
+  controllers: [AssistantController, MyAssistantController],
 })
 export class AssistantModule {}
