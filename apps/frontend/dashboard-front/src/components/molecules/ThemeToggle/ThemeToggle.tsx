@@ -59,7 +59,7 @@ export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
     <div
       role="radiogroup"
       aria-label="Tema de la interfaz"
-      className="relative inline-flex items-center rounded-full border border-border bg-surface"
+      className="relative inline-flex items-center rounded-full border border-border bg-surface max-w-20"
       style={{ padding: PADDING }}
     >
       <span
