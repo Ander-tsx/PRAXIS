@@ -2720,3 +2720,137 @@ Se ofrecieron dos alternativas y se rechazaron las dos:
 
 **Decisión: se queda como está.** Cero código nuevo — lo que se pedía ya se
 puede repartir hoy desde el administrador de roles.
+
+> ⚠️ **Esto duró una conversación.** Ver §29: con el caso de uso concreto
+> delante —un perfil cuyo trabajo es concretar y mover tareas— la decisión se
+> revirtió y `canViewReports` pasó a cerrar la página entera. Lo que sigue
+> siendo cierto de §28.3 es el obstáculo estructural del sidebar; lo que
+> cambió es la línea de dentro de la página.
+
+## 29. Reportes, cerrados de verdad
+
+> Vuelta sobre §28.3 con el caso de uso que faltaba: «si mi usuario es
+> trabajador y su única razón en la plataforma es concretar y ver tareas, no
+> necesito que vea los análisis de datos ni pregunte a la IA».
+
+Eso no lo resolvía el permiso tal y como estaba. `canViewReports` solo tapaba
+la tabla de personas; los cuatro agregados y el chat del asistente los veía
+cualquier miembro. Y filtrar únicamente el desplegable habría sido cosmética:
+la página seguía alcanzable escribiendo `/reports/<id>` a mano.
+
+### 29.1 El permiso pasa a ser la puerta
+
+Las **siete** rutas de `projects/:projectId/reports` y las **dos** de
+`projects/:projectId/assistant` piden ahora `CAN_VIEW_REPORTS`. Antes seis y
+dos de ellas pedían `CAN_VIEW_PROJECT`.
+
+El asistente entra en el mismo saco porque **lee este mismo informe**: dejarlo
+abierto habría sido una puerta trasera al contenido que la pantalla ya no
+enseña. Con el chat cerrado, `incluirPersonas` —la bandera con la que el
+gateway le decía a reports-service si meter el bloque de personas en el
+briefing— es siempre cierta para quien llega. Se deja donde está, como defensa
+en profundidad: el día que alguien abra otra ruta al asistente, la línea sigue
+puesta.
+
+`GET /me/assistant/quota` **no cambia**: es la cuota del usuario, no de ningún
+proyecto, y es lo que lee Facturación en Configuración (§27.3). Un trabajador
+sin reportes en ningún proyecto sigue viendo su plan y su consumo.
+
+#### 🔴 Es un cierre, no una ampliación
+
+Un miembro con `canViewProject` que ayer recibía `snapshot` hoy recibe **403**.
+No hay migración que lo evite y no debería haberla: es exactamente el cambio
+que se pidió. Los roles «Administrador» no notan nada —`canViewReports` entra
+implicado por `canManageMembers`, `canEditProject` y `canDeleteProject`— y el
+dueño tiene bypass en el guard.
+
+#### Y la distinción interna desaparece
+
+Con la página cerrada, quien entra tiene `canViewReports` por definición, así
+que el condicional que escondía la tabla de personas era código muerto. Se
+quita: un permiso con un solo significado —«puedes ver los reportes de este
+proyecto»— en vez de uno que significaba dos cosas a la vez según dónde se
+mirase.
+
+Se pierde algo real y conviene decirlo: ya no se puede representar «ve el
+estado del proyecto pero no las cifras de cada cual». Si ese perfil vuelve a
+hacer falta, la forma de recuperarlo es un permiso nuevo para el acceso, no
+desdoblar otra vez este — que es la alternativa que §28.3 ya había descrito.
+
+### 29.2 `GET /projects?permission=<clave>`
+
+El selector tiene que ofrecer solo los proyectos cuyo informe se puede abrir.
+Con lo que había, la única forma era pedir `/projects/:id/permissions/me` **una
+vez por proyecto** desde el cliente: N peticiones por carga para descartar casi
+todas.
+
+`FindProjectsQueryDto` gana un `permission` validado contra `ProjectPermission`
+—cualquier otra clave da 400— y `findAllProjects` lo aplica **al `where`**:
+
+```ts
+const memberScope = dto.permission
+  ? { id: { in: await this.projectIdsWithPermission(dto.userId, dto.permission) } }
+  : { members: { some: { userId: dto.userId } } };
+
+where.OR = [{ ownerId: dto.userId }, memberScope];
+```
+
+Al `where` y no al resultado, para que `total` y la paginación sigan contando
+lo que de verdad se puede ver: filtrar después de paginar devolvería páginas de
+tamaño irregular y un total que miente.
+
+`projectIdsWithPermission` es **una sola consulta** para todos los proyectos
+del usuario —sus filas de `projectMember` con el rol embebido— y expande la
+jerarquía en memoria. El dueño pasa siempre, igual que en el guard.
+
+#### La jerarquía sale a `permission-map.ts`
+
+Vivía dentro de `ProjectRolesService`, su único consumidor hasta ahora.
+Duplicarla en `ProjectsService` era el error clásico de este repo —el segundo
+sitio donde discrepar el día que alguien añade un permiso— así que se extrajo a
+`project-roles/permission-map.ts`: `PERMISSION_HIERARCHY`, `VIEW_PERMISSION`,
+`fullPermissionMap`, `normalizeBooleans`, `normalizePermissions` y
+`expandPermissions`, que deja de ser método privado. No es un provider de Nest
+a propósito: son funciones puras sobre un objeto.
+
+#### 🟡 No pasa por la caché de permisos
+
+`project:<id>:user:<id>:permissions` tiene TTL de 300 s y es **por proyecto**:
+leer N claves de Redis para ahorrarse una consulta a Postgres no compensa. El
+efecto lateral es que el listado ve un cambio de rol al instante mientras
+`permissions/me` puede tardar hasta cinco minutos. Va en la dirección segura —
+el selector deja de ofrecer un proyecto antes de que la página deje de
+abrirlo — pero es una inconsistencia real y está aquí escrita.
+
+### 29.3 `NoReportsAccess`, y por qué no es un 404
+
+Dos sitios la enseñan: `/reports` cuando no hay ningún proyecto que puedas
+mirar, y `/reports/<id>` cuando escribes a mano uno que no puedes.
+
+No es un 404 —la página existe— ni un rebote silencioso al panel, que se lee
+como un enlace roto. **La entrada «Reportes» del sidebar sigue visible para
+todo el mundo**, porque el obstáculo de §28.3 no se ha movido: la barra es
+global y el permiso es por proyecto. Si la entrada no se puede esconder, la
+pantalla del otro lado tiene que explicarse sola, y decir **a quién pedirlo**,
+que es lo único accionable.
+
+La raíz de la zona distingue dos casos que se confundían en uno:
+
+| Situación | Qué se enseña |
+|---|---|
+| No estás en ningún proyecto | «Todavía no estás en ningún proyecto» (el estado que ya existía) |
+| Estás en proyectos, en ninguno con reportes | «Ningún proyecto tuyo tiene los reportes abiertos para ti» |
+
+La segunda consulta (`?limit=1`, de la que solo se mira el `total`) se hace
+**solo** en ese caso, que es el raro. Sin ella, a quien lo que necesita es que
+le añadan a un proyecto se le mandaría a pedir un permiso.
+
+La página del informe comprueba `canViewReports` aunque el gateway ya lo exija:
+sin la comprobación, el `Promise.all` caería en cascada a `null` y la pantalla
+enseñaría cinco tarjetas rotas en vez de decir qué pasa. **El guard es la
+seguridad; esto es la explicación.**
+
+La etiqueta del administrador de roles pasa de «Ver los reportes por persona» a
+«Ver los reportes y usar el asistente» — que es lo que concede ahora, y es el
+texto exacto al que `NoReportsAccess` manda a quien lo necesita.
+

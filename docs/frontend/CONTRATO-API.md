@@ -108,7 +108,7 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | POST | `/projects` | `{ name, description? }` | — (`ownerId` sale del token) |
-| GET | `/projects` | query params (`page`, `limit`, `search`…) | — |
+| GET | `/projects` | query params (`page`, `limit`, `search`, `permission`…) | — |
 | GET | `/projects/:id` | — | `canViewProject` |
 | PATCH | `/projects/:id` | `{ name?, description? }` | `canEditProject` |
 | DELETE | `/projects/:id` | — | `canDeleteProject` |
@@ -116,6 +116,13 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 - `name`: 2–100 chars, único **por dueño**. Repetirlo en tu propia cuenta da 409
   («Ya tienes un proyecto llamado X»); otro equipo puede llamar igual al suyo.
 - `GET /projects` → `{ items, total }`, filtrado por **dueño o miembro**.
+- `?permission=<clave>` estrecha el listado a los proyectos donde **tienes ese
+  permiso**, ya expandido por jerarquía; el dueño pasa siempre, como en el
+  guard. La clave tiene que ser una de `ProjectPermission` — cualquier otra da
+  400. Existe para no pedir `/projects/:id/permissions/me` una vez por proyecto
+  solo para descartar casi todos: hoy lo usa el selector de Reportes con
+  `?permission=canViewReports`. El filtro entra en el `where`, así que `total` y
+  la paginación cuentan lo que de verdad se puede ver.
 - `GET /projects/:id` viene con todo el árbol embebido (ver abajo).
 
 ### `PATCH` exige `canEditProject`, no `canEditBoard`
@@ -731,30 +738,40 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 
 | Método | Ruta | Permiso |
 |---|---|---|
-| GET | `/projects/:projectId/reports/snapshot` | `canViewProject` |
-| GET | `/projects/:projectId/reports/flow?days` | `canViewProject` |
-| GET | `/projects/:projectId/reports/cycle-time?days` | `canViewProject` |
-| GET | `/projects/:projectId/reports/forecast?days` | `canViewProject` |
-| GET | `/projects/:projectId/reports/weekly?weeks` | `canViewProject` |
-| GET | `/projects/:projectId/reports/blocked?days` | `canViewProject` |
-| GET | `/projects/:projectId/reports/people` | **`canViewReports`** |
+| GET | `/projects/:projectId/reports/snapshot` | `canViewReports` |
+| GET | `/projects/:projectId/reports/flow?days` | `canViewReports` |
+| GET | `/projects/:projectId/reports/cycle-time?days` | `canViewReports` |
+| GET | `/projects/:projectId/reports/forecast?days` | `canViewReports` |
+| GET | `/projects/:projectId/reports/weekly?weeks` | `canViewReports` |
+| GET | `/projects/:projectId/reports/blocked?days` | `canViewReports` |
+| GET | `/projects/:projectId/reports/people` | `canViewReports` |
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
-### La línea de permisos
+### ⚠️ Las siete piden `canViewReports`. Antes solo la última.
 
-Los agregados **que no nombran a nadie** piden `canViewProject`: son el estado
-del trabajo y los ve cualquiera que pueda ver el proyecto. Todo lo desglosado
-**por persona** pide `canViewReports`.
+Seis de las siete pedían `canViewProject`, con la idea de que la línea fuese de
+**privacidad y no de acceso**: los agregados no nombran a nadie —son el estado
+del trabajo— y lo único que había que decidir a propósito era enseñar las cifras
+de cada cual, porque un tablero con todas a la vista se convierte en una
+clasificación aunque nadie lo pretenda.
 
-No es una línea de seguridad —son datos del trabajo, no secretos— sino de
-privacidad: un tablero con las cifras de todo el mundo a la vista se convierte en
-una clasificación aunque nadie lo pretenda, así que enseñarlas tiene que ser una
-decisión de alguien.
+Se cerró entero por una razón de producto: un perfil cuyo trabajo en la
+plataforma es concretar y mover tareas no necesita el análisis de datos, y
+ofrecérselo es ruido. Con la página cerrada, la distinción interna se quedaba
+sin trabajo que hacer —quien entra lo tiene por definición— así que se eliminó
+en vez de dejar un permiso con dos significados.
+
+**Si escribes un fetch a reportes, cuenta con el 403.** Un miembro con
+`canViewProject` que antes recibía `snapshot` ahora no. La forma de saberlo por
+adelantado es la de siempre: `GET /projects/:id/permissions/me`.
 
 `canViewReports` entra **implicado por `canManageMembers`, `canEditProject` y
 `canDeleteProject`**, así que los roles «Administrador» ya existentes lo reciben
 sin migración y un «Colaborador» no.
+
+Para **listar solo los proyectos cuyo informe puedes abrir**, sin preguntar uno
+a uno, está `GET /projects?permission=canViewReports` — ver «Proyectos».
 
 ### `snapshot` — el único que funciona sin historial
 
@@ -874,8 +891,8 @@ una consulta agregada nueva, hazlo también.
 
 | Método | Ruta | Entrada | Permiso |
 |---|---|---|---|
-| GET | `/projects/:projectId/assistant/quota` | — | `canViewProject` |
-| POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewProject` |
+| GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
+| POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
 
 Las dos primeras cuelgan de `/projects/:projectId` para que el guard resuelva el
@@ -889,6 +906,13 @@ pantallas como Configuración, que no tienen ningún proyecto abierto. Sin
 `ProjectPermissionGuard` — el usuario sale del token, como en `/me/tasks` y
 `/me/notifications` — y reenvía al mismo `{ cmd: 'assistant_quota' }` que la
 ruta de proyecto. Misma forma de respuesta que «La cuota», más abajo.
+
+⚠️ **Las dos de proyecto pasaron de `canViewProject` a `canViewReports`.** El
+asistente lee este mismo informe, así que quien no puede abrirlo tampoco puede
+preguntarle por él: dejarlo abierto habría sido una puerta trasera al contenido
+que la pantalla ya no enseña. `/me/assistant/quota` **no** cambia — es la cuota
+del usuario, no de ningún proyecto, y Configuración la sigue leyendo sin
+permisos de proyecto.
 
 ### ⚠️ Ninguna de las dos escribe nada
 
@@ -953,9 +977,11 @@ que no tener contador.
 
 El contexto sale del briefing de `reports-service`: columnas, etiquetas,
 instantánea, **avance**, **la semana**, **lo que está parado**, percentiles,
-predicción y —**solo con `canViewReports`**— el desglose por persona con su
-experiencia por etiqueta. No entran títulos de todas las tareas, descripciones,
-comentarios ni adjuntos.
+predicción y el desglose por persona con su experiencia por etiqueta. No entran
+títulos de todas las tareas, descripciones, comentarios ni adjuntos.
+
+El desglose por persona ya no va condicionado: hablar con el asistente exige
+`canViewReports`, el mismo permiso que antes filtraba esa parte del briefing.
 
 ⚠️ **Las cuentas vienen hechas, y eso es a propósito.** `avance` trae el
 porcentaje ya calculado y `semana` la variación: el modelo hace aritmética simple
