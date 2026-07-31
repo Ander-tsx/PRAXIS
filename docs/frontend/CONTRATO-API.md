@@ -735,9 +735,11 @@ POST /boards/:bid/tasks        → { columnId, title, status: <name de la column
 | GET | `/projects/:projectId/reports/flow?days` | `canViewProject` |
 | GET | `/projects/:projectId/reports/cycle-time?days` | `canViewProject` |
 | GET | `/projects/:projectId/reports/forecast?days` | `canViewProject` |
+| GET | `/projects/:projectId/reports/weekly?weeks` | `canViewProject` |
+| GET | `/projects/:projectId/reports/blocked?days` | `canViewProject` |
 | GET | `/projects/:projectId/reports/people` | **`canViewReports`** |
 
-`days` va acotado a 1–365 en el gateway; por defecto 60.
+`days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
 ### La línea de permisos
 
@@ -804,6 +806,53 @@ que una sacada de cuatrocientas.
 El número sale de **Monte Carlo sobre el ritmo observado** —se remuestrean los
 cierres por día, incluidos los días de cero— y no de estimaciones de esfuerzo,
 que no existen en el modelo.
+
+### `weekly` — cómo fue la semana
+
+```ts
+{
+  semana:   { semana: 'YYYY-MM-DD', cerradas, creadas, diasTranscurridos },  // lunes de esta
+  anterior: { semana: 'YYYY-MM-DD', cerradas, creadas },
+  variacion: number | null,          // % de cierres frente a la anterior
+  ritmoDiario: { semana, anterior },  // cierres por día
+  serie: [{ semana, cerradas, creadas }],
+}
+```
+
+⚠️ **La semana en curso está a medias.** Un lunes por la mañana `variacion`
+siempre sale catastrófica; por eso viaja `diasTranscurridos` y el ritmo diario de
+las dos. Enseña la variación con esa aclaración, o el ritmo.
+
+`variacion` es `null` si la semana anterior fue de cero: no hay porcentaje que
+sacar de una división entre cero.
+
+⚠️ `cerradas` y `creadas` **no miden lo mismo**: la primera va por `completedAt`,
+que solo existe desde que se captura el historial; la segunda por `createdAt`,
+que es completo.
+
+### `blocked` — lo que está parado
+
+```ts
+{ dias, total,
+  tareas: [{ taskId, titulo, columna, columnId, diasParada, sinHistorial, vencida }] }
+```
+
+**No existe ningún estado «bloqueada» en el modelo.** Son las tareas abiertas que
+llevan `dias` o más sin cambiar de columna, deducido del historial. Por defecto 7,
+máximo 20 filas, ordenadas de más parada a menos.
+
+Se mira el último evento `CREATED`/`MOVED`, **no `updatedAt`**: ese lo pisa
+cualquier edición —el título, una etiqueta— y también la cascada que reescribe el
+`status` al renombrar una columna, así que una tarea parada un mes parecería
+recién tocada.
+
+⚠️ `sinHistorial: true` significa **anterior a la captura de eventos**: ahí
+`diasParada` es su edad, no su parón. Dilo al pintarlo; acusar de estar parada a
+una tarea que simplemente es vieja es la clase de error que quita la confianza al
+informe entero.
+
+`columna` viene con el nombre **actual** de la columna, no con el `status`
+congelado en la tarea.
 
 ### `flow` — flujo acumulado
 
@@ -895,9 +944,16 @@ que no tener contador.
 ### Lo que ve el modelo, y lo que decide
 
 El contexto sale del briefing de `reports-service`: columnas, etiquetas,
-instantánea, percentiles, predicción y —**solo con `canViewReports`**— el
-desglose por persona con su experiencia por etiqueta. No entran títulos de
-tareas, descripciones, comentarios ni adjuntos.
+instantánea, **avance**, **la semana**, **lo que está parado**, percentiles,
+predicción y —**solo con `canViewReports`**— el desglose por persona con su
+experiencia por etiqueta. No entran títulos de todas las tareas, descripciones,
+comentarios ni adjuntos.
+
+⚠️ **Las cuentas vienen hechas, y eso es a propósito.** `avance` trae el
+porcentaje ya calculado y `semana` la variación: el modelo hace aritmética simple
+sobre lo que tiene delante, pero las cifras que acaban repitiéndose en una reunión
+no dependen de que hoy le salga bien. Lo que **no** puede es estimar duraciones,
+deducir fechas de entrega ni suponer un ritmo que nadie midió.
 
 Las herramientas se filtran por permisos antes de declarárselas: sin
 `canCreateTask` no existe `proponer_tarea`, así que el modelo **no puede ni

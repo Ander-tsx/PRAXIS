@@ -2243,7 +2243,86 @@ Cuenta de prueba creada para el caso de permisos, con rol «Colaborador de
 prueba» (`canViewProject` + `canViewReports`, sin `canCreateTask`):
 `colab-asistente@praxis.dev` / `Colab@12345!`.
 
-### 26.8 Una del entorno, para la próxima
+### 26.8 Segunda pasada: las preguntas que no tenían dato detrás
+
+Probándolo de verdad salieron tres respuestas malas, y ninguna era del modelo:
+
+| Se preguntaba | Respondía | Por qué |
+|---|---|---|
+| «¿Qué porcentaje de avance?» | «No hay un porcentaje literal en el reporte» | La regla 1 decía «nunca calcules», a secas |
+| «¿Cómo estuvo la semana?» | «No existen datos sobre la semana» | Cierto: el flujo acumulado no contesta a eso |
+| «¿Hay tareas bloqueadas?» | «No hay datos sobre eso» | Cierto también: no existía la consulta |
+
+**La regla 1 estaba mal escrita, no de más.** La prohibición que importa no es la
+aritmética —restar dos cifras que tiene delante lo hace bien— sino **inventar el
+dato de partida**: estimar cuánto tardará algo, deducir una fecha, suponer un
+ritmo que nadie ha medido. Eso sigue prohibido; sumar, restar y sacar un
+porcentaje de lo que está en el contexto, ya no.
+
+Aun así, **las divisiones que se acaban repitiendo en una reunión vienen
+calculadas del servidor**. Un porcentaje mal contado sobre el trabajo de un
+equipo se repite antes de que a nadie se le ocurra comprobarlo, y el mismo
+argumento que impide dejarle estimar duraciones vale para no jugársela a que hoy
+divida bien.
+
+Y una que faltaba desde el principio: **la fecha de hoy**. El modelo no la tiene
+por su cuenta, así que no entendía «esta semana» ni podía convertir «para el
+viernes» en un `dueDate`.
+
+#### `avance`, dos medidas porque miden cosas distintas
+
+`porCierre` cuenta lo que está en columna verde —lo que se ve mirando el tablero,
+y funciona desde el primer día—; `porCompletado` cuenta lo que tiene
+`completedAt`, que **solo existe desde que hay historial**. En un proyecto
+anterior a la captura la segunda sale más baja, y no porque se haya avanzado
+menos. Con cero tareas las dos son `null`, no `0`: un tablero vacío no está al
+0 % de nada.
+
+#### `weekly`, y por qué lleva la semana anterior pegada
+
+Un total suelto —«5 cerradas»— no dice si la semana estuvo bien. La comparación
+es el informe entero.
+
+⚠️ **La semana en curso está a medias**, así que compararla contra siete días
+completos sale catastrófico un lunes por la mañana. Viajan
+`semana.diasTranscurridos` y el ritmo diario de las dos, y el prompt obliga a
+decirlo cuando la semana no ha terminado.
+
+#### `blocked`: no hay estado «bloqueada», hay historial
+
+El modelo de datos no tiene esa marca y no se inventó una. Son las abiertas que
+llevan `days` (7 por defecto) sin cambiar de columna, sacado del último
+`CREATED`/`MOVED`.
+
+⚠️ **No vale `updatedAt`**: lo pisa cualquier `PATCH` —el título, una etiqueta— y
+también la cascada que reescribe el `status` al renombrar una columna. Una tarea
+parada un mes parecería recién tocada. Es el mismo motivo por el que el historial
+guarda `columnId` y no `status` (§25.2).
+
+Las anteriores a la captura salen con `sinHistorial: true`, porque ahí lo que se
+cuenta es su **edad**, no su parón. Acusar de parada a una tarea que solo es vieja
+es la clase de error que le quita la confianza al informe entero.
+
+#### Con esto, la skill de voz tiene de dónde tirar
+
+Las ocho respuestas del guion de la skill —que vivirá en su propio
+microservicio— ya tienen endpoint detrás:
+
+| Pregunta de la skill | De dónde sale |
+|---|---|
+| Avance del proyecto | `avance` del briefing / `reports/snapshot` |
+| Productividad semanal | **`reports/weekly`** |
+| Estimación de entrega | `reports/forecast` |
+| Tareas bloqueadas | **`reports/blocked`** |
+| Carga de trabajo | `reports/people` |
+| Desempeño individual | `reports/people` + experiencia por etiqueta |
+
+Verificado sobre el proyecto de demostración: «56 % (35 de 62)»; «la semana va
+por la mitad, 4 días: 1 cerrada y 2 creadas, ritmo 0,25/día frente a 0,43 la
+anterior»; «20 tareas con más de 7 días sin movimiento», con las cinco más
+paradas y su columna.
+
+### 26.9 Una del entorno, para la próxima
 
 `tasks-service` no arrancaba: `Cannot find module '../generated/prisma-client'`.
 No es del código — el cliente de Prisma se genera dentro de `src/generated/` y no
