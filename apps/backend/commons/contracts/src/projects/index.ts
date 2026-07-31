@@ -12,6 +12,8 @@ export * from './project-role.dto';
 export {
   AddMemberBodyDto,
   AddMemberDto,
+  ChangeMemberRoleBodyDto,
+  ChangeMemberRoleDto,
   InviteMemberBodyDto,
   RemoveMemberBodyDto,
   RemoveMemberDto,

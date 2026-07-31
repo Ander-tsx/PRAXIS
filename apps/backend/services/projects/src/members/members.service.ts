@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
   AddMemberDto,
+  ChangeMemberRoleDto,
   NotificationType,
   RemoveMemberDto,
 } from '@praxis/contracts';
@@ -83,6 +84,50 @@ export class MembersService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * Cambiar el rol de alguien que ya es miembro.
+   *
+   * No existía, y la única forma de hacerlo era sacarlo del proyecto y volver a
+   * meterlo: eso le borraba la fecha de entrada, le mandaba dos avisos —uno
+   * diciendo que lo habían sacado— y entre las dos operaciones lo dejaba sin
+   * ningún permiso. Un cambio de rol no es una baja seguida de un alta.
+   *
+   * ⚠️ **Invalida la caché de permisos de esa persona.** Sin eso el rol nuevo
+   * tarda hasta 300 s en surtir efecto, y el caso peor no es el de alguien que
+   * gana permisos —espera un rato— sino el de alguien a quien se los quitan y
+   * los conserva cinco minutos.
+   */
+  async changeMemberRole(dto: ChangeMemberRoleDto) {
+    const [member, role] = await Promise.all([
+      this.prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: dto.projectId, userId: dto.userId } },
+      }),
+      this.prisma.projectRole.findUnique({ where: { id: dto.projectRoleId } }),
+    ]);
+
+    if (!member) {
+      throw new RpcException({ statusCode: 404, message: 'El usuario no es miembro del proyecto' });
+    }
+    if (!role || role.projectId !== dto.projectId) {
+      /* Un rol de otro proyecto daría permisos escritos para un tablero que no
+         es este. Se comprueba aquí porque el id solo dice que existe. */
+      throw new RpcException({ statusCode: 404, message: 'Rol de proyecto no encontrado' });
+    }
+
+    if (member.projectRoleId === dto.projectRoleId) return member;
+
+    const actualizado = await this.prisma.projectMember.update({
+      where: { id: member.id },
+      data: { projectRoleId: dto.projectRoleId },
+      include: { projectRole: true },
+    });
+
+    await this.redis.del(`members:project:${dto.projectId}`);
+    await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
+
+    return actualizado;
   }
 
   async findMembers(projectId: string) {
