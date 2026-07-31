@@ -43,7 +43,7 @@ export function ProfileForm({ email, initialFirstName, initialLastName }: Profil
         setTouched(true);
         if (clientError) event.preventDefault();
       }}
-      className="flex max-w-xl flex-col gap-5 rounded-2xl border border-border bg-surface p-6"
+      className="flex max-w-2xl flex-col gap-5 rounded-2xl border border-border bg-surface p-6"
     >
       <Input
         id={emailId}
@@ -55,32 +55,36 @@ export function ProfileForm({ email, initialFirstName, initialLastName }: Profil
         fullWidth
       />
 
-      <Input
-        id={firstNameId}
-        name="firstName"
-        label="Nombre"
-        placeholder="Andrés"
-        value={firstName}
-        onChange={(event) => setFirstName(event.target.value)}
-        maxLength={NAME_MAX}
-        autoComplete="given-name"
-        variant={touched && clientError ? 'error' : 'default'}
-        fullWidth
-      />
+      {/* Nombre y apellido en fila: son dos campos cortos, y apilados dejaban
+          la card angosta pegada a la izquierda por más max-w que se le diera. */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <Input
+          id={firstNameId}
+          name="firstName"
+          label="Nombre"
+          placeholder="Andrés"
+          value={firstName}
+          onChange={(event) => setFirstName(event.target.value)}
+          maxLength={NAME_MAX}
+          autoComplete="given-name"
+          variant={touched && clientError ? 'error' : 'default'}
+          fullWidth
+        />
 
-      <Input
-        id={lastNameId}
-        name="lastName"
-        label="Apellido"
-        placeholder="Ramírez"
-        value={lastName}
-        onChange={(event) => setLastName(event.target.value)}
-        maxLength={NAME_MAX}
-        autoComplete="family-name"
-        variant={touched && clientError ? 'error' : 'default'}
-        message={touched && clientError ? clientError : undefined}
-        fullWidth
-      />
+        <Input
+          id={lastNameId}
+          name="lastName"
+          label="Apellido"
+          placeholder="Ramírez"
+          value={lastName}
+          onChange={(event) => setLastName(event.target.value)}
+          maxLength={NAME_MAX}
+          autoComplete="family-name"
+          variant={touched && clientError ? 'error' : 'default'}
+          message={touched && clientError ? clientError : undefined}
+          fullWidth
+        />
+      </div>
 
       {state.error && (
         <p
