@@ -108,9 +108,12 @@ export function ProjectLabels({ projectId, labels, canManage }: ProjectLabelsPro
               name="color"
               label="Color"
               defaultValue={editing?.color ?? 'primary'}
+              /* La razón de tener un select propio: elegir «el rojo» leyendo
+                 la palabra «Rojo» era lo que había antes. */
               options={LABEL_COLORS.map((color) => ({
                 value: color,
                 label: LABEL_COLOR_LABELS[color],
+                color: labelColor(color),
               }))}
               fullWidth
             />

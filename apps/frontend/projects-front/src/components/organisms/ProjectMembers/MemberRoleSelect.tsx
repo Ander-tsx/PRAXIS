@@ -1,7 +1,7 @@
 'use client';
 
-import type { ProjectRole } from '@praxis/commons';
-import { useActionState, useEffect, useRef } from 'react';
+import { type ProjectRole, Select } from '@praxis/commons';
+import { useActionState, useRef, useState } from 'react';
 import { changeMemberRoleAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
@@ -13,9 +13,9 @@ import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
  * lo que se quiere, y un «Guardar» al lado solo añade un paso y la posibilidad
  * de dejarlo a medias creyendo que se aplicó.
  *
- * Se envía con `requestSubmit()` desde el `onChange` en vez de con un `onClick`
- * a la acción, para que el formulario siga funcionando sin JavaScript: es el
- * mismo patrón que el resto de esta pantalla.
+ * Se envía con `requestSubmit()` al elegir, no con un `onClick` a la acción:
+ * así el formulario sigue siendo un formulario y la acción recibe su `FormData`
+ * como el resto de la pantalla.
  *
  * Quien no puede gestionar el equipo ve el rol como texto y no como control —lo
  * decide `ProjectMembers`, que es quien conoce el permiso—, así que aquí se da
@@ -40,39 +40,34 @@ export function MemberRoleSelect({
     MEMBER_INITIAL_STATE,
   );
   const formRef = useRef<HTMLFormElement>(null);
-  const selectRef = useRef<HTMLSelectElement>(null);
 
   /**
-   * Si el servidor rechaza el cambio, el desplegable vuelve al rol que había.
+   * El rol elegido, controlado aquí.
    *
-   * Sin esto se queda enseñando el rol nuevo con un error al lado, que es la
-   * peor combinación posible: dice a la vez que se aplicó y que no.
+   * Si el servidor rechaza el cambio vuelve al que había: dejarlo enseñando el
+   * nuevo con un error al lado sería la peor combinación posible, porque diría
+   * a la vez que se aplicó y que no.
    */
-  useEffect(() => {
-    if (state.error && selectRef.current) selectRef.current.value = currentRoleId;
-  }, [state.error, currentRoleId]);
+  const [rolId, setRolId] = useState(currentRoleId);
 
   return (
     <form ref={formRef} action={action} className="flex items-center gap-2">
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="userId" value={userId} />
 
-      <select
-        ref={selectRef}
+      <Select
         name="projectRoleId"
-        defaultValue={currentRoleId}
+        value={rolId}
         disabled={pending}
-        onChange={() => formRef.current?.requestSubmit()}
-        aria-label={`Rol de ${label}`}
-        title={state.error ?? `Rol de ${label}`}
-        className="rounded-lg border border-border bg-background px-2 py-1 font-sans text-xs text-text-primary outline-none transition-colors hover:border-border-strong focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-      >
-        {roles.map((rol) => (
-          <option key={rol.id} value={rol.id}>
-            {rol.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={(valor) => {
+          setRolId(valor);
+          /* En el microtask siguiente: el input oculto del Select tiene que
+             haber recibido el valor nuevo antes de que se envíe el formulario. */
+          queueMicrotask(() => formRef.current?.requestSubmit());
+        }}
+        options={roles.map((rol) => ({ value: rol.id, label: rol.name }))}
+        className="h-8 min-w-36 text-xs"
+      />
 
       {/* El error va aquí y no en un aviso global: quien lo lee necesita saber
           de qué fila habla, y la fila es donde está mirando. */}
@@ -81,6 +76,31 @@ export function MemberRoleSelect({
           {state.error}
         </span>
       )}
+      <Revertir cuando={state.error} a={currentRoleId} aplicar={setRolId} />
     </form>
   );
+}
+
+/**
+ * Devuelve el desplegable a su valor anterior cuando el servidor rechaza.
+ *
+ * Es un componente y no un `useEffect` en el cuerpo para que la dependencia sea
+ * explícita: solo tiene que dispararse cuando **aparece** un error, no en cada
+ * render que tenga uno.
+ */
+function Revertir({
+  cuando,
+  a,
+  aplicar,
+}: {
+  cuando: string | null;
+  a: string;
+  aplicar: (valor: string) => void;
+}) {
+  const visto = useRef<string | null>(null);
+  if (cuando && visto.current !== cuando) {
+    visto.current = cuando;
+    queueMicrotask(() => aplicar(a));
+  }
+  return null;
 }
