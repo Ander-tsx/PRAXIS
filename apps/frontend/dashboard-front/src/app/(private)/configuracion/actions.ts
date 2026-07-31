@@ -2,6 +2,8 @@
 
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { THEME_COOKIE, themeCookieOptions, type ThemeName } from '@praxis/commons/theme';
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import type { UpdateProfileState } from '@/lib/action-state';
 import type { UserProfile } from '@praxis/commons';
@@ -69,4 +71,22 @@ export async function updateProfileAction(
   revalidatePath('/configuracion');
 
   return { error: null, savedName: firstName };
+}
+
+/**
+ * Guarda el tema elegido en la cookie compartida por las cinco zonas.
+ *
+ * No hay nada que validar contra el backend —el tema no vive en ningún
+ * microservicio, es una preferencia de la interfaz— así que no hay `data` que
+ * confirmar: escribir la cookie y que el layout la relea es la confirmación.
+ *
+ * `revalidatePath('/', 'layout')` y no solo `'/configuracion'`: el `data-theme`
+ * lo estampa el `RootLayout`, que envuelve toda la zona, no la page. Sin el
+ * segundo argumento, `revalidatePath` solo invalida ese segmento y el `<html>`
+ * se queda con el tema viejo hasta la próxima navegación completa.
+ */
+export async function setThemeAction(theme: ThemeName): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(THEME_COOKIE, theme, themeCookieOptions());
+  revalidatePath('/', 'layout');
 }
