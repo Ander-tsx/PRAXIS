@@ -1,19 +1,26 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Inject,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AssistantChatBodyDto, ProjectPermission } from '@praxis/contracts';
+import {
+  AssistantChatBodyDto,
+  ProjectPermission,
+  RenameConversationBodyDto,
+  ResolveProposalBodyDto,
+} from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
@@ -38,15 +45,20 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
  *
  * | | |
  * |---|---|
- * | Hablar con el asistente | `canViewProject` |
- * | Que le llegue el desglose por persona | `canViewReports` |
+ * | Hablar con el asistente, y leer sus conversaciones | `canViewReports` |
  * | Que se le declare `proponer_tarea` | `canCreateTask` |
- * | Que se le declare `proponer_asignacion` | `canEditTask` |
+ * | `proponer_asignacion`, `proponer_edicion`, `proponer_checklist` | `canEditTask` |
+ * | `proponer_movimiento` | `canMoveTask` |
+ * | `proponer_comentario` | `canComment` |
  *
- * Los tres últimos no son guards: son **datos que viajan** y que recortan lo que
- * el modelo ve y lo que puede sugerir. El guard de verdad sigue estando donde
- * estaba: al aceptar la propuesta se llama al endpoint de siempre, con su
+ * Solo la primera fila es un guard. Las demás son **datos que viajan** y que
+ * recortan lo que el modelo puede sugerir. El guard de verdad sigue estando
+ * donde estaba: al aceptar la propuesta se llama al endpoint de siempre, con su
  * permiso de siempre.
+ *
+ * ⚠️ Y el permiso **no basta para las conversaciones**: son de quien las
+ * escribió, así que el `userId` viaja en cada comando y el servicio filtra por
+ * él. Ver la nota de `conversaciones`.
  *
  * ⚠️ **Este controlador no escribe nada.** No crea tareas, no asigna y no toca
  * el tablero. Devuelve texto y propuestas.
@@ -126,10 +138,128 @@ export class AssistantController {
           projectId,
           userId,
           message: body.message,
-          history: body.history ?? [],
+          /* `history` ya no viaja: el hilo lo guarda el servicio y lo lee de su
+             base. Ver la nota de `AssistantTurnDto`. */
+          conversationId: body.conversationId,
           permisos,
           miembros,
         },
+      ),
+    );
+  }
+
+  /**
+   * Las conversaciones guardadas.
+   *
+   * ⚠️ **`canViewReports` no basta y por eso no es lo único que se comprueba.**
+   * Es un permiso del **proyecto**: con él, cualquier compañero del mismo rol
+   * podría pedir la conversación de otro. Lo que alguien le escribe a un
+   * asistente no es un dato del proyecto, es suyo — así que el `userId` viaja
+   * en cada comando y assistant-service filtra por él. Una conversación ajena
+   * responde 404, no 403: un 403 confirmaría que ese id existe.
+   *
+   * El permiso sigue haciendo falta igualmente: sin acceso al informe no hay
+   * asistente del que tener conversaciones.
+   */
+  @Get('conversations')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Mis conversaciones en este proyecto' })
+  conversaciones(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversations' },
+        { userId: req.user!.userId, projectId },
+      ),
+    );
+  }
+
+  @Get('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Una conversación con sus mensajes y propuestas' })
+  @ApiResponse({ status: 404, description: 'No existe, o no es tuya' })
+  conversacion(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation' },
+        { userId: req.user!.userId, projectId, conversationId },
+      ),
+    );
+  }
+
+  @Patch('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Renombrar una conversación' })
+  renombrar(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+    @Body() body: RenameConversationBodyDto,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation_rename' },
+        { userId: req.user!.userId, projectId, conversationId, title: body.title },
+      ),
+    );
+  }
+
+  /**
+   * Borrar una conversación propia.
+   *
+   * No contradice la regla de que el asistente nunca borra: ahí quien borraría
+   * es el modelo, sobre el trabajo de un equipo. Aquí borra una persona sus
+   * propios mensajes, que es lo mínimo que se le debe a quien ahora deja rastro
+   * de lo que escribe.
+   */
+  @Delete('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Borrar una conversación propia' })
+  borrar(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation_delete' },
+        { userId: req.user!.userId, projectId, conversationId },
+      ),
+    );
+  }
+
+  /**
+   * Marcar una propuesta como aplicada o descartada.
+   *
+   * ⚠️ **Esto no aplica nada.** Solo anota lo que se decidió, para que al releer
+   * el hilo dentro de una semana no vuelva a ofrecer un botón que ya se pulsó.
+   * Aplicarla sigue siendo otra petición, al endpoint de siempre y con su
+   * permiso — el cliente llama aquí **después** de que aquella haya salido bien.
+   */
+  @Post('proposals/:proposalId/resolve')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Anotar si una propuesta se aceptó o se descartó' })
+  resolverPropuesta(
+    @Param('projectId', ParseUUIDPipe) _projectId: string,
+    @Param('proposalId', ParseUUIDPipe) proposalId: string,
+    @Request() req: Express.Request,
+    @Body() body: ResolveProposalBodyDto,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_proposal_resolve' },
+        { userId: req.user!.userId, proposalId, status: body.status },
       ),
     );
   }

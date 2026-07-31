@@ -26,6 +26,7 @@ export class AssistantController {
       projectId: string;
       userId: string;
       message: string;
+      conversationId?: string;
       history?: { role: string; text: string }[];
       permisos: Record<string, boolean>;
       miembros: { userId: string; nombre: string }[];
@@ -43,5 +44,83 @@ export class AssistantController {
   @MessagePattern({ cmd: 'assistant_quota' })
   quota(@Payload() dto: { userId: string }) {
     return this.assistant.estadoCuota(dto.userId);
+  }
+
+  /**
+   * Los comandos de conversaciones.
+   *
+   * Todos llevan `userId` y **ninguno acepta un id sin él**: una conversación
+   * es de quien la escribió, y `canViewReports` —lo único que comprueba el
+   * gateway— es un permiso del proyecto, no de la conversación. Sin esto, un
+   * compañero con el mismo rol leería estos hilos.
+   */
+  @MessagePattern({ cmd: 'assistant_conversations' })
+  conversaciones(@Payload() dto: { userId: string; projectId: string }) {
+    return this.assistant.listarConversaciones(dto.userId, dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'assistant_conversation' })
+  async conversacion(
+    @Payload() dto: { userId: string; projectId: string; conversationId: string },
+  ) {
+    try {
+      return await this.assistant.detalleConversacion(
+        dto.userId,
+        dto.projectId,
+        dto.conversationId,
+      );
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  @MessagePattern({ cmd: 'assistant_conversation_rename' })
+  async renombrar(
+    @Payload()
+    dto: { userId: string; projectId: string; conversationId: string; title: string },
+  ) {
+    try {
+      return await this.assistant.renombrarConversacion(
+        dto.userId,
+        dto.projectId,
+        dto.conversationId,
+        dto.title,
+      );
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  @MessagePattern({ cmd: 'assistant_conversation_delete' })
+  async borrar(
+    @Payload() dto: { userId: string; projectId: string; conversationId: string },
+  ) {
+    try {
+      return await this.assistant.borrarConversacion(
+        dto.userId,
+        dto.projectId,
+        dto.conversationId,
+      );
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  @MessagePattern({ cmd: 'assistant_proposal_resolve' })
+  async resolverPropuesta(
+    @Payload()
+    dto: { userId: string; proposalId: string; status: 'ACCEPTED' | 'DISCARDED' },
+  ) {
+    try {
+      return await this.assistant.resolverPropuesta(dto.userId, dto.proposalId, dto.status);
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  /** Lo llama el gateway al borrar un proyecto, como `task_purge`. */
+  @MessagePattern({ cmd: 'assistant_purge' })
+  purgar(@Payload() dto: { projectId: string }) {
+    return this.assistant.purgarConversaciones(dto.projectId);
   }
 }

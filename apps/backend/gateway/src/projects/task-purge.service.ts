@@ -27,12 +27,40 @@ import { firstValueFrom } from 'rxjs';
 export class TaskPurgeService {
   constructor(
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
+    @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     private readonly logger: Logger,
   ) {}
 
-  /** Tras borrar un proyecto: se van todas sus tareas. */
+  /**
+   * Tras borrar un proyecto: se van todas sus tareas **y sus conversaciones**.
+   *
+   * Las conversaciones del asistente están en el mismo caso que las tareas —
+   * viven en otro servicio, sin clave foránea, así que la cascada no llega— con
+   * el agravante de que guardan lo que la gente escribió. Un proyecto borrado no
+   * puede dejar atrás los mensajes que se cruzaron sobre él.
+   *
+   * Las dos van en paralelo y las dos son best-effort: si una falla, el proyecto
+   * ya se borró igualmente.
+   */
   async afterProjectDeleted(projectId: string) {
-    await this.purge({ projectId }, `proyecto ${projectId}`);
+    await Promise.all([
+      this.purge({ projectId }, `proyecto ${projectId}`),
+      this.purgeConversations(projectId),
+    ]);
+  }
+
+  private async purgeConversations(projectId: string) {
+    try {
+      await firstValueFrom(
+        this.assistantClient.send({ cmd: 'assistant_purge' }, { projectId }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `No se pudieron borrar las conversaciones del proyecto ${projectId}: ${
+          (error as Error).message
+        }`,
+      );
+    }
   }
 
   /** Tras borrar un tablero o un espacio: se van las de esos tableros. */

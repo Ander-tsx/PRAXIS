@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -35,13 +36,14 @@ export const ASSISTANT_ROLES = ['user', 'model'] as const;
 /**
  * Un turno del hilo, tal y como lo reenvía el cliente.
  *
- * ⚠️ **El historial lo manda el cliente y el servidor no lo guarda.** Es la
- * consecuencia de no tener tabla de conversaciones —queda fuera del alcance a
- * propósito— y tiene un efecto que hay que tener presente: el hilo es *lo que
- * el cliente diga que es*. No importa para la seguridad, porque nada de lo que
- * el modelo devuelva se ejecuta sin que el usuario lo confirme y sin que el
- * gateway compruebe permisos; sí importa para el coste, y por eso se acota a
- * `MAX_HISTORIAL` turnos y a 2 000 caracteres cada uno.
+ * ⚠️ **Ya no se usa para nada.** Durante un tiempo el historial lo mandaba el
+ * cliente en cada turno porque no había tabla de conversaciones, con el efecto
+ * incómodo de que el hilo era *lo que el cliente dijera que era*. Desde
+ * `assistant_conversations` sale de la base: el modelo ve exactamente el mismo
+ * hilo que la pantalla, y el cliente ya no puede recortarlo mal.
+ *
+ * `MAX_HISTORIAL` sigue vivo y sigue significando lo mismo —cuántos turnos
+ * entran en el prompt—, solo que ahora lo aplica el servidor al leer.
  */
 export class AssistantTurnDto {
   @ApiProperty({ enum: ASSISTANT_ROLES })
@@ -65,8 +67,24 @@ export class AssistantChatBodyDto {
   message: string;
 
   @ApiPropertyOptional({
+    description:
+      'Conversación que se continúa. Sin él, el servidor abre una nueva y ' +
+      'devuelve su id en la respuesta',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  conversationId?: string;
+
+  /**
+   * @deprecated El servidor **guarda las conversaciones** desde que existe
+   * `assistant_conversations`, así que el hilo sale de la base y este campo se
+   * ignora. Se mantiene aceptado —y validado— para que un cliente sin
+   * actualizar no reciba un 400, pero no influye en la respuesta.
+   */
+  @ApiPropertyOptional({
     type: [AssistantTurnDto],
-    description: 'Turnos anteriores del hilo. Los manda el cliente; el servidor no los guarda',
+    deprecated: true,
+    description: 'Ignorado. El hilo lo guarda el servidor desde que hay conversaciones',
   })
   @IsOptional()
   @IsArray()
@@ -74,6 +92,22 @@ export class AssistantChatBodyDto {
   @ValidateNested({ each: true })
   @Type(() => AssistantTurnDto)
   history?: AssistantTurnDto[];
+}
+
+/** Renombrar una conversación. */
+export class RenameConversationBodyDto {
+  @ApiProperty({ minLength: 1, maxLength: 60 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(60)
+  title: string;
+}
+
+/** Marcar una propuesta como aplicada o descartada. */
+export class ResolveProposalBodyDto {
+  @ApiProperty({ enum: ['ACCEPTED', 'DISCARDED'] })
+  @IsIn(['ACCEPTED', 'DISCARDED'])
+  status: 'ACCEPTED' | 'DISCARDED';
 }
 
 /**
@@ -88,17 +122,69 @@ export class AssistantChatBodyDto {
  * Un fallo del modelo es, como mucho, una propuesta mala que alguien rechaza.
  */
 export interface AssistantProposal {
-  /** `proponer_tarea` | `proponer_asignacion` */
+  /**
+   * Id de la propuesta guardada.
+   *
+   * Existe desde que las conversaciones se persisten: es con lo que el cliente
+   * marca la propuesta como aceptada o descartada, para que al releer el hilo
+   * días después no vuelva a ofrecer un botón que ya se pulsó.
+   */
+  id?: string;
+  /** `proponer_tarea` | `proponer_asignacion` | `proponer_edicion` | … */
   tool: string;
   /** Los argumentos tal cual los devolvió el modelo, ya validados contra el proyecto. */
   args: Record<string, unknown>;
+  /** `PENDING` al proponerse. Solo las pendientes conservan sus botones al releer. */
+  status?: AssistantProposalStatus;
 }
+
+export type AssistantProposalStatus = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /** Lo que ve el chat después de cada turno. */
 export interface AssistantChatResult {
+  /**
+   * La conversación en la que ha caído este turno.
+   *
+   * Si la petición no traía `conversationId`, el servidor abrió una y este es su
+   * id: el cliente tiene que quedárselo para que el siguiente mensaje continúe
+   * el mismo hilo en vez de abrir otro.
+   */
+  conversationId: string;
   reply: string;
   proposals: AssistantProposal[];
   cuota: AssistantQuota;
+}
+
+/** Una conversación en la lista, sin sus mensajes. */
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  mensajes: number;
+}
+
+/** Un turno guardado, tal y como se relee. */
+export interface AssistantStoredMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  createdAt: string;
+  proposals: AssistantProposal[];
+}
+
+/**
+ * Una conversación entera.
+ *
+ * No extiende a `AssistantConversationSummary` porque `mensajes` significa
+ * cosas distintas en cada una: en la lista es cuántos hay, aquí son cuáles.
+ */
+export interface AssistantConversation {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  mensajes: AssistantStoredMessage[];
 }
 
 export interface AssistantQuota {

@@ -46,6 +46,21 @@ import { TaskPurgeService } from './task-purge.service';
           },
         }),
       },
+      /* Solo para la purga: al borrar un proyecto hay que llevarse también sus
+         conversaciones del asistente, que viven en otro servicio y sin clave
+         foránea. Ver `TaskPurgeService`. */
+      {
+        name: 'ASSISTANT_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
+            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [

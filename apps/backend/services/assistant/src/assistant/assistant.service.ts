@@ -13,6 +13,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
+import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
 import { systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
@@ -23,6 +24,15 @@ interface ChatPayload {
   projectId: string;
   userId: string;
   message: string;
+  /**
+   * La conversación que continúa. Sin él se abre una nueva.
+   *
+   * ⚠️ **`history` ya no se usa y se ignora.** Lo mandaba el cliente en cada
+   * turno porque no había dónde guardarlo; ahora sale de la base, así que el
+   * modelo ve exactamente el mismo hilo que la pantalla. Se deja declarado
+   * para que una petición vieja no reviente, pero no entra en el prompt.
+   */
+  conversationId?: string;
   history?: { role: string; text: string }[];
   /** Mapa efectivo, ya expandido por jerarquía. Lo resuelve el gateway. */
   permisos: Record<string, boolean>;
@@ -55,6 +65,7 @@ export class AssistantService {
     private readonly config: ConfigService,
     private readonly quota: QuotaService,
     private readonly gemini: GeminiClient,
+    private readonly conversaciones: ConversationsService,
   ) {
     this.reportsClient = ClientProxyFactory.create({
       transport: Transport.TCP,
@@ -77,9 +88,16 @@ export class AssistantService {
    *
    * 1. **Cuota primero.** Si está agotada no se llama a Gemini: sería gastar
    *    dinero del equipo en una respuesta que se va a tirar.
-   * 2. Contexto, con el bloque de personas solo si hay `canViewReports`.
-   * 3. Gemini, con las herramientas que los permisos de esta persona permiten.
-   * 4. **Se consume después**, y solo si respondió bien.
+   * 2. La conversación —la que continúa o una nueva— y su hilo.
+   * 3. Contexto, con el bloque de personas solo si hay `canViewReports`.
+   * 4. Gemini, con las herramientas que los permisos de esta persona permiten.
+   * 5. **Se consume después**, y solo si respondió bien.
+   * 6. Se guarda el turno, ya con las propuestas validadas.
+   *
+   * El guardado va al final **y a propósito**: si Gemini falla, no queda una
+   * pregunta suelta en el historial esperando una respuesta que no llegó. El
+   * precio es que un fallo al escribir en la base pierde un turno que sí se
+   * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
    */
   async chat(payload: ChatPayload): Promise<AssistantChatResult> {
     const cuotaPrevia = await this.quota.estado(payload.userId);
@@ -95,6 +113,14 @@ export class AssistantService {
         details: { cuota: cuotaPrevia },
       });
     }
+
+    const conversationId = await this.conversaciones.resolver(
+      payload.userId,
+      payload.projectId,
+      payload.message,
+      payload.conversationId,
+    );
+    const history = await this.conversaciones.historial(conversationId);
 
     const briefing = await firstValueFrom(
       this.reportsClient.send<Briefing>(
@@ -116,10 +142,8 @@ export class AssistantService {
         payload.miembros,
         herramientas.map((herramienta) => herramienta.name),
       ),
-      /* El historial lo manda el cliente y aquí se recorta otra vez: el DTO del
-         gateway ya lo acota, pero este servicio también responde por TCP y no
-         puede dar por hecho quién llama. */
-      history: (payload.history ?? []).slice(-MAX_HISTORIAL),
+      /* Sale de la base, ya recortado a MAX_HISTORIAL. */
+      history,
       message: payload.message,
       tools: herramientas,
     });
@@ -128,15 +152,57 @@ export class AssistantService {
        Ver `GeminiError`. */
     const cuota = await this.quota.consumir(payload.userId);
 
-    const proposals = respuesta.calls
+    const validadas = respuesta.calls
       .map((call) => this.validarPropuesta(call, briefing, payload))
       .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
 
+    const reply = respuesta.text || this.textoPorDefecto(validadas);
+
+    /* Las propuestas vuelven **con su id**: es lo que necesita el cliente para
+       marcarlas como aceptadas o descartadas después. */
+    const proposals = await this.conversaciones.guardarTurno({
+      conversationId,
+      pregunta: payload.message,
+      respuesta: reply,
+      proposals: validadas,
+    });
+
     return {
-      reply: respuesta.text || this.textoPorDefecto(proposals),
-      proposals,
+      conversationId,
+      reply,
+      proposals: proposals as unknown as AssistantProposal[],
       cuota,
     };
+  }
+
+  /** Las conversaciones, delegadas. El gateway habla con este servicio. */
+  listarConversaciones(userId: string, projectId: string) {
+    return this.conversaciones.listar(userId, projectId);
+  }
+
+  detalleConversacion(userId: string, projectId: string, conversationId: string) {
+    return this.conversaciones.detalle(userId, projectId, conversationId);
+  }
+
+  renombrarConversacion(
+    userId: string,
+    projectId: string,
+    conversationId: string,
+    title: string,
+  ) {
+    return this.conversaciones.renombrar(userId, projectId, conversationId, title);
+  }
+
+  borrarConversacion(userId: string, projectId: string, conversationId: string) {
+    return this.conversaciones.borrar(userId, projectId, conversationId);
+  }
+
+  resolverPropuesta(userId: string, proposalId: string, status: 'ACCEPTED' | 'DISCARDED') {
+    return this.conversaciones.resolverPropuesta(userId, proposalId, status);
+  }
+
+  purgarConversaciones(projectId: string) {
+    return this.conversaciones.purgar(projectId);
   }
 
   /**
