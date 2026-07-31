@@ -149,11 +149,22 @@ export function AssignProposalCard({
       onDescartar={() => setEstado('descartada')}
     >
       <p className="font-sans text-sm text-text-secondary">
-        La tarea{' '}
-        <code className="font-mono text-xs text-text-primary">
-          {propuesta.taskId.slice(0, 8)}
-        </code>{' '}
-        pasaría a{' '}
+        {/* Con el inventario en el contexto la propuesta ya viaja con el
+            título. El id recortado se queda de reserva: identificaba la tarea
+            para quien la escribió a mano, no para quien decide si acepta. */}
+        {propuesta.taskTitle ? (
+          <>
+            <strong className="text-text-primary">{propuesta.taskTitle}</strong> pasaría a{' '}
+          </>
+        ) : (
+          <>
+            La tarea{' '}
+            <code className="font-mono text-xs text-text-primary">
+              {propuesta.taskId.slice(0, 8)}
+            </code>{' '}
+            pasaría a{' '}
+          </>
+        )}
         <strong className="text-text-primary">
           {quedan.length > 0 ? quedan.join(', ') : 'nadie'}
         </strong>

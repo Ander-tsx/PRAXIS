@@ -51,6 +51,15 @@ export interface PropuestaTarea {
 /** `proponer_asignacion`. `taskId` lo da la persona: no está en el contexto. */
 export interface PropuestaAsignacion {
   taskId: string;
+  /**
+   * El título de la tarea, resuelto por el servicio contra su inventario.
+   *
+   * Opcional porque la propuesta se validó en el servidor y la tarjeta tiene
+   * que poder pintarse igual si algún día llega sin él. Cuando está, es lo que
+   * se enseña: un id recortado a ocho caracteres no identifica nada para quien
+   * está decidiendo si acepta.
+   */
+  taskTitle?: string;
   assigneeIds: string[];
   porQue?: string;
 }
