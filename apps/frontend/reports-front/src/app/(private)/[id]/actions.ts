@@ -5,8 +5,8 @@ import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import {
   type AssistantChatResult,
   type AssistantQuota,
-  type ChatTurn,
-  MAX_HISTORIAL,
+  type ConversacionCompleta,
+  type ConversacionResumen,
   type PropuestaAsignacion,
   type PropuestaChecklist,
   type PropuestaComentario,
@@ -93,36 +93,51 @@ export interface RespuestaChat {
   proposals: AssistantChatResult['proposals'];
   /** Siempre que se pueda saber: también cuando el turno falla por cuota. */
   cuota: AssistantQuota | null;
+  /** La conversación en la que cayó el turno. El cliente lo guarda para el siguiente. */
+  conversationId: string | null;
   error: string | null;
 }
 
 /**
  * Un turno de conversación.
  *
- * El historial lo manda el cliente —no hay tabla de conversaciones, queda fuera
- * del alcance— y se recorta aquí a `MAX_HISTORIAL`: el DTO del gateway lo
- * rechaza con 400 si se pasa, y un 400 por algo que sabemos de antemano es un
- * mensaje perdido.
+ * ⚠️ **El historial ya no lo manda el cliente.** Lo guarda el servidor desde que
+ * hay conversaciones, así que aquí solo viaja `conversationId` — sin él se abre
+ * una nueva y su id vuelve en la respuesta, para que el siguiente mensaje
+ * continúe el mismo hilo.
  */
 export async function preguntarAction(
   projectId: string,
   message: string,
-  history: ChatTurn[],
+  conversationId?: string,
 ): Promise<RespuestaChat> {
   const api = await requireApi();
   if (!api) {
-    return { reply: null, proposals: [], cuota: null, error: 'Tu sesión ha caducado.' };
+    return {
+      reply: null,
+      proposals: [],
+      cuota: null,
+      conversationId: null,
+      error: 'Tu sesión ha caducado.',
+    };
   }
 
   const texto = message.trim();
   if (texto.length === 0) {
-    return { reply: null, proposals: [], cuota: null, error: 'Escribe algo primero.' };
+    return {
+      reply: null,
+      proposals: [],
+      cuota: null,
+      conversationId: null,
+      error: 'Escribe algo primero.',
+    };
   }
   if (texto.length > 2000) {
     return {
       reply: null,
       proposals: [],
       cuota: null,
+      conversationId: null,
       error: 'El mensaje no puede pasar de 2 000 caracteres.',
     };
   }
@@ -130,13 +145,7 @@ export async function preguntarAction(
   try {
     const resultado = await api.post<AssistantChatResult>(
       `/projects/${projectId}/assistant/chat`,
-      {
-        message: texto,
-        history: history.slice(-MAX_HISTORIAL).map((turno) => ({
-          role: turno.role,
-          text: turno.text.slice(0, 2000),
-        })),
-      },
+      { message: texto, ...(conversationId ? { conversationId } : {}) },
     );
 
     /* Contra el `data`, no contra el status: un 200 con el cuerpo vacío es la
@@ -146,6 +155,7 @@ export async function preguntarAction(
         reply: null,
         proposals: [],
         cuota: resultado?.cuota ?? null,
+        conversationId: resultado?.conversationId ?? null,
         error: 'El asistente no ha respondido nada.',
       };
     }
@@ -154,18 +164,108 @@ export async function preguntarAction(
       reply: resultado.reply,
       proposals: resultado.proposals ?? [],
       cuota: resultado.cuota ?? null,
+      conversationId: resultado.conversationId ?? null,
       error: null,
     };
   } catch (error) {
     return {
       reply: null,
       proposals: [],
+      conversationId: null,
       /* En el 429 la cuota viaja en el error: el contador tiene que quedar en
          el tope, no en el número de antes de intentarlo. */
       cuota: cuotaDelError(error),
       error: describe(error, 'El asistente no ha podido responder. Inténtalo otra vez.'),
     };
   }
+}
+
+/** Mis conversaciones en este proyecto, la última movida arriba. */
+export async function conversacionesAction(
+  projectId: string,
+): Promise<ConversacionResumen[]> {
+  const api = await requireApi();
+  if (!api) return [];
+  return api
+    .get<ConversacionResumen[]>(`/projects/${projectId}/assistant/conversations`)
+    .catch(() => []);
+}
+
+/** Una conversación entera, para volver a pintarla. */
+export async function cargarConversacionAction(
+  projectId: string,
+  conversationId: string,
+): Promise<ConversacionCompleta | null> {
+  const api = await requireApi();
+  if (!api) return null;
+  return api
+    .get<ConversacionCompleta>(
+      `/projects/${projectId}/assistant/conversations/${conversationId}`,
+    )
+    .catch(() => null);
+}
+
+export async function renombrarConversacionAction(
+  projectId: string,
+  conversationId: string,
+  title: string,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  const limpio = title.trim().slice(0, 60);
+  if (limpio.length === 0) return { error: 'El título no puede estar vacío.' };
+
+  try {
+    await api.patch(`/projects/${projectId}/assistant/conversations/${conversationId}`, {
+      title: limpio,
+    });
+    return { error: null };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo renombrar.') };
+  }
+}
+
+export async function borrarConversacionAction(
+  projectId: string,
+  conversationId: string,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await api.delete(`/projects/${projectId}/assistant/conversations/${conversationId}`);
+    return { error: null };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo borrar la conversación.') };
+  }
+}
+
+/**
+ * Anota qué se decidió sobre una propuesta.
+ *
+ * ⚠️ **Esto no aplica nada.** Solo deja constancia, para que al releer el hilo
+ * dentro de una semana no vuelva a ofrecer un botón que ya se pulsó.
+ *
+ * Se llama **después** de que la acción de verdad haya salido bien: al revés,
+ * un fallo del gateway dejaría una propuesta marcada como aceptada sin que se
+ * hubiera creado nada, que es peor que no marcarla.
+ *
+ * Falla en silencio a propósito. Que no se pueda anotar el estado no es motivo
+ * para decirle a alguien que su tarea no se creó, cuando sí se creó: el peor
+ * caso es una tarjeta que sigue ofreciendo su botón, y ese botón vuelve a pasar
+ * por el gateway con sus permisos.
+ */
+export async function resolverPropuestaAction(
+  projectId: string,
+  proposalId: string,
+  status: 'ACCEPTED' | 'DISCARDED',
+): Promise<void> {
+  const api = await requireApi();
+  if (!api) return;
+  await api
+    .post(`/projects/${projectId}/assistant/proposals/${proposalId}/resolve`, { status })
+    .catch(() => null);
 }
 
 /** Cuánta cuota queda. La pide la página al cargar, antes de escribir nada. */

@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, PRIORITY_LABELS, type Priority, alpha, colors } from '@praxis/commons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   type AceptarSobreTareaState,
   aceptarAsignacionAction,
@@ -10,8 +10,10 @@ import {
   aceptarEdicionAction,
   aceptarMovimientoAction,
   aceptarTareaAction,
+  resolverPropuestaAction,
 } from '@/app/(private)/[id]/actions';
 import type {
+  EstadoPropuesta,
   PropuestaAsignacion,
   PropuestaChecklist,
   PropuestaComentario,
@@ -54,6 +56,21 @@ interface Resultado {
 
 export interface ProposalCardProps {
   projectId: string;
+  /**
+   * Id de la propuesta guardada. Con él se anota lo que se decide.
+   *
+   * Opcional porque una propuesta podría llegar sin él si el guardado falló: la
+   * tarjeta funciona igual, solo que su decisión no queda anotada y al releer
+   * volverá a ofrecer sus botones.
+   */
+  proposalId?: string;
+  /**
+   * Lo que se decidió la última vez, si esto viene de una conversación vieja.
+   *
+   * Solo `PENDING` —o ausente, que es lo que llega en un turno nuevo— conserva
+   * los botones. Ver `Marco`.
+   */
+  estadoGuardado?: EstadoPropuesta;
   /** `userId` → nombre para mostrar. Sin entrada, se enseña el id recortado. */
   nombres: Record<string, string>;
   /** `labelId` → nombre de la etiqueta. */
@@ -62,6 +79,8 @@ export interface ProposalCardProps {
 
 export function TaskProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
   nombres,
   etiquetas,
@@ -104,6 +123,9 @@ export function TaskProposalCard({
       resultado={resultado}
       onAceptar={aceptar}
       onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
     >
       <p className="font-sans text-base font-semibold text-text-primary">{propuesta.title}</p>
 
@@ -138,6 +160,8 @@ export function TaskProposalCard({
 
 export function AssignProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
   nombres,
 }: ProposalCardProps & { propuesta: PropuestaAsignacion }) {
@@ -179,6 +203,9 @@ export function AssignProposalCard({
       resultado={resultado}
       onAceptar={aceptar}
       onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
     >
       <p className="font-sans text-sm text-text-secondary">
         {/* Con el inventario en el contexto la propuesta ya viaja con el
@@ -233,6 +260,8 @@ function CambioSobreTarea({
   porQue,
   ejecutar,
   projectId,
+  proposalId,
+  estadoGuardado,
   children,
 }: {
   titulo: string;
@@ -241,6 +270,8 @@ function CambioSobreTarea({
   porQue?: string;
   ejecutar: () => Promise<AceptarSobreTareaState>;
   projectId: string;
+  proposalId?: string;
+  estadoGuardado?: EstadoPropuesta;
   children: React.ReactNode;
 }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
@@ -276,6 +307,9 @@ function CambioSobreTarea({
       resultado={resultado}
       onAceptar={aceptar}
       onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
     >
       <p className="font-sans text-sm text-text-secondary">
         {taskTitle ? (
@@ -291,6 +325,8 @@ function CambioSobreTarea({
 
 export function EditProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
   etiquetas,
 }: ProposalCardProps & { propuesta: PropuestaEdicion }) {
@@ -303,6 +339,8 @@ export function EditProposalCard({
       taskTitle={propuesta.taskTitle}
       porQue={propuesta.porQue}
       projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarEdicionAction(projectId, propuesta)}
     >
       {/* Campo a campo y con el valor nuevo delante: quien acepta tiene que
@@ -351,6 +389,8 @@ export function EditProposalCard({
 
 export function MoveProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
 }: ProposalCardProps & { propuesta: PropuestaMovimiento }) {
   return (
@@ -360,6 +400,8 @@ export function MoveProposalCard({
       taskTitle={propuesta.taskTitle}
       porQue={propuesta.porQue}
       projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarMovimientoAction(projectId, propuesta)}
     >
       <p className="font-sans text-sm text-text-secondary">
@@ -378,6 +420,8 @@ export function MoveProposalCard({
 
 export function ChecklistProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
 }: ProposalCardProps & { propuesta: PropuestaChecklist }) {
   return (
@@ -387,6 +431,8 @@ export function ChecklistProposalCard({
       taskTitle={propuesta.taskTitle}
       porQue={propuesta.porQue}
       projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarChecklistAction(projectId, propuesta)}
     >
       <ol className="flex flex-col gap-1">
@@ -412,6 +458,8 @@ export function ChecklistProposalCard({
 
 export function CommentProposalCard({
   projectId,
+  proposalId,
+  estadoGuardado,
   propuesta,
 }: ProposalCardProps & { propuesta: PropuestaComentario }) {
   return (
@@ -421,6 +469,8 @@ export function CommentProposalCard({
       taskTitle={propuesta.taskTitle}
       porQue={propuesta.porQue}
       projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarComentarioAction(projectId, propuesta)}
     >
       {/* El texto entero y tal cual se va a publicar: se firma con tu nombre,
@@ -454,6 +504,9 @@ function Marco({
   resultado,
   onAceptar,
   onDescartar,
+  projectId,
+  proposalId,
+  estadoGuardado,
   children,
 }: {
   titulo: string;
@@ -473,8 +526,62 @@ function Marco({
   resultado: Resultado | null;
   onAceptar: () => void;
   onDescartar: () => void;
+  projectId: string;
+  proposalId?: string;
+  estadoGuardado?: EstadoPropuesta;
   children: React.ReactNode;
 }) {
+  /**
+   * Anota lo decidido, una sola vez, **después** de que haya salido bien.
+   *
+   * Va aquí y no en cada tarjeta porque las seis terminan igual: `estado` pasa a
+   * `hecho` o a `descartada` y eso es lo que hay que guardar. Repetirlo seis
+   * veces habría sido seis sitios donde olvidarlo.
+   *
+   * `resolverPropuestaAction` falla en silencio a propósito: que no se pueda
+   * anotar no es motivo para decir que la tarea no se creó, cuando sí se creó.
+   */
+  const anotado = useRef(false);
+  useEffect(() => {
+    if (!proposalId || anotado.current) return;
+    if (estado !== 'hecho' && estado !== 'descartada') return;
+    anotado.current = true;
+    resolverPropuestaAction(
+      projectId,
+      proposalId,
+      estado === 'hecho' ? 'ACCEPTED' : 'DISCARDED',
+    );
+  }, [estado, proposalId, projectId]);
+
+  /**
+   * Lo que se decidió en su día, al releer una conversación vieja.
+   *
+   * Sin esto, una propuesta de hace una semana volvería a ofrecer su «Aceptar» y
+   * bastaría un clic distraído para crear la misma tarea dos veces. Se deja
+   * legible —importa saber qué se propuso— pero sin nada que pulsar.
+   */
+  if (estado === 'pendiente' && estadoGuardado && estadoGuardado !== 'PENDING') {
+    return (
+      <article
+        className="flex flex-col gap-3 rounded-xl border border-dashed px-4 py-3"
+        style={{ borderColor: colors.border }}
+      >
+        <header className="flex items-center gap-2">
+          <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+            {titulo}
+          </span>
+          <span
+            className="font-sans text-[11px]"
+            style={{ color: estadoGuardado === 'ACCEPTED' ? colors.success : colors.textDisabled }}
+          >
+            {estadoGuardado === 'ACCEPTED' ? 'aceptada' : 'descartada'}
+          </span>
+        </header>
+        <div className="opacity-60">{children}</div>
+      </article>
+    );
+  }
+
   if (estado === 'descartada') {
     return (
       <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-disabled">

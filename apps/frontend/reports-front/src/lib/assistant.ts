@@ -29,8 +29,15 @@ export interface AssistantQuota {
  * de pintarla, que es el único sitio donde importa la forma concreta.
  */
 export interface AssistantProposal {
+  /**
+   * Id de la propuesta guardada. Con él se marca como aceptada o descartada,
+   * para que al releer el hilo días después no ofrezca un botón ya pulsado.
+   */
+  id?: string;
   tool: string;
   args: Record<string, unknown>;
+  /** Solo las `PENDING` conservan sus botones al releer una conversación. */
+  status?: EstadoPropuesta;
 }
 
 /** `proponer_tarea`, ya validada contra el proyecto por el servicio. */
@@ -104,7 +111,38 @@ export interface PropuestaComentario extends SobreTarea {
   body: string;
 }
 
+export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
+
+/** Una conversación en la lista lateral, sin sus mensajes. */
+export interface ConversacionResumen {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  mensajes: number;
+}
+
+/** Un turno tal y como vuelve de la base al releer una conversación. */
+export interface MensajeGuardado {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  createdAt: string;
+  proposals: AssistantProposal[];
+}
+
+export interface ConversacionCompleta {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  mensajes: MensajeGuardado[];
+}
+
 export interface AssistantChatResult {
+  /** La conversación en la que cayó el turno. Sin `conversationId` en la
+      petición, el servidor abre una y devuelve su id aquí. */
+  conversationId: string;
   reply: string;
   proposals: AssistantProposal[];
   cuota: AssistantQuota;

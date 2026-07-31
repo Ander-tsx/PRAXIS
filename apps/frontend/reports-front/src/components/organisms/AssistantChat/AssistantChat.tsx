@@ -2,12 +2,10 @@
 
 import { Badge, Button, Sparkle, alpha, colors } from '@praxis/commons';
 import { useEffect, useId, useRef, useState } from 'react';
-import { preguntarAction } from '@/app/(private)/[id]/actions';
+import { cargarConversacionAction, preguntarAction } from '@/app/(private)/[id]/actions';
 import {
   type AssistantProposal,
   type AssistantQuota,
-  type ChatTurn,
-  MAX_HISTORIAL,
   esPropuestaDeAsignacion,
   esPropuestaDeChecklist,
   esPropuestaDeComentario,
@@ -16,6 +14,7 @@ import {
   esPropuestaDeTarea,
   formatoReinicio,
 } from '@/lib/assistant';
+import { ConversationList } from './ConversationList';
 import {
   AssignProposalCard,
   ChecklistProposalCard,
@@ -66,13 +65,16 @@ const SUGERENCIAS = [
  * Gemini lo soporta, pero atravesar SSE por una Server Action complica el bucle
  * entero y las respuestas de aquí son cortas. Un estado de carga honesto basta.
  *
- * ### El historial lo lleva el cliente
+ * ### El hilo lo guarda el servidor
  *
- * No hay tabla de conversaciones —queda fuera del alcance— así que el hilo vive
- * en este estado y se reenvía en cada turno, recortado a `MAX_HISTORIAL`.
- * Consecuencia que hay que tener presente: **recargar la página borra la
- * conversación**. No se guarda en `localStorage` a propósito; lo que se habla de
- * un proyecto no tiene por qué quedarse en el navegador de quien lo usó.
+ * Hubo un tiempo en que el historial vivía en este estado y se reenviaba en cada
+ * turno, porque no había tabla de conversaciones: recargar la página lo borraba.
+ * Ahora solo viaja `conversationId` y el hilo sale de la base, así que el modelo
+ * ve exactamente el mismo que la pantalla.
+ *
+ * Al montar se empieza **limpio**, con la conversación anterior a un clic en la
+ * lista. Recuperar sola la última convertiría cada visita a Reportes en la
+ * continuación de algo que a lo mejor ya estaba cerrado.
  */
 export function AssistantChat({
   projectId,
@@ -81,6 +83,14 @@ export function AssistantChat({
   etiquetas,
 }: AssistantChatProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  /**
+   * La conversación abierta. `null` significa «la siguiente pregunta abre una».
+   *
+   * No se guarda en `localStorage`: al recargar se empieza limpio y las de antes
+   * están en la lista. Recuperar sola la última convertiría cada visita a
+   * Reportes en la continuación de algo que a lo mejor ya estaba cerrado.
+   */
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,28 +112,52 @@ export function AssistantChat({
     hiloRef.current?.scrollTo({ top: hiloRef.current.scrollHeight, behavior: 'smooth' });
   }, [mensajes.length, pendiente]);
 
+  /**
+   * Abre una conversación guardada, con sus propuestas y su estado.
+   *
+   * Las tarjetas vuelven a pintarse tal cual, pero solo las `PENDING` conservan
+   * sus botones: ver `ProposalCard`.
+   */
+  async function cargar(id: string) {
+    setError(null);
+    setPendiente(true);
+    const conversacion = await cargarConversacionAction(projectId, id);
+    setPendiente(false);
+
+    if (!conversacion) {
+      setError('No se pudo abrir esa conversación.');
+      return;
+    }
+
+    setConversationId(conversacion.id);
+    setMensajes(
+      conversacion.mensajes.map((mensaje) => ({
+        id: mensaje.id,
+        role: mensaje.role,
+        text: mensaje.text,
+        proposals: mensaje.proposals,
+      })),
+    );
+  }
+
   async function enviar(pregunta: string) {
     const limpio = pregunta.trim();
     if (!limpio || pendiente || agotada) return;
 
     const mio: Mensaje = { id: crypto.randomUUID(), role: 'user', text: limpio };
 
-    /* El historial es lo que había ANTES de este mensaje: el propio mensaje va
-       en `message`, y mandarlo dos veces le haría creer al modelo que se ha
-       repetido. */
-    const historial: ChatTurn[] = mensajes
-      .slice(-MAX_HISTORIAL)
-      .map(({ role, text }) => ({ role, text }));
-
     setMensajes((previos) => [...previos, mio]);
     setTexto('');
     setError(null);
     setPendiente(true);
 
-    const respuesta = await preguntarAction(projectId, limpio, historial);
+    const respuesta = await preguntarAction(projectId, limpio, conversationId ?? undefined);
 
     setPendiente(false);
     if (respuesta.cuota) setCuota(respuesta.cuota);
+    /* Aunque el turno falle: si el servidor llegó a abrir la conversación, el
+       siguiente intento tiene que caer dentro y no abrir otra. */
+    if (respuesta.conversationId) setConversationId(respuesta.conversationId);
 
     if (respuesta.error || !respuesta.reply) {
       setError(respuesta.error ?? 'El asistente no ha respondido nada.');
@@ -177,6 +211,21 @@ export function AssistantChat({
         {cuota && <ContadorCuota cuota={cuota} />}
       </header>
 
+      <ConversationList
+        projectId={projectId}
+        activaId={conversationId}
+        onElegir={cargar}
+        onNueva={() => {
+          setConversationId(null);
+          setMensajes([]);
+          setError(null);
+        }}
+        onBorrarActiva={() => {
+          setConversationId(null);
+          setMensajes([]);
+        }}
+      />
+
       {mensajes.length > 0 && (
         <div
           ref={hiloRef}
@@ -191,8 +240,10 @@ export function AssistantChat({
                 if (esPropuestaDeTarea(propuesta)) {
                   return (
                     <TaskProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
@@ -202,8 +253,10 @@ export function AssistantChat({
                 if (esPropuestaDeAsignacion(propuesta)) {
                   return (
                     <AssignProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
@@ -213,8 +266,10 @@ export function AssistantChat({
                 if (esPropuestaDeEdicion(propuesta)) {
                   return (
                     <EditProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
@@ -224,8 +279,10 @@ export function AssistantChat({
                 if (esPropuestaDeMovimiento(propuesta)) {
                   return (
                     <MoveProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
@@ -235,8 +292,10 @@ export function AssistantChat({
                 if (esPropuestaDeChecklist(propuesta)) {
                   return (
                     <ChecklistProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
@@ -246,8 +305,10 @@ export function AssistantChat({
                 if (esPropuestaDeComentario(propuesta)) {
                   return (
                     <CommentProposalCard
-                      key={`${mensaje.id}-${indice}`}
+                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
                       projectId={projectId}
+                      proposalId={propuesta.id}
+                      estadoGuardado={propuesta.status}
                       propuesta={propuesta.args}
                       nombres={nombres}
                       etiquetas={etiquetas}
