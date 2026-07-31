@@ -14,7 +14,7 @@ import {
   esPropuestaDeTarea,
   formatoReinicio,
 } from '@/lib/assistant';
-import { ConversationList } from './ConversationList';
+import { ConversationHistory } from './ConversationHistory';
 import {
   AssignProposalCard,
   ChecklistProposalCard,
@@ -72,9 +72,18 @@ const SUGERENCIAS = [
  * Ahora solo viaja `conversationId` y el hilo sale de la base, así que el modelo
  * ve exactamente el mismo que la pantalla.
  *
- * Al montar se empieza **limpio**, con la conversación anterior a un clic en la
- * lista. Recuperar sola la última convertiría cada visita a Reportes en la
+ * Al montar se empieza **limpio**, con la conversación anterior a un clic en el
+ * historial. Recuperar sola la última convertiría cada visita a Reportes en la
  * continuación de algo que a lo mejor ya estaba cerrado.
+ *
+ * ### Dos vistas, una sección
+ *
+ * «Historial» **sustituye** al chat en la misma tarjeta en vez de abrirse
+ * encima. Un desplegable sobre el hilo se probó y no servía: esto vive entre
+ * los gráficos del informe, así que el panel salía estrecho y tapaba lo que
+ * estabas leyendo para enseñar cuatro títulos recortados. Del historial solo
+ * se sale eligiendo —abrir una conversación o empezar otra—, y las dos llevan
+ * al chat, que es donde se puede hacer algo.
  */
 export function AssistantChat({
   projectId,
@@ -91,6 +100,15 @@ export function AssistantChat({
    * Reportes en la continuación de algo que a lo mejor ya estaba cerrado.
    */
   const [conversationId, setConversationId] = useState<string | null>(null);
+  /**
+   * Qué enseña la tarjeta: el chat o el historial.
+   *
+   * Son **la misma sección en dos modos**, no un panel encima del otro. El chat
+   * vive entre los gráficos del informe, así que un desplegable salía estrecho y
+   * tapaba el hilo que estabas leyendo para enseñar cuatro títulos. En el
+   * historial hay sitio para lo que hace falta al elegir.
+   */
+  const [vista, setVista] = useState<'chat' | 'historial'>('chat');
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +138,7 @@ export function AssistantChat({
    */
   async function cargar(id: string) {
     setError(null);
+    setVista('chat');
     setPendiente(true);
     const conversacion = await cargarConversacionAction(projectId, id);
     setPendiente(false);
@@ -188,7 +207,9 @@ export function AssistantChat({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-xl text-text-primary">Pregúntale a los datos</h3>
+            <h3 className="font-display text-xl text-text-primary">
+              {vista === 'historial' ? 'Historial' : 'Pregúntale a los datos'}
+            </h3>
             <Badge
               variant="accent"
               className="inline-flex items-center gap-1 uppercase"
@@ -204,27 +225,43 @@ export function AssistantChat({
             </Badge>
           </div>
           <p className="font-sans text-sm text-text-secondary">
-            Lee este mismo informe y responde con sus números. Cuando propone algo,
-            no lo hace: lo deja para que lo revises.
+            {vista === 'historial'
+              ? 'Tus conversaciones en este proyecto. Abre una para seguir donde la dejaste.'
+              : 'Lee este mismo informe y responde con sus números. Cuando propone algo, no lo hace: lo deja para que lo revises.'}
           </p>
         </div>
-        {cuota && <ContadorCuota cuota={cuota} />}
+        <div className="flex shrink-0 items-center gap-3">
+          {/* El contador solo en el chat: en el historial no se gasta nada, y un
+              número de cuota sobre una lista de títulos solo distrae. */}
+          {vista === 'chat' && cuota && <ContadorCuota cuota={cuota} />}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
+          >
+            {vista === 'historial' ? 'Volver al chat' : 'Historial'}
+          </Button>
+        </div>
       </header>
 
-      <ConversationList
-        projectId={projectId}
-        activaId={conversationId}
-        onElegir={cargar}
-        onNueva={() => {
-          setConversationId(null);
-          setMensajes([]);
-          setError(null);
-        }}
-        onBorrarActiva={() => {
-          setConversationId(null);
-          setMensajes([]);
-        }}
-      />
+      {vista === 'historial' ? (
+        <ConversationHistory
+          projectId={projectId}
+          activaId={conversationId}
+          onElegir={cargar}
+          onNueva={() => {
+            setConversationId(null);
+            setMensajes([]);
+            setError(null);
+            setVista('chat');
+          }}
+          onBorrarActiva={() => {
+            setConversationId(null);
+            setMensajes([]);
+          }}
+        />
+      ) : (
+        <>
 
       {mensajes.length > 0 && (
         <div
@@ -414,6 +451,8 @@ export function AssistantChat({
 
           {error && <p className="font-sans text-sm text-error">{error}</p>}
         </form>
+      )}
+        </>
       )}
     </section>
   );
