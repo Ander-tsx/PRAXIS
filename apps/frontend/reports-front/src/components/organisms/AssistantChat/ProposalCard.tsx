@@ -14,8 +14,20 @@ import type { PropuestaAsignacion, PropuestaTarea } from '@/lib/assistant';
  * tiene que poder ver exactamente lo que va a pasar, no fiarse de que el modelo
  * lo haya contado bien.
  *
- * El **por qué** no se pinta aquí: viaja como texto del asistente, en la burbuja
- * de encima. La tarjeta enseña QUÉ; la burbuja dice POR QUÉ.
+ * **El porqué se pinta aquí, dentro de cada tarjeta.** Estuvo solo en la burbuja
+ * de encima, como texto libre del asistente, y con una propuesta por respuesta
+ * colaba: el párrafo de arriba justificaba la única tarjeta de abajo. En cuanto
+ * el modelo empezó a proponer varias a la vez —repartir cinco tareas sin
+ * encargado es una llamada por tarea— dejó de casar: un bloque de razones
+ * arriba y N tarjetas debajo no se pueden emparejar leyendo.
+ *
+ * Por eso `porQue` es un parámetro **obligatorio** de las dos herramientas (ver
+ * `tools.ts`) y no una recomendación del prompt: para que cada propuesta llegue
+ * con la suya pegada y no dependa de que el modelo escriba además un texto que
+ * las cubra todas.
+ *
+ * Va **entre los hechos y los botones**, que es el orden en que se decide: qué
+ * va a pasar, por qué se propone, y entonces aceptar o descartar.
  */
 
 type Estado = 'pendiente' | 'enviando' | 'hecho' | 'descartada';
@@ -70,6 +82,8 @@ export function TaskProposalCard({
   return (
     <Marco
       titulo="Tarea propuesta"
+      sinAplicar="nada existe todavía"
+      porQue={propuesta.porQue}
       estado={estado}
       error={error}
       resultado={resultado}
@@ -142,6 +156,9 @@ export function AssignProposalCard({
   return (
     <Marco
       titulo="Cambio de encargado propuesto"
+      /* La tarea existe desde antes: lo que no se ha aplicado es el cambio. */
+      sinAplicar="sin aplicar"
+      porQue={propuesta.porQue}
       estado={estado}
       error={error}
       resultado={resultado}
@@ -190,6 +207,8 @@ export function AssignProposalCard({
  */
 function Marco({
   titulo,
+  sinAplicar,
+  porQue,
   estado,
   error,
   resultado,
@@ -198,6 +217,17 @@ function Marco({
   children,
 }: {
   titulo: string;
+  /**
+   * Qué se dice mientras la propuesta sigue sin aceptarse.
+   *
+   * Lo pone cada tarjeta porque no significan lo mismo: en una tarea nueva
+   * **nada existe todavía**, pero en un cambio de encargado la tarea existe
+   * desde antes y lo único que falta es aplicar el cambio. Decir «nada existe
+   * todavía» sobre una tarea que está en el tablero era, sencillamente, falso.
+   */
+  sinAplicar: string;
+  /** La justificación del modelo, obligatoria en las dos herramientas. */
+  porQue?: string;
   estado: Estado;
   error: string | null;
   resultado: Resultado | null;
@@ -208,7 +238,9 @@ function Marco({
   if (estado === 'descartada') {
     return (
       <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-disabled">
-        Propuesta descartada. No se ha creado nada.
+        {/* «No se ha creado nada» solo valía para la tarea nueva: al descartar
+            un cambio de encargado no había nada que crear. */}
+        Propuesta descartada. No se ha aplicado nada.
       </p>
     );
   }
@@ -226,11 +258,23 @@ function Marco({
           {titulo}
         </span>
         <span className="font-sans text-[11px] text-text-disabled">
-          {estado === 'hecho' ? 'aceptada' : 'nada existe todavía'}
+          {estado === 'hecho' ? 'aceptada' : sinAplicar}
         </span>
       </header>
 
       {children}
+
+      {/* El porqué, separado de los hechos por un filete: lo de arriba es lo que
+          va a pasar y esto es una opinión del asistente sobre por qué. Mezclarlos
+          en el mismo bloque los haría leer con la misma autoridad. */}
+      {porQue && (
+        <p
+          className="border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
+          style={{ borderColor: alpha(colors.primary, 35) }}
+        >
+          {porQue}
+        </p>
+      )}
 
       {estado === 'hecho' && resultado ? (
         <p className="font-sans text-sm text-success">
