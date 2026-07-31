@@ -27,7 +27,20 @@
 @source "../molecules/**/*.tsx";
 @source "../organisms/**/*.tsx";
 
-@theme {
+/* ⚠️ `@theme static`, no `@theme` a secas: por defecto Tailwind v4 solo emite
+   la variable CSS de un token cuando detecta una CLASE DE UTILIDAD literal que
+   la use (`text-info`, `bg-error-muted`…). Los tokens que solo se consumen vía
+   `colors.info` de `commons/tokens/colors.ts` —en un `style={{ background:
+   colors.info }}`, que es justo para lo que existe ese archivo— nunca generan
+   esa clase, así que Tailwind los recortaba del CSS final en silencio: la
+   variable no existía, `var(--color-info)` no resolvía a nada, y el punto de
+   color quedaba transparente. Pasó con `--color-info` y con las tres
+   `-muted` que ningún componente usa como clase (`success-muted`,
+   `warning-muted`, `info-muted`) — confirmado comparando qué tokens se sirven
+   con grep de sus clases (`bg-error-muted` sí aparece 3 veces; `bg-info` y
+   `bg-info-muted`, cero). `static` fuerza a Tailwind a emitir todas las
+   variables del bloque siempre, las use o no un `className`. */
+@theme static {
   /* ── FONDOS ─────────────────────────────────────────────── */
   --color-background: #0d0f14; /* Fondo base de la app */
   --color-surface: #161b27; /* Cards, modales, panels */
