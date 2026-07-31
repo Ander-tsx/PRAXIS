@@ -249,21 +249,11 @@ export interface TaskComment {
 /** Tope por archivo, espejo de `ATTACHMENT_MAX_BYTES` en el backend. */
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-/** Tipos admitidos. Lista blanca, igual que en el backend. */
-export const ATTACHMENT_ALLOWED_MIME = [
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'application/zip',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-] as const;
+/**
+ * Tipos admitidos: **solo PDF**. Espejo del backend, que además comprueba la
+ * firma del archivo y no solo lo que declare el navegador.
+ */
+export const ATTACHMENT_ALLOWED_MIME = ['application/pdf'] as const;
 
 /**
  * Archivo adjunto a una tarea. **Sin los bytes**: viven en otra tabla y solo
@@ -282,6 +272,17 @@ export interface TaskAttachment {
 /** ¿Se puede previsualizar como imagen? Solo rasterizadas; el SVG ni se admite. */
 export function isPreviewableImage(mimeType: string): boolean {
   return ['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(mimeType);
+}
+
+/**
+ * ¿Se puede abrir en el visor de la propia página?
+ *
+ * Solo el PDF. El backend lo sirve con `Content-Disposition: inline` y con
+ * `Content-Security-Policy: sandbox`, que es lo que permite meterlo en un
+ * `<iframe>` sin darle acceso a la sesión.
+ */
+export function isViewablePdf(mimeType: string): boolean {
+  return mimeType === 'application/pdf';
 }
 
 /** `1536000` → `1,5 MB`. */

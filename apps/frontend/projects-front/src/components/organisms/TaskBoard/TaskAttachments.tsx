@@ -2,6 +2,7 @@
 
 import {
   ATTACHMENT_ALLOWED_MIME,
+  isViewablePdf,
   ATTACHMENT_MAX_BYTES,
   type TaskAttachment,
   type UserProfile,
@@ -14,6 +15,7 @@ import {
 import { useActionState, useEffect, useRef } from 'react';
 import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { PdfViewer } from './PdfViewer';
 import { SECTION_PANEL } from './section-panel';
 
 export interface TaskAttachmentsProps {
@@ -71,7 +73,7 @@ export function TaskAttachments({
       {attachments.length === 0 && (
         <p className="font-sans text-xs text-text-secondary">
           {canUpload
-            ? `Imágenes, PDF, documentos o ZIP, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
+            ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
             : 'Esta tarea no tiene archivos.'}
         </p>
       )}
@@ -145,6 +147,9 @@ function AttachmentRow({
   /** Mismo origen que la aplicación: la cookie de sesión viaja sola. */
   const href = `/projects/api/gateway/tasks/${taskId}/attachments/${file.id}/content`;
   const preview = isPreviewableImage(file.mimeType);
+  /* Solo PDF desde que la subida se cerró a ese tipo. Sigue comprobándose por
+     archivo porque los adjuntos de antes conservan el suyo. */
+  const verEnPagina = isViewablePdf(file.mimeType);
 
   return (
     <li className="flex items-center gap-3 rounded-xl p-2.5" style={SECTION_PANEL}>
@@ -181,6 +186,8 @@ function AttachmentRow({
           </span>
         </span>
       </a>
+
+      {verEnPagina && <PdfViewer href={href} filename={file.filename} />}
 
       {canDelete && (
         <form action={deleteAction} className="shrink-0">
