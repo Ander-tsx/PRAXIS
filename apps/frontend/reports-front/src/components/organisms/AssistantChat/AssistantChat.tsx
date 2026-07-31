@@ -144,8 +144,17 @@ export function AssistantChat({
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-xl text-text-primary">Pregúntale a los datos</h3>
-            <Badge variant="accent" className="inline-flex items-center gap-1">
-              <Sparkle size={9} />
+            <Badge
+              variant="accent"
+              className="inline-flex items-center gap-1 uppercase"
+              style={{
+                borderRadius: 4,
+                background: colors.accent,
+                color: colors.accentForeground,
+                fontWeight: 700,
+              }}
+            >
+
               AI Powered
             </Badge>
           </div>
@@ -197,11 +206,8 @@ export function AssistantChat({
 
           {pendiente && (
             <div className="flex items-center gap-2">
-              <Sparkle
-                size={14}
-                style={{ color: colors.primary, animation: 'sparkle-spin 0.9s linear infinite' }}
-              />
-              <p className="font-sans text-sm italic text-text-disabled">Leyendo el informe…</p>
+              <ThinkingStars />
+              <p className="font-sans text-sm italic text-text-disabled">Pensando…</p>
             </div>
           )}
         </div>
@@ -292,6 +298,51 @@ export function AssistantChat({
         </form>
       )}
     </section>
+  );
+}
+
+/**
+ * Tres `Sparkle` de distinto tamaño, cada una con su propio `animation-delay`.
+ *
+ * Antes era una sola estrella girando sobre sí misma — un adorno, no una
+ * señal de actividad. Tres estrellas que titilan por turnos, cambiando de
+ * tamaño y posición sin sincronizarse entre sí, es la misma idea que usan los
+ * indicadores de "pensando" de otros asistentes: no gira nada, parpadea.
+ */
+function ThinkingStars() {
+  return (
+    <div className="relative h-6 w-11 shrink-0" aria-hidden="true">
+      <Sparkle
+        size={9}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 6,
+          color: colors.accent,
+          animation: 'sparkle-drift 1.6s ease-in-out infinite',
+        }}
+      />
+      <Sparkle
+        size={18}
+        style={{
+          position: 'absolute',
+          left: 12,
+          top: -3,
+          color: colors.primary,
+          animation: 'sparkle-drift 1.9s ease-in-out infinite 0.3s',
+        }}
+      />
+      <Sparkle
+        size={11}
+        style={{
+          position: 'absolute',
+          left: 30,
+          top: 7,
+          color: colors.primary,
+          animation: 'sparkle-drift 1.4s ease-in-out infinite 0.6s',
+        }}
+      />
+    </div>
   );
 }
 
