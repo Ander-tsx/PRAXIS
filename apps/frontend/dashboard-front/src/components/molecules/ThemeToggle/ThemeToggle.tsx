@@ -22,8 +22,18 @@ const OPTIONS: { value: ThemeName; label: string }[] = [
   { value: 'light', label: 'Claro' },
 ];
 
+/** 32px de botón + 4px de padding a cada lado: el thumb desliza entre esas dos posiciones. */
+const BUTTON_SIZE = 32;
+const PADDING = 4;
+
 /**
- * Selector de tema, dos opciones.
+ * Selector de tema: un switch de dos posiciones, no dos botones de texto.
+ *
+ * La primera versión eran dos botones con la palabra completa («Oscuro» /
+ * «Claro») y se veía estirada de más para lo poco que dice. Con solo los
+ * iconos —sol y luna, los mismos de siempre para esta idea— cabe en un
+ * círculo de 32px cada uno, y una marca deslizante (`aria-hidden`) detrás
+ * indica cuál está activo sin repetir el color en cada botón.
  *
  * Cambia de vista al instante —el estado local se adelanta al servidor— y
  * confirma con `setThemeAction`, que escribe la cookie y revalida el layout
@@ -43,12 +53,27 @@ export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
     });
   }
 
+  const activeIndex = OPTIONS.findIndex((option) => option.value === theme);
+
   return (
     <div
       role="radiogroup"
       aria-label="Tema de la interfaz"
-      className="inline-flex gap-1 rounded-lg border border-border bg-surface p-1"
+      className="relative inline-flex items-center rounded-full border border-border bg-surface"
+      style={{ padding: PADDING }}
     >
+      <span
+        aria-hidden="true"
+        className="absolute rounded-full bg-primary transition-transform duration-200 ease-out"
+        style={{
+          width: BUTTON_SIZE,
+          height: BUTTON_SIZE,
+          top: PADDING,
+          left: PADDING,
+          transform: `translateX(${activeIndex * BUTTON_SIZE}px)`,
+        }}
+      />
+
       {OPTIONS.map((option) => {
         const active = option.value === theme;
         return (
@@ -57,19 +82,49 @@ export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
             type="button"
             role="radio"
             aria-checked={active}
+            aria-label={option.label}
+            title={option.label}
             disabled={pending}
             onClick={() => select(option.value)}
             className={[
-              'rounded-md px-4 py-2 font-sans text-sm font-medium transition-all duration-150',
-              active
-                ? 'bg-primary text-primary-foreground'
-                : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+              'relative z-10 flex items-center justify-center rounded-full transition-colors duration-150',
+              active ? 'text-primary-foreground' : 'text-text-secondary hover:text-text-primary',
             ].join(' ')}
+            style={{ width: BUTTON_SIZE, height: BUTTON_SIZE }}
           >
-            {option.label}
+            {option.value === 'dark' ? <MoonIcon /> : <SunIcon />}
           </button>
         );
       })}
     </div>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+      <g stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <path d="M12 2.5v2.5" />
+        <path d="M12 19v2.5" />
+        <path d="M4.4 4.4l1.8 1.8" />
+        <path d="M17.8 17.8l1.8 1.8" />
+        <path d="M2.5 12h2.5" />
+        <path d="M19 12h2.5" />
+        <path d="M4.4 19.6l1.8-1.8" />
+        <path d="M17.8 6.2l1.8-1.8" />
+      </g>
+    </svg>
   );
 }
