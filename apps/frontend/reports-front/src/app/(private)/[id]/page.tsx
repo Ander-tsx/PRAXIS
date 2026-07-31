@@ -1,6 +1,7 @@
 import {
   AppHeader,
   type EffectivePermissions,
+  type Label,
   type Paginated,
   type Project,
   type ProjectDetail,
@@ -12,8 +13,10 @@ import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ChartCard, NotEnoughData, Stat, SyntheticBanner } from '@/components/molecules/ChartCard';
+import { AssistantChat } from '@/components/organisms/AssistantChat';
 import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/organisms/Charts';
 import { ProjectPicker } from '@/components/organisms/ProjectPicker';
+import type { AssistantQuota } from '@/lib/assistant';
 import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
@@ -79,7 +82,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * el informe completo, y es el mismo criterio que ya usa el tablero con sus
    * tareas por tablero.
    */
-  const [proyectos, snapshot, flow, cycle, forecast, people, members, directory] =
+  const [proyectos, snapshot, flow, cycle, forecast, people, members, directory, etiquetas, cuota] =
     await Promise.all([
       api
         .get<Paginated<Project>>('/projects?limit=100')
@@ -93,17 +96,35 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       puedeVerPersonas
         ? api.get<ReportPerson[]>(`/projects/${id}/reports/people`).catch(() => [])
         : Promise.resolve([] as ReportPerson[]),
-      puedeVerPersonas
-        ? api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => [])
-        : Promise.resolve([] as ProjectMember[]),
-      puedeVerPersonas
-        ? api
-            .get<Paginated<UserProfile>>('/users?limit=100')
-            .catch(() => ({ items: [] as UserProfile[], total: 0 }))
-        : Promise.resolve({ items: [] as UserProfile[], total: 0 }),
+      /* Los miembros y el directorio ya no dependen de `canViewReports`: la
+         tabla de personas sigue siendo suya, pero el asistente necesita poner
+         nombre a un `userId` para pintar una propuesta, y proponer un encargado
+         no exige ver el desglose por persona. Ambas rutas piden solo
+         `canViewProject`. */
+      api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => []),
+      api
+        .get<Paginated<UserProfile>>('/users?limit=100')
+        .catch(() => ({ items: [] as UserProfile[], total: 0 })),
+      /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
+         id, y la tarjeta tiene que enseñar el nombre. */
+      api.get<Label[]>(`/projects/${id}/labels`).catch(() => [] as Label[]),
+      /* La cuota, al cargar y antes de escribir nada: poner el coste a la vista
+         de quien lo gasta evita encontrarse el límite de golpe. */
+      api.get<AssistantQuota>(`/projects/${id}/assistant/quota`).catch(() => null),
     ]);
 
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
+
+  /** `userId` → nombre, para que una propuesta no hable en UUID. */
+  const nombres = Object.fromEntries(
+    members.map((miembro) => {
+      const user = usersById.get(miembro.userId);
+      return [miembro.userId, user ? personLabel(user) : 'Alguien que ya no está'];
+    }),
+  );
+  const nombresDeEtiquetas = Object.fromEntries(
+    etiquetas.map((etiqueta) => [etiqueta.id, etiqueta.name]),
+  );
 
   const abiertas = snapshot.total - snapshot.completed;
   const checklistPct =
@@ -130,6 +151,16 @@ export default async function ProjectReportsPage({ params }: PageProps) {
         {snapshot.eventosSinteticos > 0 && (
           <SyntheticBanner eventos={snapshot.eventosSinteticos} />
         )}
+
+        {/* Arriba del todo y no al final: lee este mismo informe, y quien llega
+            con una pregunta concreta no debería tener que recorrer cinco
+            gráficos antes de poder hacerla. */}
+        <AssistantChat
+          projectId={id}
+          cuotaInicial={cuota}
+          nombres={nombres}
+          etiquetas={nombresDeEtiquetas}
+        />
 
         {/* ── 1. Dónde está el trabajo ahora ─────────────────────────── */}
 
