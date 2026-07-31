@@ -876,11 +876,19 @@ una consulta agregada nueva, hazlo también.
 |---|---|---|---|
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewProject` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewProject` |
+| GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
 
-Cuelgan de `/projects/:projectId` para que el guard resuelva el proyecto desde la
-ruta, igual que los reportes. La cuota es **del usuario**, no del proyecto, pero
-va aquí porque sin proyecto en la ruta no hay nada contra lo que comprobar el
-permiso — el mismo motivo por el que `/me/tasks` cuelga de `/me`.
+Las dos primeras cuelgan de `/projects/:projectId` para que el guard resuelva el
+proyecto desde la ruta, igual que los reportes. La cuota es **del usuario**, no
+del proyecto, pero va ahí porque sin proyecto en la ruta no hay nada contra lo
+que comprobar el permiso — el mismo motivo por el que `/me/tasks` cuelga de
+`/me`.
+
+`GET /me/assistant/quota` es la misma cuota, sin proyecto: existe para
+pantallas como Configuración, que no tienen ningún proyecto abierto. Sin
+`ProjectPermissionGuard` — el usuario sale del token, como en `/me/tasks` y
+`/me/notifications` — y reenvía al mismo `{ cmd: 'assistant_quota' }` que la
+ruta de proyecto. Misma forma de respuesta que «La cuota», más abajo.
 
 ### ⚠️ Ninguna de las dos escribe nada
 

@@ -120,7 +120,9 @@ relativas a ese archivo. Verificado en runtime: una clase que solo aparece en
 que no usa ese componente — prueba de que Tailwind resolvió el `@source` a
 través del `@import`.
 
-Paleta: dark-only. Fondo `#0D0F14`, primario `#6C63FF`, acento `#D4A843`, texto `#E8EAF0`.
+Paleta: oscuro y claro desde §27. Fondo oscuro `#0D0F14`, primario `#6C63FF`,
+acento `#D4A843`, texto `#E8EAF0` — siguen siendo el default (`@theme`, sin
+`data-theme` en el `<html>`).
 Tipografía: `Redaction 50` (display, self-hosted woff2) + Inter y Lora vía
 `next/font` **en las tres zonas**. Antes auth-front no cargaba `next/font` y
 caía a `system-ui`, y encima le faltaban los `.woff2` (404), así que el salto
@@ -2335,3 +2337,196 @@ pnpm --filter @praxis/tasks-service exec prisma generate
 Encaja con la trampa de siempre: **si un servicio parece caído, compruébalo antes
 de buscar el fallo en el código.** Los otros cinco arrancaron sin problema y el
 síntoma fue «el tablero da 500 y los reportes van bien».
+
+---
+
+## 27. Tema claro, facturación en Configuración y retoques del asistente
+
+> Cuarta pasada sobre Configuración. Tres piezas independientes que cayeron
+> juntas por compartir pantalla: el tema claro (con su selector), la sección
+> de facturación del asistente, y un repaso del chat de Reportes que ya tenía
+> dueño desde §26.
+
+### 27.1 `GET /me/assistant/quota` — la cuota sin proyecto
+
+`GET /projects/:projectId/assistant/quota` (§26) sigue existiendo y sigue
+colgando de un proyecto solo porque `ProjectPermissionGuard` necesita algo
+contra qué resolver `canViewProject`. Pero Configuración no tiene ningún
+proyecto abierto, y la cuota es del usuario, no del proyecto — así que se
+añadió un segundo controlador, `MyAssistantController`
+(`apps/backend/gateway/src/assistant/my-assistant.controller.ts`), con
+`@Controller('me/assistant')` y solo `JwtGuard` (sin `ProjectPermissionGuard`,
+sin `projectId` en la ruta). Reenvía al mismo `{ cmd: 'assistant_quota' }` de
+siempre; assistant-service no distingue de dónde vino la petición. Mismo
+patrón que `/me/tasks` y `/me/notifications`.
+
+Verificado con curl contra el stack: `GET /api/me/assistant/quota` con
+Bearer token da `{ plan, usados, limite, periodo, reinicia }`; sin token, 401.
+
+### 27.2 El tema claro — redefinir variables, no duplicar componentes
+
+El grueso fue exactamente lo que se esperaba: **redefinir las variables**, no
+tocar componentes. `commons/styles/theme.css` gana un segundo bloque,
+`:root[data-theme='light'] { … }`, con las mismas variables del `@theme`
+oscuro y otro valor — no vive dentro de `@theme` porque ese bloque es la
+sintaxis de Tailwind v4 para *declarar* tokens y generar utilidades, no para
+condicionarlos. Al ser un selector con más especificidad que el `:root` que
+`@theme` emite, gana sin que Tailwind tenga que regenerar nada.
+
+`--color-overlay` **no cambia entre temas**: en todo el código se usa como
+sombra (`boxShadow`) o como scrim de modal/drawer (`Dialog`, `AppShell`), nunca
+como superficie de página, así que se queda oscuro en los dos temas —
+oscurecer un poco por encima de algo claro sigue leyendo como sombra.
+`success/warning/error/info` sí se oscurecen un punto en claro: el mismo tono
+pastel que se lee bien sobre `#0D0F14` pierde casi todo el contraste sobre
+blanco.
+
+#### La cookie, y por qué el layout y no `localStorage`
+
+`commons/theme/` (nuevo, mismo patrón de módulo de servidor que
+`commons/auth/`: no se re-exporta desde el índice raíz, se importa por
+`@praxis/commons/theme`) declara la cookie `praxis_theme` y `getTheme()`, que
+la lee con `next/headers`. Cada zona la llama en su `layout.tsx` — que pasó a
+ser `async` — y estampa `data-theme` en el `<html>`:
+
+```tsx
+const theme = await getTheme();
+<html lang="es" data-theme={theme} ...>
+```
+
+Es la única forma de que no haya parpadeo: las cinco zonas son apps Next
+independientes servidas por el mismo origen (el del shell), así que la
+elección tiene que resolverse **en el servidor, antes del primer byte**, en
+cada una. `localStorage` habría dejado un fogonazo del tema por defecto en
+cada salto de zona, que aquí es un salto de página completo (§16).
+
+#### 🟡 El landing del shell se queda oscuro siempre, a propósito
+
+Primer intento: que `web-shell/layout.tsx` leyera la cookie igual que las
+otras cuatro. Roto en cuanto se probó: el landing público hereda
+`data-theme="light"` y sus organismos —`LandingHero`, `LandingCTA`,
+`LandingFeatures`, `LandingHowItWorks`, `PublicNavbar`, `AsciiBackground`,
+`EchoDot3D`, siete archivos con colores incrustados que se dejaron fuera de
+esta pasada— siguen pintando texto gris claro pensado para fondo `#0D0F14`.
+Sobre blanco, la mitad del hero desaparece.
+
+El shell **no sirve páginas de negocio** (CLAUDE.md): lo único que hay detrás
+de esa cookie es el landing público, que no necesita el selector porque no
+tiene una pantalla de Configuración propia. Se revirtió a `data-theme="dark"`
+fijo en `web-shell/layout.tsx`. El selector de las cuatro zonas privadas sigue
+afectando a las cuatro — el shell es la única que no participa, y es la única
+sin razón para hacerlo.
+
+#### Colores incrustados que sí importaban
+
+`Badge`, `FeatureCard` y `AuthForm` tenían `rgba(255,255,255,…)` y hex fijos
+que asumían fondo oscuro — el resto de los diez archivos con color literal son
+del landing (excluidos, ver arriba). Los tres se migraron a `colors`/`alpha()`
+de `commons/tokens`:
+
+- `Badge`: la variante `default` usaba blanco al 6-8%, invisible sobre blanco.
+  Sale de `colors.textSecondary`, que ya es gris en los dos temas.
+- `FeatureCard`: `background`/`border` en hex fijo (`#171722`/`#131319`) pasan a
+  `colors.surfaceElevated`/`colors.surface` — el mismo par que ya usa para
+  «elevado sobre superficie» en el resto del sistema. Las sombras en
+  `rgba(0,0,0,…)` pasan a `alpha(colors.overlay, …)`, y las concatenaciones
+  `${card.accent}45` (el bug que `colors.ts` ya advertía: solo funciona con hex
+  de 6 dígitos) pasan a `alpha(card.accent, 45)`.
+- `AuthForm`: un único `boxShadow: rgba(0,0,0,0.4)` pasa a `alpha(colors.overlay, 40)`.
+
+Se tocó porque `FeatureCard` es la que arma las tarjetas de Facturación (§27.3
+la reutiliza en espíritu, no en componente — ver ahí por qué se descartó
+reusarla literalmente) y porque es una molécula de `commons`, no del landing:
+aunque hoy solo la invoque `LandingFeatures`, cruza la cookie compartida igual
+que cualquier otra zona si algún día se usa fuera del shell.
+
+### 27.3 Facturación en Configuración — sin botón que mienta
+
+`GET /me/assistant/quota` ya daba `{ plan, usados, limite, periodo, reinicia }`
+del usuario; faltaba enseñarlo. `BillingSummary`
+(`dashboard-front/src/components/organisms/BillingSummary`) pinta dos
+tarjetas: la del plan actual, con los números reales y una barra de progreso
+`usados/limite`, y la del otro plan, en palabras.
+
+**El otro plan no lleva cifra.** `ASSISTANT_LIMITS` (`FREE: 50, PRO: 500`) vive
+en `@praxis/contracts`, del lado del backend, y copiarlo a mano en el
+frontend es exactamente el error que `reports-front/src/lib/assistant.ts` ya
+había evitado: un segundo sitio donde apuntar «500» es un segundo sitio donde
+discrepar el día que cambie. Si hoy eres FREE, la tarjeta de PRO dice «más
+conversaciones al mes» sin número; el día que PRO sea tu plan, sus cifras
+reales llegan por la misma cuota.
+
+**No hay botón de compra.** El brief es explícito: pasar a PRO es hoy un
+`UPDATE` a mano en `assistant.assistant_subscriptions`, no hay pasarela de
+pago. El botón del plan que no es el tuyo queda deshabilitado, con «Aún no
+disponible» — nunca un enlace a un checkout que no existe.
+
+Se descartó reusar `FeatureCard` para las dos tarjetas: está pensada para una
+escena visual animada por hover (`visual(active) => ReactNode`) que aquí no
+pinta nada, y forzar un `visual` vacío solo para heredar el borde y el fondo
+habría sido más código que escribir las dos tarjetas a mano.
+
+Si `GET /me/assistant/quota` falla (assistant-service caído),
+`BillingSummary` recibe `quota: null` y enseña un aviso en vez de tumbar toda
+Configuración — mismo criterio que `loadCurrentUser` con los roles (§17.1).
+
+### 27.4 La pantalla, con el acabado que pedía crecer a tres secciones
+
+`SettingsSection` (§24.2) ya estaba pensada para esto: «Tus datos» pasa a
+convivir con «Apariencia» (el selector, §27.2) y «Facturación» (§27.3). Lo que
+faltaba con una sola sección y no se notaba: una línea que separe dónde acaba
+una y empieza la siguiente. Va en el `<div>` que envuelve la pila, no dentro
+de `SettingsSection` — con `[&>section:not(:first-child)]:border-t`, para que
+el componente no tenga que saber si es el primero.
+
+`ThemeToggle` (`dashboard-front/src/components/molecules/ThemeToggle`) es el
+selector: dos botones, estado optimista local y `setThemeAction` —server
+action en `configuracion/actions.ts`— que escribe la cookie y llama a
+`revalidatePath('/', 'layout')`. El segundo argumento importa: el `data-theme`
+lo pinta el `RootLayout`, que envuelve toda la zona, no la page — sin
+`'layout'`, `revalidatePath` solo invalida ese segmento y el `<html>` se queda
+con el tema viejo hasta la próxima navegación completa.
+
+`ThemeToggle` no importa `ThemeName` de `@praxis/commons/theme`: ese módulo es
+de servidor (`next/headers`) y la copia local del tipo (`'dark' | 'light'`) es
+más barata que arriesgarse a que un import se cuele en el bundle del
+navegador, aunque fuera solo por el tipo.
+
+#### Verificado en navegador, cinco zonas × dos temas
+
+| Caso | Resultado |
+|---|---|
+| Cambiar a Claro en Configuración | Las tres secciones repintan al instante, sin recargar |
+| Navegar a Reportes tras el cambio | Ya llega en claro, **cero parpadeo** — el servidor lo resolvió antes del primer byte |
+| Proyectos, tablero con etiquetas y avatares | Legible en claro; el borrador de sombra de `BoardStrip` (`alpha(colors.overlay,…)`) se sigue viendo como viñeta, no como mancha |
+| `auth/login` en claro | Tarjeta blanca, sombra de `AuthForm` correcta |
+| Landing pública (`web-shell`) tras elegir Claro | Se queda oscura — es la exclusión de §27.2, no un fallo |
+| Volver a Oscuro | Idéntico al diseño previo a esta pasada, en las cinco zonas |
+
+### 27.5 El chat de Reportes, con lo que le pedían
+
+Sobre `AssistantChat` (§26.6), cuatro retoques de interfaz, sin tocar el flujo:
+
+- **Badge «AI Powered»** junto al título, con `Sparkle` a 9px — mismo átomo que
+  ya existía, sin escribir un icono nuevo.
+- **Disclaimer** bajo el compositor, texto pequeño y siempre visible mientras
+  se puede escribir: «El asistente puede equivocarse. Revisa cada propuesta
+  antes de aceptarla.» Encaja con lo que la pantalla ya hacía —el aviso de
+  historial fabricado (§26.8) y que nada se ejecuta sin aceptar (§26.1)— y lo
+  dice en el sitio donde se escribe, no solo donde se lee.
+- **Carga**: «Leyendo el informe…» tenía razón en el texto pero era plano.
+  Ahora lleva `Sparkle` girando con el mismo `sparkle-spin` de
+  `SectionHeader`, a 0.9 s en vez de los 4 s decorativos — aquí tiene que leerse
+  como actividad, no como adorno.
+- **Botón «Preguntar» a la altura del campo**: con dos filas, el botón por
+  defecto (`size="md"`, 40px) quedaba anclado abajo por `items-end`, con un
+  hueco encima. Pasa a `items-stretch` en el contenedor y `style={{ height:
+  '100%' }}` en el botón — **no** una clase `h-full`: compite con el `h-10` de
+  `sizeClasses.md` en la misma especificidad, y quién gana depende del orden
+  en que Tailwind generó el CSS, no del orden en el `className`. Un `style` en
+  línea no tiene esa ambigüedad.
+
+Probado contra Gemini de verdad: pregunta real, cuota sube de 10 a 11,
+respuesta con avance/semana/predicción citando los mismos números que el
+informe — mismo comportamiento que documentó §26.7, con la interfaz nueva
+encima.
