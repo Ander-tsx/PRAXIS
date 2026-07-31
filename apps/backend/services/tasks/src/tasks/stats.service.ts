@@ -13,6 +13,19 @@ import { PrismaService } from '../prisma/prisma.service';
 const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 
 /**
+ * Techo del inventario que se le pasa al asistente.
+ *
+ * Hoy es deliberadamente alto: se quiere que pueda hablar de **cualquier**
+ * tarea del proyecto. No es un tope de producto, es un cortafuegos — el
+ * contexto viaja en cada turno, así que sin ningún límite un proyecto grande
+ * podría reventar la ventana del modelo y encarecer cada mensaje sin avisar.
+ *
+ * Si algún día hace falta recortar de verdad, el sitio es este y el criterio
+ * está en el `orderBy` de `inventory`: se corta por lo cerrado y lo viejo.
+ */
+const LIMITE_INVENTARIO = 500;
+
+/**
  * Agregación sobre las tareas y su historial.
  *
  * Vive **aquí y no en reports-service** porque los datos son de este servicio.
@@ -311,6 +324,70 @@ export class StatsService {
        ORDER BY "diasParada" DESC
        LIMIT ${limite}::int
     `;
+  }
+
+  /**
+   * Las tareas del proyecto, **en proyección mínima**, para el contexto del
+   * asistente.
+   *
+   * Existe porque el briefing solo llevaba agregados —«5 sin asignar»— y con un
+   * número no se puede actuar: pedirle «asigna a las que no tienen responsable»
+   * era pedirle que adivinara ids que nunca había visto, y se negaba con razón.
+   *
+   * **No se reutiliza `task_find_all`.** Aquel devuelve la tarea entera con sus
+   * relaciones —descripción, comentarios, adjuntos— y este contexto viaja
+   * dentro de la instrucción de sistema en **cada turno** de la conversación.
+   * Lo que aquí se deja fuera se deja de pagar en todos los mensajes.
+   *
+   * Va sin tope por decisión de producto: se prefiere que el asistente pueda
+   * hablar de cualquier tarea a que acierte más barato. `LIMITE` está para
+   * poder ponerle uno sin rehacer nada el día que un proyecto lo pida — a
+   * partir de unos cientos de tareas abiertas esto se nota en latencia y en
+   * cuota de Gemini.
+   */
+  async inventory(projectId: string) {
+    const tareas = await this.prisma.task.findMany({
+      where: { projectId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        columnId: true,
+        priority: true,
+        dueDate: true,
+        completedAt: true,
+        assignees: { select: { userId: true } },
+        labels: { select: { labelId: true } },
+      },
+      /**
+       * Las abiertas primero y las recientes antes: si algún día se baja el
+       * tope, lo que se corte tiene que ser lo que menos falta hace.
+       *
+       * ⚠️ `nulls: 'first'` es obligatorio, no cosmético. En Postgres un
+       * `ORDER BY ... ASC` pone los `NULL` **al final**, y aquí `completedAt`
+       * nulo es precisamente «sigue abierta»: sin esto el `take` recortaría las
+       * abiertas y dejaría dentro las cerradas, que es el orden contrario al
+       * que hace falta.
+       */
+      orderBy: [
+        { completedAt: { sort: 'asc', nulls: 'first' } },
+        { createdAt: 'desc' },
+      ],
+      take: LIMITE_INVENTARIO,
+    });
+
+    return tareas.map((tarea) => ({
+      id: tarea.id,
+      titulo: tarea.title,
+      columna: tarea.status,
+      columnId: tarea.columnId,
+      prioridad: tarea.priority,
+      /* Solo el día: la hora no la usa nadie para decidir y ocupa en cada turno. */
+      vence: tarea.dueDate ? tarea.dueDate.toISOString().slice(0, 10) : null,
+      cerrada: tarea.completedAt !== null,
+      encargados: tarea.assignees.map((a) => a.userId),
+      etiquetas: tarea.labels.map((l) => l.labelId),
+    }));
   }
 
   /**

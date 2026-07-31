@@ -396,6 +396,7 @@ export class ReportsService {
       etiquetas,
       semana,
       paradas,
+      tareas,
     ] = await Promise.all([
       this.ask<{ name: string; description: string | null }>(
         this.projectsClient,
@@ -433,6 +434,22 @@ export class ReportsService {
          de voz, sin ir más lejos— los necesita por HTTP. */
       this.weekly(projectId),
       this.blocked(projectId),
+      /* El inventario: sin él, «asigna a las que no tienen responsable» era
+         irresoluble — el briefing solo llevaba el número, y con un número no
+         hay a qué tarea apuntar. */
+      this.ask<
+        {
+          id: string;
+          titulo: string;
+          columna: string;
+          columnId: string;
+          prioridad: string;
+          vence: string | null;
+          cerrada: boolean;
+          encargados: string[];
+          etiquetas: string[];
+        }[]
+      >(this.tasksClient, 'task_inventory', { projectId }),
     ]);
 
     const ordenadas = [...columnas].sort((a, b) => a.order - b.order);
@@ -452,6 +469,26 @@ export class ReportsService {
         orden: c.order,
       })),
       etiquetas: (etiquetas ?? []).map((l) => ({ id: l.id, nombre: l.name })),
+      /**
+       * **El inventario de tareas, con sus ids.**
+       *
+       * Es lo que separa un asistente que comenta números de uno que puede
+       * actuar sobre el trabajo. Antes el contexto solo llevaba agregados
+       * —«5 sin asignar», «12 en curso»— y con eso el modelo podía describir el
+       * estado del proyecto pero no señalar ninguna tarea concreta: al pedirle
+       * «asigna a las que no tienen responsable» respondía, correctamente, que
+       * necesitaba ids que nadie le había dado.
+       *
+       * Va **entero, sin recortar por relevancia**: la decisión es que pueda
+       * hablar de cualquier tarea del proyecto. El tope duro vive en
+       * `LIMITE_INVENTARIO`, en tasks-service, y es un cortafuegos contra la
+       * ventana del modelo, no un criterio de producto.
+       *
+       * ⚠️ Esto viaja en **cada turno** de la conversación, dentro de la
+       * instrucción de sistema. Es, con diferencia, el bloque más caro del
+       * briefing, y crece con el proyecto mientras el resto no.
+       */
+      tareas,
       /**
        * El avance, **ya calculado aquí**.
        *
@@ -486,6 +523,11 @@ export class ReportsService {
         umbralDias: paradas.dias,
         total: paradas.total,
         tareas: paradas.tareas.map((tarea) => ({
+          /* El id se descartaba aquí, y con él la posibilidad de hacer nada con
+             lo que este bloque señala: el modelo podía decir «X lleva 12 días
+             parada» y no proponer moverla ni reasignarla. Se conserva desde que
+             existe `tareas`, para que las dos listas se puedan cruzar. */
+          id: tarea.taskId,
           titulo: tarea.titulo,
           columna: tarea.columna,
           diasParada: tarea.diasParada,

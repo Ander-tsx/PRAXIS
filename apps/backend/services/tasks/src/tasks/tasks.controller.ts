@@ -217,6 +217,12 @@ export class TasksController {
     return this.statsService.byPerson(dto.projectId);
   }
 
+  /** El inventario de tareas para el contexto del asistente. */
+  @MessagePattern({ cmd: 'task_inventory' })
+  taskInventory(@Payload() dto: { projectId: string }) {
+    return this.statsService.inventory(dto.projectId);
+  }
+
   /**
    * Experiencia por persona **y etiqueta**. La consume el asistente para poder
    * recomendar a alguien por lo que ha hecho, no por lo rápido que va.
