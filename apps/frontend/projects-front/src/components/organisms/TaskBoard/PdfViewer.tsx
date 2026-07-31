@@ -20,15 +20,26 @@ import { useState } from 'react';
  * sesión, sin acceso al DOM de la aplicación y sin poder navegar la ventana de
  * arriba. Ese era el riesgo por el que estaba prohibido.
  *
- * El `sandbox` del propio `<iframe>` es una segunda capa por si algún día se
- * sirviera sin la cabecera.
+ * ⚠️ **El `<iframe>` NO lleva atributo `sandbox`, y quitarlo fue el arreglo.**
  *
- * ⚠️ **Lleva `allow-scripts`, y hace falta.** El primer intento fue `sandbox=""`
- * y Chrome respondió «This page has been blocked by Chrome»: su visor de PDF no
- * es contenido de la página sino una extensión interna que se carga dentro del
- * marco, y sin scripts no arranca. Lo que sigue sin ir —ni aquí ni en la
- * cabecera— es `allow-same-origin`: es la que devolvería el acceso a la cookie
- * de sesión, y junto a `allow-scripts` anularía el sandbox entero.
+ * Chrome se niega a cargar su visor de PDF dentro de un marco con atributo
+ * `sandbox`, **da igual qué permisos lleve**: el visor es una extensión interna
+ * y el marco sandboxeado no puede alojarla. Medido con cinco combinaciones
+ * sirviendo el mismo PDF:
+ *
+ * | CSP de la respuesta | `sandbox` del iframe | |
+ * |---|---|---|
+ * | — | — | carga |
+ * | `sandbox allow-scripts` | — | **carga** |
+ * | `sandbox allow-scripts` | `allow-scripts` | ERR_BLOCKED_BY_CLIENT |
+ * | — | `allow-scripts` | ERR_BLOCKED_BY_CLIENT |
+ * | `sandbox … allow-same-origin` | `allow-scripts allow-same-origin` | ERR_BLOCKED_BY_CLIENT |
+ *
+ * **No se pierde nada de seguridad al quitarlo.** La directiva `sandbox` de la
+ * cabecera aplica las mismas restricciones al documento en sí, y esa sigue
+ * puesta: el PDF vive en un origen opaco, sin acceso a la cookie de sesión ni
+ * al DOM de la aplicación. El atributo era una segunda capa redundante que,
+ * además, impedía que la primera sirviera para algo.
  *
  * ## Por qué un `<iframe>` y no una librería
  *
@@ -64,7 +75,6 @@ export function PdfViewer({ href, filename }: { href: string; filename: string }
                descargar. */
             src={href}
             title={filename}
-            sandbox="allow-scripts allow-downloads"
             className="h-[70vh] w-full rounded-lg border border-border bg-background"
           />
 
