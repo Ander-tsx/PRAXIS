@@ -1,6 +1,7 @@
 import { AppHeader, type Paginated, type Project } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import { redirect } from 'next/navigation';
+import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 
 /**
  * Puerta de la sección.
@@ -21,13 +22,48 @@ import { redirect } from 'next/navigation';
 export default async function ReportsIndexPage() {
   const api = createServerApiClient();
 
-  const proyectos = await api
-    .get<Paginated<Project>>('/projects?limit=100')
+  /**
+   * Solo los proyectos cuyo informe puedes abrir. Entrar al primero de la lista
+   * sin filtrar mandaría a la pantalla de «no tienes acceso» a cualquiera que
+   * pulse Reportes en la barra lateral y tenga de primer proyecto uno donde no
+   * se lo han abierto.
+   */
+  const conAcceso = await api
+    .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
     .catch(() => ({ items: [] as Project[], total: 0 }));
 
-  const primero = proyectos.items[0];
+  const primero = conAcceso.items[0];
   // Sin el basePath: es una ruta del App Router de esta app. Ver §17.4.
   if (primero) redirect(`/${primero.id}`);
+
+  /**
+   * Sin ninguno hay dos motivos distintos, y confundirlos manda a pedir un
+   * permiso a quien lo que necesita es que le añadan a un proyecto. La segunda
+   * consulta solo se hace en este caso, que es el raro: `limit=1` porque de
+   * esta lista únicamente se mira el `total`.
+   */
+  const todos = await api
+    .get<Paginated<Project>>('/projects?limit=1')
+    .catch(() => ({ items: [] as Project[], total: 0 }));
+
+  if (todos.total > 0) {
+    return (
+      <AppHeader title="Reportes">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
+              Cómo va el trabajo
+            </h2>
+            <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+              Cuánto hay, cómo se mueve, cuánto tarda y qué cabe esperar.
+            </p>
+          </div>
+
+          <NoReportsAccess />
+        </div>
+      </AppHeader>
+    );
+  }
 
   return (
     <AppHeader title="Reportes">

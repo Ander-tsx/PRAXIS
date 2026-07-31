@@ -13,6 +13,7 @@ import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ChartCard, NotEnoughData, Stat, SyntheticBanner } from '@/components/molecules/ChartCard';
+import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 import { AssistantChat } from '@/components/organisms/AssistantChat';
 import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/organisms/Charts';
 import { ProjectPicker } from '@/components/organisms/ProjectPicker';
@@ -73,8 +74,23 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   const project = await api.get<ProjectDetail>(`/projects/${id}`).catch(() => null);
   if (!project) return notFound();
 
+  /**
+   * `canViewReports` es la puerta del informe entero, no solo del desglose por
+   * persona: sin él no hay agregados, ni tabla de personas, ni asistente.
+   *
+   * Se comprueba aquí aunque el gateway ya lo exija en las nueve rutas, porque
+   * el `Promise.all` de abajo caería en cascada a `null` y la pantalla
+   * enseñaría cinco tarjetas rotas en vez de decir qué pasa. El guard es la
+   * seguridad; esto es la explicación.
+   */
   const effective = await api.get<EffectivePermissions>(`/projects/${id}/permissions/me`);
-  const puedeVerPersonas = effective.permissions.canViewReports;
+  if (!effective.permissions.canViewReports) {
+    return (
+      <AppHeader title={`Reportes · ${project.name}`}>
+        <NoReportsAccess projectName={project.name} />
+      </AppHeader>
+    );
+  }
 
   /**
    * Todo a la vez. Cada informe que falle cae a `null` y su tarjeta lo dice, en
@@ -84,23 +100,22 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    */
   const [proyectos, snapshot, flow, cycle, forecast, people, members, directory, etiquetas, cuota] =
     await Promise.all([
+      /* El selector solo ofrece lo que se puede abrir. `permission` filtra en la
+         consulta, así que no hace falta preguntar por los permisos de cada
+         proyecto uno a uno para acabar descartando casi todos. */
       api
-        .get<Paginated<Project>>('/projects?limit=100')
+        .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
         .catch(() => ({ items: [] as Project[], total: 0 })),
       api.get<ReportSnapshot>(`/projects/${id}/reports/snapshot`),
       api.get<ReportFlow>(`/projects/${id}/reports/flow?days=60`).catch(() => null),
       api.get<ReportCycleTime>(`/projects/${id}/reports/cycle-time`).catch(() => null),
       api.get<ReportForecast>(`/projects/${id}/reports/forecast`).catch(() => null),
-      /* Sin `canViewReports` ni se pide: el 403 sería esperado, y pedirlo para
-         descartarlo es justo lo que evita `permissions/me`. */
-      puedeVerPersonas
-        ? api.get<ReportPerson[]>(`/projects/${id}/reports/people`).catch(() => [])
-        : Promise.resolve([] as ReportPerson[]),
-      /* Los miembros y el directorio ya no dependen de `canViewReports`: la
-         tabla de personas sigue siendo suya, pero el asistente necesita poner
-         nombre a un `userId` para pintar una propuesta, y proponer un encargado
-         no exige ver el desglose por persona. Ambas rutas piden solo
-         `canViewProject`. */
+      /* Ya no va condicionado: si llegas hasta aquí tienes `canViewReports`, y
+         el desglose por persona dejó de ser un permiso aparte. */
+      api.get<ReportPerson[]>(`/projects/${id}/reports/people`).catch(() => []),
+      /* Los miembros y el directorio piden solo `canViewProject`: el asistente
+         necesita poner nombre a un `userId` para pintar una propuesta, y esas
+         dos rutas también las usa quien nunca abre esta pantalla. */
       api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => []),
       api
         .get<Paginated<UserProfile>>('/users?limit=100')
@@ -444,90 +459,88 @@ export default async function ProjectReportsPage({ params }: PageProps) {
 
         {/* ── 5. Quién lleva qué ─────────────────────────────────────── */}
 
-        {puedeVerPersonas && (
-          <ChartCard
-            title="Cómo está repartido el trabajo"
-            description="Carga y flujo de cada persona."
-            howToRead={
-              <>
-                <p>
-                  <strong>Esto no es una clasificación</strong>, y no debe usarse
-                  como tal. Estos números cuentan tareas: no saben de dificultad, ni
-                  de a quién le tocó lo difícil, ni de quién pasó la semana ayudando
-                  a otro. Ordenan tareas, no personas.
-                </p>
-                <p>
-                  Lo que sí dice bien es el <strong>reparto</strong>: si una persona
-                  tiene el triple de abiertas que el resto, es un problema de
-                  planificación, no suyo. Y las <strong>vencidas concentradas</strong>{' '}
-                  en alguien suelen significar que se le asignó más de lo que cabe.
-                </p>
-                <p>
-                  La <strong>mediana</strong> es de sus tareas cerradas, de crear a
-                  cerrar. Con pocas tareas cerradas, un solo caso raro la mueve
-                  entera: míralas junto a la columna de «cerradas».
-                </p>
-              </>
-            }
-          >
-            {people.length === 0 ? (
-              <p className="py-8 text-center font-sans text-sm text-text-disabled">
-                Nadie tiene tareas asignadas todavía.
+        <ChartCard
+          title="Cómo está repartido el trabajo"
+          description="Carga y flujo de cada persona."
+          howToRead={
+            <>
+              <p>
+                <strong>Esto no es una clasificación</strong>, y no debe usarse
+                como tal. Estos números cuentan tareas: no saben de dificultad, ni
+                de a quién le tocó lo difícil, ni de quién pasó la semana ayudando
+                a otro. Ordenan tareas, no personas.
               </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] border-collapse">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      {['Persona', 'Abiertas', 'Cerradas', 'Vencidas', 'Mediana'].map((th) => (
-                        <th
-                          key={th}
-                          className="pb-2 font-sans text-xs uppercase tracking-wider text-text-disabled"
+              <p>
+                Lo que sí dice bien es el <strong>reparto</strong>: si una persona
+                tiene el triple de abiertas que el resto, es un problema de
+                planificación, no suyo. Y las <strong>vencidas concentradas</strong>{' '}
+                en alguien suelen significar que se le asignó más de lo que cabe.
+              </p>
+              <p>
+                La <strong>mediana</strong> es de sus tareas cerradas, de crear a
+                cerrar. Con pocas tareas cerradas, un solo caso raro la mueve
+                entera: míralas junto a la columna de «cerradas».
+              </p>
+            </>
+          }
+        >
+          {people.length === 0 ? (
+            <p className="py-8 text-center font-sans text-sm text-text-disabled">
+              Nadie tiene tareas asignadas todavía.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] border-collapse">
+                <thead>
+                  <tr className="border-b border-border text-left">
+                    {['Persona', 'Abiertas', 'Cerradas', 'Vencidas', 'Mediana'].map((th) => (
+                      <th
+                        key={th}
+                        className="pb-2 font-sans text-xs uppercase tracking-wider text-text-disabled"
+                      >
+                        {th}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {people.map((persona) => {
+                    const user = usersById.get(persona.userId);
+                    const rol = members.find((m) => m.userId === persona.userId)?.projectRole;
+                    return (
+                      <tr key={persona.userId} className="border-b border-border-subtle">
+                        <td className="py-3 font-sans text-sm text-text-primary">
+                          {user ? personLabel(user) : 'Alguien que ya no está'}
+                          {rol && (
+                            <span className="ml-2 font-sans text-xs text-text-disabled">
+                              {rol.name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
+                          {persona.abiertas}
+                        </td>
+                        <td className="py-3 font-sans text-sm tabular-nums text-success">
+                          {persona.cerradas}
+                        </td>
+                        <td
+                          className={`py-3 font-sans text-sm tabular-nums ${
+                            persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
+                          }`}
                         >
-                          {th}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {people.map((persona) => {
-                      const user = usersById.get(persona.userId);
-                      const rol = members.find((m) => m.userId === persona.userId)?.projectRole;
-                      return (
-                        <tr key={persona.userId} className="border-b border-border-subtle">
-                          <td className="py-3 font-sans text-sm text-text-primary">
-                            {user ? personLabel(user) : 'Alguien que ya no está'}
-                            {rol && (
-                              <span className="ml-2 font-sans text-xs text-text-disabled">
-                                {rol.name}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
-                            {persona.abiertas}
-                          </td>
-                          <td className="py-3 font-sans text-sm tabular-nums text-success">
-                            {persona.cerradas}
-                          </td>
-                          <td
-                            className={`py-3 font-sans text-sm tabular-nums ${
-                              persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
-                            }`}
-                          >
-                            {persona.vencidas}
-                          </td>
-                          <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
-                            {formatDuration(persona.medianaHoras)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </ChartCard>
-        )}
+                          {persona.vencidas}
+                        </td>
+                        <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
+                          {formatDuration(persona.medianaHoras)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ChartCard>
       </div>
     </AppHeader>
   );
