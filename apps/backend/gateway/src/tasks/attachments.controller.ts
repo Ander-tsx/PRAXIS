@@ -175,16 +175,29 @@ export class AttachmentsController {
      * **Origen opaco para todo lo que se sirve en línea.**
      *
      * Es lo que permite enseñar un PDF dentro de la aplicación sin abrir el
-     * agujero por el que estaba prohibido: `Content-Security-Policy: sandbox`
-     * —sin ninguna palabra clave detrás— hace que el navegador trate esta
-     * respuesta como si viniera de un origen distinto. Un PDF con JavaScript
-     * dentro se ejecuta sin acceso a las cookies de sesión ni al DOM de la
-     * aplicación, y sin poder navegar la ventana de arriba.
+     * agujero por el que estaba prohibido. La palabra que hace el trabajo es
+     * `sandbox`: sin `allow-same-origin`, el navegador trata esta respuesta
+     * como si viniera de otro origen, así que un PDF con JavaScript dentro se
+     * ejecuta sin acceso a la cookie de sesión ni al DOM de la aplicación.
      *
-     * Va también en lo que se descarga: ahí no hace nada, y una cabecera de
+     * ⚠️ **`allow-scripts` es obligatorio y cuesta explicar por qué.** El visor
+     * de PDF de Chrome no es código de la página: es una extensión interna
+     * (PDFium) que se carga *dentro* de ese marco y necesita poder ejecutar
+     * scripts para arrancar. Con `sandbox` a secas, Chrome no lo carga y
+     * enseña «This page has been blocked by Chrome» en el iframe, o una página
+     * en blanco si se abre la URL directamente. Reproducido.
+     *
+     * Lo que **no** se pone es `allow-same-origin`: esa es la que devolvería el
+     * acceso a las cookies, y `allow-scripts` + `allow-same-origin` juntas
+     * anulan el sandbox por completo. Las dos nunca van juntas aquí.
+     *
+     * `allow-downloads` para que los botones de guardar e imprimir de la barra
+     * del visor no fallen en silencio.
+     *
+     * Va también en lo que se descarga: ahí no cambia nada, y una cabecera de
      * seguridad condicionada a un `if` es una cabecera que algún día se olvida.
      */
-    res.setHeader('Content-Security-Policy', 'sandbox');
+    res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-downloads');
     /* El nombre va en `filename*` con codificación RFC 5987: los acentos y los
        espacios rompen el `filename` simple. */
     res.setHeader(
