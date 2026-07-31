@@ -66,20 +66,30 @@ export enum ProjectPermission {
   CAN_EDIT_PROJECT   = 'canEditProject',
 
   /**
-   * Ver los reportes **desglosados por persona**.
+   * Ver los reportes del proyecto, **y preguntarle al asistente sobre él**.
    *
-   * Los agregados que no nombran a nadie —flujo del tablero, tiempos de ciclo,
-   * reparto por prioridad— piden `canViewProject` y los ve cualquiera que pueda
-   * ver el proyecto. Este permiso cubre lo otro: cuánto lleva cada cual, cuánto
-   * ha cerrado y en cuánto tiempo.
+   * Cubre las siete rutas de `projects/:projectId/reports` y las dos de
+   * `projects/:projectId/assistant`. Quien no lo tenga no entra al informe: no
+   * ve los agregados, no ve el desglose por persona y no puede consultar a la
+   * IA con los datos del proyecto delante.
    *
-   * Es una línea de privacidad, no de seguridad: son datos del trabajo, no
-   * secretos. Pero un tablero con las cifras de todo el mundo a la vista se
-   * convierte en una clasificación aunque nadie lo pretenda, así que enseñarlas
-   * es una decisión que alguien tiene que tomar a propósito.
+   * ⚠️ **Antes solo cubría el desglose por persona.** Los agregados que no
+   * nombran a nadie —flujo del tablero, tiempos de ciclo, reparto por
+   * prioridad, predicción— pedían `canViewProject`, y la idea era que la línea
+   * fuese de privacidad y no de acceso: son datos del trabajo, no secretos, y
+   * lo único que había que decidir a propósito era enseñar las cifras de cada
+   * cual, porque un tablero con todas a la vista se convierte en una
+   * clasificación aunque nadie lo pretenda.
    *
-   * Cada persona ve **siempre** sus propios números, sin ningún permiso, en
-   * `/me/reports`.
+   * Se cerró entero por una razón de producto, no técnica: un perfil cuyo
+   * trabajo en la plataforma es concretar y mover tareas no necesita el análisis
+   * de datos ni el asistente, y ofrecérselo es ruido. Con la página cerrada la
+   * distinción interna se quedaba sin trabajo que hacer —quien entra lo tiene
+   * por definición— así que se eliminó en vez de dejar un permiso que
+   * significara dos cosas a la vez.
+   *
+   * La cuota del asistente sí sigue abierta en `/me/assistant/quota`: es del
+   * usuario y no de ningún proyecto, y es lo que lee Configuración.
    *
    * Entra implicado por `canManageMembers`, `canEditProject` y
    * `canDeleteProject`: así los roles «Administrador» que ya existen lo reciben

@@ -76,7 +76,7 @@ export class AssistantController {
    */
   @Get('quota')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama' })
   @ApiResponse({ status: 200, description: 'plan, usados, limite, periodo y fecha de reinicio' })
   quota(
@@ -102,7 +102,7 @@ export class AssistantController {
    */
   @Post('chat')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Un turno de conversación con el asistente del proyecto' })
   @ApiResponse({ status: 200, description: 'Respuesta, propuestas pendientes de aceptar y cuota' })
   @ApiResponse({ status: 429, description: 'Cuota mensual agotada' })

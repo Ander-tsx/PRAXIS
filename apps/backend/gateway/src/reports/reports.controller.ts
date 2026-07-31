@@ -67,7 +67,7 @@ export class ReportsController {
   }
 
   @Get('snapshot')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({
     summary: 'Estado actual del proyecto. Es el único informe que no necesita historial',
   })
@@ -79,7 +79,7 @@ export class ReportsController {
   }
 
   @Get('flow')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Flujo acumulado: cuántas tareas hay en cada columna cada día' })
   @ApiQuery({ name: 'days', required: false, description: 'Días de historial (1–365)' })
   flow(
@@ -92,7 +92,7 @@ export class ReportsController {
   }
 
   @Get('cycle-time')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Tiempos de entrega y de ciclo, en percentiles 50 y 85' })
   @ApiQuery({ name: 'days', required: false })
   cycleTime(
@@ -108,7 +108,7 @@ export class ReportsController {
   }
 
   @Get('forecast')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({
     summary: 'Cuándo estaría vacío el tablero, por simulación sobre el ritmo observado',
   })
@@ -142,7 +142,7 @@ export class ReportsController {
    * catastrófico siempre.
    */
   @Get('weekly')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cierres y entradas por semana, con la anterior para comparar' })
   @ApiQuery({ name: 'weeks', required: false, description: 'Semanas de serie (2–52)' })
   weekly(
@@ -163,7 +163,7 @@ export class ReportsController {
    * el que el historial guarda `columnId` y no `status`.
    */
   @Get('blocked')
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Tareas abiertas que llevan días sin moverse de columna' })
   @ApiQuery({ name: 'days', required: false, description: 'Umbral en días (1–365). Por defecto 7' })
   @ApiResponse({
