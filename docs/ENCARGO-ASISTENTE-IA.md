@@ -3,8 +3,14 @@
 > Documento de diseño **y** briefing para quien lo implemente. La sección
 > «Prompt de arranque» de abajo se puede pasar tal cual a otro agente.
 >
-> Escrito el 2026-07-30, al terminar la sección de Reportes. Nada de esto está
-> implementado todavía.
+> Escrito el 2026-07-30, al terminar la sección de Reportes.
+>
+> ✅ **Implementado el 2026-07-30.** Se siguió el diseño de este documento; lo
+> que se construyó, lo que se verificó y las dos cosas que solo aparecieron al
+> probarlo contra Gemini están en
+> [ESTADO-ACTUAL §26](frontend/ESTADO-ACTUAL.md#26-el-asistente-propone-y-ejecuta-el-código-que-ya-existe),
+> y el contrato de las dos rutas en
+> [CONTRATO-API «Asistente»](frontend/CONTRATO-API.md#asistente-).
 
 ---
 

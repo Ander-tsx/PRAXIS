@@ -65,7 +65,9 @@ Lista completa de lo que falta por el lado del backend, con severidad y reproduc
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP 3001-3004 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · 4103+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP 3001-3006 (credentials, projects, permissions, tasks, reports, assistant) · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · 4105+ para zonas nuevas.
+
+⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm --filter @praxis/<x>-service exec prisma generate`.
 
 **El shell no sirve páginas de negocio.** Es la cáscara: landing pública, `rewrites()` y la renovación de sesión. Cada pantalla privada va en su zona, que trae su propio guard en `proxy.ts` y se puede levantar sola. Checklist de zona nueva en ESTADO-ACTUAL §17.7.
 

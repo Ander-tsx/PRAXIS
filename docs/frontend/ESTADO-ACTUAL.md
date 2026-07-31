@@ -2085,3 +2085,174 @@ corregirle el orden. Ordenaba distinto de como apila —empezaba por la segunda
 columna—, y una leyenda que no sigue el orden del gráfico hace leer mal las
 bandas. Se pinta en HTML: el orden es el del tablero por construcción y hereda
 los estilos del sistema.
+
+---
+
+## 26. El asistente: propone, y ejecuta el código que ya existe
+
+> Sexto microservicio y un chat dentro de la pantalla de reportes. El diseño
+> entero está en [docs/ENCARGO-ASISTENTE-IA.md](../ENCARGO-ASISTENTE-IA.md);
+> aquí queda lo que se construyó y lo que se aprendió construyéndolo.
+
+### 26.1 La decisión que sostiene todo lo demás
+
+**La IA propone; ejecuta el código que ya existe.** Cuando Gemini devuelve una
+llamada a función, el backend **no la ejecuta**: la devuelve como propuesta, el
+frontend pinta una tarjeta y solo al pulsar «Aceptar» se llama al mismo endpoint
+que usa el formulario del tablero.
+
+Lo que se gana con eso, y es casi todo:
+
+- **No se abre ninguna vía de escritura nueva.** Sin `canCreateTask`, aceptar
+  falla igual que le fallaría a esa persona pulsando el botón a mano.
+- La validación, los 400 y los 403 son los que ya estaban probados.
+- Un fallo del modelo es, como mucho, una propuesta mala que alguien rechaza.
+
+Y una segunda línea, antes de esa: **las herramientas se filtran por permisos**
+antes de declarárselas al modelo. No es redundante con lo anterior — proponerle a
+alguien algo que no puede hacer es enseñarle un botón que revienta al pulsarlo,
+que es justo lo que existe para evitar `permissions/me`.
+
+### 26.2 Quién hace qué
+
+```
+reports-front (4104)
+   └─ Server Action ──► gateway :3000
+                          /projects/:projectId/assistant/{quota,chat}
+                          (JwtGuard + ProjectPermissionGuard, canViewProject)
+                             │
+                             ├─ resuelve permisos efectivos   → projects (3002)
+                             ├─ pone nombre a cada userId     → credentials (3001)
+                             └─► assistant-service (3006)
+                                    ├─ cuota (tabla propia)
+                                    ├─ briefing               → reports (3005)
+                                    └─ Gemini
+```
+
+El reparto no es casual. **El gateway es el único que sabe de roles**, así que
+resuelve el mapa efectivo y cruza los miembros con sus nombres, y le manda a
+`assistant-service` el trabajo ya masticado; ese servicio no abre clientes hacia
+media plataforma y se queda con lo suyo —la cuota y hablar con Gemini—. **El
+briefing lo arma `reports-service`**, que es quien ya sabe cruzar tasks y
+projects y quien tiene la caché.
+
+⚠️ **La clave de Gemini vive en un solo `.env`**, el de assistant-service. El
+gateway sigue siendo un router y nunca habla con un tercero.
+
+Dicho en voz alta lo incómodo: quien pueda hablar por TCP con el 3006 puede pedir
+un turno declarando los permisos que quiera. Es la misma superficie que ya tienen
+los otros cinco servicios —está en la red interna— y por eso el modelo no ejecuta
+nada: aceptar vuelve a pasar por el gateway, que sí comprueba.
+
+### 26.3 La cuota necesita estado, y por eso hay microservicio
+
+Un contador mensual que gobierna un coste real no puede vivir solo en Redis: un
+`FLUSHALL` regalaría 500 mensajes a todo el mundo. Dos tablas, esquema
+`assistant`: la suscripción (`FREE`/`PRO`) y una fila de consumo **por mes**, que
+además deja el histórico.
+
+Se consume **después de una respuesta correcta**. Si Gemini falla no se cobra:
+cobrar por un error que no es del usuario es la clase de detalle que hace que la
+gente deje de fiarse del contador. Contrapartida asumida: alguien podría provocar
+errores para no gastar cuota, y le costaría más trabajo que el que ahorra.
+
+**No hay pasarela de pago.** Pasar a `PRO` es un `UPDATE` a mano.
+
+### 26.4 Lo que el modelo decide, y lo que no
+
+**No calcula ni estima nunca.** Se le pasan los percentiles ya calculados y se le
+pide que los explique y los cite; si le dejaras estimar, diría «unos tres días»
+con total seguridad y sin ninguna base. Sí decide lo que un LLM hace bien: de qué
+trata una tarea nueva —«es del formulario de login» → etiqueta *frontend*—, a
+quién recomendar cruzando experiencia y carga, y cómo redactarlo.
+
+Recomienda **por experiencia y carga, nunca por velocidad**: «ha cerrado 3 de
+frontend y ahora tiene 5 abiertas» es un hecho sobre qué ha hecho alguien; «es
+más rápido» es un juicio hecho por un sistema que no sabe de dificultad. Es la
+misma línea que ya trazó la tabla de personas (§25.7).
+
+⚠️ **El bloque `personas` del briefing solo viaja con `canViewReports`**, y se
+filtra al armar el contexto, no en el prompt: pedirle al modelo que no cuente
+algo que tiene delante no es un control de acceso.
+
+### 26.5 Dos cosas que solo se ven al probarlo con el modelo de verdad
+
+**Una propuesta llegaba muda.** Con function calling lo normal es que el modelo
+devuelva la llamada y ni una palabra, así que la tarjeta aparecía sin decir por
+qué esa etiqueta ni por qué esa persona — justo lo que la recomendación tenía que
+aportar. Pedirlo por prompt no bastó. `porQue` es hoy **parámetro obligatorio de
+las dos herramientas**: la tarjeta enseña QUÉ se va a crear y ese campo dice POR
+QUÉ. Cuando Gemini no manda texto, la respuesta se compone con esas razones.
+
+**Sin herramientas, el asistente se callaba.** A un rol de solo lectura no se le
+declara ninguna, y al pedirle «crea una tarea» no llamaba a nada ni escribía
+nada: salía el texto por defecto, «No he sabido responder a eso», que suena a
+fallo del asistente cuando es una cuestión de permisos. La instrucción de sistema
+lleva ahora la lista de herramientas de esa conversación, en palabras, y la regla
+de decirlo en una frase y seguir con lo que sí pueda responder.
+
+### 26.6 El chat, en la propia pantalla de reportes
+
+Está ahí y no en una pantalla aparte porque **lee exactamente lo que se está
+viendo**. Isla cliente, el turno es una Server Action, y:
+
+- **Sin streaming.** Gemini lo soporta, pero atravesar SSE por una Server Action
+  complica el bucle entero y estas respuestas son cortas.
+- **Contador visible** —«6 / 50 este mes»— con el número que manda el backend en
+  cada respuesta, nunca una cuenta local.
+- **Al agotar la cuota**, el compositor desaparece y queda el aviso con la fecha
+  de reinicio. Un límite sin fecha es un muro.
+- **El hilo vive en el estado del componente** y se reenvía recortado a 12
+  turnos: no hay tabla de conversaciones. Recargar la página borra la
+  conversación, y no se guarda en `localStorage` a propósito.
+- **Las tarjetas no desaparecen al pulsar.** Quedan como «aceptada», con el
+  enlace a la tarea, o como «descartada». En un hilo, algo que se borra al
+  pulsarlo deja la conversación hablando de algo que ya no está.
+
+Dos cosas se resuelven en la Server Action y no en el chat, porque la propuesta ha
+pasado por el navegador: **el tablero**, que la propuesta no trae y se busca por
+el `columnId` en el proyecto de verdad, y **`status`**, que se toma del nombre de
+la columna encontrada y no de lo que diga el modelo.
+
+⚠️ **Ninguna acción del asistente llama a `revalidatePath`.** Lo que cambia al
+aceptar está en otra zona, que no comparte caché con esta; revalidar aquí solo
+volvería a renderizar los cinco informes para no cambiar un píxel de lo que se
+está viendo (§24, la trampa del autoguardado).
+
+Efecto lateral del chat sobre la página: **los miembros y el directorio ya no
+dependen de `canViewReports`**. La tabla de personas sigue siendo suya, pero
+poner nombre a un `userId` en una propuesta no exige ver el desglose, y las dos
+rutas piden solo `canViewProject`.
+
+### 26.7 Verificado contra el stack
+
+| Caso | Resultado |
+|---|---|
+| `GET .../assistant/quota` | `{ plan: FREE, usados: 3, limite: 50, periodo: 2026-07, reinicia: 2026-08-01 }` |
+| «¿Cómo va y para cuándo?» | Cita 44 d (p50) y 56 d (p85) — **los mismos que `/reports/forecast`** |
+| Historial fabricado | El modelo lo avisa **sin que se lo pidan en la pregunta** |
+| «Arregla el formulario de login» | Propone tarea, deduce etiqueta *frontend*, recomienda con el hecho detrás |
+| **Proponer no crea** | Tras la propuesta, `SELECT` en `tasks.tasks` → **0 filas** |
+| Aceptar sí crea | 1 fila, `status = 'Por hacer'` = nombre de la columna, prioridad, encargado y etiqueta correctos |
+| El informe lo recoge | La instantánea pasa de 60 a 61 tareas |
+| Cuota agotada (`used = 50`) | 429 con la cuota en `details`; la pantalla pinta «50 / 50» y «Vuelven el 1 de agosto» |
+| Plan `PRO` | `limite` pasa a 500 sin tocar nada más |
+| **Rol sin `canCreateTask`** | `proposals: []` y el asistente **explica que esa persona no puede**; antes del arreglo de §26.5 respondía «No he sabido responder a eso» |
+
+Cuenta de prueba creada para el caso de permisos, con rol «Colaborador de
+prueba» (`canViewProject` + `canViewReports`, sin `canCreateTask`):
+`colab-asistente@praxis.dev` / `Colab@12345!`.
+
+### 26.8 Una del entorno, para la próxima
+
+`tasks-service` no arrancaba: `Cannot find module '../generated/prisma-client'`.
+No es del código — el cliente de Prisma se genera dentro de `src/generated/` y no
+está versionado, así que un árbol recién clonado o limpiado lo necesita:
+
+```bash
+pnpm --filter @praxis/tasks-service exec prisma generate
+```
+
+Encaja con la trampa de siempre: **si un servicio parece caído, compruébalo antes
+de buscar el fallo en el código.** Los otros cinco arrancaron sin problema y el
+síntoma fue «el tablero da 500 y los reportes van bien».

@@ -818,3 +818,88 @@ que no existen en el modelo.
 Costó un rato: las consultas agregadas devolvían 500 sin más pista que «Internal
 server error». Todas las cuentas se castean a `::int` en el propio SQL. Si añades
 una consulta agregada nueva, hazlo también.
+
+---
+
+## Asistente 🔒
+
+| Método | Ruta | Entrada | Permiso |
+|---|---|---|---|
+| GET | `/projects/:projectId/assistant/quota` | — | `canViewProject` |
+| POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewProject` |
+
+Cuelgan de `/projects/:projectId` para que el guard resuelva el proyecto desde la
+ruta, igual que los reportes. La cuota es **del usuario**, no del proyecto, pero
+va aquí porque sin proyecto en la ruta no hay nada contra lo que comprobar el
+permiso — el mismo motivo por el que `/me/tasks` cuelga de `/me`.
+
+### ⚠️ Ninguna de las dos escribe nada
+
+`chat` devuelve **propuestas**, no hechos. Crear la tarea es otra petición, a
+`POST /boards/:boardId/tasks`, con `canCreateTask` y la misma validación de
+siempre; cambiar encargados es `POST /tasks/:taskId/assign`. Si el asistente
+dice que ha creado algo, está mintiendo: mira la tabla.
+
+### `chat`
+
+```ts
+// entrada
+{ message: string,                          // 1–2 000 caracteres
+  history?: [{ role: 'user' | 'model', text: string }] }   // máx. 12 turnos, 2 000 c/u
+
+// salida
+{ reply: string,
+  proposals: [{ tool, args }],
+  cuota: { plan, usados, limite, periodo, reinicia } }
+```
+
+**El historial lo manda el cliente y el servidor no lo guarda** — no hay tabla de
+conversaciones. Pasarse de 12 turnos da 400, así que recórtalo antes de mandarlo.
+
+`args` de `proponer_tarea`: `title`, `description?`, `columnId`, `columnName`,
+`priority`, `dueDate?` (`YYYY-MM-DD`), `assigneeIds?`, `labelIds?`, `porQue`.
+`columnName` viaja ya resuelto porque **`status` tiene que igualar el nombre de
+la columna destino** al crear la tarea.
+
+`args` de `proponer_asignacion`: `taskId`, `assigneeIds`, `porQue`. ⚠️ El
+`taskId` **lo escribe la persona en el chat**: los ids de tarea no entran en el
+contexto del modelo, así que compruébalo con un `GET /tasks/:id` antes de
+aceptar o el 404 llegará después de prometer el cambio.
+
+`porQue` es obligatorio en las dos y es el texto que explica la propuesta. Con
+function calling lo normal es que el modelo devuelva la llamada y ni una palabra;
+la tarjeta enseña **qué** se va a crear y ese campo dice **por qué**.
+
+### Códigos propios
+
+| Código | Cuándo | Qué hacer |
+|---|---|---|
+| **429** | Cuota mensual agotada | El cuerpo trae `error.details.cuota`: pinta el contador al tope y la fecha de `reinicia` |
+| **502** | Gemini no respondió | **No se ha consumido cuota.** Se puede reintentar |
+
+### La cuota
+
+```ts
+{ plan: 'FREE' | 'PRO', usados, limite, periodo: 'YYYY-MM', reinicia: ISO }
+```
+
+`FREE` da 50 mensajes al mes y `PRO` 500. **No hay pasarela de pago**: pasar a
+`PRO` es hoy un `UPDATE` a mano en `assistant.assistant_subscriptions`, así que
+no montes una pantalla de suscripción — prometería algo que no existe.
+
+Se consume **después de una respuesta correcta**: si Gemini falla no se cobra.
+Enseña el número que venga en cada respuesta y no lleves una cuenta local: un
+contador que diga «quedan 12» mientras el servidor rechaza el siguiente es peor
+que no tener contador.
+
+### Lo que ve el modelo, y lo que decide
+
+El contexto sale del briefing de `reports-service`: columnas, etiquetas,
+instantánea, percentiles, predicción y —**solo con `canViewReports`**— el
+desglose por persona con su experiencia por etiqueta. No entran títulos de
+tareas, descripciones, comentarios ni adjuntos.
+
+Las herramientas se filtran por permisos antes de declarárselas: sin
+`canCreateTask` no existe `proponer_tarea`, así que el modelo **no puede ni
+sugerirlo**. Con cero herramientas responde diciendo que esa persona no puede
+hacerlo, en vez de quedarse mudo.
