@@ -106,14 +106,20 @@ export class AssistantService {
       ),
     );
 
+    const herramientas = herramientasPara(payload.permisos);
+
     const respuesta = await this.gemini.chat({
-      system: systemInstruction(briefing, payload.miembros),
+      system: systemInstruction(
+        briefing,
+        payload.miembros,
+        herramientas.map((herramienta) => herramienta.name),
+      ),
       /* El historial lo manda el cliente y aquí se recorta otra vez: el DTO del
          gateway ya lo acota, pero este servicio también responde por TCP y no
          puede dar por hecho quién llama. */
       history: (payload.history ?? []).slice(-MAX_HISTORIAL),
       message: payload.message,
-      tools: herramientasPara(payload.permisos),
+      tools: herramientas,
     });
 
     /* Si Gemini falló, `chat` ya lanzó y no se llega aquí: la cuota no se toca.

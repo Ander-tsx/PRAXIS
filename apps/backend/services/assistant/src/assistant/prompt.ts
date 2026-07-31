@@ -71,6 +71,20 @@ const REGLAS = [
     'recomiendas a alguien, con el dato que lo sostiene ("ha cerrado 3 de ' +
     'frontend y ahora tiene 3 abiertas"). Una propuesta sin explicacion no vale.',
 
+  /**
+   * 7 ter — Sin tocar esto, quien no puede crear tareas recibe silencio.
+   *
+   * Las herramientas se filtran por permisos, así que a un rol de solo lectura
+   * se le declaran cero. Al pedirle «crea una tarea», Gemini no llamaba a nada
+   * y **tampoco escribía nada**: la respuesta salía por el texto por defecto
+   * —«No he sabido responder a eso»— que suena a fallo del asistente cuando en
+   * realidad es una cuestión de permisos. Reproducido con un rol sin
+   * `canCreateTask`.
+   */
+  'Si te piden algo para lo que NO tienes herramienta declarada, no te quedes ' +
+    'callado: di en una frase que esa persona no puede hacerlo en este proyecto ' +
+    'y sigue respondiendo lo que si puedas. Nunca prometas hacerlo mas tarde.',
+
   /* 8 — Lo que sí decide el modelo, y es exactamente para lo que sirve. */
   'Para clasificar una tarea nueva usa SOLO las etiquetas que vienen en ' +
     '"etiquetas", con su id. Deduce de cual es por lo que cuenta la persona: ' +
@@ -94,13 +108,25 @@ const REGLAS = [
  * usuario falso: así no se confunde con lo que ha escrito la persona, y el
  * historial que reenvía el cliente no puede desplazarlo fuera de la ventana.
  */
-export function systemInstruction(briefing: unknown, miembros: { userId: string; nombre: string }[]) {
+export function systemInstruction(
+  briefing: unknown,
+  miembros: { userId: string; nombre: string }[],
+  herramientas: string[] = [],
+) {
   return [
     'Eres el asistente de PRAXIS, un gestor de proyectos. Ayudas a leer los ' +
       'reportes del proyecto que la persona tiene delante y a preparar tareas.',
     '',
     'REGLAS (en este orden de importancia):',
     ...REGLAS.map((regla, i) => `${i + 1}. ${regla}`),
+    '',
+    /* Dicho en palabras y no solo en la lista de funciones: sin esto el modelo
+       se queda mudo cuando le piden lo que no puede proponer (regla 8). */
+    `HERRAMIENTAS QUE TIENES AQUI: ${
+      herramientas.length > 0
+        ? herramientas.join(', ')
+        : 'ninguna. Esta persona solo puede consultar; no puedes proponer nada.'
+    }`,
     '',
     'PERSONAS DEL PROYECTO (usa el nombre al hablar, el userId al llamar a una herramienta):',
     JSON.stringify(miembros),
