@@ -143,20 +143,23 @@ export class AssistantService {
    * Qué se dice cuando Gemini no manda texto.
    *
    * **Con function calling eso es lo normal, no la excepción:** el modelo
-   * devuelve la llamada y ni una palabra. Por eso el «por qué» es un parámetro
-   * obligatorio de la herramienta y no una petición en el prompt — pedirlo por
-   * prompt no funcionó— y por eso se puede usar aquí.
+   * devuelve la llamada y ni una palabra. Una burbuja en blanco encima de una
+   * tarjeta de propuesta se lee como un fallo, así que se rellena aquí y no en
+   * el frontend.
    *
-   * Se rellena en el servidor y no en el frontend porque una burbuja en blanco
-   * encima de una tarjeta de propuesta se lee como un fallo.
+   * ⚠️ **Ya no se componen los `porQue`.** Antes se unían y se devolvían como
+   * texto, porque la tarjeta los descartaba y era la única forma de que la
+   * justificación se leyera en alguna parte. Desde que cada tarjeta pinta el
+   * suyo, hacer eso escribe la misma frase dos veces, una encima de otra.
+   *
+   * Lo que queda es un encuadre que dice **cuántas** propuestas hay, que es lo
+   * único que el texto puede aportar y la tarjeta no.
    */
   private textoPorDefecto(propuestas: AssistantProposal[]): string {
-    const razones = propuestas
-      .map((propuesta) => String(propuesta.args.porQue ?? '').trim())
-      .filter(Boolean);
-
-    if (razones.length > 0) return razones.join('\n\n');
-    if (propuestas.length > 0) return 'Te propongo esto. Revisalo antes de aceptar.';
+    if (propuestas.length === 1) return 'Te propongo esto. Revisalo antes de aceptar.';
+    if (propuestas.length > 1) {
+      return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
+    }
     return 'No he sabido responder a eso.';
   }
 

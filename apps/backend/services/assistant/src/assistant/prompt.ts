@@ -82,18 +82,28 @@ const REGLAS = [
     'algo. Di que lo propones, y que lo revise.',
 
   /**
-   * 7 bis — Sin esto, una propuesta llega muda.
+   * 7 bis — Dónde va la justificación, ahora que la tarjeta la pinta.
    *
-   * Con function calling lo normal es que el modelo devuelva la llamada y ni una
-   * palabra, y entonces la tarjeta aparece sin que nadie sepa por que se
-   * recomienda a esa persona ni por que esa etiqueta. Justo lo que la
-   * recomendacion tenia que aportar —el hecho que la sostiene— es lo que se
-   * pierde. La tarjeta enseña QUE se va a crear; el texto tiene que decir POR QUE.
+   * Esta regla pedía lo contrario: que el porqué fuera en el **texto**, porque
+   * con function calling el modelo devuelve la llamada y casi nunca una
+   * palabra, y la tarjeta aparecía muda. Se resolvió por partida doble —un
+   * `porQue` obligatorio en la herramienta *y* esta regla— y durante un tiempo
+   * solo funcionaba la mitad visible: el frontend descartaba `porQue` y lo
+   * único que se leía era el texto.
+   *
+   * Desde que la tarjeta pinta su `porQue`, pedir las dos cosas hace que el
+   * modelo escriba **la misma frase dos veces**, una encima de otra. Verificado
+   * en pantalla.
+   *
+   * Así que la regla cambia de trabajo: el `porQue` justifica cada propuesta,
+   * una por una; el texto solo encuadra el conjunto. Que es lo único que el
+   * texto puede decir y la tarjeta no, cuando hay varias.
    */
-  'SIEMPRE que llames a una herramienta, escribe ADEMAS una o dos frases ' +
-    'explicando por que: de que trata la tarea y por que esa etiqueta, y si ' +
-    'recomiendas a alguien, con el dato que lo sostiene ("ha cerrado 3 de ' +
-    'frontend y ahora tiene 3 abiertas"). Una propuesta sin explicacion no vale.',
+  'La justificacion de cada propuesta va en su "porQue", NO en el texto: la ' +
+    'interfaz la pinta dentro de su tarjeta. En el texto no la repitas. Escribe ' +
+    'solo una frase de encuadre que diga que has hecho y cuantas propuestas ' +
+    'hay ("He encontrado 3 sin encargado; te propongo un reparto"), o nada si ' +
+    'con la tarjeta se entiende. Nunca dejes un "porQue" vacio o generico.',
 
   /**
    * 7 ter — Sin tocar esto, quien no puede crear tareas recibe silencio.
