@@ -9,7 +9,9 @@ import { ProjectsModule } from './projects/projects.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BoardsModule } from './boards/boards.module';
 import { ColumnsModule } from './columns/columns.module';
+import { InvitationsModule } from './invitations/invitations.module';
 import { MembersModule } from './members/members.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ProjectRolesModule } from './project-roles/project-roles.module';
 
 @Module({
@@ -35,7 +37,9 @@ import { ProjectRolesModule } from './project-roles/project-roles.module';
     WorkspacesModule,
     BoardsModule,
     ColumnsModule,
+    InvitationsModule,
     MembersModule,
+    NotificationsModule,
     ProjectRolesModule,
   ],
 })

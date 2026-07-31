@@ -18,12 +18,12 @@ useGLTF.preload('/alexa.glb');
 
 const UTTERANCES = [
   'Alexa, dame un resumen del proyecto',
-  'Alexa, ¿qué tareas quedan pendientes?',
-  'Alexa, ¿cuándo es mi próxima entrega?',
-  'Alexa, ¿en qué sprint estamos?',
-  'Alexa, ¿cuánto presupuesto queda?',
-  'Alexa, ¿hay tareas atrasadas hoy?',
-  'Alexa, ¿quién tiene más carga de trabajo?',
+  'Alexa, ¿qué tareas tengo asignadas?',
+  'Alexa, ¿qué hay en la columna En progreso?',
+  'Alexa, mueve la tarea de login a Hecho',
+  'Alexa, ¿qué vence esta semana?',
+  'Alexa, crea una tarea en el tablero de diseño',
+  'Alexa, ¿quién tiene más tareas abiertas?',
 ];
 
 /* ── Echo Dot GLB model ──────────────────────────────────────── */
@@ -41,7 +41,7 @@ function EchoDotModel() {
   return (
     <Float speed={3.67} rotationIntensity={2} floatIntensity={0.55} floatingRange={[-0.12, 0.12]}>
       <group ref={groupRef}>
-        <primitive object={clonedScene} scale={1.1} position={[0, -1, 0]} />
+        <primitive object={clonedScene} scale={1.18} position={[0, -1, 0]} />
       </group>
     </Float>
   );
@@ -102,26 +102,26 @@ function SpeechBubble({ text, visible }: { text: string; visible: boolean }) {
   return (
     <div
       ref={ref}
-      className="flex items-center gap-3 px-4 py-3 rounded-2xl rounded-bl-sm"
+      className="flex items-center gap-3.5 rounded-2xl rounded-bl-sm px-5 py-4"
       style={{
         background: 'rgba(22,27,39,0.92)',
         border: '1px solid rgba(108,99,255,0.35)',
         boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(108,99,255,0.08)',
         backdropFilter: 'blur(14px)',
-        maxWidth: 290,
+        maxWidth: 400,
         opacity: 0,
       }}
     >
       <div
-        className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center"
+        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
         style={{ background: 'rgba(108,99,255,0.15)', border: '1.5px solid rgba(108,99,255,0.55)' }}
       >
         <div
-          className="w-2 h-2 rounded-full animate-pulse"
+          className="h-2.5 w-2.5 animate-pulse rounded-full"
           style={{ background: 'var(--color-primary)' }}
         />
       </div>
-      <output className="font-sans text-sm text-text-primary leading-snug" aria-live="polite">
+      <output className="font-sans text-base leading-snug text-text-primary" aria-live="polite">
         {text}
       </output>
     </div>
@@ -152,25 +152,25 @@ export function EchoDot3D() {
   }, [visible]);
 
   return (
-    <div className="flex flex-col items-center" style={{ width: 300 }}>
+    <div className="flex flex-col items-center" style={{ width: 440 }}>
       {/* Alexa Skill label */}
       <div
-        className="flex items-center gap-2 mb-4 px-3 py-1 rounded-full border"
+        className="mb-5 flex items-center gap-2 rounded-full border px-4 py-1.5"
         style={{ borderColor: 'rgba(108,99,255,0.3)', background: 'rgba(108,99,255,0.08)' }}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" aria-hidden="true" />
-        <span className="font-sans text-xs text-primary font-medium tracking-wide">
+        <span className="font-sans text-sm font-medium tracking-wide text-primary">
           Integración Alexa Skill
         </span>
       </div>
 
       {/* Speech bubble */}
-      <div className="mb-2 w-full pl-1" style={{ minHeight: 56 }}>
+      <div className="mb-3 w-full pl-1" style={{ minHeight: 74 }}>
         <SpeechBubble text={UTTERANCES[currentIdx]} visible={visible} />
       </div>
 
       {/* Three.js Canvas */}
-      <div style={{ position: 'relative', width: 270, height: 270 }}>
+      <div style={{ position: 'relative', width: 420, height: 400 }}>
         {/* Background contrast zone */}
         <div
           aria-hidden="true"
@@ -192,11 +192,11 @@ export function EchoDot3D() {
             bottom: 8,
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 200,
-            height: 55,
+            width: 320,
+            height: 88,
             background:
               'radial-gradient(ellipse, rgba(108,99,255,0.45) 0%, rgba(108,99,255,0.18) 45%, transparent 72%)',
-            filter: 'blur(14px)',
+            filter: 'blur(22px)',
             pointerEvents: 'none',
             zIndex: 0,
           }}
@@ -208,10 +208,10 @@ export function EchoDot3D() {
             bottom: -12,
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 300,
-            height: 80,
+            width: 480,
+            height: 128,
             background: 'radial-gradient(ellipse, rgba(108,99,255,0.18) 0%, transparent 68%)',
-            filter: 'blur(20px)',
+            filter: 'blur(32px)',
             pointerEvents: 'none',
             zIndex: 0,
           }}

@@ -1,0 +1,194 @@
+import { alpha, colors } from '@praxis/commons';
+import type { ReactNode } from 'react';
+
+export interface ChartCardProps {
+  title: string;
+  /** Qué significa el gráfico, en una frase. Va **siempre**: ver abajo. */
+  description: string;
+  /** Cifra grande a la derecha del título, si la hay. */
+  highlight?: ReactNode;
+  /**
+   * Cómo se lee el gráfico y qué decisiones permite tomar.
+   *
+   * Va en un desplegable cerrado: quien ya lo entiende no lo abre nunca y quien
+   * no, lo tiene a mano sin salir de la pantalla. Es la diferencia entre un
+   * gráfico que se mira y uno que se usa.
+   */
+  howToRead?: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * La caja de un gráfico.
+ *
+ * **`description` es obligatoria a propósito.** Un gráfico sin una frase que
+ * diga qué mide se interpreta mal con una seguridad enorme: quien lo mira
+ * inventa la explicación que le encaja. En una sección cuyo trabajo entero es
+ * decir cosas ciertas sobre el equipo, esa es la peor forma de fallar, y hacerla
+ * opcional habría bastado para que la mitad se quedara sin ella.
+ */
+export function ChartCard({
+  title,
+  description,
+  highlight,
+  howToRead,
+  children,
+}: ChartCardProps) {
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className="font-display text-xl text-text-primary">{title}</h3>
+          <p className="font-sans text-sm text-text-secondary">{description}</p>
+        </div>
+        {highlight && <div className="shrink-0 text-right">{highlight}</div>}
+      </header>
+
+      {children}
+
+      {howToRead && <HowToRead>{howToRead}</HowToRead>}
+    </section>
+  );
+}
+
+/**
+ * «Cómo se lee esto», plegado.
+ *
+ * Es un `<details>` nativo y no un estado de React: el navegador ya da la
+ * apertura con teclado, el anuncio correcto al lector de pantalla y la búsqueda
+ * dentro de la página aunque esté cerrado. Reimplementarlo sería trabajo para
+ * quedarse peor.
+ *
+ * Cerrado por defecto, y esa es la decisión: la explicación no puede competir
+ * con el gráfico ni empujarlo fuera de la pantalla, pero tampoco puede vivir en
+ * una documentación que nadie va a abrir en otro sitio.
+ */
+export function HowToRead({ children }: { children: ReactNode }) {
+  return (
+    <details className="group rounded-xl border border-border-subtle bg-background/40">
+      <summary className="cursor-pointer list-none px-4 py-2.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary">
+        <span className="inline-flex items-center gap-2">
+          <svg
+            className="h-3.5 w-3.5 transition-transform group-open:rotate-90"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          Cómo se lee esto
+        </span>
+      </summary>
+
+      <div className="flex flex-col gap-2 px-4 pb-4 pt-1 font-sans text-sm leading-relaxed text-text-secondary [&_strong]:font-semibold [&_strong]:text-text-primary">
+        {children}
+      </div>
+    </details>
+  );
+}
+
+/** Cifra grande con su etiqueta. Para el hueco de `highlight` y los resúmenes. */
+export function Stat({
+  value,
+  label,
+  tone = 'primary',
+}: {
+  value: ReactNode;
+  label: string;
+  tone?: 'primary' | 'success' | 'warning' | 'error' | 'muted';
+}) {
+  const color = {
+    primary: colors.primary,
+    success: colors.success,
+    warning: colors.warning,
+    error: colors.error,
+    muted: colors.textSecondary,
+  }[tone];
+
+  return (
+    <div className="flex flex-col">
+      <span
+        className="font-display text-3xl leading-none tabular-nums"
+        style={{ color }}
+      >
+        {value}
+      </span>
+      <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Aviso de que el historial de este proyecto **está fabricado**.
+ *
+ * Va arriba del todo y no se puede cerrar. Un gráfico inventado sin etiquetar es
+ * el peor resultado posible de esta sección: durante una demostración nadie
+ * distingue un dato medido de uno generado, y el que lo ve se lleva una
+ * conclusión falsa sobre gente real.
+ */
+export function SyntheticBanner({ eventos }: { eventos: number }) {
+  return (
+    <p
+      role="note"
+      className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
+      style={{
+        background: alpha(colors.warning, 8),
+        borderColor: alpha(colors.warning, 30),
+      }}
+    >
+      <strong>Historial de demostración.</strong> Los {eventos.toLocaleString('es-MX')} eventos de
+      este proyecto los fabricó un script para poder enseñar la sección. No miden
+      trabajo real de nadie.
+    </p>
+  );
+}
+
+/**
+ * Lo que se enseña cuando **no hay datos suficientes para predecir**.
+ *
+ * Es la pieza que más importa de toda la sección. Una predicción sacada de
+ * cuatro tareas parece exactamente igual de seria que una sacada de
+ * cuatrocientas, así que dibujarla igualmente sería la forma más rápida de que
+ * esto pierda la confianza de quien lo lee. En lugar del gráfico se dice qué
+ * falta y por qué.
+ */
+export function NotEnoughData({
+  faltanTareas,
+  faltanDias,
+}: {
+  faltanTareas: number;
+  faltanDias: number;
+}) {
+  const piezas = [
+    faltanTareas > 0 &&
+      `${faltanTareas} ${faltanTareas === 1 ? 'tarea cerrada más' : 'tareas cerradas más'}`,
+    faltanDias > 0 && `${faltanDias} ${faltanDias === 1 ? 'día más' : 'días más'} de historial`,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div
+      className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center"
+      style={{ borderColor: colors.border }}
+    >
+      <p className="font-display text-lg text-text-primary">Todavía no hay suficiente historial</p>
+      <p className="max-w-md font-sans text-sm text-text-secondary">
+        {piezas.length > 0 ? (
+          <>
+            Faltan <strong className="text-text-primary">{piezas.join(' y ')}</strong>.
+          </>
+        ) : (
+          'Faltan datos para calcular esto.'
+        )}
+      </p>
+      <p className="max-w-md font-sans text-xs text-text-disabled">
+        Se prefiere no enseñar nada a enseñar un número que parecería fiable sin
+        serlo. El historial empieza a contar desde que se registró la primera
+        tarea, no antes.
+      </p>
+    </div>
+  );
+}

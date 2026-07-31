@@ -22,12 +22,19 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import {
-  CreateChecklistDto,
-  DeleteChecklistDto,
+  CreateChecklistBodyDto,
+  DeleteChecklistBodyDto,
   ProjectPermission,
-  ToggleChecklistDto,
+  ToggleChecklistBodyDto,
 } from '@praxis/contracts';
 
+/**
+ * Ítems de checklist de una tarea.
+ *
+ * ⚠️ **El `projectId` sale de `req.projectId`**, resuelto por el guard desde
+ * el `:taskId` de la ruta. El cuerpo ya no lo declara: mandarlo responde 400
+ * (`PENDIENTES-BACKEND.md §9`).
+ */
 @ApiTags('Task Checklists')
 @ApiBearerAuth()
 @UseGuards(JwtGuard, ProjectPermissionGuard)
@@ -46,7 +53,7 @@ export class ChecklistsController {
   create(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<CreateChecklistDto, 'taskId' | 'requesterId'>,
+    @Body() body: CreateChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -54,23 +61,34 @@ export class ChecklistsController {
         {
           ...body,
           taskId,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
     );
   }
 
-  /** Alterna el estado completado de un ítem de checklist */
+  /**
+   * Alterna el estado completado de un ítem (requiere canMoveTask).
+   *
+   * **Marcar un paso es ejecutar el trabajo, no redefinirlo.** Quien puede
+   * arrastrar la tarjeta a «Hecho» tiene que poder ir marcando los pasos por el
+   * camino; exigir `canEditTask` dejaba a esa persona con un checklist de solo
+   * lectura sobre su propia tarea.
+   *
+   * Añadir y borrar ítems sí siguen siendo `canEditTask`: eso es decidir en qué
+   * consiste la tarea.
+   */
   @Post(':id/toggle')
   @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_EDIT_TASK)
+  @RequireProjectPermission(ProjectPermission.CAN_MOVE_TASK)
   @ApiOperation({ summary: 'Alterna el estado completado de un ítem' })
   @ApiResponse({ status: 200, description: 'Estado de ítem cambiado' })
   toggle(
     @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<ToggleChecklistDto, 'id' | 'requesterId'>,
+    @Body() body: ToggleChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -78,6 +96,7 @@ export class ChecklistsController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),
@@ -94,7 +113,7 @@ export class ChecklistsController {
     @Param('taskId') taskId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
-    @Body() body: Omit<DeleteChecklistDto, 'id' | 'requesterId'>,
+    @Body() body: DeleteChecklistBodyDto,
   ) {
     return firstValueFrom(
       this.tasksClient.send(
@@ -102,6 +121,7 @@ export class ChecklistsController {
         {
           ...body,
           id,
+          projectId: req.projectId,
           requesterId: req.user!.userId,
         },
       ),

@@ -4,10 +4,13 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ObservabilityModule } from '@praxis/observability';
 import { envValidationSchema } from './common/config/env.validation';
 
+import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
 
 
@@ -31,6 +34,9 @@ import { TasksModule } from './tasks/tasks.module';
     PermissionsModule,
     ProjectsModule,
     TasksModule,
+    NotificationsModule,
+    ReportsModule,
+    AssistantModule,
   ],
 })
 

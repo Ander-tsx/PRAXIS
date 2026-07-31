@@ -1,0 +1,474 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  ClientProxy,
+  ClientProxyFactory,
+  RpcException,
+  Transport,
+} from '@nestjs/microservices';
+import {
+  type AssistantChatResult,
+  type AssistantProposal,
+  MAX_HISTORIAL,
+} from '@praxis/contracts';
+import { firstValueFrom } from 'rxjs';
+
+import { ConversationsService } from './conversations.service';
+import { GeminiClient, GeminiError } from './gemini.client';
+import { systemInstruction } from './prompt';
+import { QuotaService } from './quota.service';
+import { herramientasPara } from './tools';
+
+/** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */
+interface ChatPayload {
+  projectId: string;
+  userId: string;
+  message: string;
+  /**
+   * La conversación que continúa. Sin él se abre una nueva.
+   *
+   * ⚠️ **`history` ya no se usa y se ignora.** Lo mandaba el cliente en cada
+   * turno porque no había dónde guardarlo; ahora sale de la base, así que el
+   * modelo ve exactamente el mismo hilo que la pantalla. Se deja declarado
+   * para que una petición vieja no reviente, pero no entra en el prompt.
+   */
+  conversationId?: string;
+  history?: { role: string; text: string }[];
+  /** Mapa efectivo, ya expandido por jerarquía. Lo resuelve el gateway. */
+  permisos: Record<string, boolean>;
+  miembros: { userId: string; nombre: string }[];
+}
+
+/** La forma del briefing, en lo que hace falta para validar lo que propone. */
+interface Briefing {
+  columnas: { id: string; nombre: string; orden: number }[];
+  etiquetas: { id: string; nombre: string }[];
+  /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
+  tareas?: { id: string; titulo: string; cerrada: boolean; columnId: string; columna: string }[];
+}
+
+@Injectable()
+export class AssistantService {
+  private readonly log = new Logger(AssistantService.name);
+  private readonly reportsClient: ClientProxy;
+
+  /**
+   * Un solo cliente, hacia reports.
+   *
+   * Este servicio **no consulta tareas ni proyectos por su cuenta**: el contexto
+   * ya lo arma `reports-service`, que es quien sabe cruzar las dos mitades y
+   * quien tiene la caché. Se crea con `ClientProxyFactory` y no con
+   * `ClientsModule` siguiendo el patrón de `reports.service.ts` y
+   * `tasks.service.ts`.
+   */
+  constructor(
+    private readonly config: ConfigService,
+    private readonly quota: QuotaService,
+    private readonly gemini: GeminiClient,
+    private readonly conversaciones: ConversationsService,
+  ) {
+    this.reportsClient = ClientProxyFactory.create({
+      transport: Transport.TCP,
+      options: {
+        host: this.config.get<string>('REPORTS_SERVICE_HOST'),
+        port: this.config.get<number>('REPORTS_SERVICE_PORT'),
+      },
+    });
+  }
+
+  /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */
+  estadoCuota(userId: string) {
+    return this.quota.estado(userId);
+  }
+
+  /**
+   * Un turno de conversación.
+   *
+   * El orden de los pasos es la mitad del diseño:
+   *
+   * 1. **Cuota primero.** Si está agotada no se llama a Gemini: sería gastar
+   *    dinero del equipo en una respuesta que se va a tirar.
+   * 2. La conversación —la que continúa o una nueva— y su hilo.
+   * 3. Contexto, con el bloque de personas solo si hay `canViewReports`.
+   * 4. Gemini, con las herramientas que los permisos de esta persona permiten.
+   * 5. **Se consume después**, y solo si respondió bien.
+   * 6. Se guarda el turno, ya con las propuestas validadas.
+   *
+   * El guardado va al final **y a propósito**: si Gemini falla, no queda una
+   * pregunta suelta en el historial esperando una respuesta que no llegó. El
+   * precio es que un fallo al escribir en la base pierde un turno que sí se
+   * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
+   */
+  async chat(payload: ChatPayload): Promise<AssistantChatResult> {
+    const cuotaPrevia = await this.quota.estado(payload.userId);
+
+    if (cuotaPrevia.usados >= cuotaPrevia.limite) {
+      /* 429 y no 403: no es que no pueda, es que ya no le quedan. El mensaje
+         lleva la fecha de reinicio porque un límite sin fecha es un muro. */
+      throw new RpcException({
+        statusCode: 429,
+        message:
+          `Has gastado los ${cuotaPrevia.limite} mensajes de este mes. ` +
+          'Vuelven el dia 1 del mes que viene.',
+        details: { cuota: cuotaPrevia },
+      });
+    }
+
+    const conversationId = await this.conversaciones.resolver(
+      payload.userId,
+      payload.projectId,
+      payload.message,
+      payload.conversationId,
+    );
+    const history = await this.conversaciones.historial(conversationId);
+
+    const briefing = await firstValueFrom(
+      this.reportsClient.send<Briefing>(
+        { cmd: 'report_briefing' },
+        {
+          projectId: payload.projectId,
+          /* La línea de `canViewReports`, resuelta por el gateway. Lo que no se
+             trae no se puede filtrar mal más adelante. */
+          incluirPersonas: payload.permisos.canViewReports === true,
+        },
+      ),
+    );
+
+    const herramientas = herramientasPara(payload.permisos);
+
+    const respuesta = await this.gemini.chat({
+      system: systemInstruction(
+        briefing,
+        payload.miembros,
+        herramientas.map((herramienta) => herramienta.name),
+      ),
+      /* Sale de la base, ya recortado a MAX_HISTORIAL. */
+      history,
+      message: payload.message,
+      tools: herramientas,
+    });
+
+    /* Si Gemini falló, `chat` ya lanzó y no se llega aquí: la cuota no se toca.
+       Ver `GeminiError`. */
+    const cuota = await this.quota.consumir(payload.userId);
+
+    const validadas = respuesta.calls
+      .map((call) => this.validarPropuesta(call, briefing, payload))
+      .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
+
+    const reply = respuesta.text || this.textoPorDefecto(validadas);
+
+    /* Las propuestas vuelven **con su id**: es lo que necesita el cliente para
+       marcarlas como aceptadas o descartadas después. */
+    const proposals = await this.conversaciones.guardarTurno({
+      conversationId,
+      pregunta: payload.message,
+      respuesta: reply,
+      proposals: validadas,
+    });
+
+    return {
+      conversationId,
+      reply,
+      proposals: proposals as unknown as AssistantProposal[],
+      cuota,
+    };
+  }
+
+  /** Las conversaciones, delegadas. El gateway habla con este servicio. */
+  listarConversaciones(userId: string, projectId: string) {
+    return this.conversaciones.listar(userId, projectId);
+  }
+
+  detalleConversacion(userId: string, projectId: string, conversationId: string) {
+    return this.conversaciones.detalle(userId, projectId, conversationId);
+  }
+
+  renombrarConversacion(
+    userId: string,
+    projectId: string,
+    conversationId: string,
+    title: string,
+  ) {
+    return this.conversaciones.renombrar(userId, projectId, conversationId, title);
+  }
+
+  borrarConversacion(userId: string, projectId: string, conversationId: string) {
+    return this.conversaciones.borrar(userId, projectId, conversationId);
+  }
+
+  resolverPropuesta(userId: string, proposalId: string, status: 'ACCEPTED' | 'DISCARDED') {
+    return this.conversaciones.resolverPropuesta(userId, proposalId, status);
+  }
+
+  purgarConversaciones(projectId: string) {
+    return this.conversaciones.purgar(projectId);
+  }
+
+  /**
+   * Qué se dice cuando Gemini no manda texto.
+   *
+   * **Con function calling eso es lo normal, no la excepción:** el modelo
+   * devuelve la llamada y ni una palabra. Una burbuja en blanco encima de una
+   * tarjeta de propuesta se lee como un fallo, así que se rellena aquí y no en
+   * el frontend.
+   *
+   * ⚠️ **Ya no se componen los `porQue`.** Antes se unían y se devolvían como
+   * texto, porque la tarjeta los descartaba y era la única forma de que la
+   * justificación se leyera en alguna parte. Desde que cada tarjeta pinta el
+   * suyo, hacer eso escribe la misma frase dos veces, una encima de otra.
+   *
+   * Lo que queda es un encuadre que dice **cuántas** propuestas hay, que es lo
+   * único que el texto puede aportar y la tarjeta no.
+   */
+  private textoPorDefecto(propuestas: AssistantProposal[]): string {
+    if (propuestas.length === 1) return 'Te propongo esto. Revisalo antes de aceptar.';
+    if (propuestas.length > 1) {
+      return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
+    }
+    return 'No he sabido responder a eso.';
+  }
+
+  /**
+   * Comprueba lo que el modelo devolvió **contra el proyecto de verdad**.
+   *
+   * Un id de columna o de etiqueta inventado no se descubriría hasta que alguien
+   * pulsara «Aceptar» y el gateway respondiera 400, y para entonces la tarjeta
+   * ya le habría prometido una tarea que no se puede crear. Se comprueba aquí,
+   * mientras todavía hay dónde ponerlo.
+   *
+   * Los ids que no cuadran **se quitan en vez de tumbar la propuesta**: que el
+   * modelo se invente una etiqueta no es motivo para tirar un título bueno. Un
+   * `columnId` malo sí lo es —es obligatorio y no hay a dónde crear la tarea—,
+   * así que se sustituye por la primera columna del tablero, que además es lo
+   * que se le pidió por defecto.
+   *
+   * ⚠️ Nada de esto es la barrera de seguridad. La barrera es que **esto no
+   * ejecuta nada**: sale como propuesta, la persona la acepta, y ahí el gateway
+   * vuelve a comprobar permisos y a validar el DTO como con cualquier
+   * formulario. Esto solo evita enseñar una propuesta rota.
+   */
+  private validarPropuesta(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+    payload: ChatPayload,
+  ): AssistantProposal | null {
+    const permitidas = new Set(herramientasPara(payload.permisos).map((t) => t.name));
+    if (!permitidas.has(call.name)) {
+      /* No debería pasar: la herramienta no se le declaró. Si pasa, es que el
+         modelo se la inventó, y se descarta sin ruido para el usuario. */
+      this.log.warn(`El modelo llamo a ${call.name}, que no se le habia declarado`);
+      return null;
+    }
+
+    const miembros = new Set(payload.miembros.map((m) => m.userId));
+
+    if (call.name === 'proponer_tarea') {
+      const columnas = [...briefing.columnas].sort((a, b) => a.orden - b.orden);
+      if (columnas.length === 0) return null;
+
+      const pedida = String(call.args.columnId ?? '');
+      const columna = columnas.find((c) => c.id === pedida) ?? columnas[0];
+
+      const etiquetas = this.soloConocidos(
+        call.args.labelIds,
+        new Set(briefing.etiquetas.map((l) => l.id)),
+      );
+      const encargados = this.soloConocidos(call.args.assigneeIds, miembros);
+
+      return {
+        tool: call.name,
+        args: {
+          title: String(call.args.title ?? '').slice(0, 120),
+          ...(call.args.description ? { description: String(call.args.description) } : {}),
+          columnId: columna.id,
+          /* El nombre de la columna viaja en la propuesta porque quien la
+             ejecute lo necesita: `status` tiene que igualar el nombre de la
+             columna destino, y el frontend no tiene por qué volver a buscarlo.
+             También es lo que enseña la tarjeta. */
+          columnName: columna.nombre,
+          priority: this.prioridadValida(call.args.priority),
+          ...(this.fechaValida(call.args.dueDate) ? { dueDate: call.args.dueDate } : {}),
+          ...(encargados.length > 0 ? { assigneeIds: encargados } : {}),
+          ...(etiquetas.length > 0 ? { labelIds: etiquetas } : {}),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    if (call.name === 'proponer_asignacion') {
+      const taskId = String(call.args.taskId ?? '');
+      if (!taskId) return null;
+
+      /**
+       * El `taskId` se comprueba contra el inventario, que antes no existía.
+       *
+       * Mientras el id tenía que darlo la persona a mano, aquí no había con qué
+       * contrastarlo y pasaba tal cual: un id mal copiado llegaba a la tarjeta y
+       * moría en el 404 al aceptar. Ahora el contexto trae las tareas del
+       * proyecto, así que una propuesta sobre algo que no existe —o sobre una
+       * tarea de otro proyecto— se descarta antes de pintarse.
+       *
+       * Se descarta la propuesta entera y no solo el campo: sin tarea válida no
+       * queda nada que proponer, al revés que con una etiqueta inventada.
+       */
+      const tarea = briefing.tareas?.find((t) => t.id === taskId);
+      if (briefing.tareas && !tarea) {
+        this.log.warn(`El modelo propuso asignar ${taskId}, que no esta en el proyecto`);
+        return null;
+      }
+
+      return {
+        tool: call.name,
+        args: {
+          taskId,
+          /* El título viaja con la propuesta para que la tarjeta pueda decir
+             sobre qué tarea es sin ir a buscarla. */
+          ...(tarea ? { taskTitle: tarea.titulo } : {}),
+          assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /* Las cuatro de la capa 2 comparten la misma puerta: todas apuntan a una
+       tarea que ya existe, y ninguna vale sin ella. */
+    const sobreTarea = this.tareaDeLaPropuesta(call, briefing);
+    if (!sobreTarea) return null;
+    const { taskId, tarea } = sobreTarea;
+    const base = {
+      taskId,
+      ...(tarea ? { taskTitle: tarea.titulo } : {}),
+      ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+    };
+
+    if (call.name === 'proponer_edicion') {
+      const cambios: Record<string, unknown> = {};
+
+      if (call.args.title) cambios.title = String(call.args.title).slice(0, 120);
+      if (call.args.description) cambios.description = String(call.args.description);
+      if (call.args.priority) cambios.priority = this.prioridadValida(call.args.priority);
+      if (this.fechaValida(call.args.dueDate)) cambios.dueDate = call.args.dueDate;
+      /* `labelIds` sí puede llegar vacío con intención —«quítale las etiquetas»—
+         así que se distingue «no lo mandó» de «lo mandó vacío». */
+      if (Array.isArray(call.args.labelIds)) {
+        cambios.labelIds = this.soloConocidos(
+          call.args.labelIds,
+          new Set(briefing.etiquetas.map((l) => l.id)),
+        );
+      }
+
+      /* Una edición que no cambia nada es una tarjeta que promete algo y no
+         hace nada al aceptarla. Pasa cuando el modelo manda solo el porQue. */
+      if (Object.keys(cambios).length === 0) {
+        this.log.warn('El modelo propuso una edicion sin ningun campo que cambiar');
+        return null;
+      }
+
+      return { tool: call.name, args: { ...base, ...cambios } };
+    }
+
+    if (call.name === 'proponer_movimiento') {
+      const columna = briefing.columnas.find((c) => c.id === String(call.args.columnId ?? ''));
+      /* Sin columna válida no hay a dónde mover, y aquí **no** se cae a la
+         primera del tablero como en `proponer_tarea`: crear en otra columna es
+         un matiz, mover a otra columna es otra acción. */
+      if (!columna) return null;
+      /* Mover a donde ya está no cambia nada y la tarjeta mentiría. */
+      if (tarea && tarea.columnId === columna.id) return null;
+
+      return {
+        tool: call.name,
+        args: {
+          ...base,
+          columnId: columna.id,
+          /* El nombre viaja para la tarjeta y para el `status`, que el contrato
+             exige que iguale al de la columna destino. */
+          columnName: columna.nombre,
+          ...(tarea ? { columnaActual: tarea.columna } : {}),
+        },
+      };
+    }
+
+    if (call.name === 'proponer_checklist') {
+      const items = (Array.isArray(call.args.items) ? call.args.items : [])
+        .map((paso) => String(paso).trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 10);
+
+      if (items.length === 0) return null;
+      return { tool: call.name, args: { ...base, items } };
+    }
+
+    if (call.name === 'proponer_comentario') {
+      const body = String(call.args.body ?? '').trim().slice(0, 2000);
+      if (body.length === 0) return null;
+      return { tool: call.name, args: { ...base, body } };
+    }
+
+    return null;
+  }
+
+  /**
+   * La tarea sobre la que va una propuesta, comprobada contra el inventario.
+   *
+   * Lo comparten las cuatro herramientas que actúan sobre algo que ya existe.
+   * Devuelve `null` —y con ello se descarta la propuesta entera— cuando el id
+   * falta o no es de este proyecto: sin tarea no queda nada que proponer, al
+   * revés que con una etiqueta inventada, que solo se quita.
+   *
+   * `tarea` puede venir indefinida si el briefing no trajera inventario. Es un
+   * caso que hoy no ocurre, pero el código no se apoya en que no ocurra.
+   */
+  private tareaDeLaPropuesta(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): { taskId: string; tarea?: { id: string; titulo: string; columnId?: string; columna?: string } } | null {
+    const taskId = String(call.args.taskId ?? '').trim();
+    if (!taskId) return null;
+
+    const tarea = briefing.tareas?.find((t) => t.id === taskId);
+    if (briefing.tareas && !tarea) {
+      this.log.warn(`El modelo llamo a ${call.name} sobre ${taskId}, que no esta en el proyecto`);
+      return null;
+    }
+
+    return { taskId, tarea };
+  }
+
+  /** Se queda con los ids que existen de verdad y descarta el resto. */
+  private soloConocidos(valor: unknown, conocidos: Set<string>): string[] {
+    if (!Array.isArray(valor)) return [];
+    return valor.map(String).filter((id) => conocidos.has(id));
+  }
+
+  private prioridadValida(valor: unknown): string {
+    const prioridad = String(valor ?? '').toUpperCase();
+    return ['LOW', 'MEDIUM', 'HIGH', 'URGENT'].includes(prioridad) ? prioridad : 'MEDIUM';
+  }
+
+  /**
+   * `YYYY-MM-DD` y nada más.
+   *
+   * El modelo tiende a devolver fechas en cualquier formato que le suene, y una
+   * que no case aquí se descarta entera: es mejor una propuesta sin fecha que
+   * una con una fecha que nadie pidió.
+   */
+  private fechaValida(valor: unknown): boolean {
+    if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return false;
+    return !Number.isNaN(new Date(valor).getTime());
+  }
+
+  /** Traduce el fallo de Gemini a algo que el gateway pueda devolver. */
+  static comoRpc(error: unknown): RpcException {
+    if (error instanceof GeminiError) {
+      return new RpcException({ statusCode: 502, message: error.message, details: {} });
+    }
+    if (error instanceof RpcException) return error;
+    return new RpcException({
+      statusCode: 500,
+      message: 'El asistente no ha podido responder.',
+      details: {},
+    });
+  }
+}

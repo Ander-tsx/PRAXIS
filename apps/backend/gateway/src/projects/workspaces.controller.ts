@@ -19,12 +19,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateWorkspaceDto,
-  UpdateWorkspaceDto,
+  CreateWorkspaceBodyDto,
   ProjectPermission,
+  UpdateWorkspaceBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -58,7 +59,7 @@ export class WorkspacesController {
   @ApiResponse({ status: 201, description: 'Workspace creado exitosamente' })
   create(
     @Param('projectId') projectId: string,
-    @Body() body: Omit<CreateWorkspaceDto, 'projectId'>,
+    @Body() body: CreateWorkspaceBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_create' }, { projectId, ...body }),
@@ -75,6 +76,7 @@ export class WorkspacesController {
 export class WorkspacesResourceController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Detalle de un workspace por ID (la membresía basta) */
@@ -95,7 +97,7 @@ export class WorkspacesResourceController {
   @ApiResponse({ status: 200, description: 'Workspace actualizado exitosamente' })
   update(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: Omit<UpdateWorkspaceDto, 'id'>,
+    @Body() body: UpdateWorkspaceBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_update' }, { id: workspaceId, ...body }),
@@ -107,9 +109,21 @@ export class WorkspacesResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un workspace' })
   @ApiResponse({ status: 200, description: 'Workspace eliminado exitosamente' })
-  delete(@Param('workspaceId') workspaceId: string) {
-    return firstValueFrom(
+  async delete(@Param('workspaceId') workspaceId: string) {
+    /**
+     * Los tableros se leen **antes** de borrar el espacio: el borrado los
+     * arrastra en cascada dentro de projects-service, y después ya no habría
+     * forma de saber qué tareas se quedaron sin sitio.
+     */
+    const boards = await firstValueFrom(
+      this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
+    ).catch(() => [] as Array<{ id: string }>);
+
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_delete' }, { id: workspaceId }),
     );
+
+    await this.taskPurge.afterBoardsDeleted((boards ?? []).map((b) => b.id));
+    return result;
   }
 }

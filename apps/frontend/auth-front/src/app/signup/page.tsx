@@ -3,8 +3,8 @@
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de RegisterDto del backend
 // email: formato válido, password: 8-64 caracteres
@@ -40,7 +40,6 @@ function validateForm(
  * que internamente hace auto-login tras un registro exitoso.
  */
 export default function SignupPage() {
-  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -80,8 +79,9 @@ export default function SignupPage() {
       });
 
       if (res.ok) {
-        // El BFF hace auto-login y setea la cookie — redirigimos al shell
-        router.push('/');
+        // El BFF ya dejó la sesión iniciada. Navegación dura: router.push('/')
+        // se convertiría en '/auth/' por el basePath y no saldría de la zona.
+        navigateAfterAuth();
         return;
       }
 

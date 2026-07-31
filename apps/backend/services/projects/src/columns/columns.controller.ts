@@ -4,6 +4,8 @@ import {
   CreateColumnDto,
   ReorderColumnsDto,
   DeleteColumnDto,
+  FindColumnsByIdsDto,
+  UpdateColumnDto,
 } from '@praxis/contracts';
 import { ColumnsService } from './columns.service';
 
@@ -19,6 +21,17 @@ export class ColumnsController {
   @MessagePattern({ cmd: 'column_reorder' })
   reorderColumns(@Payload() dto: ReorderColumnsDto) {
     return this.columnsService.reorderColumns(dto);
+  }
+
+  /** Para que el gateway resuelva la columna de una tarea. */
+  @MessagePattern({ cmd: 'column_find_by_ids' })
+  findColumnsByIds(@Payload() dto: FindColumnsByIdsDto) {
+    return this.columnsService.findColumnsByIds(dto.ids);
+  }
+
+  @MessagePattern({ cmd: 'column_update' })
+  updateColumn(@Payload() dto: UpdateColumnDto) {
+    return this.columnsService.updateColumn(dto);
   }
 
   @MessagePattern({ cmd: 'column_delete' })

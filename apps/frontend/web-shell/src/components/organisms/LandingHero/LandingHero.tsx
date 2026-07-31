@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkle, StatItem } from '@praxis/commons';
+import { Sparkle } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import dynamic from 'next/dynamic';
@@ -98,13 +98,11 @@ const PARTICLES: Particle[] = [
   },
 ];
 
-const STATS = [
-  { n: '11', label: 'Módulos' },
-  { n: '4', label: 'Ciclos' },
-  { n: '∞', label: 'Permisos' },
-];
+export interface LandingHeroProps {
+  isAuthenticated?: boolean;
+}
 
-export function LandingHero() {
+export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const line1Ref = useRef<HTMLSpanElement>(null);
   const line2Ref = useRef<HTMLSpanElement>(null);
@@ -226,9 +224,9 @@ export function LandingHero() {
 
       {/* Content grid */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-16 items-center">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[1.02fr_0.98fr] lg:gap-8">
           {/* Left: Headline + CTA */}
-          <div className="flex flex-col items-start gap-8">
+          <div className="flex flex-col items-start gap-7">
             {/* Sparkles decorativos */}
             <div className="relative self-start" aria-hidden="true">
               <Sparkle
@@ -308,9 +306,9 @@ export function LandingHero() {
               className="font-serif text-lg md:text-xl text-text-secondary max-w-lg leading-relaxed"
               style={{ opacity: 0 }}
             >
-              Tableros Kanban, permisos dinámicos por rol y reportes de desviación. Con integración{' '}
-              <span className="text-text-primary font-semibold">Alexa Skill</span> para gestionar
-              tus proyectos por voz.
+              Organiza cada proyecto en espacios y tableros, define qué puede hacer cada rol y
+              consulta el avance de tu equipo por voz con la{' '}
+              <span className="font-semibold text-text-primary">integración de Alexa</span>.
             </p>
 
             {/* CTA buttons */}
@@ -319,7 +317,7 @@ export function LandingHero() {
               className="flex flex-col sm:flex-row gap-3 items-start"
               style={{ opacity: 0 }}
             >
-              <a href="/auth/signup">
+              <a href={isAuthenticated ? '/dashboard' : '/auth/signup'}>
                 <button
                   type="button"
                   className="font-sans text-sm font-semibold px-7 py-3 rounded-full transition-all duration-200 cursor-pointer"
@@ -339,9 +337,10 @@ export function LandingHero() {
                     el.style.transform = 'translateY(0)';
                   }}
                 >
-                  Comenzar gratis
+                  {isAuthenticated ? 'Ir al panel' : 'Comenzar gratis'}
                 </button>
               </a>
+              {!isAuthenticated && (
               <a href="/auth/login">
                 <button
                   type="button"
@@ -361,33 +360,18 @@ export function LandingHero() {
                   Iniciar sesión
                 </button>
               </a>
+              )}
             </div>
 
-            {/* Micro stats */}
-            <div className="flex items-center gap-6 pt-2">
-              {STATS.map((s) => (
-                <StatItem key={s.label} value={s.n} label={s.label} />
-              ))}
-            </div>
           </div>
 
           {/* Right: Echo Dot 3D */}
-          <div ref={echoDotRef} className="hidden lg:flex justify-center" style={{ opacity: 0 }}>
+          <div ref={echoDotRef} className="hidden justify-center lg:flex" style={{ opacity: 0 }}>
             <EchoDot3D />
           </div>
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 opacity-40"
-        aria-hidden="true"
-      >
-        <span className="font-sans text-xs text-text-disabled tracking-widest uppercase">
-          Scroll
-        </span>
-        <div className="w-px h-8 bg-gradient-to-b from-text-disabled to-transparent" />
-      </div>
     </section>
   );
 }

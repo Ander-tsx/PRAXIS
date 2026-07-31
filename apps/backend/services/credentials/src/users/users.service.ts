@@ -81,8 +81,14 @@ export class UsersService {
     const updated = await this.prisma.user.update({
       where: { id: dto.id },
       data: {
-        ...(dto.first_name !== undefined && { firstName: dto.first_name }),
-        ...(dto.last_name  !== undefined && { lastName:  dto.last_name }),
+        /* camelCase primero; `first_name` sigue aceptándose por compatibilidad
+           y se ignora si vienen los dos. Ver `UpdateUserBodyDto`. */
+        ...(dto.firstName  !== undefined && { firstName: dto.firstName }),
+        ...(dto.firstName === undefined &&
+          dto.first_name !== undefined && { firstName: dto.first_name }),
+        ...(dto.lastName   !== undefined && { lastName: dto.lastName }),
+        ...(dto.lastName === undefined &&
+          dto.last_name !== undefined && { lastName: dto.last_name }),
       },
       include: { credential: { select: { email: true } } },
     });

@@ -19,12 +19,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  CreateBoardDto,
-  UpdateBoardDto,
+  CreateBoardBodyDto,
   ProjectPermission,
+  UpdateBoardBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { TaskPurgeService } from './task-purge.service';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
@@ -47,7 +48,7 @@ export class BoardsController {
   @ApiResponse({ status: 201, description: 'Board creado exitosamente' })
   create(
     @Param('workspaceId') workspaceId: string,
-    @Body() body: Omit<CreateBoardDto, 'workspaceId'>,
+    @Body() body: CreateBoardBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_create' }, { workspaceId, ...body }),
@@ -75,6 +76,7 @@ export class BoardsController {
 export class BoardsResourceController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly taskPurge: TaskPurgeService,
   ) {}
 
   /** Detalle de un board por ID (la membresía basta) */
@@ -95,7 +97,7 @@ export class BoardsResourceController {
   @ApiResponse({ status: 200, description: 'Board actualizado exitosamente' })
   update(
     @Param('boardId') boardId: string,
-    @Body() body: Omit<UpdateBoardDto, 'id'>,
+    @Body() body: UpdateBoardBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_update' }, { id: boardId, ...body }),
@@ -107,9 +109,12 @@ export class BoardsResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_BOARD)
   @ApiOperation({ summary: 'Elimina un board' })
   @ApiResponse({ status: 200, description: 'Board eliminado exitosamente' })
-  delete(@Param('boardId') boardId: string) {
-    return firstValueFrom(
+  async delete(@Param('boardId') boardId: string) {
+    const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'board_delete' }, { id: boardId }),
     );
+    // Las tareas viven en otro microservicio: el cascade no llega hasta ellas.
+    await this.taskPurge.afterBoardsDeleted([boardId]);
+    return result;
   }
 }

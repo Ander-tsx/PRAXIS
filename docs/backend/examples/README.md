@@ -12,7 +12,17 @@ En este directorio se encuentran los archivos de ejemplo detallados para cada un
 | **Roles Service** | `3002` | Roles globales del sistema y permisos de vista de proyectos. | [roles-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/roles-service.md) |
 | **Projects Service** | `3003` | Proyectos, workspaces, boards, columnas, miembros y roles locales. | [projects-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/projects-service.md) |
 | **Tasks Service** | `3004` | Tareas, subtareas y listas de control (checklists) en boards. | [tasks-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/tasks-service.md) |
-| **Notifications Service** | `3005` | Registro, lectura y recuento de notificaciones internas de usuarios. | [notifications-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/notifications-service.md) |
+| **Reports Service** | `3005` | Agregación, estadística y predicción sobre proyectos y tareas. **No tiene base de datos propia.** | — |
+
+> ⚠️ **Corrección:** esta tabla listaba en el `3005` un «Notifications Service»
+> que **nunca existió**. Las notificaciones se implementaron dentro de
+> `projects-service` (comandos `notification_*`), que es donde ya vivían las
+> membresías e invitaciones —cinco de los siete tipos de aviso—. El puerto estaba
+> libre y lo ocupa `reports-service` desde esta sesión.
+>
+> Los enlaces de esta tabla apuntan a rutas absolutas de la máquina de otra
+> persona (`c:/Users/cesar/...`) y no funcionan desde ningún otro sitio; se
+> dejan como estaban para no tocar lo que no toca a esta sesión.
 
 ---
 

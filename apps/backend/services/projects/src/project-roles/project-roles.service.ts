@@ -7,30 +7,14 @@ import {
   UpdateProjectRoleDto,
   CheckProjectPermissionDto,
 } from '@praxis/contracts';
+import {
+  expandPermissions,
+  fullPermissionMap,
+  normalizeBooleans,
+  normalizePermissions,
+} from './permission-map';
 
 const PERMISSION_CACHE_TTL = 300;
-
-/**
- * Mapa de jerarquía de permisos:
- * Si el usuario tiene el permiso-hijo, se le otorgan automáticamente
- * los permisos-padre listados en el arreglo.
- *
- * Regla general:
- *   canDelete* → implica canEdit* + canCreate*
- *   canEdit*   → implica canCreate*
- */
-const PERMISSION_HIERARCHY: Record<string, string[]> = {
-  // Boards
-  canDeleteBoard: ['canEditBoard', 'canCreateBoard'],
-  canEditBoard:   ['canCreateBoard'],
-  // Columns
-  canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
-  canEditColumn:   ['canCreateColumn'],
-  // Tasks
-  canDeleteTask: ['canEditTask', 'canCreateTask'],
-  canEditTask:   ['canCreateTask'],
-  // Roles y miembros no tienen jerarquía adicional
-};
 
 @Injectable()
 export class ProjectRolesService {
@@ -52,13 +36,16 @@ export class ProjectRolesService {
       throw new RpcException({ statusCode: 409, message: `Ya existe el rol '${dto.name}' en este proyecto` });
     }
 
-    return this.prisma.projectRole.create({
+    const created = await this.prisma.projectRole.create({
       data: {
         name:        dto.name,
         projectId:   dto.projectId,
         permissions: dto.permissions,
       },
     });
+
+    await this.invalidateProjectCache(dto.projectId);
+    return created;
   }
 
   async updateProjectRole(dto: UpdateProjectRoleDto) {
@@ -82,6 +69,7 @@ export class ProjectRolesService {
     await Promise.all(
       affected.map((m) => this.invalidatePermissionCache(m.userId, m.projectId)),
     );
+    await this.invalidateProjectCache(role.projectId);
 
     return updated;
   }
@@ -102,6 +90,7 @@ export class ProjectRolesService {
     }
 
     await this.prisma.projectRole.delete({ where: { id } });
+    await this.invalidateProjectCache(role.projectId);
     return { success: true };
   }
 
@@ -127,37 +116,58 @@ export class ProjectRolesService {
       cached ?? (await this.loadPermissions(dto.userId, dto.projectId, cacheKey));
 
     // ── 3. Expandir permisos implícitos por jerarquía ──
-    const effective = this.expandPermissions(rawPerms);
+    const effective = expandPermissions(rawPerms);
 
     return { allowed: !!effective[dto.permission] };
+  }
+
+  /**
+   * Todos los permisos efectivos de un usuario en un proyecto, ya expandidos.
+   *
+   * Es lo que necesita la interfaz para saber qué enseñar. Sin esto solo podía
+   * descubrir que no tenía permiso **después** de que la acción fallara con un
+   * 403, que es la peor forma de enterarse.
+   *
+   * Devuelve el mapa completo con todos los permisos conocidos, explícitamente
+   * a `false` los que no tiene: así el cliente no tiene que distinguir entre
+   * "ausente" y "denegado".
+   */
+  async getEffectivePermissions(dto: {
+    userId: string;
+    projectId: string;
+  }): Promise<{ isOwner: boolean; permissions: Record<string, boolean> }> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: dto.projectId },
+      select: { ownerId: true },
+    });
+
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    const isOwner = project.ownerId === dto.userId;
+
+    // El dueño tiene bypass en el guard, así que aquí se refleja igual.
+    if (isOwner) {
+      return { isOwner, permissions: fullPermissionMap(true) };
+    }
+
+    const cacheKey = `project:${dto.projectId}:user:${dto.userId}:permissions`;
+    const cached = await this.redis.get<Record<string, boolean>>(cacheKey);
+    const rawPerms =
+      cached ?? (await this.loadPermissions(dto.userId, dto.projectId, cacheKey));
+
+    const effective = expandPermissions(rawPerms);
+
+    return {
+      isOwner,
+      permissions: { ...fullPermissionMap(false), ...normalizeBooleans(effective) },
+    };
   }
 
   // ---------------------------------------------------------------------------
   // Helpers privados
   // ---------------------------------------------------------------------------
-
-  /**
-   * Dado el mapa de permisos almacenado en BD, devuelve uno expandido
-   * donde cada permiso de nivel superior "hereda" los de nivel inferior.
-   *
-   * Ejemplo:
-   *   { canDeleteBoard: true } → { canDeleteBoard: true, canEditBoard: true, canCreateBoard: true }
-   */
-  private expandPermissions(
-    raw: Record<string, boolean>,
-  ): Record<string, boolean> {
-    const expanded = { ...raw };
-
-    for (const [key, implied] of Object.entries(PERMISSION_HIERARCHY)) {
-      if (expanded[key]) {
-        for (const impliedPerm of implied) {
-          expanded[impliedPerm] = true;
-        }
-      }
-    }
-
-    return expanded;
-  }
 
   private async loadPermissions(
     userId: string,
@@ -169,9 +179,7 @@ export class ProjectRolesService {
       include: { projectRole: true },
     });
 
-    const permissions: Record<string, boolean> = member
-      ? (member.projectRole.permissions as Record<string, boolean>)
-      : {};
+    const permissions = member ? normalizePermissions(member.projectRole.permissions) : {};
 
     await this.redis.set(cacheKey, permissions, PERMISSION_CACHE_TTL);
     return permissions;
@@ -179,5 +187,17 @@ export class ProjectRolesService {
 
   async invalidatePermissionCache(userId: string, projectId: string) {
     await this.redis.del(`project:${projectId}:user:${userId}:permissions`);
+  }
+
+  /**
+   * Invalida el detalle cacheado del proyecto.
+   *
+   * `findOneProject` guarda el proyecto entero en `project:<id>` durante 5
+   * minutos, **con sus roles embebidos**. Sin esto, crear o editar un rol no se
+   * veía en pantalla hasta que expiraba la caché: la escritura funcionaba y la
+   * interfaz parecía no haber hecho nada.
+   */
+  private async invalidateProjectCache(projectId: string) {
+    await this.redis.del(`project:${projectId}`);
   }
 }

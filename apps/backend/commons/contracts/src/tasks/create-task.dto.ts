@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsInt,
   IsISO8601,
@@ -12,17 +14,15 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
-export class CreateTaskDto {
-  /** ID del usuario que realiza la operación (inyectado por el gateway) */
-  @IsUUID('4')
-  requesterId: string;
-
-  @IsUUID('4')
-  projectId: string;
-
-  @IsUUID('4')
-  boardId: string;
-
+/**
+ * Cuerpo que envía el cliente.
+ *
+ * ⚠️ **No lleva `projectId`.** El gateway lo resuelve desde la ruta —aquí,
+ * desde el `:boardId`— y mandarlo responde 400. Cuando lo elegía el cliente,
+ * declarar el id de un proyecto propio daba acceso a las tareas de cualquier
+ * otro (`PENDIENTES-BACKEND.md §9`).
+ */
+export class CreateTaskBodyDto {
   @IsUUID('4')
   columnId: string;
 
@@ -40,10 +40,13 @@ export class CreateTaskDto {
   @IsString()
   status: string;
 
-  @ApiPropertyOptional()
+  /** Encargados iniciales. Deben ser miembros del proyecto. */
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsUUID('4')
-  assigneeId?: string;
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -61,9 +64,31 @@ export class CreateTaskDto {
   @Min(0)
   order?: number;
 
+  /** Etiquetas iniciales. Deben existir en el proyecto. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  labelIds?: string[];
+
   /** Si se proporciona, esta tarea se crea como subtarea */
   @ApiPropertyOptional()
   @IsOptional()
   @IsUUID('4')
   parentTaskId?: string;
+}
+
+/** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
+export class CreateTaskDto extends CreateTaskBodyDto {
+  /** ID del usuario que realiza la operación (inyectado por el gateway) */
+  @IsUUID('4')
+  requesterId: string;
+
+  @IsUUID('4')
+  boardId: string;
+
+  /** Resuelto por el guard desde la ruta, no por el cliente. */
+  @IsUUID('4')
+  projectId: string;
 }

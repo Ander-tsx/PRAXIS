@@ -1,6 +1,6 @@
 'use client';
 
-import { ProgressBar, RoleBadge, Sparkle } from '@praxis/commons';
+import { RoleBadge, Sparkle, alpha } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -13,141 +13,183 @@ interface RoleData {
   visual: ReactNode;
 }
 
-const ROLES: RoleData[] = [
-  {
-    role: 'Project Manager',
-    roleColor: 'var(--color-primary)',
-    tagline: 'Toma el control desde el inicio',
-    steps: [
-      'Crea el proyecto con fechas, presupuesto y descripción',
-      'Invita al equipo y asigna roles base (Admin, PM, Colaborador)',
-      'Configura permisos granulares: quién ve costos, quién mueve tareas',
-      'Monitorea el avance desde el dashboard personalizado',
-    ],
-    visual: (
-      <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          <span className="font-sans text-xs text-text-disabled">Proyecto Alpha · En progreso</span>
-        </div>
-        <div className="flex gap-3">
-          <ProgressBar label="Progreso" value="68%" percentage={68} color="var(--color-primary)" />
-          <ProgressBar
-            label="Presupuesto"
-            value="$32k / $45k"
-            percentage={71}
-            color="var(--color-accent)"
-          />
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {['proyecto:crear ✓', 'costos:ver ✓', 'reporte:exportar ✓'].map((p) => (
+/* ── Piezas visuales ──────────────────────────────────────────── */
+
+function Panel({ title, meta, children }: { title: string; meta?: string; children: ReactNode }) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-2xl p-5"
+      style={{
+        background: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-sans text-xs font-medium text-text-secondary">{title}</span>
+        {meta && <span className="font-sans text-xs text-text-disabled">{meta}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Rol de proyecto con su diccionario de permisos, tal cual lo modela el backend. */
+function ProjectRolePanel() {
+  const roles = [
+    { name: 'Scrum Master', permissions: 10, color: 'var(--color-primary)' },
+    { name: 'Desarrollo', permissions: 5, color: '#818cf8' },
+    { name: 'QA', permissions: 3, color: '#34d399' },
+  ];
+
+  return (
+    <Panel title="Roles del proyecto" meta="Aurora">
+      <div className="flex flex-col gap-2">
+        {roles.map((role) => (
+          <div
+            key={role.name}
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+            style={{ background: 'var(--color-surface-elevated)' }}
+          >
+            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: role.color }} />
+            <span className="font-sans text-xs text-text-primary">{role.name}</span>
+            <span className="ml-auto font-mono text-[0.65rem] text-text-disabled">
+              {role.permissions} de 10 permisos
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {['canCreateBoard', 'canManageMembers', 'canManageRoles'].map((permission) => (
+          <span
+            key={permission}
+            className="rounded px-2 py-0.5 font-mono text-[0.6rem]"
+            style={{ background: 'var(--color-primary-muted)', color: 'var(--color-primary)' }}
+          >
+            {permission}
+          </span>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+/** Vista del miembro: sus tareas asignadas en el tablero. */
+function MemberTasksPanel() {
+  const tasks = [
+    { name: 'Formulario de registro', column: 'En progreso', color: 'var(--color-warning)', priority: 'ALTA' },
+    { name: 'Validar DTOs del gateway', column: 'Por hacer', color: 'var(--color-info)', priority: 'MEDIA' },
+    { name: 'Migración de permisos', column: 'Hecho', color: 'var(--color-success)', priority: 'BAJA' },
+  ];
+
+  return (
+    <Panel title="Mis tareas asignadas" meta="Sprint 4">
+      <div className="flex flex-col gap-2">
+        {tasks.map((task) => (
+          <div
+            key={task.name}
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
+            style={{ background: 'var(--color-surface-elevated)' }}
+          >
+            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: task.color }} />
+            <span className="flex-1 truncate font-sans text-xs text-text-primary">{task.name}</span>
             <span
-              key={p}
-              className="font-mono text-xs px-2 py-0.5 rounded"
+              className="flex-shrink-0 rounded px-1.5 py-0.5 font-sans text-[0.6rem] font-medium"
+              style={{ background: alpha(task.color, 12), color: task.color }}
+            >
+              {task.column}
+            </span>
+          </div>
+        ))}
+      </div>
+      <span className="font-sans text-xs text-text-disabled">
+        Solo aparecen los tableros de los proyectos donde eres miembro.
+      </span>
+    </Panel>
+  );
+}
+
+/** Vista del administrador de plataforma: usuarios y roles globales. */
+function AdminPanel() {
+  const users = [
+    { name: 'Andrés G.', email: 'andres@praxis.dev', role: 'Admin', color: 'var(--color-accent)' },
+    { name: 'Juan J.', email: 'juan@praxis.dev', role: 'User', color: 'var(--color-text-secondary)' },
+    { name: 'César E.', email: 'cesar@praxis.dev', role: 'User', color: 'var(--color-text-secondary)' },
+  ];
+
+  return (
+    <Panel title="Usuarios de la plataforma" meta="3 activos">
+      <div className="flex flex-col gap-2">
+        {users.map((user) => (
+          <div
+            key={user.email}
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+            style={{ background: 'var(--color-surface-elevated)' }}
+          >
+            <div className="flex flex-col">
+              <span className="font-sans text-xs text-text-primary">{user.name}</span>
+              <span className="font-sans text-[0.65rem] text-text-disabled">{user.email}</span>
+            </div>
+            <span
+              className="ml-auto rounded-full px-2.5 py-0.5 font-sans text-[0.65rem] font-medium"
               style={{
-                background: 'var(--color-primary-muted)',
-                color: 'var(--color-primary)',
-                fontSize: 9,
+                background: alpha(user.color, 12),
+                color: user.color,
+                border: `1px solid ${alpha(user.color, 30)}`,
               }}
             >
-              {p}
+              {user.role}
             </span>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-    ),
+      <span className="font-sans text-xs text-text-disabled">
+        El rol global no otorga permisos dentro de un proyecto ajeno.
+      </span>
+    </Panel>
+  );
+}
+
+/* ── Contenido ────────────────────────────────────────────────── */
+
+const ROLES: RoleData[] = [
+  {
+    role: 'Responsable del proyecto',
+    roleColor: 'var(--color-primary)',
+    tagline: 'Define las reglas del juego',
+    steps: [
+      'Crea el proyecto y lo divide en espacios de trabajo y tableros',
+      'Define los roles propios del proyecto: Scrum Master, Desarrollo, QA o los que necesite',
+      'Ajusta permiso a permiso lo que puede hacer cada rol sobre tareas, tableros y columnas',
+      'Invita a su equipo y le asigna el rol que le corresponde',
+    ],
+    visual: <ProjectRolePanel />,
   },
   {
-    role: 'Colaborador',
-    roleColor: 'var(--color-accent)',
+    role: 'Miembro del equipo',
+    roleColor: '#38bdf8',
     tagline: 'Enfocado en lo que le toca',
     steps: [
-      'Ve solo las tareas que le fueron asignadas',
-      'Actualiza el estado de sus tareas en el tablero Kanban',
-      'Registra horas trabajadas y avance real vs. estimado',
-      'Recibe notificaciones de cambios en su carga de trabajo',
+      'Entra directamente a los tableros de los proyectos donde participa',
+      'Mueve sus tareas entre columnas y actualiza prioridad y fecha límite',
+      /* Decía «subtareas», y no las exponemos: la landing prometía una función
+         que no existe en ninguna pantalla. Ver ESTADO-ACTUAL §24.5. */
+      'Desglosa el trabajo en pasos y los va marcando en el checklist',
+      'Solo ve las acciones que su rol le permite: la interfaz se adapta a sus permisos',
     ],
-    visual: (
-      <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="font-sans text-xs text-text-secondary font-medium">
-            Mis tareas de hoy
-          </span>
-          <span className="font-sans text-xs text-text-disabled">4 pendientes · 1 atrasada</span>
-        </div>
-        <div className="flex flex-col gap-2">
-          {[
-            { name: 'Implementar Login UI', status: 'Doing', color: 'var(--color-warning)' },
-            { name: 'Tests unitarios Auth', status: 'To Do', color: 'var(--color-info)' },
-            { name: 'Review PR #23', status: 'Done', color: 'var(--color-success)' },
-          ].map((t) => (
-            <div
-              key={t.name}
-              className="flex items-center gap-2 p-2 rounded-lg"
-              style={{ background: 'var(--color-surface-elevated)' }}
-            >
-              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-              <span className="font-sans text-xs text-text-primary flex-1 truncate">{t.name}</span>
-              <span
-                className="font-sans text-xs font-medium px-1.5 py-0.5 rounded"
-                style={{ background: `${t.color}15`, color: t.color, fontSize: 9 }}
-              >
-                {t.status}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="pt-1 flex items-center gap-1.5">
-          <span className="font-sans text-xs text-text-disabled">
-            Solo ves lo que tienes permiso de ver
-          </span>
-          <span className="text-xs" aria-hidden="true">
-            🔒
-          </span>
-        </div>
-      </div>
-    ),
+    visual: <MemberTasksPanel />,
   },
   {
-    role: 'Cliente / Observador',
-    roleColor: '#a78bfa',
-    tagline: 'Visibilidad sin complejidad',
+    role: 'Administración',
+    roleColor: 'var(--color-accent)',
+    tagline: 'Gobierna la plataforma, no los proyectos',
     steps: [
-      'Accede a un dashboard personalizado con su vista autorizada',
-      'Consulta el avance del proyecto en porcentaje y fechas',
-      'Ve los entregables y el estado de cada módulo',
-      'No puede ver costos internos ni datos sensibles del equipo',
+      'Da de alta usuarios y gestiona su estado en la plataforma',
+      'Asigna los roles globales que dan acceso al panel de administración',
+      'Consulta la actividad general sin entrar en el detalle de cada proyecto',
+      'No hereda permisos dentro de proyectos de los que no es miembro',
     ],
-    visual: (
-      <div className="rounded-xl border border-border bg-surface p-4 flex flex-col gap-3">
-        <div className="text-center mb-1">
-          <span className="font-sans text-xs text-text-disabled">
-            Vista del cliente — Solo lectura
-          </span>
-        </div>
-        {[
-          { label: 'Frontend', pct: 73, color: '#a78bfa' },
-          { label: 'Backend', pct: 55, color: 'var(--color-primary)' },
-          { label: 'Base de datos', pct: 90, color: 'var(--color-success)' },
-          { label: 'Deploy AWS', pct: 20, color: 'var(--color-warning)' },
-        ].map((m) => (
-          <ProgressBar
-            key={m.label}
-            label={m.label}
-            value={`${m.pct}%`}
-            percentage={m.pct}
-            color={m.color}
-            height={6}
-          />
-        ))}
-        <div className="flex items-center justify-center gap-2 pt-1">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#a78bfa' }} />
-          <span className="font-sans text-xs text-text-disabled">
-            costos:ver — <span className="text-error">sin acceso</span>
-          </span>
-        </div>
-      </div>
-    ),
+    visual: <AdminPanel />,
   },
 ];
 
@@ -192,10 +234,9 @@ export function LandingHowItWorks() {
   }, []);
 
   return (
-    <section id="how-it-works" ref={sectionRef} className="py-32 px-6 relative overflow-hidden">
-      {/* Decorative background */}
+    <section id="how-it-works" ref={sectionRef} className="relative overflow-hidden px-6 py-32">
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         aria-hidden="true"
         style={{
           background:
@@ -203,10 +244,9 @@ export function LandingHowItWorks() {
         }}
       />
 
-      <div className="max-w-7xl mx-auto relative z-10">
-        {/* Header */}
-        <div ref={headingRef} className="text-center mb-20 opacity-0">
-          <div className="flex items-center justify-center gap-4 mb-4">
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div ref={headingRef} className="mb-20 text-center opacity-0">
+          <div className="mb-4 flex items-center justify-center gap-4">
             <Sparkle
               style={{
                 color: 'var(--color-primary)',
@@ -214,7 +254,7 @@ export function LandingHowItWorks() {
                 opacity: 0.6,
               }}
             />
-            <h2 className="font-display text-4xl md:text-5xl text-text-primary italic">
+            <h2 className="font-display text-4xl italic text-text-primary md:text-5xl">
               Cómo usan Praxis los equipos
             </h2>
             <Sparkle
@@ -225,12 +265,11 @@ export function LandingHowItWorks() {
               }}
             />
           </div>
-          <p className="font-serif text-lg text-text-secondary italic max-w-xl mx-auto">
-            Cada rol ve exactamente lo que necesita. Ni más, ni menos.
+          <p className="mx-auto max-w-xl font-serif text-lg italic text-text-secondary">
+            Cada persona ve exactamente lo que su rol le permite. Ni más, ni menos.
           </p>
         </div>
 
-        {/* Role cards — alternating layout */}
         <div className="flex flex-col gap-16">
           {ROLES.map((role, i) => (
             <div
@@ -238,9 +277,10 @@ export function LandingHowItWorks() {
               ref={(el) => {
                 cardsRef.current[i] = el;
               }}
-              className={`grid grid-cols-1 lg:grid-cols-2 gap-10 items-center opacity-0 ${i % 2 === 1 ? 'lg:[&>*:first-child]:order-2' : ''}`}
+              className={`grid grid-cols-1 items-center gap-10 opacity-0 lg:grid-cols-2 ${
+                i % 2 === 1 ? 'lg:[&>*:first-child]:order-2' : ''
+              }`}
             >
-              {/* Text side */}
               <div className="flex flex-col gap-6">
                 <RoleBadge
                   index={i + 1}
@@ -249,26 +289,25 @@ export function LandingHowItWorks() {
                   color={role.roleColor}
                 />
 
-                <h3 className="font-display text-2xl md:text-3xl text-text-primary">
+                <h3 className="font-display text-2xl text-text-primary md:text-3xl">
                   {role.tagline}
                 </h3>
 
                 <ul className="flex flex-col gap-3">
                   {role.steps.map((step, si) => (
                     <li key={step} className="flex items-start gap-3">
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 font-sans font-bold"
+                      <span
+                        className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full font-sans text-[0.6rem] font-bold"
                         style={{
-                          background: `${role.roleColor}15`,
+                          background: alpha(role.roleColor, 12),
                           color: role.roleColor,
-                          fontSize: 9,
-                          border: `1px solid ${role.roleColor}30`,
+                          border: `1px solid ${alpha(role.roleColor, 30)}`,
                         }}
                         aria-hidden="true"
                       >
                         {si + 1}
-                      </div>
-                      <span className="font-sans text-sm text-text-secondary leading-relaxed">
+                      </span>
+                      <span className="font-sans text-sm leading-relaxed text-text-secondary">
                         {step}
                       </span>
                     </li>
@@ -276,7 +315,6 @@ export function LandingHowItWorks() {
                 </ul>
               </div>
 
-              {/* Visual side */}
               <div>{role.visual}</div>
             </div>
           ))}

@@ -32,5 +32,11 @@ export class ProjectRolesController {
   checkPermission(@Payload() dto: CheckProjectPermissionDto) {
     return this.projectRolesService.checkPermission(dto);
   }
+
+  /** Todos los permisos efectivos de un usuario en un proyecto, ya expandidos. */
+  @MessagePattern({ cmd: 'project_effective_permissions' })
+  effectivePermissions(@Payload() dto: { userId: string; projectId: string }) {
+    return this.projectRolesService.getEffectivePermissions(dto);
+  }
 }
 

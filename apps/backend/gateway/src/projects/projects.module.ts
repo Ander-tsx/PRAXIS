@@ -8,6 +8,14 @@ import { BoardsController, BoardsResourceController } from './boards.controller'
 import { ColumnsController } from './columns.controller';
 import { MembersController } from './members.controller';
 import { ProjectRolesController } from './project-roles.controller';
+import { ProjectPermissionsController } from './project-permissions.controller';
+import {
+  MyInvitationsController,
+  ProjectInvitationsController,
+  ProjectMembershipController,
+} from './invitations.controller';
+import { ColumnStatusSyncService } from './column-status-sync.service';
+import { TaskPurgeService } from './task-purge.service';
 
 
 @Module({
@@ -38,6 +46,21 @@ import { ProjectRolesController } from './project-roles.controller';
           },
         }),
       },
+      /* Solo para la purga: al borrar un proyecto hay que llevarse también sus
+         conversaciones del asistente, que viven en otro servicio y sin clave
+         foránea. Ver `TaskPurgeService`. */
+      {
+        name: 'ASSISTANT_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
+            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [
@@ -49,6 +72,11 @@ import { ProjectRolesController } from './project-roles.controller';
     ColumnsController,
     MembersController,
     ProjectRolesController,
+    ProjectPermissionsController,
+    ProjectInvitationsController,
+    MyInvitationsController,
+    ProjectMembershipController,
   ],
+  providers: [ColumnStatusSyncService, TaskPurgeService],
 })
 export class ProjectsModule {}

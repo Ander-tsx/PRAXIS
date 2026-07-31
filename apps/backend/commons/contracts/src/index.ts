@@ -1,5 +1,7 @@
+export * from './assistant';
 export * from './auth';
 export * from './credentials';
+export * from './notifications';
 export * from './pagination.dto';
 export * from './permissions';
 export * from './projects';

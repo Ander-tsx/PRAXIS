@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsISO8601,
   IsOptional,
@@ -10,16 +13,12 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
-export class UpdateTaskDto {
-  @IsUUID('4')
-  id: string;
-
-  @IsUUID('4')
-  requesterId: string;
-
-  @IsUUID('4')
-  projectId: string;
-
+/**
+ * Cuerpo que envía el cliente.
+ *
+ * ⚠️ **No lleva `projectId`.** Ver `CreateTaskBodyDto`.
+ */
+export class UpdateTaskBodyDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
@@ -42,10 +41,24 @@ export class UpdateTaskDto {
   @IsUUID('4')
   columnId?: string;
 
-  @ApiPropertyOptional()
+  /**
+   * Conjunto completo de encargados. Omitirlo los deja como están; mandarlo
+   * vacío desasigna a todo el mundo. Ver `AssignTaskBodyDto`.
+   */
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsUUID('4')
-  assigneeId?: string;
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
+  /** Conjunto completo de etiquetas. Omitirlo las deja como están. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  labelIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -56,4 +69,27 @@ export class UpdateTaskDto {
   @IsOptional()
   @IsEnum(Priority)
   priority?: Priority;
+}
+
+/** Payload al microservicio: el cuerpo + lo que inyecta el gateway. */
+export class UpdateTaskDto extends UpdateTaskBodyDto {
+  @IsUUID('4')
+  id: string;
+
+  /** Resuelto por el guard desde la ruta, no por el cliente. */
+  @IsUUID('4')
+  projectId: string;
+
+  @IsUUID('4')
+  requesterId: string;
+
+  /**
+   * ¿La columna destino es de cierre? Igual que en `MoveTaskDto`, y por el mismo
+   * motivo: este `PATCH` **también** acepta `columnId`, así que también puede
+   * cerrar una tarea. Si solo lo resolviera la ruta de mover, editar la columna
+   * desde aquí dejaría el `completedAt` sin poner y el reporte se lo perdería.
+   */
+  @IsOptional()
+  @IsBoolean()
+  isClosingColumn?: boolean;
 }

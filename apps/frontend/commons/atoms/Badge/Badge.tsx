@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { alpha, colors } from '../../tokens';
 
 export type BadgeVariant =
   | 'default'
@@ -16,41 +17,49 @@ export interface BadgeProps {
   style?: CSSProperties;
 }
 
+/**
+ * `background`/`border` son washes al 10-12% sobre lo que haya detrás, no
+ * colores sólidos: por eso se leen bien tanto sobre `--color-surface` oscuro
+ * como sobre el blanco del tema claro. `default` es el único que no tenía
+ * token propio — usaba blanco fijo, que en tema claro es invisible sobre
+ * fondo blanco — así que sale de `textSecondary`, que ya es gris en los dos
+ * temas.
+ */
 const variantStyles: Record<BadgeVariant, CSSProperties> = {
   default: {
-    background: 'rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    color: 'rgba(255,255,255,0.45)',
+    background: alpha(colors.textSecondary, 12),
+    border: `1px solid ${alpha(colors.textSecondary, 25)}`,
+    color: colors.textSecondary,
   },
   primary: {
-    background: 'rgba(108,99,255,0.12)',
-    border: '1px solid rgba(108,99,255,0.3)',
-    color: 'var(--color-primary)',
+    background: colors.primaryMuted,
+    border: `1px solid ${alpha(colors.primary, 30)}`,
+    color: colors.primary,
   },
   accent: {
-    background: 'rgba(212,168,67,0.12)',
-    border: '1px solid rgba(212,168,67,0.3)',
-    color: 'var(--color-accent)',
+    background: colors.accentMuted,
+    border: `1px solid ${alpha(colors.accent, 30)}`,
+    color: colors.accent,
   },
   success: {
-    background: 'rgba(74,222,128,0.12)',
-    border: '1px solid rgba(74,222,128,0.3)',
-    color: 'var(--color-success)',
+    background: colors.successMuted,
+    border: `1px solid ${alpha(colors.success, 30)}`,
+    color: colors.success,
   },
   warning: {
-    background: 'rgba(251,191,36,0.12)',
-    border: '1px solid rgba(251,191,36,0.3)',
-    color: 'var(--color-warning)',
+    background: colors.warningMuted,
+    border: `1px solid ${alpha(colors.warning, 30)}`,
+    color: colors.warning,
   },
   error: {
-    background: 'rgba(248,113,113,0.12)',
-    border: '1px solid rgba(248,113,113,0.3)',
-    color: 'var(--color-error)',
+    background: colors.errorMuted,
+    border: `1px solid ${alpha(colors.error, 30)}`,
+    color: colors.error,
   },
   info: {
-    background: 'rgba(96,165,250,0.12)',
-    border: '1px solid rgba(96,165,250,0.3)',
-    color: 'var(--color-info)',
+    background: colors.infoMuted,
+    border: `1px solid ${alpha(colors.info, 30)}`,
+    color: colors.info,
   },
 };
 

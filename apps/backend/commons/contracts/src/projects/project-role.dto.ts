@@ -1,69 +1,71 @@
-import { IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsPermissionMap } from '../roles/is-permission-map.validator';
+import { PROJECT_PERMISSIONS } from '../roles/project-permission.enum';
 
-export class CreateProjectRoleDto {
-  @IsUUID('4')
-  projectId: string;
+/** Mapa de permisos de un rol: claves del enum, valores booleanos. */
+export type PermissionMap = Partial<Record<string, boolean>>;
 
-  @IsString()
-  @MinLength(2)
-  @MaxLength(50)
-  name: string;
-
-  @ApiProperty({
+const PERMISSIONS_API = {
     type: 'object',
     additionalProperties: { type: 'boolean' },
-    description: 'Diccionario de permisos asignados al rol',
-  })
-  @IsObject()
-  permissions: {
-    canCreateBoard?: boolean;
-    canEditBoard?: boolean;
-    canDeleteBoard?: boolean;
-    canCreateColumn?: boolean;
-    canEditColumn?: boolean;
-    canDeleteColumn?: boolean;
-    canCreateTask?: boolean;
-    canEditTask?: boolean;
-    canDeleteTask?: boolean;
-    canManageMembers?: boolean;
-    canManageRoles?: boolean;
-  };
+    description:
+        'Diccionario de permisos. Claves válidas: ' +
+        PROJECT_PERMISSIONS.join(', ') +
+        '. Un array se rechaza: el evaluador hace permisos[clave] y sobre un array daría undefined.',
+    example: { canViewProject: true, canEditTask: true },
+} as const;
+
+/** Cuerpo de `POST /projects/:projectId/roles`. */
+export class CreateProjectRoleBodyDto {
+    @IsString()
+    @MinLength(2)
+    @MaxLength(50)
+    name: string;
+
+    @ApiProperty(PERMISSIONS_API)
+    @IsPermissionMap()
+    permissions: PermissionMap;
 }
 
-export class UpdateProjectRoleDto {
-  @IsUUID('4')
-  id: string;
+/** Payload al microservicio: el cuerpo más el projectId de la ruta. */
+export class CreateProjectRoleDto extends CreateProjectRoleBodyDto {
+    @IsUUID('4')
+    projectId: string;
+}
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MinLength(2)
-  @MaxLength(50)
-  name?: string;
+/** Cuerpo de `PATCH /projects/:projectId/roles/:id`. */
+export class UpdateProjectRoleBodyDto {
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    @MinLength(2)
+    @MaxLength(50)
+    name?: string;
 
-  @ApiPropertyOptional({
-    type: 'object',
-    additionalProperties: { type: 'boolean' },
-    description: 'Diccionario de permisos del rol',
-  })
-  @IsOptional()
-  @IsObject()
-  permissions?: Record<string, boolean>;
+    @ApiPropertyOptional(PERMISSIONS_API)
+    @IsOptional()
+    @IsPermissionMap()
+    permissions?: PermissionMap;
+}
+
+export class UpdateProjectRoleDto extends UpdateProjectRoleBodyDto {
+    @IsUUID('4')
+    id: string;
 }
 
 export class DeleteProjectRoleDto {
-  @IsUUID('4')
-  id: string;
+    @IsUUID('4')
+    id: string;
 }
 
 export class CheckProjectPermissionDto {
-  @IsUUID('4')
-  userId: string;
+    @IsUUID('4')
+    userId: string;
 
-  @IsUUID('4')
-  projectId: string;
+    @IsUUID('4')
+    projectId: string;
 
-  @IsString()
-  permission: string;
+    @IsString()
+    permission: string;
 }

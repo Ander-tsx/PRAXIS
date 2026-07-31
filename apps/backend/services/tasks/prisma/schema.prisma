@@ -10,27 +10,138 @@ datasource db {
 }
 
 model Task {
-  id           String      @id @default(uuid())
+  id           String         @id @default(uuid())
   title        String
   description  String?
   status       String
   boardId      String
   columnId     String
-  assigneeId   String?
+  /// Quién creó la tarea. Los encargados están en `assignees`.
   reporterId   String
   projectId    String
   parentTaskId String?
-  parent       Task?       @relation("Subtasks", fields: [parentTaskId], references: [id])
-  subtasks     Task[]      @relation("Subtasks")
+  parent       Task?          @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]         @relation("Subtasks")
   checklists   Checklist[]
+  assignees    TaskAssignee[]
+  labels       TaskLabel[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
   dueDate      DateTime?
-  priority     Priority    @default(MEDIUM)
-  order        Int         @default(0)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  priority     Priority       @default(MEDIUM)
+  order        Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
+  /// Cuándo entró en una **columna de cierre** (la verde). `null` mientras siga
+  /// abierta, y se vuelve a `null` si alguien la saca de ahí.
+  ///
+  /// Está denormalizado a propósito. Se podría deducir del último evento
+  /// `COMPLETED` de `TaskEvent`, pero entonces cada consulta de «¿qué está
+  /// cerrado?» tendría que recorrer el historial, y esa pregunta la hacen casi
+  /// todos los reportes.
+  ///
+  /// ⚠️ Quién decide si la columna cierra es el **gateway**, no este servicio:
+  /// el color vive en projects-service. Ver `isClosingColumn` en `MoveTaskDto`.
+  completedAt  DateTime?
+
+  /// Para «mis tareas»: se filtra por vencimiento dentro de los proyectos visibles.
+  @@index([projectId, dueDate])
+  /// Para el throughput: cuántas se cerraron en cada tramo de fechas.
+  @@index([projectId, completedAt])
   @@schema("tasks")
   @@map("tasks")
+}
+
+/// Qué le pasó a una tarea, y cuándo.
+///
+/// Es la tabla que **no existía** y sin la cual no hay analítica posible: hasta
+/// ahora el sistema solo guardaba el estado actual, así que no había forma de
+/// saber cuánto tardó nada. `Task.updatedAt` no servía de aproximación porque lo
+/// pisa cualquier edición —cambiar el título, la prioridad, una etiqueta— y
+/// también la cascada que renombra el `status` al renombrar la columna.
+///
+/// ⚠️ **El historial solo se puede capturar hacia adelante.** Lo anterior a esta
+/// tabla no existe y no se puede reconstruir.
+enum TaskEventType {
+  CREATED
+  MOVED
+  /// Entró en una columna de cierre.
+  COMPLETED
+  /// Salió de una columna de cierre estando cerrada.
+  REOPENED
+  ASSIGNED
+  UNASSIGNED
+  PRIORITY_CHANGED
+  DELETED
+
+  @@schema("tasks")
+}
+
+model TaskEvent {
+  id           String        @id @default(uuid())
+  taskId       String
+  projectId    String
+  boardId      String
+  type         TaskEventType
+
+  /// Movimiento, **por id de columna y nunca por `status`**.
+  ///
+  /// El `status` es el *nombre* de la columna, y renombrar una columna lo cambia
+  /// en todas sus tareas sin que ninguna se haya movido. Un historial apoyado en
+  /// el nombre registraría movimientos que no ocurrieron.
+  fromColumnId String?
+  toColumnId   String?
+
+  fromPriority Priority?
+  toPriority   Priority?
+
+  /// A quién se asignó o desasignó. `actorId` es quien lo hizo; no coinciden.
+  subjectId    String?
+  actorId      String
+
+  /// Copia del momento, igual que en `notifications`: el evento tiene que poder
+  /// leerse cuando la tarea de la que habla ya no existe.
+  taskTitle    String
+
+  occurredAt   DateTime      @default(now())
+
+  /// Sin clave foránea a `Task`, y es deliberado: un evento es un hecho del
+  /// pasado. Con `onDelete: Cascade` el throughput histórico se borraría solo al
+  /// limpiar el tablero, que es justo cuando más interesa conservarlo. Los
+  /// borra explícitamente `TaskPurgeService` cuando desaparece el proyecto.
+  @@index([projectId, occurredAt])
+  @@index([taskId, occurredAt])
+  @@index([projectId, type, occurredAt])
+  @@schema("tasks")
+  @@map("task_events")
+}
+
+/// Encargado de una tarea.
+///
+/// Sustituye al antiguo `Task.assigneeId`, que era un solo campo. Se migró en
+/// vez de mantener los dos porque dos fuentes para el mismo hecho acaban
+/// divergiendo, y «¿quién está asignado?» tendría dos respuestas: justo el
+/// problema que ya tuvimos con los permisos guardados como array.
+///
+/// No hay clave foránea hacia el usuario: vive en otro microservicio y en otro
+/// esquema. La comprobación de que es miembro del proyecto se hace en el
+/// servicio, preguntando a projects-service.
+model TaskAssignee {
+  id         String   @id @default(uuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId     String
+  /// Quién lo asignó, para poder decirlo en la interfaz.
+  assignedBy String
+  assignedAt DateTime @default(now())
+
+  /// Una persona no puede estar asignada dos veces a la misma tarea.
+  @@unique([taskId, userId])
+  /// El índice que hace barata la consulta de «mis tareas».
+  @@index([userId])
+  @@schema("tasks")
+  @@map("task_assignees")
 }
 
 model Checklist {
@@ -43,6 +154,112 @@ model Checklist {
 
   @@schema("tasks")
   @@map("checklists")
+}
+
+/// Metadatos de un archivo adjunto a una tarea.
+///
+/// **Los bytes no están aquí**: viven en `AttachmentBlob`, en una fila aparte.
+/// Es la única protección que de verdad funciona contra arrastrar megabytes sin
+/// querer — un `SELECT` sobre esta tabla, o un `include` distraído desde la
+/// tarea, no puede traerse el contenido porque no está en ella.
+///
+/// Se guardan en Postgres y no en almacenamiento de objetos porque la infra son
+/// Postgres y Redis: la alternativa era meter otro servicio en el compose. Con
+/// cientos de adjuntos va sobrado; a decenas de miles, el sitio por donde
+/// cortar es `AttachmentBlob`, y la API pública no cambiaría.
+model TaskAttachment {
+  id         String          @id @default(uuid())
+  taskId     String
+  task       Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  /// Nombre con el que se subió, saneado. Es lo que se ofrece al descargar.
+  filename   String
+  mimeType   String
+  /// Bytes reales del archivo, medidos en el servidor y no declarados por el cliente.
+  size       Int
+  uploadedBy String
+  createdAt  DateTime        @default(now())
+  blob       AttachmentBlob?
+
+  @@index([taskId, createdAt])
+  @@schema("tasks")
+  @@map("task_attachments")
+}
+
+/// Los bytes de un adjunto, en su propia fila.
+///
+/// Uno a uno con `TaskAttachment`. Separarlos es lo que permite listar adjuntos
+/// sin tocar el contenido: el listado consulta la tabla de metadatos y esta solo
+/// se lee en la ruta de descarga.
+model AttachmentBlob {
+  attachmentId String         @id
+  attachment   TaskAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  /// `bytea`. Postgres lo saca del bloque principal vía TOAST.
+  data         Bytes
+
+  @@schema("tasks")
+  @@map("attachment_blobs")
+}
+
+/// Comentario en una tarea.
+///
+/// `authorId` es un id sin clave foránea: el usuario vive en otro
+/// microservicio. El nombre lo resuelve la interfaz contra los miembros del
+/// proyecto, igual que con los encargados.
+///
+/// Se guarda `editedAt` aparte de `updatedAt` porque solo interesa marcar
+/// «editado» cuando cambió el **texto**, no cada vez que Prisma toca la fila.
+model TaskComment {
+  id        String    @id @default(uuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  authorId  String
+  body      String
+  createdAt DateTime  @default(now())
+  editedAt  DateTime?
+
+  /// El listado siempre va por tarea y en orden cronológico.
+  @@index([taskId, createdAt])
+  @@schema("tasks")
+  @@map("task_comments")
+}
+
+/// Etiqueta de un proyecto.
+///
+/// Es **del proyecto y no del tablero**: así se reutiliza la misma etiqueta en
+/// todos los tableros del proyecto, que es como funcionan las de Trello. Por
+/// tablero quedarían aisladas y habría que recrearlas en cada uno.
+///
+/// No hay clave foránea hacia `Project`: vive en otro microservicio. Al borrar
+/// un proyecto las limpia `task_purge`, igual que a las tareas.
+model Label {
+  id        String      @id @default(uuid())
+  projectId String
+  name      String
+  /// Token de color del design system (`primary`, `error`, …), no un hex: así
+  /// las etiquetas siguen el tema y no se salen de la paleta.
+  color     String
+  tasks     TaskLabel[]
+  createdAt DateTime    @default(now())
+
+  /// Dos etiquetas con el mismo nombre en un proyecto no distinguirían nada.
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@schema("tasks")
+  @@map("labels")
+}
+
+/// Une una etiqueta con una tarea.
+model TaskLabel {
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  /// Clave compuesta: no hace falta un id propio y evita duplicados por diseño.
+  @@id([taskId, labelId])
+  @@index([labelId])
+  @@schema("tasks")
+  @@map("task_labels")
 }
 
 enum Priority {

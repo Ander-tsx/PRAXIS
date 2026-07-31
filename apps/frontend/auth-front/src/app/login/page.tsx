@@ -3,8 +3,8 @@
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de LoginDto del backend
 // email: formato válido, password: 8-64 caracteres
@@ -27,7 +27,6 @@ function validateForm(email: string, password: string): string | null {
  * Renderiza AuthForm (molécula) con átomos Input y Button como slots.
  */
 export default function LoginPage() {
-  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,8 +64,9 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        // Cookie httpOnly seteada por el BFF — redirigimos al shell
-        router.push('/');
+        // Cookie httpOnly seteada por el BFF. Navegación dura: router.push('/')
+        // se convertiría en '/auth/' por el basePath y no saldría de la zona.
+        navigateAfterAuth();
         return;
       }
 

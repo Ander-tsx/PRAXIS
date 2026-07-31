@@ -4,6 +4,10 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { TasksController } from './tasks.controller';
 import { ChecklistsController } from './checklists.controller';
+import { MyTasksController } from './my-tasks.controller';
+import { LabelsController } from './labels.controller';
+import { CommentsController } from './comments.controller';
+import { AttachmentsController } from './attachments.controller';
 
 @Module({
   imports: [
@@ -35,6 +39,18 @@ import { ChecklistsController } from './checklists.controller';
       },
     ]),
   ],
-  controllers: [TasksController, ChecklistsController],
+  /**
+   * `MyTasksController` va **antes** que `TasksController`: este declara
+   * `@Get('tasks/:id')` sin prefijo de controlador, y aunque hoy no colisiona
+   * con `me/tasks`, el orden deja claro cuál es la ruta más específica.
+   */
+  controllers: [
+    MyTasksController,
+    TasksController,
+    ChecklistsController,
+    LabelsController,
+    CommentsController,
+    AttachmentsController,
+  ],
 })
 export class TasksModule {}

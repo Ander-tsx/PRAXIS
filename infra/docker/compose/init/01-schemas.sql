@@ -1,2 +1,8 @@
-CREATE SCHEMA IF NOT EXISTS auth_service;
-CREATE SCHEMA IF NOT EXISTS users_service;
+-- Este script solo se ejecuta la primera vez que se inicializa el volumen.
+--
+-- Los schemas de los microservicios (credentials, permissions, projects,
+-- tasks) los crea Prisma al aplicar las migraciones, gracias a la propiedad
+-- `schemas` del datasource. No hace falta declararlos aquí.
+--
+-- Antes este archivo creaba `auth_service` y `users_service`, nombres de una
+-- iteración anterior del backend que ya no usa ningún servicio.

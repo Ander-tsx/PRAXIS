@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { alpha, colors } from '../../tokens';
 
 export interface AuthFormProps {
   /** Título principal del formulario */
@@ -35,7 +36,7 @@ export function AuthForm({
   return (
     <div
       className="w-full max-w-md rounded-2xl border border-border bg-surface p-8"
-      style={{ boxShadow: '0 8px 48px rgba(0,0,0,0.4)' }}
+      style={{ boxShadow: `0 8px 48px ${alpha(colors.overlay, 40)}` }}
     >
       {/* Header */}
       <div className="mb-8 flex flex-col gap-1">

@@ -5,25 +5,31 @@ export class FindOneBoardDto {
   id: string;
 }
 
-export class CreateBoardDto {
-  @IsUUID('4')
-  workspaceId: string;
-
+/** Cuerpo de `POST /workspaces/:workspaceId/boards`. */
+export class CreateBoardBodyDto {
   @IsString()
   @MinLength(2)
   @MaxLength(100)
   name: string;
 }
 
-export class UpdateBoardDto {
+export class CreateBoardDto extends CreateBoardBodyDto {
   @IsUUID('4')
-  id: string;
+  workspaceId: string;
+}
 
+/** Cuerpo de `PATCH /boards/:boardId`. */
+export class UpdateBoardBodyDto {
   @IsOptional()
   @IsString()
   @MinLength(2)
   @MaxLength(100)
   name?: string;
+}
+
+export class UpdateBoardDto extends UpdateBoardBodyDto {
+  @IsUUID('4')
+  id: string;
 }
 
 export class DeleteBoardDto {

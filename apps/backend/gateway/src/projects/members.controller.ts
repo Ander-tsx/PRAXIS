@@ -8,6 +8,7 @@ import {
   Inject,
   Param,
   Post,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
@@ -18,9 +19,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
-  AddMemberDto,
-  RemoveMemberDto,
+  AddMemberBodyDto,
   ProjectPermission,
+  RemoveMemberBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -55,7 +56,7 @@ export class MembersController {
   @ApiResponse({ status: 201, description: 'Miembro agregado exitosamente' })
   add(
     @Param('projectId') projectId: string,
-    @Body() body: Omit<AddMemberDto, 'projectId'>,
+    @Body() body: AddMemberBodyDto,
   ) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_add' }, { projectId, ...body }),
@@ -70,10 +71,15 @@ export class MembersController {
   @ApiResponse({ status: 200, description: 'Miembro eliminado exitosamente' })
   remove(
     @Param('projectId') projectId: string,
-    @Body() body: Omit<RemoveMemberDto, 'projectId'>,
+    @Request() req: Express.Request,
+    @Body() body: RemoveMemberBodyDto,
   ) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'member_remove' }, { projectId, ...body }),
+      this.projectsClient.send(
+        { cmd: 'member_remove' },
+        // `requesterId` solo para poder decir en el aviso quién la sacó.
+        { projectId, ...body, requesterId: req.user!.userId },
+      ),
     );
   }
 }

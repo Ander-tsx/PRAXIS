@@ -2,5 +2,12 @@ packages:
   - "apps/backend/gateway"
   - "apps/backend/services/*"
   - "apps/backend/commons/*"
+  - "apps/frontend/*"
   - "packages/**"
   - "stubs/**"
+
+# Heredado de apps/frontend/web-shell/pnpm-workspace.yaml, que existía como
+# workspace anidado y se eliminó al integrar el frontend al monorepo.
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
