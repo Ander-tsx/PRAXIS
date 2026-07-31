@@ -92,6 +92,21 @@ export class CreateNotificationsDto {
 
 /** Query de `GET /api/me/notifications`. */
 export class FindNotificationsQueryDto {
+  /**
+   * Página, desde 1.
+   *
+   * No existía: solo había `limit`, con tope 100, así que a partir del aviso
+   * 101 no había forma de llegar. Una bandeja crece sola —cada asignación, cada
+   * invitación, cada comentario— y es de las listas que más rápido se pasan de
+   * cualquier tope.
+   */
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
   @ApiPropertyOptional({ default: 30, maximum: 100 })
   @IsOptional()
   @Type(() => Number)

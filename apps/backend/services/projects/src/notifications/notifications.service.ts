@@ -65,11 +65,15 @@ export class NotificationsService {
       ...(dto.unreadOnly && { readAt: null }),
     };
 
+    const limit = dto.limit ?? DEFAULT_LIMIT;
+    const page = dto.page ?? 1;
+
     const [items, total, unread] = await Promise.all([
       this.prisma.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        take: dto.limit ?? DEFAULT_LIMIT,
+        skip: (page - 1) * limit,
+        take: limit,
       }),
       this.prisma.notification.count({ where }),
       this.prisma.notification.count({ where: { userId: dto.userId, readAt: null } }),
