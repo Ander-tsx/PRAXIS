@@ -182,7 +182,24 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
       }
     }
 
-    const payload = await gatewayResponse.text();
+    /**
+     * ⚠️ **`arrayBuffer()` y no `text()`.**
+     *
+     * Estuvo con `text()`, y eso decodifica los bytes como UTF-8 para volver a
+     * codificarlos al construir la respuesta: cualquier byte que no forme una
+     * secuencia UTF-8 válida se sustituye por el carácter de reemplazo y **no
+     * hay vuelta atrás**. Todo lo que cruzara este proxy sin ser texto llegaba
+     * roto al navegador.
+     *
+     * Se vio con un PDF: 38 135 bytes correctos en la base, con su `%PDF-1.7` y
+     * su `%%EOF`, y un archivo ilegible en el navegador. El almacenamiento
+     * estaba bien; se rompía aquí, en la entrega.
+     *
+     * Con `arrayBuffer()` los bytes pasan tal cual, y el JSON —que es el 99 %
+     * de lo que cruza— sigue funcionando igual: el `Content-Type` que reenvía
+     * el gateway es el que decide cómo lo lee el cliente.
+     */
+    const payload = await gatewayResponse.arrayBuffer();
 
     const responseHeaders = new Headers();
     gatewayResponse.headers.forEach((value, key) => {
