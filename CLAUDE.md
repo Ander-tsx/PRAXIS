@@ -36,6 +36,8 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 
 ⚠️ Tailwind solo genera las clases que encuentra escaneando. Los `@source` hacia commons van dentro de `theme.css` y son relativos a ese archivo — si los quitas o el import falla, una utilidad usada solo dentro de un componente compartido se descarta **sin ningún error** y el componente se renderiza sin estilos. Ya nos pasó (`ba94057`).
 
+⚠️ Por el mismo motivo, `@theme` (a secas) solo emite la **variable CSS** de un token si detecta una clase de utilidad literal que la use (`text-info`, `bg-error-muted`…). Un token que solo se consuma vía `colors.info` de `commons/tokens/colors.ts` en un `style={{ background: colors.info }}` —que es justo para lo que existe ese archivo— no genera esa clase, y Tailwind lo recorta del CSS final, también en silencio: la variable no existe y `var(--color-info)` no resuelve a nada. Por eso `theme.css` declara `@theme static`, no `@theme`: fuerza a emitir todas las variables del bloque siempre, las use un `className` o no.
+
 **Auth:** el JWT vive en una cookie httpOnly `praxis_session`, nunca en `localStorage` ni en el JS del cliente. Toda llamada al gateway pasa por el proxy de la zona:
 
 - Server Component → `createServerApiClient()` de `@praxis/commons/auth` (llama al gateway directo; `createApiClient` no sirve en el servidor)

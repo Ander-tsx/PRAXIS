@@ -2530,3 +2530,65 @@ Probado contra Gemini de verdad: pregunta real, cuota sube de 10 a 11,
 respuesta con avance/semana/predicción citando los mismos números que el
 informe — mismo comportamiento que documentó §26.7, con la interfaz nueva
 encima.
+
+### 27.6 Segunda pasada: un bug real y cuatro retoques
+
+Probando el tema claro en el tablero de verdad salió un bug que no era del
+tema — llevaba ahí desde antes, y el tema claro solo lo hizo evidente.
+
+#### 🔴 `@theme` (a secas) recortaba tokens sin clase literal
+
+El punto «Azul» del selector de color de columna (`ColumnMenu`) se veía
+transparente — el botón existía, el tooltip funcionaba, pero el círculo no
+tenía color. Mismo síntoma en cualquier gráfica que citara `colors.info`.
+
+Causa: Tailwind v4 con `@theme` (a secas) solo emite la **variable CSS** de un
+token cuando detecta una clase de utilidad literal que la use (`text-info`,
+`bg-error-muted`…). `colors.info` se consume siempre vía `style={{ background:
+colors.info }}` — que es precisamente para lo que existe
+`commons/tokens/colors.ts` — así que ningún archivo tiene jamás la cadena
+`text-info` o `bg-info`, y Tailwind nunca generaba `--color-info` en el CSS
+final. Confirmado comparando con grep: `bg-error-muted` aparece 3 veces como
+clase (sobrevive), `bg-info`/`bg-info-muted` cero veces (no sobrevivían) —
+tampoco `--color-success-muted` ni `--color-warning-muted`, por el mismo
+motivo.
+
+Se reprodujo igual tras matar los procesos de `next dev` y borrar `.next` de
+las cinco zonas: no era caché de Turbopack, era el CSS que Tailwind genera de
+verdad desde el código fuente.
+
+**Arreglo:** `@theme static` en vez de `@theme`. Fuerza a Tailwind a emitir
+todas las variables del bloque siempre, las use un `className` o no — que es
+lo que necesita cualquier token pensado para consumirse solo desde
+`commons/tokens/colors.ts`.
+
+#### La sombra del lienzo, negra también en tema claro
+
+`BoardStrip` (projects-front) pinta el tablero con una sombra `inset` que
+usaba `colors.overlay`. `overlay` se queda oscuro a propósito en los dos
+temas — es el scrim de modales y drawers (§27.2) — pero aquí no es un scrim,
+es la superficie del lienzo, y un hundido oscuro sobre un lienzo que en claro
+ya es blanco se leía como suciedad en los bordes, no como profundidad.
+
+Token nuevo, `--color-canvas-shadow`, que sí invierte por tema (oscuro en
+oscuro, blanco en claro) y que solo usa `BoardStrip`; las demás sombras de
+`overlay` (menús, `Dialog`, `AppShell`) se quedan igual porque ahí sí es un
+scrim.
+
+#### Cuatro retoques de interfaz
+
+- **Tus datos**: Nombre y Apellido pasan de apilados a una fila de dos
+  columnas — apilados dejaban la card angosta pegada a la izquierda por más
+  `max-w` que se le diera a dos campos tan cortos.
+- **`ThemeToggle`**: de dos botones con la palabra completa a un switch de
+  dos círculos de 32px con iconos de sol y luna y una marca deslizante detrás.
+- **Badge «AI Powered»**: de wash translúcido y píldora a mayúsculas fijas,
+  relleno sólido del color de acento y esquinas casi rectas.
+- **Loader del chat**: «Leyendo el informe…» con una estrella girando era un
+  adorno; pasa a «Pensando…» con tres `Sparkle` de distinto tamaño y su propio
+  `animation-delay` (`sparkle-drift`, en `theme.css`) que titilan por turnos
+  sin sincronizarse.
+
+Verificado contra Gemini con la clave nueva: 429 de la cuenta —cuota propia
+del key, no la cuota mensual de la app, que se quedó igual— y, tras esperar,
+respuesta correcta con la cuota de la app subiendo de 11 a 12.
