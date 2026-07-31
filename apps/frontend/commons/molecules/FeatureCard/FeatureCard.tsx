@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { alpha, colors } from '../../tokens';
 
 export interface FeatureCardData {
   id: number;
@@ -39,14 +40,14 @@ export function FeatureCard({ card }: FeatureCardProps) {
       onMouseEnter={() => setActive(true)}
       onMouseLeave={() => setActive(false)}
       style={{
-        background: active ? '#171722' : '#131319',
-        border: `1px solid ${active ? `${card.accent}45` : 'rgba(255,255,255,0.07)'}`,
+        background: active ? colors.surfaceElevated : colors.surface,
+        border: `1px solid ${active ? alpha(card.accent, 45) : colors.border}`,
         transition:
           'background 320ms ease, border-color 320ms ease, transform 420ms cubic-bezier(.22,1,.36,1), box-shadow 320ms ease',
         transform: active ? 'translateY(-4px)' : 'none',
         boxShadow: active
-          ? `0 18px 48px rgba(0,0,0,0.5), 0 0 48px -12px ${card.accent}40`
-          : '0 1px 2px rgba(0,0,0,0.3)',
+          ? `0 18px 48px ${alpha(colors.overlay, 50)}, 0 0 48px -12px ${alpha(card.accent, 40)}`
+          : `0 1px 2px ${alpha(colors.overlay, 30)}`,
       }}
     >
       {/* Halo inferior */}
@@ -54,7 +55,7 @@ export function FeatureCard({ card }: FeatureCardProps) {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
-          background: `radial-gradient(ellipse 75% 55% at 50% 108%, ${card.accent}1f 0%, transparent 70%)`,
+          background: `radial-gradient(ellipse 75% 55% at 50% 108%, ${alpha(card.accent, 12)} 0%, transparent 70%)`,
           opacity: active ? 1 : 0,
           transition: 'opacity 400ms ease',
         }}
@@ -84,8 +85,8 @@ export function FeatureCard({ card }: FeatureCardProps) {
         <div
           className="h-full w-full rounded-xl"
           style={{
-            background: active ? 'rgba(255,255,255,0.025)' : 'rgba(255,255,255,0.015)',
-            border: `1px solid ${active ? `${card.accent}22` : 'rgba(255,255,255,0.05)'}`,
+            background: active ? alpha(colors.textPrimary, 3) : alpha(colors.textPrimary, 1.5),
+            border: `1px solid ${active ? alpha(card.accent, 22) : colors.borderSubtle}`,
             transition: 'background 320ms ease, border-color 320ms ease',
           }}
         >
@@ -101,9 +102,9 @@ export function FeatureCard({ card }: FeatureCardProps) {
             style={{
               width: 40,
               height: 40,
-              background: active ? `${card.accent}1a` : 'rgba(255,255,255,0.05)',
-              border: `1px solid ${active ? `${card.accent}40` : 'rgba(255,255,255,0.07)'}`,
-              color: active ? card.accent : 'rgba(255,255,255,0.4)',
+              background: active ? alpha(card.accent, 16) : alpha(colors.textPrimary, 5),
+              border: `1px solid ${active ? alpha(card.accent, 40) : colors.border}`,
+              color: active ? card.accent : colors.textSecondary,
               transition: 'all 320ms ease',
             }}
           >
@@ -112,7 +113,7 @@ export function FeatureCard({ card }: FeatureCardProps) {
 
           <h3
             className="font-sans text-[0.95rem] font-semibold leading-tight"
-            style={{ color: '#f0f0f5', letterSpacing: '-0.01em' }}
+            style={{ color: colors.textPrimary, letterSpacing: '-0.01em' }}
           >
             {card.title}
           </h3>
@@ -120,9 +121,9 @@ export function FeatureCard({ card }: FeatureCardProps) {
           <span
             className="ml-auto flex-shrink-0 rounded-full px-2.5 py-1 font-sans text-[0.65rem] font-medium uppercase tracking-wide"
             style={{
-              border: `1px solid ${active ? `${card.accent}35` : 'rgba(255,255,255,0.08)'}`,
-              background: active ? `${card.accent}12` : 'transparent',
-              color: active ? card.accent : 'rgba(255,255,255,0.3)',
+              border: `1px solid ${active ? alpha(card.accent, 35) : colors.border}`,
+              background: active ? alpha(card.accent, 12) : 'transparent',
+              color: active ? card.accent : colors.textSecondary,
               transition: 'all 320ms ease',
             }}
           >
@@ -132,7 +133,7 @@ export function FeatureCard({ card }: FeatureCardProps) {
 
         <p
           className="font-sans text-[0.83rem] leading-relaxed"
-          style={{ color: 'rgba(255,255,255,0.5)' }}
+          style={{ color: colors.textSecondary }}
         >
           {card.description}
         </p>
