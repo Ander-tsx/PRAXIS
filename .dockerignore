@@ -1,0 +1,34 @@
+# Lo que no debe entrar en la imagen.
+#
+# `node_modules` es el importante: se instala dentro con el lockfile, y copiar
+# el de la máquina traería binarios compilados para otro sistema — el motor de
+# Prisma y `@turbo/darwin-arm64` son los que revientan primero.
+node_modules
+**/node_modules
+
+# Salidas de compilación: se generan dentro. Copiarlas invalidaría la caché de
+# capas en cada build sin aportar nada.
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+*.tsbuildinfo
+
+# ⚠️ Los `.env` **no entran**. La configuración se pasa por variables de
+# entorno en la plataforma; meterlos en la imagen dejaría el JWT_SECRET y la
+# clave de Gemini dentro de una capa, legibles por quien tenga la imagen.
+.env
+**/.env
+.env.local
+**/.env.local
+
+.git
+.github
+.claude
+.planning
+docs
+infra/k8s
+*.md
+!README.md
