@@ -15,6 +15,7 @@ import {
   formatoReinicio,
 } from '@/lib/assistant';
 import { ConversationHistory } from './ConversationHistory';
+import { TextoDelModelo } from './TextoDelModelo';
 import {
   AssignProposalCard,
   ChecklistProposalCard,
@@ -546,7 +547,7 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
             : { background: colors.surfaceElevated }
         }
       >
-        {mensaje.text}
+        <TextoDelModelo texto={mensaje.text} />
       </div>
     </div>
   );

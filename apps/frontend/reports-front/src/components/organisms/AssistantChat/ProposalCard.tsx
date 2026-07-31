@@ -21,6 +21,7 @@ import type {
   PropuestaMovimiento,
   PropuestaTarea,
 } from '@/lib/assistant';
+import { TextoDelModelo } from './TextoDelModelo';
 
 /**
  * La tarjeta de una propuesta: **lo que se va a crear, antes de que exista.**
@@ -619,7 +620,7 @@ function Marco({
           className="border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
           style={{ borderColor: alpha(colors.primary, 35) }}
         >
-          {porQue}
+          <TextoDelModelo texto={porQue} />
         </p>
       )}
 
