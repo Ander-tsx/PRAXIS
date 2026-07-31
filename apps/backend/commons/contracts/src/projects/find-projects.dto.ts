@@ -11,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { QueryOptionsDto, SortOrder } from '../pagination.dto';
+import { ProjectPermission } from '../roles/project-permission.enum';
 
 export class FindProjectsDto {
   /**
@@ -33,6 +34,21 @@ export class FindProjectsDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  /**
+   * Solo los proyectos donde `userId` tiene **este permiso**, ya expandido por
+   * jerarquía. El dueño pasa siempre, igual que en el guard.
+   *
+   * Existe para el selector de Reportes, que tiene que ofrecer únicamente los
+   * proyectos cuyo informe puedes abrir. La alternativa era pedir
+   * `/projects/:id/permissions/me` una vez por proyecto desde el cliente: N
+   * peticiones por carga para descartar casi todas.
+   *
+   * Sin `userId` no hace nada — un permiso sin sujeto no filtra a nadie.
+   */
+  @IsOptional()
+  @IsEnum(ProjectPermission)
+  permission?: ProjectPermission;
 
   @IsOptional()
   @ValidateNested()
@@ -78,11 +94,21 @@ export class FindProjectsQueryDto {
   @IsString()
   search?: string;
 
+  @ApiPropertyOptional({
+    enum: ProjectPermission,
+    description:
+      'Solo los proyectos donde tienes este permiso (ya expandido por jerarquía). El dueño pasa siempre.',
+  })
+  @IsOptional()
+  @IsEnum(ProjectPermission)
+  permission?: ProjectPermission;
+
   /** `userId` sale del token, nunca de la URL. */
   toFindProjectsDto(userId: string): FindProjectsDto {
     const dto: FindProjectsDto = { userId };
 
     if (this.search) dto.search = this.search;
+    if (this.permission) dto.permission = this.permission;
 
     const query: QueryOptionsDto = {};
     if (this.page !== undefined) query.page = this.page;

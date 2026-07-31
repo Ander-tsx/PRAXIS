@@ -9,6 +9,7 @@ import {
   FindProjectsDto,
   UpdateProjectDto,
 } from '@praxis/contracts';
+import { expandPermissions, normalizePermissions } from '../project-roles/permission-map';
 
 const PROJECT_CACHE_TTL = 300; // 5 min
 
@@ -128,10 +129,21 @@ export class ProjectsService {
      * los proyectos del sistema a cualquiera.
      */
     if (dto.userId) {
-      where.OR = [
-        { ownerId: dto.userId },
-        { members: { some: { userId: dto.userId } } },
-      ];
+      /**
+       * Con `permission`, ser miembro no basta: hay que serlo **con un rol que
+       * conceda ese permiso**. El dueño sigue pasando siempre, igual que en el
+       * guard, que le da bypass.
+       *
+       * El filtro se aplica al `where`, no al resultado: así `total` y la
+       * paginación siguen contando lo que de verdad se puede ver. Filtrar
+       * después de paginar devolvería páginas de tamaño irregular y un total
+       * que miente.
+       */
+      const memberScope = dto.permission
+        ? { id: { in: await this.projectIdsWithPermission(dto.userId, dto.permission) } }
+        : { members: { some: { userId: dto.userId } } };
+
+      where.OR = [{ ownerId: dto.userId }, memberScope];
     }
 
     // Filtro estricto por propietario, para herramientas de administración.
@@ -160,6 +172,37 @@ export class ProjectsService {
     ]);
 
     return { items, total };
+  }
+
+  /**
+   * Proyectos donde este usuario es miembro **con un rol que concede
+   * `permission`**, ya expandido por jerarquía.
+   *
+   * Una sola consulta para todos sus proyectos, no una por proyecto: se traen
+   * sus filas de `projectMember` con el rol embebido y la expansión se hace en
+   * memoria, que es donde ya vivía. La jerarquía sale de `permission-map.ts`,
+   * la misma que usa `ProjectRolesService` — una segunda copia sería una copia
+   * que se queda atrás en cuanto alguien añada un permiso.
+   *
+   * No pasa por la caché de Redis de permisos (`project:…:user:…:permissions`),
+   * que es por proyecto: leer N claves para evitar una consulta no compensa. El
+   * efecto lateral es que aquí un cambio de rol se ve al instante y en
+   * `permissions/me` tarda hasta 300 s, lo cual va en la dirección segura.
+   */
+  private async projectIdsWithPermission(
+    userId: string,
+    permission: string,
+  ): Promise<string[]> {
+    const memberships = await this.prisma.projectMember.findMany({
+      where: { userId },
+      select: { projectId: true, projectRole: { select: { permissions: true } } },
+    });
+
+    return memberships
+      .filter(
+        (m) => expandPermissions(normalizePermissions(m.projectRole?.permissions))[permission],
+      )
+      .map((m) => m.projectId);
   }
 
   async findOneProject(id: string) {
