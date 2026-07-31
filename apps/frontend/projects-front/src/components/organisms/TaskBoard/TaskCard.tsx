@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Avatar,
   PRIORITY_LABELS,
   type Priority,
   type Task,
@@ -234,26 +235,17 @@ export function TaskCard({
               const label = user ? personLabel(user) : 'Alguien que ya no está en el proyecto';
               const mine = assignee.userId === currentUserId;
               return (
-                <span
+                <Avatar
                   key={assignee.id}
+                  label={label}
                   title={mine ? `${label} — es tuya` : label}
-                  className={[
-                    'flex h-6 w-6 items-center justify-center rounded-full font-sans text-[10px] font-semibold uppercase text-text-primary ring-2 ring-background',
-                    /* Con `-space-x-1.5` los círculos se solapan y el que va
-                       después tapa al anterior. Ir primero en el DOM no basta
-                       para verse entero: hace falta subirlo de capa. */
-                    mine ? 'relative z-10' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={
-                    mine
-                      ? { background: colors.error, color: colors.textInverse }
-                      : { background: alpha(colors.primary, 30) }
-                  }
-                >
-                  {initials(label)}
-                </span>
+                  mine={mine}
+                  ring
+                  /* Con `-space-x-1.5` los círculos se solapan y el que va
+                     después tapa al anterior. Ir primero en el DOM no basta
+                     para verse entero: hace falta subirlo de capa. */
+                  className={mine ? 'relative z-10' : ''}
+                />
               );
             })}
           {task.assignees.length > 4 && (
@@ -282,21 +274,6 @@ function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: 
   const index = assignees.findIndex((assignee) => assignee.userId === currentUserId);
   if (index <= 0) return assignees;
   return [assignees[index], ...assignees.slice(0, index), ...assignees.slice(index + 1)];
-}
-
-/**
- * Iniciales de una persona: la primera letra de sus dos primeras palabras.
- *
- * Cortar los dos primeros caracteres del nombre parecía equivalente y no lo es:
- * «Andres Praxis» y «Andrea Ruiz» daban las dos «AN» y quedaban indistinguibles
- * en la misma tarjeta. Con una sola palabra —el caso de quien no ha puesto
- * nombre y cae al correo— sí se usan sus dos primeras letras.
- */
-function initials(label: string): string {
-  const words = label.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0].slice(0, 2);
-  return words[0][0] + words[1][0];
 }
 
 function Chip({ color, children }: { color: string; children: React.ReactNode }) {

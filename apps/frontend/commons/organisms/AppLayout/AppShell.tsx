@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
+import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
 import { NavList } from './NavList';
@@ -143,15 +144,10 @@ export function AppShell({ navItems, zonePath, user, footerSlot, children }: App
 function UserCard({ user }: { user: AppShellUser }) {
   return (
     <div className="mb-3 flex items-center gap-3">
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-sans font-bold text-primary"
-        style={{
-          background: alpha(colors.primary, 18),
-          border: `1px solid ${alpha(colors.primary, 45)}`,
-        }}
-      >
-        {initialOf(user)}
-      </div>
+      {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
+          la barra lateral la persona siempre eres tú, así que sale en rojo. Que
+          coincida importa — es lo que enseña que el rojo significa «tuyo». */}
+      <Avatar label={user.name.trim() || user.email} mine size="md" />
       <div className="min-w-0 flex-1">
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-text-primary">{user.name}</p>
@@ -160,13 +156,6 @@ function UserCard({ user }: { user: AppShellUser }) {
       </div>
     </div>
   );
-}
-
-/** Inicial del avatar: del nombre si lo hay, si no del email. */
-function initialOf({ name, email }: AppShellUser): string {
-  const source = name.trim() || email.trim();
-  const first = source[0];
-  return first ? first.toUpperCase() : '?';
 }
 
 function Wordmark() {

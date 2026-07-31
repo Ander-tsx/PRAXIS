@@ -76,7 +76,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    label: 'Reportes',
+    label: 'Análisis',
     href: '/reports',
     icon: (
       <svg {...iconProps} aria-hidden="true">
