@@ -2625,3 +2625,98 @@ Los tokens implicados son `--color-accent` y su uso vía `alpha()`, no clases
 de utilidad — o sea, exactamente el caso que §27.6 documenta: si `theme.css`
 volviera a `@theme` sin `static`, este badge se quedaría sin color y sin borde
 en silencio.
+
+## 28. La tarjeta del tablero: menos color, y el tuyo destacado
+
+> Dos cambios sobre `TaskCard` que van en la misma dirección —quitarle color al
+> tablero para que el poco que quede signifique algo— y una decisión de
+> permisos que se estudió y se descartó.
+
+### 28.1 Tu inicial, roja y la primera
+
+Los encargados se pintan como círculos con iniciales, todos con el mismo
+`alpha(colors.primary, 30)`. Buscar lo tuyo en un tablero lleno era leer hasta
+cuatro iniciales por tarjeta y compararlas con las tuyas, tarjeta por tarjeta.
+
+La tuya pasa a `colors.error` sólido con `colors.textInverse` encima. El par se
+invierte solo entre temas y por eso no hace falta condicionarlo: en oscuro
+`--color-error` es `#f87171` (rojo claro) con texto `#0d0f14`, y en claro es
+`#dc2626` (rojo fuerte) con texto `#ffffff`. En los dos casos el contraste sale
+del propio token.
+
+Es el **único color de la tarjeta que no describe la tarea sino a quien la
+mira**, y por eso puede permitirse ser el más fuerte de los que quedan tras
+§28.2.
+
+#### 🟡 Comparte rojo con «Urgente» y «Venció»
+
+`colors.error` ya es el color de la prioridad urgente y del chip de vencida.
+Se aceptó la colisión: son chips de texto en la fila de metadatos y esto es un
+círculo con iniciales en la fila de abajo, así que no compiten en el mismo
+sitio ni con la misma forma. Si algún día chirría, el cambio es una línea.
+
+#### Dos detalles que no son cosméticos
+
+- **El reordenado va antes del `slice(0, 4)`.** La tarjeta solo pinta cuatro
+  círculos y un `+N`. Ordenar después de cortar te dejaría fuera con cinco
+  encargados y tú de quinto — justo el caso en que más falta hace verte.
+  `mineFirst()` devuelve el array original si no estás en él, para no crear uno
+  nuevo en cada render de cada tarjeta ajena, que en un tablero lleno son casi
+  todas.
+- **`relative z-10` en el círculo propio.** Con `-space-x-1.5` los círculos se
+  solapan y el que va después en el DOM tapa al anterior. Ir primero no bastaba
+  para verse entero: hay que subirlo de capa.
+
+`currentUserId` ya llegaba hasta `ColumnTasks`; solo bajó un nivel. No decide
+nada sobre lo que se puede tocar — eso sigue siendo cosa de los permisos.
+
+### 28.2 Fuera el punto de prioridad
+
+A la izquierda del título había un punto de 6px coloreado por prioridad. El
+diagnóstico del que salió el cambio —«un arcoíris de confusión»— se queda
+corto en el motivo: el punto no marcaba las urgentes, porque **toda** tarea
+tiene prioridad. Pintaba las cuatro familias a la vez, así que una columna
+llena era una columna de puntos de colores sin jerarquía entre ellos.
+
+No se pierde el dato: la prioridad sigue en su `Chip` de la fila de metadatos,
+escrita con palabras y con el mismo color. La diferencia es que ahí se lee
+cuando la buscas, en vez de reclamar atención siempre.
+
+### 28.3 Reportes tras un permiso: estudiado y descartado
+
+Se planteó si `/reports` y su entrada del sidebar deberían colgar de un permiso
+del proyecto, con acceso automático para el dueño y asignable a un
+administrador o a un scrum master.
+
+**El permiso ya existe y ya es asignable.** Es `canViewReports`, sale en el
+administrador de roles como «Ver los reportes por persona», y lo implican
+`canManageMembers`, `canEditProject` y `canDeleteProject` — o sea que el rol
+«Administrador» con el que nace todo proyecto lo tiene, y el dueño está dentro
+desde el primer momento.
+
+Lo que no hace es esconder la página ni la entrada del sidebar, y ahí hay un
+obstáculo estructural:
+
+> **El sidebar es global; los permisos son por proyecto.** `APP_NAV_ITEMS`
+> (`commons/organisms/AppLayout/navigation.tsx`) es una lista canónica que
+> cruza las cuatro zonas privadas. Un usuario puede ser administrador en un
+> proyecto y colaborador raso en otro, así que «¿enseño Reportes?» no tiene
+> respuesta correcta sin preguntar por cuál. Resolverlo obligaría a pedir los
+> permisos de todos tus proyectos en cada render de cada zona.
+
+Por eso la línea está trazada **dentro** de la página, con el criterio que ya
+documenta el enum: los agregados que no nombran a nadie —flujo, tiempos de
+ciclo, reparto por prioridad, predicción— piden solo `canViewProject`; el
+desglose **por persona** pide `canViewReports`, porque un tablero con las
+cifras de todo el mundo a la vista se vuelve una clasificación aunque nadie lo
+pretenda.
+
+Se ofrecieron dos alternativas y se rechazaron las dos:
+
+| Alternativa | Por qué no |
+|---|---|
+| `canViewReports` cierra el informe entero | El sidebar seguiría siempre visible igualmente (es global), así que se ganaría poco y se perdería el acceso de un colaborador a datos que no son de nadie |
+| Permiso nuevo `canViewProjectReports` para el acceso, `canViewReports` para la privacidad | Más preciso, pero son dos permisos para una sola pantalla en el administrador de roles: más modelo del que el producto necesita |
+
+**Decisión: se queda como está.** Cero código nuevo — lo que se pedía ya se
+puede repartir hoy desde el administrador de roles.
