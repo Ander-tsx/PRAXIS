@@ -10,6 +10,7 @@ export const colors = {
   surface: 'var(--color-surface)', // #161B27 — Cards, modales
   surfaceElevated: 'var(--color-surface-elevated)', // #1E2535 — Elevado sobre surface
   overlay: 'var(--color-overlay)', // #080A0F — Overlays, drawers
+  canvasShadow: 'var(--color-canvas-shadow)', // Sombra del lienzo del tablero — invierte con el tema
 
   // ── MARCA / PRIMARIO ──────────────────────────────────────
   primary: 'var(--color-primary)', // #6C63FF

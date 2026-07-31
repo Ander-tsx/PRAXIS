@@ -46,6 +46,11 @@
   --color-surface: #161b27; /* Cards, modales, panels */
   --color-surface-elevated: #1e2535; /* Elevado sobre surface */
   --color-overlay: #080a0f; /* Overlays, drawers */
+  /* Sombra hacia dentro del lienzo del tablero (BoardStrip): a diferencia de
+     overlay, que se queda oscuro en los dos temas porque es un scrim, esta sí
+     cambia — un hundido oscuro en tema claro se ve como suciedad, no como
+     profundidad. */
+  --color-canvas-shadow: #080a0f;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #6c63ff; /* Botones, links activos, estados */
@@ -129,6 +134,7 @@
   --color-surface: #ffffff;
   --color-surface-elevated: #eceef5;
   --color-overlay: #0d0f14;
+  --color-canvas-shadow: #ffffff;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #5b52e0;
@@ -238,6 +244,21 @@ button:disabled,
   100% {
     transform: rotate(360deg) scale(1);
     opacity: 0.5;
+  }
+}
+
+/* Tres estrellas que titilan por turnos, no una sola girando: la usa el
+   estado "Pensando" del asistente (AssistantChat). Cada estrella lleva su
+   propio `animation-delay` y tamaño para que no queden sincronizadas. */
+@keyframes sparkle-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(1px, -2px) scale(1);
+    opacity: 1;
   }
 }
 
