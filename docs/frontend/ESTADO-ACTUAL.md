@@ -2854,3 +2854,145 @@ La etiqueta del administrador de roles pasa de «Ver los reportes por persona» 
 «Ver los reportes y usar el asistente» — que es lo que concede ahora, y es el
 texto exacto al que `NoReportsAccess` manda a quien lo necesita.
 
+## 30. El asistente pasa de comentar a actuar
+
+> De dos herramientas a seis, y de un contexto que solo tenía agregados a uno
+> que conoce cada tarea por su nombre. El disparador fue una petición que
+> falló: «auto asigna responsables a las actividades que no tienen».
+
+### 30.1 Por qué fallaba, que no era un fallo
+
+El modelo respondió que no podía y que necesitaba el id de la tarea. Tenía
+razón, y el motivo estaba a la vista en el briefing:
+
+- `instantanea.sinAsignar` era **un número**, no una lista;
+- `bloqueadas.tareas` traía títulos pero **el mapper descartaba el `taskId`**,
+  que la consulta sí devolvía;
+- la descripción de `proponer_asignacion` decía literalmente que el id *«tiene
+  que darlo la persona: no está en el contexto»*.
+
+Se le pidió actuar sobre datos que nunca había visto. Lo correcto era negarse.
+
+### 30.2 `task_inventory`, y por qué no vale `task_find_all`
+
+Proyección mínima de **todas** las tareas del proyecto: `id`, `titulo`,
+`columna`, `columnId`, `prioridad`, `vence`, `cerrada`, `encargados`,
+`etiquetas`.
+
+No se reutiliza `task_find_all` —que ya existía— porque aquel devuelve la tarea
+entera con sus relaciones: descripción, comentarios, adjuntos. **Este contexto
+viaja dentro de la instrucción de sistema en cada turno**, así que lo que se
+deja fuera se deja de pagar en todos los mensajes de la conversación.
+
+Va sin recortar por relevancia, por decisión explícita: se prefiere que el
+asistente pueda hablar de cualquier tarea a que acierte más barato.
+`LIMITE_INVENTARIO` (500) es un cortafuegos contra la ventana del modelo, no un
+criterio de producto.
+
+#### 🟡 Es el único bloque del briefing que crece con el proyecto
+
+Medido: **31,7 KB de briefing con 69 tareas**, unos 8–10k tokens por turno. Con
+un proyecto de demostración va sobrado. A partir de unos cientos de tareas
+abiertas se va a notar en latencia y en cuota, y el sitio por donde cortar ya
+está preparado —el `orderBy` de `inventory` pone las abiertas y las recientes
+primero, así que el `take` recorta por lo cerrado y lo viejo.
+
+⚠️ `nulls: 'first'` en ese `orderBy` **no es cosmético**. En Postgres un `ASC`
+pone los `NULL` al final, y aquí `completedAt` nulo significa «sigue abierta»:
+sin eso el recorte se comería exactamente lo que hay que conservar.
+
+### 30.3 De dos herramientas a seis
+
+| Herramienta | Permiso | Endpoint al aceptar |
+|---|---|---|
+| `proponer_tarea` | `canCreateTask` | `POST /boards/:id/tasks` |
+| `proponer_asignacion` | `canEditTask` | `POST /tasks/:id/assign` |
+| `proponer_edicion` | `canEditTask` | `PATCH /tasks/:id` |
+| `proponer_movimiento` | **`canMoveTask`** | `POST /tasks/:id/move` |
+| `proponer_checklist` | `canEditTask` | `POST /tasks/:id/checklists` |
+| `proponer_comentario` | `canComment` | `POST /tasks/:id/comments` |
+
+La regla de §26 no se ha tocado: **la IA propone; ejecuta el código que ya
+existe.** Ninguna abre una vía de escritura nueva.
+
+**`proponer_movimiento` cuelga de `canMoveTask` y no de `canEditTask`**, igual
+que su endpoint. Es la única herramienta que alcanza a un colaborador: quien
+ejecuta el trabajo puede decir que lo terminó sin poder redefinir en qué
+consistía, y eso vale también cuando lo pide hablando. Se usa
+`POST /tasks/:id/move` y no `PATCH /tasks/:id` aunque los dos muevan, porque el
+`PATCH` pide `canEditTask` y dejaría fuera justo a ese perfil.
+
+Cada herramienta **se niega cuando no cambiaría nada**: una edición sin campos,
+un movimiento a la columna donde ya está, un checklist vacío. Una tarjeta que
+promete algo y al aceptarla no hace nada es peor que no haberla propuesto.
+
+#### El checklist son N peticiones, y se dice
+
+`POST /tasks/:id/checklists` crea **un paso por llamada**. Van en secuencia y no
+en paralelo porque el `order` es la posición: lanzadas a la vez, el orden en
+pantalla lo decide quién llegue antes al servidor. No hay transacción que abarque
+varias peticiones HTTP, así que si falla a mitad las anteriores ya están creadas
+y la tarjeta dice «se añadieron 3 de 5 pasos antes de fallar». Fingir que no pasó
+nada habría sido mentir sobre el estado del tablero.
+
+#### 🔴 Aquí no hay, ni va a haber, borrado
+
+No es un olvido. Es la garantía de que el asistente no puede destruir nada, y es
+**estructural, no una instrucción**: el prompt no menciona el borrado a
+propósito, porque una regla que dice «nunca borres» se rodea con la pregunta
+adecuada, mientras que una capacidad que no existe no se puede invocar.
+
+Tres capas, ninguna dependiente de que el modelo obedezca:
+
+1. la herramienta no se le declara, así que no puede expresar la intención;
+2. `validarPropuesta` descarta cualquier `call` fuera de la lista permitida;
+3. las server actions solo saben llamar a los endpoints que tienen escritos.
+
+Está anotado al pie de `tools.ts` para quien vaya a añadir una herramienta
+dentro de seis meses.
+
+### 30.4 El `porQue` que nunca se pintó
+
+`porQue` es un parámetro **obligatorio** de todas las herramientas. `prompt.ts`
+tenía dos comentarios largos explicando que se hizo obligatorio para que el
+modelo no pudiera omitirlo, `validarPropuesta` lo arrastraba, la interfaz de
+TypeScript lo declaraba… y **el frontend no lo renderizaba en ningún sitio**.
+Cero usos, confirmado con grep.
+
+Lo que se veía era el texto libre del modelo en la burbuja, que la regla 7 bis
+del prompt pedía aparte: dos mecanismos para el mismo trabajo, y cableado solo
+el que no se puede garantizar. El JSDoc de `ProposalCard` llegó a afirmar que el
+porqué vivía en la burbuja, contradiciendo a `tools.ts` en el mismo repositorio.
+
+Con **una** propuesta por respuesta colaba, porque el párrafo de arriba
+justificaba la única tarjeta de abajo. Desde que el inventario permite repartir
+varias tareas en una sola respuesta —una llamada por tarea— deja de casar: un
+bloque de razones arriba y N tarjetas debajo no se pueden emparejar leyendo.
+
+Ahora el `porQue` va **dentro de su tarjeta**, entre los hechos y los botones,
+separado por un filete: arriba lo que va a pasar, luego la opinión del asistente
+sobre por qué, y entonces decidir. Mezclarlos leería con la misma autoridad.
+
+Y la regla 7 bis cambia de trabajo en vez de desaparecer: el `porQue` justifica
+cada propuesta una a una, y el texto **solo encuadra el conjunto** —qué se ha
+hecho y cuántas propuestas hay—, que es lo único que puede aportar el texto y no
+la tarjeta. Sin ese ajuste el modelo escribía la misma frase dos veces, una
+encima de otra; se vio en pantalla. `textoPorDefecto` dejó de componer razones
+por el mismo motivo.
+
+### 30.5 Dos textos que mentían
+
+- **«nada existe todavía»** en un cambio de encargado. Vale para una tarea
+  nueva; sobre una tarea que está en el tablero desde antes es falso. Ahora
+  «sin aplicar», y lo pone cada tarjeta porque no significan lo mismo.
+- **«No se ha creado nada»** al descartar. Servía para la tarea nueva, no para
+  un cambio: no había nada que crear. Ahora «no se ha aplicado nada».
+
+### 30.6 Lo que queda
+
+**Capa 3, sin hacer.** Con seis tipos de propuesta y el modelo proponiendo
+varias por respuesta, faltan un «Aceptar todas» y una tarjeta que resuma en vez
+de N sueltas. Probado con las cuatro herramientas nuevas pedidas en un solo
+mensaje: respondió con un montón de propuestas, todas correctas, y esa es
+exactamente la pantalla que pide el trabajo de interfaz que falta.
+

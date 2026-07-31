@@ -916,10 +916,29 @@ permisos de proyecto.
 
 ### ⚠️ Ninguna de las dos escribe nada
 
-`chat` devuelve **propuestas**, no hechos. Crear la tarea es otra petición, a
-`POST /boards/:boardId/tasks`, con `canCreateTask` y la misma validación de
-siempre; cambiar encargados es `POST /tasks/:taskId/assign`. Si el asistente
-dice que ha creado algo, está mintiendo: mira la tabla.
+`chat` devuelve **propuestas**, no hechos. Si el asistente dice que ha creado,
+movido o cambiado algo, está mintiendo: mira la tabla.
+
+Aplicar una propuesta es **otra petición**, y siempre a un endpoint que ya
+existía, con su permiso de siempre:
+
+| `tool` | Endpoint al aceptar | Permiso |
+|---|---|---|
+| `proponer_tarea` | `POST /boards/:boardId/tasks` | `canCreateTask` |
+| `proponer_asignacion` | `POST /tasks/:id/assign` | `canEditTask` |
+| `proponer_edicion` | `PATCH /tasks/:id` | `canEditTask` |
+| `proponer_movimiento` | `POST /tasks/:id/move` | `canMoveTask` |
+| `proponer_checklist` | `POST /tasks/:id/checklists` | `canEditTask` |
+| `proponer_comentario` | `POST /tasks/:id/comments` | `canComment` |
+
+**No hay ninguna vía de escritura nueva.** Sin el permiso de la fila, aceptar
+falla igual que le fallaría a esa persona pulsando el botón a mano.
+
+⚠️ **Ninguna borra, y no es un descuido.** No existe herramienta de borrado, así
+que el modelo no tiene forma de expresar esa intención; el servicio descarta
+cualquier `tool` fuera de esta tabla, y quien la ejecuta solo sabe llamar a estos
+endpoints. Son tres capas y ninguna depende de que el modelo obedezca. Si añades
+una herramienta, sabe que rompes las tres a la vez.
 
 ### `chat`
 
@@ -942,14 +961,40 @@ conversaciones. Pasarse de 12 turnos da 400, así que recórtalo antes de mandar
 `columnName` viaja ya resuelto porque **`status` tiene que igualar el nombre de
 la columna destino** al crear la tarea.
 
-`args` de `proponer_asignacion`: `taskId`, `assigneeIds`, `porQue`. ⚠️ El
-`taskId` **lo escribe la persona en el chat**: los ids de tarea no entran en el
-contexto del modelo, así que compruébalo con un `GET /tasks/:id` antes de
-aceptar o el 404 llegará después de prometer el cambio.
+Las otras cinco actúan sobre una tarea que ya existe y comparten `taskId` y
+`taskTitle` — el título va resuelto por el servicio contra su inventario, para
+que la confirmación pueda nombrar la tarea sin ir a buscarla:
 
-`porQue` es obligatorio en las dos y es el texto que explica la propuesta. Con
-function calling lo normal es que el modelo devuelva la llamada y ni una palabra;
-la tarjeta enseña **qué** se va a crear y ese campo dice **por qué**.
+| `tool` | Resto de `args` |
+|---|---|
+| `proponer_asignacion` | `assigneeIds` (lista **completa**: sustituye) |
+| `proponer_edicion` | `title?`, `description?`, `priority?`, `dueDate?`, `labelIds?` — **solo los que cambian** |
+| `proponer_movimiento` | `columnId`, `columnName`, `columnaActual?` |
+| `proponer_checklist` | `items: string[]` (1–10, **se suman** a los que haya) |
+| `proponer_comentario` | `body` (máx. 2 000) |
+
+⚠️ **Aun así, comprueba la tarea con un `GET /tasks/:id` antes de aceptar.** El
+servicio ya validó el `taskId` contra el inventario del proyecto, pero la
+propuesta ha pasado por el navegador: entre proponer y aceptar la tarea puede
+haberse borrado. Comprobar que es de **este** proyecto evita además un 403 que
+se leería como un fallo de permisos de quien acepta.
+
+⚠️ En `proponer_edicion`, **omitir un campo no es lo mismo que mandarlo vacío**:
+lo omitido se queda como estaba, lo vacío se borra. Manda al `PATCH` solo lo que
+la propuesta trae, sin rellenar huecos.
+
+⚠️ `POST /tasks/:id/checklists` **crea un paso por llamada**, así que un
+`proponer_checklist` son N peticiones y no una. Van en secuencia: el `order` es
+la posición, y lanzadas en paralelo el orden lo decide quién llegue antes. No hay
+transacción que las abarque — si falla a mitad, las anteriores ya están creadas y
+hay que decirlo.
+
+`porQue` es obligatorio en las seis y es el texto que explica **por qué** se
+propone. Con function calling lo normal es que el modelo devuelva la llamada y ni
+una palabra, y por eso es un parámetro y no una petición del prompt. Píntalo
+**dentro de cada tarjeta**: con varias propuestas en una respuesta —cosa
+habitual desde que el contexto trae las tareas— un bloque de razones aparte no se
+puede emparejar con la tarjeta que justifica.
 
 ### Códigos propios
 
@@ -977,8 +1022,19 @@ que no tener contador.
 
 El contexto sale del briefing de `reports-service`: columnas, etiquetas,
 instantánea, **avance**, **la semana**, **lo que está parado**, percentiles,
-predicción y el desglose por persona con su experiencia por etiqueta. No entran
-títulos de todas las tareas, descripciones, comentarios ni adjuntos.
+predicción, el desglose por persona con su experiencia por etiqueta y **el
+inventario de tareas**. No entran descripciones, comentarios ni adjuntos.
+
+`tareas` trae **todas** las del proyecto con `id`, `titulo`, `columna`,
+`columnId`, `prioridad`, `vence`, `cerrada`, `encargados` y `etiquetas`. Es lo
+que permite pedirle cosas por nombre —«las que no tienen encargado»— y sacar el
+`taskId` de las cinco herramientas que actúan sobre algo existente. Antes solo
+había agregados, y con «5 sin asignar» no se puede apuntar a ninguna.
+
+⚠️ **Es el bloque más caro del briefing y el único que crece con el proyecto.**
+Viaja entero en cada turno dentro de la instrucción de sistema: con 69 tareas el
+briefing pesa ~32 KB. El tope duro es `LIMITE_INVENTARIO` en tasks-service, y es
+un cortafuegos contra la ventana del modelo, no un criterio de producto.
 
 El desglose por persona ya no va condicionado: hablar con el asistente exige
 `canViewReports`, el mismo permiso que antes filtraba esa parte del briefing.
