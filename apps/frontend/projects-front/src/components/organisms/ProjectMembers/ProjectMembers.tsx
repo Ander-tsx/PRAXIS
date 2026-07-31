@@ -1,15 +1,15 @@
 import {
+  Avatar,
   Badge,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
-  alpha,
-  colors,
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { LeaveProjectButton } from './LeaveProjectButton';
+import { MemberRoleSelect } from './MemberRoleSelect';
 import { PendingInvitations } from './PendingInvitations';
 import { RemoveMemberButton } from './RemoveMemberButton';
 
@@ -107,15 +107,9 @@ export function ProjectMembers({
                 key={member.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4"
               >
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-sans font-bold text-primary"
-                  style={{
-                    background: alpha(colors.primary, 18),
-                    border: `1px solid ${alpha(colors.primary, 45)}`,
-                  }}
-                >
-                  {label[0]?.toUpperCase() ?? '?'}
-                </span>
+                {/* El mismo círculo que el tablero y la barra lateral: el rojo
+                    dice «eres tú» en todo el producto. */}
+                <Avatar label={label} mine={member.userId === currentUserId} size="md" />
 
                 <div className="flex min-w-0 flex-1 flex-col">
                   {/* Siempre dos líneas, con o sin nombre: si no lo hay,
@@ -129,15 +123,40 @@ export function ProjectMembers({
                   </span>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {isOwner && <Badge variant="accent">DUEÑO</Badge>}
-                  <Badge variant="primary">{member.projectRole.name}</Badge>
+                  {/**
+                   * Al dueño no se le cambia el rol: tiene bypass en el guard,
+                   * así que el desplegable prometería un efecto que no ocurre.
+                   *
+                   * A ti mismo **sí** puedes cambiártelo, incluso rebajarte.
+                   * Impedirlo no protegería de nada —siempre puedes pedírselo a
+                   * otro administrador— y esconderlo dejaría la duda de por qué
+                   * tu fila se comporta distinto.
+                   */}
+                  {canManage && !isOwner ? (
+                    <MemberRoleSelect
+                      projectId={projectId}
+                      userId={member.userId}
+                      roles={roles}
+                      currentRoleId={member.projectRoleId}
+                      label={label}
+                    />
+                  ) : (
+                    <Badge variant="primary">{member.projectRole.name}</Badge>
+                  )}
                   <span className="hidden font-sans text-xs text-text-disabled sm:inline">
                     desde {dateFormatter.format(new Date(member.joinedAt))}
                   </span>
 
-                  {/* Al dueño no se le puede quitar: perdería su propio proyecto. */}
-                  {canManage && !isOwner && (
+                  {/**
+                   * Al dueño no se le puede quitar: perdería su propio proyecto.
+                   * Y **nadie se saca a sí mismo**: al salir pierdes los
+                   * permisos, así que tampoco podrías volver a entrar. Para irse
+                   * está «Salir del proyecto», que es otra decisión y lo dice.
+                   * El backend lo rechaza igualmente con un 400.
+                   */}
+                  {canManage && !isOwner && member.userId !== currentUserId && (
                     <RemoveMemberButton
                       projectId={projectId}
                       userId={member.userId}

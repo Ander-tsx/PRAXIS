@@ -429,6 +429,37 @@ export async function leaveProjectAction(
   redirect('/');
 }
 
+/**
+ * Cambiar el rol de alguien que ya está dentro.
+ *
+ * Va a `PATCH /projects/:id/members/:userId`, que existe desde que se vio que
+ * la alternativa —sacar y volver a meter— le borraba la fecha de entrada, le
+ * mandaba un aviso diciendo que lo habían echado y lo dejaba sin permisos entre
+ * las dos operaciones.
+ */
+export async function changeMemberRoleAction(
+  _prev: MemberState,
+  formData: FormData,
+): Promise<MemberState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const userId = String(formData.get('userId') ?? '');
+  const projectRoleId = String(formData.get('projectRoleId') ?? '');
+
+  if (!projectRoleId) return { error: 'Elige un rol.', done: null };
+
+  try {
+    await api.patch(`/projects/${projectId}/members/${userId}`, { projectRoleId });
+  } catch (error) {
+    return { error: describe(error, 'No se pudo cambiar el rol.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'role-changed' };
+}
+
 export async function removeMemberAction(
   _prev: MemberState,
   formData: FormData,
