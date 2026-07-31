@@ -173,7 +173,7 @@ export function validateChecklistItem(text: string): string | null {
  */
 export function validateAttachment(mimeType: string, size: number): string | null {
   if (!ATTACHMENT_ALLOWED_MIME.includes(mimeType as (typeof ATTACHMENT_ALLOWED_MIME)[number])) {
-    return 'Ese tipo de archivo no se admite. Puedes subir imágenes, PDF, texto, hojas de cálculo, documentos y ZIP.';
+    return 'Solo se admiten archivos PDF.';
   }
   if (size > ATTACHMENT_MAX_BYTES) {
     return `El archivo pesa ${formatBytes(size)} y el máximo son ${formatBytes(ATTACHMENT_MAX_BYTES)}.`;

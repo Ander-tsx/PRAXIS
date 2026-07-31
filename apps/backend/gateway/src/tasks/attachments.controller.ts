@@ -31,6 +31,7 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import {
   ATTACHMENT_ALLOWED_MIME,
+  empiezaPorPdf,
   ATTACHMENT_MAX_BYTES,
   ProjectPermission,
   isInlineMime,
@@ -102,10 +103,22 @@ export class AttachmentsController {
       throw new BadRequestException('No llegó ningún archivo en el campo «file»');
     }
     if (!(ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
-      throw new BadRequestException(`Tipo de archivo no admitido: ${file.mimetype}`);
+      throw new BadRequestException('Solo se admiten archivos PDF.');
     }
     if (file.size === 0) {
       throw new BadRequestException('El archivo está vacío');
+    }
+    /**
+     * ⚠️ **El `mimetype` lo declara quien sube el archivo**, en la cabecera de
+     * su parte multipart: un ejecutable renombrado con
+     * `Content-Type: application/pdf` pasaba la lista blanca sin más.
+     *
+     * Con un solo tipo admitido, comprobar la firma es barato y cierra ese
+     * hueco. Va **después** del tamaño para que un archivo vacío reciba el
+     * mensaje que le toca y no «no es un PDF».
+     */
+    if (!empiezaPorPdf(file.buffer)) {
+      throw new BadRequestException('Ese archivo no es un PDF, aunque lo parezca por el nombre.');
     }
 
     return firstValueFrom(
@@ -158,6 +171,20 @@ export class AttachmentsController {
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader('Content-Length', buffer.length);
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    /**
+     * **Origen opaco para todo lo que se sirve en línea.**
+     *
+     * Es lo que permite enseñar un PDF dentro de la aplicación sin abrir el
+     * agujero por el que estaba prohibido: `Content-Security-Policy: sandbox`
+     * —sin ninguna palabra clave detrás— hace que el navegador trate esta
+     * respuesta como si viniera de un origen distinto. Un PDF con JavaScript
+     * dentro se ejecuta sin acceso a las cookies de sesión ni al DOM de la
+     * aplicación, y sin poder navegar la ventana de arriba.
+     *
+     * Va también en lo que se descarga: ahí no hace nada, y una cabecera de
+     * seguridad condicionada a un `if` es una cabecera que algún día se olvida.
+     */
+    res.setHeader('Content-Security-Policy', 'sandbox');
     /* El nombre va en `filename*` con codificación RFC 5987: los acentos y los
        espacios rompen el `filename` simple. */
     res.setHeader(
