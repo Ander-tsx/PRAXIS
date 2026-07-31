@@ -265,13 +265,47 @@ real.
 
 ⚠️ Un proyecto recién creado **no tiene roles ni miembros**. Hay que crear un `ProjectRole` antes de poder añadir a nadie.
 
-⚠️ **Esto no es invitar, es dar de alta.** Recibe un `userId` —no un correo— y
-surte efecto inmediato: la persona entra en el proyecto sin enterarse, sin
-aceptar y sin estado "pendiente". No existe ningún flujo de invitación en el
-backend (ni tabla, ni token, ni correo). Para pasar de correo a `userId` hay que
-traerse `GET /users` y buscar en el cliente, lo que además solo encuentra a
-quien ya tiene cuenta. **Llámalo "añadir miembro" en la interfaz**, no
-"invitar". Ver PENDIENTES-BACKEND §12.
+⚠️ **`POST /members` da de alta directamente**: la persona entra sin enterarse,
+sin aceptar y sin estado «pendiente». **No es lo que usa la interfaz** — para
+meter a alguien en un proyecto se manda una invitación (abajo), y el
+`ProjectMember` lo crea el backend **al aceptarla**. Esta ruta sigue existiendo
+para altas administrativas; si la usas, no lo llames «invitar».
+
+Recibe un `userId`, no un correo. Para pasar de correo a `userId` hay que
+traerse `GET /users` y buscar en el cliente, lo que solo encuentra a quien ya
+tiene cuenta — sigue sin haber invitación por correo a alguien de fuera.
+
+---
+
+## Invitaciones 🔒
+
+| Método | Ruta | Body | Permiso |
+|---|---|---|---|
+| GET | `/projects/:projectId/invitations` | — | `canManageMembers` |
+| POST | `/projects/:projectId/invitations` | `{ userId, projectRoleId }` → 201 | `canManageMembers` |
+| DELETE | `/projects/:projectId/invitations/:id` | — | `canManageMembers` |
+| GET | `/me/invitations` | — | solo `JwtGuard` |
+| POST | `/me/invitations/:id/accept` | — | solo `JwtGuard` |
+| POST | `/me/invitations/:id/reject` | — | solo `JwtGuard` |
+| DELETE | `/projects/:projectId/membership/me` | — | solo `JwtGuard` — salir del proyecto |
+
+**Esto sí es invitar.** Existe desde `a88e804` y es lo que usa la interfaz.
+Antes solo estaba `POST /members`, que daba de alta a la persona sin avisarla.
+
+El flujo: se envía la invitación con el rol que tendrá al entrar, queda
+`PENDING`, y **el `ProjectMember` se crea al aceptar**. Mientras esté pendiente
+no hay membresía y por tanto no hay permisos — no basta con estar invitado.
+
+- **409** si esa persona ya es miembro o ya tiene una invitación pendiente. Solo
+  se admite una viva por persona y proyecto; las resueltas se conservan como
+  historial.
+- Las de `/me` cuelgan de `/me` y **no llevan permiso de proyecto**: quien
+  responde todavía no es miembro, así que no hay permiso que comprobar. El
+  usuario sale del token, como en `/me/tasks`.
+- Invitar y aceptar generan aviso (`INVITATION_RECEIVED`, `INVITATION_ACCEPTED`,
+  `INVITATION_REJECTED`). Ver «Avisos».
+- Filtra el directorio antes de enseñarlo: quien ya es miembro **y** quien tiene
+  invitación sin responder no deberían salir como opción.
 
 ---
 
