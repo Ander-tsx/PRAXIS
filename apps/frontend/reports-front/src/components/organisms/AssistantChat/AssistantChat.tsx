@@ -9,10 +9,21 @@ import {
   type ChatTurn,
   MAX_HISTORIAL,
   esPropuestaDeAsignacion,
+  esPropuestaDeChecklist,
+  esPropuestaDeComentario,
+  esPropuestaDeEdicion,
+  esPropuestaDeMovimiento,
   esPropuestaDeTarea,
   formatoReinicio,
 } from '@/lib/assistant';
-import { AssignProposalCard, TaskProposalCard } from './ProposalCard';
+import {
+  AssignProposalCard,
+  ChecklistProposalCard,
+  CommentProposalCard,
+  EditProposalCard,
+  MoveProposalCard,
+  TaskProposalCard,
+} from './ProposalCard';
 
 interface Mensaje {
   id: string;
@@ -199,6 +210,52 @@ export function AssistantChat({
                     />
                   );
                 }
+                if (esPropuestaDeEdicion(propuesta)) {
+                  return (
+                    <EditProposalCard
+                      key={`${mensaje.id}-${indice}`}
+                      projectId={projectId}
+                      propuesta={propuesta.args}
+                      nombres={nombres}
+                      etiquetas={etiquetas}
+                    />
+                  );
+                }
+                if (esPropuestaDeMovimiento(propuesta)) {
+                  return (
+                    <MoveProposalCard
+                      key={`${mensaje.id}-${indice}`}
+                      projectId={projectId}
+                      propuesta={propuesta.args}
+                      nombres={nombres}
+                      etiquetas={etiquetas}
+                    />
+                  );
+                }
+                if (esPropuestaDeChecklist(propuesta)) {
+                  return (
+                    <ChecklistProposalCard
+                      key={`${mensaje.id}-${indice}`}
+                      projectId={projectId}
+                      propuesta={propuesta.args}
+                      nombres={nombres}
+                      etiquetas={etiquetas}
+                    />
+                  );
+                }
+                if (esPropuestaDeComentario(propuesta)) {
+                  return (
+                    <CommentProposalCard
+                      key={`${mensaje.id}-${indice}`}
+                      projectId={projectId}
+                      propuesta={propuesta.args}
+                      nombres={nombres}
+                      etiquetas={etiquetas}
+                    />
+                  );
+                }
+                /* Una herramienta que el servicio conozca y esta pantalla no.
+                   Se ignora en silencio: la burbuja de texto ya está pintada. */
                 return null;
               })}
             </div>
@@ -284,7 +341,7 @@ export function AssistantChat({
               type="submit"
               isLoading={pendiente}
               disabled={texto.trim().length === 0}
-              style={{ height: '100%' }}
+              style={{ height: 70 }}
             >
               Preguntar
             </Button>

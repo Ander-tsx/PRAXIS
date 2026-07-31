@@ -64,6 +64,46 @@ export interface PropuestaAsignacion {
   porQue?: string;
 }
 
+/**
+ * Lo que comparten las propuestas que actúan sobre una tarea que ya existe.
+ *
+ * `taskTitle` lo resuelve el servicio contra su inventario. Es opcional por lo
+ * mismo en las cuatro: la tarjeta tiene que poder pintarse aunque llegue sin él.
+ */
+interface SobreTarea {
+  taskId: string;
+  taskTitle?: string;
+  porQue?: string;
+}
+
+/** `proponer_edicion`. Solo trae los campos que cambian. */
+export interface PropuestaEdicion extends SobreTarea {
+  title?: string;
+  description?: string;
+  priority?: string;
+  dueDate?: string;
+  /** La lista completa que queda, no las que se añaden. */
+  labelIds?: string[];
+}
+
+/** `proponer_movimiento`. */
+export interface PropuestaMovimiento extends SobreTarea {
+  columnId: string;
+  columnName: string;
+  /** De dónde sale, para que la tarjeta pueda decir «de X a Y». */
+  columnaActual?: string;
+}
+
+/** `proponer_checklist`. Los pasos se suman a los que ya hubiera. */
+export interface PropuestaChecklist extends SobreTarea {
+  items: string[];
+}
+
+/** `proponer_comentario`. Se publica a nombre de quien acepta. */
+export interface PropuestaComentario extends SobreTarea {
+  body: string;
+}
+
 export interface AssistantChatResult {
   reply: string;
   proposals: AssistantProposal[];
@@ -89,6 +129,32 @@ export function esPropuestaDeAsignacion(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: PropuestaAsignacion } {
   return propuesta.tool === 'proponer_asignacion' && typeof propuesta.args.taskId === 'string';
+}
+
+export function esPropuestaDeEdicion(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaEdicion } {
+  return propuesta.tool === 'proponer_edicion' && typeof propuesta.args.taskId === 'string';
+}
+
+export function esPropuestaDeMovimiento(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaMovimiento } {
+  return (
+    propuesta.tool === 'proponer_movimiento' && typeof propuesta.args.columnId === 'string'
+  );
+}
+
+export function esPropuestaDeChecklist(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaChecklist } {
+  return propuesta.tool === 'proponer_checklist' && Array.isArray(propuesta.args.items);
+}
+
+export function esPropuestaDeComentario(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaComentario } {
+  return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
 }
 
 /**

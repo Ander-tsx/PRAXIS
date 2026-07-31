@@ -8,6 +8,10 @@ import {
   type ChatTurn,
   MAX_HISTORIAL,
   type PropuestaAsignacion,
+  type PropuestaChecklist,
+  type PropuestaComentario,
+  type PropuestaEdicion,
+  type PropuestaMovimiento,
   type PropuestaTarea,
 } from '@/lib/assistant';
 
@@ -18,12 +22,24 @@ import {
  *
  * **La IA propone; ejecuta el código que ya existe.** `preguntarAction` solo
  * habla con el asistente y devuelve texto y propuestas. Escribir es otra cosa y
- * pasa por `aceptarTareaAction` / `aceptarAsignacionAction`, que llaman a los
- * **mismos endpoints que el formulario del tablero** —`POST /boards/:id/tasks`,
- * `POST /tasks/:id/assign`— con los mismos permisos, la misma validación y los
- * mismos 400 y 403 que ya están probados. No se abre ninguna vía de escritura
- * nueva: sin `canCreateTask`, aceptar falla igual que le fallaría a esa persona
- * pulsando el botón a mano.
+ * pasa por una `aceptar*Action`, y **cada una llama al mismo endpoint que su
+ * formulario del tablero**, con los mismos permisos, la misma validación y los
+ * mismos 400 y 403 que ya están probados:
+ *
+ * | Acción | Endpoint | Permiso |
+ * |---|---|---|
+ * | `aceptarTareaAction` | `POST /boards/:id/tasks` | `canCreateTask` |
+ * | `aceptarAsignacionAction` | `POST /tasks/:id/assign` | `canEditTask` |
+ * | `aceptarEdicionAction` | `PATCH /tasks/:id` | `canEditTask` |
+ * | `aceptarMovimientoAction` | `POST /tasks/:id/move` | `canMoveTask` |
+ * | `aceptarChecklistAction` | `POST /tasks/:id/checklists` | `canEditTask` |
+ * | `aceptarComentarioAction` | `POST /tasks/:id/comments` | `canComment` |
+ *
+ * No se abre ninguna vía de escritura nueva: sin `canCreateTask`, aceptar falla
+ * igual que le fallaría a esa persona pulsando el botón a mano.
+ *
+ * **Y no hay ninguna que borre.** No existe `aceptarBorradoAction` ni la va a
+ * haber: ver la nota al pie de `tools.ts`.
  *
  * ⚠️ **Nada de lo que llega aquí desde el chat es de fiar**, y no hace falta que
  * lo sea: la propuesta viaja por el navegador, así que el `columnId` se vuelve a
@@ -234,12 +250,14 @@ export interface AceptarAsignacionState {
 /**
  * Cambiar quién lleva una tarea que ya existe.
  *
- * ⚠️ **El `taskId` de esta propuesta lo escribió la persona en el chat**, porque
- * los ids de tarea no viajan en el contexto del modelo a propósito. Así que lo
- * primero es traer la tarea: sirve para confirmar que existe, para comprobar que
- * es de **este** proyecto —un id de otro proyecto respondería 403 y se leería
- * como un fallo de permisos que no es— y para poder decir en la confirmación
- * cuál se ha tocado, con su nombre.
+ * El `taskId` ya lo validó el servicio contra su inventario, pero se vuelve a
+ * traer la tarea igualmente: **la propuesta ha pasado por el navegador**. Entre
+ * proponer y aceptar la tarea puede haberse borrado, y nada impide que llegue un
+ * id manipulado. Comprobar que es de **este** proyecto evita además un 403 del
+ * gateway, que se leería como un fallo de permisos de quien acepta y no lo es.
+ *
+ * (Hubo un tiempo en que el id lo escribía la persona a mano en el chat, porque
+ * los ids no viajaban en el contexto. Ya no: ver `task_inventory`.)
  */
 export async function aceptarAsignacionAction(
   projectId: string,
@@ -283,6 +301,253 @@ export async function aceptarAsignacionAction(
     };
   } catch (error) {
     return { error: describe(error, 'No se pudo cambiar el encargado.'), asignada: null };
+  }
+}
+
+/**
+ * El resultado común de las cuatro acciones que tocan una tarea existente.
+ *
+ * `hecha` trae lo que hace falta para confirmar en pantalla y enlazar al
+ * tablero. Es la misma forma en las cuatro para que la tarjeta no tenga que
+ * saber cuál de ellas la ha llamado.
+ */
+export interface AceptarSobreTareaState {
+  error: string | null;
+  hecha: { id: string; title: string; boardId: string; detalle: string } | null;
+}
+
+/**
+ * Trae la tarea y comprueba que es de este proyecto.
+ *
+ * Lo hacen las cuatro antes de escribir nada. El `taskId` ya lo validó el
+ * servicio contra su inventario, pero **la propuesta ha pasado por el
+ * navegador**: entre que se propuso y se acepta, la tarea puede haberse
+ * borrado, y nada impide que llegue un id manipulado. Sin esta comprobación un
+ * id de otro proyecto daría un 403 del gateway, que se leería como un fallo de
+ * permisos de quien acepta y no lo es.
+ */
+async function tareaDelProyecto(
+  api: NonNullable<Awaited<ReturnType<typeof requireApi>>>,
+  projectId: string,
+  taskId: string,
+): Promise<{ tarea: Task } | { error: string }> {
+  if (!taskId) return { error: 'La propuesta no dice qué tarea.' };
+
+  const tarea = await api.get<Task>(`/tasks/${taskId}`).catch(() => null);
+  if (!tarea?.id) return { error: 'Esa tarea ya no existe.' };
+  if (tarea.projectId !== projectId) return { error: 'Esa tarea es de otro proyecto.' };
+
+  return { tarea };
+}
+
+/**
+ * Editar los datos de una tarea que ya existe.
+ *
+ * Va a `PATCH /tasks/:id`, que pide `canEditTask` — el mismo endpoint y el
+ * mismo permiso que el formulario del diálogo de tarea.
+ *
+ * **Solo se mandan los campos que la propuesta trae.** Omitir un campo en el
+ * `PATCH` lo deja como estaba, y mandarlo vacío lo borra: no es lo mismo, y por
+ * eso la propuesta distingue «no lo cambia» de «lo deja vacío» en vez de
+ * rellenar huecos con lo que ya hubiera.
+ */
+export async function aceptarEdicionAction(
+  projectId: string,
+  propuesta: PropuestaEdicion,
+): Promise<AceptarSobreTareaState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, hecha: null };
+
+  const title = propuesta.title?.trim();
+  if (title !== undefined && (title.length === 0 || title.length > 120)) {
+    return { error: 'El título tiene que tener entre 1 y 120 caracteres.', hecha: null };
+  }
+
+  const cuerpo: Record<string, unknown> = {};
+  if (title !== undefined) cuerpo.title = title;
+  if (propuesta.description !== undefined) cuerpo.description = propuesta.description;
+  if (propuesta.priority !== undefined) cuerpo.priority = propuesta.priority;
+  if (propuesta.dueDate !== undefined) cuerpo.dueDate = toIsoDueDate(propuesta.dueDate);
+  if (propuesta.labelIds !== undefined) cuerpo.labelIds = propuesta.labelIds;
+
+  if (Object.keys(cuerpo).length === 0) {
+    return { error: 'La propuesta no cambia nada.', hecha: null };
+  }
+
+  try {
+    const guardada = await api.patch<Task>(`/tasks/${encontrada.tarea.id}`, cuerpo);
+    /* Se confirma contra el `data`, no contra el status: la trampa nº 3 del
+       backend, que devolvía 200 sin guardar nada. */
+    if (!guardada?.id) return { error: 'El servidor no guardó el cambio.', hecha: null };
+
+    return {
+      error: null,
+      hecha: {
+        id: guardada.id,
+        title: guardada.title,
+        boardId: guardada.boardId,
+        detalle: 'Tarea actualizada.',
+      },
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo editar la tarea.'), hecha: null };
+  }
+}
+
+/**
+ * Mover una tarea a otra columna.
+ *
+ * Va a `POST /tasks/:id/move`, **no** a `PATCH /tasks/:id`. Los dos mueven,
+ * pero el `PATCH` pide `canEditTask` y este pide `canMoveTask`: usar el otro
+ * dejaría fuera precisamente al perfil para el que existe esta herramienta —
+ * quien ejecuta el trabajo y puede decir que lo terminó sin poder redefinirlo.
+ *
+ * `status` sale del proyecto de verdad y no de la propuesta: el contrato exige
+ * que iguale el nombre de la columna destino.
+ */
+export async function aceptarMovimientoAction(
+  projectId: string,
+  propuesta: PropuestaMovimiento,
+): Promise<AceptarSobreTareaState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, hecha: null };
+
+  const project = await api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null);
+  const columna = (project?.workspaces ?? [])
+    .flatMap((workspace) => workspace.boards ?? [])
+    .flatMap((board) => board.columns ?? [])
+    .find((column) => column.id === propuesta.columnId);
+
+  if (!columna) {
+    return { error: 'La columna de la propuesta ya no existe en el tablero.', hecha: null };
+  }
+
+  try {
+    const movida = await api.post<Task>(`/tasks/${encontrada.tarea.id}/move`, {
+      columnId: columna.id,
+      status: columna.name,
+    });
+
+    if (movida?.columnId !== columna.id) {
+      return { error: 'El servidor no movió la tarea.', hecha: null };
+    }
+
+    return {
+      error: null,
+      hecha: {
+        id: movida.id,
+        title: movida.title,
+        boardId: movida.boardId,
+        detalle: `Movida a «${columna.name}».`,
+      },
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo mover la tarea.'), hecha: null };
+  }
+}
+
+/**
+ * Añadir pasos al checklist de una tarea.
+ *
+ * ⚠️ **`POST /tasks/:taskId/checklists` crea un paso por llamada**, así que
+ * esto son N peticiones y no una. Van en **secuencia y no en paralelo** porque
+ * el `order` de cada paso es su posición: lanzadas a la vez, el orden en que
+ * llegan al servidor decide el orden en pantalla, y no tiene por qué ser el que
+ * propuso el modelo.
+ *
+ * Si una falla a mitad, las anteriores **ya están creadas**: no hay transacción
+ * que abarque varias peticiones HTTP. Se dice cuántas entraron en vez de fingir
+ * que no pasó nada, que es lo único honesto que se puede hacer aquí.
+ */
+export async function aceptarChecklistAction(
+  projectId: string,
+  propuesta: PropuestaChecklist,
+): Promise<AceptarSobreTareaState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, hecha: null };
+
+  const { tarea } = encontrada;
+  const pasos = (propuesta.items ?? []).map((paso) => String(paso).trim()).filter(Boolean);
+  if (pasos.length === 0) return { error: 'La propuesta no trae ningún paso.', hecha: null };
+
+  /* Detrás de los que ya tenga: los pasos se suman, no sustituyen. */
+  const desde = (tarea.checklists ?? []).length;
+  let creados = 0;
+
+  try {
+    for (const [indice, text] of pasos.entries()) {
+      await api.post(`/tasks/${tarea.id}/checklists`, { text, order: desde + indice });
+      creados += 1;
+    }
+  } catch (error) {
+    if (creados === 0) {
+      return { error: describe(error, 'No se pudo añadir el checklist.'), hecha: null };
+    }
+    return {
+      error: `Se añadieron ${creados} de ${pasos.length} pasos antes de fallar.`,
+      hecha: null,
+    };
+  }
+
+  return {
+    error: null,
+    hecha: {
+      id: tarea.id,
+      title: tarea.title,
+      boardId: tarea.boardId,
+      detalle: creados === 1 ? 'Se añadió 1 paso.' : `Se añadieron ${creados} pasos.`,
+    },
+  };
+}
+
+/**
+ * Publicar un comentario en una tarea.
+ *
+ * Va a `POST /tasks/:taskId/comments`, que pide `canComment`. El autor sale del
+ * token, así que **el comentario queda a nombre de quien acepta**, no del
+ * asistente: es lo que se le dice al modelo al declararle la herramienta, y es
+ * la razón por la que la tarjeta tiene que enseñar el texto entero antes de
+ * publicarlo. Nadie debería firmar algo que no ha leído.
+ */
+export async function aceptarComentarioAction(
+  projectId: string,
+  propuesta: PropuestaComentario,
+): Promise<AceptarSobreTareaState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, hecha: null };
+
+  const body = String(propuesta.body ?? '').trim();
+  if (body.length === 0) return { error: 'El comentario está vacío.', hecha: null };
+
+  try {
+    const creado = await api.post<{ id: string }>(`/tasks/${encontrada.tarea.id}/comments`, {
+      body,
+    });
+    if (!creado?.id) return { error: 'El servidor no guardó el comentario.', hecha: null };
+
+    return {
+      error: null,
+      hecha: {
+        id: encontrada.tarea.id,
+        title: encontrada.tarea.title,
+        boardId: encontrada.tarea.boardId,
+        detalle: 'Comentario publicado.',
+      },
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo publicar el comentario.'), hecha: null };
   }
 }
 

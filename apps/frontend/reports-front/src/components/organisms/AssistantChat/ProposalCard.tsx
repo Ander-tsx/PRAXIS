@@ -2,8 +2,23 @@
 
 import { Badge, Button, PRIORITY_LABELS, type Priority, alpha, colors } from '@praxis/commons';
 import { useState } from 'react';
-import { aceptarAsignacionAction, aceptarTareaAction } from '@/app/(private)/[id]/actions';
-import type { PropuestaAsignacion, PropuestaTarea } from '@/lib/assistant';
+import {
+  type AceptarSobreTareaState,
+  aceptarAsignacionAction,
+  aceptarChecklistAction,
+  aceptarComentarioAction,
+  aceptarEdicionAction,
+  aceptarMovimientoAction,
+  aceptarTareaAction,
+} from '@/app/(private)/[id]/actions';
+import type {
+  PropuestaAsignacion,
+  PropuestaChecklist,
+  PropuestaComentario,
+  PropuestaEdicion,
+  PropuestaMovimiento,
+  PropuestaTarea,
+} from '@/lib/assistant';
 
 /**
  * La tarjeta de una propuesta: **lo que se va a crear, antes de que exista.**
@@ -195,6 +210,231 @@ export function AssignProposalCard({
           : 'La tarea se quedaría sin nadie asignado.'}
       </p>
     </Marco>
+  );
+}
+
+/**
+ * La tarjeta de las cuatro propuestas que actúan sobre una tarea que ya existe:
+ * editar, mover, checklist y comentario.
+ *
+ * Las cuatro comparten forma —una tarea identificada por su título, un cuerpo
+ * que describe el cambio y el mismo resultado al aceptar— así que comparten
+ * componente y solo se diferencian en el `titulo`, el `children` y qué acción
+ * llaman. Escribirlas cuatro veces habría sido cuatro sitios donde arreglar el
+ * mismo error de copia.
+ *
+ * Todas dicen **«sin aplicar»** y no «nada existe todavía»: la tarea existe
+ * desde antes, lo que falta es el cambio.
+ */
+function CambioSobreTarea({
+  titulo,
+  taskId,
+  taskTitle,
+  porQue,
+  ejecutar,
+  projectId,
+  children,
+}: {
+  titulo: string;
+  taskId: string;
+  taskTitle?: string;
+  porQue?: string;
+  ejecutar: () => Promise<AceptarSobreTareaState>;
+  projectId: string;
+  children: React.ReactNode;
+}) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await ejecutar();
+
+    if (respuesta.error || !respuesta.hecha) {
+      setError(respuesta.error ?? 'No se pudo aplicar el cambio.');
+      setEstado('pendiente');
+      return;
+    }
+
+    setResultado({
+      texto: respuesta.hecha.detalle,
+      href: `/projects/${projectId}?board=${respuesta.hecha.boardId}&task=${respuesta.hecha.id}`,
+    });
+    setEstado('hecho');
+  }
+
+  return (
+    <Marco
+      titulo={titulo}
+      sinAplicar="sin aplicar"
+      porQue={porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+    >
+      <p className="font-sans text-sm text-text-secondary">
+        {taskTitle ? (
+          <strong className="text-text-primary">{taskTitle}</strong>
+        ) : (
+          <code className="font-mono text-xs text-text-primary">{taskId.slice(0, 8)}</code>
+        )}
+      </p>
+      {children}
+    </Marco>
+  );
+}
+
+export function EditProposalCard({
+  projectId,
+  propuesta,
+  etiquetas,
+}: ProposalCardProps & { propuesta: PropuestaEdicion }) {
+  const marcas = (propuesta.labelIds ?? []).map((id) => etiquetas[id] ?? 'etiqueta');
+
+  return (
+    <CambioSobreTarea
+      titulo="Edición propuesta"
+      taskId={propuesta.taskId}
+      taskTitle={propuesta.taskTitle}
+      porQue={propuesta.porQue}
+      projectId={projectId}
+      ejecutar={() => aceptarEdicionAction(projectId, propuesta)}
+    >
+      {/* Campo a campo y con el valor nuevo delante: quien acepta tiene que
+          poder ver exactamente qué se va a sobrescribir. */}
+      <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {propuesta.title !== undefined && <Campo termino="Título" valor={propuesta.title} />}
+        {propuesta.priority !== undefined && (
+          <Campo
+            termino="Prioridad"
+            valor={PRIORITY_LABELS[propuesta.priority as Priority] ?? propuesta.priority}
+          />
+        )}
+        {propuesta.dueDate !== undefined && (
+          <Campo termino="Vence" valor={formatoFecha(propuesta.dueDate)} />
+        )}
+      </dl>
+
+      {propuesta.description !== undefined && (
+        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+          {propuesta.description}
+        </p>
+      )}
+
+      {propuesta.labelIds !== undefined &&
+        (marcas.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {marcas.map((nombre) => (
+              <Badge key={nombre} variant="primary">
+                {nombre}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="font-sans text-xs text-text-disabled">Se quedaría sin etiquetas.</p>
+        ))}
+
+      {propuesta.labelIds !== undefined && marcas.length > 0 && (
+        /* Misma advertencia que en los encargados: la lista sustituye. */
+        <p className="font-sans text-xs text-text-disabled">
+          Esas serían todas sus etiquetas; las demás se quitan.
+        </p>
+      )}
+    </CambioSobreTarea>
+  );
+}
+
+export function MoveProposalCard({
+  projectId,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaMovimiento }) {
+  return (
+    <CambioSobreTarea
+      titulo="Movimiento propuesto"
+      taskId={propuesta.taskId}
+      taskTitle={propuesta.taskTitle}
+      porQue={propuesta.porQue}
+      projectId={projectId}
+      ejecutar={() => aceptarMovimientoAction(projectId, propuesta)}
+    >
+      <p className="font-sans text-sm text-text-secondary">
+        {propuesta.columnaActual ? (
+          <>
+            Pasaría de <strong className="text-text-primary">{propuesta.columnaActual}</strong> a{' '}
+          </>
+        ) : (
+          'Pasaría a '
+        )}
+        <strong className="text-text-primary">{propuesta.columnName}</strong>.
+      </p>
+    </CambioSobreTarea>
+  );
+}
+
+export function ChecklistProposalCard({
+  projectId,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaChecklist }) {
+  return (
+    <CambioSobreTarea
+      titulo="Checklist propuesto"
+      taskId={propuesta.taskId}
+      taskTitle={propuesta.taskTitle}
+      porQue={propuesta.porQue}
+      projectId={projectId}
+      ejecutar={() => aceptarChecklistAction(projectId, propuesta)}
+    >
+      <ol className="flex flex-col gap-1">
+        {propuesta.items.map((paso, indice) => (
+          <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: son textos sin id, y la lista no se reordena
+            key={`${indice}-${paso}`}
+            className="flex gap-2 font-sans text-sm text-text-secondary"
+          >
+            <span className="text-text-disabled tabular-nums">{indice + 1}.</span>
+            {paso}
+          </li>
+        ))}
+      </ol>
+      {/* Se suman: hay que decirlo, porque «proponer un checklist» suena a
+          reemplazarlo entero. */}
+      <p className="font-sans text-xs text-text-disabled">
+        Se añaden a los pasos que ya tenga. No se borra ninguno.
+      </p>
+    </CambioSobreTarea>
+  );
+}
+
+export function CommentProposalCard({
+  projectId,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaComentario }) {
+  return (
+    <CambioSobreTarea
+      titulo="Comentario propuesto"
+      taskId={propuesta.taskId}
+      taskTitle={propuesta.taskTitle}
+      porQue={propuesta.porQue}
+      projectId={projectId}
+      ejecutar={() => aceptarComentarioAction(projectId, propuesta)}
+    >
+      {/* El texto entero y tal cual se va a publicar: se firma con tu nombre,
+          así que no puede quedar resumido ni recortado. */}
+      <p
+        className="whitespace-pre-wrap rounded-lg px-3 py-2 font-sans text-sm leading-relaxed text-text-primary"
+        style={{ background: alpha(colors.primary, 8) }}
+      >
+        {propuesta.body}
+      </p>
+      <p className="font-sans text-xs text-text-disabled">
+        Se publicaría a tu nombre, no al del asistente.
+      </p>
+    </CambioSobreTarea>
   );
 }
 
