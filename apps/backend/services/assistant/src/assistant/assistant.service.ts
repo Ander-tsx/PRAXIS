@@ -34,7 +34,7 @@ interface Briefing {
   columnas: { id: string; nombre: string; orden: number }[];
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
-  tareas?: { id: string; titulo: string; cerrada: boolean }[];
+  tareas?: { id: string; titulo: string; cerrada: boolean; columnId: string; columna: string }[];
 }
 
 @Injectable()
@@ -265,7 +265,109 @@ export class AssistantService {
       };
     }
 
+    /* Las cuatro de la capa 2 comparten la misma puerta: todas apuntan a una
+       tarea que ya existe, y ninguna vale sin ella. */
+    const sobreTarea = this.tareaDeLaPropuesta(call, briefing);
+    if (!sobreTarea) return null;
+    const { taskId, tarea } = sobreTarea;
+    const base = {
+      taskId,
+      ...(tarea ? { taskTitle: tarea.titulo } : {}),
+      ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+    };
+
+    if (call.name === 'proponer_edicion') {
+      const cambios: Record<string, unknown> = {};
+
+      if (call.args.title) cambios.title = String(call.args.title).slice(0, 120);
+      if (call.args.description) cambios.description = String(call.args.description);
+      if (call.args.priority) cambios.priority = this.prioridadValida(call.args.priority);
+      if (this.fechaValida(call.args.dueDate)) cambios.dueDate = call.args.dueDate;
+      /* `labelIds` sí puede llegar vacío con intención —«quítale las etiquetas»—
+         así que se distingue «no lo mandó» de «lo mandó vacío». */
+      if (Array.isArray(call.args.labelIds)) {
+        cambios.labelIds = this.soloConocidos(
+          call.args.labelIds,
+          new Set(briefing.etiquetas.map((l) => l.id)),
+        );
+      }
+
+      /* Una edición que no cambia nada es una tarjeta que promete algo y no
+         hace nada al aceptarla. Pasa cuando el modelo manda solo el porQue. */
+      if (Object.keys(cambios).length === 0) {
+        this.log.warn('El modelo propuso una edicion sin ningun campo que cambiar');
+        return null;
+      }
+
+      return { tool: call.name, args: { ...base, ...cambios } };
+    }
+
+    if (call.name === 'proponer_movimiento') {
+      const columna = briefing.columnas.find((c) => c.id === String(call.args.columnId ?? ''));
+      /* Sin columna válida no hay a dónde mover, y aquí **no** se cae a la
+         primera del tablero como en `proponer_tarea`: crear en otra columna es
+         un matiz, mover a otra columna es otra acción. */
+      if (!columna) return null;
+      /* Mover a donde ya está no cambia nada y la tarjeta mentiría. */
+      if (tarea && tarea.columnId === columna.id) return null;
+
+      return {
+        tool: call.name,
+        args: {
+          ...base,
+          columnId: columna.id,
+          /* El nombre viaja para la tarjeta y para el `status`, que el contrato
+             exige que iguale al de la columna destino. */
+          columnName: columna.nombre,
+          ...(tarea ? { columnaActual: tarea.columna } : {}),
+        },
+      };
+    }
+
+    if (call.name === 'proponer_checklist') {
+      const items = (Array.isArray(call.args.items) ? call.args.items : [])
+        .map((paso) => String(paso).trim().slice(0, 200))
+        .filter(Boolean)
+        .slice(0, 10);
+
+      if (items.length === 0) return null;
+      return { tool: call.name, args: { ...base, items } };
+    }
+
+    if (call.name === 'proponer_comentario') {
+      const body = String(call.args.body ?? '').trim().slice(0, 2000);
+      if (body.length === 0) return null;
+      return { tool: call.name, args: { ...base, body } };
+    }
+
     return null;
+  }
+
+  /**
+   * La tarea sobre la que va una propuesta, comprobada contra el inventario.
+   *
+   * Lo comparten las cuatro herramientas que actúan sobre algo que ya existe.
+   * Devuelve `null` —y con ello se descarta la propuesta entera— cuando el id
+   * falta o no es de este proyecto: sin tarea no queda nada que proponer, al
+   * revés que con una etiqueta inventada, que solo se quita.
+   *
+   * `tarea` puede venir indefinida si el briefing no trajera inventario. Es un
+   * caso que hoy no ocurre, pero el código no se apoya en que no ocurra.
+   */
+  private tareaDeLaPropuesta(
+    call: { name: string; args: Record<string, unknown> },
+    briefing: Briefing,
+  ): { taskId: string; tarea?: { id: string; titulo: string; columnId?: string; columna?: string } } | null {
+    const taskId = String(call.args.taskId ?? '').trim();
+    if (!taskId) return null;
+
+    const tarea = briefing.tareas?.find((t) => t.id === taskId);
+    if (briefing.tareas && !tarea) {
+      this.log.warn(`El modelo llamo a ${call.name} sobre ${taskId}, que no esta en el proyecto`);
+      return null;
+    }
+
+    return { taskId, tarea };
   }
 
   /** Se queda con los ids que existen de verdad y descarta el resto. */

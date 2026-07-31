@@ -133,6 +133,135 @@ const PROPONER_ASIGNACION: FunctionDeclaration = {
   },
 };
 
+const PROPONER_EDICION: FunctionDeclaration = {
+  name: 'proponer_edicion',
+  description:
+    'Prepara una propuesta para cambiar los datos de una tarea que YA existe: ' +
+    'titulo, descripcion, prioridad, fecha limite o etiquetas. NO la cambia: la ' +
+    'persona tiene que aceptarla. Manda SOLO los campos que cambian; lo que no ' +
+    'mandes se queda como esta. Para cambiar de columna usa proponer_movimiento, ' +
+    'y para cambiar encargados usa proponer_asignacion.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description: 'id de una tarea de "tareas" del contexto. Nunca lo inventes.',
+      },
+      title: { type: 'STRING', description: 'Opcional. Maximo 120 caracteres.' },
+      description: { type: 'STRING', description: 'Opcional.' },
+      priority: { type: 'STRING', enum: PRIORIDADES, description: 'Opcional.' },
+      dueDate: {
+        type: 'STRING',
+        description:
+          'Opcional, formato YYYY-MM-DD. Solo si la persona da una fecha o un ' +
+          'plazo explicito. NUNCA la deduzcas de la prediccion.',
+      },
+      labelIds: {
+        type: 'ARRAY',
+        items: { type: 'STRING' },
+        description:
+          'Opcional. La lista COMPLETA de etiquetas que quedan, no solo las que ' +
+          'anades: lo que mandes sustituye a las que tuviera. id de "etiquetas".',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Una o dos frases con el motivo del cambio, apoyado en ' +
+          'algo del contexto. La tarjeta lo enseña junto a la propuesta.',
+      },
+    },
+    required: ['taskId', 'porQue'],
+  },
+};
+
+const PROPONER_MOVIMIENTO: FunctionDeclaration = {
+  name: 'proponer_movimiento',
+  description:
+    'Prepara una propuesta para mover una tarea a otra columna del tablero. NO la ' +
+    'mueve: la persona tiene que aceptarla. Usala cuando te pidan avanzar, ' +
+    'devolver o dar por terminada una tarea.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description: 'id de una tarea de "tareas" del contexto. Nunca lo inventes.',
+      },
+      columnId: {
+        type: 'STRING',
+        description:
+          'id de una columna de "columnas" del contexto, distinta de la que ya ' +
+          'tiene la tarea. Nunca inventes uno.',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Una frase con el motivo, apoyado en algo del contexto ' +
+          '("lleva 12 dias parada en revision").',
+      },
+    },
+    required: ['taskId', 'columnId', 'porQue'],
+  },
+};
+
+const PROPONER_CHECKLIST: FunctionDeclaration = {
+  name: 'proponer_checklist',
+  description:
+    'Prepara una propuesta para anadir pasos al checklist de una tarea que YA ' +
+    'existe. NO los anade: la persona tiene que aceptarla. Los pasos se SUMAN a ' +
+    'los que ya tenga; no se borra ni se reemplaza ninguno.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description: 'id de una tarea de "tareas" del contexto. Nunca lo inventes.',
+      },
+      items: {
+        type: 'ARRAY',
+        items: { type: 'STRING' },
+        description:
+          'Los pasos, en orden, en infinitivo y concretos. Entre 1 y 10. Cada uno ' +
+          'una accion que se pueda dar por hecha o no hecha, no una idea vaga.',
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase sobre por que ese desglose y no otro.',
+      },
+    },
+    required: ['taskId', 'items', 'porQue'],
+  },
+};
+
+const PROPONER_COMENTARIO: FunctionDeclaration = {
+  name: 'proponer_comentario',
+  description:
+    'Prepara una propuesta de comentario en una tarea que YA existe. NO lo ' +
+    'publica: la persona tiene que aceptarla, y se publicara a SU nombre, no al ' +
+    'tuyo. Usalo para dejar constancia de algo que se ha hablado aqui.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description: 'id de una tarea de "tareas" del contexto. Nunca lo inventes.',
+      },
+      body: {
+        type: 'STRING',
+        description:
+          'El comentario, redactado en primera persona como lo escribiria la ' +
+          'persona que lo publica. Corto y concreto. Maximo 2000 caracteres.',
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase sobre por que dejar constancia de esto.',
+      },
+    },
+    required: ['taskId', 'body', 'porQue'],
+  },
+};
+
 /**
  * Las herramientas que le tocan a esta persona.
  *
@@ -146,6 +275,36 @@ const PROPONER_ASIGNACION: FunctionDeclaration = {
 export function herramientasPara(permisos: Record<string, boolean>): FunctionDeclaration[] {
   const tools: FunctionDeclaration[] = [];
   if (permisos.canCreateTask) tools.push(PROPONER_TAREA);
-  if (permisos.canEditTask) tools.push(PROPONER_ASIGNACION);
+  if (permisos.canEditTask) tools.push(PROPONER_ASIGNACION, PROPONER_EDICION, PROPONER_CHECKLIST);
+  /**
+   * Mover cuelga de `canMoveTask` y no de `canEditTask`, igual que su endpoint.
+   *
+   * Es la **única herramienta que alcanza a un colaborador**: quien ejecuta el
+   * trabajo puede decir que lo terminó sin poder redefinir en qué consistía, y
+   * eso vale también cuando lo pide por el chat. Como `canEditTask` implica
+   * `canMoveTask` por jerarquía, quien edita la recibe igual sin repetirla
+   * arriba.
+   */
+  if (permisos.canMoveTask) tools.push(PROPONER_MOVIMIENTO);
+  if (permisos.canComment) tools.push(PROPONER_COMENTARIO);
   return tools;
 }
+
+/**
+ * ⚠️ **Aquí no hay, ni va a haber, una herramienta de borrado.**
+ *
+ * No es un olvido ni una decisión que se pueda revisar a la ligera: es la
+ * garantía de que el asistente no puede destruir nada. Y la garantía es
+ * **estructural, no una instrucción** — el prompt no menciona el borrado a
+ * propósito, porque una regla que dice «nunca borres» se rodea con la pregunta
+ * adecuada, mientras que una capacidad que no existe no se puede invocar.
+ *
+ * Son tres capas y ninguna depende de que el modelo obedezca:
+ *
+ * 1. la herramienta no se le declara, así que no tiene forma de expresarlo;
+ * 2. `validarPropuesta` descarta cualquier `call` fuera de esta lista;
+ * 3. las server actions solo saben llamar a los endpoints que tienen escritos.
+ *
+ * Si alguna vez alguien añade aquí algo destructivo, que sea sabiendo que
+ * rompe las tres a la vez.
+ */
