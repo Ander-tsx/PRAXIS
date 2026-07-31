@@ -13,10 +13,34 @@
  */
 
 const REGLAS = [
-  /* 1 — Lo que separa esto de un juguete. */
-  'NUNCA calcules, estimes ni inventes duraciones, fechas, plazos, porcentajes ' +
-    'ni cantidades. Todos los números que digas tienen que estar literalmente en ' +
-    'el CONTEXTO. Si te piden uno que no está, di que no hay dato y por que.',
+  /**
+   * 1 — Lo que separa esto de un juguete, dicho con más precisión que antes.
+   *
+   * La primera versión prohibía «calcular», a secas, y salió cara: a «¿qué
+   * porcentaje de avance hay?» respondía que ese número no estaba en el reporte
+   * teniendo delante 35 cerradas de 62. La prohibición que importa no es la
+   * aritmética —restar dos cifras que tiene delante lo hace bien— sino
+   * **inventar el dato de partida**: estimar cuánto tardará algo, deducir una
+   * fecha de entrega o suponer un ritmo que nadie ha medido.
+   *
+   * Las divisiones que se repiten en una reunión —el avance, la variación
+   * semanal— vienen ya calculadas en `avance` y en `semana` precisamente para
+   * que no dependan de que hoy le salga bien.
+   */
+  'NUNCA estimes ni inventes duraciones, plazos, fechas de entrega ni ritmos: ' +
+    'esos salen del CONTEXTO o no se dicen. Con las cifras que SI estan en el ' +
+    'contexto puedes hacer cuentas simples —sumar, restar, un porcentaje— y ' +
+    'decir de donde sale ("35 de 62"). Si el dato de partida no esta, di que no ' +
+    'lo hay y por que; no lo supongas.',
+
+  /* 1 bis — Las tres respuestas que la gente pide primero, ya calculadas. */
+  'Para el avance usa "avance": empieza por porCierre, que es lo que se ve en el ' +
+    'tablero, y si porCompletado es bastante menor aclara que ese solo cuenta lo ' +
+    'cerrado desde que hay historial. ' +
+    'para "como estuvo la semana" usa "semana" —cerradas, creadas, la semana ' +
+    'anterior y el ritmo diario—; para lo bloqueado usa "bloqueadas". Estan ahi ' +
+    'para que no tengas que calcularlos tu. Si "semana.diasTranscurridos" es ' +
+    'menor que 7, di que la semana va por la mitad y compara ritmos, no totales.',
 
   /* 2 — El contexto se niega a predecir a propósito; el modelo también tiene que
      saber negarse, o el trabajo de `evaluarSuficiencia` no sirve de nada. */
@@ -116,6 +140,16 @@ export function systemInstruction(
   return [
     'Eres el asistente de PRAXIS, un gestor de proyectos. Ayudas a leer los ' +
       'reportes del proyecto que la persona tiene delante y a preparar tareas.',
+    '',
+    /**
+     * La fecha de hoy, que el modelo no tiene por su cuenta.
+     *
+     * Hace falta para dos cosas concretas: entender «esta semana» —la serie
+     * viene con la fecha del lunes de cada una— y poder convertir «para el
+     * viernes» en la fecha que pide `dueDate`. Sin esto se la inventaba o
+     * preguntaba de vuelta.
+     */
+    `HOY ES ${new Date().toISOString().slice(0, 10)}.`,
     '',
     'REGLAS (en este orden de importancia):',
     ...REGLAS.map((regla, i) => `${i + 1}. ${regla}`),
