@@ -60,3 +60,91 @@ model AssistantUsage {
   @@schema("assistant")
   @@map("assistant_usage")
 }
+
+/// Una conversación con el asistente.
+///
+/// Hasta ahora **no se guardaba ninguna**: el historial lo mandaba el cliente en
+/// cada turno y el servidor no lo veía nunca. Recargar la página perdía el hilo,
+/// y cruzar de zona —que en Multi-Zones es una recarga completa— también.
+///
+/// Es de **una persona en un proyecto**, y las dos mitades importan:
+/// el contexto que ve el modelo es del proyecto, y lo que alguien le escribe al
+/// asistente es suyo. `userId` no es solo para agrupar: es la clave de acceso.
+///
+/// ⚠️ `canViewReports` es del proyecto, no de la conversación. Comprobar solo el
+/// permiso dejaría a cualquier compañero leer estos hilos, así que quien los
+/// sirve comprueba **además** que el `userId` es el de quien llama.
+///
+/// Sin clave foránea hacia el proyecto ni hacia el usuario: viven en otros
+/// servicios. Al borrar el proyecto las limpia el gateway, como con las tareas.
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  projectId String
+  /// Las primeras palabras del primer mensaje. Se puede renombrar a mano.
+  title     String
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  /// El listado siempre es «mis conversaciones de este proyecto, la última arriba».
+  @@index([userId, projectId, updatedAt])
+  @@schema("assistant")
+  @@map("assistant_conversations")
+}
+
+enum MessageRole {
+  USER
+  MODEL
+
+  @@schema("assistant")
+}
+
+/// Un turno. El texto tal cual se escribió o se respondió.
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  text           String
+  proposals      Proposal[]
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@schema("assistant")
+  @@map("assistant_messages")
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  DISCARDED
+
+  @@schema("assistant")
+}
+
+/// Una propuesta del asistente, **con lo que se decidió sobre ella**.
+///
+/// Es una fila y no un JSON dentro del mensaje justamente por `status`. Al
+/// reabrir una conversación de hace días sus tarjetas vuelven a aparecer, y sin
+/// saber qué se decidió entonces habría dos formas de equivocarse: pulsar
+/// «Aceptar» en algo que ya se aceptó —creando la tarea dos veces— o no
+/// distinguir lo que se descartó a propósito de lo que quedó a medias.
+///
+/// Solo las `PENDING` conservan sus botones al releer.
+///
+/// `args` sí es Json: su forma depende de `tool` y ya la valida el servicio
+/// antes de guardarla. Aquí solo se conserva lo que se propuso.
+model Proposal {
+  id         String         @id @default(uuid())
+  messageId  String
+  message    Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  tool       String
+  args       Json
+  status     ProposalStatus @default(PENDING)
+  resolvedAt DateTime?
+
+  @@index([messageId])
+  @@schema("assistant")
+  @@map("assistant_proposals")
+}
