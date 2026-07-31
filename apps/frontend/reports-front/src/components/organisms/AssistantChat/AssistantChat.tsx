@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, alpha, colors } from '@praxis/commons';
+import { Badge, Button, Sparkle, alpha, colors } from '@praxis/commons';
 import { useEffect, useId, useRef, useState } from 'react';
 import { preguntarAction } from '@/app/(private)/[id]/actions';
 import {
@@ -142,7 +142,13 @@ export function AssistantChat({
     >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="font-display text-xl text-text-primary">Pregúntale a los datos</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-xl text-text-primary">Pregúntale a los datos</h3>
+            <Badge variant="accent" className="inline-flex items-center gap-1">
+              <Sparkle size={9} />
+              AI Powered
+            </Badge>
+          </div>
           <p className="font-sans text-sm text-text-secondary">
             Lee este mismo informe y responde con sus números. Cuando propone algo,
             no lo hace: lo deja para que lo revises.
@@ -190,7 +196,13 @@ export function AssistantChat({
           ))}
 
           {pendiente && (
-            <p className="font-sans text-sm italic text-text-disabled">Leyendo el informe…</p>
+            <div className="flex items-center gap-2">
+              <Sparkle
+                size={14}
+                style={{ color: colors.primary, animation: 'sparkle-spin 0.9s linear infinite' }}
+              />
+              <p className="font-sans text-sm italic text-text-disabled">Leyendo el informe…</p>
+            </div>
           )}
         </div>
       )}
@@ -234,7 +246,7 @@ export function AssistantChat({
           <label htmlFor={campoId} className="sr-only">
             Pregunta al asistente
           </label>
-          <div className="flex items-end gap-2">
+          <div className="flex items-stretch gap-2">
             <textarea
               id={campoId}
               rows={2}
@@ -254,10 +266,27 @@ export function AssistantChat({
               }}
               className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
             />
-            <Button type="submit" isLoading={pendiente} disabled={texto.trim().length === 0}>
+            {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
+                filas el botón por defecto mide una (`size="md"`, 40px) y quedaba
+                anclado abajo, con un hueco encima que rompía la simetría con el
+                campo. Va por `style` y no por una clase `h-full`: la clase
+                compite con el `h-10` de `sizeClasses.md` en la misma
+                especificidad, y quién gana depende del orden en que Tailwind
+                generó el CSS, no del orden en el `className` — un `style` en
+                línea no tiene esa ambigüedad. */}
+            <Button
+              type="submit"
+              isLoading={pendiente}
+              disabled={texto.trim().length === 0}
+              style={{ height: '100%' }}
+            >
               Preguntar
             </Button>
           </div>
+
+          <p className="font-sans text-xs text-text-disabled">
+            El asistente puede equivocarse. Revisa cada propuesta antes de aceptarla.
+          </p>
 
           {error && <p className="font-sans text-sm text-error">{error}</p>}
         </form>
