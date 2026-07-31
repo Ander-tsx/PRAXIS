@@ -2583,7 +2583,8 @@ scrim.
 - **`ThemeToggle`**: de dos botones con la palabra completa a un switch de
   dos círculos de 32px con iconos de sol y luna y una marca deslizante detrás.
 - **Badge «AI Powered»**: de wash translúcido y píldora a mayúsculas fijas,
-  relleno sólido del color de acento y esquinas casi rectas.
+  relleno sólido del color de acento y esquinas casi rectas. Tras verlo
+  montado se dio marcha atrás en el relleno y en el texto: ver §27.7.
 - **Loader del chat**: «Leyendo el informe…» con una estrella girando era un
   adorno; pasa a «Pensando…» con tres `Sparkle` de distinto tamaño y su propio
   `animation-delay` (`sparkle-drift`, en `theme.css`) que titilan por turnos
@@ -2592,3 +2593,35 @@ scrim.
 Verificado contra Gemini con la clave nueva: 429 de la cuenta —cuota propia
 del key, no la cuota mensual de la app, que se quedó igual— y, tras esperar,
 respuesta correcta con la cuota de la app subiendo de 11 a 12.
+
+### 27.7 El badge del asistente, en su forma final
+
+El relleno sólido de §27.6 duró lo que tardó en verse junto al título. El
+badge está al lado de un `<h3>` de 20px, y un bloque macizo del color de
+acento competía con él por la atención: lo primero que leía el ojo al entrar
+en la tarjeta era la etiqueta, no el encabezado. Queda:
+
+```tsx
+background: alpha(colors.accent, 15),
+border: `1px solid ${alpha(colors.accent, 40)}`,
+color: colors.accent,
+```
+
+Wash del acento al 15% con borde al 40% y el texto en el propio acento —el
+mismo patrón que ya usan el aviso de historial fabricado (`colors.warning` al
+8/30, §26.8) y la burbuja de los mensajes propios (`colors.primary` al 14) en
+este mismo archivo, así que no inventa una forma nueva. Se mantienen de
+§27.6 las mayúsculas, el `fontWeight: 700` y el `borderRadius: 4`: lo que
+sobraba era la masa de color, no la geometría.
+
+El texto pasa de «AI Powered» a **«AI»**. Con el relleno sólido, «AI Powered»
+llenaba la píldora y se leía como un sello; en wash translúcido la etiqueta ya
+no reclama espacio, y la palabra larga solo empujaba el `<h3>` hacia el salto
+de línea en anchos intermedios. La promesa que hacía «Powered» la dice mejor
+el párrafo que va justo debajo, que además es cierto y concreto: «Lee este
+mismo informe y responde con sus números».
+
+Los tokens implicados son `--color-accent` y su uso vía `alpha()`, no clases
+de utilidad — o sea, exactamente el caso que §27.6 documenta: si `theme.css`
+volviera a `@theme` sin `static`, este badge se quedaría sin color y sin borde
+en silencio.
