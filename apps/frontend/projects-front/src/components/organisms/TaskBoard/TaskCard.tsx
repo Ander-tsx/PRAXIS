@@ -16,6 +16,13 @@ export interface TaskCardProps {
   task: Task;
   /** Para poner cara a los `userId` de los encargados. */
   usersById: Map<string, UserProfile>;
+  /**
+   * Quién está mirando el tablero.
+   *
+   * Solo se usa para destacar su propia inicial entre los encargados: no
+   * decide nada sobre lo que se puede tocar, eso lo dicen los permisos.
+   */
+  currentUserId: string;
   onOpen: () => void;
   /** Solo cambia cómo se nombra el botón: el diálogo decide qué deja tocar. */
   canEdit: boolean;
@@ -48,6 +55,11 @@ const PRIORITY_COLORS: Record<Priority, string> = {
  * límite si está cerca o pasada, avance del checklist y quién la lleva. Todo lo
  * demás —descripción, comentarios, adjuntos— vive en el diálogo.
  *
+ * **Tu inicial va primera y en rojo.** Es el único color de la tarjeta que no
+ * describe la tarea sino a quien la mira, y por eso puede permitirse ser el más
+ * fuerte: barrer un tablero buscando lo tuyo era leer cuatro iniciales por
+ * tarjeta, todas del mismo violeta.
+ *
  * Es un `<article>`, no un `<button>` entero: un botón sería ancestro de las
  * iniciales y los contadores, y un botón con contenido estructurado se anuncia
  * fatal en un lector de pantalla.
@@ -72,6 +84,7 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 export function TaskCard({
   task,
   usersById,
+  currentUserId,
   onOpen,
   canEdit,
   isDone,
@@ -214,20 +227,35 @@ export function TaskCard({
 
       {task.assignees.length > 0 && (
         <div className="flex items-center -space-x-1.5">
-          {task.assignees.slice(0, 4).map((assignee) => {
-            const user = usersById.get(assignee.userId);
-            const label = user ? personLabel(user) : 'Alguien que ya no está en el proyecto';
-            return (
-              <span
-                key={assignee.id}
-                title={label}
-                className="flex h-6 w-6 items-center justify-center rounded-full font-sans text-[10px] font-semibold uppercase text-text-primary ring-2 ring-background"
-                style={{ background: alpha(colors.primary, 30) }}
-              >
-                {initials(label)}
-              </span>
-            );
-          })}
+          {mineFirst(task.assignees, currentUserId)
+            .slice(0, 4)
+            .map((assignee) => {
+              const user = usersById.get(assignee.userId);
+              const label = user ? personLabel(user) : 'Alguien que ya no está en el proyecto';
+              const mine = assignee.userId === currentUserId;
+              return (
+                <span
+                  key={assignee.id}
+                  title={mine ? `${label} — es tuya` : label}
+                  className={[
+                    'flex h-6 w-6 items-center justify-center rounded-full font-sans text-[10px] font-semibold uppercase text-text-primary ring-2 ring-background',
+                    /* Con `-space-x-1.5` los círculos se solapan y el que va
+                       después tapa al anterior. Ir primero en el DOM no basta
+                       para verse entero: hace falta subirlo de capa. */
+                    mine ? 'relative z-10' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  style={
+                    mine
+                      ? { background: colors.error, color: colors.textInverse }
+                      : { background: alpha(colors.primary, 30) }
+                  }
+                >
+                  {initials(label)}
+                </span>
+              );
+            })}
           {task.assignees.length > 4 && (
             <span className="pl-3 font-sans text-[11px] text-text-secondary">
               +{task.assignees.length - 4}
@@ -237,6 +265,23 @@ export function TaskCard({
       )}
     </article>
   );
+}
+
+/**
+ * Los encargados, contigo delante.
+ *
+ * Va antes del `slice(0, 4)` a propósito: con cinco encargados y tú de quinto,
+ * ordenar después de cortar te dejaría fuera de la tarjeta justo en el caso en
+ * que más falta hace verte. El resto conserva su orden original.
+ *
+ * Devuelve la lista tal cual si no eres uno de ellos, para no crear un array
+ * nuevo en cada render de cada tarjeta ajena — que en un tablero lleno es la
+ * mayoría.
+ */
+function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: string): T[] {
+  const index = assignees.findIndex((assignee) => assignee.userId === currentUserId);
+  if (index <= 0) return assignees;
+  return [assignees[index], ...assignees.slice(0, index), ...assignees.slice(index + 1)];
 }
 
 /**

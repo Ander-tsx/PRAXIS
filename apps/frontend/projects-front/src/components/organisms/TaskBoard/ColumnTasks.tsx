@@ -142,6 +142,7 @@ export function ColumnTasks({
                 key={task.id}
                 task={task}
                 usersById={usersById}
+                currentUserId={currentUserId}
                 onOpen={() => setOpenTask(task)}
                 canEdit={canEdit}
                 isDone={isDoneColumn}
