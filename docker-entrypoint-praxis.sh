@@ -11,10 +11,21 @@ log() { echo "[praxis] $*"; }
 
 # ─── Configuración que hay que dar por fuera ────────────────────────────────
 : "${JWT_SECRET:?Falta JWT_SECRET. Tiene que ser el mismo para todo el contenedor}"
-: "${GEMINI_API_KEY:=}"
 : "${GEMINI_MODEL:=gemini-flash-latest}"
 : "${PORT:=8080}"
 : "${POSTGRES_PASSWORD:=praxis123}"
+
+# ⚠️ `assistant-service` valida `GEMINI_API_KEY` con Joi y **no admite vacío**:
+# sin ella el servicio muere al arrancar y, como el vigilante para el
+# contenedor cuando cae cualquiera de los doce, se caía el producto entero por
+# no tener clave del chat. Reproducido.
+#
+# Con un valor de relleno arranca todo y solo falla el asistente al usarlo, que
+# es lo que se quería: la clave es opcional para ver el proyecto.
+if [ -z "${GEMINI_API_KEY:-}" ]; then
+  log "AVISO: sin GEMINI_API_KEY. Todo funciona menos el chat del asistente."
+  GEMINI_API_KEY="sin-configurar"
+fi
 
 export JWT_SECRET GEMINI_API_KEY GEMINI_MODEL
 : "${JWT_EXPIRES_IN:=15m}"

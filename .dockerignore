@@ -32,3 +32,9 @@ docs
 infra/k8s
 *.md
 !README.md
+
+# El script de arranque se copia **aparte y al final** del Dockerfile. Si además
+# entrara en el `COPY . .`, cualquier retoque suyo invalidaría la capa de
+# instalación y obligaría a recompilar el monorepo entero —quince minutos por
+# cambiar una línea de shell—.
+docker-entrypoint-praxis.sh

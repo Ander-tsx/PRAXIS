@@ -91,8 +91,12 @@ openssl rand -base64 32
 `PORT` lo inyecta Railway solo. Todo lo demás tiene un valor por defecto que ya
 es el correcto dentro del contenedor.
 
-> El asistente es lo único que necesita `GEMINI_API_KEY`. Sin ella el resto del
-> producto funciona; solo el chat responderá con error.
+> `GEMINI_API_KEY` solo la usa el asistente. Si no la pones, el arranque avisa
+> con `AVISO: sin GEMINI_API_KEY` y todo funciona menos el chat.
+>
+> ⚠️ Lo que **no** puedes hacer es ponerla vacía: `assistant-service` la valida
+> y una cadena vacía lo mata al arrancar, lo que a su vez para el contenedor
+> entero. O la pones con un valor real, o no declares la variable.
 
 ## 4. Dominio
 

@@ -67,8 +67,12 @@ openssl rand -base64 32   # para JWT_SECRET
 openssl rand -base64 32   # para POSTGRES_PASSWORD
 ```
 
-La tercera, `GEMINI_API_KEY`, te la doy yo. Es solo para el asistente de IA: sin
-ella el resto del producto funciona igual y únicamente el chat dará error.
+La tercera, `GEMINI_API_KEY`, te la doy yo. Es solo para el asistente de IA: si
+no la pones, el arranque avisa y todo funciona menos el chat.
+
+⚠️ Lo que no debes hacer es pasarla **vacía** (`-e GEMINI_API_KEY=`). El
+servicio del asistente la valida, una cadena vacía lo mata al arrancar y eso
+para el contenedor entero. O va con un valor real, o no se declara.
 
 ## Paso 5 — Arrancar el contenedor
 
