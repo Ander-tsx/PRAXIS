@@ -66,6 +66,27 @@ ENV DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build?schema=public"
 # fuera lo que solo se compila en producción.
 ENV NODE_ENV=production
 
+# ⚠️ **El dominio público, y va en el build a propósito.**
+#
+# Next rechaza toda Server Action cuyo `Origin` no case con el host que ve el
+# servidor. Detrás de un proxy inverso nunca casan, y como aquí *todos* los
+# formularios son Server Actions, sin esto no se puede ni iniciar sesión: falla
+# con `Invalid Server Actions request`. Lo leen los cinco `next.config.ts`.
+#
+# Con `output: 'standalone'` el valor queda grabado en
+# `.next/required-server-files.json` al compilar, así que **pasarlo en el
+# `docker run` no sirve de nada**: cambiar de dominio obliga a reconstruir.
+#
+# Se deja vacío por defecto porque en local no hace falta —navegador y servidor
+# ven el mismo host— y un valor equivocado sería peor que ninguno.
+#
+#   docker build --build-arg PUBLIC_ORIGIN=34-1-2-3.sslip.io -t praxis:local .
+#
+# Sin protocolo y con el puerto si no es el estándar: `mi-dominio.com`,
+# `1-2-3-4.sslip.io`, `localhost:8080`.
+ARG PUBLIC_ORIGIN=""
+ENV PUBLIC_ORIGIN=$PUBLIC_ORIGIN
+
 # ⚠️ **`--env-mode=loose`, y hace falta.**
 #
 # Turborepo 2 filtra el entorno de cada tarea: solo pasa lo que esté declarado

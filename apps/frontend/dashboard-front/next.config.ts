@@ -1,6 +1,12 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 
+/**
+ * El dominio por el que entra la gente, cuando no es el mismo que ve el
+ * servidor. Ver el bloque `experimental` de abajo.
+ */
+const origenesPermitidos = process.env.PUBLIC_ORIGIN ? [process.env.PUBLIC_ORIGIN] : [];
+
 const nextConfig: NextConfig = {
   /**
    * Imagen mínima para producción.
@@ -31,6 +37,24 @@ const nextConfig: NextConfig = {
    * dentro de node_modules, donde Next no transpila por defecto.
    */
   transpilePackages: ['@praxis/commons'],
+
+  /**
+   * ⚠️ **Sin esto, detrás de un proxy los formularios de esta zona fallan.**
+   *
+   * Next compara el `Origin` de toda Server Action con el host que ve el
+   * servidor y la rechaza si no coinciden. Detrás de un proxy inverso no
+   * coinciden nunca, así que sale `Invalid Server Actions request`. La zona
+   * recibe el tráfico reescrito por el shell, pero valida contra el dominio
+   * público igual que él — el razonamiento largo está en el `next.config.ts`
+   * de `web-shell`.
+   *
+   * ⚠️ Se lee **al compilar**, no al arrancar: hay que pasarlo al `docker build`.
+   */
+  experimental: {
+    serverActions: {
+      allowedOrigins: origenesPermitidos,
+    },
+  },
 };
 
 export default nextConfig;
