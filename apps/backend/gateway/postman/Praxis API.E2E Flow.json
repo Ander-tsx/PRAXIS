@@ -32,10 +32,9 @@
               "} else {",
               "    const body = pm.response.json();",
               "    const res = body.data || body;",
-              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
-              "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
-              "    pm.collectionVariables.set('userId', res.userId || res.id);",
-              "}"
+              "    if (res.accessToken || res.access_token) pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "    if (res.refreshToken || res.refresh_token) pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
+              "    if (res.userId || res.id) pm.collectionVariables.set('userId', res.userId || res.id);",              "}"
             ],
             "type": "text/javascript"
           }
@@ -87,8 +86,8 @@
               "} else {",
               "    const body = pm.response.json();",
               "    const res = body.data || body;",
-              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
-              "    pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
+              "    if (res.accessToken || res.access_token) pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "    if (res.refreshToken || res.refresh_token) pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
               "}"
             ],
             "type": "text/javascript"
@@ -141,9 +140,9 @@
               "} else {",
               "    const body = pm.response.json();",
               "    const res = body.data || body;",
-              "    pm.collectionVariables.set('admin_access_token', res.accessToken || res.access_token);",
-              "    pm.collectionVariables.set('admin_refresh_token', res.refreshToken || res.refresh_token);",
-              "    pm.collectionVariables.set('adminId', res.userId || res.id);",
+              "    if (res.accessToken || res.access_token) pm.collectionVariables.set('admin_access_token', res.accessToken || res.access_token);",
+              "    if (res.refreshToken || res.refresh_token) pm.collectionVariables.set('admin_refresh_token', res.refreshToken || res.refresh_token);",
+              "    if (res.userId || res.id) pm.collectionVariables.set('adminId', res.userId || res.id);",
               "}"
             ],
             "type": "text/javascript"
@@ -196,7 +195,7 @@
               "} else {",
               "    const body = pm.response.json();",
               "    const res = body.data || body;",
-              "    pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
+              "    if (res.accessToken || res.access_token) pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
               "}"
             ],
             "type": "text/javascript"
