@@ -3,6 +3,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
   CreateProjectDto,
+  FindProjectsByMemberDto,
   FindProjectsDto,
   FindOneProjectDto,
   UpdateProjectDto,
@@ -25,6 +26,12 @@ export class ProjectsController {
   @MessagePattern({ cmd: 'project_find_all' })
   findAll(@Payload() dto: FindProjectsDto) {
     return this.projectsService.findAllProjects(dto);
+  }
+
+  /** Proyectos donde el usuario es dueño o miembro */
+  @MessagePattern({ cmd: 'project_find_by_member' })
+  findByMember(@Payload() dto: FindProjectsByMemberDto) {
+    return this.projectsService.findProjectsByMember(dto);
   }
 
   @MessagePattern({ cmd: 'project_find_one' })

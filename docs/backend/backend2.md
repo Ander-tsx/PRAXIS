@@ -685,7 +685,9 @@ NODE_ENV=development
 | roles-service | 3002 |
 | projects-service | 3003 |
 | tasks-service | 3004 |
-| notifications-service | 3005 |
+| reports-service | 3005 |
+| assistant-service | 3006 |
+| alexa-service | 3007 |
 
 ---
 
@@ -697,6 +699,10 @@ roles-service         → independiente
 projects-service      → independiente
 tasks-service         → consulta a projects-service (permisos)
 notifications-service → independiente (recibe eventos del gateway)
+alexa-service         → consulta a projects-service, tasks-service y credentials-service (solo lectura)
 ```
+
+> `alexa-service` está documentado aparte en [examples/alexa-service.md](./examples/alexa-service.md)
+> y su contrato HTTP para la skill en [alexa-skill-contract.md](./alexa-skill-contract.md).
 
 El gateway es quien orquesta las llamadas entre servicios cuando una operación lo requiere (ej: registro crea credencial y luego notifica). Los servicios no se llaman entre sí excepto `tasks-service → projects-service` para verificar permisos.

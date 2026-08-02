@@ -6,12 +6,14 @@ import { RedisService } from '../redis/redis.service';
 
 import {
   CreateProjectDto,
+  FindProjectsByMemberDto,
   FindProjectsDto,
   UpdateProjectDto,
 } from '@praxis/contracts';
 import { expandPermissions, normalizePermissions } from '../project-roles/permission-map';
 
 const PROJECT_CACHE_TTL = 300; // 5 min
+const MEMBER_PROJECTS_TTL = 60; // 1 min — proyectos visibles por usuario
 
 /** Rol que se crea con el proyecto para que el dueño pueda operar y delegar. */
 const DEFAULT_ROLE_NAME = 'Administrador';
@@ -172,6 +174,34 @@ export class ProjectsService {
     ]);
 
     return { items, total };
+  }
+
+  /** Proyectos donde el usuario es dueño o miembro. */
+  async findProjectsByMember(dto: FindProjectsByMemberDto) {
+    const cacheKey = `projects:member:${dto.userId}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached;
+
+    const projects = await this.prisma.project.findMany({
+      where: {
+        OR: [
+          { ownerId: dto.userId },
+          { members: { some: { userId: dto.userId } } },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id:          true,
+        name:        true,
+        description: true,
+        ownerId:     true,
+        createdAt:   true,
+        updatedAt:   true,
+      },
+    });
+
+    await this.redis.set(cacheKey, projects, MEMBER_PROJECTS_TTL);
+    return projects;
   }
 
   /**

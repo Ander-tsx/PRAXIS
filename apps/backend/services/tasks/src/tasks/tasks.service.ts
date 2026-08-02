@@ -17,6 +17,7 @@ import {
   FindMyTasksDto,
   FindOneTaskDto,
   FindTasksDto,
+  FindTasksByProjectDto,
   MoveTaskDto,
   PurgeTasksDto,
   RestatusTasksDto,
@@ -26,6 +27,7 @@ import {
 
 const TASK_CACHE_TTL = 120;       // 2 min individual task
 const BOARD_TASKS_TTL = 60;       // 1 min board tasks list
+const PROJECT_TASKS_TTL = 60;     // 1 min project tasks list
 
 /**
  * Un evento a registrar, sin los campos que se repiten en todos.
@@ -52,12 +54,12 @@ type TaskEventDraft = {
  * dónde venía cada tarea.
  */
 const TASK_INCLUDE = {
-  subtasks:   { include: { checklists: { orderBy: { order: 'asc' } } } },
+  subtasks: { include: { checklists: { orderBy: { order: 'asc' } } } },
   checklists: { orderBy: { order: 'asc' } },
-  assignees:  { orderBy: { assignedAt: 'asc' } },
+  assignees: { orderBy: { assignedAt: 'asc' } },
   /* La etiqueta entera, no solo su id: la tarjeta necesita nombre y color y no
      tiene de dónde sacarlos si solo llega la relación. */
-  labels:     { include: { label: true } },
+  labels: { include: { label: true } },
   /**
    * Los comentarios viajan **con la tarea**, también en el listado del tablero.
    *
@@ -70,7 +72,7 @@ const TASK_INCLUDE = {
    * tarea con cien comentarios es rara. Si algún día pesa, el sitio por donde
    * cortar es este: sacarlos de aquí, dejar solo `_count`, y pedirlos al abrir.
    */
-  comments:   { orderBy: { createdAt: 'asc' } },
+  comments: { orderBy: { createdAt: 'asc' } },
   /**
    * Adjuntos: **solo los metadatos**.
    *
@@ -179,9 +181,9 @@ export class TasksService {
 
     await tx.taskEvent.createMany({
       data: events.map((event) => ({
-        taskId:    task.id,
+        taskId: task.id,
         projectId: task.projectId,
-        boardId:   task.boardId,
+        boardId: task.boardId,
         actorId,
         // Copia del momento: el evento sobrevive a la tarea.
         taskTitle: task.title,
@@ -453,17 +455,17 @@ export class TasksService {
     const task = await this.prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
-          title:        dto.title,
-          description:  dto.description,
-          status:       dto.status,
-          boardId:      dto.boardId,
-          columnId:     dto.columnId,
-          reporterId:   dto.requesterId,
-          projectId:    dto.projectId,
+          title: dto.title,
+          description: dto.description,
+          status: dto.status,
+          boardId: dto.boardId,
+          columnId: dto.columnId,
+          reporterId: dto.requesterId,
+          projectId: dto.projectId,
           parentTaskId: dto.parentTaskId,
-          dueDate:      dto.dueDate ? new Date(dto.dueDate) : undefined,
-          priority:     dto.priority,
-          order:        dto.order ?? 0,
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+          priority: dto.priority,
+          order: dto.order ?? 0,
           assignees: {
             create: assignees.map((userId) => ({ userId, assignedBy: dto.requesterId })),
           },
@@ -503,9 +505,9 @@ export class TasksService {
     const cached = await this.redis.get(cacheKey);
     if (cached) return cached;
 
-    const page  = dto.query?.page  ?? 1;
+    const page = dto.query?.page ?? 1;
     const limit = dto.query?.limit ?? 50;
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
     const where: any = { boardId: dto.boardId };
     if (dto.columnId) where.columnId = dto.columnId;
@@ -546,7 +548,7 @@ export class TasksService {
     const where: Prisma.TaskWhereInput = {
       projectId: { in: projectIds },
       assignees: { some: { userId: dto.userId } },
-      ...(dto.status   !== undefined && { status: dto.status }),
+      ...(dto.status !== undefined && { status: dto.status }),
       ...(dto.priority !== undefined && { priority: dto.priority }),
       // `not: null` explícito: sin él, las tareas sin fecha entrarían en un
       // filtro que pregunta justamente por vencimiento.
@@ -567,6 +569,37 @@ export class TasksService {
     ]);
 
     return { items, total };
+  }
+
+  /** Resuelve todas las tareas de un proyecto (para alexa) */
+  async findTasksByProject(dto: FindTasksByProjectDto) {
+    const cacheKey = `tasks:project:${dto.projectId}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return cached;
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        projectId: dto.projectId,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        columnId: true,
+        assignees: {
+          select: {
+            userId: true,
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    await this.redis.set(cacheKey, tasks, PROJECT_TASKS_TTL);
+    return tasks;
   }
 
   async findOneTask(dto: FindOneTaskDto) {
@@ -615,11 +648,11 @@ export class TasksService {
     const change =
       dto.columnId !== undefined
         ? this.resolveColumnChange({
-            fromColumnId: task.columnId,
-            toColumnId: dto.columnId,
-            wasCompleted: task.completedAt !== null,
-            isClosingColumn: dto.isClosingColumn,
-          })
+          fromColumnId: task.columnId,
+          toColumnId: dto.columnId,
+          wasCompleted: task.completedAt !== null,
+          isClosingColumn: dto.isClosingColumn,
+        })
         : { events: [] as TaskEventDraft[], completedAt: undefined };
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -633,13 +666,13 @@ export class TasksService {
       const saved = await tx.task.update({
         where: { id: dto.id },
         data: {
-          ...(dto.title       !== undefined && { title: dto.title }),
+          ...(dto.title !== undefined && { title: dto.title }),
           ...(dto.description !== undefined && { description: dto.description }),
-          ...(dto.status      !== undefined && { status: dto.status }),
-          ...(dto.columnId    !== undefined && { columnId: dto.columnId }),
-          ...(dto.priority    !== undefined && { priority: dto.priority }),
+          ...(dto.status !== undefined && { status: dto.status }),
+          ...(dto.columnId !== undefined && { columnId: dto.columnId }),
+          ...(dto.priority !== undefined && { priority: dto.priority }),
           // `null` limpia la fecha; sin esto no habría forma de quitarla.
-          ...(dto.dueDate     !== undefined && {
+          ...(dto.dueDate !== undefined && {
             dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
           }),
           ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
@@ -654,10 +687,10 @@ export class TasksService {
            fueron y desvirtuaría cualquier análisis de repriorización. */
         ...(dto.priority !== undefined && dto.priority !== task.priority
           ? [{
-              type: 'PRIORITY_CHANGED' as const,
-              fromPriority: task.priority,
-              toPriority: dto.priority,
-            }]
+            type: 'PRIORITY_CHANGED' as const,
+            fromPriority: task.priority,
+            toPriority: dto.priority,
+          }]
           : []),
         ...this.assigneeEvents(before, assignees),
       ]);
@@ -706,7 +739,7 @@ export class TasksService {
         data: {
           columnId: dto.columnId,
           ...(dto.status !== undefined && { status: dto.status }),
-          ...(dto.order  !== undefined && { order: dto.order }),
+          ...(dto.order !== undefined && { order: dto.order }),
           ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
         },
         include: TASK_INCLUDE,
@@ -943,8 +976,8 @@ export class TasksService {
     const item = await this.prisma.checklist.create({
       data: {
         taskId: dto.taskId,
-        text:   dto.text,
-        order:  dto.order ?? 0,
+        text: dto.text,
+        order: dto.order ?? 0,
       },
     });
 

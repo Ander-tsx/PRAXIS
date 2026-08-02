@@ -22,6 +22,7 @@ import {
   FindMyTasksDto,
   FindOneTaskDto,
   FindTasksDto,
+  FindTasksByProjectDto,
   MoveTaskDto,
   PurgeTasksDto,
   RestatusTasksDto,
@@ -66,6 +67,12 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_find_mine' })
   findMine(@Payload() dto: FindMyTasksDto) {
     return this.tasksService.findMyTasks(dto);
+  }
+
+  /** Tareas de todo un proyecto (útil para alexa / asistente de voz) */
+  @MessagePattern({ cmd: 'task_find_by_project' })
+  findByProject(@Payload() dto: FindTasksByProjectDto) {
+    return this.tasksService.findTasksByProject(dto);
   }
 
   @MessagePattern({ cmd: 'task_update' })
@@ -192,10 +199,6 @@ export class TasksController {
   }
 
   // ─── Estadísticas ─────────────────────────────────────────────────────────
-  //
-  // Las consume reports-service. Ninguna comprueba permisos: lo hizo el gateway
-  // contra el `projectId` de la ruta antes de llegar hasta aquí, igual que en
-  // `task_purge` y `task_restatus`.
 
   @MessagePattern({ cmd: 'task_stats_snapshot' })
   statsSnapshot(@Payload() dto: { projectId: string }) {

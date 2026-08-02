@@ -15,3 +15,4 @@ export * from './assign-task.dto';
 export * from './create-checklist.dto';
 export * from './toggle-checklist.dto';
 export * from './delete-checklist.dto';
+export * from './find-tasks-by-project.dto';

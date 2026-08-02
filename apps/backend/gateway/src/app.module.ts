@@ -12,6 +12,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
+import { AlexaModule } from './alexa/alexa.module';
 
 
 @Module({
@@ -37,6 +38,7 @@ import { TasksModule } from './tasks/tasks.module';
     NotificationsModule,
     ReportsModule,
     AssistantModule,
+    AlexaModule,
   ],
 })
 

@@ -16,3 +16,4 @@ export {
   RemoveMemberBodyDto,
   RemoveMemberDto,
 } from './member.dto';
+export * from './find-projects-by-member.dto';

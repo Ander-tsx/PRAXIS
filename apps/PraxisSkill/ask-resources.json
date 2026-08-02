@@ -1,0 +1,19 @@
+{
+  "askcliConfigFileVersion": "13",
+  "profiles": {
+    "default": {
+      "skillId": "amzn1.ask.skill.da1cb66f-4442-4e15-af14-0d6628f3da44",
+      "skillMetadata": {
+        "src": "skill-package"
+      },
+      "code": {
+        "default": {
+          "src": "lambda"
+        }
+      },
+      "skillInfrastructure": {
+        "type": "@ask-cli/hosted-skill-deployer"
+      }
+    }
+  }
+}

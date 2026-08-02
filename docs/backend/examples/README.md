@@ -8,11 +8,13 @@ En este directorio se encuentran los archivos de ejemplo detallados para cada un
 
 | Servicio | Puerto TCP | Descripción Breve | Enlace de Ejemplos |
 |---|---|---|---|
-| **Credentials Service** | `3001` | Identidad, credenciales de acceso, perfiles de usuario y sesiones. | [credentials-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/credentials-service.md) |
-| **Roles Service** | `3002` | Roles globales del sistema y permisos de vista de proyectos. | [roles-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/roles-service.md) |
-| **Projects Service** | `3003` | Proyectos, workspaces, boards, columnas, miembros y roles locales. | [projects-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/projects-service.md) |
-| **Tasks Service** | `3004` | Tareas, subtareas y listas de control (checklists) en boards. | [tasks-service.md](file:///c:/Users/cesar/OneDrive/Documentos/utez/9no/ulises/PRAXIS/docs/backend/examples/tasks-service.md) |
+| **Credentials Service** | `3001` | Identidad, credenciales de acceso, perfiles de usuario y sesiones. | [credentials-service.md](./credentials-service.md) |
+| **Roles Service** | `3002` | Roles globales del sistema y permisos de vista de proyectos. | [roles-service.md](./roles-service.md) |
+| **Projects Service** | `3003` | Proyectos, workspaces, boards, columnas, miembros y roles locales. | [projects-service.md](./projects-service.md) |
+| **Tasks Service** | `3004` | Tareas, subtareas y listas de control (checklists) en boards. | [tasks-service.md](./tasks-service.md) |
 | **Reports Service** | `3005` | Agregación, estadística y predicción sobre proyectos y tareas. **No tiene base de datos propia.** | — |
+| **Assistant Service** | `3006` | Asistente de inteligencia artificial y procesamiento de contexto. | — |
+| **Alexa Service** | `3007` | Capa de datos de solo lectura para la skill de voz (vinculación, analítica, equipo). | [alexa-service.md](./alexa-service.md) |
 
 > ⚠️ **Corrección:** esta tabla listaba en el `3005` un «Notifications Service»
 > que **nunca existió**. Las notificaciones se implementaron dentro de

@@ -48,12 +48,6 @@ Compila todos los paquetes del monorepo:
 pnpm build
 ```
 
-Corre el seed inicial (crea el usuario admin y roles base):
-
-```bash
-pnpm seed:credentials
-```
-
 ## Desarrollo
 
 Backend:

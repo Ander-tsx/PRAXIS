@@ -118,4 +118,17 @@ export class UsersService {
 
     return { success: true, id };
   }
+
+  /** Resuelve varios perfiles en una sola llamada (evita N consultas desde otros servicios). */
+  async findByIds(ids: string[]) {
+    const unique = [...new Set(ids)].filter(Boolean);
+    if (unique.length === 0) return [];
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: unique } },
+      include: { credential: { select: { email: true } } },
+    });
+
+    return users;
+  }
 }
