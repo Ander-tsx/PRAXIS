@@ -2,6 +2,7 @@
     "name": "root",
     "private": true,
     "scripts": {
+        "dev:frontend": "turbo run dev --filter='./apps/frontend/*'",
         "dev:cli": "node scripts/dev-cli/index.mjs",
         "build": "turbo run build",
         "lint": "turbo run lint",

@@ -1,19 +1,10 @@
-#!/usr/bin/env node
 import inquirer from "inquirer";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
-import {
-  ROOT,
-  DOCKER_COMPOSE_FILE,
-  SENSITIVE_KEY_RE,
-  label,
-  BACKEND_SERVICES,
-  FRONTEND_APPS,
-  ALL_SERVICES
-} from "./config/index.mjs";
+import { ROOT, DOCKER_COMPOSE_FILE, SENSITIVE_KEY_RE, label, BACKEND_SERVICES, FRONTEND_APPS, FRONTEND_TURBO_SERVICE } from "./config/index.mjs";
 
 const color = (code, text) => `\x1b[${code}m${text}\x1b[0m`;
 
@@ -38,18 +29,21 @@ function parseEnvFile(content) {
 }
 
 function serializeEnv(map) {
-  return `${Array.from(map.entries()).map(([k, v]) => `${k}=${v}`).join("\n")} \n`;
+  return `${Array.from(map.entries()).map(([k, v]) => `${k}=${v}`).join("\n")}\n`;
 }
 
-const ESC = "\x1B";
 function stripClearScreen(text) {
   return text
-    .replace(new RegExp(`${ESC}c`, "g"), "")
-    .replace(new RegExp(`${ESC}\\[[0-9;]*[Hf]`, "g"), "")
-    .replace(new RegExp(`${ESC}\\[[23]?J`, "g"), "");
+    .replace(/\x1Bc/g, "")
+    .replace(/\x1B\[[0-9;]*[Hf]/g, "")
+    .replace(/\x1B\[[23]?J/g, "");
 }
 
 function getDevCommand(svc) {
+  if (svc.startCommand) {
+    return { cmd: svc.startCommand, args: [], cwd: path.join(ROOT, svc.dir), shellString: true };
+  }
+
   const pkgJsonPath = path.join(ROOT, svc.dir, "package.json");
   let devScript = null;
 
@@ -185,7 +179,8 @@ function restartService(svc) {
 }
 
 function stopAll() {
-  for (const svc of ALL_SERVICES) stopService(svc);
+  for (const child of running.values()) child.kill("SIGTERM");
+  running.clear();
 }
 
 function startRepl(selectedServices) {
@@ -211,16 +206,12 @@ function startRepl(selectedServices) {
         break;
       case "stop":
         if (!arg) return console.log(color(31, "uso: stop <servicio|all>"));
-        for (const s of target) {
-          stopService(s);
-        }
+        target.forEach((s) => stopService(s));
         break;
       case "list":
-        for (const s of selectedServices) {
-          console.log(
-            `${prefix(s)}${running.has(s.key) ? color(32, "running") : color(90, "stopped")}`
-          );
-        }
+        selectedServices.forEach((s) =>
+          console.log(`${prefix(s)}${running.has(s.key) ? color(32, "running") : color(90, "stopped")}`)
+        );
         break;
       case "help":
         console.log("rs <servicio|all>  stop <servicio|all>  list  exit");
@@ -252,22 +243,22 @@ async function main() {
     },
   ]);
 
-  const { frontendKeys } = await inquirer.prompt([
+  const { runFrontend } = await inquirer.prompt([
     {
-      type: "checkbox",
-      name: "frontendKeys",
-      message: "Frontend: ¿qué apps quieres levantar?",
-      choices: FRONTEND_APPS.map((s) => ({ name: label(s), value: s.key })),
-      pageSize: 15,
+      type: "confirm",
+      name: "runFrontend",
+      message: "¿Levantar frontend? (todas las apps juntas vía turbo)",
+      default: true,
     },
   ]);
 
-  const selectedKeys = [...backendKeys, ...frontendKeys];
-  const selected = ALL_SERVICES.filter((s) => selectedKeys.includes(s.key));
-  const selectedBackend = selected.filter((s) => BACKEND_SERVICES.includes(s));
+  const selectedBackend = BACKEND_SERVICES.filter((s) => backendKeys.includes(s.key));
 
-  if (selected.length === 0) {
-    console.log(color(33, "No seleccionaste ningún servicio. Saliendo."));
+  const envTargets = [...selectedBackend, ...(runFrontend ? FRONTEND_APPS : [])];
+  const startTargets = [...selectedBackend, ...(runFrontend ? [FRONTEND_TURBO_SERVICE] : [])];
+
+  if (startTargets.length === 0) {
+    console.log(color(33, "No seleccionaste nada para levantar. Saliendo."));
     return;
   }
 
@@ -305,6 +296,7 @@ async function main() {
     },
   ]);
 
+  // 1. Docker
   if (answers.docker === "up") {
     sh(`docker compose -f ${DOCKER_COMPOSE_FILE} up -d`);
   } else if (answers.docker === "restart") {
@@ -313,7 +305,7 @@ async function main() {
   }
 
   if (answers.fillEnv) {
-    for (const svc of selected) await ensureEnvFile(svc);
+    for (const svc of envTargets) await ensureEnvFile(svc);
   }
 
   if (answers.prismaReset) {
@@ -323,11 +315,11 @@ async function main() {
     for (const svc of selectedBackend.filter((s) => s.seed)) prismaSeed(svc);
   }
 
-  buildDependencies(selected);
+  buildDependencies(startTargets);
 
-  for (const svc of selected) startService(svc);
+  for (const svc of startTargets) startService(svc);
 
-  startRepl(selected);
+  startRepl(startTargets);
 }
 
 main().catch((err) => {
