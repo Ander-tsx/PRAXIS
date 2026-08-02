@@ -15,8 +15,30 @@
         "docker:restart": "docker compose -f infra/docker/compose/docker-compose.yml down && docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
         "prisma:reset": "pnpm --filter @praxis/credentials-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/projects-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/permissions-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/tasks-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/assistant-service exec prisma migrate reset --force --skip-seed",
-        "prisma:seed": "pnpm --filter @praxis/permissions-service run prisma:seed && pnpm --filter @praxis/credentials-service run prisma:seed && pnpm --filter @praxis/projects-service run prisma:seed && pnpm --filter @praxis/tasks-service run prisma:seed",
-        "prisma:deploy": "pnpm --filter @praxis/credentials-service exec prisma migrate deploy && pnpm --filter @praxis/projects-service exec prisma migrate deploy && pnpm --filter @praxis/permissions-service exec prisma migrate deploy && pnpm --filter @praxis/tasks-service exec prisma migrate deploy && pnpm --filter @praxis/assistant-service exec prisma migrate deploy"
+        "prisma:seed": "pnpm --filter @praxis/credentials-service run prisma:seed",
+        "prisma:deploy": "pnpm --filter @praxis/credentials-service exec prisma migrate deploy && pnpm --filter @praxis/projects-service exec prisma migrate deploy && pnpm --filter @praxis/permissions-service exec prisma migrate deploy && pnpm --filter @praxis/tasks-service exec prisma migrate deploy && pnpm --filter @praxis/assistant-service exec prisma migrate deploy",
+
+        "setup:shared": "pnpm --filter @praxis/contracts run build && pnpm --filter @praxis/observability run build",
+        "setup:gateway": "pnpm run setup:shared",
+        "dev:gateway": "pnpm run setup:gateway && pnpm --filter @praxis/gateway dev",
+
+        "setup:credentials": "pnpm run setup:shared && pnpm --filter @praxis/credentials-service run prisma:generate",
+        "dev:credentials": "pnpm run setup:credentials && pnpm --filter @praxis/credentials-service dev",
+
+        "setup:projects": "pnpm run setup:shared && pnpm --filter @praxis/projects-service run prisma:generate",
+        "dev:projects": "pnpm run setup:projects && pnpm --filter @praxis/projects-service dev",
+
+        "setup:permissions": "pnpm run setup:shared && pnpm --filter @praxis/permissions-service run prisma:generate",
+        "dev:permissions": "pnpm run setup:permissions && pnpm --filter @praxis/permissions-service dev",
+
+        "setup:tasks": "pnpm run setup:shared && pnpm --filter @praxis/tasks-service run prisma:generate",
+        "dev:tasks": "pnpm run setup:tasks && pnpm --filter @praxis/tasks-service dev",
+
+        "setup:assistant": "pnpm run setup:shared && pnpm --filter @praxis/assistant-service run prisma:generate",
+        "dev:assistant": "pnpm run setup:assistant && pnpm --filter @praxis/assistant-service dev",
+
+        "setup:reports": "pnpm run setup:shared",
+        "dev:reports": "pnpm run setup:reports && pnpm --filter @praxis/reports-service dev"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",
