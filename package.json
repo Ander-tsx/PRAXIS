@@ -2,26 +2,22 @@
     "name": "root",
     "private": true,
     "scripts": {
-        "dev": "turbo run dev",
-        "dev:backend":  "turbo run dev --filter=@praxis/gateway --filter=@praxis/*-service",
-        "dev:frontend": "turbo run dev --filter='./apps/frontend/*'",
+        "dev:cli": "node scripts/dev-cli/index.mjs",
         "build": "turbo run build",
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "biome format --write .",
         "format:check": "biome format .",
-        "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
-        "docker:restart": "docker compose -f infra/docker/compose/docker-compose.yml down && docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
-        "prisma:reset": "pnpm --filter @praxis/credentials-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/projects-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/permissions-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/tasks-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/assistant-service exec prisma migrate reset --force --skip-seed && pnpm --filter @praxis/alexa-service exec prisma migrate reset --force --skip-seed",
-        "prisma:seed": "pnpm --filter @praxis/permissions-service run prisma:seed && pnpm --filter @praxis/credentials-service run prisma:seed && pnpm --filter @praxis/projects-service run prisma:seed && pnpm --filter @praxis/tasks-service run prisma:seed",
-        "prisma:deploy": "pnpm --filter @praxis/credentials-service exec prisma migrate deploy && pnpm --filter @praxis/projects-service exec prisma migrate deploy && pnpm --filter @praxis/permissions-service exec prisma migrate deploy && pnpm --filter @praxis/tasks-service exec prisma migrate deploy && pnpm --filter @praxis/assistant-service exec prisma migrate deploy && pnpm --filter @praxis/alexa-service exec prisma migrate deploy"
+        "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" exec prisma migrate deploy",
+        "prisma:generate": "pnpm --filter \"@praxis/*-service\" exec prisma generate"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",
         "@commitlint/cli": "^19.0.0",
         "@commitlint/config-conventional": "^19.0.0",
+        "inquirer": "^14.0.2",
         "turbo": "^2.0.0"
     },
     "engines": {

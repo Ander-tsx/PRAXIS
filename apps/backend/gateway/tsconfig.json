@@ -24,7 +24,8 @@
         "strictPropertyInitialization": false,
         // `multer` va explícito: `types` es una lista cerrada, y sin él
         // `Express.Multer.File` no existe al compilar los adjuntos.
-        "types": ["node", "jest", "multer"]
+        "types": ["node", "jest", "multer"],
+        "preserveWatchOutput": true
     },
     "include": ["src/**/*"],
     "exclude": ["node_modules", "dist"]
