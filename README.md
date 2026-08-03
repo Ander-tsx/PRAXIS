@@ -195,6 +195,7 @@ pnpm dev:frontend
 
 | Comando | Descripción |
 |---------|-------------|
+| `pnpm dev:cli` | **Asistente interactivo.** Levanta lo que elijas y comprueba que arrancó. |
 | `pnpm dev:frontend` | Levanta las 5 zonas del frontend. |
 | `pnpm build` | Compila todo el monorepo (Turborepo resuelve el orden). |
 | `pnpm lint` | Biome en la raíz, ESLint en `web-shell`. |
@@ -208,8 +209,28 @@ pnpm dev:frontend
 y abortan con `Command "prisma" not found`. Usa los bucles de los pasos 4 y 5
 hasta que se corrijan.
 
-⚠️ `pnpm dev:cli` (asistente interactivo) no arranca el gateway y no incluye
-`reports-service`. Ver `scripts/dev-cli/README` o preguntar a quien lo mantiene.
+### `pnpm dev:cli` — el atajo para el día a día
+
+Hace los pasos 3 a 8 preguntando qué quieres, y **espera a que cada servicio
+responda en su puerto** antes de dar el arranque por bueno. Con nueve procesos
+escupiendo logs a la vez, saber cuál no llegó a levantar es la mitad del
+trabajo.
+
+```bash
+pnpm dev:cli
+```
+
+Trae cuatro presets —todo, mínimo, solo backend, solo frontend— o selección a
+mano. Después deja un prompt:
+
+| Comando | Qué hace |
+|---|---|
+| `status` | Estado real, comprobando los puertos uno a uno. |
+| `rs <servicio\|all>` | Reinicia. Hace falta tras recompilar `contracts`. |
+| `stop` / `start` | Detiene o vuelve a arrancar algo suelto. |
+| `exit` | Detiene todo y sale sin dejar huérfanos. |
+
+Necesita una terminal interactiva: para CI o scripts, los comandos de arriba.
 
 ## Si algo falla
 
