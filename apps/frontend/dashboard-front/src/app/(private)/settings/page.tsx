@@ -7,6 +7,8 @@ import { SettingsSection } from '@/components/molecules/SettingsSection';
 import { ThemeToggle } from '@/components/molecules/ThemeToggle';
 import { BillingSummary } from '@/components/organisms/BillingSummary';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
+import { VoiceLinking } from '@/components/organisms/VoiceLinking';
+import type { VoiceLink } from '@/lib/voice';
 
 export const metadata: Metadata = {
   title: 'Configuración',
@@ -32,11 +34,17 @@ export const metadata: Metadata = {
  * desactivado, para que al menos quede claro de qué cuenta hablamos.
  */
 export default async function SettingsPage() {
-  const [{ profile, roles }, theme, quota] = await Promise.all([
+  /* Cada `catch` deja su bloque en el estado «no se pudo cargar» en vez de
+     tumbar la pantalla entera: que alexa-service esté caído no es motivo para
+     no poder cambiar tu nombre. */
+  const [{ profile, roles }, theme, quota, voiceLinks] = await Promise.all([
     loadCurrentUser(),
     getTheme(),
     createServerApiClient()
       .get<AssistantQuota>('/me/assistant/quota')
+      .catch(() => null),
+    createServerApiClient()
+      .get<VoiceLink[]>('/alexa/links')
       .catch(() => null),
   ]);
 
@@ -63,6 +71,17 @@ export default async function SettingsPage() {
             initialFirstName={profile.firstName ?? ''}
             initialLastName={profile.lastName ?? ''}
           />
+        </SettingsSection>
+
+        {/* Va la segunda, justo detrás de tus datos: es lo único de esta
+            pantalla que habilita algo que no se puede hacer desde ninguna otra
+            parte del producto. Apariencia y Facturación se consultan; esto se
+            usa. */}
+        <SettingsSection
+          title="Praxis Voice"
+          description="Vincula tu cuenta con Alexa para consultar tus proyectos hablando."
+        >
+          <VoiceLinking links={voiceLinks ?? []} sinConexion={voiceLinks === null} />
         </SettingsSection>
 
         <SettingsSection

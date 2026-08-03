@@ -16,6 +16,8 @@ import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { ProjectList } from '@/components/organisms/ProjectList';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
+import { VoiceCallout } from '@/components/organisms/VoiceCallout';
+import { estaActiva, type VoiceLink } from '@/lib/voice';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 
 export const metadata: Metadata = {
@@ -50,10 +52,13 @@ export default async function DashboardPage() {
    */
   const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
 
-  const [page, invitations, dueTasks] = await Promise.all([
+  const [page, invitations, voiceLinks, dueTasks] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
+    /* Si alexa-service no responde no se enseña el aviso: es mejor no decir
+       nada que invitar a vincular contra un servicio que está caído. */
+    api.get<VoiceLink[]>('/alexa/links').catch(() => [] as VoiceLink[]),
     api
       /* `excludeDone`: una tarea que ya está en la columna de cierre —la verde—
          no es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar
@@ -87,6 +92,11 @@ export default async function DashboardPage() {
 
   const name = displayName(profile);
 
+  /* El aviso de voz solo mientras no haya ninguna vinculación viva. Una
+     revocada o caducada no cuenta: si la única que había se revocó, volver a
+     ofrecerlo es justo lo que toca. */
+  const sinVoz = !voiceLinks.some(estaActiva);
+
   return (
     <AppHeader
       title="Panel"
@@ -107,6 +117,11 @@ export default async function DashboardPage() {
           projectsById={new Map(projects.map((project) => [project.id, project]))}
           soonDays={DUE_SOON_DAYS}
         />
+
+        {/* Detrás de invitaciones y avisos de tareas: aquello es trabajo que
+            espera, esto es una función que descubrir. Delante de las métricas
+            porque ahí abajo ya no lo ve nadie. */}
+        {sinVoz && <VoiceCallout />}
 
         {projects.length === 0 ? (
           <DashboardEmptyState
