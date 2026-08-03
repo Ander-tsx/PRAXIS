@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import inquirer from 'inquirer';
@@ -8,23 +8,90 @@ import {
   SENSITIVE_KEY_RE,
   SHARED_BUILD_PACKAGES,
 } from '../config/index.mjs';
-import { aviso, azul, gris, ok, paso } from './ui.mjs';
+import { aviso, azul, gris, ok, rojo, spinner } from './ui.mjs';
 
-/** Ejecuta y deja que la salida fluya. Lanza si el comando falla. */
-export function sh(cmd, opts = {}) {
-  console.log(gris(`  $ ${cmd}`));
-  execSync(cmd, { stdio: 'inherit', cwd: ROOT, ...opts });
+/** `DEBUG=1 pnpm dev:cli` enseña la salida de cada comando en vez de resumirla. */
+const VERBOSO = Boolean(process.env.DEBUG);
+
+/**
+ * Ejecuta un comando y **captura** su salida.
+ *
+ * ⚠️ Es asíncrono a propósito, y no es un capricho: `execSync` bloquea el bucle
+ * de eventos, así que el `setInterval` del spinner no llega a dispararse nunca
+ * y lo que se ve es un spinner congelado en el primer fotograma durante los
+ * cuarenta segundos que tarda un `prisma generate`. Peor que no ponerlo.
+ *
+ * La salida se guarda y solo se enseña si el comando falla. Un arranque que va
+ * bien no necesita mostrar los avisos de deprecación de Prisma seis veces.
+ */
+function ejecutar(cmd, env) {
+  return new Promise((resolve, reject) => {
+    const hijo = spawn(cmd, {
+      cwd: ROOT,
+      shell: true,
+      env: env ?? process.env,
+      stdio: VERBOSO ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+    });
+
+    let salida = '';
+    hijo.stdout?.on('data', (c) => {
+      salida += c.toString();
+    });
+    hijo.stderr?.on('data', (c) => {
+      salida += c.toString();
+    });
+
+    hijo.on('error', reject);
+    hijo.on('exit', (code) => {
+      if (code === 0) return resolve(salida);
+
+      const err = new Error(`«${cmd}» falló con código ${code}`);
+      err.salida = salida;
+      reject(err);
+    });
+  });
 }
+
+/**
+ * Un paso con spinner. Si falla, vuelca lo que el comando había escrito.
+ *
+ * Sin ese volcado el resumen sería una trampa: verías «✖ Clientes de Prisma» y
+ * ni una pista de por qué, que es exactamente el problema que tenía la versión
+ * anterior al tragarse los errores de las rutas mal.
+ */
+async function paso(cmd, etiqueta, { env } = {}) {
+  if (VERBOSO) {
+    console.log(gris(`  $ ${cmd}`));
+    return ejecutar(cmd, env);
+  }
+
+  const sp = spinner(etiqueta);
+
+  try {
+    const salida = await ejecutar(cmd, env);
+    sp.exito();
+    return salida;
+  } catch (err) {
+    sp.fallo();
+    console.log(gris(`    $ ${cmd}`));
+    for (const linea of (err.salida ?? '').trimEnd().split('\n').slice(-15)) {
+      console.log(rojo(`    ${linea}`));
+    }
+    throw err;
+  }
+}
+
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── Docker ──────────────────────────────────────────────────────────────────
 
-export function docker(accion) {
+export async function docker(accion) {
   if (accion === 'skip') return;
 
-  paso('Infraestructura (Postgres + Redis)');
-  if (accion === 'restart') sh(`docker compose -f ${DOCKER_COMPOSE_FILE} down`);
-  sh(`docker compose -f ${DOCKER_COMPOSE_FILE} up -d`);
-  ok('Contenedores arriba');
+  if (accion === 'restart') {
+    await paso(`docker compose -f ${DOCKER_COMPOSE_FILE} down`, 'Parando contenedores');
+  }
+  await paso(`docker compose -f ${DOCKER_COMPOSE_FILE} up -d`, 'Postgres y Redis');
 }
 
 /**
@@ -35,15 +102,20 @@ export function docker(accion) {
  * en esa ventana falla con un error de conexión que parece de configuración y
  * no lo es.
  */
-export function esperarPostgres({ intentos = 30 } = {}) {
+export async function esperarPostgres({ intentos = 30 } = {}) {
+  const sp = spinner('Esperando a que Postgres acepte conexiones');
+
   for (let i = 0; i < intentos; i++) {
     try {
-      execSync('docker exec praxis_postgres pg_isready -U praxis', { stdio: 'ignore' });
+      await ejecutar('docker exec praxis_postgres pg_isready -U praxis');
+      sp.exito('Postgres acepta conexiones');
       return true;
     } catch {
-      execSync('sleep 1');
+      await dormir(1000);
     }
   }
+
+  sp.fallo('Postgres no respondió');
   return false;
 }
 
@@ -55,10 +127,10 @@ export function esperarPostgres({ intentos = 30 } = {}) {
  * ⚠️ Los **dos**. El CLI compilaba solo `contracts` y en un árbol limpio los
  * ocho servicios morían con `Cannot find module '@praxis/observability'`.
  */
-export function compilarCompartidos() {
-  paso('Paquetes compartidos del backend');
-  for (const pkg of SHARED_BUILD_PACKAGES) sh(`pnpm --filter ${pkg} run build`);
-  ok(`${SHARED_BUILD_PACKAGES.join(' y ')} compilados`);
+export async function compilarCompartidos() {
+  for (const pkg of SHARED_BUILD_PACKAGES) {
+    await paso(`pnpm --filter ${pkg} run build`, `Compilando ${pkg.replace('@praxis/', '')}`);
+  }
 }
 
 // ── Prisma ──────────────────────────────────────────────────────────────────
@@ -76,13 +148,12 @@ export function compilarCompartidos() {
  * comando aborta entero con `Command "prisma" not found`. Es el mismo motivo
  * por el que el `prisma:generate` de la raíz está marcado como roto.
  */
-export function prismaGenerate(servicios) {
+export async function prismaGenerate(servicios) {
   const conPrisma = servicios.filter((s) => s.prisma);
-  if (conPrisma.length === 0) return;
 
-  paso('Clientes de Prisma');
-  for (const svc of conPrisma) sh(`pnpm --filter ${svc.pkg} exec prisma generate`);
-  ok(`${conPrisma.length} cliente(s) generado(s)`);
+  for (const svc of conPrisma) {
+    await paso(`pnpm --filter ${svc.pkg} exec prisma generate`, `Cliente Prisma · ${svc.key}`);
+  }
 }
 
 /**
@@ -92,17 +163,17 @@ export function prismaGenerate(servicios) {
  * `migrate reset` cuando cree que lo pide un agente. Aquí lo ha pedido una
  * persona, por un menú que ya avisó de que borra los datos.
  */
-export function prismaReset(servicios) {
+export async function prismaReset(servicios) {
   const conPrisma = servicios.filter((s) => s.prisma);
-  if (conPrisma.length === 0) return;
+  const env = { ...process.env, PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: '1' };
 
-  paso('Recreando las tablas');
   for (const svc of conPrisma) {
-    sh(`pnpm --filter ${svc.pkg} exec prisma migrate reset --force --skip-seed`, {
-      env: { ...process.env, PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION: '1' },
-    });
+    await paso(
+      `pnpm --filter ${svc.pkg} exec prisma migrate reset --force --skip-seed`,
+      `Recreando tablas · ${svc.key}`,
+      { env },
+    );
   }
-  ok(`${conPrisma.length} base(s) recreada(s)`);
 }
 
 /**
@@ -113,16 +184,17 @@ export function prismaReset(servicios) {
  * los servicios en el menú, que es el orden en que el usuario marcó las
  * casillas. Con suerte funcionaba.
  */
-export function prismaSeed(servicios) {
+export async function prismaSeed(servicios) {
   const conSeed = servicios
     .filter((s) => s.seedOrder !== null && s.seedOrder !== undefined)
     .sort((a, b) => a.seedOrder - b.seedOrder);
 
   if (conSeed.length === 0) return;
 
-  paso(`Seeds (${conSeed.map((s) => s.key).join(' → ')})`);
-  for (const svc of conSeed) sh(`pnpm --filter ${svc.pkg} run prisma:seed`);
-  ok(`${conSeed.length} seed(s) ejecutado(s)`);
+  console.log(gris(`  Orden: ${conSeed.map((s) => s.key).join(' → ')}`));
+  for (const svc of conSeed) {
+    await paso(`pnpm --filter ${svc.pkg} run prisma:seed`, `Sembrando · ${svc.key}`);
+  }
 }
 
 // ── Archivos de entorno ─────────────────────────────────────────────────────
@@ -153,9 +225,6 @@ const escribirEnv = (mapa) =>
  * **`.env.local`**. Next no lee `.env` en desarrollo, así que rellenar ese
  * archivo era escribir uno que nadie abre; el síntoma llegaba mucho después,
  * como un `GATEWAY_URL` undefined en la primera petición.
- *
- * Devuelve qué hizo, para poder resumirlo al final en vez de soltar una línea
- * por servicio en mitad del arranque.
  */
 export async function completarEnv(svc) {
   const dir = path.join(ROOT, svc.dir);
@@ -172,7 +241,7 @@ export async function completarEnv(svc) {
   const faltan = [...ejemplo.keys()].filter((k) => !actual.has(k));
   if (faltan.length === 0) return { key: svc.key, estado: 'ok' };
 
-  console.log(`\n${azul(`  ${svc.key}`)} ${gris(`· faltan ${faltan.length} variable(s) en ${svc.envFile ?? '.env'}`)}`);
+  console.log(`\n  ${azul(svc.key)} ${gris(`· faltan ${faltan.length} variable(s) en ${svc.envFile ?? '.env'}`)}`);
 
   for (const clave of faltan) {
     const porDefecto = ejemplo.get(clave);
@@ -188,7 +257,7 @@ export async function completarEnv(svc) {
   }
 
   fs.writeFileSync(destino, escribirEnv(actual));
-  return { key: svc.key, estado: 'completado', añadidas: faltan.length };
+  return { key: svc.key, estado: 'completado', anadidas: faltan.length };
 }
 
 /**

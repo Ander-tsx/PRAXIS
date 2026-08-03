@@ -45,7 +45,7 @@ import {
   prismaSeed,
   revisarEnvFaltantes,
 } from './lib/steps.mjs';
-import { ambar, azul, banner, error, gris, negrita, ok, paso, rojo, tabla, titulo, verde } from './lib/ui.mjs';
+import { ambar, aviso, azul, banner, caja, cian, error, gris, listaViva, negrita, ok, rojo, tabla, titulo, verde } from './lib/ui.mjs';
 
 // ── Comprobaciones previas ──────────────────────────────────────────────────
 
@@ -205,47 +205,134 @@ async function revisarPuertosOcupados(servicios) {
   return seguir;
 }
 
-/** Arranca todo y espera a que cada puerto conteste, informando de cuál no llegó. */
-async function arrancarYEsperar(servicios) {
+/**
+ * Reintenta una vez los servicios que cayeron por la carrera del cliente Prisma.
+ *
+ * ## Qué carrera
+ *
+ * `nest start --watch` limpia `dist/` al arrancar y copia después los assets,
+ * entre ellos el cliente de Prisma generado. Si el proceso llega a `require`
+ * antes de que termine esa copia, muere con
+ * `Cannot find module '../generated/prisma-client'` — aunque el cliente esté
+ * perfectamente generado. Con ocho servicios compitiendo por el disco a la vez,
+ * pasa a menudo, y siempre a uno o dos distintos.
+ *
+ * El arreglo documentado es «reinicia y vuelve a mirar; a la segunda levantan».
+ * Eso es exactamente lo que hace esto, en vez de pedírselo a quien mira.
+ *
+ * ⚠️ **Solo reintenta ante ese error concreto y solo una vez.** Un reintento
+ * ciego convertiría un fallo real —falta el `.env`, el puerto está cogido— en
+ * dos fallos y el doble de espera, y el mensaje seguiría sin aparecer.
+ */
+async function reintentarCarreraDePrisma(resultados, buffers) {
+  const esLaCarrera = (key) =>
+    (buffers.get(key) ?? []).join('').includes('generated/prisma-client');
+
+  const reintentables = resultados.filter((r) => !r.listo && esLaCarrera(r.svc.key));
+  if (reintentables.length === 0) return resultados;
+
+  console.log();
+  aviso(
+    `Carrera del arranque en: ${reintentables.map((r) => r.svc.key).join(', ')} — reintentando`,
+  );
+  console.log(gris('  nest limpia dist/ y arranca antes de copiar el cliente de Prisma.\n'));
+
+  const lista = listaViva(reintentables.map((r) => ({ key: r.svc.key })));
+
+  const nuevos = await Promise.all(
+    reintentables.map(async ({ svc }) => {
+      buffers.set(svc.key, []);
+      await reiniciar(svc);
+
+      const puertos = svc.puertosVigilados ?? [svc.port];
+      const tiempos = await Promise.all(puertos.map((p) => esperarPuerto(p)));
+      const listo = tiempos.every((t) => t !== null);
+      const ms = Math.max(...tiempos.map((t) => t ?? 0));
+
+      lista.resolver(svc.key, listo ? 'listo' : 'fallo', gris(`:${puertos.join(' :')}  ${(ms / 1000).toFixed(1)}s`));
+      return { svc, ms, listo };
+    }),
+  );
+
+  lista.terminar();
+
+  const porClave = new Map(nuevos.map((r) => [r.svc.key, r]));
+  return resultados.map((r) => porClave.get(r.svc.key) ?? r);
+}
+
+/**
+ * Arranca todo y espera a que cada puerto conteste.
+ *
+ * ## Por qué se silencian los logs durante el arranque
+ *
+ * Nueve procesos compilando a la vez escupen varios cientos de líneas, y entre
+ * ellas no se distingue lo que importa —quién ha levantado y quién no— de los
+ * avisos de deprecación. Durante la espera, la salida se guarda en memoria y en
+ * pantalla solo queda la lista viva.
+ *
+ * **Nada se pierde**: al terminar se vuelca lo de quien haya fallado, que es
+ * justo lo que hace falta leer, y el resto queda disponible con `logs <clave>`.
+ * A partir de ahí la salida vuelve a fluir en directo.
+ */
+async function arrancarYEsperar(servicios, buffers) {
   titulo('Arrancando');
 
+  /* Se guarda por servicio en vez de en una sola cinta para poder enseñar la de
+     uno concreto luego. La etiqueta ya viene puesta desde proc.mjs. */
+  usarEscritor((texto) => {
+    const clave = texto.match(/^\x1b?\[?[0-9;]*m?\[([a-z-]+)\]/)?.[1];
+    const destino = buffers.get(clave) ?? buffers.get('_otros');
+    destino.push(texto);
+  });
+
   for (const svc of servicios) {
-    paso(`${svc.key} ${gris(svc.descripcion ?? '')}`);
+    if (!buffers.has(svc.key)) buffers.set(svc.key, []);
     arrancar(svc);
   }
 
-  console.log(gris('\n  Esperando a que respondan…\n'));
+  const lista = listaViva(
+    servicios.map((s) => ({ key: s.key, detalle: gris(s.descripcion ?? '') })),
+  );
 
   const esperas = servicios.map(async (svc) => {
     const puertos = svc.puertosVigilados ?? (svc.port ? [svc.port] : []);
-    if (puertos.length === 0) return { svc, ms: 0, listo: true };
+    if (puertos.length === 0) {
+      lista.resolver(svc.key, 'listo', gris('sin puerto que vigilar'));
+      return { svc, ms: 0, listo: true };
+    }
 
     const tiempos = await Promise.all(puertos.map((p) => esperarPuerto(p)));
     const listo = tiempos.every((t) => t !== null);
+    const ms = Math.max(...tiempos.map((t) => t ?? 0));
 
-    return { svc, ms: Math.max(...tiempos.map((t) => t ?? 0)), listo };
+    lista.resolver(
+      svc.key,
+      listo ? 'listo' : 'fallo',
+      listo ? gris(`:${puertos.join(' :')}  ${(ms / 1000).toFixed(1)}s`) : '',
+    );
+
+    return { svc, ms, listo };
   });
 
-  const resultados = await Promise.all(esperas);
+  let resultados = await Promise.all(esperas);
+  lista.terminar();
 
-  console.log();
-  tabla(
-    ['SERVICIO', 'PUERTO', 'ESTADO', 'TIEMPO'],
-    resultados.map(({ svc, ms, listo }) => [
-      azul(svc.key),
-      gris((svc.puertosVigilados ?? [svc.port]).join(', ')),
-      listo ? verde('listo') : rojo('no responde'),
-      gris(listo ? `${(ms / 1000).toFixed(1)}s` : '—'),
-    ]),
-  );
+  resultados = await reintentarCarreraDePrisma(resultados, buffers);
 
   const caidos = resultados.filter((r) => !r.listo);
+
   if (caidos.length > 0) {
     console.log();
     error(`No llegaron a levantar: ${caidos.map((r) => r.svc.key).join(', ')}`);
-    console.log(gris('  Mira sus líneas más arriba. Lo más habitual en un clon nuevo:'));
+    console.log(gris('  Sus últimas líneas:\n'));
+
+    for (const { svc } of caidos) {
+      for (const linea of (buffers.get(svc.key) ?? []).slice(-12)) process.stdout.write(linea);
+    }
+
+    console.log(gris('\n  Lo más habitual en un clon nuevo:'));
     console.log(gris("  · Cannot find module '../generated/prisma-client'  → responde sí a «generar clientes»"));
-    console.log(gris("  · Cannot find module '@praxis/contracts'           → se compila solo al arrancar"));
+    console.log(gris("  · Cannot find module '@praxis/observability'       → se compila solo al arrancar"));
     console.log(gris('  · falta el .env                                    → responde sí a «completar .env»'));
   }
 
@@ -259,6 +346,7 @@ const AYUDA = `
   ${negrita('stop')} <servicio|all>   detiene
   ${negrita('start')} <servicio|all>  vuelve a arrancar algo detenido
   ${negrita('status')}                estado y puertos, comprobados de verdad
+  ${negrita('logs')} <servicio>       lo que escribió durante el arranque
   ${negrita('help')}                  esto
   ${negrita('exit')}                  detiene todo y sale
 `;
@@ -288,7 +376,7 @@ async function mostrarEstado(servicios) {
   console.log();
 }
 
-function iniciarRepl(servicios) {
+function iniciarRepl(servicios, buffers) {
   console.log(gris(`\nEscribe ${negrita('help')}${gris(' para ver los comandos.')}\n`));
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: azul('praxis> ') });
@@ -300,6 +388,7 @@ function iniciarRepl(servicios) {
    * `rl.prompt()` conserva lo que llevaras tecleado: sin él, cada línea de log
    * —y hay nueve servicios escribiendo— te borraba el comando a medias.
    */
+  /* Se acabó el buffering del arranque: a partir de aquí, en directo. */
   usarEscritor((texto) => {
     readline.cursorTo(process.stdout, 0);
     readline.clearLine(process.stdout, 0);
@@ -341,6 +430,30 @@ function iniciarRepl(servicios) {
         case 'status':
           await mostrarEstado(servicios);
           break;
+
+        case 'logs': {
+          /* Lo que se guardó mientras arrancaba. Después de esa fase la salida
+             va en directo, así que esto es el historial del arranque, que es
+             justo el trozo que se pierde y el que suele explicar un fallo. */
+          if (!arg) {
+            console.log(rojo('uso: logs <servicio>'));
+            console.log(gris(`servicios: ${servicios.map((s) => s.key).join(', ')}`));
+            break;
+          }
+          const guardado = buffers.get(arg);
+          if (!guardado) {
+            console.log(rojo(`no conozco «${arg}»`));
+            break;
+          }
+          if (guardado.length === 0) {
+            console.log(gris(`${arg} no escribió nada durante el arranque`));
+            break;
+          }
+          console.log(gris(`\n── ${arg}: arranque (${guardado.length} líneas) ──\n`));
+          for (const l of guardado.slice(-60)) process.stdout.write(l);
+          console.log();
+          break;
+        }
 
         case 'help':
           console.log(AYUDA);
@@ -412,18 +525,16 @@ async function main() {
 
   titulo('Preparando');
 
-  docker(respuestas.docker);
+  await docker(respuestas.docker);
 
   if (respuestas.docker !== 'skip' && backend.some((s) => s.prisma)) {
-    if (!esperarPostgres()) {
+    if (!(await esperarPostgres())) {
       error('Postgres no aceptó conexiones. ¿Está bien el contenedor?');
       process.exit(1);
     }
-    ok('Postgres acepta conexiones');
   }
 
   if (respuestas.env) {
-    paso('Archivos de entorno');
     const resultados = [];
     for (const svc of objetivosDeEnv) resultados.push(await completarEnv(svc));
 
@@ -432,11 +543,11 @@ async function main() {
 
     ok(
       completados.length > 0
-        ? `${completados.length} archivo(s) completado(s)`
-        : 'Todos los .env estaban completos',
+        ? `Archivos de entorno · ${completados.length} completado(s)`
+        : 'Archivos de entorno · todos completos',
     );
     if (sinPlantilla.length > 0) {
-      console.log(gris(`  Sin .env.example ni .env: ${sinPlantilla.map((r) => r.key).join(', ')}`));
+      console.log(gris(`    Sin .env.example ni .env: ${sinPlantilla.map((r) => r.key).join(', ')}`));
     }
   }
 
@@ -444,27 +555,37 @@ async function main() {
 
   /* Antes que Prisma: sus esquemas no dependen de esto, pero los servicios sí,
      y compilar primero deja el árbol coherente si algo falla a mitad. */
-  if (backend.length > 0) compilarCompartidos();
+  if (backend.length > 0) await compilarCompartidos();
 
-  if (respuestas.generate) prismaGenerate(backend);
-  if (respuestas.reset) prismaReset(backend);
-  if (respuestas.seed) prismaSeed(backend);
+  if (respuestas.generate) await prismaGenerate(backend);
+  if (respuestas.reset) await prismaReset(backend);
+  if (respuestas.seed) await prismaSeed(backend);
 
   if (!(await revisarPuertosOcupados(objetivosDeArranque))) {
     console.log(ambar('\nCancelado. Libera los puertos y vuelve a lanzarlo.'));
     return;
   }
 
-  await arrancarYEsperar(objetivosDeArranque);
+  /* Un buffer por servicio, compartido entre el arranque y el comando `logs`. */
+  const buffers = new Map([['_otros', []]]);
 
-  if (frontend) {
-    console.log(`\n  ${negrita('Entra por')} ${azul('http://localhost:4100')}`);
-  }
+  const resultados = await arrancarYEsperar(objetivosDeArranque, buffers);
+  const arriba = resultados.filter((r) => r.listo).length;
+
+  console.log();
+  const lineas = [];
+  if (frontend) lineas.push(`${negrita('Entra por')}  ${cian('http://localhost:4100')}`);
   if (backend.some((s) => s.key === 'gateway')) {
-    console.log(`  ${negrita('Swagger')}   ${azul('http://localhost:3000/api/docs')}`);
+    lineas.push(`${negrita('Swagger')}    ${cian('http://localhost:3000/api/docs')}`);
   }
+  if (backend.some((s) => s.seedOrder !== null)) {
+    lineas.push(gris('admin@praxis.dev · Admin@12345!'));
+  }
+  lineas.push(gris(`${arriba} de ${resultados.length} arriba`));
 
-  iniciarRepl(objetivosDeArranque);
+  caja(lineas, arriba === resultados.length ? verde : ambar);
+
+  iniciarRepl(objetivosDeArranque, buffers);
 }
 
 main().catch(async (err) => {
