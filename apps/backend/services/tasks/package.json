@@ -21,7 +21,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
+    "prisma:seed": "pnpm run prisma:seed:base && pnpm run prisma:seed:events",
+    "prisma:seed:base": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+    "prisma:seed:events": "ts-node -r tsconfig-paths/register prisma/seed-events.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

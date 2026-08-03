@@ -25,7 +25,15 @@
  * no puede colisionar con ninguna persona real. Con eso la API sabe contarlos y
  * la interfaz puede avisar de que ese proyecto no mide trabajo real.
  *
- * Se ejecuta a mano:
+ * ## Cuándo se ejecuta
+ *
+ * **Va enganchado a `prisma:seed` de este servicio**, detrás del seed normal.
+ * Antes se lanzaba a mano y el resultado era que una base recién sembrada
+ * enseñaba Análisis vacío: el estado por defecto del producto era el estado
+ * roto. Como el seed de tasks es el último de los cuatro, aquí ya existen las
+ * personas y los proyectos de los que esto tira.
+ *
+ * Sigue valiendo suelto, que es lo cómodo para regenerar solo el historial:
  *   pnpm --filter @praxis/tasks-service exec ts-node -r tsconfig-paths/register prisma/seed-events.ts
  */
 
@@ -43,8 +51,21 @@ import { PrismaClient } from '../src/generated/prisma-client';
 const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 
 const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
-const SEMANAS = 8;
-const TAREAS = 60;
+
+/**
+ * Cuánto historial se fabrica.
+ *
+ * **16 semanas y no 8.** `weekly` acepta hasta 52 y dibuja una serie: con ocho
+ * puntos el gráfico es un boceto, y la mitad de esa ventana son las dos semanas
+ * que `forecast` exige como mínimo, así que no quedaba margen para *ver* una
+ * tendencia —solo para que el endpoint dejara de decir que no hay datos.
+ *
+ * Con 180 tareas, `cycle-time` tiene muestras de sobra para que p50 y p85 se
+ * separen de verdad en vez de salir pegados por falta de cola, y la predicción
+ * de Monte Carlo se remuestrea sobre ~110 días de ritmo observado.
+ */
+const SEMANAS = 16;
+const TAREAS = 180;
 
 const DIA = 86_400_000;
 
@@ -68,6 +89,23 @@ const TITULOS = [
   'Reducir el tamaño del paquete de la landing',
   'Arreglar el foco al cerrar el diálogo',
   'Normalizar los saltos de línea en los comentarios',
+  'Paginar el listado de actividad del proyecto',
+  'Separar el cliente de Redis en su propio módulo',
+  'Traducir los mensajes de error del formulario de alta',
+  'Añadir reintento con espera al cliente del gateway',
+  'Medir el tiempo de respuesta del tablero en producción',
+  'Recortar el tamaño de las imágenes del onboarding',
+  'Revisar los contrastes del tema claro',
+  'Cerrar la sesión al caducar el refresh token',
+  'Agrupar las migraciones sueltas del último mes',
+  'Cachear el conteo de avisos sin leer',
+  'Quitar el scroll horizontal de la tabla de miembros',
+  'Validar el tamaño del adjunto antes de subirlo',
+  'Extraer los tokens de color a un único archivo',
+  'Ordenar las columnas por posición y no por id',
+  'Escribir las pruebas del guard de permisos',
+  'Documentar el flujo de renovación de sesión',
+  'Corregir el huso horario en las fechas de vencimiento',
 ];
 
 const PRIORIDADES = ['LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'HIGH', 'URGENT'] as const;
@@ -275,9 +313,20 @@ async function main() {
   let cerradas = 0;
 
   for (let i = 0; i < TAREAS; i++) {
-    /* Nacimiento repartido por las primeras seis semanas, para que siempre haya
-       trabajo entrando y el flujo acumulado no sea un escalón. */
-    const nacida = new Date(inicio.getTime() + entre(0, SEMANAS * 0.75 * 7) * DIA);
+    /**
+     * Nacimiento repartido por **toda** la ventana, hasta anteayer.
+     *
+     * ⚠️ Antes se cortaba al 75 % del periodo. Con 8 semanas eso dejaba dos sin
+     * altas, que pasaba desapercibido; con 16 son cuatro, y el resultado era que
+     * `weekly` —la tarjeta de «cómo fue la semana»— salía con la semana en curso
+     * y la anterior a cero, `variacion` a `null` y el ritmo diario plano. Es
+     * decir: justo el estado vacío que este archivo existe para evitar, solo que
+     * cuatro semanas más tarde.
+     *
+     * El colchón de dos días es para que las últimas tareas creadas tengan
+     * margen de moverse una vez y no nazcan ya paradas en la primera columna.
+     */
+    const nacida = new Date(inicio.getTime() + entre(0, SEMANAS * 7 - 2) * DIA);
     const titulo = `${azar(TITULOS)} (${i + 1})`;
     const prioridad = azar(PRIORIDADES);
 

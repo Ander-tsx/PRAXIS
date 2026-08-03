@@ -138,8 +138,19 @@ Solo esos cuatro servicios tienen seed. Deja la base con:
 | `maria@praxis.dev` | `User@12345!` | User |
 | `carlos@praxis.dev` | `User@12345!` | User |
 
-Más un proyecto de demostración con 1 espacio, 1 tablero de 4 columnas y 7 tareas
-con etiquetas, checklists y comentarios.
+Más **dos proyectos**:
+
+- **Proyecto PRAXIS Demo** — 1 espacio, 1 tablero de 4 columnas y 7 tareas con
+  etiquetas, checklists y comentarios.
+- **Sprint histórico (datos de demostración)** — 180 tareas y 16 semanas de
+  historial fabricado, que es lo que necesita la sección de **Análisis** para
+  tener algo que enseñar. El historial solo se captura hacia adelante, así que
+  sin esto los siete informes salen vacíos en una base recién creada. Lo genera
+  `prisma/seed-events.ts`, enganchado al `prisma:seed` de tasks-service.
+
+⚠️ Los eventos del segundo llevan `actorId = 00000000-0000-0000-0000-000000000000`:
+son sintéticos y no miden trabajo real. Para regenerar solo ese historial:
+`pnpm --filter @praxis/tasks-service run prisma:seed:events`.
 
 ## 7. Compilar el monorepo
 
