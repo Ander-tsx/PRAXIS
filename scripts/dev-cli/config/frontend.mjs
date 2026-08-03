@@ -10,5 +10,5 @@ export const FRONTEND_TURBO_SERVICE = {
   seed: false,
   color: 96,
   buildDeps: [],
-  startCommand: "turbo run dev --filter='./apps/frontend/*'",
+  startCommand: 'turbo run dev --filter="./apps/frontend/*"',
 };

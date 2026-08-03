@@ -922,7 +922,7 @@ Checklist, salida de montar esta:
    `<ZONA>_FRONT_URL` en su `.env.local`.
 
 `pnpm dev:frontend` la recoge sola: el filtro es por directorio
-(`--filter='./apps/frontend/*'`), no una lista de paquetes.
+(`--filter="./apps/frontend/*"`), no una lista de paquetes.
 
 ### 17.8 Verificado en navegador real
 
