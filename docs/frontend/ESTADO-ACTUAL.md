@@ -1472,7 +1472,7 @@ Al darle entrada propia había dos caminos, y se eligió el primero:
 | Configuración enlaza a «Tus datos» | ❌ Una pantalla cuyo único contenido es un enlace a otra es un salto de más |
 | Las dos rutas, con el mismo formulario | ❌ Dos sitios donde editar lo mismo, y el segundo se queda atrás |
 
-`/dashboard/perfil` queda como **redirect** a `/dashboard/configuracion`. No es
+`/dashboard/perfil` queda como **redirect** a `/dashboard/settings`. No es
 por compatibilidad con nadie de dentro —los enlaces internos ya apuntan al sitio
 nuevo— sino por los marcadores y los enlaces compartidos, que no se pueden
 corregir desde aquí.
@@ -1493,7 +1493,7 @@ hacer sin inventar el endpoint.
 
 Verificado en el navegador: entrada nueva con su icono, resaltado correcto (la
 regla del prefijo más largo de `NavList` ya lo resolvía), `/dashboard/perfil`
-aterriza en `/dashboard/configuracion`, y guardar el apellido confirma contra el
+aterriza en `/dashboard/settings`, y guardar el apellido confirma contra el
 `data` y **actualiza el nombre de la barra lateral** — que vive en el layout, y
 lo alcanza `revalidatePath('/configuracion')`.
 

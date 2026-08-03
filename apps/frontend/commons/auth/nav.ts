@@ -3,7 +3,7 @@ import type { NotificationPage } from '../api/domain';
 import { createServerApiClient } from './server-client';
 
 /** Href de la bandeja. En un solo sitio para no repetir la cadena. */
-const NOTIFICATIONS_HREF = '/dashboard/notificaciones';
+const NOTIFICATIONS_HREF = '/dashboard/notifications';
 
 /**
  * La navegación del área privada con el contador de notificaciones puesto.

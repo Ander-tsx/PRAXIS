@@ -2,7 +2,7 @@
 
 import { Button, Input, alpha, colors } from '@praxis/commons';
 import { useActionState, useId, useState } from 'react';
-import { updateProfileAction } from '@/app/(private)/configuracion/actions';
+import { updateProfileAction } from '@/app/(private)/settings/actions';
 import { UPDATE_PROFILE_INITIAL_STATE } from '@/lib/action-state';
 import { NAME_MAX, validateProfile } from '@/lib/validation';
 

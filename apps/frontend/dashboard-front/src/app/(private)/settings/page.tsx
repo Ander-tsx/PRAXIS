@@ -19,7 +19,9 @@ export const metadata: Metadata = {
  * entrada nueva en la barra lateral que llevara a una pantalla cuyo único
  * contenido fuese un enlace a «Tus datos» es un salto de más; y dejar las dos
  * rutas con el mismo formulario serían dos sitios donde editar lo mismo.
- * `/perfil` queda como redirect, solo por los enlaces que ya estuvieran por ahí.
+ * `/dashboard/perfil` queda como redirect, solo por los enlaces que ya
+ * estuvieran por ahí — y en español a propósito: es la cadena que la gente
+ * pudo guardar, no una ruta del producto.
  *
  * Está montada como una **pila de secciones** desde el primer día, con una sola
  * dentro. Es donde van los ajustes que vengan después, y esa es la razón de que

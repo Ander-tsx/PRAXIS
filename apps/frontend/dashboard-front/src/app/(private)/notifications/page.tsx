@@ -83,8 +83,8 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
           total={inbox.total}
           hrefFor={(n) =>
             n > 1
-              ? `/dashboard/notificaciones?page=${n}`
-              : '/dashboard/notificaciones'
+              ? `/dashboard/notifications?page=${n}`
+              : '/dashboard/notifications'
           }
           nombre="avisos"
         />

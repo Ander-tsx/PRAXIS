@@ -65,10 +65,10 @@ export async function updateProfileAction(
   }
 
   // Sin el basePath: son rutas del App Router de esta app, donde el panel es
-  // `/` y esta pantalla `/configuracion`. El nombre se ve en las dos, y también
+  // `/` y esta pantalla `/settings`. El nombre se ve en las dos, y también
   // en la barra lateral, que vive en el layout y lo recibe del mismo perfil.
   revalidatePath('/');
-  revalidatePath('/configuracion');
+  revalidatePath('/settings');
 
   return { error: null, savedName: firstName };
 }
@@ -80,7 +80,7 @@ export async function updateProfileAction(
  * microservicio, es una preferencia de la interfaz— así que no hay `data` que
  * confirmar: escribir la cookie y que el layout la relea es la confirmación.
  *
- * `revalidatePath('/', 'layout')` y no solo `'/configuracion'`: el `data-theme`
+ * `revalidatePath('/', 'layout')` y no solo `'/settings'`: el `data-theme`
  * lo estampa el `RootLayout`, que envuelve toda la zona, no la page. Sin el
  * segundo argumento, `revalidatePath` solo invalida ese segmento y el `<html>`
  * se queda con el tema viejo hasta la próxima navegación completa.

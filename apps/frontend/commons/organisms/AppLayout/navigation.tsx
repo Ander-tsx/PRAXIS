@@ -92,7 +92,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Notificaciones',
-    href: '/dashboard/notificaciones',
+    href: '/dashboard/notifications',
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -106,14 +106,14 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     /**
      * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
-     * registro no pide— y por eso **absorbió `/dashboard/perfil`** en vez de
+     * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.
      *
      * Va la última a propósito: es la entrada a la que se vuelve de vez en
      * cuando, no una por la que se pasa a diario.
      */
     label: 'Configuración',
-    href: '/dashboard/configuracion',
+    href: '/dashboard/settings',
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path

@@ -7,7 +7,7 @@ import type { AppNavItem } from './navigation';
  * El enlace activo es el que **más** coincide con la ruta, no cualquiera que sea
  * prefijo suyo.
  *
- * Con la comparación por prefijo a secas, en `/dashboard/notificaciones` se
+ * Con la comparación por prefijo a secas, en `/dashboard/notifications` se
  * encendían dos a la vez: «Panel» (`/dashboard`) y «Notificaciones». Ganar por
  * longitud resuelve el caso general —una sección dentro de otra— sin listar
  * excepciones, y sigue haciendo lo correcto con una pantalla que **no** tiene

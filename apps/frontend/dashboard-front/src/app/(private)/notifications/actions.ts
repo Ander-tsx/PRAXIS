@@ -21,7 +21,7 @@ async function requireApi() {
 
 /** Revalida la bandeja y el panel, que comparten la insignia de no leídos. */
 function revalidateInbox() {
-  revalidatePath('/notificaciones');
+  revalidatePath('/notifications');
   revalidatePath('/');
 }
 

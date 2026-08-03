@@ -19,8 +19,8 @@ export interface AppShellProps {
    * Ruta pública de la zona (`/dashboard`, `/projects`).
    *
    * ⚠️ Hace falta porque `usePathname()` devuelve la ruta **sin el basePath**:
-   * dentro de dashboard-front, `/dashboard/notificaciones` llega como
-   * `/notificaciones`, y los enlaces de la barra lateral son rutas del shell.
+   * dentro de dashboard-front, `/dashboard/notifications` llega como
+   * `/notifications`, y los enlaces de la barra lateral son rutas del shell.
    * La zona sabe cuál es su prefijo; este componente no.
    */
   zonePath: string;
