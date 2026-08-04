@@ -1,6 +1,8 @@
 'use client';
 
-import { type Project, alpha, colors } from '@praxis/commons';
+import { type Project, alpha, colors,
+  reportPath,
+} from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -54,7 +56,7 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
     /* Sin el basePath: Next añade `/reports`. `push` y no `replace` para que el
        botón atrás devuelva al proyecto anterior, que es lo que se espera al
        estar comparando. */
-    router.push(`/${slug}`);
+    router.push(reportPath({ slug }));
   }
 
   return (

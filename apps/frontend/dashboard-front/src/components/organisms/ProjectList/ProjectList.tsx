@@ -1,4 +1,6 @@
-import { Badge, type Project, alpha, colors } from '@praxis/commons';
+import { Badge, type Project, alpha, colors,
+  projectHref,
+} from '@praxis/commons';
 
 export interface ProjectListProps {
   projects: Project[];
@@ -50,7 +52,7 @@ export function ProjectList({ projects, currentUserId }: ProjectListProps) {
         {projects.map((project) => (
           <li key={project.id} className="flex">
             <a
-              href={`/projects/${project.slug}`}
+              href={projectHref(project)}
               className="group flex w-full flex-col gap-3 rounded-xl border border-border bg-surface p-5 transition-[border-color,transform] duration-150 hover:-translate-y-0.5 hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <div className="flex flex-col gap-1.5">

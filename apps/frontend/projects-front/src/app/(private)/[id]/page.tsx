@@ -11,6 +11,7 @@ import {
   type Task,
   type UserProfile,
   tabLinkClasses,
+  projectPath,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -262,7 +263,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
               /* Misma zona: sin el basePath, Next añade `/projects`.
                  Con el `id` en vez del `slug`, cambiar de pestaña reescribía
                  una URL bonita por el UUID. */
-              href={`/${project.slug}?tab=${t.id}`}
+              href={projectPath(project, { tab: t.id as TabId })}
               aria-current={isActive ? 'page' : undefined}
               className={tabLinkClasses(isActive)}
               /* Sustituye la entrada en el historial: cambiar de pestaña no

@@ -6,6 +6,7 @@ import {
   alpha,
   checklistProgress,
   colors,
+  projectHref,
 } from '@praxis/commons';
 import { NoticePanel } from '@/components/molecules/NoticePanel';
 
@@ -97,12 +98,7 @@ function TaskRows({
              * tarea directamente.
              */}
             <a
-              /* El slug sale del mapa de proyectos que ya recibe este
-                 componente, así que no cuesta una petición. Si por lo que sea
-                 el proyecto no está en el mapa, se cae al UUID: la ruta acepta
-                 las dos formas, así que el enlace sigue funcionando —solo se ve
-                 más feo. */
-              href={`/projects/${projectsById.get(task.projectId)?.slug ?? task.projectId}?board=${task.boardId}&task=${task.id}`}
+              href={hrefDeTarea(task, projectsById)}
               className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ background: alpha(colors.border, 30) }}
             >
@@ -194,6 +190,21 @@ function SoonIcon() {
         d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
       />
     </svg>
+  );
+}
+
+/**
+ * El enlace a la tarea, con su proyecto resuelto.
+ *
+ * El slug sale del mapa que ya recibe el componente, así que no cuesta una
+ * petición. Si el proyecto no estuviera en el mapa se cae al UUID: la ruta
+ * acepta las dos formas, así que el enlace sigue funcionando —solo se ve peor.
+ */
+function hrefDeTarea(task: Task, projectsById: Map<string, Project>): string {
+  const project = projectsById.get(task.projectId);
+  return projectHref(
+    { slug: project?.slug ?? task.projectId },
+    { board: task.boardId ?? undefined, task: task.id },
   );
 }
 
