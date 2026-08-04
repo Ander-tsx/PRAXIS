@@ -21,10 +21,10 @@ Estado por pieza:
 | `web-shell` | ✅ Funcional | Landing pública consciente de la sesión + rewrites hacia las zonas. Ya no sirve páginas de negocio: es la cáscara. Ver §17.0. |
 | `auth-front` | ✅ Funcional | Login, signup, session, logout y refresh verificados end-to-end. Ver §13. |
 | `commons` | 🟡 Parcial | 5 átomos + 5 moléculas + tokens. Falta capa de organismos, cliente HTTP, tipos de dominio, estado de sesión. |
-| `projects-front` | 🔴 No existe | Solo mockup sin mergear en `feature/vibecoded-mockup-frontend-flow`. |
+| `projects-front` | ✅ Funcional | Lista, detalle, espacios, tableros, tablero Kanban, tareas, checklists, miembros, roles y etiquetas. La zona más grande. Zona propia en el 4103. Ver §18–§24 y §28. |
 | `dashboard-front` | ✅ Funcional | Panel y datos del usuario, contra el backend real. Zona propia en el 4102. Ver §17. |
-| `admin-front` | 🔴 No existe | Idem. |
-| `reports-front` | 🔴 No existe | Idem. **No hay backend para reportes.** |
+| `admin-front` | ✅ Funcional | Cuentas, proyectos y registro de actividad. Zona propia en el 4105. Ver §31. |
+| `reports-front` | ✅ Funcional | Análisis y asistente. Zona propia en el 4104. Ver §25, §26, §29 y §30. |
 | `apps/mobile` | 🔴 Vacío | Solo `.gitkeep`. Fuera de alcance por ahora. |
 
 **Lo que bloqueaba todo** (§4.1 workspace, §4.2 puertos, §5.1 login, §12 errores del gateway) **ya está resuelto**. El siguiente bloqueante real es que no existe el proxy autenticado hacia el gateway desde una zona privada (§7).
@@ -422,8 +422,8 @@ Esta es la "fase 0". Sin esto, cada zona nueva reimplementa lo mismo y mal.
 2. **web-shell privado** — sesión, middleware, AppLayout, navegación.
 3. **projects-front** — el corazón del producto: lista → detalle → workspaces → boards → columnas → tablero Kanban con tareas y checklists. El más grande con diferencia.
 4. **dashboard-front** — depende de que `GET /projects` filtre bien.
-5. **admin-front** — usuarios y roles globales; depende de arreglar `GET /users`.
-6. **reports-front** — bloqueado, no hay backend.
+5. ~~**admin-front** — usuarios y roles globales; depende de arreglar `GET /users`.~~ ✅ Hecho, y con más de lo previsto: jerarquía de roles, registro de actividad y suspensión de proyectos. Ver §31.
+6. ~~**reports-front** — bloqueado, no hay backend.~~ ✅ Hecho. Ver §25 y §29.
 
 ---
 
@@ -2996,3 +2996,108 @@ de N sueltas. Probado con las cuatro herramientas nuevas pedidas en un solo
 mensaje: respondió con un montón de propuestas, todas correctas, y esa es
 exactamente la pantalla que pide el trabajo de interfaz que falta.
 
+
+---
+
+## 31. Administración de la plataforma — la sexta zona, y la capa que faltaba
+
+> El único punto de §10 que quedaba sin construir: «**admin-front** — usuarios y
+> roles globales». Se hizo en cuatro fases, y por el camino apareció una capa
+> que no estaba en el plan: el estado del proyecto.
+
+Es la primera vez que **tocamos el backend a propósito** (CLAUDE.md dice que no
+lo hacemos sin acordarlo). El motivo es que no había nada que consumir: el rol
+global existía con dos valores y sin jerarquía, no había registro de actividad, y
+un proyecto no tenía forma de estar suspendido. La zona sola no era construible.
+
+### 31.1 Las cuatro fases
+
+| Fase | Qué añadió |
+|---|---|
+| 0 | `SuperAdmin > Admin > User`, con jerarquía y la regla de actuar hacia abajo |
+| 1 | Registro de actividad administrativa, consultable y **solo-añadir** |
+| 2 | Namespace `/api/admin`, panel de Cuentas y la zona `admin-front` (4105) |
+| 3 | Suspensión y archivado de proyectos |
+
+Detalle del contrato en [CONTRATO-API.md § Administración](CONTRATO-API.md) y del
+modelo en [docs/backend/permissions.md](../backend/permissions.md).
+
+### 31.2 La zona
+
+`admin-front` en el puerto **4105**, servida en `/admin`, con tres pestañas:
+Cuentas, Proyectos y Actividad — los dos inventarios primero y el registro al
+final, porque se consulta después.
+
+Sigue el patrón de las demás zonas: los filtros viven en la **URL** (`?q=`,
+`?estado=`, `?page=`) y no en estado de cliente, así que «los proyectos
+suspendidos» es un enlace que se puede pegar en un mensaje, el botón atrás hace
+lo que se espera, y las páginas siguen siendo Server Components.
+
+⚠️ Los enlaces de pestaña van **sin** el prefijo (`next/link` añade `/admin`
+solo), pero el `hrefFor` del paginador va **con** él: `Pagination` monta `<a>` de
+verdad, no `Link`. Es §16 otra vez, en dos direcciones dentro del mismo archivo.
+
+### 31.3 El panel no enlaza a los proyectos, y es a propósito
+
+El rol global no concede permisos dentro de un proyecto, y eso no se relajó.
+`/projects/<slug>` le daría **403** a quien administra si no es miembro, y
+parecería roto. La ficha se pinta con `GET /admin/projects/:id`, que es otra
+puerta: solo lectura, sin conceder ningún permiso de proyecto.
+
+### 31.4 El estado del proyecto, que era la pieza de verdad
+
+Suspender no podía ser «esconderlo de la lista». Un proyecto `SUSPENDED` se ve
+**entero** —tableros, tareas, comentarios— y no acepta ninguna escritura, **ni
+del dueño**. Un `DELETED` responde 404 a todo el mundo y solo existe en el panel.
+Los dos se deshacen; el `DELETE /projects/:id` del dueño no, y el panel no lo
+ofrece.
+
+Tres decisiones que se pagan si se olvidan:
+
+1. **El recorte llega en `permissions/me`.** El mapa viene ya reducido a
+   `canViewProject` + `canViewReports`, así que ninguna pantalla necesita mirar
+   el estado para dejar de enseñar botones. Se hizo ahí y no en cada pantalla
+   porque ese endpoint es la única pregunta que hace la interfaz: la pantalla que
+   se olvidara de mirar el estado enseñaría botones que fallan.
+2. **`projectStatus` y `suspendedReason` viajan con el mapa.** No para apagar
+   nada, para **explicarlo**: un mapa vacío sin motivo parece que te han quitado
+   el rol. Vienen en la misma respuesta y no de `GET /projects/:id` para que no
+   puedan discrepar por la caché de 5 minutos.
+3. **El 403 lleva `code: 'PROJECT_SUSPENDED'`.** Un `FORBIDDEN` se arregla
+   pidiendo permiso a quien administra el proyecto; esto no se arregla. Sin
+   distinguirlos, el dueño de un proyecto suspendido se pone a pedirse permisos a
+   sí mismo.
+
+El aviso de la pantalla del proyecto (`SuspendedProjectNotice`) **no oculta el
+contenido**. Lo que hay dentro sigue siendo el trabajo del equipo, consultarlo no
+rompe nada, y taparlo convertiría una suspensión reversible en una pérdida de
+acceso.
+
+### 31.5 Dos fallos que solo aparecieron al ejecutarlo
+
+Los tipos compilaban y las pruebas pasaban en los dos casos.
+
+- **El `code` explícito no llegaba nunca.** `StandardExceptionFilter` derivaba el
+  código del status HTTP en sus dos ramas: la de `HttpException` ignoraba el
+  `code` del cuerpo, y en la de `RpcException` se miraba `statusCode` **antes**
+  que `code` — y como todos los `RpcException` del repo llevan `statusCode`, la
+  rama del código era inalcanzable. O sea que la pieza entera que distingue «está
+  suspendido» de «no tienes permiso» estaba muerta, y salía `FORBIDDEN`. Ninguna
+  de las 32 pruebas del gateway lo cubría; ahora hay tres que sí.
+- **`PROJECT_RESTORED` no se emitía.** El registro elegía la acción por el estado
+  **nuevo**, y recuperar un archivado termina en `ACTIVE` igual que reactivar un
+  suspendido, así que se anotaba como reactivación. Se resuelve devolviendo el
+  estado anterior desde el microservicio. Un fallo invisible: la operación
+  funciona, la fila aparece, y dice otra cosa — en un registro que no se puede
+  editar.
+
+Y una fuga que se cerró antes de que se notara: `suspendedBy` salía en
+`GET /projects` y `GET /projects/:id`, o sea el id de una cuenta administradora,
+cuando el rol global es **privado**. Se omite en las rutas de usuario; el panel lo
+sigue viendo por la suya.
+
+### 31.6 Lo que no está verificado
+
+Las cuatro pantallas nuevas de `admin-front` **no se han abierto en un
+navegador**. Compilan, y el contrato que consumen está verificado petición a
+petición contra el backend en marcha, pero el render no.

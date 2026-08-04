@@ -1,14 +1,22 @@
 import type {
   AdminActionName,
   AdminActivityEntry,
+  AdminProject,
   AdminUser,
   GlobalRoleName,
+  ProjectStatusName,
   UserStatusName,
 } from '@praxis/commons';
 
 /** `GET /admin/users` y `GET /admin/activity` devuelven esta forma. */
 export interface AdminUserPage {
   items: AdminUser[];
+  total: number;
+}
+
+/** `GET /admin/projects` → `{ items, total }`. */
+export interface AdminProjectPage {
+  items: AdminProject[];
   total: number;
 }
 
@@ -47,6 +55,36 @@ export const ESTADOS: Record<
     etiqueta: 'De baja',
     variante: 'warning',
     descripcion: 'No puede entrar. Se usa para bajas, no como sanción.',
+  },
+};
+
+/**
+ * Cómo se llama en pantalla cada estado de proyecto.
+ *
+ * `DELETED` dice **«Archivado»**, no «Borrado», y no es un eufemismo: el proyecto
+ * sigue entero, con sus tableros y sus tareas, y vuelve con un clic. Llamarlo
+ * borrado haría creer a quien administra que está destruyendo trabajo —y a quien
+ * lea el registro, que ya no hay nada que recuperar—. El borrado de verdad existe,
+ * es del dueño, y este panel no lo ofrece.
+ */
+export const ESTADOS_PROYECTO: Record<
+  ProjectStatusName,
+  { etiqueta: string; variante: 'success' | 'error' | 'warning'; descripcion: string }
+> = {
+  ACTIVE: {
+    etiqueta: 'Activo',
+    variante: 'success',
+    descripcion: 'Funciona con normalidad.',
+  },
+  SUSPENDED: {
+    etiqueta: 'Suspendido',
+    variante: 'error',
+    descripcion: 'Se ve entero y no se puede modificar nada. Es reversible.',
+  },
+  DELETED: {
+    etiqueta: 'Archivado',
+    variante: 'warning',
+    descripcion: 'Retirado de la vista de todos menos de este panel. Es reversible.',
   },
 };
 

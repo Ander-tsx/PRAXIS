@@ -629,7 +629,14 @@ Tres consecuencias, por orden de gravedad:
 
 ---
 
-## 🔵 16. Las etiquetas se gestionan con `canEditTask`, sin permiso propio
+## ✅ 16. ~~Las etiquetas se gestionan con `canEditTask`, sin permiso propio~~
+
+> **Resuelto** en `ee8be65`. `canManageLabels` existe en el enum y es lo que exigen el
+> `POST`, el `PATCH` y el `DELETE` de `labels.controller.ts`; leerlas sigue en
+> `canViewProject`. Lo implica `canEditTask` por jerarquía, así que ningún rol existente
+> perdió nada. Verificado en el controlador, no en la documentación.
+
+<details><summary>El planteamiento original</summary>
 
 **Decisión nuestra, anotada para que no sorprenda.** Al añadir etiquetas de
 proyecto hacía falta un permiso para crearlas, editarlas y borrarlas. El enum
@@ -644,9 +651,18 @@ las tareas —o al revés— hoy no se puede representar. Si os parece que merec
 `canManageLabels`, es un permiso más en el enum y un cambio de una línea en
 `labels.controller.ts`.
 
+</details>
+
 ---
 
-## 🔵 17. Comentar exige `canEditTask`: no hay permiso de comentar
+## ✅ 17. ~~Comentar exige `canEditTask`: no hay permiso de comentar~~
+
+> **Resuelto** en `ee8be65`. `canComment` existe y es lo que exigen el `POST`, el `PATCH`
+> y el `DELETE` de `comments.controller.ts`. Lo implica `canEditTask` por jerarquía. El
+> rol observador del punto 13 ya puede responder en un hilo sin poder tocar el trabajo,
+> que era justo el caso que quedaba cojo.
+
+<details><summary>El planteamiento original</summary>
 
 **Decisión nuestra, del mismo tipo que el punto 16.** Los comentarios de tarea
 necesitaban un permiso para escribir. Leerlos exige `canViewProject`; escribir,
@@ -659,6 +675,8 @@ tablero real, esa gente es justo la que más comenta sin tocar el trabajo.
 
 Si os parece que merece un `canComment`, es un permiso más en el enum y dos
 líneas en `comments.controller.ts`.
+
+</details>
 
 ---
 
@@ -677,6 +695,44 @@ alguno de estos archivos, avisad para evitar conflictos.
 | `fb4a758` | 409 al repetir el nombre de un espacio |
 | `48a0058` | El `projectId` de las tareas se resuelve desde la ruta, y los `GET` piden `canViewProject` |
 | `3cbe735` `c276067` `9c03e87` | Invalidación de caché al tocar roles, miembros, tableros y columnas |
+| `dd321b5` | Rol `SuperAdmin`, jerarquía de roles globales y la regla de actuar hacia abajo |
+| `1b6e65e` | Registro de actividad administrativa, consultable y solo-añadir |
+| `a71956d` | Namespace `/api/admin` y panel de cuentas: estado, rol y corte de sesión |
+| `7e94f06` | Los ids fijos de los seeders no eran UUIDs válidos |
+| rama `feature/administracion-global` | Estado administrativo del proyecto: suspensión y archivado |
+
+### ⚠️ Lo más invasivo de la última tanda: el estado del proyecto
+
+`Project` gana cuatro columnas (`status`, `suspendedAt`, `suspendedBy`,
+`suspendedReason`) y un enum `ProjectStatus`, en la migración
+`20260804140000_project_status`. Lo que hay que saber si tocáis esto:
+
+- **`ProjectPermissionGuard` comprueba el estado antes del bypass del dueño.** Ese orden
+  es la mitad del diseño: al revés, el dueño —que es la persona a la que se le suspendió
+  el proyecto— seguiría pudiendo hacer de todo.
+- **`getEffectivePermissions` recorta el mapa** a `canViewProject` + `canViewReports`
+  cuando el proyecto está suspendido, y devuelve `projectStatus` y `suspendedReason` para
+  que la interfaz pueda explicarlo. Es aditivo: nada de lo que ya leía esa respuesta se
+  rompe.
+- **Tres rutas se cierran dentro de projects-service** (`exigirProyectoActivo`): aceptar
+  invitación, rechazarla y salir del proyecto. No declaran permiso, así que no pasan por
+  el guard. Es la única excepción a «la autorización va en el gateway», y está anotada en
+  `docs/backend/permissions.md`.
+- **`setStatus` invalida `project:<id>` y `projects:member:<userId>`** de todos los
+  afectados. Sin eso la suspensión no surtiría efecto hasta 5 minutos después.
+- **`findOneProject` y `findAllProjects` ahora omiten `suspendedBy`.** Es el id de una
+  cuenta administradora y el rol global es privado; el panel lo lee por su propia ruta.
+
+### Y un arreglo en el filtro de excepciones que afecta a todos
+
+`standard-exception.filter.ts` **se comía el `code` explícito de un error** y lo
+sustituía por el genérico del status, en sus dos ramas: la de `HttpException` lo
+ignoraba, y en la de `RpcException` se miraba `statusCode` antes que `code` —y como
+todos los `RpcException` del repo llevan `statusCode`, esa rama era inalcanzable—.
+
+Ahora el código explícito gana, y si no hay se sigue derivando del status. **Nada
+existente cambia de comportamiento**: comprobamos que ningún otro sitio del backend
+manda un `code` propio. Si queréis emitir códigos de dominio, ya funcionan.
 
 ### Un patrón que apareció cuatro veces
 

@@ -5,6 +5,7 @@ import { RedisService } from '../redis/redis.service';
 import { NotificationType } from '@praxis/contracts';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
+import { exigirProyectoActivo } from '../projects/project-status.guard';
 
 /**
  * Invitaciones a un proyecto.
@@ -202,6 +203,11 @@ export class InvitationsService {
    * podría recuperarlo, porque el bypass del guard va por `ownerId`.
    */
   async leave(dto: { projectId: string; userId: string }) {
+    /* Un proyecto suspendido no cambia, y salirse lo cambiaría. Esta ruta no
+       declara permiso, así que no pasa por `ProjectPermissionGuard` y la
+       comprobación tiene que estar aquí. */
+    await exigirProyectoActivo(this.prisma, dto.projectId);
+
     const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
       select: { ownerId: true, name: true },
@@ -257,6 +263,8 @@ export class InvitationsService {
         message: 'Esa invitación ya fue respondida',
       });
     }
+
+    await exigirProyectoActivo(this.prisma, invitation.projectId);
 
     return invitation;
   }

@@ -6,6 +6,7 @@ import {
   CreateProjectRoleDto,
   UpdateProjectRoleDto,
   CheckProjectPermissionDto,
+  READ_ONLY_PROJECT_PERMISSIONS,
 } from '@praxis/contracts';
 import {
   expandPermissions,
@@ -15,6 +16,59 @@ import {
 } from './permission-map';
 
 const PERMISSION_CACHE_TTL = 300;
+
+/** Lo que devuelve `project_effective_permissions`. */
+export interface EffectivePermissionsResult {
+  isOwner: boolean;
+  permissions: Record<string, boolean>;
+  /** Estado del proyecto, para que la interfaz pueda explicar el recorte. */
+  projectStatus: string;
+  suspendedReason: string | null;
+}
+
+/**
+ * Recorta el mapa según el estado del proyecto.
+ *
+ * - `SUSPENDED` → solo los permisos de lectura.
+ * - `DELETED` → ninguno.
+ *
+ * ⚠️ El caso `DELETED` **hoy no se alcanza**: `ProjectPermissionGuard` responde 404
+ * a un proyecto archivado antes de llegar aquí, así que `permissions/me` no lo
+ * devuelve nunca. Se recorta igual porque lo contrario es una trampa esperando: una
+ * ruta futura que consulte los permisos sin pasar por ese guard recibiría el mapa
+ * entero de un proyecto que se supone que no existe. Un archivado no concede nada.
+ *
+ * ## Por qué aquí y no en cada pantalla
+ *
+ * Porque `permissions/me` es **la única pregunta que hace la interfaz** para decidir
+ * qué enseña: es la regla del repo, «pide los permisos en vez de intentar la acción
+ * y reaccionar al 403». Si este mapa dijera que se puede crear tareas en un proyecto
+ * suspendido, cada pantalla —tablero, informes, asistente, ajustes— tendría que
+ * acordarse de mirar el estado por su cuenta, y la que se olvidara enseñaría botones
+ * que fallan. Recortándolo aquí, todas quedan correctas sin saber que esto existe.
+ *
+ * El guard sigue bloqueando de verdad; esto es lo que hace que no haga falta.
+ *
+ * ⚠️ **También al dueño.** Es justo la persona a la que se le suspendió el proyecto:
+ * si el bypass de dueño se aplicara después del recorte, la suspensión solo afectaría
+ * a los demás miembros.
+ */
+export function recortarPorEstado(
+  permissions: Record<string, boolean>,
+  status: string,
+): Record<string, boolean> {
+  if (status === 'ACTIVE') return permissions;
+
+  const dejaPasar = (permiso: string): boolean =>
+    status === 'SUSPENDED' && READ_ONLY_PROJECT_PERMISSIONS.includes(permiso);
+
+  return Object.fromEntries(
+    Object.entries(permissions).map(([permiso, concedido]) => [
+      permiso,
+      concedido && dejaPasar(permiso),
+    ]),
+  );
+}
 
 @Injectable()
 export class ProjectRolesService {
@@ -135,10 +189,12 @@ export class ProjectRolesService {
   async getEffectivePermissions(dto: {
     userId: string;
     projectId: string;
-  }): Promise<{ isOwner: boolean; permissions: Record<string, boolean> }> {
+  }): Promise<EffectivePermissionsResult> {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
-      select: { ownerId: true },
+      /* El estado entra en el `select` que ya hacía falta para el dueño: recortar
+         los permisos de un proyecto suspendido no cuesta ninguna consulta más. */
+      select: { ownerId: true, status: true, suspendedReason: true },
     });
 
     if (!project) {
@@ -148,21 +204,33 @@ export class ProjectRolesService {
     const isOwner = project.ownerId === dto.userId;
 
     // El dueño tiene bypass en el guard, así que aquí se refleja igual.
-    if (isOwner) {
-      return { isOwner, permissions: fullPermissionMap(true) };
-    }
-
-    const cacheKey = `project:${dto.projectId}:user:${dto.userId}:permissions`;
-    const cached = await this.redis.get<Record<string, boolean>>(cacheKey);
-    const rawPerms =
-      cached ?? (await this.loadPermissions(dto.userId, dto.projectId, cacheKey));
-
-    const effective = expandPermissions(rawPerms);
+    const permissions = isOwner
+      ? fullPermissionMap(true)
+      : await this.loadEffective(dto.userId, dto.projectId);
 
     return {
       isOwner,
-      permissions: { ...fullPermissionMap(false), ...normalizeBooleans(effective) },
+      permissions: recortarPorEstado(permissions, project.status),
+      /* Viajan con los permisos para que la pantalla pueda **explicar** por qué no
+         hay botones. Un mapa recortado sin motivo produce una interfaz que parece
+         estar rota o haberte degradado de rol. */
+      projectStatus: project.status,
+      suspendedReason: project.suspendedReason,
     };
+  }
+
+  /** Los permisos que dan los roles, expandidos por jerarquía. */
+  private async loadEffective(
+    userId: string,
+    projectId: string,
+  ): Promise<Record<string, boolean>> {
+    const cacheKey = `project:${projectId}:user:${userId}:permissions`;
+    const cached = await this.redis.get<Record<string, boolean>>(cacheKey);
+    const rawPerms = cached ?? (await this.loadPermissions(userId, projectId, cacheKey));
+
+    const effective = expandPermissions(rawPerms);
+
+    return { ...fullPermissionMap(false), ...normalizeBooleans(effective) };
   }
 
   // ---------------------------------------------------------------------------

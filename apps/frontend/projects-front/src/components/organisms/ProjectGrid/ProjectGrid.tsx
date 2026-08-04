@@ -54,10 +54,21 @@ export function ProjectGrid({ projects, total, currentUserId, search }: ProjectG
                     <h3 className="font-sans text-base font-semibold text-text-primary">
                       {project.name}
                     </h3>
-                    {project.ownerId !== currentUserId && (
-                      <Badge variant="info" className="shrink-0">
-                        MIEMBRO
+                    {/* Suspendido pesa más que «de quién es»: cambia lo que se puede
+                        hacer al entrar, y saberlo antes evita abrir el proyecto para
+                        descubrir que ningún botón responde. Se enseña una sola
+                        insignia para no convertir la tarjeta en una fila de
+                        etiquetas. */}
+                    {project.status === 'SUSPENDED' ? (
+                      <Badge variant="error" className="shrink-0">
+                        SUSPENDIDO
                       </Badge>
+                    ) : (
+                      project.ownerId !== currentUserId && (
+                        <Badge variant="info" className="shrink-0">
+                          MIEMBRO
+                        </Badge>
+                      )
                     )}
                   </div>
 

@@ -59,6 +59,10 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 8. ⚠️ `permissions` de un rol es un **diccionario de booleanos**, nunca un array. El backend lo valida; los roles creados antes del validador siguen guardados como array y se normalizan al leer.
 9. ✅ `Project.name` es único **por dueño**, no global: dos equipos pueden tener cada uno su "Sprint 1". Lo era a nivel global y chocaba con proyectos que no puedes ver; lo arregló `20260730020000_project_name_unique_per_owner`.
 10. ⚠️ `Project.slug` **sí** es único global, y es lo que va en la URL (`/projects/rediseno-del-panel`). Los choques se resuelven con un sufijo **aleatorio** (`praxis-rjv6`), no un contador: `-2`, `-3` decía cuántos hay y —peor— dejaba enumerar proyectos ajenos probando el siguiente, porque el gateway responde 404 a un slug inexistente y 403 a uno ajeno. **Se regenera al renombrar**, así que un slug viejo deja de resolver — el UUID se acepta siempre. Para enlazar usa `slug`; para llamar a la API, `id`: solo `GET /projects/:id` traduce el slug, todo lo anidado espera el UUID.
+11. ⚠️ **Un proyecto tiene estado administrativo, y un 403 puede no ser de permisos.** `Project.status` es `ACTIVE`, `SUSPENDED` o `DELETED`, lo pone el panel de administración y **no es el `DELETE /projects/:id` del dueño** (ese sí borra y no se deshace). Un `SUSPENDED` se ve entero y no acepta ninguna escritura, ni del dueño; un `DELETED` responde **404 a todo el mundo** y no sale en ningún listado salvo en `/admin/projects`. Lo que tiene que saber la interfaz:
+    - **`permissions/me` ya llega recortado** a `canViewProject` + `canViewReports` cuando está suspendido, así que los botones se apagan por la vía de siempre y no hay que mirar el estado para eso. Trae `projectStatus` y `suspendedReason` justo para poder **explicarlo**: un mapa vacío sin motivo parece que te han quitado el rol.
+    - Los 403 de suspensión llevan **`error.code === 'PROJECT_SUSPENDED'`** (`PROJECT_SUSPENDED_CODE` en `commons/api/domain.ts`). Distinguirlo de un `FORBIDDEN` normal importa: uno se arregla pidiendo permiso a quien administra el proyecto, el otro no se arregla —hay que esperar a que la plataforma lo reactive—.
+    - `suspendedBy` **no sale por ninguna ruta de usuario**: sería decir qué cuenta es administradora, y el rol global es privado.
 
 **Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
 `projectHref` / `projectPath` / `reportHref` / `reportPath`, en
@@ -79,9 +83,11 @@ Lista completa de lo que falta por el lado del backend, con severidad y reproduc
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP 3001-3006 (credentials, projects, permissions, tasks, reports, assistant) · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · 4105+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · 4106+ para zonas nuevas.
 
-⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm --filter @praxis/<x>-service exec prisma generate`.
+⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
+
+⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm prisma:generate`.
 
 **El shell no sirve páginas de negocio.** Es la cáscara: landing pública, `rewrites()` y la renovación de sesión. Cada pantalla privada va en su zona, que trae su propio guard en `proxy.ts` y se puede levantar sola. Checklist de zona nueva en ESTADO-ACTUAL §17.7.
 
@@ -89,17 +95,34 @@ Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy au
 
 ## Comandos
 
+**El camino corto es `pnpm dev:cli`**, un asistente que levanta solo lo que elijas
+—hay preajustes— y **espera a que cada puerto responda** antes de darlo por
+arrancado. Exige TTY, así que para scripts y CI van los comandos sueltos:
+
 ```bash
 pnpm install
 pnpm docker:up            # Postgres + Redis
-pnpm --filter @praxis/contracts --filter @praxis/observability run build
-pnpm prisma:reset         # recrea las tablas de los 4 servicios
-pnpm prisma:seed
-pnpm dev:backend
-pnpm dev:frontend
+pnpm build:shared         # contracts + observability
+pnpm prisma:generate      # los 6 servicios con Prisma
+pnpm prisma:deploy        # aplica migraciones sin tocar los datos
+pnpm prisma:seed          # 4 seeds, en su orden de dependencia
+pnpm dev:backend          # gateway + los 7 microservicios
+pnpm dev:frontend         # las 6 zonas
 ```
 
-⚠️ El `build` de `contracts` y `observability` no está en el README pero es imprescindible: publican `dist/` y sin él los 4 microservicios fallan con `Cannot find module '@praxis/contracts'`.
+⚠️ **`prisma:reset` borra las tablas.** Es `migrate reset --force`: recrea el
+esquema de los 6 servicios con Prisma y siembra encima. Para aplicar una migración
+nueva sin perder datos, `prisma:deploy`.
+
+⚠️ `build:shared` no está en el README y es imprescindible: `contracts` y
+`observability` publican `dist/`, y sin él los microservicios fallan con
+`Cannot find module '@praxis/contracts'`.
+
+⚠️ **Los scripts de Prisma excluyen `reports-service` a propósito.** Ese servicio no
+tiene tablas —solo agrega lo que le sirven los demás— así que no tiene Prisma, y un
+filtro `@praxis/*-service` a secas moría ahí con `Command "prisma" not found`
+llevándose por delante a los servicios que aún no le había tocado el turno. Le pasaba
+a `prisma:generate` y a `prisma:deploy`, que eran los dos únicos que existían.
 
 Los `.env` no se versionan. El `JWT_SECRET` debe ser idéntico en gateway, credentials-service y el `.env.local` de cada zona.
 

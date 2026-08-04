@@ -4,6 +4,7 @@ import type { INestApplication } from '@nestjs/common';
 import {
     Body,
     Controller,
+    ForbiddenException,
     Get,
     HttpStatus,
     Module,
@@ -58,6 +59,26 @@ class TestController {
   @Get('rpc-unauthorized')
   rpcUnauthorized() {
     throw { statusCode: HttpStatus.UNAUTHORIZED, message: 'Credenciales inválidas' };
+  }
+
+  /** Un 403 del gateway que trae su propio código, no el genérico del status. */
+  @Get('forbidden-con-codigo')
+  forbiddenConCodigo() {
+    throw new ForbiddenException({
+      code: 'PROJECT_SUSPENDED',
+      message: 'Este proyecto está suspendido por la administración',
+      details: { reason: 'Uso indebido' },
+    });
+  }
+
+  /** Lo mismo, pero cruzando el transporte: objeto plano con `statusCode` y `code`. */
+  @Get('rpc-forbidden-con-codigo')
+  rpcForbiddenConCodigo() {
+    throw {
+      statusCode: HttpStatus.FORBIDDEN,
+      code: 'PROJECT_SUSPENDED',
+      message: 'Este proyecto está suspendido por la administración',
+    };
   }
 }
 
@@ -166,5 +187,52 @@ describe('response normalization', () => {
         details: {},
       },
     });
+  });
+
+  /**
+   * Un `code` explícito gana al derivado del status.
+   *
+   * ⚠️ **Esto estaba roto en las dos ramas y no lo cubría ninguna prueba.** El
+   * filtro derivaba el código del número HTTP siempre, así que un 403 que decía
+   * `PROJECT_SUSPENDED` salía como `FORBIDDEN`. Importa porque los dos son 403 y
+   * **no se arreglan igual**: uno se resuelve pidiendo permiso a quien administra el
+   * proyecto, el otro no se resuelve —hay que esperar a que la plataforma lo
+   * reactive—. Sin el código, la interfaz enseña «acceso denegado» en los dos casos
+   * y el dueño de un proyecto suspendido se pone a pedirse permisos a sí mismo.
+   */
+  it('respeta el code explícito de una HttpException en vez del genérico del status', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/test/forbidden-con-codigo')
+      .expect(HttpStatus.FORBIDDEN);
+
+    expect(response.body).toEqual({
+      success: false,
+      error: {
+        code: 'PROJECT_SUSPENDED',
+        message: 'Este proyecto está suspendido por la administración',
+        details: { reason: 'Uso indebido' },
+      },
+    });
+  });
+
+  it('respeta el code explícito también cuando el error cruza el transporte', async () => {
+    /* Aquí el orden era el fallo: se miraba `statusCode` antes que `code`, y en este
+       repo todo RpcException lleva `statusCode`, así que la rama del código nunca se
+       alcanzaba. */
+    const response = await request(app.getHttpServer())
+      .get('/test/rpc-forbidden-con-codigo')
+      .expect(HttpStatus.FORBIDDEN);
+
+    expect(response.body.error.code).toBe('PROJECT_SUSPENDED');
+  });
+
+  it('sigue derivando el código del status cuando el error no trae uno', async () => {
+    /* La regla nueva no debe cambiar el caso normal, que es la mayoría de los
+       errores del gateway. */
+    const response = await request(app.getHttpServer())
+      .get('/test/not-found')
+      .expect(HttpStatus.NOT_FOUND);
+
+    expect(response.body.error.code).toBe('NOT_FOUND');
   });
 });

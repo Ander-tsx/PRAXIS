@@ -25,7 +25,15 @@ export class StandardExceptionFilter implements ExceptionFilter {
       const message = this.extractMessage(rawResponse, exception.message);
       const details = this.extractDetails(rawResponse, status);
 
-      response.status(status).json(this.buildErrorPayload(this.mapStatusToCode(status), message, details));
+      response
+        .status(status)
+        .json(
+          this.buildErrorPayload(
+            this.getExplicitCode(rawResponse) ?? this.mapStatusToCode(status),
+            message,
+            details,
+          ),
+        );
       return;
     }
 
@@ -180,17 +188,47 @@ export class StandardExceptionFilter implements ExceptionFilter {
   }
 
   private getRpcErrorCode(error: unknown): string {
+    /**
+     * ⚠️ **El `code` explícito va primero, y el orden era el error.**
+     *
+     * Antes se miraba `statusCode` antes que `code`, así que la rama de `code`
+     * nunca se alcanzaba: en este repo todo `RpcException` lleva `statusCode`. Un
+     * microservicio que se molestaba en mandar un código propio lo veía sustituido
+     * por el genérico del status, y la interfaz recibía `FORBIDDEN` donde el
+     * backend había dicho `PROJECT_SUSPENDED` — que es justo el par que hay que
+     * distinguir, porque los dos son 403 y no se arreglan igual.
+     */
+    const explicito = this.getExplicitCode(error);
+    if (explicito) {
+      return explicito;
+    }
+
     if (error && typeof error === 'object') {
       if ('statusCode' in error && typeof (error as { statusCode?: unknown }).statusCode === 'number') {
         return this.mapStatusToCode((error as { statusCode: number }).statusCode);
       }
-
-      if ('code' in error && typeof (error as { code?: unknown }).code === 'string') {
-        return (error as { code: string }).code;
-      }
     }
 
     return 'BAD_GATEWAY';
+  }
+
+  /**
+   * El `code` que el error trae escrito, si trae uno.
+   *
+   * Existe para que un caso concreto pueda decir *qué* pasó y no solo de qué
+   * familia es: `mapStatusToCode` solo sabe traducir el número HTTP, y con eso
+   * «este proyecto está suspendido» y «no tienes permiso» salen indistinguibles.
+   * Cuando no hay código explícito —lo normal— se sigue derivando del status.
+   */
+  private getExplicitCode(response: unknown): string | undefined {
+    if (response && typeof response === 'object' && 'code' in response) {
+      const code = (response as { code?: unknown }).code;
+      if (typeof code === 'string' && code.length > 0) {
+        return code;
+      }
+    }
+
+    return undefined;
   }
 
   private mapStatusToCode(status: number): string {

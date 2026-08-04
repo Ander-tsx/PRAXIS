@@ -142,6 +142,30 @@ export function globalRoleLevelOf(roleNames: readonly string[]): number {
   );
 }
 
+/**
+ * Estado administrativo de un proyecto. Espejo de `ProjectStatus`.
+ *
+ * ⚠️ `DELETED` **no es** un proyecto borrado. `DELETE /projects/:id` existe, es del
+ * dueño, cascadea y no tiene vuelta atrás; esto es un estado que pone y quita la
+ * administración de la plataforma, y se deshace. Un proyecto en `DELETED` no
+ * aparece en ningún listado salvo en el panel.
+ */
+export const PROJECT_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETED'] as const;
+
+export type ProjectStatusName = (typeof PROJECT_STATUSES)[number];
+
+/**
+ * El `code` con el que el gateway distingue «este proyecto está suspendido» de «no
+ * tienes permiso».
+ *
+ * Los dos son 403 y **no se arreglan igual**: uno se resuelve pidiéndole permiso a
+ * quien administra el proyecto, el otro no se resuelve —hay que esperar a que la
+ * plataforma lo reactive—. Sin mirar el código, la pantalla enseña «acceso
+ * denegado» en los dos casos y el dueño de un proyecto suspendido se pone a
+ * pedirse permisos a sí mismo.
+ */
+export const PROJECT_SUSPENDED_CODE = 'PROJECT_SUSPENDED';
+
 /** Un elemento de `GET /api/projects` → `{ items, total }` */
 export interface Project {
   id: string;
@@ -162,11 +186,48 @@ export interface Project {
   ownerId: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Estado administrativo.
+   *
+   * Un proyecto `SUSPENDED` **sigue apareciendo aquí**: el dueño y los miembros lo
+   * ven entero y no pueden tocar nada. Esconderlo lo haría indistinguible de uno
+   * borrado y nadie sabría a quién preguntar. Los `DELETED` no llegan nunca a esta
+   * lista, así que en la práctica solo se ven los dos primeros valores.
+   */
+  status: ProjectStatusName;
+  /** Por qué se suspendió. Es lo que se le enseña al dueño. `null` si está activo. */
+  suspendedReason?: string | null;
+  suspendedAt?: string | null;
   /** Contadores que el backend ya agrega: nos ahorran peticiones extra. */
   _count: {
     members: number;
     workspaces: number;
   };
+}
+
+/**
+ * Una fila de `GET /api/admin/projects`.
+ *
+ * Es `Project` más lo único que el panel ve y las pantallas de negocio no: los
+ * archivados. La ruta es otra —no un parámetro de `GET /projects`— porque aquella
+ * filtra por dueño o miembro, y añadirle una forma de ver todos sería poner un
+ * interruptor de bypass en la ruta que usa cualquiera.
+ *
+ * Trae además el **dueño resuelto**, que las rutas de negocio no dan: allí basta el
+ * `ownerId` porque la pantalla ya sabe de quién es el proyecto, y aquí «de quién es»
+ * es la primera pregunta al decidir si se suspende. Lo cruza el gateway con una sola
+ * llamada a credentials por página.
+ *
+ * ⚠️ **No trae `suspendedBy`.** El id de quien administra no sale por ninguna ruta:
+ * el rol global es privado, y devolverlo diría qué cuenta es administradora. Quién
+ * actuó se lee en el registro de actividad, que ya es admin-only.
+ */
+export interface AdminProject extends Project {
+  /**
+   * Nombre y correo del dueño. `null` si credentials no respondió: el inventario
+   * sale sin nombres antes que no salir, porque sirve igual para suspender.
+   */
+  owner?: { id: string; name: string | null; email: string | null } | null;
 }
 
 /** Los permisos de proyecto. Espejo del enum `ProjectPermission`. */
@@ -531,8 +592,19 @@ export interface ProjectDetail extends Project {
 /** `GET /api/projects/:projectId/permissions/me` */
 export interface EffectivePermissions {
   isOwner: boolean;
-  /** Mapa completo: los no concedidos vienen en `false`, no ausentes. */
+  /**
+   * Mapa completo: los no concedidos vienen en `false`, no ausentes.
+   *
+   * ⚠️ **En un proyecto suspendido llega ya recortado a solo lectura**, y al dueño
+   * también. Eso significa que una pantalla no necesita mirar el estado para dejar
+   * de enseñar botones — pero sí para **explicarlo**: un mapa vacío sin motivo
+   * parece que te han quitado el rol. Para eso están los dos campos de abajo.
+   */
   permissions: Record<ProjectPermission, boolean>;
+  /** Estado del proyecto. Es lo que justifica un mapa recortado. */
+  projectStatus?: ProjectStatusName;
+  /** Por qué se suspendió, tal como lo escribió quien administra. */
+  suspendedReason?: string | null;
 }
 
 /**
