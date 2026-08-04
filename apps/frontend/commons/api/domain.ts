@@ -42,6 +42,66 @@ export const GLOBAL_ROLES = ['SuperAdmin', 'Admin', 'User'] as const;
 
 export type GlobalRoleName = (typeof GLOBAL_ROLES)[number];
 
+/** Estados de una cuenta. Espejo de `UserStatus` en `@praxis/contracts`. */
+export const USER_STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'] as const;
+
+export type UserStatusName = (typeof USER_STATUSES)[number];
+
+/**
+ * Una fila de `GET /api/admin/users`.
+ *
+ * No es `UserProfile`: **este listado enseña dos cosas que el directorio no**, el
+ * estado de la cuenta y el rol global, y por eso es otra ruta detrás del rol de
+ * administrador en vez de un campo más de `GET /users`.
+ */
+export interface AdminUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  status: UserStatusName;
+  createdAt: string;
+  credential: { email: string };
+  /** El rol efectivo. `User` cuando la cuenta no tiene ninguna fila de rol. */
+  globalRole: GlobalRoleName;
+  /** Los roles tal cual. Vacío en la mayoría de las cuentas reales. */
+  globalRoles: string[];
+}
+
+/** Acciones que registra el panel. Espejo de `AdminActionType`. */
+export const ADMIN_ACTIONS = [
+  'USER_SUSPENDED',
+  'USER_REACTIVATED',
+  'USER_DEACTIVATED',
+  'ROLE_GRANTED',
+  'ROLE_REVOKED',
+  'PROJECT_SUSPENDED',
+  'PROJECT_REACTIVATED',
+  'PROJECT_ARCHIVED',
+  'PROJECT_RESTORED',
+] as const;
+
+export type AdminActionName = (typeof ADMIN_ACTIONS)[number];
+
+/**
+ * Una entrada de `GET /api/admin/activity`.
+ *
+ * `actorLabel` y `targetLabel` son **copias del momento**, no referencias: por eso
+ * la entrada sigue leyéndose cuando la cuenta o el proyecto ya no existen. Igual
+ * que `projectName` en los avisos.
+ */
+export interface AdminActivityEntry {
+  id: string;
+  actorId: string;
+  actorLabel: string | null;
+  action: AdminActionName;
+  targetType: 'USER' | 'PROJECT';
+  targetId: string;
+  targetLabel: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 /**
  * ¿Estos roles dan acceso al panel de administración?
  *
@@ -54,6 +114,32 @@ export type GlobalRoleName = (typeof GLOBAL_ROLES)[number];
  */
 export function hasAdminRole(roleNames: readonly string[]): boolean {
   return roleNames.some((name) => name === 'SuperAdmin' || name === 'Admin');
+}
+
+/**
+ * El nivel de estos roles: el más alto de los que haya.
+ *
+ * Espejo de `globalRoleLevel` en `@praxis/contracts`, con las mismas dos reglas
+ * que allí y por las mismas razones:
+ *
+ * - **una lista vacía es `User`**, no «sin nivel»: `POST /auth/register` no
+ *   asigna ningún rol, así que la mayoría de las cuentas reales no tienen
+ *   ninguno;
+ * - **los nombres desconocidos se ignoran**, para que un rol inventado en la
+ *   tabla no suba a nadie de nivel.
+ *
+ * Lo usa el panel para **apagar** lo que el gateway va a rechazar: nada sobre tu
+ * propia cuenta, nada sobre una de nivel igual o superior. Es cortesía, no
+ * autorización: quien decide es el gateway.
+ */
+export function globalRoleLevelOf(roleNames: readonly string[]): number {
+  const NIVELES: Record<GlobalRoleName, number> = { User: 0, Admin: 1, SuperAdmin: 2 };
+
+  return roleNames.reduce(
+    (nivel, name) =>
+      name in NIVELES ? Math.max(nivel, NIVELES[name as GlobalRoleName]) : nivel,
+    0,
+  );
 }
 
 /** Un elemento de `GET /api/projects` → `{ items, total }` */

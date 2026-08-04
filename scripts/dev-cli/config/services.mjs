@@ -134,7 +134,7 @@ export const BACKEND_SERVICES = [
 ];
 
 /**
- * Las cinco zonas del frontend.
+ * Las seis zonas del frontend.
  *
  * ⚠️ Su archivo de entorno es **`.env.local`**, no `.env`. Next solo carga el
  * primero, así que rellenar `.env` aquí es escribir un archivo que nadie lee —
@@ -147,12 +147,13 @@ export const FRONTEND_APPS = [
   { key: 'dashboard-front', pkg: '@praxis/dashboard-front', dir: 'apps/frontend/dashboard-front', port: 4102, envFile: '.env.local', color: 96, descripcion: 'Panel, avisos y ajustes' },
   { key: 'projects-front', pkg: '@praxis/projects-front', dir: 'apps/frontend/projects-front', port: 4103, envFile: '.env.local', color: 96, descripcion: 'Proyectos y tableros' },
   { key: 'reports-front', pkg: '@praxis/reports-front', dir: 'apps/frontend/reports-front', port: 4104, envFile: '.env.local', color: 96, descripcion: 'Análisis y asistente' },
+  { key: 'admin-front', pkg: '@praxis/admin-front', dir: 'apps/frontend/admin-front', port: 4105, envFile: '.env.local', color: 96, descripcion: 'Administración de la plataforma' },
 ];
 
 /**
  * El frontend se arranca **de una pieza, con turbo**, no zona a zona.
  *
- * Cinco `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
+ * Seis `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
  * y comparte la caché; y sobre todo, la lista de zonas vive en un único filtro
  * en vez de repetida aquí. Las entradas de `FRONTEND_APPS` siguen haciendo
  * falta para los `.env.local` y para saber qué puertos vigilar.
@@ -164,7 +165,7 @@ export const FRONTEND_TURBO_SERVICE = {
   prisma: false,
   seedOrder: null,
   color: 96,
-  descripcion: 'Las 5 zonas juntas',
+  descripcion: 'Las 6 zonas juntas',
   /**
    * ⚠️ Va por `pnpm run`, **no invocando `turbo` directamente**.
    *
@@ -194,7 +195,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 8 servicios y las 5 zonas',
+    nombre: 'Todo — los 8 servicios y las 6 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -212,7 +213,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 5 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 6 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },
