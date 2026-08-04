@@ -17,6 +17,24 @@
  * y tasks para que las referencias entre servicios sean consistentes sin
  * necesidad de cruzar schemas.
  *
+ * ## ⚠️ El `4` y el `8` de cada id no son decorativos
+ *
+ * `11111111-1111-4111-8111-111111111111` es un **UUID v4 válido**: el `4` es el
+ * nibble de versión y el `8` el de variante. Eran `1111-1111` en todas las
+ * posiciones, y así **no son UUIDs** para `class-validator`, ni siquiera con
+ * `@IsUUID()` sin versión.
+ *
+ * El efecto era el peor posible: `ParseUUIDPipe` los acepta —trae su propia
+ * regex, más laxa— así que las rutas con el id en el **camino** funcionaban,
+ * mientras que cualquier ruta que lo recibiera en el **cuerpo** respondía
+ * `400 "must be a UUID"`. Y como Prisma genera v4 de verdad, el fallo solo
+ * aparecía con las cuentas del seed: las de demostración, las que se usan para
+ * probar. Se descubrió al montar `POST /permissions/assign`, la primera ruta que
+ * recibe un id de usuario en el cuerpo.
+ *
+ * Si añades cuentas, respeta la forma: tercer grupo empezando por `4`, cuarto
+ * empezando por `8`.
+ *
  * Es idempotente: re-ejecutar no duplica ni destruye datos.
  *
  * Run with:
@@ -29,17 +47,17 @@ import * as bcrypt from 'bcrypt';
 
 // ─── UUIDs fijos compartidos entre seeders ────────────────────────────────────
 
-export const ADMIN_CREDENTIAL_ID = '11111111-1111-1111-1111-111111111112';
-export const ADMIN_USER_ID       = '11111111-1111-1111-1111-111111111111';
+export const ADMIN_CREDENTIAL_ID = '11111111-1111-4111-8111-111111111112';
+export const ADMIN_USER_ID       = '11111111-1111-4111-8111-111111111111';
 
-export const MARIA_CREDENTIAL_ID = '22222222-2222-2222-2222-222222222222';
-export const MARIA_USER_ID       = '22222222-2222-2222-2222-222222222221';
+export const MARIA_CREDENTIAL_ID = '22222222-2222-4222-8222-222222222222';
+export const MARIA_USER_ID       = '22222222-2222-4222-8222-222222222221';
 
-export const CARLOS_CREDENTIAL_ID = '33333333-3333-3333-3333-333333333332';
-export const CARLOS_USER_ID       = '33333333-3333-3333-3333-333333333331';
+export const CARLOS_CREDENTIAL_ID = '33333333-3333-4333-8333-333333333332';
+export const CARLOS_USER_ID       = '33333333-3333-4333-8333-333333333331';
 
-export const SOFIA_CREDENTIAL_ID = '44444444-4444-4444-4444-444444444442';
-export const SOFIA_USER_ID       = '44444444-4444-4444-4444-444444444441';
+export const SOFIA_CREDENTIAL_ID = '44444444-4444-4444-8444-444444444442';
+export const SOFIA_USER_ID       = '44444444-4444-4444-8444-444444444441';
 
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
 
