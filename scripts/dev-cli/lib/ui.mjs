@@ -63,8 +63,22 @@ export function banner() {
     return;
   }
 
-  /* De violeta a cian, que son los dos acentos de la interfaz web. */
-  const degradado = [93, 95, 95, 35, 36, 96];
+  /**
+   * De morado a azul, siguiendo los tokens de la interfaz web: arranca por
+   * encima de `primary` (#6C63FF) y baja hasta `info` (#60A5FA).
+   *
+   * Son códigos de la paleta de 256 y no color verdadero (`38;2;r;g;b`) porque
+   * el Terminal.app de macOS no lo admite y ahí el degradado se vería plano.
+   * Los 256 los pinta cualquier terminal de este siglo.
+   */
+  const degradado = [
+    '38;5;141', // lavanda
+    '38;5;99', // violeta
+    '38;5;63', // índigo — el `primary` del sistema
+    '38;5;69', // azul violáceo
+    '38;5;75', // azul — el `info` del sistema
+    '38;5;81', // azul claro
+  ];
 
   console.log();
   LOGO.forEach((linea, i) => console.log(`  ${color(degradado[i], linea)}`));
