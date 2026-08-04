@@ -26,6 +26,7 @@ const nextConfig: NextConfig = {
     const dashboardFrontUrl = process.env.DASHBOARD_FRONT_URL ?? 'http://localhost:4102';
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
     const reportsFrontUrl = process.env.REPORTS_FRONT_URL ?? 'http://localhost:4104';
+    const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
 
     return [
       {
@@ -54,6 +55,21 @@ const nextConfig: NextConfig = {
       {
         source: '/reports/:path*',
         destination: `${reportsFrontUrl}/reports/:path*`,
+      },
+      /**
+       * El panel de administración. Las **dos** entradas, igual que las demás
+       * zonas: sin la primera, `/admin` a secas no casa con `/:path*` y cae en el
+       * 404 del shell.
+       *
+       * El shell no comprueba nada aquí —no protege ninguna zona— y no hace falta:
+       * admin-front exige sesión en su `proxy.ts`, rol de administración en su
+       * layout, y el gateway exige el rol otra vez en las cuatro rutas de
+       * `/api/admin`.
+       */
+      { source: '/admin', destination: `${adminFrontUrl}/admin` },
+      {
+        source: '/admin/:path*',
+        destination: `${adminFrontUrl}/admin/:path*`,
       },
     ];
   },
