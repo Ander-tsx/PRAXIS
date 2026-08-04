@@ -53,6 +53,21 @@ const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
 
 /**
+ * El slug va escrito, no derivado del nombre.
+ *
+ * ⚠️ Este archivo inserta en `projects.projects` con **SQL crudo**, porque el
+ * cliente tipado de este servicio solo conoce el esquema `tasks`. Eso significa
+ * que TypeScript **no comprueba las columnas**: cuando `slug` pasó a ser
+ * obligatorio, el seed normal dejó de compilar y avisó, pero este habría
+ * reventado en ejecución con una violación de NOT NULL, ya con las tablas
+ * recreadas y a mitad de la siembra.
+ *
+ * Si alguien vuelve a añadir una columna obligatoria a `Project`, hay que
+ * acordarse de este INSERT: es el único sitio donde el compilador no ayuda.
+ */
+const SLUG_PROYECTO = 'sprint-historico-datos-de-demostracion';
+
+/**
  * Cuánto historial se fabrica.
  *
  * **16 semanas y no 8.** `weekly` acepta hasta 52 y dibuja una serie: con ocho
@@ -219,8 +234,8 @@ async function main() {
     await prisma.task.deleteMany({ where: { projectId } });
   } else {
     const creado = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO projects.projects (id, name, description, "ownerId", "createdAt", "updatedAt")
-      VALUES (gen_random_uuid(), ${NOMBRE_PROYECTO},
+      INSERT INTO projects.projects (id, name, slug, description, "ownerId", "createdAt", "updatedAt")
+      VALUES (gen_random_uuid(), ${NOMBRE_PROYECTO}, ${SLUG_PROYECTO},
               ${'Historial fabricado para poder enseñar los reportes. No mide trabajo real.'},
               ${dueno}, ${arranque}, now())
       RETURNING id
