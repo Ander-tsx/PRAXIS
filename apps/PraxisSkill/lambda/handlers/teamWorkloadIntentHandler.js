@@ -34,30 +34,32 @@ const TeamWorkloadIntentHandler = {
         .getResponse();
     }
 
+    let responseData;
     try {
-      const responseData = await praxisApi.getWorkload(apiClient, projectId);
-      const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
-
-      if (!items || items.length === 0) {
-        return handlerInput.responseBuilder
-          .speak('No hay datos de carga de trabajo registrados para este equipo.')
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-
-      const formattedMembers = items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount));
-      const membersList = joinNaturally(formattedMembers);
-      const firstMemberName = items[0].memberName;
-
-      const speakOutput = messages.TEAM_WORKLOAD(membersList, firstMemberName);
-
-      return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
-        .getResponse();
+      responseData = await praxisApi.getWorkload(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
+
+    if (!items || items.length === 0) {
+      return handlerInput.responseBuilder
+        .speak('No hay datos de carga de trabajo registrados para este equipo.')
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+
+    const formattedMembers = items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount));
+    const membersList = joinNaturally(formattedMembers);
+    const firstMemberName = items[0].memberName;
+
+    const speakOutput = messages.TEAM_WORKLOAD(membersList, firstMemberName);
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 

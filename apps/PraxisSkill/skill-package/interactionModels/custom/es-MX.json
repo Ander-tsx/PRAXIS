@@ -118,6 +118,7 @@
             "cuál es el avance del proyecto",
             "cómo va el progreso del proyecto",
             "dame el porcentaje de avance del proyecto",
+            "dame el avance del proyecto",
             "qué tanto se ha avanzado en el proyecto",
             "qué porcentaje de avance tiene {boardName}",
             "cuál es el avance de {boardName}",

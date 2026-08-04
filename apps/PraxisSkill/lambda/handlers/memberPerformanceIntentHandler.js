@@ -43,37 +43,43 @@ const MemberPerformanceIntentHandler = {
         .getResponse();
     }
 
+    let responseMembers;
     try {
       // 1. Obtener lista de miembros para resolver el nombre dictado
-      const responseMembers = await praxisApi.getMembers(apiClient, projectId);
-      const members = Array.isArray(responseMembers) ? responseMembers : (responseMembers?.items || []);
-
-      const matchedMember = findBestMatch(memberNameSlot, members, 'name');
-
-      if (!matchedMember) {
-        return handlerInput.responseBuilder
-          .speak(messages.MEMBER_NOT_FOUND(memberNameSlot))
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-
-      // 2. Consultar desempeño individual
-      const perf = await praxisApi.getMemberPerformance(apiClient, projectId, matchedMember.id);
-
-      const speakOutput = messages.MEMBER_PERFORMANCE(
-        perf.memberName || matchedMember.name,
-        perf.assignedCount,
-        perf.completedCount,
-        perf.inProgressCount
-      );
-
-      return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
-        .getResponse();
+      responseMembers = await praxisApi.getMembers(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const members = Array.isArray(responseMembers) ? responseMembers : (responseMembers?.items || []);
+    const matchedMember = findBestMatch(memberNameSlot, members, 'name');
+
+    if (!matchedMember) {
+      return handlerInput.responseBuilder
+        .speak(messages.MEMBER_NOT_FOUND(memberNameSlot))
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+
+    let perf;
+    try {
+      // 2. Consultar desempeño individual
+      perf = await praxisApi.getMemberPerformance(apiClient, projectId, matchedMember.id);
+    } catch (error) {
+      return await buildErrorResponse(handlerInput, error);
+    }
+
+    const speakOutput = messages.MEMBER_PERFORMANCE(
+      perf.memberName || matchedMember.name,
+      perf.assignedCount,
+      perf.completedCount,
+      perf.inProgressCount
+    );
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
