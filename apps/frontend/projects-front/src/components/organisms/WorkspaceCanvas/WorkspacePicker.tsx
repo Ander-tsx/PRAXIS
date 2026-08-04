@@ -9,6 +9,15 @@ import { WORKSPACE_NAME_MAX, validateWorkspace } from '@/lib/validation';
 
 export interface WorkspacePickerProps {
   projectId: string;
+  /**
+   * El slug, solo para navegar.
+   *
+   * Va aparte de `projectId` porque **no son intercambiables**: las acciones de
+   * este componente llaman a rutas anidadas, que solo entienden el UUID, y la
+   * barra de direcciones quiere el nombre. Navegando con `projectId` se veía
+   * una URL bonita convertirse en un UUID al cambiar de espacio.
+   */
+  projectSlug: string;
   workspaces: Workspace[];
   activeId: string;
   canManage: boolean;
@@ -29,6 +38,7 @@ export interface WorkspacePickerProps {
  */
 export function WorkspacePicker({
   projectId,
+  projectSlug,
   workspaces,
   activeId,
   canManage,
@@ -55,8 +65,8 @@ export function WorkspacePicker({
     if (!state.createdId) return;
     setOpen(false);
     setName('');
-    router.replace(`/${projectId}?tab=espacios&ws=${state.createdId}`);
-  }, [state.createdId, projectId, router]);
+    router.replace(`/${projectSlug}?tab=espacios&ws=${state.createdId}`);
+  }, [state.createdId, projectSlug, router]);
 
   /** Cerrar al pulsar fuera o con Escape, como cualquier desplegable. */
   useEffect(() => {
@@ -79,7 +89,7 @@ export function WorkspacePicker({
 
   function select(workspaceId: string) {
     setOpen(false);
-    router.replace(`/${projectId}?tab=espacios&ws=${workspaceId}`);
+    router.replace(`/${projectSlug}?tab=espacios&ws=${workspaceId}`);
   }
 
   return (
