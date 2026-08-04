@@ -79,13 +79,41 @@ export async function generarSlugUnico(
 
   if (!(await existe(base))) return base;
 
-  /* Se empieza en 2 porque el que no lleva sufijo es, conceptualmente, el 1.
-     El tope evita un bucle infinito si `existe` devolviera siempre true por un
-     error; a partir de ahí se cae a un sufijo aleatorio, que siempre termina. */
-  for (let n = 2; n <= 100; n++) {
-    const candidato = `${base}-${n}`;
+  /* Con el sufijo aleatorio no hay razón para rendirse pronto: cada intento es
+     independiente y la probabilidad de fallar varios seguidos es despreciable.
+     El tope solo existe para que un `existe` roto no cuelgue el proceso. */
+  for (let intento = 0; intento < 10; intento++) {
+    const candidato = `${base}-${sufijoAleatorio()}`;
     if (!(await existe(candidato))) return candidato;
   }
 
-  return `${base}-${Math.random().toString(36).slice(2, 8)}`;
+  throw new Error(`No se pudo encontrar un slug libre para "${nombre}"`);
+}
+
+/**
+ * Alfabeto sin caracteres que se confunden al leerlos o dictarlos.
+ *
+ * Fuera `0/o`, `1/l/i` y las vocales, que además evitan que salga una palabra
+ * reconocible —o desafortunada— por accidente en un sufijo de una URL pública.
+ */
+const ALFABETO = '23456789bcdfghjkmnpqrstvwxyz';
+
+/**
+ * Cuatro caracteres al azar: ~600 000 combinaciones.
+ *
+ * ⚠️ **Aleatorio y no un contador, a propósito.** `praxis-2` dice dos cosas que
+ * no son de nadie: cuántos proyectos con ese nombre hay, y —peor— **cuál es el
+ * siguiente**. Como el gateway responde 404 a un slug inexistente y 403 a uno
+ * ajeno, un contador deja enumerar proyectos de otros probando `-2`, `-3`, `-4`.
+ * Con esto, adivinar deja de ser viable.
+ *
+ * No hace falta que sea criptográfico: no es un secreto ni protege nada por sí
+ * mismo, solo evita que la siguiente URL sea deducible.
+ */
+function sufijoAleatorio(largo = 4): string {
+  let salida = '';
+  for (let i = 0; i < largo; i++) {
+    salida += ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+  }
+  return salida;
 }

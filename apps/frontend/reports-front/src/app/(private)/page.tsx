@@ -1,4 +1,6 @@
-import { AppHeader, type Paginated, type Project } from '@praxis/commons';
+import { AppHeader, type Paginated, type Project,
+  reportPath,
+} from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import { redirect } from 'next/navigation';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
@@ -34,7 +36,7 @@ export default async function ReportsIndexPage() {
 
   const primero = conAcceso.items[0];
   // Sin el basePath: es una ruta del App Router de esta app. Ver §17.4.
-  if (primero) redirect(`/${primero.slug}`);
+  if (primero) redirect(reportPath(primero));
 
   /**
    * Sin ninguno hay dos motivos distintos, y confundirlos manda a pedir un

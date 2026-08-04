@@ -1,6 +1,8 @@
 'use client';
 
-import { Button, type Workspace, alpha, colors } from '@praxis/commons';
+import { Button, type Workspace, alpha, colors,
+  projectPath,
+} from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { createWorkspaceAction } from '@/app/(private)/[id]/actions';
@@ -65,7 +67,7 @@ export function WorkspacePicker({
     if (!state.createdId) return;
     setOpen(false);
     setName('');
-    router.replace(`/${projectSlug}?tab=espacios&ws=${state.createdId}`);
+    router.replace(projectPath({ slug: projectSlug }, { tab: 'espacios', ws: state.createdId }));
   }, [state.createdId, projectSlug, router]);
 
   /** Cerrar al pulsar fuera o con Escape, como cualquier desplegable. */
@@ -89,7 +91,7 @@ export function WorkspacePicker({
 
   function select(workspaceId: string) {
     setOpen(false);
-    router.replace(`/${projectSlug}?tab=espacios&ws=${workspaceId}`);
+    router.replace(projectPath({ slug: projectSlug }, { tab: 'espacios', ws: workspaceId }));
   }
 
   return (
