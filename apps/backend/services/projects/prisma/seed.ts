@@ -34,24 +34,24 @@ import { PrismaClient } from '../src/generated/prisma-client';
 // ─── UUIDs fijos compartidos entre seeders ────────────────────────────────────
 
 // Usuarios (definidos en credentials/seed.ts)
-const ADMIN_USER_ID  = '11111111-1111-1111-1111-111111111111';
-const MARIA_USER_ID  = '22222222-2222-2222-2222-222222222221';
-const CARLOS_USER_ID = '33333333-3333-3333-3333-333333333331';
+const ADMIN_USER_ID  = '11111111-1111-4111-8111-111111111111';
+const MARIA_USER_ID  = '22222222-2222-4222-8222-222222222221';
+const CARLOS_USER_ID = '33333333-3333-4333-8333-333333333331';
 
 // Proyecto
-export const PROJECT_ID   = 'bbbb1111-1111-1111-1111-111111111111';
-export const WORKSPACE_ID = 'cccc1111-1111-1111-1111-111111111111';
-export const BOARD_ID     = 'dddd1111-1111-1111-1111-111111111111';
+export const PROJECT_ID   = 'bbbb1111-1111-4111-8111-111111111111';
+export const WORKSPACE_ID = 'cccc1111-1111-4111-8111-111111111111';
+export const BOARD_ID     = 'dddd1111-1111-4111-8111-111111111111';
 
 // Columnas (compartidas con tasks/seed.ts)
-export const COLUMN_TODO_ID     = 'eeee1111-1111-1111-1111-111111111111';
-export const COLUMN_PROGRESS_ID = 'eeee2222-2222-2222-2222-222222222222';
-export const COLUMN_REVIEW_ID   = 'eeee3333-3333-3333-3333-333333333333';
-export const COLUMN_DONE_ID     = 'eeee4444-4444-4444-4444-444444444444';
+export const COLUMN_TODO_ID     = 'eeee1111-1111-4111-8111-111111111111';
+export const COLUMN_PROGRESS_ID = 'eeee2222-2222-4222-8222-222222222222';
+export const COLUMN_REVIEW_ID   = 'eeee3333-3333-4333-8333-333333333333';
+export const COLUMN_DONE_ID     = 'eeee4444-4444-4444-8444-444444444444';
 
 // Roles del proyecto
-export const PROJECT_ROLE_ADMIN_ID  = 'ffff1111-1111-1111-1111-111111111111';
-export const PROJECT_ROLE_MEMBER_ID = 'ffff2222-2222-2222-2222-222222222222';
+export const PROJECT_ROLE_ADMIN_ID  = 'ffff1111-1111-4111-8111-111111111111';
+export const PROJECT_ROLE_MEMBER_ID = 'ffff2222-2222-4222-8222-222222222222';
 
 // ─── Permisos de roles ────────────────────────────────────────────────────────
 
