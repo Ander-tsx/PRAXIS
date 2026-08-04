@@ -57,7 +57,8 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 6. ✅ `GET /api/projects` filtra por **dueño o miembro**.
 7. ✅ Un proyecto nuevo nace con rol "Administrador" y con el dueño dentro.
 8. ⚠️ `permissions` de un rol es un **diccionario de booleanos**, nunca un array. El backend lo valida; los roles creados antes del validador siguen guardados como array y se normalizan al leer.
-9. ⚠️ `Project.name` es único a nivel **global**, no por usuario. Un nombre puede chocar con el proyecto de un equipo que no conoces.
+9. ✅ `Project.name` es único **por dueño**, no global: dos equipos pueden tener cada uno su "Sprint 1". Lo era a nivel global y chocaba con proyectos que no puedes ver; lo arregló `20260730020000_project_name_unique_per_owner`.
+10. ⚠️ `Project.slug` **sí** es único global, y es lo que va en la URL (`/projects/rediseno-del-panel`). Los choques se resuelven con sufijo (`-2`, `-3`) que pone el backend; nadie lo escribe. **Se regenera al renombrar**, así que un slug viejo deja de resolver — el UUID se acepta siempre. Para enlazar usa `slug`; para llamar a la API, `id`: solo `GET /projects/:id` traduce el slug, todo lo anidado espera el UUID.
 
 **Reglas al escribir un fetch:**
 

@@ -83,7 +83,13 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   if (!project) {
     const invitation = await api
       .get<MyInvitation[]>('/me/invitations')
-      .then((list) => list.find((candidate) => candidate.project.id === id))
+      .then((list) =>
+        /* `id` es lo que venga en la URL: puede ser el UUID o el slug, así que
+           se comparan los dos. */
+        list.find(
+          (candidate) => candidate.project.id === id || candidate.project.slug === id,
+        ),
+      )
       .catch(() => undefined);
 
     // Sin invitación no hay nada que ofrecer: que suba el error de siempre.
@@ -97,11 +103,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   }
 
   const [effective, members, labels] = await Promise.all([
-    api.get<EffectivePermissions>(`/projects/${id}/permissions/me`),
-    api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => [] as ProjectMember[]),
+    api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`),
+    api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
        tarea—, así que se piden siempre; son una fila por etiqueta. */
-    api.get<Label[]>(`/projects/${id}/labels`).catch(() => [] as Label[]),
+    api.get<Label[]>(`/projects/${project.id}/labels`).catch(() => [] as Label[]),
   ]);
 
   const can = effective.permissions;
@@ -123,7 +129,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       ? /* Solo quien gestiona el equipo puede listarlas; para el resto es un
            403 esperado y la sección simplemente no las muestra. */
         await api
-          .get<ProjectInvitation[]>(`/projects/${id}/invitations`)
+          .get<ProjectInvitation[]>(`/projects/${project.id}/invitations`)
           .catch(() => [] as ProjectInvitation[])
       : ([] as ProjectInvitation[]);
 

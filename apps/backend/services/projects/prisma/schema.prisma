@@ -15,6 +15,21 @@ model Project {
   /// cada uno su "Sprint 1". Antes era `@unique` a secas y el nombre chocaba con
   /// el proyecto de gente que no conoces, sin forma de saber por qué.
   name        String
+
+  /// El identificador legible de la URL: `/projects/rediseno-del-panel`.
+  ///
+  /// Único **global**, a diferencia de `name`, porque quien resuelve una URL es
+  /// una persona que puede ver proyectos de varios dueños —dos "Sprint 1" de
+  /// equipos distintos— y ahí el nombre solo no desambigua. Los choques se
+  /// resuelven con un sufijo numérico (`sprint-1-2`) que pone
+  /// `generarSlugUnico`; nadie lo escribe a mano, así que la unicidad global no
+  /// devuelve el conflicto incomprensible que quitó `20260730020000`.
+  ///
+  /// Se regenera al renombrar. Los enlaces con el UUID **siguen funcionando
+  /// siempre**: el guard acepta las dos formas, y por eso no hace falta guardar
+  /// los slugs viejos.
+  slug        String          @unique
+
   description String?
   ownerId     String
   workspaces  Workspace[]

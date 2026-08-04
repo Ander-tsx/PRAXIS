@@ -53,4 +53,10 @@ export class ProjectsController {
   resolveResource(@Payload() dto: { workspaceId?: string; boardId?: string }) {
     return this.projectsService.resolveResource(dto);
   }
+
+  /** Slug de la URL → id real. Lo usa el guard del gateway. */
+  @MessagePattern({ cmd: 'project_resolve_slug' })
+  resolveSlug(@Payload() dto: { slug: string }) {
+    return this.projectsService.resolveSlug(dto);
+  }
 }

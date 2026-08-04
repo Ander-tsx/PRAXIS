@@ -49,12 +49,12 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
     };
   }, [open]);
 
-  function select(projectId: string) {
+  function select(slug: string) {
     setOpen(false);
     /* Sin el basePath: Next añade `/reports`. `push` y no `replace` para que el
        botón atrás devuelva al proyecto anterior, que es lo que se espera al
        estar comparando. */
-    router.push(`/${projectId}`);
+    router.push(`/${slug}`);
   }
 
   return (
@@ -103,7 +103,7 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
                   <button
                     type="button"
                     aria-current={isActive ? 'true' : undefined}
-                    onClick={() => select(project.id)}
+                    onClick={() => select(project.slug)}
                     className={[
                       'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors',
                       isActive
