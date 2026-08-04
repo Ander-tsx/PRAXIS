@@ -154,6 +154,87 @@ export class PermissionsService implements OnModuleInit {
   }
 
   /**
+   * **Fija** el rol global de una cuenta: reemplaza los que tuviera.
+   *
+   * Es lo que necesita el panel, y no un `assign` más. El nivel efectivo de una
+   * cuenta es el más alto de sus filas, así que asignar `User` a un `Admin` no lo
+   * degrada: quedan las dos filas y sigue siendo `Admin`. El panel enseña **un**
+   * rol, y con esto lo que se ve y lo que se guarda son la misma cosa.
+   *
+   * En una transacción, porque el estado intermedio —una cuenta sin ningún rol
+   * mientras se cambia— es un nivel distinto del de antes y del de después, y
+   * cualquier petición que caiga justo ahí leería un permiso que nadie decidió.
+   */
+  async setUserRole(dto: { userId: string; roleName: GlobalRole }) {
+    const role = await this.prisma.role.findUnique({ where: { name: dto.roleName } });
+    if (!role) {
+      throw new RpcException({ statusCode: 404, message: `Rol '${dto.roleName}' no encontrado` });
+    }
+
+    /**
+     * Si esta cuenta es el último SuperAdmin y el rol nuevo no lo es, el sistema
+     * se quedaría sin nadie capaz de nombrar administradores. Se comprueba aquí
+     * porque aquí está la tabla; el gateway lo repite antes para dar el mensaje
+     * sin llegar a intentarlo.
+     */
+    if (dto.roleName !== GLOBAL_ROLES.SUPER_ADMIN) {
+      const superAdmins = await this.countRoleHolders({ roleName: GLOBAL_ROLES.SUPER_ADMIN });
+      const esElUltimo =
+        superAdmins.count <= 1 && superAdmins.userIds.includes(dto.userId);
+
+      if (esElUltimo) {
+        throw new RpcException({
+          statusCode: 409,
+          message:
+            'No se puede degradar al último SuperAdmin: el sistema se quedaría sin quien administre a los administradores.',
+        });
+      }
+    }
+
+    const asignado = await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: dto.userId } });
+      return tx.userRole.create({
+        data: { userId: dto.userId, roleId: role.id },
+        include: { role: true },
+      });
+    });
+
+    await this.redis.del(`roles:user:${dto.userId}`);
+    return asignado;
+  }
+
+  /**
+   * Los roles de varias cuentas de una vez.
+   *
+   * El panel lista 25 usuarios y necesita el rol de cada uno. Con
+   * `getUserRoles` serían 25 llamadas TCP por página; aquí es una consulta y un
+   * agrupado en memoria.
+   *
+   * No pasa por la caché de Redis —que es por usuario— a propósito: leer 25
+   * claves para evitar una consulta no compensa, y de paso el panel enseña
+   * siempre el rol de verdad y no uno de hasta un minuto antes, que es justo lo
+   * que confundiría después de cambiarlo.
+   *
+   * Devuelve un objeto `{ [userId]: string[] }`. Las cuentas sin ningún rol
+   * **no aparecen**: quien llama las trata como `User`, que es lo que son.
+   */
+  async getRolesForUsers(dto: { userIds: string[] }) {
+    const unicos = [...new Set(dto.userIds)].filter(Boolean);
+    if (unicos.length === 0) return {};
+
+    const filas = await this.prisma.userRole.findMany({
+      where:  { userId: { in: unicos } },
+      select: { userId: true, role: { select: { name: true } } },
+    });
+
+    const porUsuario: Record<string, string[]> = {};
+    for (const fila of filas) {
+      (porUsuario[fila.userId] ??= []).push(fila.role.name);
+    }
+    return porUsuario;
+  }
+
+  /**
    * Cuántas cuentas tienen un rol, y quiénes.
    *
    * Existe para las invariantes de «no dejar el sistema sin SuperAdmin», y por

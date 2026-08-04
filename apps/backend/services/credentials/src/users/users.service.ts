@@ -6,7 +6,9 @@ import { RedisService } from '../redis/redis.service';
 
 import {
   FindUsersDto,
+  type SetUserStatusDto,
   UpdateUserDto,
+  UserStatus,
 } from '@praxis/contracts';
 
 const USER_CACHE_TTL = 300;
@@ -39,6 +41,11 @@ export class UsersService {
       if (dto.filters.createdFrom) where.createdAt.gte = dto.filters.createdFrom;
       if (dto.filters.createdTo)   where.createdAt.lte = dto.filters.createdTo;
     }
+
+    /* El filtro por estado estaba comentado como TODO en `FindUsersFilter`. Lo
+       usa el panel de administración para responder «quién está suspendido», que
+       de otro modo obliga a traerse todas las páginas y filtrar en el cliente. */
+    if (dto.filters?.status) where.status = dto.filters.status;
 
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -94,6 +101,58 @@ export class UsersService {
     });
 
     await this.redis.del(`user:${dto.id}`);
+
+    return updated;
+  }
+
+  /**
+   * Cambia el estado de una cuenta, y **corta su sesión**.
+   *
+   * ## Lo segundo es lo importante
+   *
+   * Sin el borrado de `auth:session:<id>`, suspender a alguien con la sesión
+   * abierta **no le echaba nunca**. Comprobado leyendo `auth.service.refresh()`:
+   * verifica la firma del refresh token, lo compara con esta clave de Redis y
+   * firma un access nuevo — sin volver a mirar `status` en ningún momento. Y el
+   * `proxy.ts` de cada zona renueva en cada navegación mientras el refresh viva
+   * (7 días, y la ventana se renueva sola). Es decir: la suspensión solo impedía
+   * un login nuevo, que es justo el que esa persona no necesita.
+   *
+   * Con la clave borrada, la cadena se cierra: el access token vive lo que le
+   * quede (≤15 min, `JWT_EXPIRES_IN`), el refresh falla, el proxy manda al login
+   * y el login responde 403. Esos 15 minutos son la ventana que se aceptó a
+   * propósito; lo que no se puede aceptar es que no haya final.
+   *
+   * `refresh()` comprueba además `status` por su cuenta, así que un cambio de
+   * estado por cualquier otra vía —una migración, un arreglo a mano en la base—
+   * también surte efecto.
+   *
+   * ## Las cachés
+   *
+   * `user:<id>` dura 5 minutos y es la que lee `findOne`, así que sin
+   * invalidarla el panel enseñaría el estado viejo justo después de cambiarlo:
+   * el administrador pulsa, no ve nada y vuelve a pulsar.
+   */
+  async setStatus(dto: SetUserStatusDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: dto.id } });
+    if (!user) {
+      throw new RpcException({ statusCode: 404, message: 'Usuario no encontrado' });
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: dto.id },
+      data:  { status: dto.status },
+      include: { credential: { select: { email: true } } },
+    });
+
+    await this.redis.del(`user:${dto.id}`);
+
+    /* Al dejar de estar activa se cierra la sesión; al volver a estarlo no hay
+       nada que cerrar, y borrar la clave echaría de la aplicación a alguien a
+       quien se le acaba de devolver el acceso. */
+    if (dto.status !== UserStatus.ACTIVE) {
+      await this.redis.del(`auth:session:${dto.id}`);
+    }
 
     return updated;
   }
