@@ -13,6 +13,8 @@ import { WorkspacePicker } from './WorkspacePicker';
 
 export interface WorkspaceCanvasProps {
   projectId: string;
+  /** Solo para navegar; las acciones siguen usando `projectId`. */
+  projectSlug: string;
   workspaces: Workspace[];
   /** Espacio abierto, resuelto en la page desde `?ws=`. */
   activeWorkspace: Workspace | null;
@@ -59,6 +61,7 @@ export interface WorkspaceCanvasProps {
  */
 export function WorkspaceCanvas({
   projectId,
+  projectSlug,
   workspaces,
   activeWorkspace,
   canManage,
@@ -82,6 +85,7 @@ export function WorkspaceCanvas({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <WorkspacePicker
           projectId={projectId}
+          projectSlug={projectSlug}
           workspaces={workspaces}
           activeId={activeWorkspace?.id ?? ''}
           canManage={canManage}

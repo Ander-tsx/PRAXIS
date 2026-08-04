@@ -259,8 +259,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           renderLink={(t, isActive, content) => (
             <Link
               key={t.id}
-              /* Misma zona: sin el basePath, Next añade `/projects`. */
-              href={`/${project.id}?tab=${t.id}`}
+              /* Misma zona: sin el basePath, Next añade `/projects`.
+                 Con el `id` en vez del `slug`, cambiar de pestaña reescribía
+                 una URL bonita por el UUID. */
+              href={`/${project.slug}?tab=${t.id}`}
               aria-current={isActive ? 'page' : undefined}
               className={tabLinkClasses(isActive)}
               /* Sustituye la entrada en el historial: cambiar de pestaña no
@@ -275,6 +277,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         {activeTab === 'espacios' && (
           <WorkspaceCanvas
             projectId={project.id}
+            projectSlug={project.slug}
             workspaces={project.workspaces}
             activeWorkspace={activeWorkspace}
             canManage={can.canCreateBoard}
