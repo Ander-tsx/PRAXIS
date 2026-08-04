@@ -1,28 +1,18 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
 import { PermissionsController } from './permissions.controller';
 
+/**
+ * `GlobalRolesModule` aporta `PERMISSIONS_SERVICE` **y** `GlobalRolesService`.
+ *
+ * El cliente TCP se registraba aquí; se movió allí para que un solo módulo sea
+ * dueño de la conexión a permissions-service y los guards no tengan que
+ * importar este módulo —que necesita el suyo— cerrando un ciclo.
+ */
 @Module({
-  imports: [
-    AuthModule,
-    ClientsModule.registerAsync([
-      {
-        name: 'PERMISSIONS_SERVICE',
-        imports: [ConfigModule],
-        inject: [ConfigService],
-        useFactory: (config: ConfigService) => ({
-          transport: Transport.TCP,
-          options: {
-            host: config.get<string>('PERMISSIONS_SERVICE_HOST'),
-            port: config.get<number>('PERMISSIONS_SERVICE_PORT'),
-          },
-        }),
-      },
-    ]),
-  ],
+  imports: [AuthModule, GlobalRolesModule],
   controllers: [PermissionsController],
-  exports: [ClientsModule],
+  exports: [GlobalRolesModule],
 })
 export class PermissionsModule {}

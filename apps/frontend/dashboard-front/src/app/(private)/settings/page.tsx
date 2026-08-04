@@ -1,4 +1,4 @@
-import { AppHeader, Badge } from '@praxis/commons';
+import { AppHeader, GlobalRoleBadges } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
@@ -51,11 +51,7 @@ export default async function SettingsPage() {
   return (
     <AppHeader
       title="Configuración"
-      headerSlot={roles.map((role) => (
-        <Badge key={role} variant={role === 'Admin' ? 'accent' : 'primary'}>
-          {role.toUpperCase()}
-        </Badge>
-      ))}
+      headerSlot={<GlobalRoleBadges roles={roles} />}
     >
       {/* Sin «← Volver al panel»: ahora quien navega es la barra lateral, y un
           enlace de vuelta junto a su propia entrada resaltada sobra.
