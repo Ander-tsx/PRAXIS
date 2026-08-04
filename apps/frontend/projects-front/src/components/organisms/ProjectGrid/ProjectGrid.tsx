@@ -44,7 +44,7 @@ export function ProjectGrid({ projects, total, currentUserId, search }: ProjectG
             <li key={project.id}>
               {/* Misma zona → next/link, sin el basePath: Next añade /projects. */}
               <Link
-                href={`/${project.id}`}
+                href={`/${project.slug}`}
                 className="flex h-full flex-col gap-3 rounded-xl border border-border bg-surface p-5 transition-colors hover:border-border-strong"
               >
                 <div className="flex flex-col gap-1.5">
