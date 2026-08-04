@@ -5,7 +5,10 @@ import {
   AssignRoleDto,
   RevokeRoleDto,
   CheckRoleDto,
+  GetRolesForUsersDto,
   GetUserRolesDto,
+  type GlobalRole,
+  SetUserRoleDto,
 } from '@praxis/contracts';
 
 import { PermissionsService } from './permissions.service';
@@ -37,5 +40,28 @@ export class PermissionsController {
   @MessagePattern({ cmd: 'permission_check_role' })
   checkRole(@Payload() dto: CheckRoleDto) {
     return this.permissionsService.checkRole(dto);
+  }
+
+  /**
+   * Cuántas cuentas tienen un rol, y quiénes.
+   *
+   * Lo consumen las invariantes de administración: no dejar el sistema sin
+   * SuperAdmin, ni por revocar el rol ni por suspender la cuenta.
+   */
+  @MessagePattern({ cmd: 'permission_count_role_holders' })
+  countRoleHolders(@Payload() dto: { roleName: GlobalRole }) {
+    return this.permissionsService.countRoleHolders(dto);
+  }
+
+  /** Fija el rol global de una cuenta, reemplazando los que tuviera. */
+  @MessagePattern({ cmd: 'permission_set_user_role' })
+  setUserRole(@Payload() dto: SetUserRoleDto) {
+    return this.permissionsService.setUserRole(dto);
+  }
+
+  /** Los roles de varias cuentas de una vez, para el listado del panel. */
+  @MessagePattern({ cmd: 'permission_get_roles_for_users' })
+  getRolesForUsers(@Payload() dto: GetRolesForUsersDto) {
+    return this.permissionsService.getRolesForUsers(dto);
   }
 }

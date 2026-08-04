@@ -18,13 +18,153 @@ export interface UserProfile {
   credential: { email: string };
 }
 
-/** `GET /api/permissions/user/:id` — roles globales (Admin / User) */
+/** `GET /api/permissions/user/:id` — roles globales de la plataforma */
 export interface GlobalRole {
   id: string;
   name: string;
   description: string | null;
   createdAt: string;
 }
+
+/**
+ * Los tres roles globales, espejo de `GLOBAL_ROLES` en `@praxis/contracts`.
+ *
+ * Está copiado porque `@praxis/contracts` es un paquete de backend —arrastra
+ * `class-validator` y `@nestjs/swagger`— y el frontend no lo consume. Es el mismo
+ * trato que `PROJECT_PERMISSIONS` y `COLUMN_COLORS`: espejo declarado, con el
+ * original nombrado al lado.
+ *
+ * ⚠️ El orden es la jerarquía: `SuperAdmin > Admin > User`. Y el rol global es
+ * **privado**: no se enseña en el directorio de usuarios ni en la lista de
+ * miembros de un proyecto. Cada quien ve el suyo, y el panel ve los de todos.
+ */
+export const GLOBAL_ROLES = ['SuperAdmin', 'Admin', 'User'] as const;
+
+export type GlobalRoleName = (typeof GLOBAL_ROLES)[number];
+
+/** Estados de una cuenta. Espejo de `UserStatus` en `@praxis/contracts`. */
+export const USER_STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'] as const;
+
+export type UserStatusName = (typeof USER_STATUSES)[number];
+
+/**
+ * Una fila de `GET /api/admin/users`.
+ *
+ * No es `UserProfile`: **este listado enseña dos cosas que el directorio no**, el
+ * estado de la cuenta y el rol global, y por eso es otra ruta detrás del rol de
+ * administrador en vez de un campo más de `GET /users`.
+ */
+export interface AdminUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  status: UserStatusName;
+  createdAt: string;
+  credential: { email: string };
+  /** El rol efectivo. `User` cuando la cuenta no tiene ninguna fila de rol. */
+  globalRole: GlobalRoleName;
+  /** Los roles tal cual. Vacío en la mayoría de las cuentas reales. */
+  globalRoles: string[];
+}
+
+/** Acciones que registra el panel. Espejo de `AdminActionType`. */
+export const ADMIN_ACTIONS = [
+  'USER_SUSPENDED',
+  'USER_REACTIVATED',
+  'USER_DEACTIVATED',
+  'ROLE_GRANTED',
+  'ROLE_REVOKED',
+  'PROJECT_SUSPENDED',
+  'PROJECT_REACTIVATED',
+  'PROJECT_ARCHIVED',
+  'PROJECT_RESTORED',
+] as const;
+
+export type AdminActionName = (typeof ADMIN_ACTIONS)[number];
+
+/**
+ * Una entrada de `GET /api/admin/activity`.
+ *
+ * `actorLabel` y `targetLabel` son **copias del momento**, no referencias: por eso
+ * la entrada sigue leyéndose cuando la cuenta o el proyecto ya no existen. Igual
+ * que `projectName` en los avisos.
+ */
+export interface AdminActivityEntry {
+  id: string;
+  actorId: string;
+  actorLabel: string | null;
+  action: AdminActionName;
+  targetType: 'USER' | 'PROJECT';
+  targetId: string;
+  targetLabel: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+/**
+ * ¿Estos roles dan acceso al panel de administración?
+ *
+ * Es la única pregunta que el frontend necesita hacerse sobre la jerarquía, y
+ * por eso es una función y no una comparación suelta: `role === 'Admin'` —que es
+ * lo que había en los dos sitios que pintan la insignia— **deja fuera al
+ * SuperAdmin**, así que el nivel más alto se pintaba como un usuario corriente.
+ *
+ * Quien manda de verdad es el gateway. Esto solo decide qué se enseña.
+ */
+export function hasAdminRole(roleNames: readonly string[]): boolean {
+  return roleNames.some((name) => name === 'SuperAdmin' || name === 'Admin');
+}
+
+/**
+ * El nivel de estos roles: el más alto de los que haya.
+ *
+ * Espejo de `globalRoleLevel` en `@praxis/contracts`, con las mismas dos reglas
+ * que allí y por las mismas razones:
+ *
+ * - **una lista vacía es `User`**, no «sin nivel»: `POST /auth/register` no
+ *   asigna ningún rol, así que la mayoría de las cuentas reales no tienen
+ *   ninguno;
+ * - **los nombres desconocidos se ignoran**, para que un rol inventado en la
+ *   tabla no suba a nadie de nivel.
+ *
+ * Lo usa el panel para **apagar** lo que el gateway va a rechazar: nada sobre tu
+ * propia cuenta, nada sobre una de nivel igual o superior. Es cortesía, no
+ * autorización: quien decide es el gateway.
+ */
+export function globalRoleLevelOf(roleNames: readonly string[]): number {
+  const NIVELES: Record<GlobalRoleName, number> = { User: 0, Admin: 1, SuperAdmin: 2 };
+
+  return roleNames.reduce(
+    (nivel, name) =>
+      name in NIVELES ? Math.max(nivel, NIVELES[name as GlobalRoleName]) : nivel,
+    0,
+  );
+}
+
+/**
+ * Estado administrativo de un proyecto. Espejo de `ProjectStatus`.
+ *
+ * ⚠️ `DELETED` **no es** un proyecto borrado. `DELETE /projects/:id` existe, es del
+ * dueño, cascadea y no tiene vuelta atrás; esto es un estado que pone y quita la
+ * administración de la plataforma, y se deshace. Un proyecto en `DELETED` no
+ * aparece en ningún listado salvo en el panel.
+ */
+export const PROJECT_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETED'] as const;
+
+export type ProjectStatusName = (typeof PROJECT_STATUSES)[number];
+
+/**
+ * El `code` con el que el gateway distingue «este proyecto está suspendido» de «no
+ * tienes permiso».
+ *
+ * Los dos son 403 y **no se arreglan igual**: uno se resuelve pidiéndole permiso a
+ * quien administra el proyecto, el otro no se resuelve —hay que esperar a que la
+ * plataforma lo reactive—. Sin mirar el código, la pantalla enseña «acceso
+ * denegado» en los dos casos y el dueño de un proyecto suspendido se pone a
+ * pedirse permisos a sí mismo.
+ */
+export const PROJECT_SUSPENDED_CODE = 'PROJECT_SUSPENDED';
 
 /** Un elemento de `GET /api/projects` → `{ items, total }` */
 export interface Project {
@@ -46,11 +186,48 @@ export interface Project {
   ownerId: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Estado administrativo.
+   *
+   * Un proyecto `SUSPENDED` **sigue apareciendo aquí**: el dueño y los miembros lo
+   * ven entero y no pueden tocar nada. Esconderlo lo haría indistinguible de uno
+   * borrado y nadie sabría a quién preguntar. Los `DELETED` no llegan nunca a esta
+   * lista, así que en la práctica solo se ven los dos primeros valores.
+   */
+  status: ProjectStatusName;
+  /** Por qué se suspendió. Es lo que se le enseña al dueño. `null` si está activo. */
+  suspendedReason?: string | null;
+  suspendedAt?: string | null;
   /** Contadores que el backend ya agrega: nos ahorran peticiones extra. */
   _count: {
     members: number;
     workspaces: number;
   };
+}
+
+/**
+ * Una fila de `GET /api/admin/projects`.
+ *
+ * Es `Project` más lo único que el panel ve y las pantallas de negocio no: los
+ * archivados. La ruta es otra —no un parámetro de `GET /projects`— porque aquella
+ * filtra por dueño o miembro, y añadirle una forma de ver todos sería poner un
+ * interruptor de bypass en la ruta que usa cualquiera.
+ *
+ * Trae además el **dueño resuelto**, que las rutas de negocio no dan: allí basta el
+ * `ownerId` porque la pantalla ya sabe de quién es el proyecto, y aquí «de quién es»
+ * es la primera pregunta al decidir si se suspende. Lo cruza el gateway con una sola
+ * llamada a credentials por página.
+ *
+ * ⚠️ **No trae `suspendedBy`.** El id de quien administra no sale por ninguna ruta:
+ * el rol global es privado, y devolverlo diría qué cuenta es administradora. Quién
+ * actuó se lee en el registro de actividad, que ya es admin-only.
+ */
+export interface AdminProject extends Project {
+  /**
+   * Nombre y correo del dueño. `null` si credentials no respondió: el inventario
+   * sale sin nombres antes que no salir, porque sirve igual para suspender.
+   */
+  owner?: { id: string; name: string | null; email: string | null } | null;
 }
 
 /** Los permisos de proyecto. Espejo del enum `ProjectPermission`. */
@@ -415,8 +592,19 @@ export interface ProjectDetail extends Project {
 /** `GET /api/projects/:projectId/permissions/me` */
 export interface EffectivePermissions {
   isOwner: boolean;
-  /** Mapa completo: los no concedidos vienen en `false`, no ausentes. */
+  /**
+   * Mapa completo: los no concedidos vienen en `false`, no ausentes.
+   *
+   * ⚠️ **En un proyecto suspendido llega ya recortado a solo lectura**, y al dueño
+   * también. Eso significa que una pantalla no necesita mirar el estado para dejar
+   * de enseñar botones — pero sí para **explicarlo**: un mapa vacío sin motivo
+   * parece que te han quitado el rol. Para eso están los dos campos de abajo.
+   */
   permissions: Record<ProjectPermission, boolean>;
+  /** Estado del proyecto. Es lo que justifica un mapa recortado. */
+  projectStatus?: ProjectStatusName;
+  /** Por qué se suspendió, tal como lo escribió quien administra. */
+  suspendedReason?: string | null;
 }
 
 /**

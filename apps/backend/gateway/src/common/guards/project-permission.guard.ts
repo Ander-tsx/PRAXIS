@@ -10,7 +10,15 @@ import { Reflector } from '@nestjs/core';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
-import { ProjectPermission } from '@praxis/contracts';
+import {
+  PROJECT_SUSPENDED_CODE,
+  ProjectPermission,
+  READ_ONLY_PROJECT_PERMISSIONS,
+} from '@praxis/contracts';
+
+/** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
+const esUuid = (valor: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 
 /** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
 const esUuid = (valor: string): boolean =>
@@ -51,6 +59,21 @@ const TASK_CONTROLLERS = new Set([
  *
  * El id resuelto queda en `request.projectId` para que el controlador lo
  * inyecte en el payload al microservicio.
+ *
+ * ## También aplica el estado del proyecto
+ *
+ * Un proyecto `SUSPENDED` es de solo lectura y uno `DELETED` no existe para
+ * nadie salvo para el panel de administración. Se comprueba **aquí** porque este
+ * guard ya resuelve el proyecto de cada petición: una comprobación en este punto
+ * cubre tareas, columnas, comentarios, adjuntos, miembros, roles, etiquetas e
+ * informes de golpe, sin tocar ninguno de los servicios.
+ *
+ * ⚠️ **Lo que no lleva `@RequireProjectPermission` no pasa por aquí.** La primera
+ * línea de `canActivate` devuelve `true` si el handler no declara permiso, así
+ * que las rutas sin decorador se saltan también la comprobación de estado. Eran
+ * tres escrituras —aceptar una invitación, rechazarla y salirse del proyecto— y
+ * están cerradas a mano en sus controladores. Una ruta nueva que escriba sin
+ * declarar permiso volvería a abrir el mismo agujero.
  */
 @Injectable()
 export class ProjectPermissionGuard implements CanActivate {
@@ -164,15 +187,36 @@ export class ProjectPermissionGuard implements CanActivate {
     // Disponible para el controlador, que lo inyecta en el payload.
     request.projectId = projectId;
 
-    // 1. Verificar si el usuario es el dueño del proyecto — siempre tiene acceso total
+    /**
+     * 1. El estado del proyecto, y solo después el dueño.
+     *
+     * ⚠️ **El orden es la mitad del diseño.** La comprobación de estado va
+     * *antes* del atajo del dueño: si fuera después, el dueño —que es justo la
+     * persona a la que se le está suspendiendo el proyecto— seguiría pudiendo
+     * hacer de todo, y la suspensión solo afectaría a los demás miembros.
+     *
+     * Se aprovecha la petición que ya hacía falta para saber quién es el dueño,
+     * así que la suspensión no cuesta ni un salto de red más.
+     */
+    let project: {
+      ownerId?: string;
+      status?: string;
+      suspendedReason?: string | null;
+    } | null = null;
+
     try {
-      const project = await firstValueFrom(
+      project = await firstValueFrom(
         this.projectsClient.send({ cmd: 'project_find_one' }, { id: projectId }),
       );
-      if (project && project.ownerId === userId) return true;
     } catch {
       // Si no se encuentra el proyecto, continuar con la verificación de permisos
     }
+
+    if (project?.status && project.status !== 'ACTIVE') {
+      this.exigirEstadoQueDejePasar(project.status, project.suspendedReason, requiredPermission);
+    }
+
+    if (project?.ownerId === userId) return true;
 
     // 2. Consultar projects-service por el permiso granular
     try {
@@ -185,6 +229,50 @@ export class ProjectPermissionGuard implements CanActivate {
       return !!allowed;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Un proyecto que no está activo: qué se deja pasar y qué no.
+   *
+   * ## Suspendido: solo lectura
+   *
+   * Pasan `canViewProject` y `canViewReports`; todo lo demás implica escribir y
+   * se bloquea. El 403 lleva el código `PROJECT_SUSPENDED` **porque la interfaz
+   * tiene que distinguirlo de un 403 de permisos**: uno se arregla pidiéndole
+   * permiso a quien administra el proyecto y el otro no se arregla, hay que
+   * esperar a que la plataforma lo reactive. Sin el código, el dueño de un
+   * proyecto suspendido acabaría pidiéndose permisos a sí mismo.
+   *
+   * El motivo viaja en la respuesta. Es lo que permite que la pantalla lo diga en
+   * lugar de dejar que cada botón falle en silencio.
+   *
+   * ## Archivado: 404, no 403
+   *
+   * Para todo el mundo, dueño incluido. Un 403 diría «existe y no es tuyo», que
+   * es falso y además filtra que ese proyecto existe; un 404 dice lo que hay que
+   * decir: por esta puerta no hay nada. El administrador lo ve por la suya
+   * (`/admin/projects`), que no pasa por este guard.
+   */
+  private exigirEstadoQueDejePasar(
+    status: string,
+    reason: string | null | undefined,
+    requiredPermission: ProjectPermission,
+  ): void {
+    if (status === 'DELETED') {
+      throw new NotFoundException('Proyecto no encontrado');
+    }
+
+    if (status === 'SUSPENDED') {
+      if (READ_ONLY_PROJECT_PERMISSIONS.includes(requiredPermission)) return;
+
+      throw new ForbiddenException({
+        code: PROJECT_SUSPENDED_CODE,
+        message: reason
+          ? `Este proyecto está suspendido por la administración: ${reason}`
+          : 'Este proyecto está suspendido por la administración y solo se puede consultar.',
+        details: { reason: reason ?? null },
+      });
     }
   }
 }

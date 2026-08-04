@@ -32,6 +32,24 @@ model Project {
 
   description String?
   ownerId     String
+
+  /// Estado administrativo del proyecto. Ver `ProjectStatus`.
+  status      ProjectStatus   @default(ACTIVE)
+  /// Cuándo se suspendió o archivó. `null` mientras esté activo.
+  suspendedAt DateTime?
+  /// Quién lo hizo. Un administrador de la plataforma, no del proyecto.
+  suspendedBy String?
+  /**
+   * Por qué.
+   *
+   * ⚠️ **Vive aquí y no solo en el registro de actividad**, y es lo que hace
+   * posible el aviso obligatorio de la pantalla del proyecto: ese registro es
+   * admin-only, así que si el motivo estuviera solo allí, el dueño vería un
+   * proyecto donde nada funciona y ni una palabra que lo explique. Sin esto, cada
+   * botón falla en silencio y parece roto.
+   */
+  suspendedReason String?
+
   workspaces  Workspace[]
   members     ProjectMember[]
   roles       ProjectRole[]
@@ -40,8 +58,42 @@ model Project {
   updatedAt   DateTime        @updatedAt
 
   @@unique([ownerId, name])
+  /// El inventario del panel filtra por estado, y los listados normales excluyen
+  /// los archivados.
+  @@index([status])
   @@schema("projects")
   @@map("projects")
+}
+
+/// Estado administrativo de un proyecto.
+///
+/// ## Por qué son estados y no un borrado
+///
+/// `DELETE /projects/:id` ya existe y **se queda con el dueño**: cascadea, purga
+/// las tareas en otro microservicio y es irreversible. Un administrador que se
+/// equivoca con eso no tiene vuelta atrás, así que el panel no lo ofrece. Lo que
+/// ofrece son dos estados, y los dos se deshacen.
+enum ProjectStatus {
+  ACTIVE
+  /**
+   * Solo lectura. El dueño y los miembros lo siguen viendo entero —tableros,
+   * tareas, comentarios— y **ninguna acción funciona**.
+   *
+   * Se aplica en `ProjectPermissionGuard`, que ya resuelve el proyecto de cada
+   * petición: una comprobación ahí cubre tareas, columnas, comentarios, adjuntos,
+   * miembros, roles y etiquetas de golpe, sin tocar los servicios.
+   */
+  SUSPENDED
+  /**
+   * Retirado de la vista de todos menos del administrador, y recuperable.
+   *
+   * Conserva su `slug`, igual que un proyecto suspendido: recuperarlo tiene que
+   * devolverte tu URL. Por eso el slug sigue ocupado y no lo puede tomar un
+   * proyecto nuevo.
+   */
+  DELETED
+
+  @@schema("projects")
 }
 
 model Workspace {

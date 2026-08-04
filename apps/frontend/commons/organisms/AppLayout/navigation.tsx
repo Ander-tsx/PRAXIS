@@ -105,6 +105,34 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
+     * El panel de administración de la plataforma.
+     *
+     * ⚠️ **No sale para todo el mundo.** `loadAppNavItems` la descarta si la
+     * cuenta no tiene rol de administración, y por eso la lista canónica la trae
+     * y el filtro vive allí: aquí no hay forma de saber quién está mirando.
+     *
+     * Esconderla es **cortesía, no seguridad**: quien escriba `/admin` a mano
+     * llega a una pantalla que se lo explica, y las cuatro rutas de
+     * `/api/admin` exigen el rol en el gateway. Si esta línea se colara para
+     * todos, el resultado sería una entrada que no lleva a ninguna parte, no una
+     * fuga.
+     *
+     * Va antes de Configuración porque Configuración es siempre la última.
+     */
+    label: 'Administración',
+    href: '/admin',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
      * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
      * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.

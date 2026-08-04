@@ -1,5 +1,5 @@
 import { AppShell, LogoutButton, displayName } from '@praxis/commons';
-import { loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
+import { loadPrivateChrome } from '@praxis/commons/auth';
 
 /**
  * Armazón de la zona: barra lateral y cajón móvil, una sola vez.
@@ -12,7 +12,7 @@ import { loadAppNavItems, loadCurrentUser } from '@praxis/commons/auth';
  * El grupo `(private)` no aparece en la URL: solo sirve para envolver.
  */
 export default async function PrivateLayout({ children }: { children: React.ReactNode }) {
-  const [{ profile }, navItems] = await Promise.all([loadCurrentUser(), loadAppNavItems()]);
+  const { profile, navItems } = await loadPrivateChrome();
 
   return (
     <AppShell

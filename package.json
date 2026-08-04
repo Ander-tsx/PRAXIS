@@ -3,16 +3,21 @@
     "private": true,
     "scripts": {
         "dev:frontend": "turbo run dev --filter=\"./apps/frontend/*\"",
+        "dev:backend": "turbo run dev --filter=\"./apps/backend/gateway\" --filter=\"./apps/backend/services/*\"",
         "dev:cli": "node scripts/dev-cli/index.mjs",
         "build": "turbo run build",
+        "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability run build",
         "lint": "turbo run lint",
         "test": "turbo run test",
         "format": "biome format --write .",
         "format:check": "biome format .",
+        "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
         "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
         "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
-        "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" exec prisma migrate deploy",
-        "prisma:generate": "pnpm --filter \"@praxis/*-service\" exec prisma generate"
+        "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate deploy",
+        "prisma:generate": "pnpm --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma generate",
+        "prisma:reset": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate reset --force --skip-seed && pnpm prisma:seed",
+        "prisma:seed": "pnpm --filter @praxis/permissions-service exec prisma db seed && pnpm --filter @praxis/credentials-service exec prisma db seed && pnpm --filter @praxis/projects-service exec prisma db seed && pnpm --filter @praxis/tasks-service exec prisma db seed"
     },
     "devDependencies": {
         "@biomejs/biome": "^1.8.0",

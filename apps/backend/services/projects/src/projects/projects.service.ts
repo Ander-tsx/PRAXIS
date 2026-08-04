@@ -163,6 +163,17 @@ export class ProjectsService {
       where.OR = [{ ownerId: dto.userId }, memberScope];
     }
 
+    /**
+     * Los archivados no salen en ningún listado normal, ni para el dueño.
+     *
+     * Es lo que significa `DELETED`: retirado de la vista de todos menos del
+     * panel de administración, que usa `findAllForAdmin`. Los **suspendidos sí
+     * salen** —el dueño y los miembros siguen viéndolos, solo que no pueden
+     * tocarlos— porque esconder un proyecto suspendido lo haría indistinguible de
+     * uno borrado y nadie sabría a quién preguntar.
+     */
+    where.status = { not: 'DELETED' };
+
     // Filtro estricto por propietario, para herramientas de administración.
     if (dto.ownerId) where.ownerId = dto.ownerId;
 
@@ -183,6 +194,12 @@ export class ProjectsService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        /* `suspendedBy` es el id de quien administra la plataforma, y el rol global
+           es privado (`docs/backend/permissions.md`): devolverlo aquí le diría a
+           cualquier dueño qué cuenta es administradora. El motivo y la fecha sí
+           salen —son lo que explica el aviso—, el autor no. El panel lo lee por su
+           propia ruta, `findAllForAdmin`, que no omite nada. */
+        omit: { suspendedBy: true },
         include: { _count: { select: { members: true, workspaces: true } } },
       }),
       this.prisma.project.count({ where }),
@@ -199,6 +216,9 @@ export class ProjectsService {
 
     const projects = await this.prisma.project.findMany({
       where: {
+        /* Igual que en `findAllProjects`: los archivados no salen, los suspendidos
+           sí. Este es el selector de proyectos de Análisis y del asistente. */
+        status: { not: 'DELETED' },
         OR: [
           { ownerId: dto.userId },
           { members: { some: { userId: dto.userId } } },
@@ -214,6 +234,10 @@ export class ProjectsService {
         slug:        true,
         description: true,
         ownerId:     true,
+        /* El estado va en el `select` explícito o no llega: sin él, el selector
+           de proyectos de Análisis no puede marcar los suspendidos y ofrece
+           acciones que van a fallar. */
+        status:      true,
         createdAt:   true,
         updatedAt:   true,
       },
@@ -261,6 +285,11 @@ export class ProjectsService {
 
     const project = await this.prisma.project.findUnique({
       where: { id },
+      /* Igual que en los listados: el dueño necesita `status` y `suspendedReason`
+         para el aviso de su pantalla, pero `suspendedBy` le diría qué cuenta es
+         administradora, y el rol global es privado. El guard tampoco lo usa: solo
+         mira el estado y el motivo. */
+      omit: { suspendedBy: true },
       include: {
         workspaces: { include: { boards: { include: { columns: { orderBy: { order: 'asc' } } } } } },
         roles: true,
@@ -339,6 +368,149 @@ export class ProjectsService {
 
     await this.redis.del(`project:${dto.id}`);
     return updated;
+  }
+
+  /**
+   * Cambia el estado administrativo del proyecto.
+   *
+   * ## Las cachés, que es donde esto se rompe en silencio
+   *
+   * `project:<id>` dura 5 minutos y es la que lee el guard en **cada** petición
+   * para decidir si deja pasar. Sin invalidarla, suspender no surtiría efecto
+   * hasta pasados esos minutos: el administrador pulsa, comprueba, todo sigue
+   * funcionando, y vuelve a pulsar.
+   *
+   * `projects:member:<userId>` dura 60 s y es la lista de proyectos de cada
+   * persona. Se invalida la del dueño y la de todos los miembros, porque un
+   * proyecto archivado tiene que desaparecer de sus listas y no dentro de un
+   * minuto.
+   *
+   * ## `suspendedReason` se guarda en el proyecto
+   *
+   * No solo en el registro de actividad, que es admin-only. Es lo que permite que
+   * la pantalla del proyecto explique al dueño por qué no funciona nada, en vez de
+   * dejar que cada botón falle sin decir nada.
+   */
+  async setStatus(dto: {
+    id: string;
+    status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+    reason?: string;
+    actorId?: string;
+  }) {
+    const project = await this.prisma.project.findUnique({
+      where:  { id: dto.id },
+      select: {
+        id: true,
+        ownerId: true,
+        /* El estado **anterior** viaja de vuelta al gateway: es lo único que
+           distingue reactivar un suspendido de recuperar un archivado, y son dos
+           entradas distintas del registro de actividad. El estado nuevo no basta,
+           los dos terminan en ACTIVE. */
+        status: true,
+        members: { select: { userId: true } },
+      },
+    });
+
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    const volviendoAActivo = dto.status === 'ACTIVE';
+
+    const updated = await this.prisma.project.update({
+      where: { id: dto.id },
+      data: {
+        status: dto.status,
+        /* Al reactivar se limpian los tres campos: dejar el motivo de una
+           suspensión pasada haría que la pantalla siguiera enseñando el aviso. */
+        suspendedAt:     volviendoAActivo ? null : new Date(),
+        suspendedBy:     volviendoAActivo ? null : (dto.actorId ?? null),
+        suspendedReason: volviendoAActivo ? null : (dto.reason ?? null),
+      },
+      include: { _count: { select: { members: true, workspaces: true } } },
+    });
+
+    await this.redis.del(`project:${dto.id}`);
+
+    const afectados = new Set([project.ownerId, ...project.members.map((m) => m.userId)]);
+    await Promise.all(
+      [...afectados].map((userId) => this.redis.del(`projects:member:${userId}`)),
+    );
+
+    return { ...updated, previousStatus: project.status };
+  }
+
+  /**
+   * El inventario completo para el panel de administración.
+   *
+   * Ruta aparte de `findAllProjects` y no un parámetro suyo: aquel filtra por
+   * dueño o miembro, y añadirle una forma de ver todos sería poner un interruptor
+   * de bypass en la consulta que usa cualquiera. Aquí el alcance es la plataforma
+   * entera desde el principio, y quien decide si se puede llegar es el rol global
+   * en el gateway.
+   *
+   * Incluye los archivados: para el panel son visibles, es el único sitio donde lo
+   * son, y sin ellos no habría forma de recuperarlos.
+   */
+  async findAllForAdmin(dto: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+  }) {
+    const page  = dto.page  ?? 1;
+    const limit = dto.limit ?? 25;
+    const skip  = (page - 1) * limit;
+
+    const where: any = {};
+    if (dto.status) where.status = dto.status;
+    if (dto.search) {
+      where.OR = [
+        { name:        { contains: dto.search, mode: 'insensitive' } },
+        { description: { contains: dto.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { members: true, workspaces: true } } },
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  /**
+   * El detalle para el panel, en solo lectura.
+   *
+   * ⚠️ **No reutiliza `findOneProject`** y no es por duplicar: aquella cachea en
+   * `project:<id>`, que es la clave que lee el guard en cada petición. Que el
+   * panel la rellene con la misma forma es inofensivo hoy, pero cualquier campo
+   * extra que se añadiera aquí acabaría en la caché que decide los permisos.
+   * Además esta no lanza 404 en los archivados, que son justo los que el
+   * administrador necesita poder abrir.
+   */
+  async findOneForAdmin(id: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      include: {
+        workspaces: { include: { boards: { include: { columns: { orderBy: { order: 'asc' } } } } } },
+        members: { include: { projectRole: true } },
+        roles: true,
+        _count: { select: { members: true, workspaces: true } },
+      },
+    });
+
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    return project;
   }
 
   async deleteProject(id: string) {

@@ -6,6 +6,8 @@ import {
   FindProjectsByMemberDto,
   FindProjectsDto,
   FindOneProjectDto,
+  type ProjectStatus,
+  SetProjectStatusDto,
   UpdateProjectDto,
   DeleteProjectDto,
 } from '@praxis/contracts';
@@ -47,6 +49,38 @@ export class ProjectsController {
   @MessagePattern({ cmd: 'project_delete' })
   delete(@Payload() dto: DeleteProjectDto) {
     return this.projectsService.deleteProject(dto.id);
+  }
+
+  /* ─── Administración de la plataforma ────────────────────────────── */
+
+  /**
+   * Cambia el estado administrativo. Comando aparte de `project_update`, que es
+   * el de renombrar: el estado no lo decide quien edita el proyecto sino quien
+   * administra la plataforma, y son rutas distintas con guards distintos.
+   */
+  @MessagePattern({ cmd: 'project_set_status' })
+  setStatus(@Payload() dto: SetProjectStatusDto) {
+    return this.projectsService.setStatus({
+      id: dto.id,
+      status: dto.status,
+      reason: dto.reason,
+      actorId: dto.actorId,
+    });
+  }
+
+  /** El inventario del panel: todos los proyectos, archivados incluidos. */
+  @MessagePattern({ cmd: 'project_find_all_admin' })
+  findAllForAdmin(
+    @Payload()
+    dto: { page?: number; limit?: number; search?: string; status?: ProjectStatus },
+  ) {
+    return this.projectsService.findAllForAdmin(dto);
+  }
+
+  /** El detalle para el panel, sin pasar por la caché que lee el guard. */
+  @MessagePattern({ cmd: 'project_find_one_admin' })
+  findOneForAdmin(@Payload() dto: FindOneProjectDto) {
+    return this.projectsService.findOneForAdmin(dto.id);
   }
 
   @MessagePattern({ cmd: 'project_resolve_resource' })

@@ -5,6 +5,7 @@ import {
   FindUsersDto,
   FindOneUserDto,
   FindUsersByIdsDto,
+  SetUserStatusDto,
   UpdateUserDto,
   DeleteUserDto,
 } from '@praxis/contracts';
@@ -34,6 +35,19 @@ export class UsersController {
   @MessagePattern({ cmd: 'user_update' })
   update(@Payload() dto: UpdateUserDto) {
     return this.usersService.update(dto);
+  }
+
+  /**
+   * Cambia el estado de la cuenta. Comando **aparte** de `user_update`.
+   *
+   * No es un campo más del actualizador porque su ruta HTTP tampoco lo es:
+   * `PATCH /users/:id` deja pasar al dueño de la cuenta, así que `status` ahí
+   * sería auto-editable y un suspendido se reactivaría solo. Separarlo aquí
+   * también evita que un `user_update` cualquiera pueda tocarlo por descuido.
+   */
+  @MessagePattern({ cmd: 'user_set_status' })
+  setStatus(@Payload() dto: SetUserStatusDto) {
+    return this.usersService.setStatus(dto);
   }
 
   @MessagePattern({ cmd: 'user_delete' })

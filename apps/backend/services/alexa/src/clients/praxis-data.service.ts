@@ -188,11 +188,29 @@ export class PraxisDataService {
     return members;
   }
 
+  /**
+   * ⚠️ **`status` va declarado en el tipo, y no es cosmético.**
+   *
+   * La fila siempre lo traía —`user_find_by_ids` devuelve el registro completo—
+   * pero el tipo no lo mencionaba, así que quien quisiera comprobar si una cuenta
+   * sigue activa no tenía nada a lo que agarrarse y se conformaba con comprobar
+   * que el perfil existiera. Es exactamente lo que pasó en
+   * `AlexaAuthService.verifyToken`, cuyo comentario decía «verificar que el
+   * usuario siga activo» sobre un `if (!profile)`: una cuenta suspendida devuelve
+   * perfil, pasaba el `if`, y su token de voz seguía sirviendo **90 días**
+   * (`VOICE_TOKEN_EXPIRES_IN`).
+   *
+   * El filtro **no** puede vivir en la consulta: esta misma función resuelve los
+   * nombres de los miembros para las respuestas habladas, y descartar a los
+   * suspendidos dejaría a esas personas convertidas en un UUID en mitad de una
+   * frase. Quien decide es cada quien que llama.
+   */
   async getUsersByIds(ids: string[]): Promise<
     Array<{
       id: string;
       firstName?: string | null;
       lastName?: string | null;
+      status?: string | null;
       credential?: { email?: string | null } | null;
     }>
   > {

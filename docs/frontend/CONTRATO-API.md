@@ -2,6 +2,8 @@
 
 > Extraído leyendo los controladores del gateway y los servicios, **no** de la documentación.
 > Fuente: `apps/backend/gateway/src/**` + `apps/backend/commons/contracts/src/**` (commit `ae01766`).
+> La sección «Administración» se añadió después, verificada petición a petición contra
+> el backend en marcha (rama `feature/administracion-global`).
 > Swagger vivo: `http://localhost:3000/api/docs`
 
 ---
@@ -26,7 +28,8 @@
   "success": false,
   "error": {
     "code": "BAD_REQUEST | UNAUTHORIZED | FORBIDDEN | NOT_FOUND | CONFLICT |
-             UNPROCESSABLE_ENTITY | INTERNAL_SERVER_ERROR | BAD_GATEWAY | HTTP_ERROR",
+             UNPROCESSABLE_ENTITY | INTERNAL_SERVER_ERROR | BAD_GATEWAY | HTTP_ERROR
+             | <código de dominio>",
     "message": "…",
     "details": {}          // en errores de validación: { "errors": ["…", "…"] }
   }
@@ -35,12 +38,27 @@
 
 En validación fallida el `message` es literalmente `"Validation failed"` y los mensajes útiles están en `details.errors`.
 
+#### `code` puede ser de dominio, no solo la familia del status
+
+Lo normal es que se derive del número HTTP —los ocho literales de arriba—, pero un
+caso concreto puede traer el suyo cuando **el status no basta para saber qué hacer**.
+Hoy hay uno: **`PROJECT_SUSPENDED`** (ver «Administración»), un 403 que no se arregla
+pidiendo permisos. Al leer errores, compara contra el `code` y deja un `default` para
+lo desconocido; no asumas que un 403 siempre es de permisos.
+
+⚠️ Esto estuvo roto hasta `standard-exception.filter.ts` de esta sesión: el filtro
+derivaba el código del status **siempre** y se comía el explícito en sus dos ramas
+—`HttpException` lo ignoraba, y en la de `RpcException` se miraba `statusCode` antes
+que `code`, que como todos los `RpcException` del repo lo llevan, hacía la rama
+inalcanzable—. Si ves un `FORBIDDEN` donde el backend dice mandar otra cosa, es esto.
+
 ### ⚠️ Reglas que rompen cosas si se olvidan
 
 1. **Ninguna ruta de tarea o checklist acepta `projectId` en el body.** Es al revés de como estuvo: el guard lo resuelve desde la ruta y mandarlo responde `400 "property projectId should not exist"`. Se quitó porque, mientras lo elegía el cliente, bastaba con declarar el id de un proyecto propio para leer, editar y borrar tareas de un proyecto ajeno (PENDIENTES-BACKEND §9).
 2. **Al mover una tarea manda `columnId` Y `status` coherentes.** `status` es un string que debe igualar el **nombre** de la columna destino, no su id. Quien mueva necesita la correspondencia nombre ↔ id; en la interfaz la resuelve `BoardColumns`, que ya tiene las columnas.
    El mismo hecho por el otro lado: **renombrar una columna cambia el `status` de sus tareas**, y lo hace el backend en cascada. Ver «Columns».
-3. Solo el `ownerId` del proyecto hace bypass de permisos. El `admin` global **no** tiene permisos dentro de proyectos ajenos.
+3. Solo el `ownerId` del proyecto hace bypass de permisos. El rol global **no** concede permisos dentro de proyectos ajenos, y sigue siendo cierto con el panel de administración: quien administra la plataforma no gana `canEditTask` en ningún sitio. Lo que tiene es **otra puerta** —`/api/admin/projects`, solo lectura y suspensión— que no pasa por `ProjectPermissionGuard`. Por eso el panel no enlaza a `/projects/<slug>`: ese enlace le daría 403 y parecería roto.
+4. **Un 403 puede no ser de permisos.** Si el proyecto está suspendido, todas las escrituras dan 403 con `code: 'PROJECT_SUSPENDED'` aunque tengas el permiso, y al dueño también. Ver «Administración».
 
 ---
 
@@ -99,7 +117,12 @@ obsoletas.
 | GET | `/permissions/user/:userId` | — | Roles de un usuario |
 | POST | `/permissions/check` | `{ userId, roleName }` | → `{ hasRole: boolean }` |
 
-Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
+Roles globales: **`SuperAdmin`, `Admin`, `User`**, con jerarquía. Eran solo dos y el
+guard comparaba contra el literal `'Admin'`, que **dejaba fuera al SuperAdmin**.
+
+⚠️ Estas rutas son las de bajo nivel sobre la tabla de roles. Para administrar cuentas
+usa `/api/admin/users`, que aplica la jerarquía, exige un motivo y **deja constancia en
+el registro de actividad**; `POST /permissions/assign` no hace ninguna de las tres cosas.
 
 ---
 
@@ -165,6 +188,9 @@ Un cuerpo vacío no describe ningún cambio: manda solo el campo que cambia.
 ```ts
 Project = {
   id, name, description, ownerId, createdAt, updatedAt,
+  status: 'ACTIVE' | 'SUSPENDED' | 'DELETED',   // estado administrativo, ver «Administración»
+  suspendedReason: string | null,               // el texto que se le enseña al dueño
+  suspendedAt: string | null,
   workspaces: [{ id, name, projectId, createdAt,
                  boards: [{ id, name, workspaceId, createdAt,
                             columns: [{ id, name, order, color, boardId }] }] }],   // ordenadas por `order`
@@ -173,7 +199,17 @@ Project = {
 }
 ```
 
-Cacheado en Redis 5 min — un cambio puede tardar en reflejarse.
+⚠️ **No trae `suspendedBy`**, y no es un olvido: es el id de quien administra la
+plataforma, y el rol global es privado —devolverlo diría qué cuenta es
+administradora—. Se omite en `GET /projects/:id` y en `GET /projects`. Quién actuó se
+lee en `/admin/activity`, que ya está detrás del rol.
+
+⚠️ **Un `DELETED` no llega aquí: responde 404.** Y `GET /projects` tampoco lo lista,
+ni para su dueño. En la práctica, por estas rutas solo se ven `ACTIVE` y `SUSPENDED`.
+
+Cacheado en Redis 5 min — un cambio puede tardar en reflejarse. **Suspender y archivar
+invalidan esa clave**, así que el estado sí es inmediato; lo que puede ir con retraso
+es un renombrado.
 
 ---
 
@@ -409,11 +445,43 @@ el formulario de roles **debe enseñarlo** —marcar "eliminar" implica "editar"
 —cualquier permiso lo implica— y es lo que exige `GET /projects/:id`, así que un
 rol de solo lectura se modela con él y nada más.
 
+### `GET /projects/:projectId/permissions/me` — lo que puedes hacer aquí
+
+Exige `canViewProject`, o sea que **cualquier miembro puede preguntarlo**, incluido
+uno de solo lectura. Es la pieza que evita descubrir los permisos a base de 403.
+
+```ts
+{
+  isOwner: boolean,
+  permissions: Record<ProjectPermission, boolean>,   // mapa COMPLETO, los no concedidos en false
+  projectStatus: 'ACTIVE' | 'SUSPENDED' | 'DELETED',
+  suspendedReason: string | null
+}
+```
+
+El mapa viene **ya expandido por jerarquía** y con todas las claves presentes: no hay
+que distinguir «false» de «ausente».
+
+⚠️ **En un proyecto suspendido llega recortado a `canViewProject` + `canViewReports`,
+y al dueño también** —es justo la persona a la que se le suspendió el proyecto, así
+que si el bypass de dueño sobreviviera al recorte la suspensión solo afectaría a los
+demás—. El recorte **solo quita**: no concede `canViewReports` a quien no lo tenía.
+
+Consecuencia práctica: una pantalla **no necesita mirar el estado** para dejar de
+enseñar botones, porque el mapa ya lo dice. Lo que sí necesita el estado es para
+**explicarlo** — un mapa vacío sin motivo parece que te han degradado de rol, y por eso
+`projectStatus` y `suspendedReason` viajan aquí y no hay que cruzarlos con otra
+petición (que además podría discrepar por la caché de 5 minutos del proyecto).
+
 ### Los permisos se cachean 5 minutos
 
 `project:<projectId>:user:<userId>:permissions` en Redis, TTL 300s. Se invalida
 al cambiar un rol y al añadir un miembro, así que el camino normal es
 consistente; tenlo en cuenta si algo parece no aplicarse.
+
+El recorte por estado **no pasa por esa caché**: se aplica al construir la respuesta,
+sobre lo que salga de ella. Así suspender surte efecto en la siguiente petición y no
+cuando expire el TTL.
 
 ---
 
@@ -774,6 +842,170 @@ POST /workspaces/:wid/boards   → boardId
 POST /boards/:bid/columns  ×N  → columnIds       (guarda name ↔ id: `status` usa el name)
 POST /boards/:bid/tasks        → { columnId, title, status: <name de la columna> }
 ```
+
+---
+
+## Administración — `/api/admin` 🔒 rol global
+
+Todo cuelga de `@RequireGlobalRole(Admin)`, que se satisface con **`Admin` o
+`SuperAdmin`** por jerarquía. Un `User` recibe `403 "Se requiere el rol global:
+Admin"`. Lo consume `admin-front` (zona 4105, servida en `/admin`).
+
+### Las dos capas siguen separadas
+
+El rol global **no concede nada dentro de un proyecto**, y estas rutas no son un
+atajo a `ProjectPermissionGuard`: son otra puerta, de solo lectura más las acciones
+de estado. Quien administra la plataforma no gana `canEditTask` en ningún sitio.
+
+⚠️ **Por eso el panel no enlaza a `/projects/<slug>`**: ese enlace daría 403 a quien
+no sea miembro y parecería roto. La ficha se pinta con `GET /admin/projects/:id`.
+
+### Roles globales
+
+`SuperAdmin > Admin > User`, en jerarquía. Una cuenta sin ninguna fila de rol **es
+`User`** —`POST /auth/register` no asigna ninguno, así que es el caso mayoritario—, y
+los nombres desconocidos se ignoran al calcular el nivel, para que un `INSERT` en la
+tabla de roles no sea una escalada de privilegios.
+
+La regla es **actuar hacia abajo**: solo se administran cuentas de nivel
+*estrictamente* inferior al propio, y nunca la propia. El rol global es **privado**: no
+se enseña en el directorio de usuarios ni en la lista de miembros de un proyecto.
+
+### Cuentas — `/admin/users`
+
+| Método | Ruta | Entrada | Notas |
+|---|---|---|---|
+| GET | `/admin/users` | `page`, `limit`, `search`, `status` | `{ items, total }` |
+| PATCH | `/admin/users/:id/status` | `{ status, reason? }` | `reason` obligatorio salvo al reactivar |
+| PUT | `/admin/users/:id/role` | `{ role, reason? }` | **PUT: reemplaza**, no añade |
+
+```ts
+AdminUser = { id, firstName, lastName, status, createdAt, credential: { email },
+              globalRole: 'SuperAdmin' | 'Admin' | 'User',   // el efectivo, el más alto
+              globalRoles: string[] }                        // las filas tal cual
+```
+
+- `status`: `ACTIVE | SUSPENDED | INACTIVE`. `INACTIVE` es una **baja**, no una
+  sanción; el login rechaza las dos igual, pero llamar «suspensión» a una baja es
+  acusar a alguien de algo.
+- `PUT` y no `PATCH` en el rol porque el nivel efectivo es el más alto de las filas:
+  «añadir User» a un Admin no lo degradaría.
+- ⚠️ **Suspender no corta la sesión al instante**: el access token abierto aguanta lo
+  que le quede, hasta 15 min. El refresh sí se corta ya. Dilo en la interfaz o quien
+  administra creerá que no funcionó y volverá a pulsar.
+- No hay borrado de cuentas, a propósito: dejaría tareas, comentarios e historial
+  apuntando a alguien que ya no está, y eso vive en otros microservicios donde la
+  cascada no llega.
+
+### Registro de actividad — `/admin/activity`
+
+| Método | Ruta | Entrada |
+|---|---|---|
+| GET | `/admin/activity` | `page`, `limit`, `actorId`, `targetId`, `action`, `targetType`, `from`, `to` |
+
+```ts
+AdminActivityEntry = { id, actorId, actorLabel, action, targetType: 'USER' | 'PROJECT',
+                       targetId, targetLabel, reason, metadata, createdAt }
+
+action = 'USER_SUSPENDED' | 'USER_REACTIVATED' | 'USER_DEACTIVATED'
+       | 'ROLE_GRANTED'   | 'ROLE_REVOKED'
+       | 'PROJECT_SUSPENDED' | 'PROJECT_REACTIVATED'
+       | 'PROJECT_ARCHIVED'  | 'PROJECT_RESTORED'
+```
+
+- **Solo-añadir.** No hay ruta de edición ni de borrado, ni para un SuperAdmin: si se
+  pudiera reescribir no sería auditoría.
+- Verbos concretos y no un `STATUS_CHANGED` con `metadata` que haya que abrir: un
+  registro se filtra y se cuenta por acción.
+- `actorLabel` y `targetLabel` son **copias del momento**, no referencias, así que la
+  entrada se sigue leyendo cuando la cuenta o el proyecto ya no existen.
+- ⚠️ **`PROJECT_REACTIVATED` y `PROJECT_RESTORED` no son lo mismo**: el primero levanta
+  una suspensión, el segundo recupera un archivado. Los dos terminan en `ACTIVE` y el
+  backend los distingue por el estado **anterior**.
+
+### Proyectos — `/admin/projects`
+
+| Método | Ruta | Entrada | Notas |
+|---|---|---|---|
+| GET | `/admin/projects` | `page`, `limit`, `search`, `status` | `{ items, total }`, **archivados incluidos** |
+| GET | `/admin/projects/:id` | — | Ficha de solo lectura, con el árbol |
+| PATCH | `/admin/projects/:id/status` | `{ status, reason? }` | `reason` obligatorio salvo al reactivar |
+
+```ts
+AdminProject = Project & {
+  owner: { id, name, email } | null   // resuelto por el gateway; null si credentials no responde
+}
+```
+
+- `status`: `ACTIVE | SUSPENDED | DELETED`.
+- `search` busca en **nombre y descripción**, insensible a mayúsculas.
+- Es otra ruta y no un parámetro de `GET /projects` **a propósito**: aquella filtra por
+  dueño o miembro, y añadirle una forma de ver todos sería poner un interruptor de
+  bypass en la ruta que usa cualquiera.
+- `owner` lo cruza el gateway con **una** llamada a credentials por página (los ids
+  únicos), no una por fila. Solo nombre y correo: si hace falta el estado de esa cuenta,
+  se mira en Cuentas.
+- `reason`: 4–500 caracteres. Sin él, `400` — y aquí importa más que en las cuentas,
+  porque es el texto que va a leer el dueño en su propia pantalla.
+
+#### `DELETED` no es un borrado
+
+`DELETE /projects/:id` existe, **es del dueño**, cascadea, purga tareas en otro
+microservicio y no se deshace. El panel no lo ofrece. Ofrece dos estados, y los dos se
+deshacen:
+
+| Estado | Quién lo ve | Qué se puede hacer |
+|---|---|---|
+| `SUSPENDED` | dueño y miembros, **entero** | solo leer: `canViewProject` y `canViewReports` |
+| `DELETED` | solo `/admin/projects` | nada; el resto de rutas responden **404** |
+
+**Suspendido se sigue viendo** a propósito: esconderlo lo haría indistinguible de uno
+borrado y nadie sabría a quién preguntar. **Archivado da 404 y no 403** porque un 403
+diría «existe y no es tuyo», que es falso y encima filtra que ese proyecto existe.
+
+Los dos conservan el `slug`: recuperar un proyecto tiene que devolverte tu URL, así que
+ese slug sigue ocupado y no lo puede tomar un proyecto nuevo.
+
+#### ⚠️ `PROJECT_SUSPENDED` — el 403 que no se arregla con permisos
+
+Toda escritura en un proyecto suspendido da:
+
+```jsonc
+{
+  "success": false,
+  "error": {
+    "code": "PROJECT_SUSPENDED",
+    "message": "Este proyecto está suspendido por la administración: <motivo>",
+    "details": { "reason": "<motivo>" }
+  }
+}
+```
+
+Compara contra el `code` (`PROJECT_SUSPENDED_CODE` en `commons/api/domain.ts`), nunca
+contra el status: un `FORBIDDEN` se arregla pidiendo permiso a quien administra el
+proyecto, y esto **no se arregla** —hay que esperar a que la plataforma lo reactive—.
+Sin distinguirlos, el dueño de un proyecto suspendido acaba pidiéndose permisos a sí
+mismo.
+
+Se aplica en `ProjectPermissionGuard`, que ya resuelve el proyecto de cada petición, así
+que **cubre de golpe** tareas, columnas, comentarios, adjuntos, miembros, roles,
+etiquetas e informes — incluidos los que viven en otro microservicio.
+
+⚠️ **Las rutas sin `@RequireProjectPermission` no pasan por ese guard.** Eran tres
+escrituras —aceptar una invitación, rechazarla y salir del proyecto
+(`DELETE /projects/:projectId/membership/me`)— y están cerradas a mano en
+projects-service, con el mismo código. Una ruta nueva que escriba sin declarar permiso
+volvería a abrir el agujero.
+
+### Cómo se pinta esto en la interfaz
+
+1. `GET /projects/:id/permissions/me` → si `projectStatus === 'SUSPENDED'`, el mapa ya
+   viene recortado: **no hay que apagar nada a mano**.
+2. Enseña el aviso con `suspendedReason`. Es obligatorio: sin él la pantalla es
+   indistinguible de una donde te han quitado los permisos, o de una rota.
+3. No ocultes el contenido. Lo que hay dentro sigue siendo el trabajo del equipo,
+   consultarlo no rompe nada, y taparlo convierte una suspensión reversible en una
+   pérdida de acceso.
 
 ---
 
