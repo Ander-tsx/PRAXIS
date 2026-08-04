@@ -147,6 +147,33 @@ export class AuthService {
       throw new RpcException({ statusCode: 401, message: 'Refresh token no válido' });
     }
 
+    /**
+     * ⚠️ **El estado de la cuenta se vuelve a comprobar aquí.**
+     *
+     * Sin esto, suspender a alguien con la sesión abierta **no le echaba nunca**:
+     * este método verificaba la firma, comparaba con Redis y firmaba un access
+     * nuevo sin mirar `status`, y el `proxy.ts` de cada zona renueva en cada
+     * navegación mientras el refresh viva. La suspensión solo impedía un login
+     * nuevo — el único que esa persona no necesita.
+     *
+     * `setStatus` ya borra `auth:session:<id>`, así que el `if` de arriba
+     * bastaría en el camino normal. Esta consulta cubre el resto: un cambio de
+     * estado hecho por una migración, un arreglo a mano en la base, o un futuro
+     * camino que se olvide de invalidar. Es una lectura por renovación —cada 15
+     * minutos por sesión activa— y a cambio el estado de la cuenta manda siempre.
+     */
+    const credential = await this.prisma.credential.findFirst({
+      where:  { user: { id: payload.sub } },
+      select: { user: { select: { status: true } } },
+    });
+
+    if (credential?.user && credential.user.status !== 'ACTIVE') {
+      /* Se retira la sesión: si no, cada navegación volvería a preguntar y a
+         recibir el mismo 401. */
+      await this.redis.del(sessionKey);
+      throw new RpcException({ statusCode: 401, message: 'Cuenta suspendida o inactiva' });
+    }
+
     const accessToken = await this.signAccess(payload.sub);
     return { accessToken };
   }

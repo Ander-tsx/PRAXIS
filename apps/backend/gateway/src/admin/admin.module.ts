@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
 import { AdminActivityController } from './admin-activity.controller';
 import { AdminActivityRecorder } from './admin-activity.recorder';
+import { AdminUsersController } from './admin-users.controller';
 
 /**
  * El namespace `/admin`: todo lo que solo pueden hacer los administradores de la
@@ -21,12 +24,34 @@ import { AdminActivityRecorder } from './admin-activity.recorder';
  * reactivaría a sí mismo. Las de aquí tienen otras reglas —solo hacia abajo,
  * nunca sobre uno mismo, motivo obligatorio— y viven en otro sitio.
  *
- * `GlobalRolesModule` aporta el cliente de permissions-service y los helpers de
- * jerarquía.
+ * ## Los tres servicios que necesita
+ *
+ * Este módulo cruza datos de tres sitios, y es lo normal en el gateway: las
+ * cuentas están en credentials, los roles en permissions y las sesiones de voz en
+ * alexa. `AuthModule` aporta `CREDENTIALS_SERVICE` (y el `JwtGuard`),
+ * `GlobalRolesModule` aporta `PERMISSIONS_SERVICE` y los helpers de jerarquía, y
+ * `ALEXA_SERVICE` se registra aquí porque `AlexaModule` no lo exporta.
  */
 @Module({
-  imports: [AuthModule, GlobalRolesModule],
-  controllers: [AdminActivityController],
+  imports: [
+    AuthModule,
+    GlobalRolesModule,
+    ClientsModule.registerAsync([
+      {
+        name: 'ALEXA_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ALEXA_SERVICE_HOST'),
+            port: config.get<number>('ALEXA_SERVICE_PORT'),
+          },
+        }),
+      },
+    ]),
+  ],
+  controllers: [AdminActivityController, AdminUsersController],
   providers: [AdminActivityRecorder],
   exports: [AdminActivityRecorder],
 })

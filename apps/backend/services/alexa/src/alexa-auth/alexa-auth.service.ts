@@ -173,10 +173,33 @@ export class AlexaAuthService {
       throw new RpcException({ statusCode: 401, message: 'Sesión de Alexa expirada' });
     }
 
-    // Verificar que el usuario siga activo en credentials-service
+    /**
+     * Que el usuario siga existiendo **y activo**.
+     *
+     * ⚠️ Esto era `if (!profile)` con un comentario que decía «verificar que el
+     * usuario siga activo». Comprobaba solo la **existencia**: una cuenta
+     * suspendida devuelve perfil, pasaba el `if`, y su token de voz seguía
+     * sirviendo hasta **90 días** (`VOICE_TOKEN_EXPIRES_IN`). Es el mismo fallo
+     * que tenía `auth.service.refresh()`, pero con una ventana 8.600 veces más
+     * larga y por el camino en el que nadie piensa en mirar.
+     *
+     * `getUsersByIds` ya declara `status`; hasta que lo declaró, quien quisiera
+     * hacer esta comprobación no tenía a qué agarrarse.
+     */
     const profile = await this.data.getUser(session.userId);
     if (!profile) {
-      throw new RpcException({ statusCode: 401, message: 'El usuario ya no existe o se encuentra inactivo' });
+      throw new RpcException({ statusCode: 401, message: 'El usuario ya no existe' });
+    }
+
+    if (profile.status && profile.status !== 'ACTIVE') {
+      /* La sesión se revoca aquí también: si no, cada frase que dijera esa
+         persona volvería a preguntar y a recibir el mismo 401. Suspender ya las
+         revoca, pero este camino cubre el cambio de estado que no pase por ahí. */
+      await this.prisma.alexaSession
+        .update({ where: { id: session.id }, data: { revokedAt: new Date() } })
+        .catch(() => undefined);
+
+      throw new RpcException({ statusCode: 401, message: 'La cuenta está suspendida o inactiva' });
     }
 
     // Actualizar fecha del último uso de forma asíncrona (sin bloquear)
