@@ -115,6 +115,11 @@ async function main() {
       create: {
         id:          PROJECT_ID,
         name:        'Proyecto PRAXIS Demo',
+        /* Fijo y no generado: el seed siempre siembra sobre una base recién
+           recreada, así que no hay con qué chocar, y una URL estable hace que
+           los enlaces de la documentación y de las pruebas no cambien en cada
+           siembra. Lo mismo que `PROJECT_ID`, y por el mismo motivo. */
+        slug:        'proyecto-praxis-demo',
         description: 'Proyecto de demostración para pruebas y desarrollo.',
         ownerId:     ADMIN_USER_ID,
       },
