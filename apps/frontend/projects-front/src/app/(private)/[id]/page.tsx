@@ -22,6 +22,7 @@ import { ProjectHeader } from '@/components/organisms/ProjectHeader';
 import { ProjectLabels } from '@/components/organisms/ProjectLabels';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
 import { ProjectRoles } from '@/components/organisms/ProjectRoles';
+import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 
 interface PageProps {
@@ -112,6 +113,19 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   ]);
 
   const can = effective.permissions;
+
+  /**
+   * ¿Está suspendido?
+   *
+   * Se lee de `permissions/me` y no de `project.status` porque **es la misma
+   * respuesta que ya trae el mapa recortado**: si vinieran de sitios distintos
+   * podrían discrepar —una caché de 5 minutos por medio— y saldría el caso peor de
+   * todos, una pantalla sin botones y sin aviso.
+   *
+   * No hace falta apagar nada más: el mapa llega con todas las escrituras en `false`,
+   * así que cada organismo esconde lo suyo por la vía de siempre.
+   */
+  const suspendido = effective.projectStatus === 'SUSPENDED';
 
   /**
    * El directorio hace falta en las dos pestañas que enseñan personas: equipo
@@ -238,6 +252,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   return (
     <AppHeader title={project.name}>
       <div className="flex flex-col gap-6">
+        {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
+        {suspendido && (
+          <SuspendedProjectNotice
+            reason={effective.suspendedReason}
+            isOwner={effective.isOwner}
+          />
+        )}
+
         <ProjectHeader
           project={project}
           isOwner={effective.isOwner}

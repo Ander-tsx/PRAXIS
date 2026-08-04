@@ -22,3 +22,14 @@ export interface AdminUserState {
 }
 
 export const ADMIN_USER_INITIAL_STATE: AdminUserState = { error: null, done: null };
+
+/**
+ * Estado de un cambio de estado de proyecto.
+ *
+ * Misma forma y mismo significado que el de cuentas —un error que enseñar y lo que
+ * el servidor confirmó— así que es un alias y no una copia: dos interfaces
+ * idénticas con nombres distintos se acaban separando por accidente.
+ */
+export type AdminProjectState = AdminUserState;
+
+export const ADMIN_PROJECT_INITIAL_STATE: AdminProjectState = { error: null, done: null };

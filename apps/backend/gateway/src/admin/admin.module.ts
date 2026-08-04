@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
 import { AdminActivityController } from './admin-activity.controller';
 import { AdminActivityRecorder } from './admin-activity.recorder';
+import { AdminProjectsController } from './admin-projects.controller';
 import { AdminUsersController } from './admin-users.controller';
 
 /**
@@ -49,9 +50,21 @@ import { AdminUsersController } from './admin-users.controller';
           },
         }),
       },
+      {
+        name: 'PROJECTS_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('PROJECTS_SERVICE_HOST'),
+            port: config.get<number>('PROJECTS_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
-  controllers: [AdminActivityController, AdminUsersController],
+  controllers: [AdminActivityController, AdminUsersController, AdminProjectsController],
   providers: [AdminActivityRecorder],
   exports: [AdminActivityRecorder],
 })
