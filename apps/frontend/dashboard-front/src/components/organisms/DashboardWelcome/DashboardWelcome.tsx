@@ -1,4 +1,4 @@
-import { Badge, alpha, colors } from '@praxis/commons';
+import { GlobalRoleBadges, alpha, colors } from '@praxis/commons';
 import Link from 'next/link';
 
 export interface DashboardWelcomeProps {
@@ -26,11 +26,7 @@ export function DashboardWelcome({ name, email, roles }: DashboardWelcomeProps) 
           {hasName ? `Hola, ${name}` : 'Te damos la bienvenida'}
         </h2>
 
-        {roles.map((role) => (
-          <Badge key={role} variant={role === 'Admin' ? 'accent' : 'primary'}>
-            {role.toUpperCase()}
-          </Badge>
-        ))}
+        <GlobalRoleBadges roles={roles} />
       </div>
 
       {hasName ? (

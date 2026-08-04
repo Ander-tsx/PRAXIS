@@ -1,10 +1,17 @@
 ﻿/**
  * Seed: Usuarios de prueba
  *
- * Crea tres usuarios con credenciales fijas para desarrollo y testing:
- *   - admin@praxis.dev  → Administrador global
+ * Crea cuatro usuarios con credenciales fijas para desarrollo y testing:
+ *   - admin@praxis.dev  → SuperAdmin de la plataforma
+ *   - sofia@praxis.dev  → Admin corriente
  *   - maria@praxis.dev  → Usuario normal
  *   - carlos@praxis.dev → Usuario normal
+ *
+ * Los roles se los asigna el seeder de **permissions**; aquí solo existen las
+ * cuentas. Sofía existe para que la diferencia entre los dos niveles de
+ * administración se pueda probar en el navegador: con un solo administrador no
+ * hay forma de comprobar que un `Admin` no puede tocar a otro `Admin`, ni que
+ * solo el `SuperAdmin` reparte el rol de administrador.
  *
  * Los UUIDs son fijos y compartidos con los seeders de permissions, projects
  * y tasks para que las referencias entre servicios sean consistentes sin
@@ -31,6 +38,9 @@ export const MARIA_USER_ID       = '22222222-2222-2222-2222-222222222221';
 export const CARLOS_CREDENTIAL_ID = '33333333-3333-3333-3333-333333333332';
 export const CARLOS_USER_ID       = '33333333-3333-3333-3333-333333333331';
 
+export const SOFIA_CREDENTIAL_ID = '44444444-4444-4444-4444-444444444442';
+export const SOFIA_USER_ID       = '44444444-4444-4444-4444-444444444441';
+
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
 
 const SALT_ROUNDS = 10;
@@ -43,6 +53,17 @@ const SEED_USERS = [
     userId:       ADMIN_USER_ID,
     firstName:    'Admin',
     lastName:     'Praxis',
+  },
+  {
+    /* Administradora corriente: administra usuarios normales y **no** puede
+       tocar a admin@praxis.dev. Es la cuenta con la que se comprueba que la
+       jerarquía no es decorativa. */
+    credentialId: SOFIA_CREDENTIAL_ID,
+    email:        'sofia@praxis.dev',
+    password:     'Admin@12345!',
+    userId:       SOFIA_USER_ID,
+    firstName:    'Sofía',
+    lastName:     'Ramírez',
   },
   {
     credentialId: MARIA_CREDENTIAL_ID,

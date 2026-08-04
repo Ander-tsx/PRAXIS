@@ -3,6 +3,7 @@ export * from './TabNav';
 export * from './SectionHeader';
 export * from './ProgressBar';
 export * from './FeatureCard';
+export * from './GlobalRoleBadges';
 export * from './RoleBadge';
 export * from './AuthForm';
 export * from './Pagination';

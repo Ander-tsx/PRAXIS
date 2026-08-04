@@ -18,12 +18,42 @@ export interface UserProfile {
   credential: { email: string };
 }
 
-/** `GET /api/permissions/user/:id` — roles globales (Admin / User) */
+/** `GET /api/permissions/user/:id` — roles globales de la plataforma */
 export interface GlobalRole {
   id: string;
   name: string;
   description: string | null;
   createdAt: string;
+}
+
+/**
+ * Los tres roles globales, espejo de `GLOBAL_ROLES` en `@praxis/contracts`.
+ *
+ * Está copiado porque `@praxis/contracts` es un paquete de backend —arrastra
+ * `class-validator` y `@nestjs/swagger`— y el frontend no lo consume. Es el mismo
+ * trato que `PROJECT_PERMISSIONS` y `COLUMN_COLORS`: espejo declarado, con el
+ * original nombrado al lado.
+ *
+ * ⚠️ El orden es la jerarquía: `SuperAdmin > Admin > User`. Y el rol global es
+ * **privado**: no se enseña en el directorio de usuarios ni en la lista de
+ * miembros de un proyecto. Cada quien ve el suyo, y el panel ve los de todos.
+ */
+export const GLOBAL_ROLES = ['SuperAdmin', 'Admin', 'User'] as const;
+
+export type GlobalRoleName = (typeof GLOBAL_ROLES)[number];
+
+/**
+ * ¿Estos roles dan acceso al panel de administración?
+ *
+ * Es la única pregunta que el frontend necesita hacerse sobre la jerarquía, y
+ * por eso es una función y no una comparación suelta: `role === 'Admin'` —que es
+ * lo que había en los dos sitios que pintan la insignia— **deja fuera al
+ * SuperAdmin**, así que el nivel más alto se pintaba como un usuario corriente.
+ *
+ * Quien manda de verdad es el gateway. Esto solo decide qué se enseña.
+ */
+export function hasAdminRole(roleNames: readonly string[]): boolean {
+  return roleNames.some((name) => name === 'SuperAdmin' || name === 'Admin');
 }
 
 /** Un elemento de `GET /api/projects` → `{ items, total }` */
