@@ -58,7 +58,13 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
 7. ✅ Un proyecto nuevo nace con rol "Administrador" y con el dueño dentro.
 8. ⚠️ `permissions` de un rol es un **diccionario de booleanos**, nunca un array. El backend lo valida; los roles creados antes del validador siguen guardados como array y se normalizan al leer.
 9. ✅ `Project.name` es único **por dueño**, no global: dos equipos pueden tener cada uno su "Sprint 1". Lo era a nivel global y chocaba con proyectos que no puedes ver; lo arregló `20260730020000_project_name_unique_per_owner`.
-10. ⚠️ `Project.slug` **sí** es único global, y es lo que va en la URL (`/projects/rediseno-del-panel`). Los choques se resuelven con sufijo (`-2`, `-3`) que pone el backend; nadie lo escribe. **Se regenera al renombrar**, así que un slug viejo deja de resolver — el UUID se acepta siempre. Para enlazar usa `slug`; para llamar a la API, `id`: solo `GET /projects/:id` traduce el slug, todo lo anidado espera el UUID.
+10. ⚠️ `Project.slug` **sí** es único global, y es lo que va en la URL (`/projects/rediseno-del-panel`). Los choques se resuelven con un sufijo **aleatorio** (`praxis-rjv6`), no un contador: `-2`, `-3` decía cuántos hay y —peor— dejaba enumerar proyectos ajenos probando el siguiente, porque el gateway responde 404 a un slug inexistente y 403 a uno ajeno. **Se regenera al renombrar**, así que un slug viejo deja de resolver — el UUID se acepta siempre. Para enlazar usa `slug`; para llamar a la API, `id`: solo `GET /projects/:id` traduce el slug, todo lo anidado espera el UUID.
+
+**Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
+`projectHref` / `projectPath` / `reportHref` / `reportPath`, en
+`commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son
+`string`, y equivocarse **no da error de compilación**: sale como una URL fea,
+un 403 o un desplegable vacío. Ya se coló en cinco sitios.
 
 **Reglas al escribir un fetch:**
 
