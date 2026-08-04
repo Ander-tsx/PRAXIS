@@ -23,6 +23,18 @@
               "    if (token) {",
               "        pm.collectionVariables.set('access_token', token);",
               "        console.log('✅ Token Web de usuario guardado en access_token');",
+              "        try {",
+              "            const payloadBase64 = token.split('.')[1];",
+              "            const payloadJson = atob(payloadBase64);",
+              "            const payload = JSON.parse(payloadJson);",
+              "            const uid = payload.sub || payload.userId || res.userId || res.id;",
+              "            if (uid) {",
+              "                pm.collectionVariables.set('userId', uid);",
+              "                console.log('✅ ID de usuario guardado en userId:', uid);",
+              "            }",
+              "        } catch (e) {",
+              "            console.error('⚠️ No se pudo extraer userId del JWT:', e.message);",
+              "        }",
               "    }",
               "} else {",
               "    console.error('❌ Login web falló: ' + pm.response.text());",
@@ -436,12 +448,46 @@
       "name": "08. Crear Tarea 1 (En Progreso)",
       "event": [
         {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let uid = pm.collectionVariables.get('userId') || pm.environment.get('userId');",
+              "if (!uid || typeof uid !== 'string' || uid.trim() === '') {",
+              "    const token = pm.collectionVariables.get('access_token') || pm.environment.get('access_token');",
+              "    if (token && typeof token === 'string') {",
+              "        try {",
+              "            const payloadBase64 = token.split('.')[1];",
+              "            const payloadJson = atob(payloadBase64);",
+              "            const payload = JSON.parse(payloadJson);",
+              "            uid = payload.sub || payload.userId;",
+              "            if (uid) {",
+              "                pm.collectionVariables.set('userId', uid);",
+              "            }",
+              "        } catch(e) {}",
+              "    }",
+              "}",
+              "const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+              "if (uid && uuidRegex.test(uid.trim())) {",
+              "    pm.variables.set('assignees_clause', ',\\n  \"assigneeIds\": [\"' + uid.trim() + '\"]');",
+              "} else {",
+              "    pm.variables.set('assignees_clause', '');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
           "listen": "test",
           "script": {
             "exec": [
               "pm.test(\"Status code is 201\", function () {",
               "    pm.response.to.have.status(201);",
-              "});"
+              "});",
+              "if (pm.response.code === 201) {",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
+              "    if (res.id) pm.collectionVariables.set('taskId_1', res.id);",
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -461,7 +507,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"columnId\": \"{{columnId_doing}}\",\n  \"title\": \"Diseñar vistas de interfaz para Alexa\",\n  \"status\": \"En Progreso\",\n  \"description\": \"Crear componentes web y prototipos\"\n}",
+          "raw": "{\n  \"columnId\": \"{{columnId_doing}}\",\n  \"title\": \"Diseñar vistas de interfaz para Alexa\",\n  \"status\": \"En Progreso\",\n  \"description\": \"Crear componentes web y prototipos\"{{assignees_clause}}\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -492,12 +538,46 @@
       "name": "09. Crear Tarea 2 (Completada)",
       "event": [
         {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let uid = pm.collectionVariables.get('userId') || pm.environment.get('userId');",
+              "if (!uid || typeof uid !== 'string' || uid.trim() === '') {",
+              "    const token = pm.collectionVariables.get('access_token') || pm.environment.get('access_token');",
+              "    if (token && typeof token === 'string') {",
+              "        try {",
+              "            const payloadBase64 = token.split('.')[1];",
+              "            const payloadJson = atob(payloadBase64);",
+              "            const payload = JSON.parse(payloadJson);",
+              "            uid = payload.sub || payload.userId;",
+              "            if (uid) {",
+              "                pm.collectionVariables.set('userId', uid);",
+              "            }",
+              "        } catch(e) {}",
+              "    }",
+              "}",
+              "const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;",
+              "if (uid && uuidRegex.test(uid.trim())) {",
+              "    pm.variables.set('assignees_clause', ',\\n  \"assigneeIds\": [\"' + uid.trim() + '\"]');",
+              "} else {",
+              "    pm.variables.set('assignees_clause', '');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
           "listen": "test",
           "script": {
             "exec": [
               "pm.test(\"Status code is 201\", function () {",
               "    pm.response.to.have.status(201);",
-              "});"
+              "});",
+              "if (pm.response.code === 201) {",
+              "    const body = pm.response.json();",
+              "    const res = body.data || body;",
+              "    if (res.id) pm.collectionVariables.set('taskId_2', res.id);",
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -517,7 +597,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"columnId\": \"{{columnId_done}}\",\n  \"title\": \"Definir arquitectura de microservicios\",\n  \"status\": \"Completada\",\n  \"description\": \"Configuración de NestJS con comunicación TCP\"\n}",
+          "raw": "{\n  \"columnId\": \"{{columnId_done}}\",\n  \"title\": \"Definir arquitectura de microservicios\",\n  \"status\": \"Completada\",\n  \"description\": \"Configuración de NestJS con comunicación TCP\"{{assignees_clause}}\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -672,6 +752,11 @@
     },
     {
       "key": "alexa_seed_phrase",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
       "value": "",
       "type": "string"
     }

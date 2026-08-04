@@ -110,8 +110,8 @@ const messages = {
 
   HELP:
     'Puedes decir: dame el avance del proyecto, cómo estuvo la productividad esta semana, ' +
-    'qué tareas están bloqueadas, cómo está distribuida la carga de trabajo ' +
-    'o cómo va un integrante del equipo. ¿Qué deseas saber?',
+    'cuándo terminará el proyecto, qué tareas están bloqueadas, cómo está distribuida la carga de trabajo ' +
+    'o cómo va un integrante como Carlos. ¿Qué deseas saber?',
 
   CANCEL: 'Acción cancelada. ¿Hay algo más en lo que pueda ayudarte?',
 
