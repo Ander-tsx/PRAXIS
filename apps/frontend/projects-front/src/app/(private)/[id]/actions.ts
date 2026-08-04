@@ -210,7 +210,7 @@ export async function saveProjectFieldAction(input: {
   name?: string;
   description?: string;
 }): Promise<ProjectFieldState> {
-  const empty = { savedName: null, savedDescription: null };
+  const empty = { savedName: null, savedDescription: null, savedSlug: null };
 
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', ...empty };
@@ -249,7 +249,14 @@ export async function saveProjectFieldAction(input: {
       return { error: 'El servidor no guardó la descripción.', ...empty };
     }
 
-    return { error: null, savedName: saved.name, savedDescription: saved.description ?? '' };
+    return {
+      error: null,
+      savedName: saved.name,
+      savedDescription: saved.description ?? '',
+      /* Solo cuando se tocó el nombre: es lo único que mueve el slug, y así
+         quien llama sabe que no hay URL que corregir con un simple `null`. */
+      savedSlug: name !== undefined ? saved.slug : null,
+    };
   } catch (error) {
     return { error: describe(error, 'No se pudo guardar el cambio.'), ...empty };
   }

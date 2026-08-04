@@ -34,7 +34,7 @@ export default async function ReportsIndexPage() {
 
   const primero = conAcceso.items[0];
   // Sin el basePath: es una ruta del App Router de esta app. Ver §17.4.
-  if (primero) redirect(`/${primero.id}`);
+  if (primero) redirect(`/${primero.slug}`);
 
   /**
    * Sin ninguno hay dos motivos distintos, y confundirlos manda a pedir un

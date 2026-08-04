@@ -109,12 +109,33 @@ Roles globales: `admin`, `user` (el guard compara contra el literal `'Admin'`).
 |---|---|---|---|
 | POST | `/projects` | `{ name, description? }` | — (`ownerId` sale del token) |
 | GET | `/projects` | query params (`page`, `limit`, `search`, `permission`…) | — |
-| GET | `/projects/:id` | — | `canViewProject` |
-| PATCH | `/projects/:id` | `{ name?, description? }` | `canEditProject` |
-| DELETE | `/projects/:id` | — | `canDeleteProject` |
+| GET | `/projects/:idOrSlug` | — | `canViewProject` |
+| PATCH | `/projects/:idOrSlug` | `{ name?, description? }` | `canEditProject` |
+| DELETE | `/projects/:idOrSlug` | — | `canDeleteProject` |
 
 - `name`: 2–100 chars, único **por dueño**. Repetirlo en tu propia cuenta da 409
   («Ya tienes un proyecto llamado X»); otro equipo puede llamar igual al suyo.
+
+### ⚠️ `:idOrSlug` acepta las dos formas, pero **solo estas tres rutas**
+
+`GET /projects/rediseno-del-panel` funciona igual que con el UUID: el
+`ProjectPermissionGuard` traduce el slug antes de comprobar permisos. Un slug
+que no existe da **404**, no 403.
+
+**Todo lo que cuelga del proyecto sigue esperando el UUID** —
+`/projects/:projectId/members`, `/tasks`, `/reports/*`, `/assistant/*`—. La
+traducción se paga una vez, no en cada petición: la pantalla resuelve el
+proyecto al entrar y a partir de ahí usa `project.id`.
+
+`slug` es único **global** (a diferencia de `name`) porque quien resuelve una
+URL puede ver proyectos de varios dueños. Los choques llevan sufijo: el segundo
+"Sprint 1" del sistema es `sprint-1-2`.
+
+⚠️ **Renombrar regenera el slug** y el anterior deja de resolver. No hay tabla
+de slugs históricos: lo que no caduca nunca es el UUID, así que un enlace
+copiado de la barra de direcciones antes de un renombrado se rompe, y uno con
+el id no. Al renombrar desde la interfaz, la propia pantalla corrige la barra
+con `replaceState`.
 - `GET /projects` → `{ items, total }`, filtrado por **dueño o miembro**.
 - `?permission=<clave>` estrecha el listado a los proyectos donde **tienes ese
   permiso**, ya expandido por jerarquía; el dueño pasa siempre, como en el

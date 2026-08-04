@@ -83,7 +83,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * enseñaría cinco tarjetas rotas en vez de decir qué pasa. El guard es la
    * seguridad; esto es la explicación.
    */
-  const effective = await api.get<EffectivePermissions>(`/projects/${id}/permissions/me`);
+  const effective = await api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`);
   if (!effective.permissions.canViewReports) {
     return (
       <AppHeader title={`${project.name}`}>
@@ -106,26 +106,26 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       api
         .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
         .catch(() => ({ items: [] as Project[], total: 0 })),
-      api.get<ReportSnapshot>(`/projects/${id}/reports/snapshot`),
-      api.get<ReportFlow>(`/projects/${id}/reports/flow?days=60`).catch(() => null),
-      api.get<ReportCycleTime>(`/projects/${id}/reports/cycle-time`).catch(() => null),
-      api.get<ReportForecast>(`/projects/${id}/reports/forecast`).catch(() => null),
+      api.get<ReportSnapshot>(`/projects/${project.id}/reports/snapshot`),
+      api.get<ReportFlow>(`/projects/${project.id}/reports/flow?days=60`).catch(() => null),
+      api.get<ReportCycleTime>(`/projects/${project.id}/reports/cycle-time`).catch(() => null),
+      api.get<ReportForecast>(`/projects/${project.id}/reports/forecast`).catch(() => null),
       /* Ya no va condicionado: si llegas hasta aquí tienes `canViewReports`, y
          el desglose por persona dejó de ser un permiso aparte. */
-      api.get<ReportPerson[]>(`/projects/${id}/reports/people`).catch(() => []),
+      api.get<ReportPerson[]>(`/projects/${project.id}/reports/people`).catch(() => []),
       /* Los miembros y el directorio piden solo `canViewProject`: el asistente
          necesita poner nombre a un `userId` para pintar una propuesta, y esas
          dos rutas también las usa quien nunca abre esta pantalla. */
-      api.get<ProjectMember[]>(`/projects/${id}/members`).catch(() => []),
+      api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => []),
       api
         .get<Paginated<UserProfile>>('/users?limit=100')
         .catch(() => ({ items: [] as UserProfile[], total: 0 })),
       /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
          id, y la tarjeta tiene que enseñar el nombre. */
-      api.get<Label[]>(`/projects/${id}/labels`).catch(() => [] as Label[]),
+      api.get<Label[]>(`/projects/${project.id}/labels`).catch(() => [] as Label[]),
       /* La cuota, al cargar y antes de escribir nada: poner el coste a la vista
          de quien lo gasta evita encontrarse el límite de golpe. */
-      api.get<AssistantQuota>(`/projects/${id}/assistant/quota`).catch(() => null),
+      api.get<AssistantQuota>(`/projects/${project.id}/assistant/quota`).catch(() => null),
     ]);
 
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
@@ -160,7 +160,11 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             </p>
           </div>
 
-          <ProjectPicker projects={proyectos.items} activeId={id} />
+          {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
+              de los proyectos es el activo, y comparando contra el slug de la
+              URL no encontraba ninguno — el desplegable se quedaba en «Elige un
+              proyecto» con el informe ya cargado debajo. */}
+          <ProjectPicker projects={proyectos.items} activeId={project.id} />
         </div>
 
         {snapshot.eventosSinteticos > 0 && (
@@ -170,8 +174,11 @@ export default async function ProjectReportsPage({ params }: PageProps) {
         {/* Arriba del todo y no al final: lee este mismo informe, y quien llega
             con una pregunta concreta no debería tener que recorrer cinco
             gráficos antes de poder hacerla. */}
+        {/* `project.id` y no el parámetro de la ruta: las acciones del asistente
+            llaman a `/projects/:projectId/assistant/...`, que espera el UUID.
+            Con el slug de la URL respondían 403. */}
         <AssistantChat
-          projectId={id}
+          projectId={project.id}
           cuotaInicial={cuota}
           nombres={nombres}
           etiquetas={nombresDeEtiquetas}

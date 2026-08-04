@@ -6,8 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
-  Param,
-  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -77,9 +75,12 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de un proyecto' })
   @ApiResponse({ status: 200, description: 'Detalle del proyecto recuperado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Request() req: Express.Request) {
+    /* `req.projectId` y no el parámetro: la ruta acepta también el slug, y el
+       guard ya lo tradujo al UUID real. Leerlo del `@Param` volvería a mandar
+       «rediseno-del-panel» al microservicio, que solo entiende ids. */
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_find_one' }, { id }),
+      this.projectsClient.send({ cmd: 'project_find_one' }, { id: req.projectId! }),
     );
   }
 
@@ -96,9 +97,10 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Actualiza un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto actualizado exitosamente' })
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: Express.Request,
     @Body() body: UpdateProjectBodyDto,
   ) {
+    const id = req.projectId!;
     // El id va después del spread: uno colado en el cuerpo no debe pisar la ruta.
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_update' }, { ...body, id }),
@@ -110,7 +112,8 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_DELETE_PROJECT)
   @ApiOperation({ summary: 'Elimina un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto eliminado exitosamente' })
-  async delete(@Param('id', ParseUUIDPipe) id: string) {
+  async delete(@Request() req: Express.Request) {
+    const id = req.projectId!;
     const result = await firstValueFrom(
       this.projectsClient.send({ cmd: 'project_delete' }, { id }),
     );
