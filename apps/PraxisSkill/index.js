@@ -330,7 +330,7 @@ const RequestInterceptor = {
         try {
           handlerInput.attributesManager.setPersistentAttributes(persistentAttributes);
           await handlerInput.attributesManager.savePersistentAttributes();
-        } catch (e) { }
+        } catch (e) {}
       }
       handlerInput.attributesManager.setRequestAttributes({
         apiClient: null, isAuthenticated: false, user: null, voiceToken: null, startTime
@@ -367,30 +367,33 @@ const LaunchRequestHandler = {
         .reprompt(messages.PROMPT_SEED_PHRASE)
         .getResponse();
     }
+
+    let responseProjects;
     try {
-      const responseProjects = await praxisApi.getProjects(apiClient);
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-      if (!projects || projects.length === 0) {
-        return handlerInput.responseBuilder.speak(messages.WELCOME_NO_PROJECTS).getResponse();
-      }
-      const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-      if (projects.length === 1) {
-        sessionAttributes.projectId = projects[0].id;
-        sessionAttributes.projectName = projects[0].name;
-        handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-        return handlerInput.responseBuilder
-          .speak(messages.WELCOME_SINGLE_PROJECT(projects[0].name))
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-      const namesList = joinNaturally(projects.slice(0, 4).map(p => p.name));
-      return handlerInput.responseBuilder
-        .speak(messages.WELCOME_MULTIPLE_PROJECTS(namesList))
-        .reprompt(messages.NO_ACTIVE_PROJECT)
-        .getResponse();
+      responseProjects = await praxisApi.getProjects(apiClient);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    if (!projects || projects.length === 0) {
+      return handlerInput.responseBuilder.speak(messages.WELCOME_NO_PROJECTS).getResponse();
+    }
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+    if (projects.length === 1) {
+      sessionAttributes.projectId = projects[0].id;
+      sessionAttributes.projectName = projects[0].name;
+      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+      return handlerInput.responseBuilder
+        .speak(messages.WELCOME_SINGLE_PROJECT(projects[0].name))
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+    const namesList = joinNaturally(projects.slice(0, 4).map(p => p.name));
+    return handlerInput.responseBuilder
+      .speak(messages.WELCOME_MULTIPLE_PROJECTS(namesList))
+      .reprompt(messages.NO_ACTIVE_PROJECT)
+      .getResponse();
   },
 };
 
@@ -412,28 +415,31 @@ const ConnectSkillIntentHandler = {
     }
     const alexaUserId = Alexa.getUserId(handlerInput.requestEnvelope);
     const deviceId = handlerInput.requestEnvelope.context?.System?.device?.deviceId || null;
+
+    let result;
     try {
-      const result = await praxisApi.redeemSeedPhrase(seed.trim().toLowerCase(), alexaUserId, deviceId);
-      const voiceToken = result?.voiceToken;
-      const displayName = result?.displayName || null;
-      if (!voiceToken) throw new Error('No voiceToken');
-
-      const persistent = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
-      persistent.voiceToken = voiceToken;
-      persistent.displayName = displayName;
-      handlerInput.attributesManager.setPersistentAttributes(persistent);
-      await handlerInput.attributesManager.savePersistentAttributes();
-
-      return handlerInput.responseBuilder
-        .speak(messages.LOGIN_SUCCESS(displayName))
-        .reprompt(messages.HELP)
-        .getResponse();
+      result = await praxisApi.redeemSeedPhrase(seed.trim().toLowerCase(), alexaUserId, deviceId);
     } catch (error) {
       return handlerInput.responseBuilder
         .speak(error.response?.status === 410 ? messages.ERROR_GONE : messages.ERROR_BAD_REQUEST)
         .reprompt(messages.PROMPT_SEED_PHRASE)
         .getResponse();
     }
+
+    const voiceToken = result?.voiceToken;
+    const displayName = result?.displayName || null;
+    if (!voiceToken) throw new Error('No voiceToken retornado por la API');
+
+    const persistent = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
+    persistent.voiceToken = voiceToken;
+    persistent.displayName = displayName;
+    handlerInput.attributesManager.setPersistentAttributes(persistent);
+    await handlerInput.attributesManager.savePersistentAttributes();
+
+    return handlerInput.responseBuilder
+      .speak(messages.LOGIN_SUCCESS(displayName))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
@@ -447,7 +453,9 @@ const LogoutIntentHandler = {
   async handle(handlerInput) {
     const { apiClient } = handlerInput.attributesManager.getRequestAttributes();
     if (apiClient) {
-      try { await praxisApi.logout(apiClient); } catch (e) { }
+      try { await praxisApi.logout(apiClient); } catch (e) {
+        console.log('[Logout] Error llamando a /logout en API:', e.message);
+      }
     }
     try {
       const persistent = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
@@ -457,7 +465,9 @@ const LogoutIntentHandler = {
       delete persistent.lastProjectName;
       handlerInput.attributesManager.setPersistentAttributes(persistent);
       await handlerInput.attributesManager.savePersistentAttributes();
-    } catch (e) { }
+    } catch (e) {
+      console.log('[Logout] Error limpiando atributos persistentes:', e.message);
+    }
     handlerInput.attributesManager.setSessionAttributes({});
     return handlerInput.responseBuilder.speak(messages.LOGOUT_SUCCESS).getResponse();
   },
@@ -474,22 +484,29 @@ const SelectBoardIntentHandler = {
       return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
     }
     const boardName = Alexa.getSlotValue(handlerInput.requestEnvelope, 'boardName');
+
+    let responseProjects;
     try {
-      const responseProjects = await praxisApi.getProjects(apiClient);
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-      const match = findBestMatch(boardName, projects, 'name');
-      if (!match) {
-        return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
-      }
-      try { await praxisApi.selectProject(apiClient, match.id); } catch (e) { }
-      const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-      sessionAttributes.projectId = match.id;
-      sessionAttributes.projectName = match.name;
-      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-      return handlerInput.responseBuilder.speak(messages.PROJECT_SELECTED(match.name)).reprompt(messages.HELP).getResponse();
+      responseProjects = await praxisApi.getProjects(apiClient);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const match = findBestMatch(boardName, projects, 'name');
+    if (!match) {
+      return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    }
+
+    try { await praxisApi.selectProject(apiClient, match.id); } catch (e) {
+      console.log('[SelectBoard] Error opcional al seleccionar proyecto en API:', e.message);
+    }
+
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+    sessionAttributes.projectId = match.id;
+    sessionAttributes.projectName = match.name;
+    handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    return handlerInput.responseBuilder.speak(messages.PROJECT_SELECTED(match.name)).reprompt(messages.HELP).getResponse();
   },
 };
 
@@ -507,27 +524,37 @@ const ProjectProgressIntentHandler = {
     const boardName = Alexa.getSlotValue(handlerInput.requestEnvelope, 'boardName');
     let projectId = sessionAttributes.projectId;
     let projectName = sessionAttributes.projectName;
-    try {
-      if (boardName) {
-        const responseProjects = await praxisApi.getProjects(apiClient);
-        const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-        const match = findBestMatch(boardName, projects, 'name');
-        if (!match) return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
-        projectId = match.id;
-        projectName = match.name;
-        sessionAttributes.projectId = projectId;
-        sessionAttributes.projectName = projectName;
-        handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+
+    if (boardName) {
+      let responseProjects;
+      try {
+        responseProjects = await praxisApi.getProjects(apiClient);
+      } catch (error) {
+        return await buildErrorResponse(handlerInput, error);
       }
-      if (!projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
-      const progress = await praxisApi.getProjectProgress(apiClient, projectId);
-      return handlerInput.responseBuilder
-        .speak(messages.PROJECT_PROGRESS(progress.projectName || projectName, progress.percentage, progress.completedTasks, progress.totalTasks))
-        .reprompt(messages.HELP)
-        .getResponse();
+      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const match = findBestMatch(boardName, projects, 'name');
+      if (!match) return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+      projectId = match.id;
+      projectName = match.name;
+      sessionAttributes.projectId = projectId;
+      sessionAttributes.projectName = projectName;
+      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    }
+
+    if (!projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+
+    let progress;
+    try {
+      progress = await praxisApi.getProjectProgress(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    return handlerInput.responseBuilder
+      .speak(messages.PROJECT_PROGRESS(progress.projectName || projectName, progress.percentage, progress.completedTasks, progress.totalTasks))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
@@ -541,16 +568,19 @@ const WeeklyProductivityIntentHandler = {
     if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
     if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+
+    let data;
     try {
-      const data = await praxisApi.getWeeklyProductivity(apiClient, sessionAttributes.projectId);
-      const { completedThisWeek, completedLastWeek, deltaPercent, trend } = data;
-      const speech = (trend === 'stable' || deltaPercent === 0)
-        ? messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek)
-        : messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trend === 'up' ? 'subió' : 'bajó', Math.abs(deltaPercent));
-      return handlerInput.responseBuilder.speak(speech).reprompt(messages.HELP).getResponse();
+      data = await praxisApi.getWeeklyProductivity(apiClient, sessionAttributes.projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const { completedThisWeek, completedLastWeek, deltaPercent, trend } = data;
+    const speech = (trend === 'stable' || deltaPercent === 0)
+      ? messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek)
+      : messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trend === 'up' ? 'subió' : 'bajó', Math.abs(deltaPercent));
+    return handlerInput.responseBuilder.speak(speech).reprompt(messages.HELP).getResponse();
   },
 };
 
@@ -564,15 +594,18 @@ const ProjectForecastIntentHandler = {
     if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
     if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+
+    let forecast;
     try {
-      const forecast = await praxisApi.getForecast(apiClient, sessionAttributes.projectId);
-      if (!forecast || forecast.estimatedDays === null || forecast.reason === 'INSUFFICIENT_DATA') {
-        return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST_NO_DATA).reprompt(messages.HELP).getResponse();
-      }
-      return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST(forecast.estimatedDays)).reprompt(messages.HELP).getResponse();
+      forecast = await praxisApi.getForecast(apiClient, sessionAttributes.projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    if (!forecast || forecast.estimatedDays === null || forecast.reason === 'INSUFFICIENT_DATA') {
+      return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST_NO_DATA).reprompt(messages.HELP).getResponse();
+    }
+    return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST(forecast.estimatedDays)).reprompt(messages.HELP).getResponse();
   },
 };
 
@@ -586,17 +619,20 @@ const BlockedTasksIntentHandler = {
     if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
     if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+
+    let res;
     try {
-      const res = await praxisApi.getBlockedTasks(apiClient, sessionAttributes.projectId);
-      const items = Array.isArray(res) ? res : (res?.items || []);
-      if (!items || items.length === 0) return handlerInput.responseBuilder.speak(messages.BLOCKED_TASKS_NONE).reprompt(messages.HELP).getResponse();
-      let speakOutput = items.slice(0, 3).map(t => messages.BLOCKED_TASKS_ITEM(t.title, t.daysStalled)).join(' ');
-      if (items.length > 3) speakOutput += messages.BLOCKED_TASKS_SUFFIX(items.length - 3);
-      speakOutput += messages.BLOCKED_TASKS_FOOTER;
-      return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
+      res = await praxisApi.getBlockedTasks(apiClient, sessionAttributes.projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const items = Array.isArray(res) ? res : (res?.items || []);
+    if (!items || items.length === 0) return handlerInput.responseBuilder.speak(messages.BLOCKED_TASKS_NONE).reprompt(messages.HELP).getResponse();
+    let speakOutput = items.slice(0, 3).map(t => messages.BLOCKED_TASKS_ITEM(t.title, t.daysStalled)).join(' ');
+    if (items.length > 3) speakOutput += messages.BLOCKED_TASKS_SUFFIX(items.length - 3);
+    speakOutput += messages.BLOCKED_TASKS_FOOTER;
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 
@@ -610,15 +646,18 @@ const TeamWorkloadIntentHandler = {
     if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
     if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+
+    let res;
     try {
-      const res = await praxisApi.getWorkload(apiClient, sessionAttributes.projectId);
-      const items = Array.isArray(res) ? res : (res?.items || []);
-      if (!items || items.length === 0) return handlerInput.responseBuilder.speak('No hay datos de carga de trabajo.').reprompt(messages.HELP).getResponse();
-      const list = joinNaturally(items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount)));
-      return handlerInput.responseBuilder.speak(messages.TEAM_WORKLOAD(list, items[0].memberName)).reprompt(messages.HELP).getResponse();
+      res = await praxisApi.getWorkload(apiClient, sessionAttributes.projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const items = Array.isArray(res) ? res : (res?.items || []);
+    if (!items || items.length === 0) return handlerInput.responseBuilder.speak('No hay datos de carga de trabajo.').reprompt(messages.HELP).getResponse();
+    const list = joinNaturally(items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount)));
+    return handlerInput.responseBuilder.speak(messages.TEAM_WORKLOAD(list, items[0].memberName)).reprompt(messages.HELP).getResponse();
   },
 };
 
@@ -634,19 +673,29 @@ const MemberPerformanceIntentHandler = {
     if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
     const memberNameSlot = Alexa.getSlotValue(handlerInput.requestEnvelope, 'memberName');
     if (!memberNameSlot) return handlerInput.responseBuilder.speak('¿De qué integrante deseas conocer el desempeño?').reprompt('Dime el nombre.').getResponse();
+
+    let res;
     try {
-      const res = await praxisApi.getMembers(apiClient, sessionAttributes.projectId);
-      const members = Array.isArray(res) ? res : (res?.items || []);
-      const matched = findBestMatch(memberNameSlot, members, 'name');
-      if (!matched) return handlerInput.responseBuilder.speak(messages.MEMBER_NOT_FOUND(memberNameSlot)).reprompt(messages.HELP).getResponse();
-      const perf = await praxisApi.getMemberPerformance(apiClient, sessionAttributes.projectId, matched.id);
-      return handlerInput.responseBuilder
-        .speak(messages.MEMBER_PERFORMANCE(perf.memberName || matched.name, perf.assignedCount, perf.completedCount, perf.inProgressCount))
-        .reprompt(messages.HELP)
-        .getResponse();
+      res = await praxisApi.getMembers(apiClient, sessionAttributes.projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const members = Array.isArray(res) ? res : (res?.items || []);
+    const matched = findBestMatch(memberNameSlot, members, 'name');
+    if (!matched) return handlerInput.responseBuilder.speak(messages.MEMBER_NOT_FOUND(memberNameSlot)).reprompt(messages.HELP).getResponse();
+
+    let perf;
+    try {
+      perf = await praxisApi.getMemberPerformance(apiClient, sessionAttributes.projectId, matched.id);
+    } catch (error) {
+      return await buildErrorResponse(handlerInput, error);
+    }
+
+    return handlerInput.responseBuilder
+      .speak(messages.MEMBER_PERFORMANCE(perf.memberName || matched.name, perf.assignedCount, perf.completedCount, perf.inProgressCount))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
@@ -704,6 +753,7 @@ const SessionEndedRequestHandler = {
 const ErrorHandler = {
   canHandle() { return true; },
   async handle(handlerInput, error) {
+    console.error(`[ErrorHandler Global] Error no capturado en la Skill:`, error);
     return await buildErrorResponse(handlerInput, error);
   },
 };

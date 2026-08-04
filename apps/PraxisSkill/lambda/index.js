@@ -6,8 +6,6 @@
  * Autenticación mediante frase semilla y persistencia en DynamoDB.
  */
 
-console.log("INDEX INICIADO");
-
 const Alexa = require('ask-sdk-core');
 const { DynamoDbPersistenceAdapter } = require('ask-sdk-dynamodb-persistence-adapter');
 

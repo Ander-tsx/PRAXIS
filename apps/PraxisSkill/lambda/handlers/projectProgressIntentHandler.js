@@ -30,50 +30,57 @@ const ProjectProgressIntentHandler = {
     let projectId = sessionAttributes.projectId;
     let projectName = sessionAttributes.projectName;
 
-    try {
-      if (boardName) {
-        const responseProjects = await praxisApi.getProjects(apiClient);
-        const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-        const match = findBestMatch(boardName, projects, 'name');
-
-        if (!match) {
-          return handlerInput.responseBuilder
-            .speak(messages.PROJECT_NOT_FOUND(boardName))
-            .reprompt(messages.NO_ACTIVE_PROJECT)
-            .getResponse();
-        }
-
-        projectId = match.id;
-        projectName = match.name;
-
-        sessionAttributes.projectId = projectId;
-        sessionAttributes.projectName = projectName;
-        handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    if (boardName) {
+      let responseProjects;
+      try {
+        responseProjects = await praxisApi.getProjects(apiClient);
+      } catch (error) {
+        return await buildErrorResponse(handlerInput, error);
       }
 
-      if (!projectId) {
+      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const match = findBestMatch(boardName, projects, 'name');
+
+      if (!match) {
         return handlerInput.responseBuilder
-          .speak(messages.NO_ACTIVE_PROJECT)
+          .speak(messages.PROJECT_NOT_FOUND(boardName))
           .reprompt(messages.NO_ACTIVE_PROJECT)
           .getResponse();
       }
 
-      const progress = await praxisApi.getProjectProgress(apiClient, projectId);
+      projectId = match.id;
+      projectName = match.name;
 
-      const speakOutput = messages.PROJECT_PROGRESS(
-        progress.projectName || projectName,
-        progress.percentage,
-        progress.completedTasks,
-        progress.totalTasks
-      );
+      sessionAttributes.projectId = projectId;
+      sessionAttributes.projectName = projectName;
+      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    }
 
+    if (!projectId) {
       return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
         .getResponse();
+    }
+
+    let progress;
+    try {
+      progress = await praxisApi.getProjectProgress(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const speakOutput = messages.PROJECT_PROGRESS(
+      progress.projectName || projectName,
+      progress.percentage,
+      progress.completedTasks,
+      progress.totalTasks
+    );
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 

@@ -29,50 +29,57 @@ const ProjectForecastIntentHandler = {
 
     let projectId = sessionAttributes.projectId;
 
-    try {
-      if (boardName) {
-        const responseProjects = await praxisApi.getProjects(apiClient);
-        const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-        const match = findBestMatch(boardName, projects, 'name');
-
-        if (!match) {
-          return handlerInput.responseBuilder
-            .speak(messages.PROJECT_NOT_FOUND(boardName))
-            .reprompt(messages.NO_ACTIVE_PROJECT)
-            .getResponse();
-        }
-
-        projectId = match.id;
-        sessionAttributes.projectId = projectId;
-        sessionAttributes.projectName = match.name;
-        handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    if (boardName) {
+      let responseProjects;
+      try {
+        responseProjects = await praxisApi.getProjects(apiClient);
+      } catch (error) {
+        return await buildErrorResponse(handlerInput, error);
       }
 
-      if (!projectId) {
+      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const match = findBestMatch(boardName, projects, 'name');
+
+      if (!match) {
         return handlerInput.responseBuilder
-          .speak(messages.NO_ACTIVE_PROJECT)
+          .speak(messages.PROJECT_NOT_FOUND(boardName))
           .reprompt(messages.NO_ACTIVE_PROJECT)
           .getResponse();
       }
 
-      const forecast = await praxisApi.getForecast(apiClient, projectId);
+      projectId = match.id;
+      sessionAttributes.projectId = projectId;
+      sessionAttributes.projectName = match.name;
+      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+    }
 
-      if (!forecast || forecast.estimatedDays === null || forecast.estimatedDays === undefined || forecast.reason === 'INSUFFICIENT_DATA') {
-        return handlerInput.responseBuilder
-          .speak(messages.PROJECT_FORECAST_NO_DATA)
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-
-      const speakOutput = messages.PROJECT_FORECAST(forecast.estimatedDays);
-
+    if (!projectId) {
       return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
         .getResponse();
+    }
+
+    let forecast;
+    try {
+      forecast = await praxisApi.getForecast(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    if (!forecast || forecast.estimatedDays === null || forecast.estimatedDays === undefined || forecast.reason === 'INSUFFICIENT_DATA') {
+      return handlerInput.responseBuilder
+        .speak(messages.PROJECT_FORECAST_NO_DATA)
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+
+    const speakOutput = messages.PROJECT_FORECAST(forecast.estimatedDays);
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 

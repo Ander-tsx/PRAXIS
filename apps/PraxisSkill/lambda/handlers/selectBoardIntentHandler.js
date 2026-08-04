@@ -40,48 +40,50 @@ const SelectBoardIntentHandler = {
         .getResponse();
     }
 
+    let responseProjects;
     try {
-      const responseProjects = await praxisApi.getProjects(apiClient);
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-      const match = findBestMatch(boardName, projects, 'name');
-
-      if (!match) {
-        return handlerInput.responseBuilder
-          .speak(messages.PROJECT_NOT_FOUND(boardName))
-          .reprompt(messages.NO_ACTIVE_PROJECT)
-          .getResponse();
-      }
-
-      // Notificar al backend la selección
-      try {
-        await praxisApi.selectProject(apiClient, match.id);
-      } catch (e) {
-        console.log('[SelectBoard] Error notificando selección al backend:', e.message);
-      }
-
-      // Guardar proyecto seleccionado en la sesión actual y en DynamoDB para futuras sesiones
-      const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-      sessionAttributes.projectId = match.id;
-      sessionAttributes.projectName = match.name;
-      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-
-      try {
-        const persistent = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
-        persistent.lastProjectId = match.id;
-        persistent.lastProjectName = match.name;
-        handlerInput.attributesManager.setPersistentAttributes(persistent);
-        await handlerInput.attributesManager.savePersistentAttributes();
-      } catch (e) {
-        console.log('[SelectBoard] Error guardando lastProjectId en DynamoDB:', e.message);
-      }
-
-      return handlerInput.responseBuilder
-        .speak(messages.PROJECT_SELECTED(match.name))
-        .reprompt(messages.HELP)
-        .getResponse();
+      responseProjects = await praxisApi.getProjects(apiClient);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const match = findBestMatch(boardName, projects, 'name');
+
+    if (!match) {
+      return handlerInput.responseBuilder
+        .speak(messages.PROJECT_NOT_FOUND(boardName))
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
+    }
+
+    // Notificar al backend la selección
+    try {
+      await praxisApi.selectProject(apiClient, match.id);
+    } catch (e) {
+      console.log('[SelectBoard] Error notificando selección al backend:', e.message);
+    }
+
+    // Guardar proyecto seleccionado en la sesión actual y en DynamoDB para futuras sesiones
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+    sessionAttributes.projectId = match.id;
+    sessionAttributes.projectName = match.name;
+    handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+
+    try {
+      const persistent = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
+      persistent.lastProjectId = match.id;
+      persistent.lastProjectName = match.name;
+      handlerInput.attributesManager.setPersistentAttributes(persistent);
+      await handlerInput.attributesManager.savePersistentAttributes();
+    } catch (e) {
+      console.log('[SelectBoard] Error guardando lastProjectId en DynamoDB:', e.message);
+    }
+
+    return handlerInput.responseBuilder
+      .speak(messages.PROJECT_SELECTED(match.name))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 

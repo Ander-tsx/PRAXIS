@@ -11,8 +11,7 @@ const ErrorHandler = {
   },
 
   handle(handlerInput, error) {
-    console.log(`[Praxis] Error handled: ${error.message}`);
-    console.log(`[Praxis] Error stack: ${error.stack}`);
+    console.error(`[ErrorHandler Global] Error no capturado en la Skill: ${error.stack || error.message}`);
 
     // Verificar si es un error de API con response
     if (error.response) {
