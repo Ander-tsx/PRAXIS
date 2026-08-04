@@ -31,3 +31,82 @@ model UserRole {
   @@schema("permissions")
   @@map("user_roles")
 }
+
+/// Qué se hizo. Verbos concretos, no un `STATUS_CHANGED` genérico: el registro
+/// se filtra y se cuenta por acción, y con un tipo único el desplegable de
+/// filtros del panel no tendría nada que ofrecer.
+///
+/// Espejo de `AdminActionType` en `@praxis/contracts`.
+enum AdminActionType {
+  USER_SUSPENDED
+  USER_REACTIVATED
+  USER_DEACTIVATED
+  ROLE_GRANTED
+  ROLE_REVOKED
+  PROJECT_SUSPENDED
+  PROJECT_REACTIVATED
+  PROJECT_ARCHIVED
+  PROJECT_RESTORED
+
+  @@schema("permissions")
+}
+
+enum AdminTargetType {
+  USER
+  PROJECT
+
+  @@schema("permissions")
+}
+
+/// El registro de lo que hacen los administradores.
+///
+/// ## Por qué vive aquí
+///
+/// Porque describe acciones sobre **usuarios y proyectos a la vez**, y ninguno de
+/// esos dos servicios es dueño de las dos cosas. permissions-service ya es la
+/// autoridad de plataforma —es a quien pregunta el gateway antes de dejar entrar
+/// a nadie— así que es el sitio neutral. Un microservicio nuevo para una tabla
+/// sería puerto, docker, entrada en el CLI y `.env` sin nada que lo justifique.
+///
+/// ## Solo-añadir
+///
+/// ⚠️ **No hay `update` ni `delete`, y no es un olvido.** No existen comandos
+/// para modificar ni borrar una entrada, ni siquiera para un SuperAdmin. Un
+/// registro que se puede reescribir no es auditoría, es una nota. Si algún día
+/// hay que purgar por retención de datos, que sea un proceso aparte y explícito,
+/// no un endpoint al alcance de quien queda retratado en él.
+///
+/// ## Sin claves foráneas, y con copias del momento
+///
+/// Igual que `Notification` en projects-service, y por el mismo motivo: describe
+/// un hecho del pasado y tiene que sobrevivir a lo que describe. De ahí
+/// `actorLabel` y `targetLabel`, que son **copias** del nombre en el momento de
+/// la acción y no una referencia a resolver: un registro que solo guarde ids
+/// obliga a cruzar cuatro servicios para poder leerse, y deja de poder leerse
+/// del todo cuando la cuenta o el proyecto desaparecen.
+model AdminAction {
+  id          String          @id @default(uuid())
+  /// Quién. Sale del JWT en el gateway, nunca del cuerpo de la petición.
+  actorId     String
+  actorLabel  String?
+  action      AdminActionType
+  targetType  AdminTargetType
+  /// Sobre quién o sobre qué.
+  targetId    String
+  targetLabel String?
+  /// Por qué. Obligatorio al suspender; lo exige el endpoint, no la columna.
+  reason      String?
+  /// El detalle que no cabe en columnas: el rol concedido, el estado anterior.
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+
+  /// Los cuatro accesos reales del panel: la lista por fecha, y los filtros por
+  /// actor, por objetivo y por acción — los tres compuestos con `createdAt`
+  /// porque el orden siempre es cronológico descendente.
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetId, createdAt])
+  @@index([action, createdAt])
+  @@schema("permissions")
+  @@map("admin_actions")
+}
