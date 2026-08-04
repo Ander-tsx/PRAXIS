@@ -4,6 +4,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ObservabilityModule } from '@praxis/observability';
 import { envValidationSchema } from './common/config/env.validation';
 
+import { AdminModule } from './admin/admin.module';
 import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './users/user.module';
@@ -39,6 +40,7 @@ import { AlexaModule } from './alexa/alexa.module';
     ReportsModule,
     AssistantModule,
     AlexaModule,
+    AdminModule,
   ],
 })
 

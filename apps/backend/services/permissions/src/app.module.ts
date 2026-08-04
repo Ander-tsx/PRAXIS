@@ -5,6 +5,7 @@ import * as Joi from 'joi';
 import { ObservabilityModule } from '@praxis/observability';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { AdminActivityModule } from './admin-activity/admin-activity.module';
 import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { PermissionsModule } from './permissions/permissions.module';
     PrismaModule,
     RedisModule,
     PermissionsModule,
+    AdminActivityModule,
   ],
 })
 export class AppModule {}
