@@ -97,7 +97,12 @@ function TaskRows({
              * tarea directamente.
              */}
             <a
-              href={`/projects/${task.projectId}?board=${task.boardId}&task=${task.id}`}
+              /* El slug sale del mapa de proyectos que ya recibe este
+                 componente, así que no cuesta una petición. Si por lo que sea
+                 el proyecto no está en el mapa, se cae al UUID: la ruta acepta
+                 las dos formas, así que el enlace sigue funcionando —solo se ve
+                 más feo. */
+              href={`/projects/${projectsById.get(task.projectId)?.slug ?? task.projectId}?board=${task.boardId}&task=${task.id}`}
               className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ background: alpha(colors.border, 30) }}
             >

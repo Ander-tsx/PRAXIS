@@ -11,6 +11,7 @@ import {
   UpdateProjectDto,
 } from '@praxis/contracts';
 import { expandPermissions, normalizePermissions } from '../project-roles/permission-map';
+import { generarSlugUnico } from './slug.util';
 
 const PROJECT_CACHE_TTL = 300; // 5 min
 const MEMBER_PROJECTS_TTL = 60; // 1 min — proyectos visibles por usuario
@@ -71,9 +72,23 @@ export class ProjectsService {
   async createProject(dto: CreateProjectDto) {
     try {
       return await this.prisma.$transaction(async (tx) => {
+        /* Dentro de la transacción y con `tx`, no con `this.prisma`: mirando
+           por fuera no vería los proyectos creados en esta misma transacción.
+           Aun así quien garantiza la unicidad es el índice, no esta consulta —
+           entre comprobar e insertar cabe otra petición, y ese caso lo recoge
+           el P2002 de abajo. */
+        const slug = await generarSlugUnico(dto.name, async (candidato) => {
+          const existente = await tx.project.findUnique({
+            where:  { slug: candidato },
+            select: { id: true },
+          });
+          return existente !== null;
+        });
+
         const project = await tx.project.create({
           data: {
             name:        dto.name,
+            slug,
             description: dto.description,
             ownerId:     dto.ownerId,
           },
@@ -193,6 +208,10 @@ export class ProjectsService {
       select: {
         id:          true,
         name:        true,
+        /* Sin esto, el selector de proyectos de Análisis recibe filas sin slug
+           y sigue construyendo enlaces con el UUID. Es un `select` explícito:
+           añadir la columna al modelo no la trae sola. */
+        slug:        true,
         description: true,
         ownerId:     true,
         createdAt:   true,
@@ -263,12 +282,39 @@ export class ProjectsService {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
     }
 
+    /**
+     * El slug se regenera **solo si el nombre cambia de verdad**.
+     *
+     * Sin la comparación, guardar el proyecto sin tocar el nombre recalcularía
+     * el slug y, al chocar consigo mismo, le colgaría un `-2`: la URL cambiaría
+     * sola cada vez que alguien edita la descripción. Con ella, renombrar de
+     * «Sprint 1» a «Sprint 1» no mueve nada.
+     *
+     * ⚠️ **Renombrar cambia la URL, y los enlaces con el slug viejo dejan de
+     * resolver.** Es deliberado: guardar el histórico de slugs es otra tabla
+     * para un caso poco frecuente, y los enlaces que de verdad circulan —los
+     * que se copian de la barra de direcciones antes de un renombrado— siguen
+     * funcionando porque la ruta acepta el UUID para siempre.
+     */
+    const renombrado = dto.name !== undefined && dto.name !== project.name;
+
+    const slug = renombrado
+      ? await generarSlugUnico(dto.name!, async (candidato) => {
+          const existente = await this.prisma.project.findUnique({
+            where:  { slug: candidato },
+            select: { id: true },
+          });
+          return existente !== null && existente.id !== dto.id;
+        })
+      : undefined;
+
     let updated: Awaited<ReturnType<typeof this.prisma.project.update>>;
     try {
       updated = await this.prisma.project.update({
         where: { id: dto.id },
         data: {
           ...(dto.name        !== undefined && { name: dto.name }),
+          ...(slug            !== undefined && { slug }),
           ...(dto.description !== undefined && { description: dto.description }),
         },
       });
@@ -329,5 +375,31 @@ export class ProjectsService {
     }
 
     throw new RpcException({ statusCode: 400, message: 'Falta workspaceId o boardId' });
+  }
+
+  /**
+   * Traduce un slug al id real del proyecto.
+   *
+   * Lo llama el `ProjectPermissionGuard` cuando el parámetro de la ruta no
+   * tiene forma de UUID. Devuelve solo el id: el guard únicamente necesita
+   * saber sobre qué proyecto comprobar permisos, y el detalle ya lo pedirá
+   * después quien corresponda.
+   *
+   * ⚠️ **Un slug que no existe es un 404, no un 403.** Es la respuesta honesta
+   * —esa URL no corresponde a nada— y no filtra nada: los slugs son públicos en
+   * el sentido de que cualquiera puede escribir uno en la barra de direcciones,
+   * y el permiso se comprueba igual justo después sobre el id resuelto.
+   */
+  async resolveSlug(dto: { slug: string }) {
+    const project = await this.prisma.project.findUnique({
+      where:  { slug: dto.slug },
+      select: { id: true },
+    });
+
+    if (!project) {
+      throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+    }
+
+    return { projectId: project.id };
   }
 }

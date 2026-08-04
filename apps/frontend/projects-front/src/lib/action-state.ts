@@ -94,6 +94,16 @@ export interface ProjectFieldState {
   error: string | null;
   savedName: string | null;
   savedDescription: string | null;
+  /**
+   * El slug que ha quedado tras guardar.
+   *
+   * Renombrar lo regenera, y entonces **la URL de la barra apunta a un slug que
+   * ya no existe**: recargar daría 404 sobre un proyecto que está perfectamente.
+   * La cabecera lo usa para corregir la dirección sin recargar.
+   *
+   * `null` cuando no se tocó el nombre: no hay nada que corregir.
+   */
+  savedSlug: string | null;
 }
 
 /** Estado de la respuesta a una invitación desde la página del proyecto. */

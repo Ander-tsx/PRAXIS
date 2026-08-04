@@ -101,7 +101,12 @@ export class InvitationsService {
       orderBy: { createdAt: 'desc' },
       include: {
         projectRole: true,
-        project: { select: { id: true, name: true, description: true, ownerId: true } },
+        /* El `slug` va aquí porque la pantalla de invitación se abre desde una
+           URL que ya es un slug: quien todavía no es miembro recibe 403 al
+           pedir el proyecto y la página busca su invitación comparando con el
+           parámetro de la ruta. Sin el slug esa comparación falla y se enseña
+           un 404 en vez del botón de aceptar. */
+        project: { select: { id: true, slug: true, name: true, description: true, ownerId: true } },
       },
     });
   }

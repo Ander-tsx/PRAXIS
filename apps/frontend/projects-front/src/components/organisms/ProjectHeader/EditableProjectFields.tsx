@@ -3,6 +3,7 @@
 import { alpha, colors } from '@praxis/commons';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { saveProjectFieldAction, settleProjectAction } from '@/app/(private)/[id]/actions';
+import type { ProjectFieldState } from '@/lib/action-state';
 import {
   PROJECT_DESCRIPTION_MAX,
   PROJECT_NAME_MAX,
@@ -94,12 +95,27 @@ export function EditableProjectFields({
     initial: initialName,
     validate: (value) => validateProject({ name: value }),
     save: (value) => saveProjectFieldAction({ projectId, name: value }),
-    onSaved: (saved) => {
+    onSaved: (saved, result) => {
       markSaved();
       /* La pestaña, que la revalidación no recalcula: `generateMetadata` solo se
          vuelve a evaluar al navegar. El sufijo es el `template` del layout de la
          zona: '%s | Praxis'. */
       document.title = `${saved} | Praxis`;
+
+      /**
+       * Renombrar regenera el slug, y la barra de direcciones se queda
+       * apuntando al viejo: **recargar daría 404** sobre un proyecto que está
+       * perfectamente.
+       *
+       * Se corrige con `replaceState` y no navegando: el contenido de la
+       * página ya es el correcto —la revalidación lo actualizó— así que volver
+       * a pedirla al servidor solo añadiría un parpadeo. Y `replace` en vez de
+       * `push` para no dejar en el historial una entrada que ya no resuelve:
+       * el botón atrás llevaría a un 404.
+       */
+      if (result.savedSlug && !window.location.pathname.endsWith(`/${result.savedSlug}`)) {
+        window.history.replaceState(null, '', `/projects/${result.savedSlug}`);
+      }
     },
   });
 
@@ -261,8 +277,10 @@ function useAutosave({
 }: {
   initial: string;
   validate: (value: string) => string | null;
-  save: (value: string) => Promise<{ error: string | null }>;
-  onSaved?: (value: string) => void;
+  /* Devuelve el estado entero, no solo el error: `onSaved` necesita el slug
+     nuevo para corregir la URL cuando el renombrado lo cambia. */
+  save: (value: string) => Promise<ProjectFieldState>;
+  onSaved?: (value: string, result: ProjectFieldState) => void;
 }): Autosave {
   const [value, setValue] = useState(initial);
   const [status, setStatus] = useState<FieldStatus>('idle');
@@ -304,7 +322,7 @@ function useAutosave({
 
     savedRef.current = next;
     setStatus('saved');
-    onSaved?.(next);
+    onSaved?.(next, result);
   }, [save, validate, onSaved]);
 
   const change = useCallback(

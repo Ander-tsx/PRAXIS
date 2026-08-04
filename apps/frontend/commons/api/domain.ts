@@ -30,6 +30,18 @@ export interface GlobalRole {
 export interface Project {
   id: string;
   name: string;
+  /**
+   * El identificador legible de la URL: `/projects/rediseno-del-panel`.
+   *
+   * **Para enlazar se usa esto; para llamar a la API, `id`.** La ruta del
+   * gateway acepta las dos formas, pero solo en `GET /projects/:id`: todo lo
+   * que cuelga (`/projects/:projectId/members`, las tareas, los informes)
+   * espera el UUID. Por eso las pantallas resuelven el proyecto una vez y a
+   * partir de ahí trabajan con `project.id`.
+   *
+   * Cambia al renombrar el proyecto. Los enlaces con el UUID no caducan nunca.
+   */
+  slug: string;
   description: string | null;
   ownerId: string;
   createdAt: string;
@@ -390,7 +402,8 @@ export interface ProjectInvitation {
 
 /** `GET /api/me/invitations` trae además el proyecto, para poder nombrarlo. */
 export interface MyInvitation extends ProjectInvitation {
-  project: Pick<Project, 'id' | 'name' | 'description' | 'ownerId'>;
+  /** Con `slug`: la puerta de invitación compara contra el parámetro de la URL. */
+  project: Pick<Project, 'id' | 'slug' | 'name' | 'description' | 'ownerId'>;
 }
 
 /** `GET /api/projects/:id` — trae espacios y roles embebidos. */

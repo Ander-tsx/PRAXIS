@@ -4,12 +4,17 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
 import { ProjectPermission } from '@praxis/contracts';
+
+/** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
+const esUuid = (valor: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 
 /** Nombres de controladores que usan el param `:id` como projectId */
 const PROJECT_ID_CONTROLLERS = new Set(['ProjectsController']);
@@ -79,6 +84,33 @@ export class ProjectPermissionGuard implements CanActivate {
     // ProjectsController usa `:id` como projectId directamente
     if (!projectId && PROJECT_ID_CONTROLLERS.has(controllerName) && params.id) {
       projectId = params.id;
+    }
+
+    /**
+     * El parámetro puede ser un **slug** en vez de un UUID.
+     *
+     * `/projects/rediseno-del-panel` tiene que acabar comprobando permisos
+     * sobre el id real, y eso hay que hacerlo **aquí y no en el controlador**:
+     * el guard corre antes, y si le llega un slug intentaría resolver permisos
+     * sobre la cadena literal y respondería 403 sin más explicación.
+     *
+     * Se resuelve una sola vez y el resto del guard sigue igual, porque a
+     * partir de este punto `projectId` ya es un UUID. Las rutas anidadas
+     * (`/projects/:projectId/members`) siguen esperando el id: la interfaz lo
+     * conoce en cuanto carga el proyecto, así que no hace falta pagar esta
+     * traducción en cada petición.
+     */
+    if (projectId && !esUuid(projectId)) {
+      try {
+        const res = await firstValueFrom(
+          this.projectsClient.send({ cmd: 'project_resolve_slug' }, { slug: projectId }),
+        );
+        projectId = res?.projectId;
+      } catch {
+        /* Un slug que no existe es un 404, no un 403: esa URL no corresponde a
+           nada, y decir «prohibido» sugeriría que existe y no es tuyo. */
+        throw new NotFoundException('Proyecto no encontrado');
+      }
     }
 
     // Si el controlador maneja tareas, resolvemos taskId → boardId → projectId.
