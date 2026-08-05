@@ -1,5 +1,6 @@
 import {
   AppHeader,
+  CreateProjectDialog,
   DUE_SOON_DAYS,
   type MyInvitation,
   type Paginated,
@@ -9,7 +10,7 @@ import {
   dueState,
 } from '@praxis/commons';
 import type { Metadata } from 'next';
-import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
+import { createProjectAction } from '@/app/actions';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
@@ -100,7 +101,9 @@ export default async function DashboardPage() {
   return (
     <AppHeader
       title="Panel"
-      headerSlot={projects.length > 0 ? <CreateProjectDialog /> : undefined}
+      headerSlot={
+        projects.length > 0 ? <CreateProjectDialog action={createProjectAction} /> : undefined
+      }
     >
       <div className="flex flex-col gap-8">
         <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
@@ -125,7 +128,13 @@ export default async function DashboardPage() {
 
         {projects.length === 0 ? (
           <DashboardEmptyState
-            action={<CreateProjectDialog triggerLabel="Crear mi primer proyecto" triggerSize="lg" />}
+            action={
+              <CreateProjectDialog
+                action={createProjectAction}
+                triggerLabel="Crear mi primer proyecto"
+                triggerSize="lg"
+              />
+            }
           />
         ) : (
           <>

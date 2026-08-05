@@ -1,12 +1,24 @@
 'use client';
 
-import { Button, Dialog, Input, Textarea, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { createProjectAction } from '@/app/actions';
-import { CREATE_PROJECT_INITIAL_STATE } from '@/lib/action-state';
-import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX, validateProject } from '@/lib/validation';
+import { Button, Input, Textarea } from '../../atoms';
+import { Dialog } from '../../molecules';
+import { alpha, colors } from '../../tokens';
+import {
+  CREATE_PROJECT_INITIAL_STATE,
+  type CreateProjectAction,
+  PROJECT_DESCRIPTION_MAX,
+  PROJECT_NAME_MAX,
+  validateProject,
+} from './project-form';
 
 export interface CreateProjectDialogProps {
+  /**
+   * Server Action que crea el proyecto. **Se inyecta**: cada zona tiene la
+   * suya porque revalidan rutas distintas y traducen los errores del gateway de
+   * forma distinta.
+   */
+  action: CreateProjectAction;
   /** Texto del disparador. El estado vacío quiere uno más explícito. */
   triggerLabel?: string;
   triggerVariant?: 'primary' | 'secondary';
@@ -17,20 +29,24 @@ export interface CreateProjectDialogProps {
 /**
  * Crear proyecto: disparador + formulario dentro del `Dialog` de commons.
  *
- * La escritura la hace `createProjectAction` (Server Action). Aquí solo vive el
- * estado de la interfaz y la validación previa — que seguimos haciendo aunque
- * el gateway ya valide: el mensaje llega antes y sin ida y vuelta.
+ * Aquí solo vive el estado de la interfaz y la validación previa. La escritura
+ * la hace la Server Action que llega por `action`.
+ *
+ * ## Por qué está en commons
+ *
+ * Lo usan **dos zonas** —el panel y la rejilla de proyectos— y estaba duplicado
+ * byte a byte en las dos. La regla del repo es que un organismo sube aquí en
+ * cuanto lo usan ≥2 zonas, precisamente para que un campo nuevo o un mensaje
+ * corregido no haya que escribirlo dos veces y olvidarlo una.
  */
 export function CreateProjectDialog({
+  action,
   triggerLabel = 'Nuevo proyecto',
   triggerVariant = 'primary',
   triggerSize = 'md',
 }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(
-    createProjectAction,
-    CREATE_PROJECT_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useActionState(action, CREATE_PROJECT_INITIAL_STATE);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

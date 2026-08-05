@@ -15,7 +15,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 ## Reglas del frontend
 
-**Next.js 16 tiene breaking changes.** Consulta `node_modules/next/dist/docs/` antes de usar una API que no hayas verificado en este repo. Regla heredada de `apps/frontend/web-shell/AGENTS.md`.
+**Next.js 16 tiene breaking changes.** Consulta `node_modules/next/dist/docs/` antes de usar una API que no hayas verificado en este repo.
 
 **Multi-Zones, no Module Federation** (el README miente). Cada microfrontend es una app Next independiente con `basePath: '/<zona>'`, expuesta por el `web-shell` vía `rewrites()`.
 
@@ -126,10 +126,21 @@ a `prisma:generate` y a `prisma:deploy`, que eran los dos únicos que existían.
 
 Los `.env` no se versionan. El `JWT_SECRET` debe ser idéntico en gateway, credentials-service y el `.env.local` de cada zona.
 
-Swagger: `http://localhost:3000/api/docs`
+Swagger: `http://localhost:3000/api/docs` — **solo fuera de producción**.
+
+## Pruebas end-to-end
+
+```bash
+pnpm e2e:regresion        # antes y después de tocar código. Verde siempre.
+pnpm e2e:seguridad        # el marcador del endurecimiento
+```
+
+Con el stack levantado y los seeds puestos. Playwright, en `e2e/`. Las
+etiquetadas `@security` describen lo que queremos, no lo que hay: viven aparte
+para que un rojo esperado no tape uno nuevo. Detalle en el README.
 
 ## Convenciones de repo
 
 - Commits: Conventional Commits en español (`feat:`, `fix:`), validados por commitlint + husky.
 - Rama por feature (`feature/<nombre>`) → PR a `main`.
-- Formato: Biome en la raíz, ESLint solo en `web-shell` — hoy están en desacuerdo con el código real.
+- Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web-shell`. `pnpm format` ya no reescribe el repo: config y código coinciden.

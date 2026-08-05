@@ -1,44 +1,20 @@
-import {
-  ATTACHMENT_ALLOWED_MIME,
-  ATTACHMENT_MAX_BYTES,
-  COLUMN_COLORS,
-  LABEL_COLORS,
-  formatBytes,
-} from '@praxis/commons';
-
 /**
- * Validación del cliente, espejo de la del gateway.
+ * Validación de proyecto: **reexportada desde commons**.
  *
- * El backend ya valida de verdad, pero seguimos validando aquí: el mensaje
- * llega antes, sin ida y vuelta, y marca el campo concreto. Los límites
- * replican los de los DTO para que no digan cosas distintas.
+ * La definición vive en `commons/organisms/CreateProjectDialog/project-form.ts`
+ * porque la comparten el organismo y las Server Actions de las dos zonas, y las
+ * tres tienen que decir lo mismo. Estuvo copiada aquí y allí.
+ *
+ * Se reexporta en lugar de cambiar los imports de media zona: el nombre local
+ * ya está en uso y la fuente única es lo que importaba.
  */
-
-export const PROJECT_NAME_MIN = 2;
-export const PROJECT_NAME_MAX = 100;
-export const PROJECT_DESCRIPTION_MAX = 500;
-
-export interface ProjectInput {
-  name: string;
-  description?: string;
-}
-
-/** Devuelve el mensaje del primer error, o null si el proyecto es válido. */
-export function validateProject({ name, description }: ProjectInput): string | null {
-  const trimmedName = name.trim();
-
-  if (trimmedName.length < PROJECT_NAME_MIN) {
-    return `El nombre debe tener al menos ${PROJECT_NAME_MIN} caracteres.`;
-  }
-  if (trimmedName.length > PROJECT_NAME_MAX) {
-    return `El nombre no puede superar ${PROJECT_NAME_MAX} caracteres.`;
-  }
-  if ((description?.trim().length ?? 0) > PROJECT_DESCRIPTION_MAX) {
-    return `La descripción no puede superar ${PROJECT_DESCRIPTION_MAX} caracteres.`;
-  }
-
-  return null;
-}
+export {
+  PROJECT_DESCRIPTION_MAX,
+  PROJECT_NAME_MAX,
+  PROJECT_NAME_MIN,
+  type ProjectInput,
+  validateProject,
+} from '@praxis/commons';
 
 /**
  * Validación del perfil.
