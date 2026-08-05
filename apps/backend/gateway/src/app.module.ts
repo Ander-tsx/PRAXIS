@@ -18,7 +18,7 @@ import { AlexaModule } from './alexa/alexa.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.forRoot({ serviceName: 'gateway' }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: envValidationSchema,

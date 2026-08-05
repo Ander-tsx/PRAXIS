@@ -20,7 +20,7 @@ import { ReportsModule } from './reports/reports.module';
  */
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.forRoot({ serviceName: 'reports' }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

@@ -18,7 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
  */
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.forRoot({ serviceName: 'assistant' }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

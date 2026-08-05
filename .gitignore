@@ -55,6 +55,7 @@ out/
 
 # Logs
 *.log
+logs/
 .uat-logs/
 
 # OS
