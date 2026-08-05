@@ -1,3 +1,19 @@
+import {
+  ATTACHMENT_ALLOWED_MIME,
+  ATTACHMENT_MAX_BYTES,
+  COLUMN_COLORS,
+  LABEL_COLORS,
+  formatBytes,
+} from '@praxis/commons';
+
+/**
+ * Validación del cliente, espejo de la del gateway.
+ *
+ * El backend ya valida de verdad, pero seguimos validando aquí: el mensaje
+ * llega antes, sin ida y vuelta, y marca el campo concreto. Los límites
+ * replican los de los DTO para que no digan cosas distintas.
+ */
+
 /**
  * Validación de proyecto: **reexportada desde commons**.
  *
