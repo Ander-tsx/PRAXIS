@@ -10,7 +10,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.forRoot({ serviceName: 'permissions' }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({

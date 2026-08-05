@@ -13,7 +13,7 @@ import { VoiceTeamModule } from './voice-team/voice-team.module';
 
 @Module({
   imports: [
-    ObservabilityModule,
+    ObservabilityModule.forRoot({ serviceName: 'alexa' }),
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
