@@ -55,11 +55,18 @@ export class BoardsController {
     );
   }
 
-  /** Lista todos los boards de un workspace (la membresía basta) */
+  /**
+   * Lista todos los boards de un workspace.
+   *
+   * `canViewProject` hace cumplir «la membresía basta»; el guard resuelve el
+   * proyecto desde el `:workspaceId`. Ver `members.controller.ts`.
+   */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Lista todos los boards de un workspace' })
   @ApiResponse({ status: 200, description: 'Lista de boards recuperada' })
+  @ApiResponse({ status: 403, description: 'No eres miembro de este proyecto' })
   findAll(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_find_all' }, { workspaceId }),
@@ -79,11 +86,18 @@ export class BoardsResourceController {
     private readonly taskPurge: TaskPurgeService,
   ) {}
 
-  /** Detalle de un board por ID (la membresía basta) */
+  /**
+   * Detalle de un board por ID.
+   *
+   * `canViewProject` hace cumplir «la membresía basta»; el guard resuelve el
+   * proyecto desde el `:boardId`. Ver `members.controller.ts`.
+   */
   @Get(':boardId')
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de un board por ID' })
   @ApiResponse({ status: 200, description: 'Detalle del board recuperado' })
+  @ApiResponse({ status: 403, description: 'No eres miembro de este proyecto' })
   findOne(@Param('boardId') boardId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'board_find_one' }, { id: boardId }),

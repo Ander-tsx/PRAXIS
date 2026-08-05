@@ -19,6 +19,13 @@ const SALT_ROUNDS = 10;
 const TOKEN_CACHE_TTL = 300;  // 5 min
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 días
 
+/**
+ * Valores del claim `typ`. El gateway compara contra el primero; `refresh()`,
+ * contra el segundo. Si cambian aquí, hay que cambiarlos en `jwt.guard.ts`.
+ */
+export const TOKEN_ACCESO = 'access';
+export const TOKEN_REFRESCO = 'refresh';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -32,13 +39,26 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
+  /**
+   * ⚠️ **El claim `typ` es lo que separa los dos tokens.**
+   *
+   * Los dos se firman con el mismo secreto y el mismo `sub`, así que sin él la
+   * única diferencia era la duración — y eso no lo puede comprobar nadie. El
+   * `JwtGuard` del gateway solo valida firma y `exp`, de modo que el refresh
+   * token de 7 días abría toda la API igual que el de 15 minutos: la ventana
+   * corta, que existe justo para limitar el daño de un token robado, no
+   * contenía nada.
+   *
+   * A partir de aquí, cada token dice para qué sirve y quien lo recibe lo
+   * comprueba: el gateway exige `access`, y `refresh()` exige `refresh`.
+   */
   private async signAccess(userId: string): Promise<string> {
-    return this.jwt.signAsync({ sub: userId });
+    return this.jwt.signAsync({ sub: userId, typ: TOKEN_ACCESO });
   }
 
   private async signRefresh(userId: string): Promise<string> {
     const expiresIn = this.config.get<any>('REFRESH_TOKEN_EXPIRES_IN', '7d');
-    return this.jwt.signAsync({ sub: userId }, { expiresIn });
+    return this.jwt.signAsync({ sub: userId, typ: TOKEN_REFRESCO }, { expiresIn });
   }
 
   async register(dto: RegisterDto) {
@@ -133,10 +153,20 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    let payload: JwtPayloadDto;
+    let payload: JwtPayloadDto & { typ?: string };
     try {
-      payload = await this.jwt.verifyAsync<JwtPayloadDto>(refreshToken);
+      payload = await this.jwt.verifyAsync<JwtPayloadDto & { typ?: string }>(refreshToken);
     } catch {
+      throw new RpcException({ statusCode: 401, message: 'Refresh token inválido o expirado' });
+    }
+
+    /**
+     * La confusión en el sentido contrario: un access token es un JWT válido
+     * con el mismo `sub`, así que sin esta comprobación se podía canjear por
+     * otro y encadenar la sesión indefinidamente sin pasar nunca por el
+     * refresh que sí está guardado en Redis.
+     */
+    if (payload.typ !== TOKEN_REFRESCO) {
       throw new RpcException({ statusCode: 401, message: 'Refresh token inválido o expirado' });
     }
 

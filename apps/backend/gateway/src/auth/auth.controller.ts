@@ -17,9 +17,22 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { LoginDto, RefreshTokenDto, RegisterDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from './jwt.guard';
+
+/**
+ * Apretón para las dos rutas donde adivinar sale a cuenta: 10 por minuto y por
+ * IP, frente a las 300 del resto de la API.
+ *
+ * ⚠️ Va bajo la clave `default` **a propósito**. `@Throttle` no crea perfiles:
+ * reajusta por handler los que ya declara `ThrottlerModule.forRoot`, y ahí solo
+ * hay uno. Nombrarlo `auth` obligaría a declararlo en el módulo, y toda entrada
+ * declarada allí se aplica a **todas** las rutas — que es como la API entera
+ * acabó en 10 peticiones por minuto.
+ */
+const LIMITE_AUTENTICACION = { default: { limit: 10, ttl: 60_000 } };
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -32,9 +45,11 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Iniciar sesión' })
   @ApiResponse({ status: 200, description: 'Inicio de sesión exitoso' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  @ApiResponse({ status: 429, description: 'Demasiados intentos; espera un minuto' })
   async login(@Body() body: LoginDto) {
     this.logger.log('POST /auth/login → credentials-service');
     return firstValueFrom(
@@ -57,6 +72,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Refrescar token de acceso' })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Token de acceso renovado' })

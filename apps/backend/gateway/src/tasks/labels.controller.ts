@@ -48,8 +48,13 @@ export class LabelsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Etiquetas del proyecto' })
   @ApiResponse({ status: 200, description: 'Lista de etiquetas' })
-  findAll(@Param('projectId') projectId: string) {
-    return firstValueFrom(this.tasksClient.send({ cmd: 'label_find_all' }, { projectId }));
+  findAll(@Request() req: Express.Request) {
+    /* `req.projectId` y no el `@Param`: la ruta admite un slug y el guard ya lo
+       tradujo. Con la cadena literal, el microservicio responde 200 con una
+       lista vacía en vez de un error. */
+    return firstValueFrom(
+      this.tasksClient.send({ cmd: 'label_find_all' }, { projectId: req.projectId }),
+    );
   }
 
   @Post()
@@ -57,15 +62,11 @@ export class LabelsController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_LABELS)
   @ApiOperation({ summary: 'Crea una etiqueta' })
   @ApiResponse({ status: 201, description: 'Etiqueta creada' })
-  create(
-    @Param('projectId') projectId: string,
-    @Request() req: Express.Request,
-    @Body() body: CreateLabelBodyDto,
-  ) {
+  create(@Request() req: Express.Request, @Body() body: CreateLabelBodyDto) {
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'label_create' },
-        { ...body, projectId, requesterId: req.user!.userId },
+        { ...body, projectId: req.projectId, requesterId: req.user!.userId },
       ),
     );
   }
@@ -76,7 +77,6 @@ export class LabelsController {
   @ApiOperation({ summary: 'Actualiza una etiqueta' })
   @ApiResponse({ status: 200, description: 'Etiqueta actualizada' })
   update(
-    @Param('projectId') projectId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
     @Body() body: UpdateLabelBodyDto,
@@ -84,7 +84,7 @@ export class LabelsController {
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'label_update' },
-        { ...body, id, projectId, requesterId: req.user!.userId },
+        { ...body, id, projectId: req.projectId, requesterId: req.user!.userId },
       ),
     );
   }
@@ -95,15 +95,11 @@ export class LabelsController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_LABELS)
   @ApiOperation({ summary: 'Elimina una etiqueta y la quita de sus tareas' })
   @ApiResponse({ status: 200, description: 'Etiqueta eliminada' })
-  delete(
-    @Param('projectId') projectId: string,
-    @Param('id') id: string,
-    @Request() req: Express.Request,
-  ) {
+  delete(@Param('id') id: string, @Request() req: Express.Request) {
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'label_delete' },
-        { id, projectId, requesterId: req.user!.userId },
+        { id, projectId: req.projectId, requesterId: req.user!.userId },
       ),
     );
   }
