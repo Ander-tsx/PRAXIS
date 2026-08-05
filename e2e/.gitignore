@@ -1,0 +1,5 @@
+# Salida de Playwright: informes, trazas y capturas de cada ejecución.
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

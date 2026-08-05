@@ -4,7 +4,7 @@ packages:
   - "apps/backend/commons/*"
   - "apps/frontend/*"
   - "packages/**"
-  - "stubs/**"
+  - "e2e"
 
 # Heredado de apps/frontend/web-shell/pnpm-workspace.yaml, que existía como
 # workspace anidado y se eliminó al integrar el frontend al monorepo.

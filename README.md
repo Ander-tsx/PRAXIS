@@ -196,18 +196,151 @@ pnpm dev:frontend
 | Comando | Descripción |
 |---------|-------------|
 | `pnpm dev:cli` | **Asistente interactivo.** Levanta lo que elijas y comprueba que arrancó. |
+| `pnpm dev:backend` | Levanta el gateway y los 7 microservicios. |
 | `pnpm dev:frontend` | Levanta las 5 zonas del frontend. |
 | `pnpm build` | Compila todo el monorepo (Turborepo resuelve el orden). |
 | `pnpm lint` | Biome en la raíz, ESLint en `web-shell`. |
-| `pnpm test` | Tests de todos los paquetes. |
+| `pnpm test` | Tests unitarios de todos los paquetes (no incluye los E2E). |
 | `pnpm format` | Formatea con Biome. |
+| `pnpm docker:up` | Levanta PostgreSQL y Redis. |
 | `pnpm docker:down` | Detiene PostgreSQL y Redis. |
 | `pnpm docker:logs` | Logs de la infraestructura. |
+| `pnpm prisma:reset` | Recrea las tablas de los 6 servicios con esquema. **Borra los datos.** |
+| `pnpm prisma:seed` | Ejecuta los seeds de los 4 servicios que los tienen. |
+| `pnpm e2e` | Pruebas end-to-end. Ver la sección de abajo. |
 
 ⚠️ `pnpm prisma:generate` y `pnpm prisma:deploy` usan el filtro
 `@praxis/*-service`, que incluye a `reports-service` — un servicio sin Prisma —
 y abortan con `Command "prisma" not found`. Usa los bucles de los pasos 4 y 5
-hasta que se corrijan.
+hasta que se corrijan. `prisma:reset` y `prisma:seed` sí llevan la lista
+explícita y funcionan.
+
+---
+
+# Pruebas end-to-end
+
+Viven en [`e2e/`](e2e/) y usan **Playwright**. Cubren dos cosas a la vez: el
+contrato del gateway (sin navegador) y los recorridos de interfaz sobre el
+multi-zone (en Chromium).
+
+### Por qué Playwright y no Cypress
+
+La mitad de lo que hay que verificar aquí **no es interfaz**: es el sobre
+`{success, data, meta}`, los guards y la semántica de los tokens. Playwright
+ejecuta las pruebas de API y las de navegador en la misma suite, con el mismo
+runner y el mismo informe; con Cypress harían falta dos herramientas. Además,
+Cypress corre dentro del propio navegador y arrastra restricciones de origen que
+un multi-zone provoca constantemente.
+
+## Preparación (una sola vez)
+
+```bash
+pnpm install
+pnpm e2e:instalar
+```
+
+`e2e:instalar` descarga el Chromium que usa Playwright (~130 MB). No hace falta
+repetirlo salvo que cambie la versión.
+
+## Antes de lanzarlas: el stack tiene que estar arriba
+
+Las pruebas **no levantan nada**: hablan con el sistema real, y esa es su razón
+de ser. Con el proyecto ya configurado (pasos 1 a 7 de arriba):
+
+```bash
+pnpm docker:up
+pnpm dev:backend
+pnpm dev:frontend
+```
+
+Y en **otra terminal**, con los puertos 3000 y 4100–4104 ya respondiendo:
+
+```bash
+pnpm e2e
+```
+
+⚠️ Necesitan los **seeds ejecutados** (`pnpm prisma:seed`): varias pruebas entran
+con `admin@praxis.dev`. Si el login falla en cadena, es esto.
+
+## Los cuatro comandos, y cuándo se usa cada uno
+
+| Comando | Qué corre | Cuándo |
+|---|---|---|
+| `pnpm e2e:regresion` | Todo **menos** `@security` | **El de antes y después de tocar código.** Tiene que estar verde siempre. |
+| `pnpm e2e:seguridad` | Solo `@security` | Mide el endurecimiento pendiente. Nace en rojo a propósito. |
+| `pnpm e2e:api` | Solo el contrato del gateway | Cambios de backend. Segundos, sin navegador. |
+| `pnpm e2e:ui` | Solo los recorridos de navegador | Cambios de interfaz. |
+| `pnpm e2e` | Las dos suites enteras | Antes de abrir un PR. |
+| `pnpm e2e:report` | Abre el informe HTML de la última ejecución | Para leer un fallo con su traza. |
+
+### La separación `@security` es deliberada
+
+Las pruebas etiquetadas `@security` describen **el comportamiento que queremos,
+no el que hay**. Cada una fija un hallazgo de la auditoría y se pone verde cuando
+ese hallazgo se corrige.
+
+Mezclarlas con el resto perdería las dos señales a la vez: un rojo esperado tapa
+un rojo nuevo. Por eso `e2e:regresion` es la red de seguridad —verde antes de un
+cambio y verde después— y `e2e:seguridad` es el marcador del endurecimiento.
+
+## Qué cubren
+
+**API** (`e2e/tests/api/`, sin navegador):
+
+| Archivo | Qué fija |
+|---|---|
+| `01-contrato` | El sobre `{success, data, meta}`, los errores, `forbidNonWhitelisted`, la forma de los listados |
+| `02-auth` | Registro, login, refresh, logout, firma manipulada, códigos que no distinguen usuario de contraseña |
+| `03-autorizacion` | Aislamiento entre cuentas, el bypass de `projectId` en el cuerpo, `AccountOwnerGuard`, permisos y jerarquía |
+| `04-proyectos` | Ciclo de vida, `name` único por dueño, `slug` único global, sufijo aleatorio, `:idOrSlug` |
+| `05-tablero` | Espacio → tablero → columnas → tarea → mover, encargados, checklists, comentarios, informes |
+| `06-seguridad` | 🏷️ `@security` — control de acceso en rutas anidadas, tipo de token, límite de intentos, cabeceras |
+
+**Interfaz** (`e2e/tests/ui/`, en Chromium):
+
+| Archivo | Qué fija |
+|---|---|
+| `01-publico` | Landing, atajos `/login` y `/signup`, los rewrites hacia auth-front, validación de cliente |
+| `02-guards` | Cada zona privada redirige al login — **la raíz y una ruta interior por separado** |
+| `03-sesion` | Crear cuenta, cookie httpOnly, navegar entre zonas, salir, crear un proyecto, el slug en la URL |
+
+⚠️ En `02-guards`, la raíz de cada zona va en su propia prueba **a propósito**:
+el `matcher` de Next con lookahead negativo no casa la raíz, así que hay que
+añadir `'/'` como entrada aparte. Ya pasó que `/dashboard/perfil` redirigía y
+`/dashboard` a secas se servía sin guard.
+
+## Escribir una prueba nueva
+
+Los ayudantes están en `e2e/fixtures/`:
+
+- `api.ts` — `registrar()`, `entrar()`, `crearProyecto()`, y `data()` / `error()`
+  para desenvolver el sobre sin repetir el bloque en cada prueba.
+- `mundo.ts` — `crearMundo()` monta un proyecto completo y utilizable (rol,
+  espacio, tablero, tres columnas) en una llamada. `darDeAlta()` mete a alguien
+  con los permisos que le pases.
+- `ui.ts` — `crearCuentaYEntrar()` y los localizadores de los formularios.
+
+⚠️ En los formularios, **localiza por `id`** (`#email`, `#password`), no con
+`getByLabel`. El botón de mostrar contraseña lleva `aria-label="Mostrar
+contraseña"` y `getByLabel('Contraseña')` casa con los dos —y con «Confirmar
+contraseña» en el registro—, así que Playwright falla por modo estricto sin que
+haya nada roto.
+
+⚠️ **No añadas `dependencies` entre proyectos de Playwright.** Un proyecto
+listado ahí se ejecuta entero **ignorando los filtros**, y eso rompe la
+separación `@security`: con `dependencies: ['api']` puesto, `--grep-invert
+@security` devolvía las 95 pruebas en lugar de las 81. El orden ya lo da la
+declaración.
+
+## Si algo falla
+
+| Síntoma | Causa |
+|---|---|
+| Todo falla con `ECONNREFUSED` | El stack no está levantado. |
+| El login falla en cadena | Faltan los seeds (`pnpm prisma:seed`). |
+| `browserType.launch: Executable doesn't exist` | Falta `pnpm e2e:instalar`. |
+| Solo fallan las `@security` | Es lo esperado mientras el hallazgo siga abierto. |
+| Un fallo que no se reproduce | Las pruebas comparten base de datos y corren con `workers: 1` a propósito. Si añadiste paralelismo, quítalo. |
 
 ### `pnpm dev:cli` — el atajo para el día a día
 
