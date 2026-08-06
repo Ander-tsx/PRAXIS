@@ -49,8 +49,7 @@ export class AccountOwnerGuard implements CanActivate {
      * el síntoma es un guard que deja pasar a todo el mundo porque `targetId`
      * llega `undefined` y no coincide con nadie.
      */
-    const targetId: string | undefined =
-      request.params?.id ?? request.params?.userId;
+    const targetId: string | undefined = request.params?.id ?? request.params?.userId;
 
     if (!userId) {
       throw new ForbiddenException('No hay usuario autenticado.');

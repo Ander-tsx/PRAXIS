@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  type FindAdminActivityDto,
-  type RecordAdminActionDto,
-} from '@praxis/contracts';
+import { type FindAdminActivityDto, type RecordAdminActionDto } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
 

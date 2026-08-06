@@ -284,10 +284,7 @@ export async function settleProjectAction(projectId: string): Promise<void> {
 
 /* ─── Roles ─────────────────────────────────────────────────────────── */
 
-export async function saveRoleAction(
-  _prev: RoleState,
-  formData: FormData,
-): Promise<RoleState> {
+export async function saveRoleAction(_prev: RoleState, formData: FormData): Promise<RoleState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', savedName: null };
 
@@ -319,10 +316,7 @@ export async function saveRoleAction(
   return { error: null, savedName: name };
 }
 
-export async function deleteRoleAction(
-  _prev: RoleState,
-  formData: FormData,
-): Promise<RoleState> {
+export async function deleteRoleAction(_prev: RoleState, formData: FormData): Promise<RoleState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
 
@@ -376,10 +370,10 @@ export async function inviteMemberAction(
   if (!projectRoleId) return { error: 'Elige el rol con el que entrará.', done: null };
 
   try {
-    const invitation = await api.post<ProjectInvitation>(
-      `/projects/${projectId}/invitations`,
-      { userId, projectRoleId },
-    );
+    const invitation = await api.post<ProjectInvitation>(`/projects/${projectId}/invitations`, {
+      userId,
+      projectRoleId,
+    });
     if (!invitation?.id) {
       return { error: 'El servidor no registró la invitación.', done: null };
     }
@@ -784,8 +778,7 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   const columnId = String(formData.get('columnId') ?? '');
   /** El nombre de la columna: `status` tiene que igualarlo (trampa #2). */
   const status = String(formData.get('status') ?? '');
-  const { title, description, dueDate, priority, assigneeIds, labelIds } =
-    readTaskFields(formData);
+  const { title, description, dueDate, priority, assigneeIds, labelIds } = readTaskFields(formData);
 
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
@@ -819,8 +812,7 @@ export async function updateTaskAction(_prev: TaskState, formData: FormData): Pr
 
   const projectId = String(formData.get('projectId') ?? '');
   const taskId = String(formData.get('taskId') ?? '');
-  const { title, description, dueDate, priority, assigneeIds, labelIds } =
-    readTaskFields(formData);
+  const { title, description, dueDate, priority, assigneeIds, labelIds } = readTaskFields(formData);
 
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
@@ -1168,10 +1160,7 @@ export async function uploadAttachmentAction(
   upload.append('file', file);
 
   try {
-    const created = await api.postForm<TaskAttachment>(
-      `/tasks/${taskId}/attachments`,
-      upload,
-    );
+    const created = await api.postForm<TaskAttachment>(`/tasks/${taskId}/attachments`, upload);
     if (!created?.id) {
       return { error: 'El servidor no guardó el archivo.', done: null };
     }

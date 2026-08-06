@@ -17,50 +17,48 @@ import { VoiceTeamModule } from './voice-team/voice-team.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        DATABASE_URL:                  Joi.string().required(),
-        REDIS_URL:                     Joi.string().default('redis://localhost:6379'),
-        TCP_PORT:                      Joi.number().required(),
+        DATABASE_URL: Joi.string().required(),
+        REDIS_URL: Joi.string().default('redis://localhost:6379'),
+        TCP_PORT: Joi.number().required(),
 
         // Token de voz — secreto propio, scope de solo lectura
-        VOICE_JWT_SECRET:              Joi.string().optional(),
-        VOICE_TOKEN_EXPIRES_IN:        Joi.string().default('90d'),
-        ALEXA_SESSION_TTL_DAYS:        Joi.number().default(90),
+        VOICE_JWT_SECRET: Joi.string().optional(),
+        VOICE_TOKEN_EXPIRES_IN: Joi.string().default('90d'),
+        ALEXA_SESSION_TTL_DAYS: Joi.number().default(90),
 
         // Vinculación por frase semilla
-        VOICE_SEED_PHRASE_WORDS:       Joi.number().min(3).max(8).default(5),
+        VOICE_SEED_PHRASE_WORDS: Joi.number().min(3).max(8).default(5),
         VOICE_SEED_PHRASE_TTL_SECONDS: Joi.number().default(300),
-        VOICE_REDEEM_MAX_ATTEMPTS:     Joi.number().default(5),
-        VOICE_REDEEM_WINDOW_SECONDS:   Joi.number().default(600),
+        VOICE_REDEEM_MAX_ATTEMPTS: Joi.number().default(5),
+        VOICE_REDEEM_WINDOW_SECONDS: Joi.number().default(600),
 
         // Convenciones de estado de tarea
-        VOICE_COMPLETED_STATUSES:      Joi.string().default(
+        VOICE_COMPLETED_STATUSES: Joi.string().default(
           'done,completed,complete,completada,completado,finalizada,finalizado,terminada,terminado,hecho,hecha',
         ),
-        VOICE_IN_PROGRESS_STATUSES:    Joi.string().default(
+        VOICE_IN_PROGRESS_STATUSES: Joi.string().default(
           'in_progress,in progress,doing,en progreso,en curso,progreso',
         ),
-        VOICE_BLOCKED_STATUSES:        Joi.string().default(
+        VOICE_BLOCKED_STATUSES: Joi.string().default(
           'blocked,bloqueada,bloqueado,blocker,impedimento,on hold,en espera',
         ),
 
-        VOICE_STALE_DAYS:              Joi.number().min(1).default(7),
-        VOICE_FORECAST_WEEKS:          Joi.number().min(1).max(12).default(4),
-        VOICE_WEEK_MODE:               Joi.string().valid('calendar', 'rolling').default('calendar'),
+        VOICE_STALE_DAYS: Joi.number().min(1).default(7),
+        VOICE_FORECAST_WEEKS: Joi.number().min(1).max(12).default(4),
+        VOICE_WEEK_MODE: Joi.string().valid('calendar', 'rolling').default('calendar'),
 
         // Servicios origen de los datos
-        CREDENTIALS_SERVICE_HOST:      Joi.string().default('localhost'),
-        CREDENTIALS_SERVICE_PORT:      Joi.number().default(3001),
-        PROJECTS_SERVICE_HOST:         Joi.string().default('localhost'),
-        PROJECTS_SERVICE_PORT:         Joi.number().default(3003),
-        TASKS_SERVICE_HOST:            Joi.string().default('localhost'),
-        TASKS_SERVICE_PORT:            Joi.number().default(3004),
+        CREDENTIALS_SERVICE_HOST: Joi.string().default('localhost'),
+        CREDENTIALS_SERVICE_PORT: Joi.number().default(3001),
+        PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
+        PROJECTS_SERVICE_PORT: Joi.number().default(3003),
+        TASKS_SERVICE_HOST: Joi.string().default('localhost'),
+        TASKS_SERVICE_PORT: Joi.number().default(3004),
 
-        LOG_LEVEL:                     Joi.string()
-                                         .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
-                                         .default('info'),
-        NODE_ENV:                      Joi.string()
-                                         .valid('development', 'production', 'test')
-                                         .default('development'),
+        LOG_LEVEL: Joi.string()
+          .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+          .default('info'),
+        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
       }),
     }),
     PrismaModule,

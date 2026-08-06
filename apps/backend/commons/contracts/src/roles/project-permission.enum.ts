@@ -8,9 +8,9 @@ export enum ProjectPermission {
    * crear y editar tableros, así que un rol de solo lectura —cliente,
    * dirección, auditoría— era imposible de representar.
    */
-  CAN_VIEW_PROJECT   = 'canViewProject',
+  CAN_VIEW_PROJECT = 'canViewProject',
 
-  CAN_CREATE_TASK    = 'canCreateTask',
+  CAN_CREATE_TASK = 'canCreateTask',
   /**
    * Mover una tarea de columna, sin poder tocar su contenido.
    *
@@ -21,18 +21,18 @@ export enum ProjectPermission {
    *
    * `canEditTask` lo implica por jerarquía: quien ya podía mover no pierde nada.
    */
-  CAN_MOVE_TASK      = 'canMoveTask',
-  CAN_EDIT_TASK      = 'canEditTask',
-  CAN_DELETE_TASK    = 'canDeleteTask',
-  CAN_CREATE_BOARD   = 'canCreateBoard',
-  CAN_EDIT_BOARD     = 'canEditBoard',
-  CAN_DELETE_BOARD   = 'canDeleteBoard',
-  CAN_CREATE_COLUMN  = 'canCreateColumn',
+  CAN_MOVE_TASK = 'canMoveTask',
+  CAN_EDIT_TASK = 'canEditTask',
+  CAN_DELETE_TASK = 'canDeleteTask',
+  CAN_CREATE_BOARD = 'canCreateBoard',
+  CAN_EDIT_BOARD = 'canEditBoard',
+  CAN_DELETE_BOARD = 'canDeleteBoard',
+  CAN_CREATE_COLUMN = 'canCreateColumn',
   /** Estaba en el DTO de roles y en la jerarquía, pero faltaba en el enum. */
-  CAN_EDIT_COLUMN    = 'canEditColumn',
-  CAN_DELETE_COLUMN  = 'canDeleteColumn',
+  CAN_EDIT_COLUMN = 'canEditColumn',
+  CAN_DELETE_COLUMN = 'canDeleteColumn',
   CAN_MANAGE_MEMBERS = 'canManageMembers',
-  CAN_MANAGE_ROLES   = 'canManageRoles',
+  CAN_MANAGE_ROLES = 'canManageRoles',
 
   /**
    * Comentar en una tarea.
@@ -41,7 +41,7 @@ export enum ProjectPermission {
    * dirección, auditoría— leía el hilo y no podía responder. Leer y opinar no es
    * editar el trabajo de nadie. `canEditTask` lo implica por jerarquía.
    */
-  CAN_COMMENT        = 'canComment',
+  CAN_COMMENT = 'canComment',
 
   /**
    * Crear, renombrar y borrar las etiquetas del proyecto.
@@ -50,7 +50,7 @@ export enum ProjectPermission {
    * tarea podía rehacer el vocabulario del proyecto entero, y al revés, quien
    * organiza las etiquetas tenía que poder editar tareas.
    */
-  CAN_MANAGE_LABELS  = 'canManageLabels',
+  CAN_MANAGE_LABELS = 'canManageLabels',
 
   /**
    * Cambiar el nombre y la descripción del proyecto.
@@ -63,7 +63,7 @@ export enum ProjectPermission {
    * capacidad — es el mismo movimiento que `canMoveTask`, `canComment`,
    * `canManageLabels` y `canDeleteProject`.
    */
-  CAN_EDIT_PROJECT   = 'canEditProject',
+  CAN_EDIT_PROJECT = 'canEditProject',
 
   /**
    * Ver los reportes del proyecto, **y preguntarle al asistente sobre él**.
@@ -95,7 +95,7 @@ export enum ProjectPermission {
    * `canDeleteProject`: así los roles «Administrador» que ya existen lo reciben
    * sin migración, y un «Colaborador» no.
    */
-  CAN_VIEW_REPORTS   = 'canViewReports',
+  CAN_VIEW_REPORTS = 'canViewReports',
 
   /**
    * Eliminar el proyecto entero.

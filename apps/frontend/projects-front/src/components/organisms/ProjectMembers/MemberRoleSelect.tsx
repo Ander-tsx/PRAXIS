@@ -35,10 +35,7 @@ export function MemberRoleSelect({
   /** Nombre de la persona, para el texto accesible. */
   label: string;
 }) {
-  const [state, action, pending] = useActionState(
-    changeMemberRoleAction,
-    MEMBER_INITIAL_STATE,
-  );
+  const [state, action, pending] = useActionState(changeMemberRoleAction, MEMBER_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
   /**

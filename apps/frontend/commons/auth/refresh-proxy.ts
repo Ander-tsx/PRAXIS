@@ -98,8 +98,10 @@ export function createSessionRefreshProxy(options: CreateSessionRefreshProxyOpti
      */
     const requestHeaders = new Headers(request.headers);
     const cookies = request.cookies.getAll().filter((cookie) => cookie.name !== SESSION_COOKIE);
-    const serialized = [...cookies.map((c) => `${c.name}=${c.value}`), `${SESSION_COOKIE}=${renewed}`]
-      .join('; ');
+    const serialized = [
+      ...cookies.map((c) => `${c.name}=${c.value}`),
+      `${SESSION_COOKIE}=${renewed}`,
+    ].join('; ');
     requestHeaders.set('cookie', serialized);
 
     const response = NextResponse.next({ request: { headers: requestHeaders } });

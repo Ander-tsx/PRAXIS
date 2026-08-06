@@ -1,6 +1,6 @@
 /**
  * Alexa Skill "Praxis" — Código Consolidado Autocontenido
- * 
+ *
  * Este archivo agrupa toda la funcionalidad del bot de voz Praxis
  * (handlers, servicios, interceptores, constantes y utilidades)
  * para facilitar su despliegue directo en la Alexa Developer Console online editor.
@@ -49,8 +49,7 @@ const messages = {
   PROJECT_NOT_FOUND: (query) =>
     `No encontré un proyecto llamado ${query}. ¿Puedes repetir el nombre?`,
 
-  NO_ACTIVE_PROJECT:
-    'Primero necesito saber con qué proyecto quieres trabajar. ¿Cuál sería?',
+  NO_ACTIVE_PROJECT: 'Primero necesito saber con qué proyecto quieres trabajar. ¿Cuál sería?',
 
   PROJECT_PROGRESS: (projectName, percentage, completedTasks, totalTasks) =>
     `El proyecto ${projectName} tiene un avance del ${percentage}%. ` +
@@ -86,8 +85,7 @@ const messages = {
   BLOCKED_TASKS_ITEM: (title, daysStalled) =>
     `La tarea ${title} lleva ${daysStalled} días sin cambios.`,
 
-  BLOCKED_TASKS_SUFFIX: (remaining) =>
-    ` Y ${remaining} tareas más con retraso.`,
+  BLOCKED_TASKS_SUFFIX: (remaining) => ` Y ${remaining} tareas más con retraso.`,
 
   BLOCKED_TASKS_FOOTER:
     ' Si deseas revisar si la carga de trabajo está equilibrada entre los integrantes del equipo, ' +
@@ -97,8 +95,7 @@ const messages = {
     `${membersList}. Si deseas consultar el desempeño de un integrante específico, ` +
     `puedes decir: ¿Cómo va ${firstMemberName}?`,
 
-  WORKLOAD_ITEM: (name, count) =>
-    `${name} tiene ${count} tareas asignadas`,
+  WORKLOAD_ITEM: (name, count) => `${name} tiene ${count} tareas asignadas`,
 
   MEMBER_PERFORMANCE: (name, assigned, completed, inProgress) =>
     `${name} tiene ${assigned} tareas asignadas, ${completed} completadas y ${inProgress} en progreso. ` +
@@ -117,8 +114,7 @@ const messages = {
 
   STOP: 'Hasta luego. Recuerda que puedes volver cuando necesites gestionar tus proyectos.',
 
-  FALLBACK:
-    'Lo siento, no entendí eso. Puedes decir ayuda para conocer las opciones disponibles.',
+  FALLBACK: 'Lo siento, no entendí eso. Puedes decir ayuda para conocer las opciones disponibles.',
 
   ERROR_BAD_REQUEST:
     'La frase semilla es inválida. Revisa la secuencia de palabras en la app web de Praxis.',
@@ -126,23 +122,18 @@ const messages = {
   ERROR_UNAUTHORIZED:
     'Tu sesión expiró. Por favor inicia sesión nuevamente diciendo mi semilla es seguido de tu frase.',
 
-  ERROR_FORBIDDEN:
-    'No tienes permisos para consultar la información de este proyecto.',
+  ERROR_FORBIDDEN: 'No tienes permisos para consultar la información de este proyecto.',
 
-  ERROR_NOT_FOUND:
-    'No encontré ese proyecto o integrante.',
+  ERROR_NOT_FOUND: 'No encontré ese proyecto o integrante.',
 
-  ERROR_GONE:
-    'La frase semilla ha expirado. Por favor genera una nueva frase en la app web.',
+  ERROR_GONE: 'La frase semilla ha expirado. Por favor genera una nueva frase en la app web.',
 
   ERROR_TOO_MANY_REQUESTS:
     'Has intentado demasiadas veces. Espera un momento antes de volver a intentar.',
 
-  ERROR_SERVER:
-    'No pude conectarme con Praxis en este momento. Inténtalo más tarde.',
+  ERROR_SERVER: 'No pude conectarme con Praxis en este momento. Inténtalo más tarde.',
 
-  ERROR_GENERIC:
-    'Ocurrió un error inesperado. Por favor intenta de nuevo.',
+  ERROR_GENERIC: 'Ocurrió un error inesperado. Por favor intenta de nuevo.',
 };
 
 // ── 2. UTILIDADES DE BUSQUEDA Y VOZ ──────────────────────────────────
@@ -167,9 +158,11 @@ function joinNaturally(array) {
 function findBestMatch(query, list, keyName = 'name') {
   if (!query || !list || list.length === 0) return null;
   const q = query.toLowerCase().trim();
-  const exact = list.find(item => item[keyName].toLowerCase() === q);
+  const exact = list.find((item) => item[keyName].toLowerCase() === q);
   if (exact) return exact;
-  const includes = list.find(item => item[keyName].toLowerCase().includes(q) || q.includes(item[keyName].toLowerCase()));
+  const includes = list.find(
+    (item) => item[keyName].toLowerCase().includes(q) || q.includes(item[keyName].toLowerCase()),
+  );
   if (includes) return includes;
   return list[0];
 }
@@ -275,13 +268,27 @@ async function buildErrorResponse(handlerInput, error) {
   let speech = messages.ERROR_GENERIC;
   if (error && error.response) {
     switch (error.response.status) {
-      case 400: speech = messages.ERROR_BAD_REQUEST; break;
-      case 401: speech = messages.ERROR_UNAUTHORIZED; break;
-      case 403: speech = messages.ERROR_FORBIDDEN; break;
-      case 404: speech = messages.ERROR_NOT_FOUND; break;
-      case 410: speech = messages.ERROR_GONE; break;
-      case 429: speech = messages.ERROR_TOO_MANY_REQUESTS; break;
-      default: speech = messages.ERROR_SERVER; break;
+      case 400:
+        speech = messages.ERROR_BAD_REQUEST;
+        break;
+      case 401:
+        speech = messages.ERROR_UNAUTHORIZED;
+        break;
+      case 403:
+        speech = messages.ERROR_FORBIDDEN;
+        break;
+      case 404:
+        speech = messages.ERROR_NOT_FOUND;
+        break;
+      case 410:
+        speech = messages.ERROR_GONE;
+        break;
+      case 429:
+        speech = messages.ERROR_TOO_MANY_REQUESTS;
+        break;
+      default:
+        speech = messages.ERROR_SERVER;
+        break;
     }
   }
 
@@ -308,7 +315,11 @@ const RequestInterceptor = {
 
     if (!voiceToken) {
       handlerInput.attributesManager.setRequestAttributes({
-        apiClient: null, isAuthenticated: false, user: null, voiceToken: null, startTime
+        apiClient: null,
+        isAuthenticated: false,
+        user: null,
+        voiceToken: null,
+        startTime,
       });
       return;
     }
@@ -318,7 +329,11 @@ const RequestInterceptor = {
     try {
       const user = await praxisApi.getMe(apiClient);
       handlerInput.attributesManager.setRequestAttributes({
-        apiClient, isAuthenticated: true, user, voiceToken, startTime
+        apiClient,
+        isAuthenticated: true,
+        user,
+        voiceToken,
+        startTime,
       });
     } catch (error) {
       const status = error.response?.status;
@@ -333,7 +348,11 @@ const RequestInterceptor = {
         } catch (e) {}
       }
       handlerInput.attributesManager.setRequestAttributes({
-        apiClient: null, isAuthenticated: false, user: null, voiceToken: null, startTime
+        apiClient: null,
+        isAuthenticated: false,
+        user: null,
+        voiceToken: null,
+        startTime,
       });
     }
   },
@@ -344,11 +363,17 @@ const ResponseInterceptor = {
     const reqAttrs = handlerInput.attributesManager.getRequestAttributes();
     const sessAttrs = handlerInput.attributesManager.getSessionAttributes();
     const reqType = Alexa.getRequestType(handlerInput.requestEnvelope);
-    const intentName = reqType === 'IntentRequest' ? Alexa.getIntentName(handlerInput.requestEnvelope) : reqType;
-    const userIdentifier = reqAttrs.user?.displayName || reqAttrs.user?.userId || Alexa.getUserId(handlerInput.requestEnvelope);
+    const intentName =
+      reqType === 'IntentRequest' ? Alexa.getIntentName(handlerInput.requestEnvelope) : reqType;
+    const userIdentifier =
+      reqAttrs.user?.displayName ||
+      reqAttrs.user?.userId ||
+      Alexa.getUserId(handlerInput.requestEnvelope);
     const durationMs = Date.now() - (reqAttrs.startTime || Date.now());
 
-    console.log(`[ResponseInterceptor] Intent: "${intentName}" | User: "${userIdentifier}" | Project: "${sessAttrs.projectId}" | Duration: ${durationMs}ms`);
+    console.log(
+      `[ResponseInterceptor] Intent: "${intentName}" | User: "${userIdentifier}" | Project: "${sessAttrs.projectId}" | Duration: ${durationMs}ms`,
+    );
     return response;
   },
 };
@@ -375,7 +400,9 @@ const LaunchRequestHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const projects = Array.isArray(responseProjects)
+      ? responseProjects
+      : responseProjects?.items || [];
     if (!projects || projects.length === 0) {
       return handlerInput.responseBuilder.speak(messages.WELCOME_NO_PROJECTS).getResponse();
     }
@@ -389,7 +416,7 @@ const LaunchRequestHandler = {
         .reprompt(messages.HELP)
         .getResponse();
     }
-    const namesList = joinNaturally(projects.slice(0, 4).map(p => p.name));
+    const namesList = joinNaturally(projects.slice(0, 4).map((p) => p.name));
     return handlerInput.responseBuilder
       .speak(messages.WELCOME_MULTIPLE_PROJECTS(namesList))
       .reprompt(messages.NO_ACTIVE_PROJECT)
@@ -405,8 +432,9 @@ const ConnectSkillIntentHandler = {
     return name === 'ConnectSkillIntent' || name === 'LoginIntent';
   },
   async handle(handlerInput) {
-    let seed = Alexa.getSlotValue(handlerInput.requestEnvelope, 'seed')
-      || Alexa.getSlotValue(handlerInput.requestEnvelope, 'SeedPhrase');
+    let seed =
+      Alexa.getSlotValue(handlerInput.requestEnvelope, 'seed') ||
+      Alexa.getSlotValue(handlerInput.requestEnvelope, 'SeedPhrase');
     if (!seed || !seed.trim()) {
       return handlerInput.responseBuilder
         .speak(messages.PROMPT_SEED_PHRASE)
@@ -453,7 +481,9 @@ const LogoutIntentHandler = {
   async handle(handlerInput) {
     const { apiClient } = handlerInput.attributesManager.getRequestAttributes();
     if (apiClient) {
-      try { await praxisApi.logout(apiClient); } catch (e) {
+      try {
+        await praxisApi.logout(apiClient);
+      } catch (e) {
         console.log('[Logout] Error llamando a /logout en API:', e.message);
       }
     }
@@ -475,13 +505,18 @@ const LogoutIntentHandler = {
 
 const SelectBoardIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'SelectBoardIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'SelectBoardIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
     if (!isAuthenticated) {
-      return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     }
     const boardName = Alexa.getSlotValue(handlerInput.requestEnvelope, 'boardName');
 
@@ -492,13 +527,20 @@ const SelectBoardIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const projects = Array.isArray(responseProjects)
+      ? responseProjects
+      : responseProjects?.items || [];
     const match = findBestMatch(boardName, projects, 'name');
     if (!match) {
-      return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+      return handlerInput.responseBuilder
+        .speak(messages.PROJECT_NOT_FOUND(boardName))
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
     }
 
-    try { await praxisApi.selectProject(apiClient, match.id); } catch (e) {
+    try {
+      await praxisApi.selectProject(apiClient, match.id);
+    } catch (e) {
       console.log('[SelectBoard] Error opcional al seleccionar proyecto en API:', e.message);
     }
 
@@ -506,19 +548,27 @@ const SelectBoardIntentHandler = {
     sessionAttributes.projectId = match.id;
     sessionAttributes.projectName = match.name;
     handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-    return handlerInput.responseBuilder.speak(messages.PROJECT_SELECTED(match.name)).reprompt(messages.HELP).getResponse();
+    return handlerInput.responseBuilder
+      .speak(messages.PROJECT_SELECTED(match.name))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
 const ProjectProgressIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectProgressIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectProgressIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
     if (!isAuthenticated) {
-      return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     }
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
     const boardName = Alexa.getSlotValue(handlerInput.requestEnvelope, 'boardName');
@@ -532,9 +582,15 @@ const ProjectProgressIntentHandler = {
       } catch (error) {
         return await buildErrorResponse(handlerInput, error);
       }
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const projects = Array.isArray(responseProjects)
+        ? responseProjects
+        : responseProjects?.items || [];
       const match = findBestMatch(boardName, projects, 'name');
-      if (!match) return handlerInput.responseBuilder.speak(messages.PROJECT_NOT_FOUND(boardName)).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+      if (!match)
+        return handlerInput.responseBuilder
+          .speak(messages.PROJECT_NOT_FOUND(boardName))
+          .reprompt(messages.NO_ACTIVE_PROJECT)
+          .getResponse();
       projectId = match.id;
       projectName = match.name;
       sessionAttributes.projectId = projectId;
@@ -542,7 +598,11 @@ const ProjectProgressIntentHandler = {
       handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
     }
 
-    if (!projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
 
     let progress;
     try {
@@ -552,7 +612,14 @@ const ProjectProgressIntentHandler = {
     }
 
     return handlerInput.responseBuilder
-      .speak(messages.PROJECT_PROGRESS(progress.projectName || projectName, progress.percentage, progress.completedTasks, progress.totalTasks))
+      .speak(
+        messages.PROJECT_PROGRESS(
+          progress.projectName || projectName,
+          progress.percentage,
+          progress.completedTasks,
+          progress.totalTasks,
+        ),
+      )
       .reprompt(messages.HELP)
       .getResponse();
   },
@@ -560,14 +627,24 @@ const ProjectProgressIntentHandler = {
 
 const WeeklyProductivityIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'WeeklyProductivityIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'WeeklyProductivityIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
-    if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+    if (!isAuthenticated)
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-    if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!sessionAttributes.projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
 
     let data;
     try {
@@ -577,23 +654,39 @@ const WeeklyProductivityIntentHandler = {
     }
 
     const { completedThisWeek, completedLastWeek, deltaPercent, trend } = data;
-    const speech = (trend === 'stable' || deltaPercent === 0)
-      ? messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek)
-      : messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trend === 'up' ? 'subió' : 'bajó', Math.abs(deltaPercent));
+    const speech =
+      trend === 'stable' || deltaPercent === 0
+        ? messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek)
+        : messages.WEEKLY_PRODUCTIVITY(
+            completedThisWeek,
+            completedLastWeek,
+            trend === 'up' ? 'subió' : 'bajó',
+            Math.abs(deltaPercent),
+          );
     return handlerInput.responseBuilder.speak(speech).reprompt(messages.HELP).getResponse();
   },
 };
 
 const ProjectForecastIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectForecastIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectForecastIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
-    if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+    if (!isAuthenticated)
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-    if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!sessionAttributes.projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
 
     let forecast;
     try {
@@ -603,22 +696,38 @@ const ProjectForecastIntentHandler = {
     }
 
     if (!forecast || forecast.estimatedDays === null || forecast.reason === 'INSUFFICIENT_DATA') {
-      return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST_NO_DATA).reprompt(messages.HELP).getResponse();
+      return handlerInput.responseBuilder
+        .speak(messages.PROJECT_FORECAST_NO_DATA)
+        .reprompt(messages.HELP)
+        .getResponse();
     }
-    return handlerInput.responseBuilder.speak(messages.PROJECT_FORECAST(forecast.estimatedDays)).reprompt(messages.HELP).getResponse();
+    return handlerInput.responseBuilder
+      .speak(messages.PROJECT_FORECAST(forecast.estimatedDays))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
 const BlockedTasksIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'BlockedTasksAnalysisIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'BlockedTasksAnalysisIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
-    if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+    if (!isAuthenticated)
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-    if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!sessionAttributes.projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
 
     let res;
     try {
@@ -627,9 +736,16 @@ const BlockedTasksIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const items = Array.isArray(res) ? res : (res?.items || []);
-    if (!items || items.length === 0) return handlerInput.responseBuilder.speak(messages.BLOCKED_TASKS_NONE).reprompt(messages.HELP).getResponse();
-    let speakOutput = items.slice(0, 3).map(t => messages.BLOCKED_TASKS_ITEM(t.title, t.daysStalled)).join(' ');
+    const items = Array.isArray(res) ? res : res?.items || [];
+    if (!items || items.length === 0)
+      return handlerInput.responseBuilder
+        .speak(messages.BLOCKED_TASKS_NONE)
+        .reprompt(messages.HELP)
+        .getResponse();
+    let speakOutput = items
+      .slice(0, 3)
+      .map((t) => messages.BLOCKED_TASKS_ITEM(t.title, t.daysStalled))
+      .join(' ');
     if (items.length > 3) speakOutput += messages.BLOCKED_TASKS_SUFFIX(items.length - 3);
     speakOutput += messages.BLOCKED_TASKS_FOOTER;
     return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
@@ -638,14 +754,24 @@ const BlockedTasksIntentHandler = {
 
 const TeamWorkloadIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'TeamWorkloadIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'TeamWorkloadIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
-    if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+    if (!isAuthenticated)
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-    if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!sessionAttributes.projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
 
     let res;
     try {
@@ -654,25 +780,48 @@ const TeamWorkloadIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const items = Array.isArray(res) ? res : (res?.items || []);
-    if (!items || items.length === 0) return handlerInput.responseBuilder.speak('No hay datos de carga de trabajo.').reprompt(messages.HELP).getResponse();
-    const list = joinNaturally(items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount)));
-    return handlerInput.responseBuilder.speak(messages.TEAM_WORKLOAD(list, items[0].memberName)).reprompt(messages.HELP).getResponse();
+    const items = Array.isArray(res) ? res : res?.items || [];
+    if (!items || items.length === 0)
+      return handlerInput.responseBuilder
+        .speak('No hay datos de carga de trabajo.')
+        .reprompt(messages.HELP)
+        .getResponse();
+    const list = joinNaturally(
+      items.map((m) => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount)),
+    );
+    return handlerInput.responseBuilder
+      .speak(messages.TEAM_WORKLOAD(list, items[0].memberName))
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
 const MemberPerformanceIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'MemberPerformanceIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'MemberPerformanceIntent'
+    );
   },
   async handle(handlerInput) {
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
-    if (!isAuthenticated) return handlerInput.responseBuilder.speak(messages.NOT_AUTHENTICATED).reprompt(messages.PROMPT_SEED_PHRASE).getResponse();
+    if (!isAuthenticated)
+      return handlerInput.responseBuilder
+        .speak(messages.NOT_AUTHENTICATED)
+        .reprompt(messages.PROMPT_SEED_PHRASE)
+        .getResponse();
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-    if (!sessionAttributes.projectId) return handlerInput.responseBuilder.speak(messages.NO_ACTIVE_PROJECT).reprompt(messages.NO_ACTIVE_PROJECT).getResponse();
+    if (!sessionAttributes.projectId)
+      return handlerInput.responseBuilder
+        .speak(messages.NO_ACTIVE_PROJECT)
+        .reprompt(messages.NO_ACTIVE_PROJECT)
+        .getResponse();
     const memberNameSlot = Alexa.getSlotValue(handlerInput.requestEnvelope, 'memberName');
-    if (!memberNameSlot) return handlerInput.responseBuilder.speak('¿De qué integrante deseas conocer el desempeño?').reprompt('Dime el nombre.').getResponse();
+    if (!memberNameSlot)
+      return handlerInput.responseBuilder
+        .speak('¿De qué integrante deseas conocer el desempeño?')
+        .reprompt('Dime el nombre.')
+        .getResponse();
 
     let res;
     try {
@@ -681,19 +830,34 @@ const MemberPerformanceIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const members = Array.isArray(res) ? res : (res?.items || []);
+    const members = Array.isArray(res) ? res : res?.items || [];
     const matched = findBestMatch(memberNameSlot, members, 'name');
-    if (!matched) return handlerInput.responseBuilder.speak(messages.MEMBER_NOT_FOUND(memberNameSlot)).reprompt(messages.HELP).getResponse();
+    if (!matched)
+      return handlerInput.responseBuilder
+        .speak(messages.MEMBER_NOT_FOUND(memberNameSlot))
+        .reprompt(messages.HELP)
+        .getResponse();
 
     let perf;
     try {
-      perf = await praxisApi.getMemberPerformance(apiClient, sessionAttributes.projectId, matched.id);
+      perf = await praxisApi.getMemberPerformance(
+        apiClient,
+        sessionAttributes.projectId,
+        matched.id,
+      );
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
 
     return handlerInput.responseBuilder
-      .speak(messages.MEMBER_PERFORMANCE(perf.memberName || matched.name, perf.assignedCount, perf.completedCount, perf.inProgressCount))
+      .speak(
+        messages.MEMBER_PERFORMANCE(
+          perf.memberName || matched.name,
+          perf.assignedCount,
+          perf.completedCount,
+          perf.inProgressCount,
+        ),
+      )
       .reprompt(messages.HELP)
       .getResponse();
   },
@@ -701,8 +865,10 @@ const MemberPerformanceIntentHandler = {
 
 const HelpIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.HelpIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.HelpIntent'
+    );
   },
   handle(handlerInput) {
     return handlerInput.responseBuilder.speak(messages.HELP).reprompt(messages.HELP).getResponse();
@@ -711,20 +877,26 @@ const HelpIntentHandler = {
 
 const CancelAndStopIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.CancelIntent'
-        || Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent');
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.CancelIntent' ||
+        Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent')
+    );
   },
   handle(handlerInput) {
     const isStop = Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent';
-    return handlerInput.responseBuilder.speak(isStop ? messages.STOP : messages.CANCEL).getResponse();
+    return handlerInput.responseBuilder
+      .speak(isStop ? messages.STOP : messages.CANCEL)
+      .getResponse();
   },
 };
 
 const NavigateHomeIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NavigateHomeIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NavigateHomeIntent'
+    );
   },
   async handle(handlerInput) {
     return LaunchRequestHandler.handle(handlerInput);
@@ -733,11 +905,16 @@ const NavigateHomeIntentHandler = {
 
 const FallbackIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.FallbackIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.FallbackIntent'
+    );
   },
   handle(handlerInput) {
-    return handlerInput.responseBuilder.speak(messages.FALLBACK).reprompt(messages.HELP).getResponse();
+    return handlerInput.responseBuilder
+      .speak(messages.FALLBACK)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
@@ -751,7 +928,9 @@ const SessionEndedRequestHandler = {
 };
 
 const ErrorHandler = {
-  canHandle() { return true; },
+  canHandle() {
+    return true;
+  },
   async handle(handlerInput, error) {
     console.error(`[ErrorHandler Global] Error no capturado en la Skill:`, error);
     return await buildErrorResponse(handlerInput, error);
@@ -823,7 +1002,7 @@ exports.handler = Alexa.SkillBuilders.custom()
     CancelAndStopIntentHandler,
     NavigateHomeIntentHandler,
     FallbackIntentHandler,
-    SessionEndedRequestHandler
+    SessionEndedRequestHandler,
   )
   .addErrorHandlers(ErrorHandler)
   .addRequestInterceptors(RequestInterceptor)

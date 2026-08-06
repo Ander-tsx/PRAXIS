@@ -40,7 +40,6 @@ function validateForm(
  * que internamente hace auto-login tras un registro exitoso.
  */
 export default function SignupPage() {
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

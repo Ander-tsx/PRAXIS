@@ -9,9 +9,11 @@ const messages = require('../constants/messages');
 
 const CancelAndStopIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.CancelIntent'
-        || Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent');
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.CancelIntent' ||
+        Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent')
+    );
   },
 
   handle(handlerInput) {

@@ -66,7 +66,6 @@ export function validateProfile({ firstName, lastName }: ProfileInput): string |
   return null;
 }
 
-
 export const ROLE_NAME_MIN = 2;
 export const ROLE_NAME_MAX = 50;
 

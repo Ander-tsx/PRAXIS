@@ -86,7 +86,7 @@ export class QuotaService {
     const period = this.periodo();
 
     const uso = await this.prisma.assistantUsage.upsert({
-      where:  { userId_period: { userId, period } },
+      where: { userId_period: { userId, period } },
       create: { userId, period, used: 1 },
       update: { used: { increment: 1 } },
     });

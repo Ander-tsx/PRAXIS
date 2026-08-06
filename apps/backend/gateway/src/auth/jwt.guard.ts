@@ -52,7 +52,7 @@ export class JwtGuard implements CanActivate {
       }
 
       request.user = {
-        userId: payload.sub
+        userId: payload.sub,
       };
       return true;
     } catch {

@@ -13,17 +13,15 @@ import { TasksModule } from './tasks/tasks.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        DATABASE_URL:           Joi.string().required(),
-        REDIS_URL:              Joi.string().default('redis://localhost:6379'),
-        TCP_PORT:               Joi.number().required(),
-        PROJECTS_SERVICE_HOST:  Joi.string().default('localhost'),
-        PROJECTS_SERVICE_PORT:  Joi.number().default(3003),
-        LOG_LEVEL:              Joi.string()
-                                  .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
-                                  .default('info'),
-        NODE_ENV:               Joi.string()
-                                  .valid('development', 'production', 'test')
-                                  .default('development'),
+        DATABASE_URL: Joi.string().required(),
+        REDIS_URL: Joi.string().default('redis://localhost:6379'),
+        TCP_PORT: Joi.number().required(),
+        PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
+        PROJECTS_SERVICE_PORT: Joi.number().default(3003),
+        LOG_LEVEL: Joi.string()
+          .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+          .default('info'),
+        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
       }),
     }),
     PrismaModule,

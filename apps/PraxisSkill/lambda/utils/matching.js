@@ -53,9 +53,9 @@ function levenshteinDistance(a, b) {
     for (let j = 1; j <= a.length; j++) {
       const cost = b[i - 1] === a[j - 1] ? 0 : 1;
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,       // deletion
-        matrix[i][j - 1] + 1,       // insertion
-        matrix[i - 1][j - 1] + cost  // substitution
+        matrix[i - 1][j] + 1, // deletion
+        matrix[i][j - 1] + 1, // insertion
+        matrix[i - 1][j - 1] + cost, // substitution
       );
     }
   }
@@ -77,18 +77,18 @@ function findBestMatch(query, candidates, key = 'name', threshold = 0.6) {
   const q = normalize(query);
 
   // Primero intentar coincidencia exacta (normalizada)
-  const exactMatch = candidates.find(c => normalize(c[key]) === q);
+  const exactMatch = candidates.find((c) => normalize(c[key]) === q);
   if (exactMatch) return exactMatch;
 
   // Luego intentar que el query esté contenido en el nombre o viceversa
-  const containsMatch = candidates.find(c => {
+  const containsMatch = candidates.find((c) => {
     const n = normalize(c[key]);
     return n.includes(q) || q.includes(n);
   });
   if (containsMatch) return containsMatch;
 
   // Finalmente, similitud difusa
-  const scored = candidates.map(c => ({
+  const scored = candidates.map((c) => ({
     item: c,
     score: similarity(q, normalize(c[key])),
   }));

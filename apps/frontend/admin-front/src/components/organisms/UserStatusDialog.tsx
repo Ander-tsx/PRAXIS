@@ -94,9 +94,7 @@ export function UserStatusDialog({ usuario, open, onClose }: UserStatusDialogPro
           </>
         )}
 
-        {!activa && state.error && (
-          <p className="font-sans text-sm text-error">{state.error}</p>
-        )}
+        {!activa && state.error && <p className="font-sans text-sm text-error">{state.error}</p>}
 
         <footer className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>

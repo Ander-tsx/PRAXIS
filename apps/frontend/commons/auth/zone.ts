@@ -23,7 +23,8 @@ export function getPublicOrigin(request: NextRequest): string {
 
   if (!host) return request.nextUrl.origin;
 
-  const proto = request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '');
+  const proto =
+    request.headers.get('x-forwarded-proto') ?? request.nextUrl.protocol.replace(':', '');
 
   return `${proto}://${host}`;
 }

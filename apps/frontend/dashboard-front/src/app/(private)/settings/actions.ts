@@ -117,7 +117,11 @@ export async function generateSeedPhraseAction(
 ): Promise<VoiceLinkState> {
   const session = await getSession();
   if (!session) {
-    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', phrase: null, expiresAt: null };
+    return {
+      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+      phrase: null,
+      expiresAt: null,
+    };
   }
 
   let generated: VoiceSeedPhrase;
@@ -127,7 +131,11 @@ export async function generateSeedPhraseAction(
     if (error instanceof ApiError) {
       return { error: error.message, phrase: null, expiresAt: null };
     }
-    return { error: 'No se pudo generar la frase. Inténtalo de nuevo.', phrase: null, expiresAt: null };
+    return {
+      error: 'No se pudo generar la frase. Inténtalo de nuevo.',
+      phrase: null,
+      expiresAt: null,
+    };
   }
 
   if (!generated?.phrase || !generated?.expiresAt) {
@@ -158,7 +166,11 @@ export async function revokeVoiceLinkAction(
 ): Promise<VoiceLinkState> {
   const session = await getSession();
   if (!session) {
-    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', phrase: null, expiresAt: null };
+    return {
+      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+      phrase: null,
+      expiresAt: null,
+    };
   }
 
   const linkId = String(formData.get('linkId') ?? '').trim();
@@ -169,7 +181,11 @@ export async function revokeVoiceLinkAction(
     if (error instanceof ApiError) {
       return { error: error.message, phrase: null, expiresAt: null };
     }
-    return { error: 'No se pudo revocar el acceso. Inténtalo de nuevo.', phrase: null, expiresAt: null };
+    return {
+      error: 'No se pudo revocar el acceso. Inténtalo de nuevo.',
+      phrase: null,
+      expiresAt: null,
+    };
   }
 
   revalidatePath('/settings');

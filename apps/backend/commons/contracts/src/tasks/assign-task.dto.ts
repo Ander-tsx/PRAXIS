@@ -14,7 +14,10 @@ export class AssignTaskBodyDto {
    * selector múltiple al cerrarse, y así la operación es idempotente: repetirla
    * no duplica ni acumula. Un array vacío desasigna a todo el mundo.
    */
-  @ApiProperty({ type: [String], description: 'Lista completa de encargados; sustituye la anterior' })
+  @ApiProperty({
+    type: [String],
+    description: 'Lista completa de encargados; sustituye la anterior',
+  })
   @IsArray()
   @ArrayMaxSize(20)
   @IsUUID('4', { each: true })

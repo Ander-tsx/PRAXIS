@@ -128,7 +128,7 @@
    texto sobre blanco, y el mismo tono pastel que se lee bien sobre
    `#0d0f14` pierde casi todo el contraste sobre una superficie clara.
    ============================================================ */
-:root[data-theme='light'] {
+:root[data-theme="light"] {
   /* ── FONDOS ─────────────────────────────────────────────── */
   --color-background: #f3f4f9;
   --color-surface: #ffffff;
@@ -194,13 +194,13 @@ body {
    aquí una vez en lugar de recordar la clase en cada botón —que era justo lo
    que se nos olvidaba— y se marca el deshabilitado como no permitido. */
 button:not(:disabled),
-[role='button']:not([aria-disabled='true']),
-label:has(> input[type='checkbox']:not(:disabled)) {
+[role="button"]:not([aria-disabled="true"]),
+label:has(> input[type="checkbox"]:not(:disabled)) {
   cursor: pointer;
 }
 
 button:disabled,
-[aria-disabled='true'] {
+[aria-disabled="true"] {
   cursor: not-allowed;
 }
 

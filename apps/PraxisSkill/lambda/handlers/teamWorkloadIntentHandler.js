@@ -10,8 +10,10 @@ const { joinNaturally } = require('../utils/speech');
 
 const TeamWorkloadIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'TeamWorkloadIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'TeamWorkloadIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -41,7 +43,7 @@ const TeamWorkloadIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
+    const items = Array.isArray(responseData) ? responseData : responseData?.items || [];
 
     if (!items || items.length === 0) {
       return handlerInput.responseBuilder
@@ -50,16 +52,15 @@ const TeamWorkloadIntentHandler = {
         .getResponse();
     }
 
-    const formattedMembers = items.map(m => messages.WORKLOAD_ITEM(m.memberName, m.assignedCount));
+    const formattedMembers = items.map((m) =>
+      messages.WORKLOAD_ITEM(m.memberName, m.assignedCount),
+    );
     const membersList = joinNaturally(formattedMembers);
     const firstMemberName = items[0].memberName;
 
     const speakOutput = messages.TEAM_WORKLOAD(membersList, firstMemberName);
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

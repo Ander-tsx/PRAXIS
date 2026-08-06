@@ -15,12 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   AddMemberBodyDto,
   ChangeMemberRoleBodyDto,
@@ -37,9 +32,7 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/members')
 export class MembersController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   /**
    * Lista todos los miembros de un proyecto.

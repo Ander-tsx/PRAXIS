@@ -144,10 +144,7 @@ export class AttachmentsService {
   }
 
   private async invalidate(taskId: string, boardId: string) {
-    await Promise.all([
-      this.redis.del(`task:${taskId}`),
-      this.redis.del(`tasks:board:${boardId}`),
-    ]);
+    await Promise.all([this.redis.del(`task:${taskId}`), this.redis.del(`tasks:board:${boardId}`)]);
   }
 
   private async assertTaskInProject(taskId: string, projectId: string) {

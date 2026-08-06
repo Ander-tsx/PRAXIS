@@ -15,7 +15,9 @@ const SessionEndedRequestHandler = {
     console.log(`[Praxis] Session ended. Reason: ${reason}`);
 
     if (handlerInput.requestEnvelope.request.error) {
-      console.log(`[Praxis] Session error: ${JSON.stringify(handlerInput.requestEnvelope.request.error)}`);
+      console.log(
+        `[Praxis] Session error: ${JSON.stringify(handlerInput.requestEnvelope.request.error)}`,
+      );
     }
 
     return handlerInput.responseBuilder.getResponse();

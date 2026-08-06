@@ -158,7 +158,7 @@ export function WorkspaceCanvas({
               canMoveTask={canMoveTask}
               openTaskId={openTaskId}
               canComment={canComment}
-        canEditTask={canEditTask}
+              canEditTask={canEditTask}
               canDeleteTask={canDeleteTask}
             />
           ))}

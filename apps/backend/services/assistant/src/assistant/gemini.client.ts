@@ -92,8 +92,7 @@ export class GeminiClient {
       body.tools = [{ functionDeclarations: params.tools }];
     }
 
-    const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
 
     let response: Response;
     try {

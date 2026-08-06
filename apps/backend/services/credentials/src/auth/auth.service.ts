@@ -8,15 +8,10 @@ import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-import {
-  RegisterDto,
-  LoginDto,
-  VerifyTokenDto,
-  JwtPayloadDto,
-} from '@praxis/contracts';
+import { RegisterDto, LoginDto, VerifyTokenDto, JwtPayloadDto } from '@praxis/contracts';
 
 const SALT_ROUNDS = 10;
-const TOKEN_CACHE_TTL = 300;  // 5 min
+const TOKEN_CACHE_TTL = 300; // 5 min
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 días
 
 /**
@@ -89,7 +84,7 @@ export class AuthService {
     });
 
     if (!credential.user) {
-      throw new Error('User profile not found')
+      throw new Error('User profile not found');
     }
 
     const userId = credential.user.id;
@@ -193,7 +188,7 @@ export class AuthService {
      * minutos por sesión activa— y a cambio el estado de la cuenta manda siempre.
      */
     const credential = await this.prisma.credential.findFirst({
-      where:  { user: { id: payload.sub } },
+      where: { user: { id: payload.sub } },
       select: { user: { select: { status: true } } },
     });
 

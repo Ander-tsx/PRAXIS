@@ -72,7 +72,10 @@ function KanbanScene(active: boolean) {
       {columns.map((col, ci) => (
         <div key={col.name} className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ background: col.color }} />
+            <span
+              className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
+              style={{ background: col.color }}
+            />
             <span
               className="truncate font-sans text-[0.58rem] font-medium"
               style={{
@@ -95,9 +98,7 @@ function KanbanScene(active: boolean) {
                 /* Solo horizontal: la tarjeta ya ocupa la segunda ranura de su
                    columna, así que al desplazarse un ancho exacto aterriza justo
                    bajo "Autenticación", sin descuadrar el hueco. */
-                transform: active
-                  ? 'translateX(calc(100% + 10px))'
-                  : 'translateX(0)',
+                transform: active ? 'translateX(calc(100% + 10px))' : 'translateX(0)',
                 filter: active
                   ? 'drop-shadow(0 10px 16px rgba(0,0,0,0.55))'
                   : 'drop-shadow(0 0 0 rgba(0,0,0,0))',
@@ -161,7 +162,10 @@ function PermissionsScene(active: boolean) {
             {role.name}
           </span>
         ))}
-        <span className="ml-auto font-mono text-[0.52rem]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+        <span
+          className="ml-auto font-mono text-[0.52rem]"
+          style={{ color: 'rgba(255,255,255,0.4)' }}
+        >
           {granted.size}/{total}
         </span>
       </div>
@@ -227,7 +231,12 @@ function HierarchyScene(active: boolean) {
 
   return (
     <div className="flex h-full items-center justify-center px-3">
-      <svg viewBox="0 0 300 144" className="h-full w-full" role="img" aria-label="Jerarquía de proyecto">
+      <svg
+        viewBox="0 0 300 144"
+        className="h-full w-full"
+        role="img"
+        aria-label="Jerarquía de proyecto"
+      >
         <title>Proyecto, espacios y tableros</title>
 
         {branches.map((branch, i) => (
@@ -298,13 +307,19 @@ function ChecklistScene(active: boolean) {
         <span className="font-sans text-[0.62rem] font-medium text-white/60">Checklist</span>
         <span
           className="font-mono text-[0.58rem]"
-          style={{ color: active ? '#34d399' : 'rgba(255,255,255,0.35)', transition: 'color 400ms ease 320ms' }}
+          style={{
+            color: active ? '#34d399' : 'rgba(255,255,255,0.35)',
+            transition: 'color 400ms ease 320ms',
+          }}
         >
           {active ? '3/3' : '0/3'}
         </span>
       </div>
 
-      <div className="h-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,0.07)' }}>
+      <div
+        className="h-1 overflow-hidden rounded-full"
+        style={{ background: 'rgba(255,255,255,0.07)' }}
+      >
         <div
           className="h-full rounded-full"
           style={{
@@ -326,7 +341,12 @@ function ChecklistScene(active: boolean) {
               transition: `background 260ms ease ${i * 140}ms, border-color 260ms ease ${i * 140}ms`,
             }}
           >
-            <span style={{ opacity: active ? 1 : 0, transition: `opacity 200ms ease ${i * 140 + 80}ms` }}>
+            <span
+              style={{
+                opacity: active ? 1 : 0,
+                transition: `opacity 200ms ease ${i * 140 + 80}ms`,
+              }}
+            >
               ✓
             </span>
           </span>

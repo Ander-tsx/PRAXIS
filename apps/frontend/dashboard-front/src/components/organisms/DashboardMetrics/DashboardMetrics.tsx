@@ -57,12 +57,7 @@ const iconProps = {
  * agregados en `_count` de cada proyecto, así que sumarlos no cuesta ninguna
  * petición extra.
  */
-export function DashboardMetrics({
-  projects,
-  owned,
-  workspaces,
-  members,
-}: DashboardMetricsProps) {
+export function DashboardMetrics({ projects, owned, workspaces, members }: DashboardMetricsProps) {
   /**
    * Desde que el backend filtra por membresía, la lista mezcla proyectos
    * propios con aquellos donde solo eres miembro. Si no todos son tuyos, el pie

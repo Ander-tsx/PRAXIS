@@ -10,8 +10,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const ProjectForecastIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectForecastIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectForecastIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -37,7 +39,9 @@ const ProjectForecastIntentHandler = {
         return await buildErrorResponse(handlerInput, error);
       }
 
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const projects = Array.isArray(responseProjects)
+        ? responseProjects
+        : responseProjects?.items || [];
       const match = findBestMatch(boardName, projects, 'name');
 
       if (!match) {
@@ -67,7 +71,12 @@ const ProjectForecastIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    if (!forecast || forecast.estimatedDays === null || forecast.estimatedDays === undefined || forecast.reason === 'INSUFFICIENT_DATA') {
+    if (
+      !forecast ||
+      forecast.estimatedDays === null ||
+      forecast.estimatedDays === undefined ||
+      forecast.reason === 'INSUFFICIENT_DATA'
+    ) {
       return handlerInput.responseBuilder
         .speak(messages.PROJECT_FORECAST_NO_DATA)
         .reprompt(messages.HELP)
@@ -76,10 +85,7 @@ const ProjectForecastIntentHandler = {
 
     const speakOutput = messages.PROJECT_FORECAST(forecast.estimatedDays);
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

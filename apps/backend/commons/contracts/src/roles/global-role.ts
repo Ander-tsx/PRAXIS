@@ -114,8 +114,7 @@ export function isGlobalRole(name: string): name is GlobalRole {
  */
 export function globalRoleLevel(roleNames: readonly string[]): number {
   return roleNames.reduce(
-    (nivel, name) =>
-      isGlobalRole(name) ? Math.max(nivel, GLOBAL_ROLE_LEVEL[name]) : nivel,
+    (nivel, name) => (isGlobalRole(name) ? Math.max(nivel, GLOBAL_ROLE_LEVEL[name]) : nivel),
     NIVEL_BASE,
   );
 }
@@ -127,10 +126,7 @@ export function globalRoleLevel(roleNames: readonly string[]): number {
  * tanto para un `Admin` como para un `SuperAdmin`, que es exactamente lo que
  * faltaba.
  */
-export function satisfiesGlobalRole(
-  roleNames: readonly string[],
-  required: GlobalRole,
-): boolean {
+export function satisfiesGlobalRole(roleNames: readonly string[], required: GlobalRole): boolean {
   return globalRoleLevel(roleNames) >= GLOBAL_ROLE_LEVEL[required];
 }
 
@@ -150,10 +146,7 @@ export function satisfiesGlobalRole(
  * mucho más claro («no puedes suspenderte») y no depende de que el nivel de los
  * dos lados se haya resuelto bien.
  */
-export function outranks(
-  actorRoles: readonly string[],
-  targetRoles: readonly string[],
-): boolean {
+export function outranks(actorRoles: readonly string[], targetRoles: readonly string[]): boolean {
   return globalRoleLevel(actorRoles) > globalRoleLevel(targetRoles);
 }
 
@@ -166,9 +159,6 @@ export function outranks(
  * cualquier administrador podría haberse concedido a sí mismo el nivel de
  * encima.
  */
-export function canGrantGlobalRole(
-  actorRoles: readonly string[],
-  role: GlobalRole,
-): boolean {
+export function canGrantGlobalRole(actorRoles: readonly string[], role: GlobalRole): boolean {
   return globalRoleLevel(actorRoles) > GLOBAL_ROLE_LEVEL[role];
 }

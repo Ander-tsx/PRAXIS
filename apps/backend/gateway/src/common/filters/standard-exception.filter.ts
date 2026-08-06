@@ -1,4 +1,11 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import type { Response } from 'express';
 
@@ -49,9 +56,14 @@ export class StandardExceptionFilter implements ExceptionFilter {
 
     if (this.isErrorWithStatus(exception)) {
       const status = exception.status;
-      const message = this.extractMessage(exception.response, exception.message || 'Internal server error');
+      const message = this.extractMessage(
+        exception.response,
+        exception.message || 'Internal server error',
+      );
       const details = this.extractDetails(exception.response, status);
-      response.status(status).json(this.buildErrorPayload(this.mapStatusToCode(status), message, details));
+      response
+        .status(status)
+        .json(this.buildErrorPayload(this.mapStatusToCode(status), message, details));
       return;
     }
 
@@ -68,10 +80,13 @@ export class StandardExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    this.logger.error('Unhandled gateway exception', exception instanceof Error ? exception.stack : exception);
-    response.status(HttpStatus.INTERNAL_SERVER_ERROR).json(
-      this.buildErrorPayload('INTERNAL_SERVER_ERROR', 'Internal server error', {}),
+    this.logger.error(
+      'Unhandled gateway exception',
+      exception instanceof Error ? exception.stack : exception,
     );
+    response
+      .status(HttpStatus.INTERNAL_SERVER_ERROR)
+      .json(this.buildErrorPayload('INTERNAL_SERVER_ERROR', 'Internal server error', {}));
   }
 
   private buildErrorPayload(code: string, message: string, details: unknown): StandardErrorPayload {
@@ -175,7 +190,10 @@ export class StandardExceptionFilter implements ExceptionFilter {
 
   private getStatusFromError(error: unknown): number {
     if (error && typeof error === 'object') {
-      if ('statusCode' in error && typeof (error as { statusCode?: unknown }).statusCode === 'number') {
+      if (
+        'statusCode' in error &&
+        typeof (error as { statusCode?: unknown }).statusCode === 'number'
+      ) {
         return (error as { statusCode: number }).statusCode;
       }
 
@@ -204,7 +222,10 @@ export class StandardExceptionFilter implements ExceptionFilter {
     }
 
     if (error && typeof error === 'object') {
-      if ('statusCode' in error && typeof (error as { statusCode?: unknown }).statusCode === 'number') {
+      if (
+        'statusCode' in error &&
+        typeof (error as { statusCode?: unknown }).statusCode === 'number'
+      ) {
         return this.mapStatusToCode((error as { statusCode: number }).statusCode);
       }
     }
@@ -265,7 +286,14 @@ export class StandardExceptionFilter implements ExceptionFilter {
     );
   }
 
-  private isErrorWithStatus(value: unknown): value is { status: number; response?: unknown; message?: string } {
-    return Boolean(value && typeof value === 'object' && 'status' in value && typeof (value as { status?: unknown }).status === 'number');
+  private isErrorWithStatus(
+    value: unknown,
+  ): value is { status: number; response?: unknown; message?: string } {
+    return Boolean(
+      value &&
+        typeof value === 'object' &&
+        'status' in value &&
+        typeof (value as { status?: unknown }).status === 'number',
+    );
   }
 }

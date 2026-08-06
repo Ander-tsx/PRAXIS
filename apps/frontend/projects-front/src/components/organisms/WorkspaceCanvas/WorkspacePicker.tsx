@@ -1,8 +1,6 @@
 'use client';
 
-import { Button, type Workspace, alpha, colors,
-  projectPath,
-} from '@praxis/commons';
+import { Button, type Workspace, alpha, colors, projectPath } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { createWorkspaceAction } from '@/app/(private)/[id]/actions';
@@ -145,7 +143,9 @@ export function WorkspacePicker({
                       onClick={() => select(workspace.id)}
                       className={[
                         'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors',
-                        isActive ? 'text-text-primary' : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+                        isActive
+                          ? 'text-text-primary'
+                          : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
                       ].join(' ')}
                       style={isActive ? { background: alpha(colors.primary, 10) } : undefined}
                     >

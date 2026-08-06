@@ -62,8 +62,8 @@ export function PendingInvitationGate({ invitation }: PendingInvitationGateProps
           Te invitaron a «{invitation.project.name}»
         </h2>
         <p className="font-sans text-sm text-text-secondary">
-          Todavía no formas parte del proyecto, así que no puedes ver su contenido. Entrarás
-          en cuanto aceptes.
+          Todavía no formas parte del proyecto, así que no puedes ver su contenido. Entrarás en
+          cuanto aceptes.
         </p>
       </div>
 

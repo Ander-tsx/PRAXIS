@@ -8,12 +8,6 @@ import { TasksService } from './tasks.service';
 
 @Module({
   controllers: [TasksController],
-  providers: [
-    TasksService,
-    LabelsService,
-    CommentsService,
-    AttachmentsService,
-    StatsService,
-  ],
+  providers: [TasksService, LabelsService, CommentsService, AttachmentsService, StatsService],
 })
 export class TasksModule {}

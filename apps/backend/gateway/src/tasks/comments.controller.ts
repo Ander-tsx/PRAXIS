@@ -18,11 +18,7 @@ import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
-import {
-  CreateCommentBodyDto,
-  ProjectPermission,
-  UpdateCommentBodyDto,
-} from '@praxis/contracts';
+import { CreateCommentBodyDto, ProjectPermission, UpdateCommentBodyDto } from '@praxis/contracts';
 
 /**
  * Comentarios de una tarea.

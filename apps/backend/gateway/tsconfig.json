@@ -1,32 +1,32 @@
 {
-    "extends": "../../../packages/shared-devtools/tsconfig/nestjs.json",
-    "compilerOptions": {
-        "module": "nodenext",
-        "moduleResolution": "nodenext",
-        "resolvePackageJsonExports": true,
-        "esModuleInterop": true,
-        "isolatedModules": true,
-        "declaration": true,
-        "removeComments": true,
-        "emitDecoratorMetadata": true,
-        "experimentalDecorators": true,
-        "allowSyntheticDefaultImports": true,
-        "target": "ES2023",
-        "sourceMap": true,
-        "outDir": "./dist",
-        "incremental": true,
-        "skipLibCheck": true,
-        "strictNullChecks": true,
-        "forceConsistentCasingInFileNames": true,
-        "noImplicitAny": false,
-        "strictBindCallApply": false,
-        "noFallthroughCasesInSwitch": false,
-        "strictPropertyInitialization": false,
-        // `multer` va explícito: `types` es una lista cerrada, y sin él
-        // `Express.Multer.File` no existe al compilar los adjuntos.
-        "types": ["node", "jest", "multer"],
-        "preserveWatchOutput": true
-    },
-    "include": ["src/**/*"],
-    "exclude": ["node_modules", "dist"]
+  "extends": "../../../packages/shared-devtools/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false,
+    "strictPropertyInitialization": false,
+    // `multer` va explícito: `types` es una lista cerrada, y sin él
+    // `Express.Multer.File` no existe al compilar los adjuntos.
+    "types": ["node", "jest", "multer"],
+    "preserveWatchOutput": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

@@ -10,8 +10,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const MemberPerformanceIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'MemberPerformanceIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'MemberPerformanceIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -51,7 +53,7 @@ const MemberPerformanceIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const members = Array.isArray(responseMembers) ? responseMembers : (responseMembers?.items || []);
+    const members = Array.isArray(responseMembers) ? responseMembers : responseMembers?.items || [];
     const matchedMember = findBestMatch(memberNameSlot, members, 'name');
 
     if (!matchedMember) {
@@ -73,13 +75,10 @@ const MemberPerformanceIntentHandler = {
       perf.memberName || matchedMember.name,
       perf.assignedCount,
       perf.completedCount,
-      perf.inProgressCount
+      perf.inProgressCount,
     );
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

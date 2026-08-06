@@ -11,7 +11,9 @@ const ErrorHandler = {
   },
 
   handle(handlerInput, error) {
-    console.error(`[ErrorHandler Global] Error no capturado en la Skill: ${error.stack || error.message}`);
+    console.error(
+      `[ErrorHandler Global] Error no capturado en la Skill: ${error.stack || error.message}`,
+    );
 
     // Verificar si es un error de API con response
     if (error.response) {
@@ -25,9 +27,7 @@ const ErrorHandler = {
       }
 
       if (status === 403) {
-        return handlerInput.responseBuilder
-          .speak(messages.ERROR_FORBIDDEN)
-          .getResponse();
+        return handlerInput.responseBuilder.speak(messages.ERROR_FORBIDDEN).getResponse();
       }
     }
 

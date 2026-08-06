@@ -4,7 +4,8 @@ const AWS = require('aws-sdk');
 // 1. Configurar región de AWS ANTES de requerir index.js
 AWS.config.update({ region: 'us-east-1' });
 process.env.AWS_REGION = 'us-east-1';
-process.env.PRAXIS_API_BASE_URL = process.env.PRAXIS_API_BASE_URL || 'http://localhost:3000/api/alexa';
+process.env.PRAXIS_API_BASE_URL =
+  process.env.PRAXIS_API_BASE_URL || 'http://localhost:3000/api/alexa';
 
 // 2. Importar index.js después de la configuración
 const { skill } = require('./index');

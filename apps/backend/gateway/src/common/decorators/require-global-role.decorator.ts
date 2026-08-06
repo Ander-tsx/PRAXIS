@@ -20,5 +20,4 @@ import { GLOBAL_ROLE_KEY } from '../guards/global-role.guard';
  * @Post('assign')
  * assign() { ... }
  */
-export const RequireGlobalRole = (role: GlobalRole) =>
-  SetMetadata(GLOBAL_ROLE_KEY, role);
+export const RequireGlobalRole = (role: GlobalRole) => SetMetadata(GLOBAL_ROLE_KEY, role);

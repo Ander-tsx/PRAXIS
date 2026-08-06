@@ -13,12 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   CreateWorkspaceBodyDto,
   ProjectPermission,
@@ -37,9 +32,7 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/workspaces')
 export class WorkspacesController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   /**
    * Lista todos los workspaces de un proyecto.
@@ -68,10 +61,7 @@ export class WorkspacesController {
   @ApiResponse({ status: 201, description: 'Workspace creado exitosamente' })
   create(@Request() req: Express.Request, @Body() body: CreateWorkspaceBodyDto) {
     return firstValueFrom(
-      this.projectsClient.send(
-        { cmd: 'workspace_create' },
-        { projectId: req.projectId, ...body },
-      ),
+      this.projectsClient.send({ cmd: 'workspace_create' }, { projectId: req.projectId, ...body }),
     );
   }
 }
@@ -111,10 +101,7 @@ export class WorkspacesResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   @ApiOperation({ summary: 'Actualiza un workspace' })
   @ApiResponse({ status: 200, description: 'Workspace actualizado exitosamente' })
-  update(
-    @Param('workspaceId') workspaceId: string,
-    @Body() body: UpdateWorkspaceBodyDto,
-  ) {
+  update(@Param('workspaceId') workspaceId: string, @Body() body: UpdateWorkspaceBodyDto) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_update' }, { id: workspaceId, ...body }),
     );

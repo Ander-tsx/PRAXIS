@@ -4,11 +4,7 @@ import { alpha, colors } from '@praxis/commons';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { saveProjectFieldAction, settleProjectAction } from '@/app/(private)/[id]/actions';
 import type { ProjectFieldState } from '@/lib/action-state';
-import {
-  PROJECT_DESCRIPTION_MAX,
-  PROJECT_NAME_MAX,
-  validateProject,
-} from '@/lib/validation';
+import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX, validateProject } from '@/lib/validation';
 
 export interface EditableProjectFieldsProps {
   projectId: string;
@@ -292,9 +288,12 @@ function useAutosave({
   const seqRef = useRef(0);
 
   // Al desmontar no queda ningún temporizador escribiendo sobre nada.
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    },
+    [],
+  );
 
   const commit = useCallback(async (): Promise<void> => {
     const next = valueRef.current.trim();

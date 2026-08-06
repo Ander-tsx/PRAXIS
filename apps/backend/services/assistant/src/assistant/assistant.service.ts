@@ -1,16 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  ClientProxy,
-  ClientProxyFactory,
-  RpcException,
-  Transport,
-} from '@nestjs/microservices';
-import {
-  type AssistantChatResult,
-  type AssistantProposal,
-  MAX_HISTORIAL,
-} from '@praxis/contracts';
+import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
+import { type AssistantChatResult, type AssistantProposal, MAX_HISTORIAL } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
 import { ConversationsService } from './conversations.service';
@@ -184,12 +175,7 @@ export class AssistantService {
     return this.conversaciones.detalle(userId, projectId, conversationId);
   }
 
-  renombrarConversacion(
-    userId: string,
-    projectId: string,
-    conversationId: string,
-    title: string,
-  ) {
+  renombrarConversacion(userId: string, projectId: string, conversationId: string, title: string) {
     return this.conversaciones.renombrar(userId, projectId, conversationId, title);
   }
 
@@ -401,7 +387,9 @@ export class AssistantService {
     }
 
     if (call.name === 'proponer_comentario') {
-      const body = String(call.args.body ?? '').trim().slice(0, 2000);
+      const body = String(call.args.body ?? '')
+        .trim()
+        .slice(0, 2000);
       if (body.length === 0) return null;
       return { tool: call.name, args: { ...base, body } };
     }
@@ -423,7 +411,10 @@ export class AssistantService {
   private tareaDeLaPropuesta(
     call: { name: string; args: Record<string, unknown> },
     briefing: Briefing,
-  ): { taskId: string; tarea?: { id: string; titulo: string; columnId?: string; columna?: string } } | null {
+  ): {
+    taskId: string;
+    tarea?: { id: string; titulo: string; columnId?: string; columna?: string };
+  } | null {
     const taskId = String(call.args.taskId ?? '').trim();
     if (!taskId) return null;
 

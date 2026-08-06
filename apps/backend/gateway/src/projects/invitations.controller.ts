@@ -32,9 +32,7 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/invitations')
 export class ProjectInvitationsController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   @Get()
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
@@ -90,9 +88,7 @@ export class ProjectInvitationsController {
 @UseGuards(JwtGuard)
 @Controller('me/invitations')
 export class MyInvitationsController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   @Get()
   @ApiOperation({ summary: 'Mis invitaciones pendientes' })
@@ -138,9 +134,7 @@ export class MyInvitationsController {
 @UseGuards(JwtGuard)
 @Controller('projects/:projectId/membership')
 export class ProjectMembershipController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   @Delete('me')
   @ApiOperation({ summary: 'Salir del proyecto' })

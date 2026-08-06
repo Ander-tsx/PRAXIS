@@ -29,7 +29,8 @@ export class MembersService {
     ]);
 
     if (!project) throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
-    if (!role)    throw new RpcException({ statusCode: 404, message: 'Rol de proyecto no encontrado' });
+    if (!role)
+      throw new RpcException({ statusCode: 404, message: 'Rol de proyecto no encontrado' });
 
     const existing = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: dto.projectId, userId: dto.userId } },
@@ -40,8 +41,8 @@ export class MembersService {
 
     const member = await this.prisma.projectMember.create({
       data: {
-        projectId:     dto.projectId,
-        userId:        dto.userId,
+        projectId: dto.projectId,
+        userId: dto.userId,
         projectRoleId: dto.projectRoleId,
       },
       include: { projectRole: true },
@@ -136,7 +137,7 @@ export class MembersService {
     if (cached) return cached;
 
     const members = await this.prisma.projectMember.findMany({
-      where:   { projectId },
+      where: { projectId },
       orderBy: { joinedAt: 'asc' },
       include: { projectRole: true },
     });

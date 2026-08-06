@@ -27,19 +27,13 @@ export class CleanupAlexaAuthJob implements OnModuleInit, OnModuleDestroy {
 
       const deletedSessions = await this.prisma.alexaSession.deleteMany({
         where: {
-          OR: [
-            { expiresAt: { lt: now } },
-            { revokedAt: { not: null } },
-          ],
+          OR: [{ expiresAt: { lt: now } }, { revokedAt: { not: null } }],
         },
       });
 
       const deletedCodes = await this.prisma.alexaLinkCode.deleteMany({
         where: {
-          OR: [
-            { expiresAt: { lt: now } },
-            { redeemedAt: { not: null } },
-          ],
+          OR: [{ expiresAt: { lt: now } }, { redeemedAt: { not: null } }],
         },
       });
 
@@ -49,7 +43,9 @@ export class CleanupAlexaAuthJob implements OnModuleInit, OnModuleDestroy {
         );
       }
     } catch (error) {
-      this.logger.warn(`Error durante la limpieza periódica de Alexa Auth: ${(error as Error).message}`);
+      this.logger.warn(
+        `Error durante la limpieza periódica de Alexa Auth: ${(error as Error).message}`,
+      );
     }
   }
 }

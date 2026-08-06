@@ -40,10 +40,7 @@ export interface UserRoleDialogProps {
  * otro no— es justo la que hay que entender antes de pulsar.
  */
 export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDialogProps) {
-  const [state, formAction, pending] = useActionState(
-    setUserRoleAction,
-    ADMIN_USER_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useActionState(setUserRoleAction, ADMIN_USER_INITIAL_STATE);
 
   /* Solo los estrictamente por debajo de mi nivel: la misma regla que aplica el
      gateway con `canGrantGlobalRole`. */
@@ -109,8 +106,7 @@ export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDial
 
       <p className="mt-3 font-sans text-xs text-text-disabled">
         Rol actual: {ROLES[usuario.globalRole].etiqueta}.
-        {repartibles.length === 0 &&
-          ' No puedes asignar ningún rol a esta cuenta desde tu nivel.'}
+        {repartibles.length === 0 && ' No puedes asignar ningún rol a esta cuenta desde tu nivel.'}
       </p>
     </Dialog>
   );

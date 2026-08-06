@@ -225,17 +225,15 @@ test.describe('Tablero', () => {
 
     await darDeAlta(request, mundo, lectora, { canViewProject: true });
 
-    const sinPermiso = await request.get(
-      `/api/projects/${mundo.proyecto.id}/reports/snapshot`,
-      { headers: comoBearer(lectora.accessToken) },
-    );
+    const sinPermiso = await request.get(`/api/projects/${mundo.proyecto.id}/reports/snapshot`, {
+      headers: comoBearer(lectora.accessToken),
+    });
     expect(sinPermiso.status(), 'Las siete rutas de informes piden canViewReports').toBe(403);
 
     /* El dueño sí, siempre: tiene acceso total sin pasar por roles. */
-    const comoDuenno = await request.get(
-      `/api/projects/${mundo.proyecto.id}/reports/snapshot`,
-      { headers: comoBearer(mundo.duenno.accessToken) },
-    );
+    const comoDuenno = await request.get(`/api/projects/${mundo.proyecto.id}/reports/snapshot`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+    });
     expect(comoDuenno.status()).toBe(200);
   });
 });

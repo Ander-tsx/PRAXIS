@@ -63,10 +63,9 @@ test.describe('Contrato de respuesta', () => {
       data: { name: 'Proyecto con campo de sobra', campoQueNoExiste: true },
     });
 
-    expect(
-      respuesta.status(),
-      'forbidNonWhitelisted debería rechazar el campo desconocido',
-    ).toBe(400);
+    expect(respuesta.status(), 'forbidNonWhitelisted debería rechazar el campo desconocido').toBe(
+      400,
+    );
   });
 
   test('un cuerpo que incumple el DTO da 400 con los mensajes en details', async ({ request }) => {
@@ -77,7 +76,10 @@ test.describe('Contrato de respuesta', () => {
     expect(respuesta.status()).toBe(400);
 
     const fallo = await error(respuesta);
-    expect(fallo.details, 'Los mensajes de class-validator deberían viajar en details').toBeTruthy();
+    expect(
+      fallo.details,
+      'Los mensajes de class-validator deberían viajar en details',
+    ).toBeTruthy();
   });
 
   /**

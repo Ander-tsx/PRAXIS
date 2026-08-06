@@ -8,7 +8,6 @@ import {
 } from '@praxis/contracts';
 import { ProjectRolesService } from './project-roles.service';
 
-
 @Controller()
 export class ProjectRolesController {
   constructor(private readonly projectRolesService: ProjectRolesService) {}
@@ -39,4 +38,3 @@ export class ProjectRolesController {
     return this.projectRolesService.getEffectivePermissions(dto);
   }
 }
-

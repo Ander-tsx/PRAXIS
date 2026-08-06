@@ -46,10 +46,7 @@ export function TaskAttachments({
   canUpload,
   canModerate,
 }: TaskAttachmentsProps) {
-  const [state, formAction, uploading] = useActionState(
-    uploadAttachmentAction,
-    TASK_INITIAL_STATE,
-  );
+  const [state, formAction, uploading] = useActionState(uploadAttachmentAction, TASK_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
   /** Se limpia al confirmar el servidor, para poder subir otro seguido. */

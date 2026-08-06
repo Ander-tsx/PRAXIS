@@ -14,12 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   CreateProjectRoleBodyDto,
   ProjectPermission,
@@ -35,9 +30,7 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/roles')
 export class ProjectRolesController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   /** Crea un rol local dentro de un proyecto (requiere canManageRoles) */
   @Post()
@@ -60,10 +53,7 @@ export class ProjectRolesController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   @ApiOperation({ summary: 'Actualiza un rol local de un proyecto' })
   @ApiResponse({ status: 200, description: 'Rol actualizado exitosamente' })
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: UpdateProjectRoleBodyDto,
-  ) {
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateProjectRoleBodyDto) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'project_role_update' }, { ...body, id }),
     );
@@ -75,8 +65,6 @@ export class ProjectRolesController {
   @ApiOperation({ summary: 'Elimina un rol local del proyecto' })
   @ApiResponse({ status: 200, description: 'Rol eliminado exitosamente' })
   delete(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_role_delete' }, { id }),
-    );
+    return firstValueFrom(this.projectsClient.send({ cmd: 'project_role_delete' }, { id }));
   }
 }

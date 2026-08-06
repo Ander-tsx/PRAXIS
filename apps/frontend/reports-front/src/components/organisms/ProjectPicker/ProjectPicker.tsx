@@ -1,8 +1,6 @@
 'use client';
 
-import { type Project, alpha, colors,
-  reportPath,
-} from '@praxis/commons';
+import { type Project, alpha, colors, reportPath } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 

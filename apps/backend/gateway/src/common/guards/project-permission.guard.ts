@@ -165,10 +165,7 @@ export class ProjectPermissionGuard implements CanActivate {
     if (!projectId && (workspaceId || boardId)) {
       try {
         const res = await firstValueFrom(
-          this.projectsClient.send(
-            { cmd: 'project_resolve_resource' },
-            { workspaceId, boardId },
-          ),
+          this.projectsClient.send({ cmd: 'project_resolve_resource' }, { workspaceId, boardId }),
         );
         projectId = res?.projectId;
       } catch {

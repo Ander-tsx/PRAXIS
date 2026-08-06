@@ -1,4 +1,10 @@
-import { CallHandler, ExecutionContext, HttpException, Injectable, NestInterceptor } from '@nestjs/common';
+import {
+  CallHandler,
+  ExecutionContext,
+  HttpException,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -55,6 +61,10 @@ export class StandardResponseInterceptor implements NestInterceptor {
       return false;
     }
 
-    return 'statusCode' in payload && 'message' in payload && typeof (payload as ErrorPayload).statusCode === 'number';
+    return (
+      'statusCode' in payload &&
+      'message' in payload &&
+      typeof (payload as ErrorPayload).statusCode === 'number'
+    );
   }
 }

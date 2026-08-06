@@ -34,7 +34,14 @@ import {
   revisarCatalogo,
 } from './config/index.mjs';
 import { esperarPuerto, estadoDePuertos, quienOcupa } from './lib/ports.mjs';
-import { arrancar, detener, detenerTodo, estaCorriendo, reiniciar, usarEscritor } from './lib/proc.mjs';
+import {
+  arrancar,
+  detener,
+  detenerTodo,
+  estaCorriendo,
+  reiniciar,
+  usarEscritor,
+} from './lib/proc.mjs';
 import {
   compilarCompartidos,
   completarEnv,
@@ -45,7 +52,23 @@ import {
   prismaSeed,
   revisarEnvFaltantes,
 } from './lib/steps.mjs';
-import { ambar, aviso, azul, banner, caja, cian, error, gris, listaViva, negrita, ok, rojo, tabla, titulo, verde } from './lib/ui.mjs';
+import {
+  ambar,
+  aviso,
+  azul,
+  banner,
+  caja,
+  cian,
+  error,
+  gris,
+  listaViva,
+  negrita,
+  ok,
+  rojo,
+  tabla,
+  titulo,
+  verde,
+} from './lib/ui.mjs';
 
 // ── Comprobaciones previas ──────────────────────────────────────────────────
 
@@ -62,7 +85,9 @@ function exigirTerminal() {
   console.error(gris('   Lo has lanzado con la entrada redirigida (una tubería, CI, un editor).'));
   console.error(gris('   Para un arranque no interactivo usa los comandos del README:\n'));
   console.error(gris('     docker compose -f infra/docker/compose/docker-compose.yml up -d'));
-  console.error(gris('     npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"'));
+  console.error(
+    gris('     npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"'),
+  );
   console.error(gris('     pnpm dev:frontend\n'));
   process.exit(1);
 }
@@ -73,7 +98,11 @@ function exigirCatalogoSano() {
 
   console.error(rojo('\n✖  El catálogo del CLI no cuadra con el repositorio:\n'));
   for (const p of problemas) console.error(rojo(`   · ${p}`));
-  console.error(gris('\n   Alguien movió o renombró carpetas. Actualiza scripts/dev-cli/config/services.mjs.\n'));
+  console.error(
+    gris(
+      '\n   Alguien movió o renombró carpetas. Actualiza scripts/dev-cli/config/services.mjs.\n',
+    ),
+  );
   process.exit(1);
 }
 
@@ -113,7 +142,12 @@ async function preguntarQueLevantar() {
   ]);
 
   const { frontend } = await inquirer.prompt([
-    { type: 'confirm', name: 'frontend', message: 'Levantar también las 5 zonas del frontend', default: true },
+    {
+      type: 'confirm',
+      name: 'frontend',
+      message: 'Levantar también las 5 zonas del frontend',
+      default: true,
+    },
   ]);
 
   return { backend: BACKEND_SERVICES.filter((s) => claves.includes(s.key)), frontend };
@@ -190,7 +224,13 @@ async function revisarPuertosOcupados(servicios) {
 
   for (const puerto of ocupados) {
     const quien = await quienOcupa(puerto);
-    console.log(gris(quien ? `  :${puerto} → ${quien.cmd} (pid ${quien.pid})` : `  :${puerto} → no se pudo averiguar quién`));
+    console.log(
+      gris(
+        quien
+          ? `  :${puerto} → ${quien.cmd} (pid ${quien.pid})`
+          : `  :${puerto} → no se pudo averiguar quién`,
+      ),
+    );
   }
 
   const { seguir } = await inquirer.prompt([
@@ -249,7 +289,11 @@ async function reintentarCarreraDePrisma(resultados, buffers) {
       const listo = tiempos.every((t) => t !== null);
       const ms = Math.max(...tiempos.map((t) => t ?? 0));
 
-      lista.resolver(svc.key, listo ? 'listo' : 'fallo', gris(`:${puertos.join(' :')}  ${(ms / 1000).toFixed(1)}s`));
+      lista.resolver(
+        svc.key,
+        listo ? 'listo' : 'fallo',
+        gris(`:${puertos.join(' :')}  ${(ms / 1000).toFixed(1)}s`),
+      );
       return { svc, ms, listo };
     }),
   );
@@ -331,9 +375,17 @@ async function arrancarYEsperar(servicios, buffers) {
     }
 
     console.log(gris('\n  Lo más habitual en un clon nuevo:'));
-    console.log(gris("  · Cannot find module '../generated/prisma-client'  → responde sí a «generar clientes»"));
-    console.log(gris("  · Cannot find module '@praxis/observability'       → se compila solo al arrancar"));
-    console.log(gris('  · falta el .env                                    → responde sí a «completar .env»'));
+    console.log(
+      gris(
+        "  · Cannot find module '../generated/prisma-client'  → responde sí a «generar clientes»",
+      ),
+    );
+    console.log(
+      gris("  · Cannot find module '@praxis/observability'       → se compila solo al arrancar"),
+    );
+    console.log(
+      gris('  · falta el .env                                    → responde sí a «completar .env»'),
+    );
   }
 
   return resultados;
@@ -361,11 +413,7 @@ async function mostrarEstado(servicios) {
 
       /* Proceso vivo pero puerto mudo es el estado interesante: o sigue
          compilando, o murió por dentro sin cerrar. Merece su propia palabra. */
-      const texto = !vivo
-        ? gris('detenido')
-        : respondiendo
-          ? verde('listo')
-          : ambar('arrancando…');
+      const texto = !vivo ? gris('detenido') : respondiendo ? verde('listo') : ambar('arrancando…');
 
       return [azul(svc.key), gris(puertos.join(', ') || '—'), texto];
     }),
@@ -379,7 +427,11 @@ async function mostrarEstado(servicios) {
 function iniciarRepl(servicios, buffers) {
   console.log(gris(`\nEscribe ${negrita('help')}${gris(' para ver los comandos.')}\n`));
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: azul('praxis> ') });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: azul('praxis> '),
+  });
 
   /**
    * Escribir por debajo del prompt sin destrozarlo.
@@ -398,8 +450,7 @@ function iniciarRepl(servicios, buffers) {
 
   rl.prompt();
 
-  const resolver = (arg) =>
-    arg === 'all' ? servicios : servicios.filter((s) => s.key === arg);
+  const resolver = (arg) => (arg === 'all' ? servicios : servicios.filter((s) => s.key === arg));
 
   rl.on('line', async (linea) => {
     const [cmd, arg] = linea.trim().split(/\s+/);
@@ -418,7 +469,9 @@ function iniciarRepl(servicios, buffers) {
           }
           const objetivo = resolver(arg);
           if (objetivo.length === 0) {
-            console.log(rojo(`no conozco «${arg}». Servicios: ${servicios.map((s) => s.key).join(', ')}`));
+            console.log(
+              rojo(`no conozco «${arg}». Servicios: ${servicios.map((s) => s.key).join(', ')}`),
+            );
             break;
           }
           if (cmd === 'rs') await Promise.all(objetivo.map(reiniciar));
@@ -547,7 +600,9 @@ async function main() {
         : 'Archivos de entorno · todos completos',
     );
     if (sinPlantilla.length > 0) {
-      console.log(gris(`    Sin .env.example ni .env: ${sinPlantilla.map((r) => r.key).join(', ')}`));
+      console.log(
+        gris(`    Sin .env.example ni .env: ${sinPlantilla.map((r) => r.key).join(', ')}`),
+      );
     }
   }
 

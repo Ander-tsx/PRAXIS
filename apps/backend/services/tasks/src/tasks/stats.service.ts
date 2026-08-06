@@ -79,8 +79,8 @@ export class StatsService {
 
     return {
       byPriority: byPriority.map((row) => ({ priority: row.priority, count: row._count._all })),
-      byColumn:   byColumn.map((row) => ({ columnId: row.columnId, count: row._count._all })),
-      byLabel:    byLabel.map((row) => ({ labelId: row.labelId, count: row._count._all })),
+      byColumn: byColumn.map((row) => ({ columnId: row.columnId, count: row._count._all })),
+      byLabel: byLabel.map((row) => ({ labelId: row.labelId, count: row._count._all })),
       byAssignee: byAssignee.map((row) => ({ userId: row.userId, count: row._count._all })),
       ...totals,
     };
@@ -161,13 +161,12 @@ export class StatsService {
        ORDER BY t."completedAt"
     `;
 
-    const horas = (desde: Date, hasta: Date) =>
-      (hasta.getTime() - desde.getTime()) / 3_600_000;
+    const horas = (desde: Date, hasta: Date) => (hasta.getTime() - desde.getTime()) / 3_600_000;
 
     return rows.map((row) => ({
-      taskId:      row.taskId,
+      taskId: row.taskId,
       completedAt: row.completedAt,
-      leadHours:   horas(row.createdAt, row.completedAt),
+      leadHours: horas(row.createdAt, row.completedAt),
       cycleHours:
         row.firstMovedAt && row.firstMovedAt < row.completedAt
           ? horas(row.firstMovedAt, row.completedAt)
@@ -369,10 +368,7 @@ export class StatsService {
        * abiertas y dejaría dentro las cerradas, que es el orden contrario al
        * que hace falta.
        */
-      orderBy: [
-        { completedAt: { sort: 'asc', nulls: 'first' } },
-        { createdAt: 'desc' },
-      ],
+      orderBy: [{ completedAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'desc' }],
       take: LIMITE_INVENTARIO,
     });
 

@@ -374,9 +374,7 @@ export function BoardColumns({
                     taskCount={tasksByColumn.get(column.id)?.length ?? 0}
                     canEdit={canEditColumn}
                     canDelete={canDeleteColumn}
-                    onOpenChange={(isOpen) =>
-                      setMenuOpenColumnId(isOpen ? column.id : null)
-                    }
+                    onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}
                   />
                 </span>
               </header>

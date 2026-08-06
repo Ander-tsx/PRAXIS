@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Inject,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Inject, Query, UseGuards } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FindAdminActivityQueryDto, GLOBAL_ROLES } from '@praxis/contracts';
@@ -44,9 +36,7 @@ import { GlobalRoleGuard } from '../common/guards/global-role.guard';
 @UseGuards(JwtGuard, GlobalRoleGuard)
 @Controller('admin/activity')
 export class AdminActivityController {
-  constructor(
-    @Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy) {}
 
   /**
    * Filtros por **query params**: quién (`actorId`), sobre quién (`targetId`),
@@ -62,10 +52,7 @@ export class AdminActivityController {
   @ApiResponse({ status: 403, description: 'Requiere rol global Admin o superior' })
   find(@Query() query: FindAdminActivityQueryDto) {
     return firstValueFrom(
-      this.permissionsClient.send(
-        { cmd: 'admin_activity_find' },
-        query.toFindAdminActivityDto(),
-      ),
+      this.permissionsClient.send({ cmd: 'admin_activity_find' }, query.toFindAdminActivityDto()),
     );
   }
 }

@@ -9,8 +9,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const WeeklyProductivityIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'WeeklyProductivityIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'WeeklyProductivityIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -48,13 +50,15 @@ const WeeklyProductivityIntentHandler = {
     } else {
       const trendWord = trend === 'up' ? 'subió' : 'bajó';
       const absDelta = Math.abs(deltaPercent);
-      speakOutput = messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trendWord, absDelta);
+      speakOutput = messages.WEEKLY_PRODUCTIVITY(
+        completedThisWeek,
+        completedLastWeek,
+        trendWord,
+        absDelta,
+      );
     }
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

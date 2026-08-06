@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  type TaskComment,
-  type UserProfile,
-  alpha,
-  colors,
-  personLabel,
-} from '@praxis/commons';
+import { type TaskComment, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import {
   addCommentAction,
@@ -75,9 +69,7 @@ export function TaskComments({
 
       {comments.length === 0 && (
         <p className="font-sans text-xs text-text-secondary">
-          {canComment
-            ? 'Todavía nadie ha comentado. Empieza tú.'
-            : 'Todavía nadie ha comentado.'}
+          {canComment ? 'Todavía nadie ha comentado. Empieza tú.' : 'Todavía nadie ha comentado.'}
         </p>
       )}
 

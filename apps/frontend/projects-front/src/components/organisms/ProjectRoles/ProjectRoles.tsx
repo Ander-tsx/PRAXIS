@@ -34,9 +34,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
           </p>
         </div>
 
-        {canManage && (
-          <RoleDialog projectId={projectId} triggerLabel="Nuevo rol" />
-        )}
+        {canManage && <RoleDialog projectId={projectId} triggerLabel="Nuevo rol" />}
       </div>
 
       {roles.length === 0 ? (
@@ -76,11 +74,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                         triggerVariant="ghost"
                         triggerSize="sm"
                       />
-                      <DeleteRoleButton
-                        projectId={projectId}
-                        role={role}
-                        membersUsing={inUse}
-                      />
+                      <DeleteRoleButton projectId={projectId} role={role} membersUsing={inUse} />
                     </div>
                   )}
                 </div>

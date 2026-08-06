@@ -16,39 +16,39 @@ import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-valida
  * romper a nadie que ya mande la vieja.
  */
 export class UpdateUserBodyDto {
-    @ApiPropertyOptional({ description: 'Nombre', example: 'Ada' })
-    @IsOptional()
-    @IsString()
-    @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
-    @MaxLength(60, { message: 'El nombre no puede superar 60 caracteres' })
-    firstName?: string;
+  @ApiPropertyOptional({ description: 'Nombre', example: 'Ada' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+  @MaxLength(60, { message: 'El nombre no puede superar 60 caracteres' })
+  firstName?: string;
 
-    @ApiPropertyOptional({ description: 'Apellido', example: 'Lovelace' })
-    @IsOptional()
-    @IsString()
-    @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
-    @MaxLength(60, { message: 'El apellido no puede superar 60 caracteres' })
-    lastName?: string;
+  @ApiPropertyOptional({ description: 'Apellido', example: 'Lovelace' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
+  @MaxLength(60, { message: 'El apellido no puede superar 60 caracteres' })
+  lastName?: string;
 
-    /** @deprecated Usa `firstName`. Se acepta para no romper clientes viejos. */
-    @ApiPropertyOptional({ deprecated: true })
-    @IsOptional()
-    @IsString()
-    @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
-    @MaxLength(60, { message: 'El nombre no puede superar 60 caracteres' })
-    first_name?: string;
+  /** @deprecated Usa `firstName`. Se acepta para no romper clientes viejos. */
+  @ApiPropertyOptional({ deprecated: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+  @MaxLength(60, { message: 'El nombre no puede superar 60 caracteres' })
+  first_name?: string;
 
-    /** @deprecated Usa `lastName`. */
-    @ApiPropertyOptional({ deprecated: true })
-    @IsOptional()
-    @IsString()
-    @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
-    @MaxLength(60, { message: 'El apellido no puede superar 60 caracteres' })
-    last_name?: string;
+  /** @deprecated Usa `lastName`. */
+  @ApiPropertyOptional({ deprecated: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
+  @MaxLength(60, { message: 'El apellido no puede superar 60 caracteres' })
+  last_name?: string;
 }
 
 /** Payload que viaja al microservicio: el cuerpo más el id de la ruta. */
 export class UpdateUserDto extends UpdateUserBodyDto {
-    @IsUUID()
-    id: string;
+  @IsUUID()
+  id: string;
 }

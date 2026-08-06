@@ -209,14 +209,19 @@ function leerEnv(contenido) {
     const igual = linea.indexOf('=');
     if (igual === -1) continue;
 
-    mapa.set(linea.slice(0, igual).trim(), linea.slice(igual + 1).trim().replace(/^["']|["']$/g, ''));
+    mapa.set(
+      linea.slice(0, igual).trim(),
+      linea
+        .slice(igual + 1)
+        .trim()
+        .replace(/^["']|["']$/g, ''),
+    );
   }
 
   return mapa;
 }
 
-const escribirEnv = (mapa) =>
-  `${[...mapa.entries()].map(([k, v]) => `${k}=${v}`).join('\n')}\n`;
+const escribirEnv = (mapa) => `${[...mapa.entries()].map(([k, v]) => `${k}=${v}`).join('\n')}\n`;
 
 /**
  * Completa el archivo de entorno de un servicio desde su `.env.example`.
@@ -241,7 +246,9 @@ export async function completarEnv(svc) {
   const faltan = [...ejemplo.keys()].filter((k) => !actual.has(k));
   if (faltan.length === 0) return { key: svc.key, estado: 'ok' };
 
-  console.log(`\n  ${azul(svc.key)} ${gris(`· faltan ${faltan.length} variable(s) en ${svc.envFile ?? '.env'}`)}`);
+  console.log(
+    `\n  ${azul(svc.key)} ${gris(`· faltan ${faltan.length} variable(s) en ${svc.envFile ?? '.env'}`)}`,
+  );
 
   for (const clave of faltan) {
     const porDefecto = ejemplo.get(clave);
@@ -275,7 +282,9 @@ export function revisarEnvFaltantes(servicios) {
 
   if (sinEnv.length > 0) {
     aviso(`Sin archivo de entorno: ${sinEnv.map((s) => s.key).join(', ')}`);
-    console.log(gris('  Van a arrancar y morir. Responde que sí a «completar .env» o créalos a mano.'));
+    console.log(
+      gris('  Van a arrancar y morir. Responde que sí a «completar .env» o créalos a mano.'),
+    );
   }
 
   return sinEnv;

@@ -19,9 +19,7 @@ import { firstValueFrom } from 'rxjs';
 export class AlexaTokenGuard implements CanActivate {
   private readonly logger = new Logger(AlexaTokenGuard.name);
 
-  constructor(
-    @Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy,
-  ) {}
+  constructor(@Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -42,7 +40,8 @@ export class AlexaTokenGuard implements CanActivate {
       }
 
       request.user = { userId: result.userId };
-      (request as Request & { alexaLinkId?: string; voiceLinkId?: string }).alexaLinkId = result.linkId;
+      (request as Request & { alexaLinkId?: string; voiceLinkId?: string }).alexaLinkId =
+        result.linkId;
       (request as Request & { voiceLinkId?: string }).voiceLinkId = result.linkId;
       return true;
     } catch (error) {

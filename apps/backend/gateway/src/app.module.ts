@@ -16,7 +16,6 @@ import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AlexaModule } from './alexa/alexa.module';
 
-
 @Module({
   imports: [
     ObservabilityModule,
@@ -70,5 +69,4 @@ import { AlexaModule } from './alexa/alexa.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-
 export class AppModule {}

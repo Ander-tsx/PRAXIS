@@ -210,11 +210,7 @@ export class ConversationsService {
    * es un error del que haya que avisar —el estado final es el que se quería—
    * pero tampoco puede reescribir la fecha ni el veredicto.
    */
-  async resolverPropuesta(
-    userId: string,
-    proposalId: string,
-    status: 'ACCEPTED' | 'DISCARDED',
-  ) {
+  async resolverPropuesta(userId: string, proposalId: string, status: 'ACCEPTED' | 'DISCARDED') {
     const propuesta = await this.prisma.proposal.findFirst({
       where: { id: proposalId, message: { conversation: { userId } } },
       select: { id: true, status: true },

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  type AdminUser,
-  Avatar,
-  Badge,
-  Button,
-  globalRoleLevelOf,
-} from '@praxis/commons';
+import { type AdminUser, Avatar, Badge, Button, globalRoleLevelOf } from '@praxis/commons';
 import { useState } from 'react';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import { UserRoleDialog } from './UserRoleDialog';
@@ -138,21 +132,10 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
         </ul>
       </div>
 
-      {estadoDe && (
-        <UserStatusDialog
-          usuario={estadoDe}
-          open
-          onClose={() => setEstadoDe(null)}
-        />
-      )}
+      {estadoDe && <UserStatusDialog usuario={estadoDe} open onClose={() => setEstadoDe(null)} />}
 
       {rolDe && (
-        <UserRoleDialog
-          usuario={rolDe}
-          miNivel={miNivel}
-          open
-          onClose={() => setRolDe(null)}
-        />
+        <UserRoleDialog usuario={rolDe} miNivel={miNivel} open onClose={() => setRolDe(null)} />
       )}
     </>
   );

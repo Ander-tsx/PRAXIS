@@ -78,44 +78,46 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
             </a>
           ) : (
             <>
-          <a href="/auth/signup">
-            <button
-              type="button"
-              className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
-              style={{
-                background: 'var(--color-primary)',
-                color: '#fff',
-                boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.boxShadow = '0 4px 48px rgba(108,99,255,0.65)';
-                el.style.transform = 'translateY(-2px)';
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLButtonElement;
-                el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
-                el.style.transform = 'translateY(0)';
-              }}
-            >
-              Crear cuenta gratis
-            </button>
-          </a>
-          <a href="/auth/login">
-            <button
-              type="button"
-              className="font-sans text-sm font-medium px-8 py-3.5 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
-              style={{ borderColor: 'rgba(255,255,255,0.12)' }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.25)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(255,255,255,0.12)';
-              }}
-            >
-              Iniciar sesión
-            </button>
-          </a>
+              <a href="/auth/signup">
+                <button
+                  type="button"
+                  className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
+                  style={{
+                    background: 'var(--color-primary)',
+                    color: '#fff',
+                    boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.boxShadow = '0 4px 48px rgba(108,99,255,0.65)';
+                    el.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
+                    el.style.transform = 'translateY(0)';
+                  }}
+                >
+                  Crear cuenta gratis
+                </button>
+              </a>
+              <a href="/auth/login">
+                <button
+                  type="button"
+                  className="font-sans text-sm font-medium px-8 py-3.5 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
+                  style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor =
+                      'rgba(255,255,255,0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor =
+                      'rgba(255,255,255,0.12)';
+                  }}
+                >
+                  Iniciar sesión
+                </button>
+              </a>
             </>
           )}
         </div>

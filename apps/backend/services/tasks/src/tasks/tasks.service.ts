@@ -25,9 +25,9 @@ import {
   UpdateTaskDto,
 } from '@praxis/contracts';
 
-const TASK_CACHE_TTL = 120;       // 2 min individual task
-const BOARD_TASKS_TTL = 60;       // 1 min board tasks list
-const PROJECT_TASKS_TTL = 60;     // 1 min project tasks list
+const TASK_CACHE_TTL = 120; // 2 min individual task
+const BOARD_TASKS_TTL = 60; // 1 min board tasks list
+const PROJECT_TASKS_TTL = 60; // 1 min project tasks list
 
 /**
  * Un evento a registrar, sin los campos que se repiten en todos.
@@ -341,11 +341,7 @@ export class TasksService {
   }
 
   /** Deja las etiquetas de una tarea exactamente en `labelIds`. */
-  private async replaceLabels(
-    tx: Prisma.TransactionClient,
-    taskId: string,
-    labelIds: string[],
-  ) {
+  private async replaceLabels(tx: Prisma.TransactionClient, taskId: string, labelIds: string[]) {
     await tx.taskLabel.deleteMany({ where: { taskId } });
     if (labelIds.length > 0) {
       await tx.taskLabel.createMany({ data: labelIds.map((labelId) => ({ taskId, labelId })) });
@@ -648,11 +644,11 @@ export class TasksService {
     const change =
       dto.columnId !== undefined
         ? this.resolveColumnChange({
-          fromColumnId: task.columnId,
-          toColumnId: dto.columnId,
-          wasCompleted: task.completedAt !== null,
-          isClosingColumn: dto.isClosingColumn,
-        })
+            fromColumnId: task.columnId,
+            toColumnId: dto.columnId,
+            wasCompleted: task.completedAt !== null,
+            isClosingColumn: dto.isClosingColumn,
+          })
         : { events: [] as TaskEventDraft[], completedAt: undefined };
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -686,11 +682,13 @@ export class TasksService {
            que registrar cada `PATCH` llenaría el historial de cambios que no
            fueron y desvirtuaría cualquier análisis de repriorización. */
         ...(dto.priority !== undefined && dto.priority !== task.priority
-          ? [{
-            type: 'PRIORITY_CHANGED' as const,
-            fromPriority: task.priority,
-            toPriority: dto.priority,
-          }]
+          ? [
+              {
+                type: 'PRIORITY_CHANGED' as const,
+                fromPriority: task.priority,
+                toPriority: dto.priority,
+              },
+            ]
           : []),
         ...this.assigneeEvents(before, assignees),
       ]);
@@ -809,12 +807,7 @@ export class TasksService {
         include: TASK_INCLUDE,
       });
 
-      await this.recordEvents(
-        tx,
-        saved,
-        dto.requesterId,
-        this.assigneeEvents(before, assignees),
-      );
+      await this.recordEvents(tx, saved, dto.requesterId, this.assigneeEvents(before, assignees));
 
       return saved;
     });
@@ -955,7 +948,10 @@ export class TasksService {
 
   async createSubtask(dto: CreateTaskDto) {
     if (!dto.parentTaskId) {
-      throw new RpcException({ statusCode: 400, message: 'Se requiere parentTaskId para crear una subtarea' });
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Se requiere parentTaskId para crear una subtarea',
+      });
     }
 
     // La madre tiene que ser del mismo proyecto: si no, una subtarea sería una

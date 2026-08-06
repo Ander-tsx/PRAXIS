@@ -14,18 +14,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import {
-  AssignRoleDto,
-  CheckRoleDto,
-  GLOBAL_ROLES,
-  RevokeRoleDto,
-} from '@praxis/contracts';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AssignRoleDto, CheckRoleDto, GLOBAL_ROLES, RevokeRoleDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RequireGlobalRole } from '../common/decorators/require-global-role.decorator';
@@ -56,9 +46,7 @@ export class PermissionsController {
   @ApiOperation({ summary: 'Lista todos los roles globales del sistema' })
   @ApiResponse({ status: 200, description: 'Lista de roles globales recuperada' })
   findAll() {
-    return firstValueFrom(
-      this.permissionsClient.send({ cmd: 'permission_find_all_roles' }, {}),
-    );
+    return firstValueFrom(this.permissionsClient.send({ cmd: 'permission_find_all_roles' }, {}));
   }
 
   /**
@@ -90,9 +78,7 @@ export class PermissionsController {
   async assign(@Request() req: Express.Request, @Body() body: AssignRoleDto) {
     await this.exigirNivelSobre(req.user!.userId, body);
 
-    return firstValueFrom(
-      this.permissionsClient.send({ cmd: 'permission_assign_role' }, body),
-    );
+    return firstValueFrom(this.permissionsClient.send({ cmd: 'permission_assign_role' }, body));
   }
 
   /**
@@ -113,9 +99,7 @@ export class PermissionsController {
   async revoke(@Request() req: Express.Request, @Body() body: RevokeRoleDto) {
     await this.exigirNivelSobre(req.user!.userId, body);
 
-    return firstValueFrom(
-      this.permissionsClient.send({ cmd: 'permission_revoke_role' }, body),
-    );
+    return firstValueFrom(this.permissionsClient.send({ cmd: 'permission_revoke_role' }, body));
   }
 
   /**
@@ -134,7 +118,9 @@ export class PermissionsController {
    */
   @Get('user/:userId')
   @UseGuards(AccountOwnerGuard)
-  @ApiOperation({ summary: 'Roles globales de un usuario (uno mismo, o cualquiera si administras)' })
+  @ApiOperation({
+    summary: 'Roles globales de un usuario (uno mismo, o cualquiera si administras)',
+  })
   @ApiResponse({ status: 200, description: 'Roles del usuario recuperados' })
   @ApiResponse({ status: 403, description: 'Solo puedes consultar tus propios roles' })
   getUserRoles(@Param('userId', ParseUUIDPipe) userId: string) {
@@ -162,12 +148,12 @@ export class PermissionsController {
   @HttpCode(HttpStatus.OK)
   @RequireGlobalRole(GLOBAL_ROLES.ADMIN)
   @UseGuards(GlobalRoleGuard)
-  @ApiOperation({ summary: 'Verifica si un usuario tiene un rol global exacto (solo administradores)' })
+  @ApiOperation({
+    summary: 'Verifica si un usuario tiene un rol global exacto (solo administradores)',
+  })
   @ApiResponse({ status: 200, description: 'Resultado de la verificación de rol' })
   checkRole(@Body() body: CheckRoleDto) {
-    return firstValueFrom(
-      this.permissionsClient.send({ cmd: 'permission_check_role' }, body),
-    );
+    return firstValueFrom(this.permissionsClient.send({ cmd: 'permission_check_role' }, body));
   }
 
   /**
@@ -202,9 +188,7 @@ export class PermissionsController {
     }
 
     if (!(await this.globalRoles.canActOn(actorId, body.userId))) {
-      throw new ForbiddenException(
-        'Solo puedes gestionar cuentas de nivel inferior al tuyo.',
-      );
+      throw new ForbiddenException('Solo puedes gestionar cuentas de nivel inferior al tuyo.');
     }
   }
 }

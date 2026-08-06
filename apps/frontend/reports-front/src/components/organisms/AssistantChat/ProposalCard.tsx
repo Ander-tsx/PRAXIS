@@ -184,7 +184,9 @@ export function AssignProposalCard({
 
     setResultado({
       texto: `«${respuesta.asignada.title}» queda con ${
-        respuesta.asignada.cuantos === 1 ? '1 encargado' : `${respuesta.asignada.cuantos} encargados`
+        respuesta.asignada.cuantos === 1
+          ? '1 encargado'
+          : `${respuesta.asignada.cuantos} encargados`
       }.`,
       href: `/projects/${projectId}?board=${respuesta.asignada.boardId}&task=${respuesta.asignada.id}`,
     });
@@ -547,11 +549,7 @@ function Marco({
     if (!proposalId || anotado.current) return;
     if (estado !== 'hecho' && estado !== 'descartada') return;
     anotado.current = true;
-    resolverPropuestaAction(
-      projectId,
-      proposalId,
-      estado === 'hecho' ? 'ACCEPTED' : 'DISCARDED',
-    );
+    resolverPropuestaAction(projectId, proposalId, estado === 'hecho' ? 'ACCEPTED' : 'DISCARDED');
   }, [estado, proposalId, projectId]);
 
   /**

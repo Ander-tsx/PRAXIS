@@ -26,7 +26,9 @@ test.describe('Sesión en el navegador', () => {
     await crearCuentaYEntrar(page);
 
     const cookiesVisibles = await page.evaluate(() => document.cookie);
-    expect(cookiesVisibles, 'praxis_session tiene que ser httpOnly').not.toContain('praxis_session');
+    expect(cookiesVisibles, 'praxis_session tiene que ser httpOnly').not.toContain(
+      'praxis_session',
+    );
     expect(cookiesVisibles, 'praxis_refresh también').not.toContain('praxis_refresh');
 
     /**

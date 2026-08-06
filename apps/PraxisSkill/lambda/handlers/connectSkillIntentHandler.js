@@ -82,14 +82,18 @@ const ConnectSkillIntentHandler = {
 
     // 3. Intentar persistir en DynamoDB (sin tumbar la app si no hay credenciales locales)
     try {
-      const persistentAttributes = (await handlerInput.attributesManager.getPersistentAttributes()) || {};
+      const persistentAttributes =
+        (await handlerInput.attributesManager.getPersistentAttributes()) || {};
       persistentAttributes.voiceToken = voiceToken;
       persistentAttributes.displayName = displayName;
 
       handlerInput.attributesManager.setPersistentAttributes(persistentAttributes);
       await handlerInput.attributesManager.savePersistentAttributes();
     } catch (dbError) {
-      console.warn('⚠️ [DynamoDB Warning] No se pudo guardar en DynamoDB (continuando con sesión en memoria):', dbError.message);
+      console.warn(
+        '⚠️ [DynamoDB Warning] No se pudo guardar en DynamoDB (continuando con sesión en memoria):',
+        dbError.message,
+      );
     }
 
     // 4. Actualizar requestAttributes para la petición actual

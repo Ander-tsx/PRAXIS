@@ -88,9 +88,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       .then((list) =>
         /* `id` es lo que venga en la URL: puede ser el UUID o el slug, así que
            se comparan los dos. */
-        list.find(
-          (candidate) => candidate.project.id === id || candidate.project.slug === id,
-        ),
+        list.find((candidate) => candidate.project.id === id || candidate.project.slug === id),
       )
       .catch(() => undefined);
 
@@ -109,7 +107,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
        tarea—, así que se piden siempre; son una fila por etiqueta. */
-    api.get<Label[]>(`/projects/${project.id}/labels`).catch(() => [] as Label[]),
+    api
+      .get<Label[]>(`/projects/${project.id}/labels`)
+      .catch(() => [] as Label[]),
   ]);
 
   const can = effective.permissions;
@@ -254,10 +254,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       <div className="flex flex-col gap-6">
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
-          <SuspendedProjectNotice
-            reason={effective.suspendedReason}
-            isOwner={effective.isOwner}
-          />
+          <SuspendedProjectNotice reason={effective.suspendedReason} isOwner={effective.isOwner} />
         )}
 
         <ProjectHeader

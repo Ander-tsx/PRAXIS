@@ -1,6 +1,4 @@
-import { AppHeader, type Paginated, type Project,
-  reportPath,
-} from '@praxis/commons';
+import { AppHeader, type Paginated, type Project, reportPath } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import { redirect } from 'next/navigation';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
@@ -84,8 +82,8 @@ export default async function ReportsIndexPage() {
             Todavía no estás en ningún proyecto
           </p>
           <p className="mt-1 font-sans text-sm text-text-secondary">
-            Los reportes se calculan sobre el trabajo de un proyecto, así que
-            necesitas estar en al menos uno.
+            Los reportes se calculan sobre el trabajo de un proyecto, así que necesitas estar en al
+            menos uno.
           </p>
         </div>
       </div>

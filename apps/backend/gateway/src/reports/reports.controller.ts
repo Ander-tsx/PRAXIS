@@ -41,9 +41,7 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/reports')
 export class ReportsController {
-  constructor(
-    @Inject('REPORTS_SERVICE') private readonly reportsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('REPORTS_SERVICE') private readonly reportsClient: ClientProxy) {}
 
   /**
    * Cuántos días de historial mira un informe.
@@ -73,19 +71,14 @@ export class ReportsController {
   })
   @ApiResponse({ status: 200, description: 'Instantánea del proyecto' })
   snapshot(@Param('projectId', ParseUUIDPipe) projectId: string) {
-    return firstValueFrom(
-      this.reportsClient.send({ cmd: 'report_snapshot' }, { projectId }),
-    );
+    return firstValueFrom(this.reportsClient.send({ cmd: 'report_snapshot' }, { projectId }));
   }
 
   @Get('flow')
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Flujo acumulado: cuántas tareas hay en cada columna cada día' })
   @ApiQuery({ name: 'days', required: false, description: 'Días de historial (1–365)' })
-  flow(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Query('days') days?: string,
-  ) {
+  flow(@Param('projectId', ParseUUIDPipe) projectId: string, @Query('days') days?: string) {
     return firstValueFrom(
       this.reportsClient.send({ cmd: 'report_flow' }, { projectId, days: this.ventana(days) }),
     );
@@ -95,10 +88,7 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Tiempos de entrega y de ciclo, en percentiles 50 y 85' })
   @ApiQuery({ name: 'days', required: false })
-  cycleTime(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Query('days') days?: string,
-  ) {
+  cycleTime(@Param('projectId', ParseUUIDPipe) projectId: string, @Query('days') days?: string) {
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_cycle_time' },
@@ -118,15 +108,9 @@ export class ReportsController {
       'Con poco historial devuelve `prediccion: null` y cuánto falta, en vez de un número inventado',
   })
   @ApiQuery({ name: 'days', required: false })
-  forecast(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Query('days') days?: string,
-  ) {
+  forecast(@Param('projectId', ParseUUIDPipe) projectId: string, @Query('days') days?: string) {
     return firstValueFrom(
-      this.reportsClient.send(
-        { cmd: 'report_forecast' },
-        { projectId, days: this.ventana(days) },
-      ),
+      this.reportsClient.send({ cmd: 'report_forecast' }, { projectId, days: this.ventana(days) }),
     );
   }
 
@@ -145,10 +129,7 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cierres y entradas por semana, con la anterior para comparar' })
   @ApiQuery({ name: 'weeks', required: false, description: 'Semanas de serie (2–52)' })
-  weekly(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Query('weeks') weeks?: string,
-  ) {
+  weekly(@Param('projectId', ParseUUIDPipe) projectId: string, @Query('weeks') weeks?: string) {
     return firstValueFrom(
       this.reportsClient.send({ cmd: 'report_weekly' }, { projectId, weeks: this.semanas(weeks) }),
     );
@@ -170,10 +151,7 @@ export class ReportsController {
     status: 200,
     description: 'Las anteriores a la captura del historial vienen marcadas con `sinHistorial`',
   })
-  blocked(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Query('days') days?: string,
-  ) {
+  blocked(@Param('projectId', ParseUUIDPipe) projectId: string, @Query('days') days?: string) {
     return firstValueFrom(
       this.reportsClient.send({ cmd: 'report_blocked' }, { projectId, days: this.ventana(days) }),
     );
@@ -191,12 +169,7 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Carga y flujo por persona (requiere canViewReports)' })
   @ApiResponse({ status: 403, description: 'Sin canViewReports' })
-  people(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Request() _req: Express.Request,
-  ) {
-    return firstValueFrom(
-      this.reportsClient.send({ cmd: 'report_people' }, { projectId }),
-    );
+  people(@Param('projectId', ParseUUIDPipe) projectId: string, @Request() _req: Express.Request) {
+    return firstValueFrom(this.reportsClient.send({ cmd: 'report_people' }, { projectId }));
   }
 }

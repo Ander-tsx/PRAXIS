@@ -143,10 +143,10 @@ export async function preguntarAction(
   }
 
   try {
-    const resultado = await api.post<AssistantChatResult>(
-      `/projects/${projectId}/assistant/chat`,
-      { message: texto, ...(conversationId ? { conversationId } : {}) },
-    );
+    const resultado = await api.post<AssistantChatResult>(`/projects/${projectId}/assistant/chat`, {
+      message: texto,
+      ...(conversationId ? { conversationId } : {}),
+    });
 
     /* Contra el `data`, no contra el status: un 200 con el cuerpo vacío es la
        forma en que este backend ha fallado antes. */
@@ -181,9 +181,7 @@ export async function preguntarAction(
 }
 
 /** Mis conversaciones en este proyecto, la última movida arriba. */
-export async function conversacionesAction(
-  projectId: string,
-): Promise<ConversacionResumen[]> {
+export async function conversacionesAction(projectId: string): Promise<ConversacionResumen[]> {
   const api = await requireApi();
   if (!api) return [];
   return api
@@ -199,9 +197,7 @@ export async function cargarConversacionAction(
   const api = await requireApi();
   if (!api) return null;
   return api
-    .get<ConversacionCompleta>(
-      `/projects/${projectId}/assistant/conversations/${conversationId}`,
-    )
+    .get<ConversacionCompleta>(`/projects/${projectId}/assistant/conversations/${conversationId}`)
     .catch(() => null);
 }
 
@@ -272,9 +268,7 @@ export async function resolverPropuestaAction(
 export async function cuotaAction(projectId: string): Promise<AssistantQuota | null> {
   const api = await requireApi();
   if (!api) return null;
-  return api
-    .get<AssistantQuota>(`/projects/${projectId}/assistant/quota`)
-    .catch(() => null);
+  return api.get<AssistantQuota>(`/projects/${projectId}/assistant/quota`).catch(() => null);
 }
 
 export interface AceptarTareaState {

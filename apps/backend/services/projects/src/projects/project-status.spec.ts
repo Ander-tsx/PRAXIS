@@ -38,8 +38,7 @@ describe('estado administrativo de un proyecto', () => {
       expect(recortado[ProjectPermission.CAN_VIEW_REPORTS]).toBe(true);
 
       const escrituras = Object.values(ProjectPermission).filter(
-        (p) =>
-          p !== ProjectPermission.CAN_VIEW_PROJECT && p !== ProjectPermission.CAN_VIEW_REPORTS,
+        (p) => p !== ProjectPermission.CAN_VIEW_PROJECT && p !== ProjectPermission.CAN_VIEW_REPORTS,
       );
       for (const permiso of escrituras) {
         expect(recortado[permiso]).toBe(false);

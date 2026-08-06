@@ -39,9 +39,7 @@ import { CreateLabelBodyDto, ProjectPermission, UpdateLabelBodyDto } from '@prax
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/labels')
 export class LabelsController {
-  constructor(
-    @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
-  ) {}
+  constructor(@Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy) {}
 
   @Get()
   @HttpCode(HttpStatus.OK)

@@ -125,7 +125,10 @@ test.describe('Proyectos', () => {
     expect(respuesta.status()).toBe(200);
 
     const miembros = await data<{ userId: string }[]>(respuesta);
-    expect(miembros.map((m) => m.userId), 'El dueño entra solo al crear').toContain(usuario.userId);
+    expect(
+      miembros.map((m) => m.userId),
+      'El dueño entra solo al crear',
+    ).toContain(usuario.userId);
   });
 
   test('renombrar regenera el slug', async ({ request }) => {

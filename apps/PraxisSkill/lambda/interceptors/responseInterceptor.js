@@ -16,19 +16,21 @@ const ResponseInterceptor = {
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
 
     const requestType = Alexa.getRequestType(handlerInput.requestEnvelope);
-    const intentName = requestType === 'IntentRequest'
-      ? Alexa.getIntentName(handlerInput.requestEnvelope)
-      : requestType;
+    const intentName =
+      requestType === 'IntentRequest'
+        ? Alexa.getIntentName(handlerInput.requestEnvelope)
+        : requestType;
 
     const user = requestAttributes.user;
-    const userIdentifier = user?.displayName || user?.userId || Alexa.getUserId(handlerInput.requestEnvelope);
+    const userIdentifier =
+      user?.displayName || user?.userId || Alexa.getUserId(handlerInput.requestEnvelope);
     const activeProjectId = sessionAttributes.projectId || null;
 
     const startTime = requestAttributes.startTime || Date.now();
     const durationMs = Date.now() - startTime;
 
     console.log(
-      `[ResponseInterceptor] Intent: "${intentName}" | Usuario: "${userIdentifier}" | ActiveProjectId: "${activeProjectId}" | Duración: ${durationMs}ms`
+      `[ResponseInterceptor] Intent: "${intentName}" | Usuario: "${userIdentifier}" | ActiveProjectId: "${activeProjectId}" | Duración: ${durationMs}ms`,
     );
 
     return response;

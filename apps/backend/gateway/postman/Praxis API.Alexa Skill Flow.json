@@ -63,13 +63,8 @@
         },
         "url": {
           "raw": "{{base_url}}/auth/login",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "login"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "login"]
         }
       },
       "response": []
@@ -120,12 +115,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["projects"]
         }
       },
       "response": []
@@ -176,14 +167,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/workspaces",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "workspaces"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "workspaces"],
           "variable": [
             {
               "key": "projectId",
@@ -240,14 +225,8 @@
         },
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId/boards",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId",
-            "boards"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId", "boards"],
           "variable": [
             {
               "key": "workspaceId",
@@ -302,14 +281,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -364,14 +337,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -426,14 +393,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -516,14 +477,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/tasks",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "tasks"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "tasks"],
           "variable": [
             {
               "key": "boardId",
@@ -606,14 +561,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/tasks",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "tasks"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "tasks"],
           "variable": [
             {
               "key": "boardId",
@@ -661,13 +610,8 @@
         ],
         "url": {
           "raw": "{{base_url}}/alexa/link",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "alexa",
-            "link"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["alexa", "link"]
         }
       },
       "response": []
@@ -697,13 +641,8 @@
         ],
         "url": {
           "raw": "{{base_url}}/alexa/links",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "alexa",
-            "links"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["alexa", "links"]
         }
       },
       "response": []

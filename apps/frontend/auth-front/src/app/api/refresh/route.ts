@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
     data = await gatewayPost<RefreshedToken>('/auth/refresh', { refreshToken });
   } catch (error) {
     const status = error instanceof ApiError ? error.status : 500;
-    const response = NextResponse.json({ authenticated: false }, { status: status === 503 ? 503 : 401 });
+    const response = NextResponse.json(
+      { authenticated: false },
+      { status: status === 503 ? 503 : 401 },
+    );
 
     // Refresh inválido o expirado → la sesión no es recuperable
     if (status !== 503) {

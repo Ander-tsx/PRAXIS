@@ -47,13 +47,9 @@ export interface Suficiencia {
   faltanDias: number;
 }
 
-export function evaluarSuficiencia(
-  tareasCerradas: number,
-  diasDeHistorial: number,
-): Suficiencia {
+export function evaluarSuficiencia(tareasCerradas: number, diasDeHistorial: number): Suficiencia {
   return {
-    suficiente:
-      tareasCerradas >= MIN_TAREAS_CERRADAS && diasDeHistorial >= MIN_DIAS_HISTORIAL,
+    suficiente: tareasCerradas >= MIN_TAREAS_CERRADAS && diasDeHistorial >= MIN_DIAS_HISTORIAL,
     tareasCerradas,
     faltanTareas: Math.max(0, MIN_TAREAS_CERRADAS - tareasCerradas),
     diasDeHistorial,
@@ -102,8 +98,7 @@ export function simularEntrega(params: {
     let dias = 0;
 
     while (restantes > 0 && dias < TOPE_DIAS) {
-      const muestra =
-        throughputDiario[Math.floor(Math.random() * throughputDiario.length)];
+      const muestra = throughputDiario[Math.floor(Math.random() * throughputDiario.length)];
       restantes -= muestra;
       dias++;
     }

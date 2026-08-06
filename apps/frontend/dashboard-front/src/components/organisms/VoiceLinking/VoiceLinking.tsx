@@ -2,10 +2,7 @@
 
 import { Badge, Button, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import {
-  generateSeedPhraseAction,
-  revokeVoiceLinkAction,
-} from '@/app/(private)/settings/actions';
+import { generateSeedPhraseAction, revokeVoiceLinkAction } from '@/app/(private)/settings/actions';
 import { VOICE_LINK_INITIAL_STATE } from '@/lib/action-state';
 import { estaActiva, formatoCuentaAtras, formatoFecha, type VoiceLink } from '@/lib/voice';
 
@@ -125,8 +122,8 @@ function GeneradorDeFrase({
           style={{ borderColor: alpha(colors.border, 140) }}
         >
           <p className="font-sans text-sm text-text-secondary">
-            Todavía no has generado ninguna frase. Se enseña una sola vez y dura cinco minutos,
-            así que genérala cuando tengas el dispositivo a mano.
+            Todavía no has generado ninguna frase. Se enseña una sola vez y dura cinco minutos, así
+            que genérala cuando tengas el dispositivo a mano.
           </p>
         </div>
       )}

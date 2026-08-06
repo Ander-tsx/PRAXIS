@@ -1,41 +1,41 @@
 {
-    "name": "root",
-    "private": true,
-    "scripts": {
-        "dev:backend": "turbo run dev --filter=\"./apps/backend/gateway\" --filter=\"./apps/backend/services/*\"",
-        "dev:frontend": "turbo run dev --filter=\"./apps/frontend/*\"",
-        "dev:cli": "node scripts/dev-cli/index.mjs",
-        "build": "turbo run build",
-        "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability run build",
-        "lint": "turbo run lint",
-        "test": "turbo run test --filter=!@praxis/e2e",
-        "format": "biome format --write .",
-        "format:check": "biome format .",
-        "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
-        "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
-        "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
-        "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate deploy",
-        "prisma:generate": "pnpm --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma generate",
-        "prisma:reset": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate reset --force --skip-seed && pnpm prisma:seed",
-        "prisma:seed": "pnpm --filter @praxis/permissions-service exec prisma db seed && pnpm --filter @praxis/credentials-service exec prisma db seed && pnpm --filter @praxis/projects-service exec prisma db seed && pnpm --filter @praxis/tasks-service exec prisma db seed",
-        "e2e": "pnpm --filter @praxis/e2e run test",
-        "e2e:api": "pnpm --filter @praxis/e2e run test:api",
-        "e2e:ui": "pnpm --filter @praxis/e2e run test:ui",
-        "e2e:regresion": "pnpm --filter @praxis/e2e run test:regresion",
-        "e2e:seguridad": "pnpm --filter @praxis/e2e run test:seguridad",
-        "e2e:report": "pnpm --filter @praxis/e2e run report",
-        "e2e:instalar": "pnpm --filter @praxis/e2e exec playwright install chromium"
-    },
-    "devDependencies": {
-        "@biomejs/biome": "^1.8.0",
-        "@commitlint/cli": "^19.0.0",
-        "@commitlint/config-conventional": "^19.0.0",
-        "inquirer": "^14.0.2",
-        "turbo": "^2.0.0"
-    },
-    "engines": {
-        "node": ">=20",
-        "pnpm": ">=9"
-    },
-    "packageManager": "pnpm@9.0.0"
+  "name": "root",
+  "private": true,
+  "scripts": {
+    "dev:backend": "turbo run dev --filter=\"./apps/backend/gateway\" --filter=\"./apps/backend/services/*\"",
+    "dev:frontend": "turbo run dev --filter=\"./apps/frontend/*\"",
+    "dev:cli": "node scripts/dev-cli/index.mjs",
+    "build": "turbo run build",
+    "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test --filter=!@praxis/e2e",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",
+    "docker:down": "docker compose -f infra/docker/compose/docker-compose.yml down",
+    "docker:logs": "docker compose -f infra/docker/compose/docker-compose.yml logs -f",
+    "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate deploy",
+    "prisma:generate": "pnpm --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma generate",
+    "prisma:reset": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate reset --force --skip-seed && pnpm prisma:seed",
+    "prisma:seed": "pnpm --filter @praxis/permissions-service exec prisma db seed && pnpm --filter @praxis/credentials-service exec prisma db seed && pnpm --filter @praxis/projects-service exec prisma db seed && pnpm --filter @praxis/tasks-service exec prisma db seed",
+    "e2e": "pnpm --filter @praxis/e2e run test",
+    "e2e:api": "pnpm --filter @praxis/e2e run test:api",
+    "e2e:ui": "pnpm --filter @praxis/e2e run test:ui",
+    "e2e:regresion": "pnpm --filter @praxis/e2e run test:regresion",
+    "e2e:seguridad": "pnpm --filter @praxis/e2e run test:seguridad",
+    "e2e:report": "pnpm --filter @praxis/e2e run report",
+    "e2e:instalar": "pnpm --filter @praxis/e2e exec playwright install chromium"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.0",
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "inquirer": "^14.0.2",
+    "turbo": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.0.0"
 }

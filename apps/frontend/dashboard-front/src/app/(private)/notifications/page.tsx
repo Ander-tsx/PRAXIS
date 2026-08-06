@@ -68,11 +68,7 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
     <AppHeader title="Notificaciones">
       <AutoRefresh seconds={REFRESH_SECONDS} />
 
-      <NotificationList
-        notifications={inbox.items}
-        unread={inbox.unread}
-        usersById={usersById}
-      />
+      <NotificationList notifications={inbox.items} unread={inbox.unread} usersById={usersById} />
 
       {/* `unread` viaja aparte del `total` y sigue contando la bandeja entera,
           no la página: es lo que pinta la insignia de la barra lateral. */}
@@ -82,9 +78,7 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
           limit={POR_PAGINA}
           total={inbox.total}
           hrefFor={(n) =>
-            n > 1
-              ? `/dashboard/notifications?page=${n}`
-              : '/dashboard/notifications'
+            n > 1 ? `/dashboard/notifications?page=${n}` : '/dashboard/notifications'
           }
           nombre="avisos"
         />

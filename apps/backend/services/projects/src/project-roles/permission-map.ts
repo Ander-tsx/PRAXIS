@@ -31,18 +31,18 @@ import { PROJECT_PERMISSIONS } from '@praxis/contracts';
 export const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Boards
   canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
-  canEditBoard:   ['canCreateBoard', 'canEditProject'],
+  canEditBoard: ['canCreateBoard', 'canEditProject'],
   // Quien administra el proyecto ve los reportes.
-  canEditProject:   ['canViewReports'],
+  canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],
   // Columns
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
-  canEditColumn:   ['canCreateColumn'],
+  canEditColumn: ['canCreateColumn'],
   // Tasks
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
   // Editar implica mover y comentar: quien puede reescribir la tarea entera
   // puede, con más razón, cambiarla de columna o dejar una nota. Al revés no.
-  canEditTask:   ['canMoveTask', 'canComment', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
   // Borrar el proyecto se lleva todos sus tableros por delante, así que quien
   // puede borrarlo puede, con mucha más razón, renombrarlo.
   canDeleteProject: [

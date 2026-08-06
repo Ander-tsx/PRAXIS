@@ -17,11 +17,7 @@ export async function gatewayPost<T>(path: string, body: unknown): Promise<T> {
       cache: 'no-store',
     });
   } catch {
-    throw new ApiError(
-      503,
-      'BAD_GATEWAY',
-      'No se pudo conectar con el servidor de autenticación.',
-    );
+    throw new ApiError(503, 'BAD_GATEWAY', 'No se pudo conectar con el servidor de autenticación.');
   }
 
   return unwrapEnvelope<T>(response);

@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { GlobalRole } from '@praxis/contracts';
 import { GlobalRolesService } from '../global-roles/global-roles.service';
@@ -37,10 +32,10 @@ export class GlobalRoleGuard implements CanActivate {
     /* El rol se busca en el handler y **también en la clase**: el namespace
        `/admin` lo declara una vez a nivel de controlador, y con `get` sobre el
        handler a secas ese controlador entero se quedaría sin guard. */
-    const requiredRole = this.reflector.getAllAndOverride<GlobalRole | undefined>(
-      GLOBAL_ROLE_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredRole = this.reflector.getAllAndOverride<GlobalRole | undefined>(GLOBAL_ROLE_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     // Si no hay rol requerido, este guard no opina.
     if (!requiredRole) return true;

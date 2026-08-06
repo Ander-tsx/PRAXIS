@@ -1,8 +1,4 @@
-import {
-    ValidationArguments,
-    ValidationOptions,
-    registerDecorator,
-} from 'class-validator';
+import { ValidationArguments, ValidationOptions, registerDecorator } from 'class-validator';
 import { PROJECT_PERMISSIONS } from './project-permission.enum';
 
 /**
@@ -19,56 +15,54 @@ import { PROJECT_PERMISSIONS } from './project-permission.enum';
  *  - valores booleanos.
  */
 export function IsPermissionMap(options?: ValidationOptions) {
-    return (object: object, propertyName: string) => {
-        registerDecorator({
-            name: 'isPermissionMap',
-            target: object.constructor,
-            propertyName,
-            options,
-            validator: {
-                validate(value: unknown) {
-                    return describeProblem(value) === null;
-                },
-                defaultMessage(args: ValidationArguments) {
-                    return describeProblem(args.value) ?? 'permissions no es válido';
-                },
-            },
-        });
-    };
+  return (object: object, propertyName: string) => {
+    registerDecorator({
+      name: 'isPermissionMap',
+      target: object.constructor,
+      propertyName,
+      options,
+      validator: {
+        validate(value: unknown) {
+          return describeProblem(value) === null;
+        },
+        defaultMessage(args: ValidationArguments) {
+          return describeProblem(args.value) ?? 'permissions no es válido';
+        },
+      },
+    });
+  };
 }
 
 function describeProblem(value: unknown): string | null {
-    if (Array.isArray(value)) {
-        return (
-            'permissions debe ser un objeto de booleanos, no un array. ' +
-            'Ejemplo: {"canEditBoard": true}'
-        );
-    }
+  if (Array.isArray(value)) {
+    return (
+      'permissions debe ser un objeto de booleanos, no un array. ' +
+      'Ejemplo: {"canEditBoard": true}'
+    );
+  }
 
-    if (value === null || typeof value !== 'object') {
-        return 'permissions debe ser un objeto de booleanos';
-    }
+  if (value === null || typeof value !== 'object') {
+    return 'permissions debe ser un objeto de booleanos';
+  }
 
-    const entries = Object.entries(value as Record<string, unknown>);
+  const entries = Object.entries(value as Record<string, unknown>);
 
-    const desconocidas = entries
-        .map(([key]) => key)
-        .filter((key) => !PROJECT_PERMISSIONS.includes(key));
+  const desconocidas = entries
+    .map(([key]) => key)
+    .filter((key) => !PROJECT_PERMISSIONS.includes(key));
 
-    if (desconocidas.length > 0) {
-        return (
-            `permisos desconocidos: ${desconocidas.join(', ')}. ` +
-            `Válidos: ${PROJECT_PERMISSIONS.join(', ')}`
-        );
-    }
+  if (desconocidas.length > 0) {
+    return (
+      `permisos desconocidos: ${desconocidas.join(', ')}. ` +
+      `Válidos: ${PROJECT_PERMISSIONS.join(', ')}`
+    );
+  }
 
-    const noBooleanas = entries
-        .filter(([, val]) => typeof val !== 'boolean')
-        .map(([key]) => key);
+  const noBooleanas = entries.filter(([, val]) => typeof val !== 'boolean').map(([key]) => key);
 
-    if (noBooleanas.length > 0) {
-        return `estos permisos deben ser booleanos: ${noBooleanas.join(', ')}`;
-    }
+  if (noBooleanas.length > 0) {
+    return `estos permisos deben ser booleanos: ${noBooleanas.join(', ')}`;
+  }
 
-    return null;
+  return null;
 }

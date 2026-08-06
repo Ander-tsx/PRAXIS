@@ -24,21 +24,19 @@ import { ReportsModule } from './reports/reports.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        REDIS_URL:              Joi.string().default('redis://localhost:6379'),
-        TCP_PORT:               Joi.number().required(),
+        REDIS_URL: Joi.string().default('redis://localhost:6379'),
+        TCP_PORT: Joi.number().required(),
         /* Los dos servicios de los que lee. Sin ellos no puede responder nada,
            así que se validan al arrancar en vez de fallar en la primera
            petición. */
-        TASKS_SERVICE_HOST:     Joi.string().default('localhost'),
-        TASKS_SERVICE_PORT:     Joi.number().default(3004),
-        PROJECTS_SERVICE_HOST:  Joi.string().default('localhost'),
-        PROJECTS_SERVICE_PORT:  Joi.number().default(3003),
-        LOG_LEVEL:              Joi.string()
-                                  .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
-                                  .default('info'),
-        NODE_ENV:               Joi.string()
-                                  .valid('development', 'production', 'test')
-                                  .default('development'),
+        TASKS_SERVICE_HOST: Joi.string().default('localhost'),
+        TASKS_SERVICE_PORT: Joi.number().default(3004),
+        PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
+        PROJECTS_SERVICE_PORT: Joi.number().default(3003),
+        LOG_LEVEL: Joi.string()
+          .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
+          .default('info'),
+        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
       }),
     }),
     RedisModule,

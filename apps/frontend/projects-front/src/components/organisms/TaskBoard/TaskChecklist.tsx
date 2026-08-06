@@ -38,10 +38,7 @@ export interface TaskChecklistProps {
  */
 export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskChecklistProps) {
   const { done, total } = checklistProgress(task);
-  const [addState, addAction, adding] = useActionState(
-    addChecklistItemAction,
-    TASK_INITIAL_STATE,
-  );
+  const [addState, addAction, adding] = useActionState(addChecklistItemAction, TASK_INITIAL_STATE);
   const addFormRef = useRef<HTMLFormElement>(null);
 
   /**

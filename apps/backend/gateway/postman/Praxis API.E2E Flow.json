@@ -34,7 +34,8 @@
               "    const res = body.data || body;",
               "    if (res.accessToken || res.access_token) pm.collectionVariables.set('access_token', res.accessToken || res.access_token);",
               "    if (res.refreshToken || res.refresh_token) pm.collectionVariables.set('refresh_token', res.refreshToken || res.refresh_token);",
-              "    if (res.userId || res.id) pm.collectionVariables.set('userId', res.userId || res.id);",              "}"
+              "    if (res.userId || res.id) pm.collectionVariables.set('userId', res.userId || res.id);",
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -59,13 +60,8 @@
         },
         "url": {
           "raw": "{{base_url}}/auth/register",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "register"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "register"]
         }
       },
       "response": []
@@ -113,13 +109,8 @@
         },
         "url": {
           "raw": "{{base_url}}/auth/login",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "login"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "login"]
         }
       },
       "response": []
@@ -168,13 +159,8 @@
         },
         "url": {
           "raw": "{{base_url}}/auth/login",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "login"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "login"]
         }
       },
       "response": []
@@ -221,13 +207,8 @@
         },
         "url": {
           "raw": "{{base_url}}/auth/refresh",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "refresh"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "refresh"]
         }
       },
       "response": []
@@ -253,12 +234,8 @@
         },
         "url": {
           "raw": "{{base_url}}/users",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "users"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["users"]
         }
       },
       "response": [],
@@ -287,13 +264,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/users/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "users",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["users", ":id"],
           "variable": [
             {
               "key": "id",
@@ -342,13 +314,8 @@
         },
         "url": {
           "raw": "{{base_url}}/users/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "users",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["users", ":id"],
           "variable": [
             {
               "key": "id",
@@ -383,12 +350,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/permissions",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "permissions"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["permissions"]
         }
       },
       "response": [],
@@ -441,13 +404,8 @@
         },
         "url": {
           "raw": "{{base_url}}/permissions/assign",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "permissions",
-            "assign"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["permissions", "assign"]
         }
       },
       "response": [],
@@ -476,14 +434,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/permissions/user/:userId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "permissions",
-            "user",
-            ":userId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["permissions", "user", ":userId"],
           "variable": [
             {
               "key": "userId",
@@ -532,13 +484,8 @@
         },
         "url": {
           "raw": "{{base_url}}/permissions/check",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "permissions",
-            "check"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["permissions", "check"]
         }
       },
       "response": [],
@@ -581,13 +528,8 @@
         },
         "url": {
           "raw": "{{base_url}}/permissions/revoke",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "permissions",
-            "revoke"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["permissions", "revoke"]
         }
       },
       "response": [],
@@ -630,12 +572,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["projects"]
         }
       },
       "response": [],
@@ -682,12 +620,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["projects"]
         }
       },
       "response": [],
@@ -716,13 +650,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":id"],
           "variable": [
             {
               "key": "id",
@@ -771,13 +700,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":id"],
           "variable": [
             {
               "key": "id",
@@ -826,14 +750,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/roles",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "roles"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "roles"],
           "variable": [
             {
               "key": "projectId",
@@ -886,15 +804,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/roles/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "roles",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "roles", ":id"],
           "variable": [
             {
               "key": "projectId",
@@ -933,14 +844,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:projectId/members",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "members"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "members"],
           "variable": [
             {
               "key": "projectId",
@@ -989,14 +894,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/members",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "members"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "members"],
           "variable": [
             {
               "key": "projectId",
@@ -1031,14 +930,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:projectId/members",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "members"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "members"],
           "variable": [
             {
               "key": "projectId",
@@ -1087,14 +980,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/workspaces",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "workspaces"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "workspaces"],
           "variable": [
             {
               "key": "projectId",
@@ -1133,14 +1020,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:projectId/workspaces",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "workspaces"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "workspaces"],
           "variable": [
             {
               "key": "projectId",
@@ -1192,13 +1073,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId"],
           "variable": [
             {
               "key": "workspaceId",
@@ -1230,13 +1106,8 @@
         },
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId"],
           "variable": [
             {
               "key": "workspaceId",
@@ -1285,14 +1156,8 @@
         },
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId/boards",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId",
-            "boards"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId", "boards"],
           "variable": [
             {
               "key": "workspaceId",
@@ -1331,14 +1196,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId/boards",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId",
-            "boards"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId", "boards"],
           "variable": [
             {
               "key": "workspaceId",
@@ -1390,13 +1249,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/boards/:boardId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId"],
           "variable": [
             {
               "key": "boardId",
@@ -1428,13 +1282,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId"],
           "variable": [
             {
               "key": "boardId",
@@ -1483,14 +1332,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -1543,14 +1386,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -1603,14 +1440,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns"],
           "variable": [
             {
               "key": "boardId",
@@ -1663,15 +1494,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns/reorder",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns",
-            "reorder"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns", "reorder"],
           "variable": [
             {
               "key": "boardId",
@@ -1720,14 +1544,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/tasks",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "tasks"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "tasks"],
           "variable": [
             {
               "key": "boardId",
@@ -1766,14 +1584,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/boards/:boardId/tasks?columnId=column-uuid-here&page=1&limit=10",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "tasks"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "tasks"],
           "query": [
             {
               "key": "columnId",
@@ -1825,13 +1637,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/tasks/:taskId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId"],
           "variable": [
             {
               "key": "taskId",
@@ -1880,13 +1687,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId"],
           "variable": [
             {
               "key": "taskId",
@@ -1935,14 +1737,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId/assign",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId",
-            "assign"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId", "assign"],
           "variable": [
             {
               "key": "taskId",
@@ -1991,14 +1787,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId/move",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId",
-            "move"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId", "move"],
           "variable": [
             {
               "key": "taskId",
@@ -2047,14 +1837,8 @@
         },
         "url": {
           "raw": "{{base_url}}/boards/:boardId/tasks",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "tasks"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "tasks"],
           "variable": [
             {
               "key": "boardId",
@@ -2106,14 +1890,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId/checklists",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId",
-            "checklists"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId", "checklists"],
           "variable": [
             {
               "key": "taskId",
@@ -2166,16 +1944,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId/checklists/:id/toggle",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId",
-            "checklists",
-            ":id",
-            "toggle"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId", "checklists", ":id", "toggle"],
           "variable": [
             {
               "key": "taskId",
@@ -2228,15 +1998,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId/checklists/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId",
-            "checklists",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId", "checklists", ":id"],
           "variable": [
             {
               "key": "taskId",
@@ -2289,13 +2052,8 @@
         },
         "url": {
           "raw": "{{base_url}}/tasks/:taskId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "tasks",
-            ":taskId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["tasks", ":taskId"],
           "variable": [
             {
               "key": "taskId",
@@ -2330,15 +2088,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/boards/:boardId/columns/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId",
-            "columns",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId", "columns", ":id"],
           "variable": [
             {
               "key": "boardId",
@@ -2377,13 +2128,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/boards/:boardId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "boards",
-            ":boardId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["boards", ":boardId"],
           "variable": [
             {
               "key": "boardId",
@@ -2418,13 +2164,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/workspaces/:workspaceId",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "workspaces",
-            ":workspaceId"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["workspaces", ":workspaceId"],
           "variable": [
             {
               "key": "workspaceId",
@@ -2473,14 +2214,8 @@
         },
         "url": {
           "raw": "{{base_url}}/projects/:projectId/members",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "members"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "members"],
           "variable": [
             {
               "key": "projectId",
@@ -2515,15 +2250,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:projectId/roles/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":projectId",
-            "roles",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":projectId", "roles", ":id"],
           "variable": [
             {
               "key": "projectId",
@@ -2562,13 +2290,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/projects/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "projects",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["projects", ":id"],
           "variable": [
             {
               "key": "id",
@@ -2603,13 +2326,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/users/:id",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "users",
-            ":id"
-          ],
+          "host": ["{{base_url}}"],
+          "path": ["users", ":id"],
           "variable": [
             {
               "key": "id",
@@ -2644,13 +2362,8 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/auth/logout",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "auth",
-            "logout"
-          ]
+          "host": ["{{base_url}}"],
+          "path": ["auth", "logout"]
         }
       },
       "response": [],
@@ -2690,9 +2403,7 @@
         "type": "text/javascript",
         "packages": {},
         "requests": {},
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     },
     {
@@ -2701,9 +2412,7 @@
         "type": "text/javascript",
         "packages": {},
         "requests": {},
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     }
   ],

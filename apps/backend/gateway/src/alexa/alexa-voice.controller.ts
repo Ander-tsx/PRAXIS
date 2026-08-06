@@ -23,9 +23,7 @@ import { AlexaTokenGuard } from '../common/guards/alexa-token.guard';
 @UseGuards(AlexaTokenGuard)
 @Controller('alexa')
 export class AlexaVoiceController {
-  constructor(
-    @Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy,
-  ) {}
+  constructor(@Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy) {}
 
   private query(cmd: string, payload: Record<string, unknown>) {
     return firstValueFrom(this.alexaClient.send({ cmd }, payload));

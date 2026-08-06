@@ -101,7 +101,7 @@ const skillBuilder = Alexa.SkillBuilders.custom()
     CancelAndStopIntentHandler,
     NavigateHomeIntentHandler,
     FallbackIntentHandler,
-    SessionEndedRequestHandler
+    SessionEndedRequestHandler,
   )
   .addErrorHandlers(ErrorHandler)
   .addRequestInterceptors(RequestInterceptor)

@@ -87,8 +87,7 @@ export function ConversationHistory({
             Todavía no has hablado con el asistente aquí
           </p>
           <p className="mt-1 font-sans text-sm text-text-secondary">
-            Las conversaciones de este proyecto se guardan y puedes retomarlas
-            cuando quieras.
+            Las conversaciones de este proyecto se guardan y puedes retomarlas cuando quieras.
           </p>
         </div>
       )}
@@ -129,9 +128,7 @@ export function ConversationHistory({
                   {conversacion.title}
                 </span>
                 <span className="mt-0.5 block font-sans text-xs text-text-disabled">
-                  {conversacion.mensajes === 1
-                    ? '1 mensaje'
-                    : `${conversacion.mensajes} mensajes`}
+                  {conversacion.mensajes === 1 ? '1 mensaje' : `${conversacion.mensajes} mensajes`}
                   {' · '}
                   {cuando(conversacion.updatedAt)}
                   {activa && ' · abierta'}

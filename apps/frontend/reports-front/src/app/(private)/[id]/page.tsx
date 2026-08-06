@@ -112,20 +112,28 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       api.get<ReportForecast>(`/projects/${project.id}/reports/forecast`).catch(() => null),
       /* Ya no va condicionado: si llegas hasta aquí tienes `canViewReports`, y
          el desglose por persona dejó de ser un permiso aparte. */
-      api.get<ReportPerson[]>(`/projects/${project.id}/reports/people`).catch(() => []),
+      api
+        .get<ReportPerson[]>(`/projects/${project.id}/reports/people`)
+        .catch(() => []),
       /* Los miembros y el directorio piden solo `canViewProject`: el asistente
          necesita poner nombre a un `userId` para pintar una propuesta, y esas
          dos rutas también las usa quien nunca abre esta pantalla. */
-      api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => []),
+      api
+        .get<ProjectMember[]>(`/projects/${project.id}/members`)
+        .catch(() => []),
       api
         .get<Paginated<UserProfile>>('/users?limit=100')
         .catch(() => ({ items: [] as UserProfile[], total: 0 })),
       /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
          id, y la tarjeta tiene que enseñar el nombre. */
-      api.get<Label[]>(`/projects/${project.id}/labels`).catch(() => [] as Label[]),
+      api
+        .get<Label[]>(`/projects/${project.id}/labels`)
+        .catch(() => [] as Label[]),
       /* La cuota, al cargar y antes de escribir nada: poner el coste a la vista
          de quien lo gasta evita encontrarse el límite de golpe. */
-      api.get<AssistantQuota>(`/projects/${project.id}/assistant/quota`).catch(() => null),
+      api
+        .get<AssistantQuota>(`/projects/${project.id}/assistant/quota`)
+        .catch(() => null),
     ]);
 
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
@@ -167,9 +175,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           <ProjectPicker projects={proyectos.items} activeId={project.id} />
         </div>
 
-        {snapshot.eventosSinteticos > 0 && (
-          <SyntheticBanner eventos={snapshot.eventosSinteticos} />
-        )}
+        {snapshot.eventosSinteticos > 0 && <SyntheticBanner eventos={snapshot.eventosSinteticos} />}
 
         {/* Arriba del todo y no al final: lee este mismo informe, y quien llega
             con una pregunta concreta no debería tener que recorrer cinco
@@ -208,15 +214,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Es una <strong>foto del momento</strong>, no una evolución: no
-                  necesita historial, así que funciona desde el primer día del
-                  proyecto.
+                  Es una <strong>foto del momento</strong>, no una evolución: no necesita historial,
+                  así que funciona desde el primer día del proyecto.
                 </p>
                 <p>
-                  Lo que se busca aquí es una <strong>acumulación</strong>. Si una
-                  columna intermedia —«En revisión», «Bloqueado»— tiene muchas más
-                  que sus vecinas, ahí hay un cuello de botella: entra trabajo más
-                  rápido de lo que sale.
+                  Lo que se busca aquí es una <strong>acumulación</strong>. Si una columna
+                  intermedia —«En revisión», «Bloqueado»— tiene muchas más que sus vecinas, ahí hay
+                  un cuello de botella: entra trabajo más rápido de lo que sale.
                 </p>
               </>
             }
@@ -237,14 +241,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Un reparto sano tiene forma de pirámide: pocas urgentes, muchas
-                  medias. Si la barra de <strong>Urgente</strong> es la más larga,
-                  la prioridad ha dejado de distinguir nada y todo compite por el
-                  mismo primer puesto.
+                  Un reparto sano tiene forma de pirámide: pocas urgentes, muchas medias. Si la
+                  barra de <strong>Urgente</strong> es la más larga, la prioridad ha dejado de
+                  distinguir nada y todo compite por el mismo primer puesto.
                 </p>
                 <p>
-                  Ojo con leerlo solo: una tarea urgente y vieja es peor señal que
-                  diez urgentes recién creadas. Cruza esto con las vencidas.
+                  Ojo con leerlo solo: una tarea urgente y vieja es peor señal que diez urgentes
+                  recién creadas. Cruza esto con las vencidas.
                 </p>
               </>
             }
@@ -278,24 +281,23 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             <>
               <p>
                 Cada banda es una columna del tablero, apiladas{' '}
-                <strong>en el mismo orden en que están en el tablero</strong>. El
-                grosor de una banda es cuántas tareas hay ahí ese día.
+                <strong>en el mismo orden en que están en el tablero</strong>. El grosor de una
+                banda es cuántas tareas hay ahí ese día.
               </p>
               <p>
-                <strong>Bandas paralelas que suben juntas</strong> = el trabajo
-                entra y sale al mismo ritmo. <strong>Una banda que engorda</strong>{' '}
-                = entra más rápido de lo que sale, y ahí se está acumulando.{' '}
-                <strong>La banda de arriba plana</strong> = no se está cerrando
-                nada.
+                <strong>Bandas paralelas que suben juntas</strong> = el trabajo entra y sale al
+                mismo ritmo. <strong>Una banda que engorda</strong> = entra más rápido de lo que
+                sale, y ahí se está acumulando. <strong>La banda de arriba plana</strong> = no se
+                está cerrando nada.
               </p>
               <p>
-                El ancho <em>horizontal</em> de las bandas intermedias es,
-                aproximadamente, lo que tarda una tarea en atravesar el tablero.
-                Si se ensancha con el tiempo, cada vez se tarda más.
+                El ancho <em>horizontal</em> de las bandas intermedias es, aproximadamente, lo que
+                tarda una tarea en atravesar el tablero. Si se ensancha con el tiempo, cada vez se
+                tarda más.
               </p>
               <p>
-                Solo cuenta movimientos <strong>registrados</strong>: lo que pasó
-                antes de que existiera el historial no aparece.
+                Solo cuenta movimientos <strong>registrados</strong>: lo que pasó antes de que
+                existiera el historial no aparece.
               </p>
             </>
           }
@@ -323,26 +325,21 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                <strong>La mediana (p50)</strong> es el punto donde la mitad de las
-                tareas tardan menos. <strong>El p85</strong>, donde tardan menos 85
-                de cada 100: es el número que sirve para prometer una fecha, porque
-                se cumple casi siempre.
+                <strong>La mediana (p50)</strong> es el punto donde la mitad de las tareas tardan
+                menos. <strong>El p85</strong>, donde tardan menos 85 de cada 100: es el número que
+                sirve para prometer una fecha, porque se cumple casi siempre.
               </p>
               <p>
-                <strong>Aquí no verás una media, y es deliberado.</strong> Estos
-                tiempos tienen cola larga —unas pocas tareas que se eternizan— y la
-                media se va detrás de esa cola: acaba describiendo un caso que no le
-                pasa a nadie.
+                <strong>Aquí no verás una media, y es deliberado.</strong> Estos tiempos tienen cola
+                larga —unas pocas tareas que se eternizan— y la media se va detrás de esa cola:
+                acaba describiendo un caso que no le pasa a nadie.
               </p>
               <p>
-                Mira <strong>la dispersión</strong>, no solo las líneas. Dos equipos
-                con la misma mediana pueden tener uno los puntos apretados y el otro
-                la mitad disparados hacia arriba; solo el segundo tiene un problema,
-                porque no puede prometer nada.
+                Mira <strong>la dispersión</strong>, no solo las líneas. Dos equipos con la misma
+                mediana pueden tener uno los puntos apretados y el otro la mitad disparados hacia
+                arriba; solo el segundo tiene un problema, porque no puede prometer nada.
               </p>
-              <p>
-                Puntos que suben según avanza la fecha = cada vez se tarda más.
-              </p>
+              <p>Puntos que suben según avanza la fecha = cada vez se tarda más.</p>
             </>
           }
         >
@@ -369,15 +366,14 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Es <strong>siempre menor</strong> que el de arriba, por definición:
-                  empieza a contar más tarde. La diferencia entre los dos es{' '}
-                  <strong>cuánto tiempo pasa una tarea esperando</strong> antes de
-                  que alguien la empiece.
+                  Es <strong>siempre menor</strong> que el de arriba, por definición: empieza a
+                  contar más tarde. La diferencia entre los dos es{' '}
+                  <strong>cuánto tiempo pasa una tarea esperando</strong> antes de que alguien la
+                  empiece.
                 </p>
                 <p>
-                  Si el de entrega es mucho mayor que este, el problema no es la
-                  velocidad del equipo: es que se abren tareas mucho antes de poder
-                  atenderlas.
+                  Si el de entrega es mucho mayor que este, el problema no es la velocidad del
+                  equipo: es que se abren tareas mucho antes de poder atenderlas.
                 </p>
               </>
             }
@@ -387,8 +383,8 @@ export default async function ProjectReportsPage({ params }: PageProps) {
               <strong className="text-text-primary tabular-nums">
                 {cycle.cycle.muestrasConMovimiento}
               </strong>{' '}
-              tareas que se movieron antes de cerrarse. Las que se crearon ya
-              terminadas no tienen tiempo de ciclo y no entran en el cálculo.
+              tareas que se movieron antes de cerrarse. Las que se crearon ya terminadas no tienen
+              tiempo de ciclo y no entran en el cálculo.
             </p>
           </ChartCard>
         )}
@@ -414,30 +410,28 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             <>
               <p>
                 Se toma cuántas tareas se cerraron cada día del historial y se{' '}
-                <strong>sortea al azar</strong> ese ritmo, día tras día, hasta
-                vaciar lo que queda abierto. Repetido <strong>5 000 veces</strong>,
-                el reparto de resultados es la predicción.
+                <strong>sortea al azar</strong> ese ritmo, día tras día, hasta vaciar lo que queda
+                abierto. Repetido <strong>5 000 veces</strong>, el reparto de resultados es la
+                predicción.
               </p>
               <p>
-                Por eso no hay un número único sino un rango: la respuesta honesta a
-                «¿cuándo acaba?» no es un día, es una probabilidad.{' '}
-                <strong>Usa el p85 para comprometerte</strong> y el p50 solo para
-                hacerte una idea.
+                Por eso no hay un número único sino un rango: la respuesta honesta a «¿cuándo
+                acaba?» no es un día, es una probabilidad.{' '}
+                <strong>Usa el p85 para comprometerte</strong> y el p50 solo para hacerte una idea.
               </p>
               <p>
-                <strong>No usa estimaciones de esfuerzo</strong>, y es a propósito:
-                no existen en el modelo, porque son un número que alguien tiene que
-                mantener en cada tarjeta y se abandona a las dos semanas. Aquí el
-                dato se recoge solo, del propio flujo del tablero.
+                <strong>No usa estimaciones de esfuerzo</strong>, y es a propósito: no existen en el
+                modelo, porque son un número que alguien tiene que mantener en cada tarjeta y se
+                abandona a las dos semanas. Aquí el dato se recoge solo, del propio flujo del
+                tablero.
               </p>
               <p>
-                Cuenta también <strong>los días en que no se cerró nada</strong>. Si
-                se omitieran, el ritmo saldría inflado y la predicción sería siempre
-                optimista.
+                Cuenta también <strong>los días en que no se cerró nada</strong>. Si se omitieran,
+                el ritmo saldría inflado y la predicción sería siempre optimista.
               </p>
               <p>
-                Supone que el ritmo se mantiene. Un cambio de equipo, unas
-                vacaciones o un cambio de alcance la invalidan.
+                Supone que el ritmo se mantiene. Un cambio de equipo, unas vacaciones o un cambio de
+                alcance la invalidan.
               </p>
             </>
           }
@@ -451,10 +445,10 @@ export default async function ProjectReportsPage({ params }: PageProps) {
                 {forecast.throughputDiario?.media.toFixed(2).replace('.', ',')}
               </strong>{' '}
               al día de media. Con ese ritmo, el tablero queda vacío en{' '}
-              <strong className="text-text-primary">{forecast.prediccion.p50} días</strong> la
-              mitad de las veces, y en{' '}
-              <strong className="text-text-primary">{forecast.prediccion.p85}</strong> en 85 de
-              cada 100. El peor caso simulado son {forecast.prediccion.p95} días.
+              <strong className="text-text-primary">{forecast.prediccion.p50} días</strong> la mitad
+              de las veces, y en{' '}
+              <strong className="text-text-primary">{forecast.prediccion.p85}</strong> en 85 de cada
+              100. El peor caso simulado son {forecast.prediccion.p95} días.
             </p>
           ) : (
             <NotEnoughData
@@ -472,21 +466,20 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                <strong>Esto no es una clasificación</strong>, y no debe usarse
-                como tal. Estos números cuentan tareas: no saben de dificultad, ni
-                de a quién le tocó lo difícil, ni de quién pasó la semana ayudando
-                a otro. Ordenan tareas, no personas.
+                <strong>Esto no es una clasificación</strong>, y no debe usarse como tal. Estos
+                números cuentan tareas: no saben de dificultad, ni de a quién le tocó lo difícil, ni
+                de quién pasó la semana ayudando a otro. Ordenan tareas, no personas.
               </p>
               <p>
-                Lo que sí dice bien es el <strong>reparto</strong>: si una persona
-                tiene el triple de abiertas que el resto, es un problema de
-                planificación, no suyo. Y las <strong>vencidas concentradas</strong>{' '}
-                en alguien suelen significar que se le asignó más de lo que cabe.
+                Lo que sí dice bien es el <strong>reparto</strong>: si una persona tiene el triple
+                de abiertas que el resto, es un problema de planificación, no suyo. Y las{' '}
+                <strong>vencidas concentradas</strong> en alguien suelen significar que se le asignó
+                más de lo que cabe.
               </p>
               <p>
-                La <strong>mediana</strong> es de sus tareas cerradas, de crear a
-                cerrar. Con pocas tareas cerradas, un solo caso raro la mueve
-                entera: míralas junto a la columna de «cerradas».
+                La <strong>mediana</strong> es de sus tareas cerradas, de crear a cerrar. Con pocas
+                tareas cerradas, un solo caso raro la mueve entera: míralas junto a la columna de
+                «cerradas».
               </p>
             </>
           }
@@ -531,8 +524,9 @@ export default async function ProjectReportsPage({ params }: PageProps) {
                           {persona.cerradas}
                         </td>
                         <td
-                          className={`py-3 font-sans text-sm tabular-nums ${persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
-                            }`}
+                          className={`py-3 font-sans text-sm tabular-nums ${
+                            persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
+                          }`}
                         >
                           {persona.vencidas}
                         </td>

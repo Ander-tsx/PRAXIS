@@ -12,12 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RedeemSeedPhraseDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -30,9 +25,7 @@ import { JwtGuard } from '../auth/jwt.guard';
 @ApiTags('Alexa · Auth')
 @Controller('alexa')
 export class AlexaAuthController {
-  constructor(
-    @Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy,
-  ) {}
+  constructor(@Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy) {}
 
   @Post('link')
   @HttpCode(HttpStatus.CREATED)
@@ -79,10 +72,7 @@ export class AlexaAuthController {
   @ApiResponse({ status: 200, description: 'Vinculación revocada' })
   revokeOne(@Request() req: Express.Request, @Param('linkId') linkId: string) {
     return firstValueFrom(
-      this.alexaClient.send(
-        { cmd: 'alexa_link_revoke' },
-        { userId: req.user!.userId, linkId },
-      ),
+      this.alexaClient.send({ cmd: 'alexa_link_revoke' }, { userId: req.user!.userId, linkId }),
     );
   }
 

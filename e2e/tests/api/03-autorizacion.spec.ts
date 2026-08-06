@@ -88,10 +88,9 @@ test.describe('Aislamiento entre cuentas', () => {
       data: { title: 'Secuestrada', projectId: proyectoDelAtacante.id },
     });
 
-    expect(
-      [400, 403, 404],
-      `El bypass de projectId volvió: llegó ${respuesta.status()}`,
-    ).toContain(respuesta.status());
+    expect([400, 403, 404], `El bypass de projectId volvió: llegó ${respuesta.status()}`).toContain(
+      respuesta.status(),
+    );
 
     const comprobacion = await request.get(`/api/tasks/${tarea.id}`, {
       headers: comoBearer(mundo.duenno.accessToken),

@@ -56,10 +56,14 @@ export default async function DashboardPage() {
   const [page, invitations, voiceLinks, dueTasks] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
-    api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
+    api
+      .get<MyInvitation[]>('/me/invitations')
+      .catch(() => [] as MyInvitation[]),
     /* Si alexa-service no responde no se enseña el aviso: es mejor no decir
        nada que invitar a vincular contra un servicio que está caído. */
-    api.get<VoiceLink[]>('/alexa/links').catch(() => [] as VoiceLink[]),
+    api
+      .get<VoiceLink[]>('/alexa/links')
+      .catch(() => [] as VoiceLink[]),
     api
       /* `excludeDone`: una tarea que ya está en la columna de cierre —la verde—
          no es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar
