@@ -4,6 +4,7 @@ import {
   Button,
   Dialog,
   Input,
+  type Paginated,
   type ProjectRole,
   Select,
   type UserProfile,
@@ -11,6 +12,7 @@ import {
   colors,
   personLabel,
 } from '@praxis/commons';
+import { createApiClient } from '@praxis/commons/api';
 import { useActionState, useEffect, useId, useState } from 'react';
 import { inviteMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
@@ -18,9 +20,12 @@ import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 export interface InviteMemberDialogProps {
   projectId: string;
   roles: ProjectRole[];
-  /** Directorio ya sin quienes son miembros o tienen invitación pendiente. */
-  candidates: UserProfile[];
+  /** Quiénes no deben salir: miembros, invitados sin responder y el dueño. */
+  excluirIds: string[];
 }
+
+/** Toda petición del navegador pasa por el proxy de la zona, que pone el Bearer. */
+const api = createApiClient({ gatewayPath: '/projects/api/gateway' });
 
 /** Cuántos resultados se enseñan por búsqueda. */
 const MAX_RESULTS = 6;
@@ -33,17 +38,23 @@ const MAX_RESULTS = 6;
  * acostumbra a elegir de una lista que dejará de caber en cuanto haya cuentas
  * de verdad; buscar primero es el gesto que escala.
  *
- * La búsqueda se resuelve **en el cliente** sobre el directorio que ya trajo la
- * página, porque `GET /users` recibe los filtros por body en un GET y solo
- * tenemos la primera página. Ver PENDIENTES-BACKEND §4.
+ * La búsqueda va **contra el servidor**, con `GET /users?search=`.
+ *
+ * ⚠️ Se resolvía en el cliente sobre `/users?limit=100` que traía la página, y
+ * ese comentario decía que no había alternativa. La había: el backend acepta
+ * `search` como query param desde hace tiempo y nadie volvió a mirarlo. Mientras
+ * tanto, buscar solo encontraba a quien cupiera en las primeras cien cuentas de
+ * **toda la plataforma** — o sea, a casi nadie en cuanto hubo cuentas de verdad.
  */
-export function InviteMemberDialog({ projectId, roles, candidates }: InviteMemberDialogProps) {
+export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMemberDialogProps) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
   /** `null` mientras no se ha buscado: distingue "sin buscar" de "sin resultados". */
   const [results, setResults] = useState<UserProfile[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState('');
   const [selected, setSelected] = useState<UserProfile | null>(null);
   const [roleId, setRoleId] = useState(roles[0]?.id ?? '');
 
@@ -59,21 +70,32 @@ export function InviteMemberDialog({ projectId, roles, candidates }: InviteMembe
     }
   }, [state.done]);
 
-  function search() {
-    const needle = query.trim().toLowerCase();
+  async function search() {
+    const needle = query.trim();
     if (!needle) {
       setResults(null);
+      setErrorBusqueda('');
       return;
     }
 
-    setResults(
-      candidates
-        .filter((user) => {
-          const label = personLabel(user).toLowerCase();
-          return user.credential.email.toLowerCase().includes(needle) || label.includes(needle);
-        })
-        .slice(0, MAX_RESULTS),
-    );
+    setBuscando(true);
+    setErrorBusqueda('');
+
+    try {
+      /* Se piden de más para poder descartar a los que ya están dentro sin
+         quedarse corto de resultados. */
+      const pagina = await api.get<Paginated<UserProfile>>(
+        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS * 3}`,
+      );
+
+      const excluidos = new Set(excluirIds);
+      setResults(pagina.items.filter((user) => !excluidos.has(user.id)).slice(0, MAX_RESULTS));
+    } catch {
+      setResults([]);
+      setErrorBusqueda('No se pudo buscar. Inténtalo de nuevo.');
+    } finally {
+      setBuscando(false);
+    }
   }
 
   function reset() {
@@ -122,7 +144,14 @@ export function InviteMemberDialog({ projectId, roles, candidates }: InviteMembe
               autoComplete="off"
               fullWidth
             />
-            <Button type="button" variant="secondary" onClick={search} className="mb-[22px]">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={search}
+              isLoading={buscando}
+              disabled={buscando}
+              className="mb-[22px]"
+            >
               Buscar
             </Button>
           </div>
@@ -151,7 +180,16 @@ export function InviteMemberDialog({ projectId, roles, candidates }: InviteMembe
           ) : (
             results !== null && (
               <div className="flex flex-col gap-1.5">
-                {results.length === 0 ? (
+                {/* Un fallo de red no es «no hay nadie»: decirlo así manda a
+                    buscar otra vez con otras palabras algo que sí estaba. */}
+                {errorBusqueda ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
+                  >
+                    {errorBusqueda}
+                  </p>
+                ) : results.length === 0 ? (
                   <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
                     Nadie coincide con «{query.trim()}».
                   </p>

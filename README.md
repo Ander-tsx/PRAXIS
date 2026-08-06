@@ -297,6 +297,8 @@ declaración.
 | `browserType.launch: Executable doesn't exist` | Falta `pnpm e2e:instalar`. |
 | Solo fallan las `@security` | Es lo esperado mientras el hallazgo siga abierto. |
 | Un fallo que no se reproduce | Las pruebas comparten base de datos y corren con `workers: 1` a propósito. Si añadiste paralelismo, quítalo. |
+| La pestaña Equipo enseña UUIDs y «Correo no disponible» | Antes pasaba con más de 100 cuentas en la base. Corregido: los miembros se resuelven por id. Si vuelve a salir, es otra cosa. |
+| La base se llena de cuentas `@praxis.test` | Las crea la suite para aislar cada prueba. Un `globalTeardown` las retira al terminar; **sus proyectos no** —viven en otro servicio y no cascadean—. Para vaciar del todo, `pnpm prisma:reset`. |
 | Un login falla con «¿Se ejecutaron los seeds?» | Puede ser el límite de intentos: `/auth/login` corta a los 10 por minuto y la propia suite lo gasta. `entrar()` reintenta, pero **`06-administracion` va antes que `07-seguridad` a propósito** — si reordenas los archivos, vuelve. |
 
 ### `pnpm dev:cli` — el atajo para el día a día

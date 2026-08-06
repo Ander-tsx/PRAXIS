@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { request as contextoDePeticion } from '@playwright/test';
+import { registrar } from '../../fixtures/api';
 import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
 
 /**
@@ -149,5 +151,56 @@ test.describe('Proyectos desde la interfaz', () => {
     expect(pareceUuid, `La URL trae un UUID en vez del slug: ${identificador}`).toBe(false);
     expect(identificador, 'El slug es minúsculas, números y guiones').toMatch(/^[a-z0-9-]+$/);
     expect(identificador).toContain('rediseno-del-panel');
+  });
+});
+
+test.describe('Las personas de un proyecto', () => {
+  /**
+   * 🔴 Regresión.
+   *
+   * La pestaña Equipo resolvía los nombres contra `/users?limit=100` — la
+   * primera página del directorio de **toda la plataforma**, con el `limit`
+   * topado en 100 por el DTO. Cuando había más de cien cuentas, los miembros de
+   * este proyecto dejaban de caber ahí y la pestaña enseñaba el UUID crudo y
+   * «Correo no disponible», con el selector de encargados vacío. Sin ningún
+   * error: solo datos que no aparecían.
+   *
+   * Lo destapó esta misma suite al llenar la base de cuentas de usar y tirar,
+   * pero habría pasado igual el día que la plataforma llegara a 101 cuentas.
+   *
+   * La prueba **empuja el directorio a propósito**: registra unas cuantas
+   * cuentas ajenas al proyecto y después comprueba que la pestaña sigue
+   * resolviendo a los suyos. Con el código viejo, esas cuentas nuevas —las más
+   * recientes— desplazaban a los miembros y la prueba caía.
+   */
+  test('se resuelven aunque el directorio esté lleno de gente ajena', async ({ page, request }) => {
+    const email = await crearCuentaYEntrar(page);
+
+    const nombre = `Proyecto con gente ${Date.now().toString(36)}`;
+    await crearProyectoEnLaInterfaz(page, nombre);
+    await page.getByText(nombre).first().click();
+    await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
+
+    /**
+     * Ruido en el directorio: cuentas que no tienen nada que ver con el
+     * proyecto y que en el listado global van por delante.
+     *
+     * ⚠️ Contexto propio contra el **gateway**. El `request` que inyecta el
+     * proyecto `ui` apunta al shell (4100), donde `/api/auth/register` no
+     * existe: da 404 y el fallo parece del registro, no del origen.
+     */
+    const alGateway = await contextoDePeticion.newContext({
+      baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
+    });
+    for (let i = 0; i < 8; i++) await registrar(alGateway);
+    await alGateway.dispose();
+
+    await page.goto(`${page.url().split('?')[0]}?tab=equipo`);
+    await page.waitForLoadState('networkidle');
+
+    const cuerpo = (await page.textContent('body')) ?? '';
+
+    expect(cuerpo, 'El correo del dueño tiene que salir').toContain(email);
+    expect(cuerpo, 'Y no el hueco de cuando no se resuelve').not.toContain('Correo no disponible');
   });
 });

@@ -44,6 +44,16 @@ export default defineConfig({
   testDir: './tests',
 
   /**
+   * Barrido de las cuentas que crea la suite.
+   *
+   * Cada prueba se registra la suya para aislarse, y eso deja más de cien por
+   * ejecución en una base de desarrollo compartida. Sin esto se acumulan hasta
+   * falsear cualquier listado — y una vez llegaron a romper la pestaña Equipo.
+   * Ver `limpieza.ts`.
+   */
+  globalTeardown: './limpieza.ts',
+
+  /**
    * Sin paralelismo entre archivos.
    *
    * Las pruebas comparten una base de datos real y varias tocan cuota, límite
