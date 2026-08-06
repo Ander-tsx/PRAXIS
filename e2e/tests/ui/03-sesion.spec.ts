@@ -203,4 +203,35 @@ test.describe('Las personas de un proyecto', () => {
     expect(cuerpo, 'El correo del dueño tiene que salir').toContain(email);
     expect(cuerpo, 'Y no el hueco de cuando no se resuelve').not.toContain('Correo no disponible');
   });
+
+  /**
+   * La misma regresión, por las otras dos puertas.
+   *
+   * El fallo del directorio estaba en **tres** sitios y solo se arregló uno al
+   * verlo: la pestaña Equipo. La pantalla de Análisis —que pone nombre a un
+   * `userId` en las propuestas del asistente— y la bandeja de avisos —donde cada
+   * aviso guarda un `actorId`— arrastraban el mismo `/users?limit=100`.
+   *
+   * Se comprueba que **cargan** con el directorio lleno de gente ajena. Ninguna
+   * de las dos tiene un texto tan delator como «Correo no disponible»: la
+   * bandeja simplemente decía «Alguien», que es cierto y legible — y por eso el
+   * fallo vivió tanto sin que nadie lo viera.
+   */
+  test('Análisis y la bandeja aguantan un directorio lleno', async ({ page }) => {
+    await crearCuentaYEntrar(page);
+
+    const alGateway = await contextoDePeticion.newContext({
+      baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
+    });
+    for (let i = 0; i < 8; i++) await registrar(alGateway);
+    await alGateway.dispose();
+
+    for (const ruta of ['/reports', '/dashboard/notifications']) {
+      const respuesta = await page.goto(ruta);
+      await page.waitForLoadState('networkidle');
+
+      expect(respuesta?.status(), `${ruta} debería servirse`).toBeLessThan(400);
+      expect(page.url(), `${ruta} no debería rebotar al login`).not.toContain('/auth/login');
+    }
+  });
 });

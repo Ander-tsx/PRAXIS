@@ -52,17 +52,31 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
     .catch(() => ({ items: [], total: 0, unread: 0 }) as NotificationPage);
 
   /**
-   * El directorio pone nombre a los `actorId`.
+   * Los nombres de quienes aparecen en la bandeja, **pedidos por id**.
    *
-   * Los avisos guardan ids, como los encargados y los autores de comentarios:
-   * projects-service no conoce a las personas. Si falla, cada aviso dice
-   * «Alguien», que sigue siendo cierto y legible.
+   * Los avisos guardan `actorId`, como los encargados y los autores de
+   * comentarios: projects-service no conoce a las personas.
+   *
+   * ⚠️ Esto pedía `/users?limit=100` y cruzaba en memoria — la primera página del
+   * directorio de **toda la plataforma**, con el `limit` topado en 100 por el
+   * DTO. Pasadas cien cuentas, quien te escribía dejaba de estar ahí y todos los
+   * avisos decían «Alguien». Sigue siendo cierto y legible, que es justo lo que
+   * hacía que nadie lo notara.
+   *
+   * Es el mismo fallo que tenían la pestaña Equipo y la pantalla del asistente.
+   * Ahora se piden solo los actores de esta página: como mucho, uno por aviso.
    */
-  const directory = await api
-    .get<Paginated<UserProfile>>('/users?limit=100')
-    .catch(() => ({ items: [] as UserProfile[], total: 0 }));
+  const idsDeActores = [
+    ...new Set(inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id)),
+  ];
 
-  const usersById = new Map(directory.items.map((user) => [user.id, user]));
+  const actores = await Promise.all(
+    idsDeActores.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
+  );
+
+  const usersById = new Map(
+    actores.filter((u): u is UserProfile => u !== null).map((user) => [user.id, user]),
+  );
 
   return (
     <AppHeader title="Notificaciones">

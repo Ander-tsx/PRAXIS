@@ -98,7 +98,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * el informe completo, y es el mismo criterio que ya usa el tablero con sus
    * tareas por tablero.
    */
-  const [proyectos, snapshot, flow, cycle, forecast, people, members, directory, etiquetas, cuota] =
+  const [proyectos, snapshot, flow, cycle, forecast, people, members, etiquetas, cuota] =
     await Promise.all([
       /* El selector solo ofrece lo que se puede abrir. `permission` filtra en la
          consulta, así que no hace falta preguntar por los permisos de cada
@@ -121,9 +121,6 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       api
         .get<ProjectMember[]>(`/projects/${project.id}/members`)
         .catch(() => []),
-      api
-        .get<Paginated<UserProfile>>('/users?limit=100')
-        .catch(() => ({ items: [] as UserProfile[], total: 0 })),
       /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
          id, y la tarjeta tiene que enseñar el nombre. */
       api
@@ -136,7 +133,28 @@ export default async function ProjectReportsPage({ params }: PageProps) {
         .catch(() => null),
     ]);
 
-  const usersById = new Map(directory.items.map((user) => [user.id, user]));
+  /**
+   * Los perfiles de quienes salen en esta pantalla, **pedidos por id**.
+   *
+   * ⚠️ Esto pedía `/users?limit=100` y cruzaba en memoria — la primera página del
+   * directorio de toda la plataforma, con el `limit` topado en 100 por el DTO.
+   * Con más de cien cuentas, los miembros de este proyecto dejaban de caber ahí y
+   * el asistente pintaba propuestas con el UUID en crudo donde va un nombre.
+   *
+   * Es el mismo fallo que tenía la pestaña Equipo de projects-front. Se arregló
+   * allí primero y este se quedó atrás: se corrigió el síntoma y no el patrón.
+   * Por eso ahora se piden solo los ids que hacen falta, que aquí son los
+   * miembros del proyecto y nadie más.
+   */
+  const idsDePersonas = [...new Set([...members.map((m) => m.userId), project.ownerId])];
+
+  const personas = await Promise.all(
+    idsDePersonas.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
+  );
+
+  const usersById = new Map(
+    personas.filter((u): u is UserProfile => u !== null).map((user) => [user.id, user]),
+  );
 
   /** `userId` → nombre, para que una propuesta no hable en UUID. */
   const nombres = Object.fromEntries(

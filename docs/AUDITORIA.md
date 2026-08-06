@@ -104,7 +104,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
-| 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
+| 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | 🔄 | 61 | 3 |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
 | 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ✅ | 16 | 16 |
 
@@ -387,6 +387,16 @@ siguiente iteración no las persiga otra vez:
 - **Son dos tokens y ninguno sirve para lo del otro.** El de voz vive siete días
   en un aparato de salón que responde a quien hable; si abriera la API de la web,
   sería una sesión sin contraseña. Comprobado en ambos sentidos.
+
+### Del bloque 5
+
+- **El fallo del directorio estaba en tres sitios, no en uno.** Se corrigió la
+  pestaña Equipo al verla rota y no se buscó el patrón: Análisis y la bandeja de
+  avisos arrastraban el mismo `/users?limit=100`. Corregir un síntoma no es
+  corregir un fallo.
+- **La bandeja decía «Alguien»** cuando no resolvía el nombre. Cierto, legible y
+  por eso invisible: es la razón de que viviera tanto. Un hueco que se lee bien
+  no se reporta.
 
 ### Preguntas de diseño, no fallos
 
