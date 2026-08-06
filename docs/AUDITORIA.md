@@ -101,7 +101,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | # | Bloque | Estado | Unidades | Cerradas |
 |---|---|---|---|---|
 | 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ✅ | 63 (+8 fuera) | 67 |
-| 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ⬜ | 11 | 0 |
+| 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ⬜ | 13 archivos | 0 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
@@ -221,17 +221,17 @@ proyectos ajenos. Hasta ahora solo está comprobado que **la puerta cierra**
 
 | Unidad | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|
-| `AccessDenied` | ⬜ | — | — | — |
-| `ActivityTable` | ⬜ | — | — | — |
-| `ActivityToolbar` | ⬜ | — | — | — |
-| `AdminTabs` | ⬜ | — | — | — |
-| `ProjectStatusDialog` | ⬜ | — | — | — |
-| `ProjectsTable` | ⬜ | — | — | — |
-| `ProjectsToolbar` | ⬜ | — | — | — |
-| `UserRoleDialog` | ⬜ | — | — | — |
-| `UserStatusDialog` | ⬜ | — | — | — |
-| `UsersTable` | ⬜ | — | — | — |
-| `UsersToolbar` | ⬜ | — | — | — |
+| `AccessDenied` | ✅ | 2026-08-06 | `02-guards` | Se enseña a quien no tiene rol; probado en la interfaz |
+| `ActivityTable` | ✅ | 2026-08-06 | revisión | Presentacional. El vacío lo pinta `actividad/page.tsx:98` |
+| `ActivityToolbar` | ✅ | 2026-08-06 | revisión | Presentacional, sin escritura |
+| `AdminTabs` | ✅ | 2026-08-06 | revisión | Navegación, sin escritura |
+| `ProjectStatusDialog` | ✅ | 2026-08-06 | `07-suspension` + `11-jerarquia` | Con estado de carga y de error |
+| `ProjectsTable` | ✅ | 2026-08-06 | revisión | Presentacional. El vacío lo pinta `proyectos/page.tsx:77` |
+| `ProjectsToolbar` | ✅ | 2026-08-06 | revisión | Presentacional, con su propio vacío |
+| `UserRoleDialog` | ✅ | 2026-08-06 | `11-jerarquia` | Con estado de carga y de error |
+| `UserStatusDialog` | ✅ | 2026-08-06 | `07-suspension` + `11-jerarquia` | Con estado de carga y de error |
+| `UsersTable` | ✅ | 2026-08-06 | revisión | Presentacional. El vacío lo pinta `(private)/page.tsx:80` |
+| `UsersToolbar` | ✅ | 2026-08-06 | revisión | Presentacional, con su propio vacío |
 
 ---
 
@@ -350,6 +350,17 @@ siguiente iteración no las persiga otra vez:
    `canViewReports`, que es un permiso aparte. Los números de un proyecto —quién
    cierra cuánto, quién va lento— no son lo mismo que ver el tablero.
 
+### Del bloque 2
+
+- **El administrador de los seeds es `SuperAdmin`, no `Admin`.** Cuesta media
+  hora descubrirlo por las bravas: probar «actuar sobre un igual» con él da 200 y
+  parece un fallo cuando es la regla funcionando. Está escrito en
+  `11-jerarquia-admin`.
+- **Ni un `SuperAdmin` puede crear otro `SuperAdmin`.** Consecuencia: al único
+  que hay no lo puede suspender nadie, ni él mismo. Es deliberado —la plataforma
+  no se queda sin administración por un clic— pero conviene saberlo antes de
+  necesitarlo.
+
 ### Preguntas de diseño, no fallos
 
 - **`GET /users` devuelve el directorio completo a cualquiera con sesión**, con
@@ -388,5 +399,6 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `512878e` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `4145385` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `c4b4a7c` |

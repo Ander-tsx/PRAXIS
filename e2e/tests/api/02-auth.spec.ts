@@ -9,6 +9,9 @@ import { comoBearer, correoUnico, data, entrar, error, registrar, SEED } from '.
  * las cuarenta pantallas que vienen detrás, con un 401 que no explica nada.
  */
 
+/* La prueba del correo inexistente puede esperar la ventana del límite. */
+test.describe.configure({ timeout: 90_000 });
+
 test.describe('Autenticación', () => {
   test('el registro devuelve 201 con los tres campos en camelCase', async ({ request }) => {
     const email = correoUnico();
@@ -81,9 +84,21 @@ test.describe('Autenticación', () => {
   });
 
   test('un correo que no existe da el mismo 401 que una contraseña mala', async ({ request }) => {
-    const respuesta = await request.post('/api/auth/login', {
+    /**
+     * ⚠️ Se reintenta ante un 429. Esta prueba afirma sobre el **código** que
+     * devuelve el login, así que el límite de intentos que añadimos nosotros la
+     * tumba: sale 429 donde espera 401 y el fallo parece de autenticación.
+     */
+    let respuesta = await request.post('/api/auth/login', {
       data: { email: correoUnico('fantasma'), password: 'Prueba@12345!' },
     });
+
+    if (respuesta.status() === 429) {
+      await new Promise((listo) => setTimeout(listo, 61_000));
+      respuesta = await request.post('/api/auth/login', {
+        data: { email: correoUnico('fantasma'), password: 'Prueba@12345!' },
+      });
+    }
 
     expect(respuesta.status(), 'Mismo código que la contraseña incorrecta').toBe(401);
   });
