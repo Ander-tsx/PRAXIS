@@ -145,7 +145,7 @@ async function preguntarQueLevantar() {
     {
       type: 'confirm',
       name: 'frontend',
-      message: 'Levantar también las 5 zonas del frontend',
+      message: 'Levantar también las 6 zonas del frontend',
       default: true,
     },
   ]);

@@ -38,12 +38,14 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | dashboard-front | 4102 |
 | projects-front | 4103 |
 | reports-front | 4104 |
+| admin-front | 4105 |
 
 ---
 
 # Primer arranque
 
-Los ocho pasos, en orden. Ninguno es opcional.
+**Todo el proceso lo hace `pnpm dev:cli`.** Los tres pasos de abajo son lo único
+manual que queda.
 
 ## 1. Instalar dependencias
 
@@ -51,86 +53,83 @@ Los ocho pasos, en orden. Ninguno es opcional.
 pnpm install
 ```
 
-## 2. Crear los archivos `.env`
+## 2. Crear los `.env`
 
-Sin esto no arranca nada. Hay que crear **12 archivos**. Cada servicio trae su
-`.env.example` como plantilla; los valores reales (JWT_SECRET, GEMINI_API_KEY,
-credenciales SMTP) se comparten por fuera del repositorio, nunca se versionan.
+Hay **14 archivos**: uno por servicio y uno por zona. La CLI los crea sola en el
+paso 3 —copia cada `.env.example` y te pregunta los valores que faltan—, así que
+aquí solo necesitas saber **qué valores tener a mano**, porque no se versionan y
+se comparten por fuera del repositorio:
 
-Backend — copiar el `.env.example` de cada carpeta a `.env` y rellenar:
+| Variable | Dónde | Qué es |
+|---|---|---|
+| `JWT_SECRET` | gateway, credentials-service y **las 6 zonas** | El mismo valor en los ocho sitios. Si uno solo difiere, el login devuelve token y **toda petición posterior da 401**. |
+| `VOICE_JWT_SECRET` | alexa-service | Un secreto **distinto**, no se reutiliza el de la plataforma. Generar con `openssl rand -hex 48`. |
+| `GEMINI_API_KEY` | assistant-service | Solo ahí. Nunca en el gateway ni en una variable `NEXT_PUBLIC_*`. |
 
-- `apps/backend/gateway/.env`
-- `apps/backend/services/credentials/.env`
-- `apps/backend/services/permissions/.env`
-- `apps/backend/services/projects/.env`
-- `apps/backend/services/tasks/.env`
-- `apps/backend/services/reports/.env`
-- `apps/backend/services/assistant/.env`
-- `apps/backend/services/alexa/.env`
+`infra/docker/compose/.env` **no hace falta**: el compose trae valores por
+defecto (`praxis` / `praxis123` / `praxis`).
 
-Frontend — crear un `.env.local` en cada zona:
-
-- `apps/frontend/web-shell/.env.local` → `GATEWAY_URL`, `JWT_SECRET`,
-  `DASHBOARD_FRONT_URL`, `PROJECTS_FRONT_URL`, `REPORTS_FRONT_URL`
-- `apps/frontend/auth-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`, `NODE_ENV`
-- `apps/frontend/dashboard-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-- `apps/frontend/projects-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-- `apps/frontend/reports-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-
-Reglas que rompen el arranque si se ignoran:
-
-- **`JWT_SECRET` debe ser idéntico** en `gateway`, `credentials-service` y las
-  cinco zonas del frontend. Si uno solo difiere, el login devuelve token pero
-  toda petición posterior da 401.
-- **`VOICE_JWT_SECRET`** (alexa-service) es un secreto **distinto**, no se
-  reutiliza el de la plataforma. Generar con `openssl rand -hex 48`.
-- **`GEMINI_API_KEY` vive únicamente** en `services/assistant/.env`. Nunca en el
-  gateway ni en una variable `NEXT_PUBLIC_*`.
-- `infra/docker/compose/.env` **no hace falta**: el compose ya trae valores por
-  defecto (`praxis` / `praxis123` / `praxis`).
-
-## 3. Levantar la infraestructura
+## 3. Lanzar la CLI
 
 ```bash
-docker compose -f infra/docker/compose/docker-compose.yml up -d
+pnpm dev:cli
 ```
 
-Levanta PostgreSQL (5432) y Redis (6379).
+Y elegir el preset **«Todo»**. Eso es el primer arranque completo.
 
-## 4. Generar los clientes de Prisma
+La CLI encadena, en orden, lo que antes eran seis pasos manuales:
+
+1. Levanta **Postgres y Redis** y **espera a que Postgres acepte conexiones** —
+   no basta con que el contenedor exista.
+2. **Completa los `.env` que falten** desde su `.env.example`, preguntando los
+   valores que no puede adivinar.
+3. **Compila `contracts` y `observability`**, que publican `dist/` y sin los
+   cuales los microservicios mueren con `Cannot find module '@praxis/contracts'`.
+4. **Genera los clientes de Prisma**. Obligatorio en un clon nuevo: no están
+   versionados.
+5. **Recrea las tablas** (te pregunta antes — **borra todos los datos**).
+6. **Ejecuta los seeds**.
+7. **Arranca lo que elegiste** y **espera a que cada servicio responda en su
+   puerto** antes de darlo por bueno.
+
+Ese último punto es la mitad del valor: con catorce procesos escupiendo logs a la
+vez, saber **cuál no llegó a levantar** es el trabajo de verdad.
+
+Cuando termine, abre **http://localhost:4100**.
+
+### Los presets
+
+| Preset | Qué levanta |
+|---|---|
+| **Todo** | Los 8 servicios y las 6 zonas |
+| **Mínimo** | Entrar y usar la app: gateway, credentials, permissions, projects, tasks + frontend. Sin IA, voz ni análisis — y sin gastar cuota de Gemini |
+| **Solo backend** | Los 8 servicios |
+| **Solo frontend** | Las 6 zonas, si el backend ya está arriba |
+| **Elegir a mano** | Lo que marques |
+
+### El prompt
+
+Al terminar de arrancar deja una consola:
+
+| Comando | Qué hace |
+|---|---|
+| `status` | Estado real, comprobando los puertos uno a uno |
+| `rs <servicio\|all>` | Reinicia. Hace falta tras recompilar `contracts` |
+| `stop` / `start` | Detiene o arranca algo suelto |
+| `exit` | Detiene todo y sale sin dejar huérfanos |
+
+⚠️ Necesita una **terminal interactiva**. Para CI o scripts, los comandos sueltos
+del apéndice.
+
+## Uso diario
 
 ```bash
-for s in credentials permissions projects tasks assistant alexa; do
-  pnpm --filter @praxis/$s-service exec prisma generate
-done
+pnpm dev:cli
 ```
 
-El cliente se genera dentro de `src/generated/` de cada servicio y **no está
-versionado**: en un árbol recién clonado este paso es obligatorio, o el servicio
-arranca y muere con `Cannot find module '../generated/prisma-client'`.
+Preset «Todo» o «Mínimo», y decir **que no** a recrear tablas y sembrar. Ya está.
 
-`reports-service` se excluye a propósito: no tiene esquema propio, lee de
-tasks-service y projects-service por TCP y cachea en Redis.
-
-## 5. Recrear las tablas
-
-```bash
-for s in credentials projects permissions tasks assistant alexa; do
-  pnpm --filter @praxis/$s-service exec prisma migrate reset --force --skip-seed
-done
-```
-
-⚠️ Borra todos los datos de la base. Solo para desarrollo.
-
-## 6. Ejecutar los seeds
-
-```bash
-for s in permissions credentials projects tasks; do
-  pnpm --filter @praxis/$s-service run prisma:seed
-done
-```
-
-Solo esos cuatro servicios tienen seed. Deja la base con:
+Las credenciales que dejan los seeds:
 
 | Usuario | Contraseña | Rol |
 |---|---|---|
@@ -145,77 +144,26 @@ Más **dos proyectos**:
 - **Sprint histórico (datos de demostración)** — 180 tareas y 16 semanas de
   historial fabricado, que es lo que necesita la sección de **Análisis** para
   tener algo que enseñar. El historial solo se captura hacia adelante, así que
-  sin esto los siete informes salen vacíos en una base recién creada. Lo genera
-  `prisma/seed-events.ts`, enganchado al `prisma:seed` de tasks-service.
+  sin esto los siete informes salen vacíos en una base recién creada.
 
 ⚠️ Los eventos del segundo llevan `actorId = 00000000-0000-0000-0000-000000000000`:
-son sintéticos y no miden trabajo real. Para regenerar solo ese historial:
-`pnpm --filter @praxis/tasks-service run prisma:seed:events`.
+son sintéticos y no miden trabajo real.
 
-## 7. Compilar el monorepo
+## Si el arranque falla
 
-```bash
-pnpm build
-```
+| Síntoma | Causa |
+|---|---|
+| `Cannot find module '@praxis/contracts'` | Falta compilar los compartidos. La CLI lo hace; suelto es `pnpm build:shared`. |
+| `Cannot find module '../generated/prisma-client'` | Falta `prisma generate`. No están versionados: en un clon nuevo es obligatorio. |
+| Login OK pero todo devuelve 401 | `JWT_SECRET` distinto entre gateway, credentials y la zona. |
+| Login OK y luego 401 **al cabo de un rato** | Lo mismo, pero en el `.env.local` de **una sola** zona. |
+| La zona de Análisis va vacía | `reports-service` (3005) no está levantado. |
+| El asistente responde error | Falta `GEMINI_API_KEY` en `services/assistant/.env`. |
+| `nest: command not found` | Se está lanzando `nest` fuera de pnpm. |
+| Un puerto ocupado al arrancar | La CLI lo detecta y pregunta antes de seguir. |
 
-**Obligatorio antes de arrancar el backend.** `@praxis/contracts` y
-`@praxis/observability` (en `apps/backend/commons/`) publican su `main` como
-`dist/index.js`, y todos los microservicios los importan. Sin este paso mueren
-con `Cannot find module '@praxis/contracts'`.
-
-## 8. Arrancar
-
-Backend (gateway + los 7 microservicios):
-
-```bash
-npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"
-```
-
-Frontend (las 5 zonas):
-
-```bash
-pnpm dev:frontend
-```
-
-Abrir **http://localhost:4100**. Swagger en http://localhost:3000/api/docs.
-
----
-
-## Uso diario
-
-Con la base ya creada, basta con:
-
-```bash
-docker compose -f infra/docker/compose/docker-compose.yml up -d
-npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"
-pnpm dev:frontend
-```
-
-## Scripts disponibles
-
-| Comando | Descripción |
-|---------|-------------|
-| `pnpm dev:cli` | **Asistente interactivo.** Levanta lo que elijas y comprueba que arrancó. |
-| `pnpm dev:backend` | Levanta el gateway y los 7 microservicios. |
-| `pnpm dev:frontend` | Levanta las 5 zonas del frontend. |
-| `pnpm build` | Compila todo el monorepo (Turborepo resuelve el orden). |
-| `pnpm lint` | Biome en la raíz, ESLint en `web-shell`. |
-| `pnpm test` | Tests unitarios de todos los paquetes (no incluye los E2E). |
-| `pnpm format` | Formatea con Biome. |
-| `pnpm docker:up` | Levanta PostgreSQL y Redis. |
-| `pnpm docker:down` | Detiene PostgreSQL y Redis. |
-| `pnpm docker:logs` | Logs de la infraestructura. |
-| `pnpm prisma:reset` | Recrea las tablas de los 6 servicios con esquema. **Borra los datos.** |
-| `pnpm prisma:seed` | Ejecuta los seeds de los 4 servicios que los tienen. |
-| `pnpm e2e` | Pruebas end-to-end. Ver la sección de abajo. |
-
-⚠️ `pnpm prisma:generate` y `pnpm prisma:deploy` usan el filtro
-`@praxis/*-service`, que incluye a `reports-service` — un servicio sin Prisma —
-y abortan con `Command "prisma" not found`. Usa los bucles de los pasos 4 y 5
-hasta que se corrijan. `prisma:reset` y `prisma:seed` sí llevan la lista
-explícita y funcionan.
-
----
+Si haces `docker compose down -v`, hay que volver a recrear tablas y sembrar —
+la CLI los ofrece los dos.
 
 # Pruebas end-to-end
 
@@ -245,22 +193,21 @@ repetirlo salvo que cambie la versión.
 ## Antes de lanzarlas: el stack tiene que estar arriba
 
 Las pruebas **no levantan nada**: hablan con el sistema real, y esa es su razón
-de ser. Con el proyecto ya configurado (pasos 1 a 7 de arriba):
+de ser. En una terminal:
 
 ```bash
-pnpm docker:up
-pnpm dev:backend
-pnpm dev:frontend
+pnpm dev:cli
 ```
 
-Y en **otra terminal**, con los puertos 3000 y 4100–4104 ya respondiendo:
+Preset «Todo» (o «Mínimo» — las pruebas no tocan el asistente ni la voz). Y
+cuando la CLI diga que todo responde, en **otra terminal**:
 
 ```bash
 pnpm e2e
 ```
 
-⚠️ Necesitan los **seeds ejecutados** (`pnpm prisma:seed`): varias pruebas entran
-con `admin@praxis.dev`. Si el login falla en cadena, es esto.
+⚠️ Necesitan los **seeds ejecutados**: varias pruebas entran con
+`admin@praxis.dev`. La CLI los ofrece al arrancar; sueltos, `pnpm prisma:seed`.
 
 ## Los cuatro comandos, y cuándo se usa cada uno
 
@@ -295,7 +242,15 @@ cambio y verde después— y `e2e:seguridad` es el marcador del endurecimiento.
 | `04-proyectos` | Ciclo de vida, `name` único por dueño, `slug` único global, sufijo aleatorio, `:idOrSlug` |
 | `05-tablero` | Espacio → tablero → columnas → tarea → mover, encargados, checklists, comentarios, informes |
 | `06-administracion` | La puerta de `/api/admin`: una cuenta corriente no lee ni suspende nada; el rol global Admin sí |
-| `07-seguridad` | 🏷️ `@security` — control de acceso en rutas anidadas, tipo de token, límite de intentos, cabeceras |
+| `07-suspension` | **Qué pasa al pulsar el botón**: proyecto suspendido de solo lectura hasta para su dueño, `PROJECT_SUSPENDED`, `DELETED` que da 404, cuenta suspendida que no puede renovar sesión, y el registro de actividad |
+| `08-avisos` | La bandeja: invitar, aceptar, rechazar y asignar generan aviso; nadie recibe aviso de lo suyo; leídas y contador |
+| `09-seguridad` | 🏷️ `@security` — control de acceso en rutas anidadas, tipo de token, límite de intentos, cabeceras |
+
+⚠️ **`09-seguridad` va el último y el número lo garantiza.** Su prueba de fuerza
+bruta dispara catorce intentos de login a propósito y deja la IP frenada un
+minuto: cualquier archivo posterior que necesite entrar con credenciales recibe
+un 429 y falla diciendo «¿Se ejecutaron los seeds?», que apunta al sitio
+equivocado. **Un archivo nuevo que haga login va antes de ese.**
 
 **Interfaz** (`e2e/tests/ui/`, en Chromium):
 
@@ -367,18 +322,80 @@ mano. Después deja un prompt:
 
 Necesita una terminal interactiva: para CI o scripts, los comandos de arriba.
 
-## Si algo falla
+---
 
-| Síntoma | Causa |
-|---|---|
-| `Cannot find module '@praxis/contracts'` | Falta el paso 7 (`pnpm build`). |
-| `Cannot find module '../generated/prisma-client'` | Falta el paso 4 (`prisma generate`). |
-| Login OK pero todo devuelve 401 | `JWT_SECRET` distinto entre gateway, credentials y la zona. |
-| La zona de Reportes va vacía | `reports-service` (3005) no está levantado. |
-| El asistente responde error | Falta `GEMINI_API_KEY` en `services/assistant/.env`. |
-| `nest: command not found` | Se está lanzando `nest` fuera de pnpm; usar siempre `pnpm --filter ... run dev`. |
+# Apéndice: los comandos sueltos
 
-Si haces `docker compose down -v`, hay que repetir los pasos 5 y 6.
+La CLI es el camino recomendado, pero **no siempre hay terminal interactiva** —
+CI, un script, un contenedor— y a veces solo quieres una pieza. Todo lo que hace
+la CLI se puede lanzar a mano:
+
+## Scripts de la raíz
+
+| Comando | Descripción |
+|---------|-------------|
+| `pnpm dev:cli` | **El asistente interactivo.** Hace todo lo de abajo, en orden, y comprueba que arrancó. |
+| `pnpm dev:backend` | Levanta el gateway y los 7 microservicios. |
+| `pnpm dev:frontend` | Levanta las 6 zonas del frontend. |
+| `pnpm build:shared` | Compila `contracts` y `observability`. **Sin esto los microservicios no arrancan.** |
+| `pnpm build` | Compila todo el monorepo (Turborepo resuelve el orden). |
+| `pnpm lint` | Biome en la raíz, ESLint en `web-shell`. |
+| `pnpm test` | Tests unitarios de cada paquete (no incluye los E2E). |
+| `pnpm format` | Formatea con Biome. En un árbol limpio no cambia nada. |
+| `pnpm docker:up` / `docker:down` / `docker:logs` | PostgreSQL y Redis. |
+| `pnpm prisma:generate` | Genera los clientes de Prisma. **Obligatorio en un clon nuevo.** |
+| `pnpm prisma:deploy` | Aplica migraciones **sin** tocar los datos. |
+| `pnpm prisma:reset` | Recrea las tablas y siembra. ⚠️ **Borra todos los datos.** |
+| `pnpm prisma:seed` | Solo los seeds. |
+| `pnpm e2e` · `e2e:regresion` · `e2e:seguridad` · `e2e:api` · `e2e:ui` · `e2e:report` · `e2e:instalar` | Pruebas end-to-end. Ver la sección de arriba. |
+
+⚠️ Los scripts de Prisma **excluyen `reports-service` a propósito**: ese servicio
+no tiene tablas —solo agrega lo que le sirven los demás— así que no tiene Prisma.
+Un filtro `@praxis/*-service` a secas moría ahí con `Command "prisma" not found`,
+llevándose por delante a los servicios a los que aún no les había tocado el turno.
+
+## El arranque completo, a mano
+
+Equivale al preset «Todo» de la CLI. En este orden, ninguno es opcional:
+
+```bash
+pnpm install
+pnpm docker:up
+pnpm build:shared
+pnpm prisma:generate
+pnpm prisma:reset
+pnpm dev:backend
+```
+
+Y en otra terminal:
+
+```bash
+pnpm dev:frontend
+```
+
+`prisma:reset` ya siembra al terminar; para sembrar sin recrear, `pnpm prisma:seed`.
+
+## Piezas sueltas
+
+Regenerar solo el historial de Análisis, sin tocar el resto de los seeds:
+
+```bash
+pnpm --filter @praxis/tasks-service run prisma:seed:events
+```
+
+Recompilar un servicio suelto tras cambiar `contracts` (y acordarse de
+reiniciarlo — o `rs <servicio>` en la CLI):
+
+```bash
+pnpm --filter @praxis/gateway run build
+```
+
+## Documentación de la API
+
+Swagger en **http://localhost:3000/api/docs**, y **solo fuera de producción**:
+publica los 28 endpoints con sus DTOs a cualquiera que alcance el puerto.
+
+---
 
 ## Estructura
 
