@@ -84,15 +84,15 @@ Cinco hallazgos de seguridad, todos con prueba en `e2e/tests/api/09-seguridad`:
 
 | Hallazgo | Commit |
 |---|---|
-| Cinco rutas anidadas dejaban ver miembros, espacios y tableros de **cualquier** proyecto a cualquiera con sesión | `9cea049` |
-| El refresh token de 7 días valía como access token: la ventana de 15 min no contenía nada | `9cea049` |
-| `ThrottlerModule` importado sin registrar el guard: la política existía y nada la aplicaba | `9cea049` |
-| Swagger servido también en producción | `9cea049` |
-| Sin `helmet`: ni `nosniff` ni ocultar `X-Powered-By` | `9cea049` |
+| Cinco rutas anidadas dejaban ver miembros, espacios y tableros de **cualquier** proyecto a cualquiera con sesión | `341182f` |
+| El refresh token de 7 días valía como access token: la ventana de 15 min no contenía nada | `341182f` |
+| `ThrottlerModule` importado sin registrar el guard: la política existía y nada la aplicaba | `341182f` |
+| Swagger servido también en producción | `341182f` |
+| Sin `helmet`: ni `nosniff` ni ocultar `X-Powered-By` | `341182f` |
 
 Más un fallo de producto que aparecería solo al llegar a 101 cuentas: la pestaña
 Equipo resolvía a sus miembros contra la primera página del directorio global
-(`69bdc42`).
+(`57d1d91`).
 
 ---
 
@@ -277,7 +277,7 @@ la ruta donde se usan), que validen antes de llamar, y que confirmen contra el
 
 46 organismos y 15 pantallas. Qué mirar: estado vacío, estado de error, estado de
 carga, y que un fallo de red no se confunda con «no hay datos» —que es
-exactamente el bug de `69bdc42`—.
+exactamente el bug de `57d1d91`—.
 
 Se detalla al abrir el bloque.
 
@@ -432,13 +432,14 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 
 | Fecha | Qué se hizo | Commits |
 |---|---|---|
-| 2026-08-05 | Auditoría inicial por muestreo. Suite E2E desde cero (Playwright, 130 casos). 5 hallazgos de seguridad corregidos. Limpieza de documentación de IA y andamio muerto. Biome a 2 espacios. | `90a2c76`…`720f4e7` |
-| 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
-| 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
+| 2026-08-05 | Auditoría inicial por muestreo. Suite E2E desde cero (Playwright, 130 casos). 5 hallazgos de seguridad corregidos. Limpieza de documentación de IA y andamio muerto. Biome a 2 espacios. | `82fbc8e`…`ce03321` |
+| 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `b4d3a89`…`f9d40fb` |
+| 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `57d1d91` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
-| 2026-08-06 | **Bloque 7 cerrado.** 14 pruebas sobre la capa de voz, sin dispositivo: frase de un solo uso, separación de los dos tokens, revocación inmediata y aislamiento entre proyectos por la puerta de la voz. Ningún hallazgo. | `c8e5358` |
-| 2026-08-06 | **Bloque 6 cerrado.** 28 pruebas unitarias sobre la estadística. Un fallo real: el flujo acumulado se saltaba los días sin actividad y el eje de tiempo dejaba de ser uniforme. | `0984928` |
-| 2026-08-06 | **Bloque 3 cerrado.** 58 Server Actions barridas. 57 comprueban sesión; la que no, no toca la API. Un endurecimiento: `setThemeAction` aceptaba cualquier cadena. | `17e082f` |
-| 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `512878e` |
-| 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `4145385` |
-| 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `c4b4a7c` |
+| 2026-08-06 | **Bloque 5, primera pasada.** El fallo del directorio estaba en tres pantallas, no en una. Corregidas Análisis y la bandeja de avisos. | `36c3f47` |
+| 2026-08-06 | **Bloque 7 cerrado.** 14 pruebas sobre la capa de voz, sin dispositivo: frase de un solo uso, separación de los dos tokens, revocación inmediata y aislamiento entre proyectos por la puerta de la voz. Ningún hallazgo. | `0c93ef7` |
+| 2026-08-06 | **Bloque 6 cerrado.** 28 pruebas unitarias sobre la estadística. Un fallo real: el flujo acumulado se saltaba los días sin actividad y el eje de tiempo dejaba de ser uniforme. | `6447374` |
+| 2026-08-06 | **Bloque 3 cerrado.** 58 Server Actions barridas. 57 comprueban sesión; la que no, no toca la API. Un endurecimiento: `setThemeAction` aceptaba cualquier cadena. | `c2bd8ae` |
+| 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `b99c6e0` |
+| 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `c4157fc` |
+| 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `3b17625` |
