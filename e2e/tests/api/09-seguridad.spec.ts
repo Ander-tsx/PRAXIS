@@ -18,6 +18,15 @@ import { crearMundo } from '../../fixtures/mundo';
  *
  * Mezclarlas sería perder las dos señales a la vez: un rojo esperado tapa un
  * rojo nuevo.
+ *
+ * ⚠️ **Este archivo va el último de la carpeta, y el número lo garantiza.**
+ * La prueba de fuerza bruta dispara catorce intentos de login a propósito y deja
+ * la IP frenada un minuto: cualquier archivo que venga detrás y necesite entrar
+ * con credenciales de verdad recibe un 429. Pasó dos veces —con
+ * `06-administracion` y con `07-suspension`— y las dos veces el mensaje decía
+ * «¿Se ejecutaron los seeds?», que apunta al sitio equivocado.
+ *
+ * Si añades un archivo nuevo que haga login, ponlo **antes** de este.
  */
 
 /** Lee el payload de un JWT sin verificar la firma. Para inspección, no para confiar. */

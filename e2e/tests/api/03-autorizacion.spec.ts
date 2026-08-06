@@ -241,10 +241,24 @@ test.describe('Permisos de proyecto', () => {
     });
     expect(respuesta.status()).toBe(200);
 
-    /* Es la ruta que evita «intenta la acción y reacciona al 403». Si deja de
-       responder, la interfaz vuelve a pintar botones que no funcionan. */
-    const permisos = await data<Record<string, unknown>>(respuesta);
-    expect(permisos, 'Debe ser un diccionario, no un array').not.toBeInstanceOf(Array);
-    expect(typeof permisos).toBe('object');
+    /**
+     * Es la ruta que evita «intenta la acción y reacciona al 403». Si deja de
+     * responder, la interfaz vuelve a pintar botones que no funcionan.
+     *
+     * ⚠️ La forma es `{ isOwner, permissions, projectStatus }` — los permisos van
+     * **anidados**. Leerlos de la raíz da `undefined` en todos, y como
+     * `undefined` es falsy, una comprobación de «no puede» daría verde siempre.
+     */
+    const cuerpo = await data<{
+      isOwner: boolean;
+      permissions: Record<string, boolean>;
+      projectStatus: string;
+    }>(respuesta);
+
+    expect(cuerpo.permissions, 'Debe ser un diccionario, no un array').not.toBeInstanceOf(Array);
+    expect(cuerpo.permissions.canViewProject, 'El rol de solo lectura lo tiene').toBe(true);
+    expect(cuerpo.permissions.canDeleteProject, 'Y no tiene lo que no le dieron').toBe(false);
+    expect(cuerpo.isOwner, 'No es la dueña, es miembro').toBe(false);
+    expect(cuerpo.projectStatus).toBe('ACTIVE');
   });
 });

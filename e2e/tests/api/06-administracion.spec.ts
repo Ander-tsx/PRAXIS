@@ -91,15 +91,10 @@ test.describe('Puerta del panel de administración', () => {
 
 test.describe('Con rol global Admin', () => {
   /**
-   * ⚠️ **Este archivo va antes que `07-seguridad` a propósito.**
-   *
-   * Allí vive la prueba de fuerza bruta, que dispara catorce intentos de login
-   * para comprobar que el límite corta. Después de eso la IP queda frenada un
-   * minuto, y estas dos —las únicas del bloque de API que necesitan entrar con
-   * credenciales de verdad— se quedaban esperando.
-   *
-   * `entrarComoAdmin` reintenta si aun así se topa con un 429, de ahí el margen
-   * de tiempo: es la red por si alguien reordena los archivos.
+   * ⚠️ El margen de tiempo es la red por si alguien reordena los archivos:
+   * `entrarComoAdmin` reintenta cuando se topa con el límite de intentos, y esa
+   * espera no cabe en el timeout normal. En el camino previsto no se usa —
+   * `09-seguridad`, que es quien gasta el presupuesto, va el último.
    */
   test.setTimeout(90_000);
 
