@@ -1,0 +1,367 @@
+# Auditoría de PRAXIS — registro de progreso
+
+> **Este documento es el estado de la auditoría, no un informe.** Se actualiza
+> conforme se avanza y está escrito para que **alguien que llega sin contexto
+> previo** —una sesión nueva, otra persona, otro agente— pueda continuar por
+> donde se quedó sin volver a empezar.
+>
+> Si eres esa persona: lee «Cómo continuar» y ve al primer bloque abierto.
+
+---
+
+## El encargo
+
+Revisar PRAXIS entero —seguridad, corrección, organización y documentación— y
+corregir lo que aparezca, dejándolo verificado con pruebas automáticas.
+
+**No hay un «terminado» definido por el cliente.** El criterio es el juicio de
+quien audita: cuando quien revisa dice que ha terminado, el trabajo pasa a otra
+iteración con otra persona o agente, a ver si encuentra lo que la anterior no
+vio. Se repite hasta que una iteración no encuentre nada.
+
+Eso tiene una consecuencia práctica: **este registro es lo que hace útil la
+siguiente iteración.** Sin él, la siguiente vuelve a mirar lo mismo.
+
+### Alcance acordado
+
+| | |
+|---|---|
+| **Backend** | ✅ **Con permiso de corregir**, no solo de reportar. (Deroga la nota de CLAUDE.md sobre no tocarlo sin acordarlo.) |
+| **Asistente de IA** | ❌ **Fuera.** Gasta cuota de Gemini en cada ejecución y no devuelve datos verificables, así que como prueba automática no aporta. |
+| **Alexa** | ⚠️ **Dentro, lo que se pueda sin dispositivo ni túnel.** `alexa-service` tiene lógica propia —vinculación, expiración, revocación, agregados— que se prueba por API como cualquier otra. |
+| **Base de datos** | La de desarrollo sirve: aún no hay despliegue. |
+
+---
+
+## Cómo continuar
+
+1. **Levanta el stack** — `pnpm dev:cli`, preset «Todo». Detalle en el README.
+2. **Comprueba la línea base** — `pnpm e2e`. Tiene que estar **verde entero**.
+   Si no lo está, eso es lo primero, antes de auditar nada.
+3. **Busca el primer bloque `🔄 en curso` o `⬜ sin empezar`** en la tabla de
+   bloques y sigue por ahí.
+4. **Al cerrar cada unidad, actualiza su fila** en este documento **en el mismo
+   commit** que el cambio. Un registro que se actualiza «luego» no se actualiza.
+
+### La regla que hace fiable este registro
+
+> **Una unidad solo pasa a ✅ cuando tiene prueba automática que la cubre, o una
+> razón escrita de por qué no la tiene.**
+
+Sin esa regla, el registro se convierte en una lista de buenas intenciones. Con
+ella, `✅` significa algo comprobable.
+
+### Los estados
+
+| | |
+|---|---|
+| ⬜ | Sin mirar |
+| 🔄 | En curso |
+| ✅ | Revisada, con prueba o con motivo escrito |
+| 🔴 | Revisada, **con hallazgo abierto** |
+| ⏭️ | Fuera de alcance, con motivo |
+
+---
+
+## Línea base — 2026-08-06
+
+Medido, no estimado.
+
+| Superficie | Cantidad |
+|---|---|
+| Código (sin generados) | ~74.000 líneas |
+| Endpoints del gateway | 113 |
+| MessagePatterns entre microservicios | 133 |
+| Pantallas (`page.tsx`) | 15 |
+| Organismos | 46 |
+| Server Actions | 56 |
+| Casos de prueba E2E | 130 |
+| **Endpoints cubiertos por pruebas** | **42 de 113 (37 %)** |
+
+### Ya corregido antes de abrir este registro
+
+Cinco hallazgos de seguridad, todos con prueba en `e2e/tests/api/09-seguridad`:
+
+| Hallazgo | Commit |
+|---|---|
+| Cinco rutas anidadas dejaban ver miembros, espacios y tableros de **cualquier** proyecto a cualquiera con sesión | `9cea049` |
+| El refresh token de 7 días valía como access token: la ventana de 15 min no contenía nada | `9cea049` |
+| `ThrottlerModule` importado sin registrar el guard: la política existía y nada la aplicaba | `9cea049` |
+| Swagger servido también en producción | `9cea049` |
+| Sin `helmet`: ni `nosniff` ni ocultar `X-Powered-By` | `9cea049` |
+
+Más un fallo de producto que aparecería solo al llegar a 101 cuentas: la pestaña
+Equipo resolvía a sus miembros contra la primera página del directorio global
+(`69bdc42`).
+
+---
+
+## Bloques
+
+| # | Bloque | Estado | Unidades | Cerradas |
+|---|---|---|---|---|
+| 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ⬜ | 63 (+8 fuera) | 0 |
+| 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ⬜ | 11 | 0 |
+| 3 | [Server Actions](#bloque-3--server-actions) | ⬜ | 13 archivos | 0 |
+| 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
+| 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
+| 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ⬜ | 7 informes | 0 |
+| 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ⬜ | 16 | 0 |
+
+El orden es por riesgo, no por comodidad: el bloque 1 va primero porque es donde
+salieron los cinco hallazgos anteriores, y salieron por muestreo — no por
+barrido.
+
+---
+
+## Bloque 1 — Endpoints del gateway
+
+**Qué se comprueba en cada uno**, y por qué:
+
+1. **¿Lleva guard?** `ProjectPermissionGuard` empieza con
+   `if (!requiredPermission) return true`. Un handler sin
+   `@RequireProjectPermission` **no comprueba nada**. Así se abrieron las cinco
+   rutas del hallazgo anterior.
+2. **¿El permiso que exige es el correcto?** Leer no puede pedir lo mismo que
+   borrar.
+3. **¿Usa `req.projectId` o el `@Param` en crudo?** Con un slug en la ruta, el
+   segundo manda la cadena literal al microservicio: **200 con lista vacía**, sin
+   error. Ya pasó en members, workspaces y labels.
+4. **¿Valida el cuerpo con un DTO declarado?** Un `@Body()` tipado con
+   `Omit<...>` es `Object` en runtime: acepta lo que sea y guarda nada.
+5. **¿Un extraño recibe 403/404, y un legítimo 200?** Las dos mitades. Solo la
+   primera fija una puerta tapiada.
+
+| Endpoint | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| `GET /admin/projects/:id` | ⬜ | — | — | — |
+| `PUT /admin/users/:id/role` | ⬜ | — | — | — |
+| `DELETE /alexa/links` | ⬜ | — | — | — |
+| `DELETE /alexa/links/:linkId` | ⬜ | — | — | — |
+| `GET /alexa/links` | ⬜ | — | — | — |
+| `GET /alexa/me` | ⬜ | — | — | — |
+| `GET /alexa/projects` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/forecast` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/members` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/progress` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/workload` | ⬜ | — | — | — |
+| `POST /alexa/link` | ⬜ | — | — | — |
+| `POST /alexa/link/redeem` | ⬜ | — | — | — |
+| `POST /alexa/logout` | ⬜ | — | — | — |
+| `POST /alexa/projects/:projectId/select` | ⬜ | — | — | — |
+| `DELETE /boards/:boardId` | ⬜ | — | — | — |
+| `DELETE /boards/:boardId/columns/:id` | ⬜ | — | — | — |
+| `GET /boards/:boardId/tasks` | ⬜ | — | — | — |
+| `PATCH /boards/:boardId` | ⬜ | — | — | — |
+| `PATCH /boards/:boardId/columns/:id` | ⬜ | — | — | — |
+| `PATCH /boards/:boardId/columns/reorder` | ⬜ | — | — | — |
+| `GET /me/assistant/quota` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `GET /me/invitations` | ⬜ | — | — | — |
+| `DELETE /permissions/revoke` | ⬜ | — | — | — |
+| `GET /permissions` | ⬜ | — | — | — |
+| `GET /permissions/user/:userId` | ⬜ | — | — | — |
+| `POST /permissions/assign` | ⬜ | — | — | — |
+| `POST /permissions/check` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `GET /projects/:projectId/assistant/conversations` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `GET /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `GET /projects/:projectId/assistant/quota` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `PATCH /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `POST /projects/:projectId/assistant/chat` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `POST /projects/:projectId/assistant/proposals/:proposalId/resolve` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+| `DELETE /projects/:projectId/invitations/:id` | ⬜ | — | — | — |
+| `GET /projects/:projectId/invitations` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/labels/:id` | ⬜ | — | — | — |
+| `GET /projects/:projectId/labels` | ⬜ | — | — | — |
+| `PATCH /projects/:projectId/labels/:id` | ⬜ | — | — | — |
+| `POST /projects/:projectId/labels` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/members` | ⬜ | — | — | — |
+| `PATCH /projects/:projectId/members/:userId` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/membership/me` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/blocked` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/cycle-time` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/flow` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/forecast` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/people` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/weekly` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/roles/:id` | ⬜ | — | — | — |
+| `PATCH /projects/:projectId/roles/:id` | ⬜ | — | — | — |
+| `GET /projects/:projectId/workspaces` | ⬜ | — | — | — |
+| `GET /` | ⬜ | — | — | — |
+| `DELETE /tasks/:taskId/attachments/:id` | ⬜ | — | — | — |
+| `DELETE /tasks/:taskId/checklists/:id` | ⬜ | — | — | — |
+| `DELETE /tasks/:taskId/comments/:id` | ⬜ | — | — | — |
+| `GET /tasks/:taskId/attachments` | ⬜ | — | — | — |
+| `GET /tasks/:taskId/attachments/:id/content` | ⬜ | — | — | — |
+| `GET /tasks/:taskId/comments` | ⬜ | — | — | — |
+| `PATCH /tasks/:taskId/comments/:id` | ⬜ | — | — | — |
+| `POST /tasks/:taskId/attachments` | ⬜ | — | — | — |
+| `POST /tasks/:taskId/checklists/:id/toggle` | ⬜ | — | — | — |
+| `GET /users/:id` | ⬜ | — | — | — |
+| `DELETE /workspaces/:workspaceId` | ⬜ | — | — | — |
+| `GET /workspaces/:workspaceId` | ⬜ | — | — | — |
+| `GET /workspaces/:workspaceId/boards` | ⬜ | — | — | — |
+| `PATCH /workspaces/:workspaceId` | ⬜ | — | — | — |
+
+> Los 42 endpoints que ya tienen cobertura no salen en esta tabla: están
+> ejercitados por `e2e/tests/api/01` a `09`. Lo que no significa que estén
+> auditados —cubiertos y auditados no es lo mismo—, así que al terminar los 71 de
+> arriba hay que dar una segunda pasada a esos 42 con los cinco criterios.
+
+---
+
+## Bloque 2 — admin-front por dentro
+
+Once organismos que suspenden cuentas, cambian roles globales y suspenden
+proyectos ajenos. Hasta ahora solo está comprobado que **la puerta cierra**
+(`06-administracion`) y que las pantallas cargan; por dentro no ha mirado nadie.
+
+| Unidad | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| `AccessDenied` | ⬜ | — | — | — |
+| `ActivityTable` | ⬜ | — | — | — |
+| `ActivityToolbar` | ⬜ | — | — | — |
+| `AdminTabs` | ⬜ | — | — | — |
+| `ProjectStatusDialog` | ⬜ | — | — | — |
+| `ProjectsTable` | ⬜ | — | — | — |
+| `ProjectsToolbar` | ⬜ | — | — | — |
+| `UserRoleDialog` | ⬜ | — | — | — |
+| `UserStatusDialog` | ⬜ | — | — | — |
+| `UsersTable` | ⬜ | — | — | — |
+| `UsersToolbar` | ⬜ | — | — | — |
+
+---
+
+## Bloque 3 — Server Actions
+
+56 funciones en 13 archivos. Cada una **escribe**. Qué mirar: que verifiquen
+sesión por su cuenta (el guard de zona no las cubre siempre — viajan como POST a
+la ruta donde se usan), que validen antes de llamar, y que confirmen contra el
+`data` de la respuesta y no contra el status.
+
+| Archivo | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| `dashboard-front/app/actions.ts` | ⬜ | — | — | — |
+| `dashboard-front/app/invitations-actions.ts` | ⬜ | — | — | — |
+| `dashboard-front/(private)/settings/actions.ts` | ⬜ | — | — | — |
+| `dashboard-front/(private)/notifications/actions.ts` | ⬜ | — | — | — |
+| `projects-front/app/actions.ts` | ⬜ | — | — | — |
+| `projects-front/(private)/[id]/actions.ts` (1219 líneas) | ⬜ | — | — | — |
+| `projects-front/(private)/[id]/invitation-actions.ts` | ⬜ | — | — | — |
+| `reports-front/(private)/[id]/actions.ts` | ⬜ | — | — | — |
+| `admin-front/(private)/actions.ts` | ⬜ | — | — | — |
+| `admin-front/(private)/proyectos/actions.ts` | ⬜ | — | — | — |
+
+---
+
+## Bloque 4 — Microservicios
+
+26.644 líneas, el bloque más grande. **Con permiso de corregir.**
+
+| Servicio | Líneas aprox. | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|---|
+| `projects` | — | ⬜ | — | — | — |
+| `tasks` | — | ⬜ | — | — | — |
+| `credentials` | — | ⬜ | — | — | — |
+| `permissions` | — | ⬜ | — | — | — |
+| `reports` | — | ⬜ | — | — | — |
+| `alexa` | — | ⬜ | — | — | — |
+| `assistant` | ⏭️ | — | — | Fuera de alcance | — |
+
+---
+
+## Bloque 5 — Organismos y pantallas
+
+46 organismos y 15 pantallas. Qué mirar: estado vacío, estado de error, estado de
+carga, y que un fallo de red no se confunda con «no hay datos» —que es
+exactamente el bug de `69bdc42`—.
+
+Se detalla al abrir el bloque.
+
+---
+
+## Bloque 6 — Reportes y estadística
+
+Siete informes con cálculo estadístico real (percentiles, previsión, flujo
+acumulado) y **cero cobertura**. Un percentil mal calculado no falla: da un
+número creíble y equivocado.
+
+| Informe | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| `snapshot` | ⬜ | — | — | — |
+| `flow` | ⬜ | — | — | — |
+| `cycle-time` | ⬜ | — | — | — |
+| `forecast` | ⬜ | — | — | — |
+| `weekly` | ⬜ | — | — | — |
+| `blocked` | ⬜ | — | — | — |
+| `people` | ⬜ | — | — | — |
+
+---
+
+## Bloque 7 — Alexa, sin dispositivo
+
+16 endpoints. **No hace falta ni Alexa ni túnel** para la mayoría: la vinculación
+por frase, su expiración, la revocación y los agregados de solo lectura son
+lógica de servidor y se prueban por API.
+
+Lo que sí queda fuera: el modelo de intenciones y el diálogo de voz.
+
+| Endpoint | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| `POST /alexa/link` | ⬜ | — | — | — |
+| `POST /alexa/link/redeem` | ⬜ | — | — | — |
+| `POST /alexa/logout` | ⬜ | — | — | — |
+| `GET /alexa/links` | ⬜ | — | — | — |
+| `DELETE /alexa/links` | ⬜ | — | — | — |
+| `DELETE /alexa/links/:linkId` | ⬜ | — | — | — |
+| `GET /alexa/me` | ⬜ | — | — | — |
+| `GET /alexa/projects` | ⬜ | — | — | — |
+| `POST /alexa/projects/:projectId/select` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/progress` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/forecast` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/workload` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/members` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⬜ | — | — | — |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ⬜ | — | — | — |
+
+---
+
+## Hallazgos abiertos
+
+Ninguno. Los que aparezcan se anotan aquí con su reproducción, y se quitan al
+cerrarlos.
+
+---
+
+## Deuda conocida, no auditada
+
+Cosas vistas de pasada que no son fallos pero conviene no olvidar:
+
+- `projects-front/(private)/[id]/actions.ts` — **1219 líneas**. Cumple la regla
+  de dónde vive la lógica, pero ya no se navega.
+- `docs/backend/examples/` — documenta `roles-service` y `notifications-service`,
+  que **no existen**, con enlaces a `c:/Users/cesar/...`. Es entrega del otro
+  equipo.
+- `scripts/bootstrap_scaffolding.sh` — el generador del andamio inicial. Ya
+  cumplió.
+- `stubs/` — un directorio con un `.gitkeep`. Se quitó de `pnpm-workspace.yaml`.
+- La suite E2E deja **~130 proyectos huérfanos** por ejecución: al borrar la
+  cuenta, sus proyectos no cascadean (viven en otro servicio). No se los ve
+  nadie, pero engordan la base. `pnpm prisma:reset` los limpia.
+
+---
+
+## Bitácora
+
+Una línea por sesión. Para saber qué pasó sin releer el historial de git.
+
+| Fecha | Qué se hizo | Commits |
+|---|---|---|
+| 2026-08-05 | Auditoría inicial por muestreo. Suite E2E desde cero (Playwright, 130 casos). 5 hallazgos de seguridad corregidos. Limpieza de documentación de IA y andamio muerto. Biome a 2 espacios. | `90a2c76`…`720f4e7` |
+| 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
+| 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
+| 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
