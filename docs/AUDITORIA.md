@@ -105,7 +105,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
-| 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ⬜ | 7 informes | 0 |
+| 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
 | 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ⬜ | 16 | 0 |
 
 El orden es por riesgo, no por comodidad: el bloque 1 va primero porque es donde
@@ -291,13 +291,13 @@ número creíble y equivocado.
 
 | Informe | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|
-| `snapshot` | ⬜ | — | — | — |
-| `flow` | ⬜ | — | — | — |
-| `cycle-time` | ⬜ | — | — | — |
-| `forecast` | ⬜ | — | — | — |
-| `weekly` | ⬜ | — | — | — |
-| `blocked` | ⬜ | — | — | — |
-| `people` | ⬜ | — | — | — |
+| `snapshot` | ✅ | 2026-08-06 | `statistics.spec` | Conteos; sin cálculo que verificar aparte |
+| `flow` | ✅ | 2026-08-06 | `statistics.spec` | 🔧 `acumularFlujo` no emitía los días sin actividad. Corregido + 10 pruebas |
+| `cycle-time` | ✅ | 2026-08-06 | `statistics.spec` | `percentile` verificado contra valores calculados a mano (7 pruebas) |
+| `forecast` | ✅ | 2026-08-06 | `statistics.spec` | Monte Carlo: cortes, orden de percentiles y saturación (6 pruebas) |
+| `weekly` | ✅ | 2026-08-06 | `statistics.spec` | Se apoya en las mismas funciones puras |
+| `blocked` | ✅ | 2026-08-06 | `statistics.spec` | Filtro por antigüedad; sin cálculo estadístico |
+| `people` | ✅ | 2026-08-06 | `statistics.spec` | Agregación por persona; sin cálculo estadístico |
 
 ---
 
@@ -371,6 +371,13 @@ siguiente iteración no las persiga otra vez:
   tiene nada que confirmar, y `unwrapEnvelope` ya lanza si el servidor dice que
   no. El primer barrido las marcó a todas; no lo son.
 
+### Del bloque 6
+
+- **La matemática se prueba con pruebas unitarias, no end-to-end.** Son
+  funciones puras y un percentil mal calculado no falla: devuelve un número
+  creíble y equivocado. Eso no lo caza un 200. Viven en
+  `reports/statistics.spec.ts` y corren con `pnpm test`.
+
 ### Preguntas de diseño, no fallos
 
 - **`GET /users` devuelve el directorio completo a cualquiera con sesión**, con
@@ -409,6 +416,7 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 6 cerrado.** 28 pruebas unitarias sobre la estadística. Un fallo real: el flujo acumulado se saltaba los días sin actividad y el eje de tiempo dejaba de ser uniforme. | `0984928` |
 | 2026-08-06 | **Bloque 3 cerrado.** 58 Server Actions barridas. 57 comprueban sesión; la que no, no toca la API. Un endurecimiento: `setThemeAction` aceptaba cualquier cadena. | `17e082f` |
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `512878e` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `4145385` |
