@@ -33,36 +33,38 @@ const BlockedTasksIntentHandler = {
         .getResponse();
     }
 
+    let responseData;
     try {
-      const responseData = await praxisApi.getBlockedTasks(apiClient, projectId);
-      const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
-
-      if (!items || items.length === 0) {
-        return handlerInput.responseBuilder
-          .speak(messages.BLOCKED_TASKS_NONE)
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-
-      // Máximo 3 tareas principales
-      const topTasks = items.slice(0, 3);
-      let speakOutput = topTasks
-        .map(task => messages.BLOCKED_TASKS_ITEM(task.title, task.daysStalled))
-        .join(' ');
-
-      if (items.length > 3) {
-        speakOutput += messages.BLOCKED_TASKS_SUFFIX(items.length - 3);
-      }
-
-      speakOutput += messages.BLOCKED_TASKS_FOOTER;
-
-      return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
-        .getResponse();
+      responseData = await praxisApi.getBlockedTasks(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
+
+    if (!items || items.length === 0) {
+      return handlerInput.responseBuilder
+        .speak(messages.BLOCKED_TASKS_NONE)
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+
+    // Máximo 3 tareas principales
+    const topTasks = items.slice(0, 3);
+    let speakOutput = topTasks
+      .map(task => messages.BLOCKED_TASKS_ITEM(task.title, task.daysStalled))
+      .join(' ');
+
+    if (items.length > 3) {
+      speakOutput += messages.BLOCKED_TASKS_SUFFIX(items.length - 3);
+    }
+
+    speakOutput += messages.BLOCKED_TASKS_FOOTER;
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 

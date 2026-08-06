@@ -22,7 +22,6 @@ const LaunchRequestHandler = {
   },
 
   async handle(handlerInput) {
-    console.log("LAUNCH REQUEST INICIADO v2");
     const { apiClient, isAuthenticated } = handlerInput.attributesManager.getRequestAttributes();
 
     // Sin sesión válida → pedir iniciar sesión por frase semilla
@@ -33,45 +32,47 @@ const LaunchRequestHandler = {
         .getResponse();
     }
 
+    let responseProjects;
     try {
-      const responseProjects = await praxisApi.getProjects(apiClient);
-      // Extraer array si viene dentro de { items: [...] } o directo
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
-
-      if (!projects || projects.length === 0) {
-        return handlerInput.responseBuilder
-          .speak(messages.WELCOME_NO_PROJECTS)
-          .getResponse();
-      }
-
-      const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-
-      if (projects.length === 1) {
-        // Auto-seleccionar el único proyecto
-        sessionAttributes.projectId = projects[0].id;
-        sessionAttributes.projectName = projects[0].name;
-        handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
-
-        return handlerInput.responseBuilder
-          .speak(messages.WELCOME_SINGLE_PROJECT(projects[0].name))
-          .reprompt(messages.HELP)
-          .getResponse();
-      }
-
-      // Varios proyectos → listar
-      const namesToList = projects.slice(0, 4).map(p => p.name);
-      let namesList = joinNaturally(namesToList);
-      if (projects.length > 4) {
-        namesList += ` y ${projects.length - 4} más`;
-      }
-
-      return handlerInput.responseBuilder
-        .speak(messages.WELCOME_MULTIPLE_PROJECTS(namesList))
-        .reprompt(messages.NO_ACTIVE_PROJECT)
-        .getResponse();
+      responseProjects = await praxisApi.getProjects(apiClient);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    // Extraer array si viene dentro de { items: [...] } o directo
+    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+
+    if (!projects || projects.length === 0) {
+      return handlerInput.responseBuilder
+        .speak(messages.WELCOME_NO_PROJECTS)
+        .getResponse();
+    }
+
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+
+    if (projects.length === 1) {
+      // Auto-seleccionar el único proyecto
+      sessionAttributes.projectId = projects[0].id;
+      sessionAttributes.projectName = projects[0].name;
+      handlerInput.attributesManager.setSessionAttributes(sessionAttributes);
+
+      return handlerInput.responseBuilder
+        .speak(messages.WELCOME_SINGLE_PROJECT(projects[0].name))
+        .reprompt(messages.HELP)
+        .getResponse();
+    }
+
+    // Varios proyectos → listar
+    const namesToList = projects.slice(0, 4).map(p => p.name);
+    let namesList = joinNaturally(namesToList);
+    if (projects.length > 4) {
+      namesList += ` y ${projects.length - 4} más`;
+    }
+
+    return handlerInput.responseBuilder
+      .speak(messages.WELCOME_MULTIPLE_PROJECTS(namesList))
+      .reprompt(messages.NO_ACTIVE_PROJECT)
+      .getResponse();
   },
 };
 

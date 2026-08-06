@@ -33,27 +33,28 @@ const WeeklyProductivityIntentHandler = {
         .getResponse();
     }
 
+    let data;
     try {
-      const data = await praxisApi.getWeeklyProductivity(apiClient, projectId);
-
-      const { completedThisWeek, completedLastWeek, deltaPercent, trend } = data;
-
-      let speakOutput;
-      if (trend === 'stable' || deltaPercent === 0) {
-        speakOutput = messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek);
-      } else {
-        const trendWord = trend === 'up' ? 'subió' : 'bajó';
-        const absDelta = Math.abs(deltaPercent);
-        speakOutput = messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trendWord, absDelta);
-      }
-
-      return handlerInput.responseBuilder
-        .speak(speakOutput)
-        .reprompt(messages.HELP)
-        .getResponse();
+      data = await praxisApi.getWeeklyProductivity(apiClient, projectId);
     } catch (error) {
       return await buildErrorResponse(handlerInput, error);
     }
+
+    const { completedThisWeek, completedLastWeek, deltaPercent, trend } = data;
+
+    let speakOutput;
+    if (trend === 'stable' || deltaPercent === 0) {
+      speakOutput = messages.WEEKLY_PRODUCTIVITY_STABLE(completedThisWeek, completedLastWeek);
+    } else {
+      const trendWord = trend === 'up' ? 'subió' : 'bajó';
+      const absDelta = Math.abs(deltaPercent);
+      speakOutput = messages.WEEKLY_PRODUCTIVITY(completedThisWeek, completedLastWeek, trendWord, absDelta);
+    }
+
+    return handlerInput.responseBuilder
+      .speak(speakOutput)
+      .reprompt(messages.HELP)
+      .getResponse();
   },
 };
 
