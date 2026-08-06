@@ -106,7 +106,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
-| 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ⬜ | 16 | 0 |
+| 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ✅ | 16 | 16 |
 
 El orden es por riesgo, no por comodidad: el bloque 1 va primero porque es donde
 salieron los cinco hallazgos anteriores, y salieron por muestreo — no por
@@ -139,19 +139,19 @@ barrido.
 | `DELETE /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
 | `DELETE /alexa/links/:linkId` | ✅ | 2026-08-06 | sonda | Correcto: Filtra por userId: revocar ajena da revoked=0 |
 | `GET /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
-| `GET /alexa/me` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/blocked-tasks` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/forecast` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/members` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/productivity/weekly` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/progress` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/workload` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/me` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/forecast` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/members` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/progress` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/workload` | ✅ | 2026-08-06 | `12-voz` | — |
 | `POST /alexa/link` | ✅ | 2026-08-06 | sonda | Correcto: Genera frase para el propio usuario |
-| `POST /alexa/link/redeem` | ⬜ | — | — | — |
-| `POST /alexa/logout` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `POST /alexa/projects/:projectId/select` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `POST /alexa/link/redeem` | ✅ | 2026-08-06 | `12-voz` | — |
+| `POST /alexa/logout` | ✅ | 2026-08-06 | `12-voz` | — |
+| `POST /alexa/projects/:projectId/select` | ✅ | 2026-08-06 | `12-voz` | — |
 | `DELETE /boards/:boardId` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /boards/:boardId/columns/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /boards/:boardId/tasks` | ✅ | 2026-08-06 | `10-barrido` | — |
@@ -311,22 +311,22 @@ Lo que sí queda fuera: el modelo de intenciones y el diálogo de voz.
 
 | Endpoint | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|
-| `POST /alexa/link` | ⬜ | — | — | — |
-| `POST /alexa/link/redeem` | ⬜ | — | — | — |
-| `POST /alexa/logout` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/links` | ⬜ | — | — | — |
-| `DELETE /alexa/links` | ⬜ | — | — | — |
-| `DELETE /alexa/links/:linkId` | ⬜ | — | — | — |
-| `GET /alexa/me` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `POST /alexa/projects/:projectId/select` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/progress` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/forecast` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/blocked-tasks` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/workload` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/members` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
-| `GET /alexa/projects/:projectId/productivity/weekly` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `POST /alexa/link` | ✅ | 2026-08-06 | `12-voz` | — |
+| `POST /alexa/link/redeem` | ✅ | 2026-08-06 | `12-voz` | — |
+| `POST /alexa/logout` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/links` | ✅ | 2026-08-06 | `12-voz` | — |
+| `DELETE /alexa/links` | ✅ | 2026-08-06 | `12-voz` | — |
+| `DELETE /alexa/links/:linkId` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/me` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects` | ✅ | 2026-08-06 | `12-voz` | — |
+| `POST /alexa/projects/:projectId/select` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/progress` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/forecast` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/workload` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/members` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ✅ | 2026-08-06 | `12-voz` | — |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ✅ | 2026-08-06 | `12-voz` | — |
 
 ---
 
@@ -378,6 +378,16 @@ siguiente iteración no las persiga otra vez:
   creíble y equivocado. Eso no lo caza un 200. Viven en
   `reports/statistics.spec.ts` y corren con `pnpm test`.
 
+### Del bloque 7
+
+- **La capa de voz se prueba entera sin dispositivo ni túnel**, y se daba por
+  supuesto lo contrario. La vinculación es una frase que se canjea por un token
+  opaco, y el `alexaUserId` lo manda quien canjea: se inventa. Lo único fuera es
+  el modelo de intenciones, que vive en la skill.
+- **Son dos tokens y ninguno sirve para lo del otro.** El de voz vive siete días
+  en un aparato de salón que responde a quien hable; si abriera la API de la web,
+  sería una sesión sin contraseña. Comprobado en ambos sentidos.
+
 ### Preguntas de diseño, no fallos
 
 - **`GET /users` devuelve el directorio completo a cualquiera con sesión**, con
@@ -416,6 +426,7 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 7 cerrado.** 14 pruebas sobre la capa de voz, sin dispositivo: frase de un solo uso, separación de los dos tokens, revocación inmediata y aislamiento entre proyectos por la puerta de la voz. Ningún hallazgo. | `c8e5358` |
 | 2026-08-06 | **Bloque 6 cerrado.** 28 pruebas unitarias sobre la estadística. Un fallo real: el flujo acumulado se saltaba los días sin actividad y el eje de tiempo dejaba de ser uniforme. | `0984928` |
 | 2026-08-06 | **Bloque 3 cerrado.** 58 Server Actions barridas. 57 comprueban sesión; la que no, no toca la API. Un endurecimiento: `setThemeAction` aceptaba cualquier cadena. | `17e082f` |
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `512878e` |
