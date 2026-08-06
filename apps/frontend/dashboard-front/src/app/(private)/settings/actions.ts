@@ -2,7 +2,12 @@
 
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
-import { THEME_COOKIE, themeCookieOptions, type ThemeName } from '@praxis/commons/theme';
+import {
+  THEME_COOKIE,
+  esTemaValido,
+  themeCookieOptions,
+  type ThemeName,
+} from '@praxis/commons/theme';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import type { UpdateProfileState, VoiceLinkState } from '@/lib/action-state';
@@ -87,6 +92,20 @@ export async function updateProfileAction(
  * se queda con el tema viejo hasta la próxima navegación completa.
  */
 export async function setThemeAction(theme: ThemeName): Promise<void> {
+  /**
+   * ⚠️ **Se valida aquí aunque `getTheme()` ya normalice al leer.**
+   *
+   * El parámetro de una Server Function llega del cliente, y `ThemeName` es un
+   * tipo: desaparece al compilar y no filtra nada. Hoy no hay agujero porque
+   * quien lee hace `=== 'light' ? 'light' : 'dark'`, así que cualquier basura
+   * acaba en oscuro — pero eso deja la seguridad de este valor en manos de un
+   * único lector. El día que alguien lo lea sin normalizar, el valor va directo
+   * a `data-theme` del `<html>`.
+   *
+   * Guardar solo lo que conocemos cuesta una línea y no depende de nadie.
+   */
+  if (!esTemaValido(theme)) return;
+
   const cookieStore = await cookies();
   cookieStore.set(THEME_COOKIE, theme, themeCookieOptions());
   revalidatePath('/', 'layout');

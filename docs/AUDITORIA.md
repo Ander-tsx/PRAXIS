@@ -102,7 +102,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 |---|---|---|---|---|
 | 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ✅ | 63 (+8 fuera) | 67 |
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
-| 3 | [Server Actions](#bloque-3--server-actions) | ⬜ | 13 archivos | 0 |
+| 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ⬜ | 61 | 0 |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ⬜ | 7 informes | 0 |
@@ -244,16 +244,16 @@ la ruta donde se usan), que validen antes de llamar, y que confirmen contra el
 
 | Archivo | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|
-| `dashboard-front/app/actions.ts` | ⬜ | — | — | — |
-| `dashboard-front/app/invitations-actions.ts` | ⬜ | — | — | — |
-| `dashboard-front/(private)/settings/actions.ts` | ⬜ | — | — | — |
-| `dashboard-front/(private)/notifications/actions.ts` | ⬜ | — | — | — |
-| `projects-front/app/actions.ts` | ⬜ | — | — | — |
+| `dashboard-front/app/actions.ts` | ✅ | 2026-08-06 | revisión | Sesión, validación y confirmación contra `data` |
+| `dashboard-front/app/invitations-actions.ts` | ✅ | 2026-08-06 | revisión | Sesión; el 409 de invitación ya resuelta se traduce |
+| `dashboard-front/(private)/settings/actions.ts` | ✅ | 2026-08-06 | revisión | 🔧 `setThemeAction` ahora valida el tema antes de guardarlo |
+| `dashboard-front/(private)/notifications/actions.ts` | ✅ | 2026-08-06 | revisión | Marcar leída no tiene `data` que confirmar; el sobre ya lanza |
+| `projects-front/app/actions.ts` | ✅ | 2026-08-06 | revisión | Sesión, validación y confirmación contra `data` |
 | `projects-front/(private)/[id]/actions.ts` (1219 líneas) | ⬜ | — | — | — |
-| `projects-front/(private)/[id]/invitation-actions.ts` | ⬜ | — | — | — |
-| `reports-front/(private)/[id]/actions.ts` | ⬜ | — | — | — |
-| `admin-front/(private)/actions.ts` | ⬜ | — | — | — |
-| `admin-front/(private)/proyectos/actions.ts` | ⬜ | — | — | — |
+| `projects-front/(private)/[id]/invitation-actions.ts` | ✅ | 2026-08-06 | revisión | Sesión; sin `data` que confirmar |
+| `reports-front/(private)/[id]/actions.ts` | ✅ | 2026-08-06 | revisión | Las del asistente quedan fuera de alcance; el resto por envoltorio |
+| `admin-front/(private)/actions.ts` | ✅ | 2026-08-06 | revisión | Cerrada en el bloque 2 |
+| `admin-front/(private)/proyectos/actions.ts` | ✅ | 2026-08-06 | revisión | Cerrada en el bloque 2 |
 
 ---
 
@@ -361,6 +361,16 @@ siguiente iteración no las persiga otra vez:
   no se queda sin administración por un clic— pero conviene saberlo antes de
   necesitarlo.
 
+### Del bloque 3
+
+- **58 Server Actions, y 57 comprueban sesión.** Casi todas por un envoltorio
+  compartido (`requireApi()` en projects-front). La excepción era
+  `setThemeAction`, que no toca la API — se le añadió validación igualmente,
+  abajo.
+- **«No confirman contra `data`» es falso en los borrados.** Un `DELETE` no
+  tiene nada que confirmar, y `unwrapEnvelope` ya lanza si el servidor dice que
+  no. El primer barrido las marcó a todas; no lo son.
+
 ### Preguntas de diseño, no fallos
 
 - **`GET /users` devuelve el directorio completo a cualquiera con sesión**, con
@@ -399,6 +409,7 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 3 cerrado.** 58 Server Actions barridas. 57 comprueban sesión; la que no, no toca la API. Un endurecimiento: `setThemeAction` aceptaba cualquier cadena. | `17e082f` |
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `512878e` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `4145385` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `c4b4a7c` |
