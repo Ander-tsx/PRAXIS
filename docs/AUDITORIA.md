@@ -35,13 +35,31 @@ siguiente iteración.** Sin él, la siguiente vuelve a mirar lo mismo.
 
 ## Cómo continuar
 
+> **Los siete bloques están cerrados.** Lo que sigue es una iteración nueva, no la
+> continuación de esta: ve a [«Para la siguiente iteración»](#para-la-siguiente-iteración),
+> que dice por dónde entraría yo y qué dejé sin mirar a propósito.
+
 1. **Levanta el stack** — `pnpm dev:cli`, preset «Todo». Detalle en el README.
-2. **Comprueba la línea base** — `pnpm e2e`. Tiene que estar **verde entero**.
-   Si no lo está, eso es lo primero, antes de auditar nada.
+2. **Comprueba la línea base** — `pnpm e2e` **y `pnpm test`**. Los dos verdes.
+   Si no lo están, eso es lo primero, antes de auditar nada.
 3. **Busca el primer bloque `🔄 en curso` o `⬜ sin empezar`** en la tabla de
    bloques y sigue por ahí.
 4. **Al cerrar cada unidad, actualiza su fila** en este documento **en el mismo
    commit** que el cambio. Un registro que se actualiza «luego» no se actualiza.
+
+### Tres cosas que costaron tiempo y no hace falta volver a descubrir
+
+- **No edites código con la suite corriendo.** Los servicios van con
+  `nest start --watch` y las zonas con Next en desarrollo: un guardado a mitad de
+  ejecución reinicia el servicio y las peticiones en vuelo caen con 500 o 403. Se
+  perdió un rato persiguiendo dos fallos de `07-suspension` que eran eso.
+- **El límite de `/auth/login` (10/min) y el del canje de frase se comparten con
+  la suite.** Si una prueba nueva gasta presupuesto, rompe a las de al lado y solo
+  a veces. `entrar()` ya lleva una espera de 61 s por ese motivo.
+- **`pnpm test` y `pnpm e2e` miden cosas distintas y las dos hacen falta.** La
+  matemática y las funciones puras no las caza un 200; que una ruta exista de
+  verdad no lo caza una prueba unitaria — `app.controller.spec` del gateway pasaba
+  con la ruta devolviendo 404, porque monta su propio módulo de test.
 
 ### La regla que hace fiable este registro
 
@@ -78,6 +96,22 @@ Medido, no estimado.
 | Casos de prueba E2E | 130 |
 | **Endpoints cubiertos por pruebas** | **42 de 113 (37 %)** |
 
+### Y dónde está al cerrar los siete bloques — 2026-08-06
+
+| Superficie | Al abrir | Ahora |
+|---|---|---|
+| Casos de prueba E2E | 130 | **177** |
+| Pruebas unitarias | 0 corriendo | **89** (`pnpm test`, 10/10 paquetes) |
+| Endpoints cubiertos | 42 de 113 | **113 de 113** (105 auditados + 8 fuera de alcance) |
+| Organismos (recuento real) | 46 | **75 archivos** — la cifra de arriba contaba carpetas |
+
+⚠️ **`pnpm test` estaba en rojo**, y llevaba tiempo. Las 28 pruebas de
+estadística que el bloque 6 dejó como red de seguridad **no las corría nadie en
+conjunto**: bastaba con que un paquete sin pruebas hiciera salir a `jest` con
+código 1 para que `turbo` parase ahí. Merece estar en la línea base porque
+falsea todo lo demás: una prueba que no se ejecuta cuenta como cobertura y no lo
+es.
+
 ### Ya corregido antes de abrir este registro
 
 Cinco hallazgos de seguridad, todos con prueba en `e2e/tests/api/09-seguridad`:
@@ -104,7 +138,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ✅ | 7 servicios | 6 (+1 fuera) |
-| 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | 🔄 | 61 | 3 |
+| 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | ✅ | 15 pantallas · 75 organismos | todas |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
 | 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ✅ | 16 | 16 |
 
@@ -387,11 +421,85 @@ servicios y puesto `--passWithNoTests`. Ahora: **10/10 paquetes, 88 pruebas**.
 
 ## Bloque 5 — Organismos y pantallas
 
-46 organismos y 15 pantallas. Qué mirar: estado vacío, estado de error, estado de
+15 pantallas y **75 archivos** de organismo (la línea base decía 46; contaba
+carpetas, no archivos). Qué mirar: estado vacío, estado de error, estado de
 carga, y que un fallo de red no se confunda con «no hay datos» —que es
 exactamente el bug de `57d1d91`—.
 
-Se detalla al abrir el bloque.
+### Cómo se buscó
+
+No leyendo 90 archivos en orden, sino **persiguiendo el patrón**: un `catch` que
+devuelve una lista vacía y una pantalla que pinta esa lista vacía como «no hay
+nada». Es lo que convierte un backend caído en una interfaz tranquila que miente,
+y es el único de los cuatro criterios que no se nota mirando la pantalla — porque
+cuando todo va bien, se ve idéntica.
+
+`git grep` de los `catch` en las 15 pantallas y en los 75 organismos, y luego
+cada uno a mano para ver **qué se pinta con ese valor**. El `catch` no es el
+fallo; el fallo es que su resultado sea indistinguible del vacío legítimo.
+
+### El modelo, que ya existía
+
+`admin-front/(private)/actividad/page.tsx` lo hace bien desde el primer día y es
+la referencia: cae a `null`, y `null` pinta «No se pudo leer el registro» —
+distinto de «Ninguna acción encaja con estos filtros» y distinto de «Todavía no
+se ha registrado ninguna acción». **Tres estados, tres textos.** El panel hace lo
+propio por otra vía: `GET /projects` no se atrapa —falla de cara, a `error.tsx`—
+y solo las insignias accesorias se degradan en silencio, cada una con su motivo
+escrito al lado.
+
+Así que esto no era una carencia de criterio, sino dos sitios donde no se aplicó.
+
+| Unidad | Estado | Fecha | Commit | Hallazgo |
+|---|---|---|---|---|
+| Pantallas · las 15, por el criterio del vacío engañoso | ✅ | 2026-08-06 | revisión | 🔧 Dos de quince lo confundían. Ver abajo |
+| `dashboard/notifications` | ✅ | 2026-08-06 | revisión | 🔧 Un corte se leía «Nada por aquí», **y la página se autorrefresca**: lo repetía cada minuto |
+| `reports` (índice) | ✅ | 2026-08-06 | revisión | 🔧 Un corte se leía «Todavía no estás en ningún proyecto», con doce proyectos |
+| `reports/error.tsx` | ✅ | 2026-08-06 | revisión | 🔧 Registraba `[projects]`: copiado de otra zona, mandaba a depurar la equivocada |
+| `admin/actividad`, `admin` (cuentas), `admin/proyectos` | ✅ | 2026-08-06 | revisión | El modelo. Error, vacío y vacío-con-filtros, separados |
+| `dashboard` (panel), `settings`, `perfil` | ✅ | 2026-08-06 | revisión | El dato principal falla de cara; lo accesorio degrada con motivo escrito |
+| `projects` (rejilla), `projects/[id]` | ✅ | 2026-08-06 | revisión | Listado sin `catch`; el detalle cae a 404, que es la regla del slug |
+| `reports/[id]` | ✅ | 2026-08-06 | revisión | Cada informe cae por separado y su tarjeta lo dice; el `snapshot` no se atrapa |
+| `login`, `signup`, raíz de auth, landing del shell | ✅ | 2026-08-06 | `ui/` | Sin datos que fallar: formularios y estático |
+| Organismos · los 75, por sus `catch` de cliente | ✅ | 2026-08-06 | revisión | Sin hallazgos. Los seis que atrapan tienen motivo escrito y ninguno se traga un fallo de datos |
+| Organismos de `admin-front` (11) | ✅ | 2026-08-06 | bloque 2 | Cerrados allí |
+| El fallo del directorio, en las tres pantallas | ✅ | 2026-08-06 | `36c3f47`, `81c6ccb` | Cerrado antes de este bloque |
+
+### Lo que enseñan los dos que fallaban
+
+Los dos son la **misma pantalla que ya distinguía con cuidado**. El índice de
+Reportes separaba dos motivos de vacío —no tienes acceso a los informes / no
+estás en ningún proyecto— y se le escapó el tercero, que es el único que no es
+culpa de nadie. La bandeja distinguía leído de no leído y no distinguía vacío de
+roto.
+
+Es decir: **el hueco no aparece por descuidar el vacío, sino por pensarlo a
+medias.** Quien no piensa en los estados vacíos deja una pantalla en blanco, que
+se ve enseguida. Quien los piensa escribe un texto amable y explicativo, y ese
+texto es el que después tapa el error — porque suena a respuesta y no a fallo.
+
+Y el peor detalle: la bandeja lleva `AutoRefresh` cada 60 s. Un corte se
+reescribía «Nada por aquí» minuto tras minuto, con la página moviéndose y todo,
+así que ni siquiera parecía congelada. Al arreglarlo se le quitó el refresco al
+estado de error a propósito: reintentar solo cuando lo pide quien mira.
+
+### Por qué esto no lleva prueba end-to-end
+
+**Porque no hay forma honesta de tirar el gateway desde Playwright.** Estas
+páginas son Server Components: la llamada sale del servidor de Next, no del
+navegador, así que `page.route()` no la ve — no hay petición del navegador que
+interceptar. Fingirlo pediría o levantar la suite con el gateway apagado (y
+entonces no arranca nada más) o inyectar un cliente falso, que probaría el falso.
+
+Lo que sí queda fijado es el código: los dos `catch` que colapsaban el fallo con
+el vacío ya no están, y en su lugar hay una rama con su propio texto. La regla
+del registro admite el motivo escrito, y este es.
+
+⚠️ **Para la siguiente iteración**, si se quiere cubrir de verdad: el sitio es una
+prueba de componente sobre la pantalla con el cliente de API inyectado, que hoy no
+se puede porque `createServerApiClient()` se importa directamente en vez de
+recibirse. Cambiar eso es más invasivo que el fallo que arregla, así que se deja
+escrito en vez de hecho.
 
 ---
 
@@ -444,7 +552,17 @@ Lo que sí queda fuera: el modelo de intenciones y el diálogo de voz.
 
 ## Hallazgos abiertos
 
-Ninguno.
+Ninguno. Los siete de esta vuelta están corregidos y con prueba:
+
+| Hallazgo | Bloque | Prueba |
+|---|---|---|
+| Una tarea podía acabar en la columna de otro tablero | 4 | `13-integridad-de-tablero` (7) |
+| La jerarquía de permisos dependía del orden de un objeto literal | 4 | `permission-map.spec` (14) |
+| El límite del canje de frase se indexaba por un campo del cuerpo | 4 | `alexa-auth.service.spec` (5) |
+| …y contaba peticiones en vez de fallos | 4 | idem |
+| El health check del gateway respondía 404 | 1 | `14-roles-globales` (3) |
+| Un corte de red se leía «no tienes avisos» y «no estás en ningún proyecto» | 5 | motivo escrito |
+| `pnpm test` en rojo: las 28 pruebas de estadística no las corría nadie | 4 | `pnpm test`, 10/10 |
 
 ### Cerrados en el bloque 1 sin ser fallos
 
@@ -509,6 +627,15 @@ siguiente iteración no las persiga otra vez:
 - **La bandeja decía «Alguien»** cuando no resolvía el nombre. Cierto, legible y
   por eso invisible: es la razón de que viviera tanto. Un hueco que se lee bien
   no se reporta.
+- **El vacío engañoso no aparece por descuidar los estados vacíos, sino por
+  pensarlos a medias.** Las dos pantallas que fallaban ya distinguían varios
+  motivos de vacío con cuidado; lo que se les escapó fue el que no es culpa de
+  nadie. Quien no piensa el vacío deja la pantalla en blanco y se ve enseguida;
+  quien lo piensa escribe un texto amable, y **ese texto es el que después tapa el
+  error**, porque suena a respuesta y no a fallo.
+- **Un refresco automático sobre un estado de error lo esconde en vez de
+  arreglarlo.** La bandeja se recargaba cada 60 s y reescribía «Nada por aquí»
+  indefinidamente: la página se movía, así que ni siquiera parecía colgada.
 
 ### Preguntas de diseño, no fallos
 
@@ -517,6 +644,71 @@ siguiente iteración no las persiga otra vez:
   pero conviene que sea una decisión consciente y no una herencia. Si algún día
   importa, la salida sería que invitar busque por correo exacto en el servidor
   sin devolver el listado.
+
+---
+
+## Para la siguiente iteración
+
+Los siete bloques están cerrados y **eso no significa que no quede nada**.
+Significa que se acabó lo que este recorrido sabía mirar. Lo que sigue es dónde
+buscaría yo, ordenado por lo que creo que rinde más, y por qué no lo hice.
+
+### 1. Los 42 endpoints que ya tenían cobertura, con los cinco criterios
+
+Es la deuda que dejó escrita el propio bloque 1 y sigue en pie: están
+**ejercitados** por `01`–`09`, que no es lo mismo que auditados. Nadie ha
+comprobado uno por uno si el permiso que exigen es el correcto ni si usan
+`req.projectId`. Es el sitio con más superficie sin revisar que queda.
+
+### 2. Los `MessagePattern` como frontera, no como implementación
+
+El bloque 4 leyó los servicios por dentro. Lo que no miró es **quién puede llamar
+a qué por TCP**: los 133 patrones aceptan lo que les llegue, y varios —
+`purgeTasks`, `restatusTasks`, `permission_set_user_role`— no comprueban permisos
+por diseño, fiándose de que el gateway ya lo hizo. Hoy los puertos no están
+expuestos, así que la pregunta es de despliegue: **si el 3003 fuera alcanzable,
+¿qué se puede hacer sin ningún token?** La respuesta parece «bastante», y no está
+medida.
+
+### 3. Concurrencia
+
+Nada de lo hecho la toca. Hay dos formas concretas ya visibles:
+`assertRateLimit` lee y luego escribe sin atomicidad —dos peticiones a la vez
+comparten cuenta—, y `createProject` genera el slug comprobando antes de
+insertar, con el P2002 como red. Ninguna es grave por separado; el patrón sí
+merece un barrido.
+
+### 4. Las pantallas con el backend caído
+
+Quedó como motivo escrito y no como prueba (bloque 5): son Server Components y
+`page.route()` de Playwright no ve sus peticiones. La vía sería inyectar el
+cliente de API en vez de importarlo, y **eso es más invasivo que el fallo que
+arregla** — por eso está escrito y no hecho. Si alguien va a tocar esa capa por
+otro motivo, es el momento de hacerlo.
+
+### 5. Lo que este recorrido asumió sin comprobar
+
+Vale la pena que otra persona lo dude:
+
+- Que el `ProjectPermissionGuard` es correcto. Se leyó y se probó por sus
+  efectos, nunca línea a línea.
+- Que `permissions/me` recorta bien en **todos** los estados. Hay prueba para
+  suspendido; no para la combinación con roles a medio propagar y la caché de
+  300 s de por medio.
+- Que la capa de voz solo lee. Lo comprueba `12-voz` sobre las rutas que existen
+  hoy; nada impide que mañana se añada una que escriba.
+
+### Y una advertencia de método
+
+**Los tres hallazgos del bloque 4 y el del bloque 5 tienen algo en común: ninguno
+es un fallo de permisos.** Son cosas que se guardan mal, controles que no
+controlan y huecos que se leen bien. El barrido de acceso —que es la herramienta
+más fuerte que tiene este repo— no vio ninguno, porque todos ocurren *después* de
+que la puerta se abra correctamente.
+
+Si la próxima iteración solo repite «¿quién entra por aquí?», va a encontrar poco.
+La pregunta que rindió esta vez fue **«¿qué queda escrito, y se puede distinguir
+de lo que debería quedar escrito?»**.
 
 ---
 
@@ -555,5 +747,6 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `b99c6e0` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `c4157fc` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `3b17625` |
+| 2026-08-06 | **Bloque 5 cerrado, y con él los siete.** Las 15 pantallas por el criterio del vacío engañoso: dos lo confundían con un fallo de red, y una de las dos lo repetía cada minuto por su autorrefresco. Los 75 organismos, sin hallazgos. | (este) |
 | 2026-08-06 | **Bloque 1 cerrado del todo.** Las 6 filas que quedaban: la ficha administrativa de un proyecto y las cuatro de `/permissions`, con las dos mitades cada una (`14-roles-globales`). Y el health check, que **respondía 404** porque `AppModule` no declaraba su controlador. | (este) |
 | 2026-08-06 | **Bloque 4, seis servicios cerrados.** Tres hallazgos, ninguno de los cuales habría visto un barrido de acceso: una tarea podía acabar en la columna de otro tablero, la jerarquía de permisos dependía del orden de un objeto literal, y el límite del canje de frase se indexaba por un campo del cuerpo. Además `pnpm test` estaba en rojo por andamio muerto: verde, 88 pruebas. | (este) |

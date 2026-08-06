@@ -47,9 +47,37 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
   const { page: pageParam } = await searchParams;
   const pagina = Math.max(1, Number.parseInt(pageParam ?? '1', 10) || 1);
 
+  /**
+   * ⚠️ **`null` es «no se pudo leer», no «no hay nada».**
+   *
+   * Esto caía a `{items: [], total: 0, unread: 0}`, y con la bandeja vacía
+   * `NotificationList` pinta «Nada por aquí». Es decir: con el gateway caído, la
+   * pantalla decía tranquilamente que no tenías avisos — y como esta página se
+   * autorrefresca cada minuto, lo repetía indefinidamente sin que nada cambiara
+   * de aspecto.
+   *
+   * Es el mismo fallo de `57d1d91` y del «Alguien» de esta misma bandeja: un
+   * hueco que se lee bien no se reporta. El modelo a seguir es
+   * `admin-front/actividad`, que distingue los tres estados —error, vacío y con
+   * datos— desde el primer día.
+   */
   const inbox = await api
     .get<NotificationPage>(`/me/notifications?page=${pagina}&limit=${POR_PAGINA}`)
-    .catch(() => ({ items: [], total: 0, unread: 0 }) as NotificationPage);
+    .catch(() => null);
+
+  if (!inbox) {
+    return (
+      <AppHeader title="Notificaciones">
+        {/* Sin `AutoRefresh`: reintentar solo tiene sentido si lo pide quien
+            mira. Un refresco automático sobre un error convierte un corte en un
+            martilleo, y encima esconde que hubo error — la página parpadea y
+            vuelve a decir lo mismo. */}
+        <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+          No se pudieron cargar tus avisos. Vuelve a intentarlo.
+        </p>
+      </AppHeader>
+    );
+  }
 
   /**
    * Los nombres de quienes aparecen en la bandeja, **pedidos por id**.

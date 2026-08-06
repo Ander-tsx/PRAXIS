@@ -4,13 +4,13 @@ import { Button } from '@praxis/commons';
 import { useEffect } from 'react';
 
 /**
- * Frontera de error del panel.
+ * Frontera de error de Proyectos.
  *
  * Cubre lo que `loadCurrentUser` o `GET /projects` puedan lanzar. No se enseña
  * `error.message` tal cual: puede traer detalles del backend que no pintan
  * nada en pantalla.
  */
-export default function DashboardError({
+export default function ProjectsError({
   error,
   reset,
 }: {

@@ -28,9 +28,25 @@ export default async function ReportsIndexPage() {
    * pulse Reportes en la barra lateral y tenga de primer proyecto uno donde no
    * se lo han abierto.
    */
-  const conAcceso = await api
-    .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
-    .catch(() => ({ items: [] as Project[], total: 0 }));
+  /**
+   * ⚠️ **No se atrapa el fallo, y es el arreglo.**
+   *
+   * Caía a `{items: [], total: 0}`, y una lista vacía en esta pantalla acaba en
+   * «Todavía no estás en ningún proyecto». Es decir: con el gateway caído, a
+   * alguien con doce proyectos se le decía que no tiene ninguno — y el texto
+   * invita a pedir que te añadan a uno, que es exactamente la gestión
+   * equivocada.
+   *
+   * Esta pantalla distinguía con cuidado **dos** motivos de vacío —no tienes
+   * acceso a los reportes / no estás en ningún proyecto— y se le escapaba el
+   * tercero, que es el único que no es culpa de nadie. Ahora lanza y lo recoge
+   * `error.tsx`, que dice que fue un corte y ofrece reintentar. Es lo que ya hace
+   * el panel con su `GET /projects`: el dato principal falla de cara, y solo lo
+   * accesorio se degrada en silencio.
+   */
+  const conAcceso = await api.get<Paginated<Project>>(
+    '/projects?limit=100&permission=canViewReports',
+  );
 
   const primero = conAcceso.items[0];
   // Sin el basePath: es una ruta del App Router de esta app. Ver §17.4.
@@ -42,9 +58,7 @@ export default async function ReportsIndexPage() {
    * consulta solo se hace en este caso, que es el raro: `limit=1` porque de
    * esta lista únicamente se mira el `total`.
    */
-  const todos = await api
-    .get<Paginated<Project>>('/projects?limit=1')
-    .catch(() => ({ items: [] as Project[], total: 0 }));
+  const todos = await api.get<Paginated<Project>>('/projects?limit=1');
 
   if (todos.total > 0) {
     return (
