@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RedeemSeedPhraseDto } from '@praxis/contracts';
+import { RedeemSeedPhraseBodyDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 
@@ -41,6 +41,24 @@ export class AlexaAuthController {
     );
   }
 
+  /**
+   * Canjea la frase dictada por un token de voz.
+   *
+   * ⚠️ **La IP se inyecta aquí, y es lo que hace que el límite exista.**
+   * alexa-service contaba los intentos por `alexaUserId` y `deviceId`, que llegan
+   * en el cuerpo de una ruta **pública**: bastaba con cambiar una letra de
+   * `alexaUserId` en cada petición para que el contador empezara de cero, así que
+   * la política de 5 intentos por 10 minutos no limitaba absolutamente nada.
+   *
+   * La IP es el único dato de esta petición que no elige quien la manda, y solo
+   * el gateway la tiene —al microservicio se llega por TCP—, así que tiene que
+   * viajar desde aquí. Va **después** del spread del cuerpo para que un
+   * `clientIp` enviado por el cliente no pueda ganar.
+   *
+   * Detrás de un balanceador esto exige `trust proxy` en Express, o `req.ip` es
+   * la del balanceador y el límite vuelve a ser uno global. Hoy no hay
+   * balanceador; el día que lo haya, esta es la línea que hay que revisar.
+   */
   @Post('link/redeem')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Canjea la frase semilla dictada por un alexaToken' })
@@ -48,8 +66,13 @@ export class AlexaAuthController {
   @ApiResponse({ status: 400, description: 'Frase inválida' })
   @ApiResponse({ status: 410, description: 'Frase expirada o ya utilizada' })
   @ApiResponse({ status: 429, description: 'Demasiados intentos' })
-  redeem(@Body() body: RedeemSeedPhraseDto) {
-    return firstValueFrom(this.alexaClient.send({ cmd: 'alexa_link_redeem' }, body));
+  redeem(@Body() body: RedeemSeedPhraseBodyDto, @Request() req: Express.Request) {
+    return firstValueFrom(
+      this.alexaClient.send(
+        { cmd: 'alexa_link_redeem' },
+        { ...body, clientIp: (req as { ip?: string }).ip },
+      ),
+    );
   }
 
   @Get('links')

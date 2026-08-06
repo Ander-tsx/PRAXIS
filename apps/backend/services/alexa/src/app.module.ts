@@ -29,7 +29,13 @@ import { VoiceTeamModule } from './voice-team/voice-team.module';
         // Vinculación por frase semilla
         VOICE_SEED_PHRASE_WORDS: Joi.number().min(3).max(8).default(5),
         VOICE_SEED_PHRASE_TTL_SECONDS: Joi.number().default(300),
+        /* Por aparato. Evita que un dispositivo mal configurado insista; no es
+           una defensa, porque quien llama elige ese identificador. */
         VOICE_REDEEM_MAX_ATTEMPTS: Joi.number().default(5),
+        /* Por IP, que la inyecta el gateway. Este es el que de verdad limita.
+           Va más holgado: una casa o una oficina son una sola IP con varios
+           aparatos legítimos detrás. */
+        VOICE_REDEEM_MAX_ATTEMPTS_PER_IP: Joi.number().default(30),
         VOICE_REDEEM_WINDOW_SECONDS: Joi.number().default(600),
 
         // Convenciones de estado de tarea

@@ -51,6 +51,9 @@ export class MembersService {
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);
+    /* Y su lista de proyectos, que acaba de ganar uno. Ver la nota de
+       `invalidarListasDe` en projects.service. */
+    await this.redis.del(`projects:member:${dto.userId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
     return member;
   }
@@ -74,6 +77,9 @@ export class MembersService {
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);
+    /* Y su lista, que acaba de perder uno: seguir enseñándolo es ofrecer una
+       puerta que el guard ya cerró. */
+    await this.redis.del(`projects:member:${dto.userId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
 
     await this.notifications.emit({

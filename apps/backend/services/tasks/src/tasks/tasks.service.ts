@@ -316,6 +316,54 @@ export class TasksService {
   }
 
   /**
+   * Comprueba que la columna destino sea **de este tablero**.
+   *
+   * `columnId` viaja en el cuerpo y solo se valida como UUID: ni el DTO ni el
+   * guard lo atan al tablero de la tarea, porque el guard resuelve el proyecto
+   * desde la ruta de la *tarea* y la columna vive en otro microservicio. Sin
+   * esta comprobación, las tres rutas que escriben `columnId` —crear, mover y el
+   * `PATCH`, que también mueve— aceptan la columna de **cualquier** tablero, el
+   * de otro proyecto incluido.
+   *
+   * ⚠️ **Lo que rompe no es la puerta, es la tarea.** No hay escalada: sigue
+   * haciendo falta permiso sobre el proyecto de la tarea. Lo que queda es una
+   * fila incoherente, y de las que no se arreglan solas:
+   *
+   * - La tarea **sigue saliendo** en `GET /boards/:id/tasks` —ese listado filtra
+   *   por `boardId`, que no cambió— pero su `columnId` no es de ninguna columna
+   *   del tablero, así que no se pinta en ninguna: desaparece del tablero sin
+   *   dejar de existir, y no se puede arrastrar lo que no se ve.
+   * - `restatusTasks` busca por `columnId`, así que renombrar esa columna ajena
+   *   reescribe el `status` de una tarea de otro proyecto.
+   * - Los informes agrupan por columna. Una tarea en una columna de otro tablero
+   *   no cuenta en el flujo de ninguno de los dos.
+   *
+   * Cuesta una consulta a projects-service en la ruta de arrastrar, que es la
+   * más caliente. Se paga a sabiendas: es el mismo precio que ya pagan
+   * `resolveAssignees` y `resolveLabels` unas líneas más abajo, y a cambio se
+   * cierra una corrupción que desde la interfaz no tiene reparación.
+   */
+  private async assertColumnInBoard(boardId: string, columnId: string): Promise<void> {
+    const columns = await firstValueFrom(
+      this.projectsClient.send<Array<{ id: string; boardId: string }>>(
+        { cmd: 'column_find_by_ids' },
+        { ids: [columnId] },
+      ),
+    );
+
+    const column = (columns ?? [])[0];
+    if (!column) {
+      throw new RpcException({ statusCode: 404, message: 'La columna destino no existe' });
+    }
+    if (column.boardId !== boardId) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Esa columna no es de este tablero',
+      });
+    }
+  }
+
+  /**
    * Comprueba que todas las etiquetas existan y sean del proyecto.
    *
    * Sin esto se puede colgar de una tarea la etiqueta de otro proyecto: la
@@ -442,6 +490,10 @@ export class TasksService {
 
   async createTask(dto: CreateTaskDto) {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canCreateTask');
+
+    /* El tablero lo pone la ruta, pero la columna la elige el cuerpo: una tarea
+       puede nacer ya fuera de sitio si no se comprueba que sean del mismo sitio. */
+    await this.assertColumnInBoard(dto.boardId, dto.columnId);
 
     const assignees = await this.resolveAssignees(dto.projectId, dto.assigneeIds ?? []);
     const labels = await this.resolveLabels(dto.projectId, dto.labelIds ?? []);
@@ -621,6 +673,12 @@ export class TasksService {
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
 
+    /* Contra el tablero **de la tarea**, no contra el del cuerpo: este `PATCH`
+       no recibe `boardId`, así que la referencia es la que ya está guardada. */
+    if (dto.columnId !== undefined) {
+      await this.assertColumnInBoard(task.boardId, dto.columnId);
+    }
+
     // Se validan antes de abrir la transacción: si alguien no es del proyecto,
     // no se ha tocado nada todavía.
     const assignees =
@@ -721,6 +779,10 @@ export class TasksService {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canMoveTask');
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
+
+    /* Antes de tocar nada: mover a una columna de otro tablero deja la tarjeta
+       sin columna donde pintarse y no hay forma de arrastrarla de vuelta. */
+    await this.assertColumnInBoard(task.boardId, dto.columnId);
 
     /* El único sitio donde de verdad se mide el flujo del tablero. Si esto no
        queda registrado, no hay tiempo de ciclo que valga. */

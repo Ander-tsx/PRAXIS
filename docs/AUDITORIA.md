@@ -103,7 +103,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ✅ | 63 (+8 fuera) | 67 |
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
-| 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
+| 4 | [Microservicios](#bloque-4--microservicios) | 🔄 | 7 servicios | 6 |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | 🔄 | 61 | 3 |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
 | 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ✅ | 16 | 16 |
@@ -261,15 +261,104 @@ la ruta donde se usan), que validen antes de llamar, y que confirmen contra el
 
 26.644 líneas, el bloque más grande. **Con permiso de corregir.**
 
-| Servicio | Líneas aprox. | Estado | Fecha | Commit | Hallazgo |
+**Qué se comprueba en cada uno**, y por qué. No son los cinco criterios del
+bloque 1: allí la pregunta era *quién entra*, y aquí es *qué se guarda*. Los tres
+hallazgos de este bloque los habría dejado pasar un barrido de acceso, porque
+ninguno necesita permisos que no se tengan.
+
+1. **¿Se fía del `projectId` que le mandan?** El gateway lo resuelve desde la
+   ruta, pero el microservicio no puede confiar en su llamante. El patrón bueno
+   está en `loadTaskInProject`.
+2. **¿Ata los identificadores del cuerpo a algo?** Un UUID válido no dice de
+   dónde es. Es de donde salió el hallazgo de la columna.
+3. **¿Se invalida la caché en todos los caminos que cambian lo cacheado?** Una
+   clave que se invalida en cuatro de cinco sitios miente de forma intermitente,
+   que es peor que mentir siempre.
+4. **¿El límite se indexa por algo que quien llama no elija?** De ahí salió el
+   del canje de frase.
+5. **¿El SQL crudo va parametrizado?** Los ocho `$queryRaw` de `stats.service`
+   y los de `reports`, uno por uno.
+
+| Servicio | Líneas | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|---|
-| `projects` | — | ⬜ | — | — | — |
-| `tasks` | — | ⬜ | — | — | — |
-| `credentials` | — | ⬜ | — | — | — |
-| `permissions` | — | ⬜ | — | — | — |
-| `reports` | — | ⬜ | — | — | — |
-| `alexa` | — | ⬜ | — | — | — |
-| `assistant` | ⏭️ | — | — | Fuera de alcance | — |
+| `tasks` | 2.393 | ✅ | 2026-08-06 | `13-integridad` | 🔧 Una tarea podía acabar en la columna de otro tablero. Corregido + 7 pruebas |
+| `projects` | 2.874 | ✅ | 2026-08-06 | `permission-map.spec` | 🔧 La jerarquía dependía del orden del objeto literal; la lista cacheada se invalidaba en 1 de 5 sitios |
+| `alexa` | 1.754 | ✅ | 2026-08-06 | `alexa-auth.service.spec` | 🔧 El límite del canje se indexaba por un campo del cuerpo: rotarlo lo desactivaba |
+| `credentials` | 685 | ✅ | 2026-08-06 | revisión | Sin hallazgos. Los dos tokens y el corte de sesión, ya probados en `02-auth` y `07-suspension` |
+| `permissions` | 616 | ✅ | 2026-08-06 | revisión | Sin hallazgos. La invariante del último SuperAdmin está donde vive la tabla, no solo en el gateway |
+| `reports` | 1.288 | ✅ | 2026-08-06 | `statistics.spec` | Cerrado en el bloque 6. Los `$queryRaw` van parametrizados |
+| `assistant` | 1.772 | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
+
+### Los tres hallazgos, en detalle
+
+**1. Una tarea podía vivir en la columna de otro tablero.** `columnId` viaja en
+el cuerpo y solo se validaba como UUID; el guard resuelve el proyecto desde la
+ruta de la *tarea*, y la columna vive en otro microservicio, así que nadie ataba
+las dos cosas. Las tres rutas que lo escriben —crear, mover y el `PATCH`, que
+también mueve— aceptaban la columna de cualquier tablero, el de otro proyecto
+incluido.
+
+No es escalada: hace falta permiso sobre el proyecto de la tarea igual que
+siempre. Lo que deja es una fila que la interfaz no sabe pintar. La tarea **sigue
+saliendo** en `GET /boards/:id/tasks` —ese listado filtra por `boardId`, que no
+cambia— pero su columna no es del tablero, así que no aparece en ninguna: se va
+de la vista sin dejar de existir, y no se puede arrastrar de vuelta lo que no se
+ve. Además `task_restatus` busca por `columnId`, así que renombrar esa columna
+ajena reescribe el `status` de una tarea de otro proyecto.
+
+**2. La jerarquía de permisos dependía del orden en que estaban escritas las
+reglas.** `expandPermissions` daba una sola pasada, así que la implicación no era
+transitiva: `canDeleteBoard` concede `canEditProject`, y `canEditProject` concede
+`canViewReports`, pero la segunda regla ya había pasado cuando la primera la
+activó. Funcionaba porque las entradas están escritas de mayor a menor alcance y
+`Object.entries` respeta el orden de inserción — es decir, **el orden de un
+objeto literal decidía quién ve los reportes**. Alfabetizar el mapa o añadir un
+permiso por arriba se lo quitaba a quien administra tableros, sin error y sin
+nada que lo relacionara con el cambio. Ahora itera hasta punto fijo.
+
+**3. El límite de intentos del canje de frase no limitaba nada.** Se indexaba por
+`alexaUserId` y `deviceId`, que llegan en el cuerpo de la **única ruta pública**
+de la capa de voz. Cuarenta peticiones rotando `alexaUserId` no producían ni un
+429. Ahora la IP la inyecta el gateway —es el único dato que quien llama no
+elige— y es la que cuenta de verdad.
+
+⚠️ El riesgo práctico era bajo y conviene decirlo: 87 palabras y 5 posiciones son
+~5·10⁹ frases, con 300 s de vida y un solo uso, y el límite global de 300/min por
+IP seguía puesto. Lo que se arregla no es un agujero abierto, es **un control que
+existía y no hacía nada** — que es peor de tener que no tener, porque se cuenta
+como defensa.
+
+Y una segunda cosa que solo salió al poner el límite: **contaba peticiones, no
+fallos.** Con el contador por IP puesto, diez pruebas de `12-voz` empezaron a dar
+429 — y esa suite canjea frases **válidas**, una detrás de otra. El número no era
+el problema; lo era qué se medía. Una casa que vincula tres aparatos gastaba lo
+mismo que quien prueba frases a ciegas, y quien acertaba a la primera se quedaba a
+un intento del bloqueo **por haber acertado**. Ahora solo suman los intentos que
+fallan, que es lo único que produce la fuerza bruta.
+
+Merece quedar escrito porque el rojo de la suite no fue una molestia: fue lo que
+encontró el fallo de diseño. Un límite que no se prueba contra el camino que sale
+bien mide otra cosa.
+
+### Lo que no era un hallazgo
+
+- **`verifyToken` cachea el payload 5 minutos sin volver a mirar la sesión**, así
+  que un `logout` no corta el token de acceso al instante. Pero el gateway ni
+  siquiera llama a `verifyToken`: valida el JWT localmente, y la ventana ya es la
+  del propio token (≤15 min, `JWT_EXPIRES_IN`). La caché no la alarga. Está
+  documentado así en `users.service.setStatus` y es coherente.
+- **`purgeTasks` y `restatusTasks` no comprueban permisos.** Correcto: los
+  autorizó el gateway sobre el recurso padre, y para cuando llegan aquí ese
+  recurso ya no existe.
+
+### Andamio muerto, de paso
+
+`pnpm test` **estaba en rojo y llevaba tiempo estándolo**, así que las 28 pruebas
+de estadística que el bloque 6 dejó como red de seguridad no las corría nadie en
+conjunto. Dos motivos: `app.controller.spec.ts` probaba clases borradas —los
+archivos eran un comentario que decía «reemplazado por…»— y tres servicios sin
+ninguna prueba hacían salir a `jest` con código 1. Retirado el andamio de cuatro
+servicios y puesto `--passWithNoTests`. Ahora: **10/10 paquetes, 88 pruebas**.
 
 ---
 
@@ -443,3 +532,4 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `b99c6e0` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `c4157fc` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `3b17625` |
+| 2026-08-06 | **Bloque 4, seis servicios cerrados.** Tres hallazgos, ninguno de los cuales habría visto un barrido de acceso: una tarea podía acabar en la columna de otro tablero, la jerarquía de permisos dependía del orden de un objeto literal, y el límite del canje de frase se indexaba por un campo del cuerpo. Además `pnpm test` estaba en rojo por andamio muerto: verde, 88 pruebas. | (este) |
