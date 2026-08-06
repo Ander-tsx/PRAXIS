@@ -103,7 +103,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 | 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ✅ | 63 (+8 fuera) | 67 |
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ✅ | 11 | 11 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ✅ | 10 archivos · 58 acciones | 9 |
-| 4 | [Microservicios](#bloque-4--microservicios) | 🔄 | 7 servicios | 6 |
+| 4 | [Microservicios](#bloque-4--microservicios) | ✅ | 7 servicios | 6 (+1 fuera) |
 | 5 | [Organismos y pantallas](#bloque-5--organismos-y-pantallas) | 🔄 | 61 | 3 |
 | 6 | [Reportes y estadística](#bloque-6--reportes-y-estadística) | ✅ | 7 informes | 7 |
 | 7 | [Alexa, sin dispositivo](#bloque-7--alexa-sin-dispositivo) | ✅ | 16 | 16 |
@@ -134,8 +134,8 @@ barrido.
 
 | Endpoint | Estado | Fecha | Commit | Hallazgo |
 |---|---|---|---|---|
-| `GET /admin/projects/:id` | ⬜ | — | — | — |
-| `PUT /admin/users/:id/role` | ⬜ | — | — | — |
+| `GET /admin/projects/:id` | ✅ | 2026-08-06 | `14-roles-globales` | Ni el dueño del proyecto entra: es proyección administrativa, no atajo |
+| `PUT /admin/users/:id/role` | ✅ | 2026-08-06 | `11-jerarquia` | Ya cubierta: jerarquía, techo de SuperAdmin y confirmación contra `data` |
 | `DELETE /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
 | `DELETE /alexa/links/:linkId` | ✅ | 2026-08-06 | sonda | Correcto: Filtra por userId: revocar ajena da revoked=0 |
 | `GET /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
@@ -160,11 +160,11 @@ barrido.
 | `PATCH /boards/:boardId/columns/reorder` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /me/assistant/quota` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `GET /me/invitations` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `DELETE /permissions/revoke` | ⬜ | — | — | — |
+| `DELETE /permissions/revoke` | ✅ | 2026-08-06 | `14-roles-globales` | Rol global + `canGrant` + `canActOn`; ni sobre la cuenta propia |
 | `GET /permissions` | ✅ | 2026-08-06 | sonda | Correcto: Catálogo de roles globales, no quién los tiene |
 | `GET /permissions/user/:userId` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `POST /permissions/assign` | ⬜ | — | — | — |
-| `POST /permissions/check` | ⬜ | — | — | — |
+| `POST /permissions/assign` | ✅ | 2026-08-06 | `14-roles-globales` | Las mismas tres. Nadie concede su propio nivel |
+| `POST /permissions/check` | ✅ | 2026-08-06 | `14-roles-globales` | El objetivo va en el cuerpo: no hay parámetro que comparar, así que pide Admin |
 | `DELETE /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `GET /projects/:projectId/assistant/conversations` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `GET /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
@@ -190,7 +190,7 @@ barrido.
 | `DELETE /projects/:projectId/roles/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /projects/:projectId/roles/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/workspaces` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `GET /` | ⬜ | — | — | — |
+| `GET /` → `GET /api` | 🔧 | 2026-08-06 | `14-roles-globales` | **Respondía 404**: el controlador existía y `AppModule` no lo declaraba. Registrado |
 | `DELETE /tasks/:taskId/attachments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /tasks/:taskId/checklists/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /tasks/:taskId/comments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
@@ -210,6 +210,29 @@ barrido.
 > ejercitados por `e2e/tests/api/01` a `09`. Lo que no significa que estén
 > auditados —cubiertos y auditados no es lo mismo—, así que al terminar los 71 de
 > arriba hay que dar una segunda pasada a esos 42 con los cinco criterios.
+
+### El health check no existía
+
+`GET /` estaba en el inventario y **respondía 404**. Dos motivos encadenados, y
+los dos valen para la próxima vez:
+
+1. El inventario se generó **escaneando decoradores**, y `AppModule` del gateway
+   no declaraba `AppController` en `controllers`. La clase existía, con sus
+   anotaciones de Swagger; en ejecución no la servía nadie. Un inventario leído
+   del código dice qué está escrito, no qué responde.
+2. Aunque hubiera estado registrada, la ruta no sería `/` sino **`/api`**, por el
+   `setGlobalPrefix('api')` de `main.ts`.
+
+Nadie lo había notado porque `dev:cli` comprueba que el **puerto acepte
+conexiones**, no que conteste: un 404 llega por un puerto abierto igual de bien
+que un 200. Se registró el controlador —el hueco es real, quien orqueste un
+despliegue necesita preguntar «¿está vivo?» sin token— devolviendo `{status:'ok'}`
+y nada más: es una ruta pública, y cualquier campo de más es inventario gratis.
+
+⚠️ **Es el único hallazgo de este bloque que salió de llamar a la ruta en vez de
+leerla.** Los 63 anteriores se cerraron con los cinco criterios sobre el código y
+con el barrido de acceso, y ninguno de los dos habría visto esto: el código está
+bien escrito, y el barrido solo recorre rutas de proyecto.
 
 ---
 
@@ -532,4 +555,5 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-06 | **Bloque 2 cerrado.** Las tres Server Actions de administración revisadas (sesión, validación de enum, motivo obligatorio, confirmación contra `data`). Jerarquía probada: nadie se administra a sí mismo, solo hacia abajo, y el techo de SuperAdmin. Los 8 organismos presentacionales, revisados en código. Ningún hallazgo. | `b99c6e0` |
 | 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `c4157fc` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `3b17625` |
+| 2026-08-06 | **Bloque 1 cerrado del todo.** Las 6 filas que quedaban: la ficha administrativa de un proyecto y las cuatro de `/permissions`, con las dos mitades cada una (`14-roles-globales`). Y el health check, que **respondía 404** porque `AppModule` no declaraba su controlador. | (este) |
 | 2026-08-06 | **Bloque 4, seis servicios cerrados.** Tres hallazgos, ninguno de los cuales habría visto un barrido de acceso: una tarea podía acabar en la columna de otro tablero, la jerarquía de permisos dependía del orden de un objeto literal, y el límite del canje de frase se indexaba por un campo del cuerpo. Además `pnpm test` estaba en rojo por andamio muerto: verde, 88 pruebas. | (este) |

@@ -15,6 +15,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AlexaModule } from './alexa/alexa.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
@@ -63,7 +65,12 @@ import { AlexaModule } from './alexa/alexa.module';
     AlexaModule,
     AdminModule,
   ],
+  /* El health check. ⚠️ Estaba escrito y **sin declarar aquí**, así que la ruta
+     salía en el inventario al escanear decoradores y respondía 404. Ver la nota
+     de `app.controller.ts`. */
+  controllers: [AppController],
   providers: [
+    AppService,
     /* Lo que hace que `ThrottlerModule` sirva de algo. Sin esta línea la
        política existe y nadie la aplica. */
     { provide: APP_GUARD, useClass: ThrottlerGuard },
