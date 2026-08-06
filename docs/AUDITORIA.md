@@ -100,7 +100,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 
 | # | Bloque | Estado | Unidades | Cerradas |
 |---|---|---|---|---|
-| 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ⬜ | 63 (+8 fuera) | 0 |
+| 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | 🔄 | 63 (+8 fuera) | 35 |
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ⬜ | 11 | 0 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ⬜ | 13 archivos | 0 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
@@ -136,9 +136,9 @@ barrido.
 |---|---|---|---|---|
 | `GET /admin/projects/:id` | ⬜ | — | — | — |
 | `PUT /admin/users/:id/role` | ⬜ | — | — | — |
-| `DELETE /alexa/links` | ⬜ | — | — | — |
-| `DELETE /alexa/links/:linkId` | ⬜ | — | — | — |
-| `GET /alexa/links` | ⬜ | — | — | — |
+| `DELETE /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
+| `DELETE /alexa/links/:linkId` | ✅ | 2026-08-06 | sonda | Correcto: Filtra por userId: revocar ajena da revoked=0 |
+| `GET /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
 | `GET /alexa/me` | ⬜ | — | — | — |
 | `GET /alexa/projects` | ⬜ | — | — | — |
 | `GET /alexa/projects/:projectId/blocked-tasks` | ⬜ | — | — | — |
@@ -148,20 +148,20 @@ barrido.
 | `GET /alexa/projects/:projectId/productivity/weekly` | ⬜ | — | — | — |
 | `GET /alexa/projects/:projectId/progress` | ⬜ | — | — | — |
 | `GET /alexa/projects/:projectId/workload` | ⬜ | — | — | — |
-| `POST /alexa/link` | ⬜ | — | — | — |
+| `POST /alexa/link` | ✅ | 2026-08-06 | sonda | Correcto: Genera frase para el propio usuario |
 | `POST /alexa/link/redeem` | ⬜ | — | — | — |
 | `POST /alexa/logout` | ⬜ | — | — | — |
 | `POST /alexa/projects/:projectId/select` | ⬜ | — | — | — |
-| `DELETE /boards/:boardId` | ⬜ | — | — | — |
-| `DELETE /boards/:boardId/columns/:id` | ⬜ | — | — | — |
-| `GET /boards/:boardId/tasks` | ⬜ | — | — | — |
-| `PATCH /boards/:boardId` | ⬜ | — | — | — |
-| `PATCH /boards/:boardId/columns/:id` | ⬜ | — | — | — |
+| `DELETE /boards/:boardId` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /boards/:boardId/columns/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /boards/:boardId/tasks` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /boards/:boardId` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /boards/:boardId/columns/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /boards/:boardId/columns/reorder` | ⬜ | — | — | — |
 | `GET /me/assistant/quota` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `GET /me/invitations` | ⬜ | — | — | — |
 | `DELETE /permissions/revoke` | ⬜ | — | — | — |
-| `GET /permissions` | ⬜ | — | — | — |
+| `GET /permissions` | ✅ | 2026-08-06 | sonda | Correcto: Catálogo de roles globales, no quién los tiene |
 | `GET /permissions/user/:userId` | ⬜ | — | — | — |
 | `POST /permissions/assign` | ⬜ | — | — | — |
 | `POST /permissions/check` | ⬜ | — | — | — |
@@ -173,38 +173,38 @@ barrido.
 | `POST /projects/:projectId/assistant/chat` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `POST /projects/:projectId/assistant/proposals/:proposalId/resolve` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `DELETE /projects/:projectId/invitations/:id` | ⬜ | — | — | — |
-| `GET /projects/:projectId/invitations` | ⬜ | — | — | — |
-| `DELETE /projects/:projectId/labels/:id` | ⬜ | — | — | — |
-| `GET /projects/:projectId/labels` | ⬜ | — | — | — |
-| `PATCH /projects/:projectId/labels/:id` | ⬜ | — | — | — |
-| `POST /projects/:projectId/labels` | ⬜ | — | — | — |
-| `DELETE /projects/:projectId/members` | ⬜ | — | — | — |
+| `GET /projects/:projectId/invitations` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /projects/:projectId/labels/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/labels` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /projects/:projectId/labels/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `POST /projects/:projectId/labels` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /projects/:projectId/members` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /projects/:projectId/members/:userId` | ⬜ | — | — | — |
 | `DELETE /projects/:projectId/membership/me` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/blocked` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/cycle-time` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/flow` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/forecast` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/people` | ⬜ | — | — | — |
-| `GET /projects/:projectId/reports/weekly` | ⬜ | — | — | — |
-| `DELETE /projects/:projectId/roles/:id` | ⬜ | — | — | — |
-| `PATCH /projects/:projectId/roles/:id` | ⬜ | — | — | — |
-| `GET /projects/:projectId/workspaces` | ⬜ | — | — | — |
+| `GET /projects/:projectId/reports/blocked` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/reports/cycle-time` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/reports/flow` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/reports/forecast` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/reports/people` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/reports/weekly` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /projects/:projectId/roles/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /projects/:projectId/roles/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /projects/:projectId/workspaces` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /` | ⬜ | — | — | — |
 | `DELETE /tasks/:taskId/attachments/:id` | ⬜ | — | — | — |
-| `DELETE /tasks/:taskId/checklists/:id` | ⬜ | — | — | — |
-| `DELETE /tasks/:taskId/comments/:id` | ⬜ | — | — | — |
-| `GET /tasks/:taskId/attachments` | ⬜ | — | — | — |
+| `DELETE /tasks/:taskId/checklists/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /tasks/:taskId/comments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /tasks/:taskId/attachments` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /tasks/:taskId/attachments/:id/content` | ⬜ | — | — | — |
-| `GET /tasks/:taskId/comments` | ⬜ | — | — | — |
-| `PATCH /tasks/:taskId/comments/:id` | ⬜ | — | — | — |
+| `GET /tasks/:taskId/comments` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /tasks/:taskId/comments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `POST /tasks/:taskId/attachments` | ⬜ | — | — | — |
 | `POST /tasks/:taskId/checklists/:id/toggle` | ⬜ | — | — | — |
-| `GET /users/:id` | ⬜ | — | — | — |
-| `DELETE /workspaces/:workspaceId` | ⬜ | — | — | — |
-| `GET /workspaces/:workspaceId` | ⬜ | — | — | — |
-| `GET /workspaces/:workspaceId/boards` | ⬜ | — | — | — |
-| `PATCH /workspaces/:workspaceId` | ⬜ | — | — | — |
+| `GET /users/:id` | ✅ | 2026-08-06 | sonda | Correcto: Directorio: el flujo de invitar lo necesita |
+| `DELETE /workspaces/:workspaceId` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /workspaces/:workspaceId` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `GET /workspaces/:workspaceId/boards` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `PATCH /workspaces/:workspaceId` | ✅ | 2026-08-06 | `10-barrido` | — |
 
 > Los 42 endpoints que ya tienen cobertura no salen en esta tabla: están
 > ejercitados por `e2e/tests/api/01` a `09`. Lo que no significa que estén
@@ -332,8 +332,31 @@ Lo que sí queda fuera: el modelo de intenciones y el diálogo de voz.
 
 ## Hallazgos abiertos
 
-Ninguno. Los que aparezcan se anotan aquí con su reproducción, y se quitan al
-cerrarlos.
+Ninguno.
+
+### Cerrados en el bloque 1 sin ser fallos
+
+Dos cosas que **parecían** hallazgos y no lo eran. Se dejan escritas para que la
+siguiente iteración no las persiga otra vez:
+
+1. **«Un miembro de solo lectura recibe 403 al leer.»** Era la sonda
+   saboteándose: recorría las rutas por orden alfabético y llamaba a
+   `DELETE /projects/:id/membership/me` a mitad del barrido. La lectora se salía
+   del proyecto y todo lo demás respondía 403 — un falso positivo con pinta de
+   fallo grave. Por eso `10-barrido-de-acceso` lleva la lista de rutas escrita a
+   mano en vez de generada.
+
+2. **«Los siete informes niegan la lectura a un miembro.»** Es la regla: piden
+   `canViewReports`, que es un permiso aparte. Los números de un proyecto —quién
+   cierra cuánto, quién va lento— no son lo mismo que ver el tablero.
+
+### Preguntas de diseño, no fallos
+
+- **`GET /users` devuelve el directorio completo a cualquiera con sesión**, con
+  los correos. Es lo que necesita el flujo de invitar, así que es deliberado —
+  pero conviene que sea una decisión consciente y no una herencia. Si algún día
+  importa, la salida sería que invitar busque por correo exacto en el servidor
+  sin devolver el listado.
 
 ---
 
@@ -365,3 +388,4 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `c4b4a7c` |
