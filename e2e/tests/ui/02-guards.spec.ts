@@ -23,6 +23,7 @@ const ZONAS = [
   { nombre: 'dashboard-front', raiz: '/dashboard', interior: '/dashboard/settings' },
   { nombre: 'projects-front', raiz: '/projects', interior: '/projects/no-existe-este-slug' },
   { nombre: 'reports-front', raiz: '/reports', interior: '/reports/no-existe-este-slug' },
+  { nombre: 'admin-front', raiz: '/admin', interior: '/admin/actividad' },
 ] as const;
 
 test.describe('Sin sesión, todo lo privado manda al login', () => {
@@ -53,9 +54,32 @@ test.describe('Sin sesión, todo lo privado manda al login', () => {
      * —el puerto interno— y saldría del shell sin que nada lo avise.
      */
     const url = new URL(page.url());
-    expect(url.port, `Se salió del shell: ${page.url()}`).not.toBe('4102');
-    expect(url.port).not.toBe('4103');
-    expect(url.port).not.toBe('4104');
+    for (const puertoInterno of ['4102', '4103', '4104', '4105']) {
+      expect(url.port, `Se salió del shell: ${page.url()}`).not.toBe(puertoInterno);
+    }
+  });
+
+  /**
+   * La zona de administración esconde la pantalla a quien no es administrador,
+   * pero **esconderla no es protegerla**: su propio `proxy.ts` solo comprueba
+   * la sesión, y el rol lo mira el `layout.tsx` para poder explicar el rechazo
+   * en vez de rebotar en silencio.
+   *
+   * Lo que de verdad protege los datos es el gateway, y eso se fija en
+   * `tests/api/07-administracion`. Aquí solo se comprueba que una cuenta
+   * corriente no ve el panel.
+   */
+  test('una cuenta corriente no ve el panel de administración', async ({ page }) => {
+    const { crearCuentaYEntrar } = await import('../../fixtures/ui');
+    await crearCuentaYEntrar(page);
+
+    await page.goto('/admin');
+
+    const contenido = await page.textContent('body');
+    expect(
+      contenido ?? '',
+      'Debería explicar que no tiene acceso, no listar cuentas',
+    ).not.toContain('admin@praxis.dev');
   });
 
   test('el proxy de gateway responde JSON, no un redirect HTML', async ({ request }) => {

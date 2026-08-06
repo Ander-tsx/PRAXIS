@@ -294,14 +294,15 @@ cambio y verde después— y `e2e:seguridad` es el marcador del endurecimiento.
 | `03-autorizacion` | Aislamiento entre cuentas, el bypass de `projectId` en el cuerpo, `AccountOwnerGuard`, permisos y jerarquía |
 | `04-proyectos` | Ciclo de vida, `name` único por dueño, `slug` único global, sufijo aleatorio, `:idOrSlug` |
 | `05-tablero` | Espacio → tablero → columnas → tarea → mover, encargados, checklists, comentarios, informes |
-| `06-seguridad` | 🏷️ `@security` — control de acceso en rutas anidadas, tipo de token, límite de intentos, cabeceras |
+| `06-administracion` | La puerta de `/api/admin`: una cuenta corriente no lee ni suspende nada; el rol global Admin sí |
+| `07-seguridad` | 🏷️ `@security` — control de acceso en rutas anidadas, tipo de token, límite de intentos, cabeceras |
 
 **Interfaz** (`e2e/tests/ui/`, en Chromium):
 
 | Archivo | Qué fija |
 |---|---|
 | `01-publico` | Landing, atajos `/login` y `/signup`, los rewrites hacia auth-front, validación de cliente |
-| `02-guards` | Cada zona privada redirige al login — **la raíz y una ruta interior por separado** |
+| `02-guards` | Las **cuatro** zonas privadas redirigen al login — la raíz y una ruta interior por separado — y el panel de administración no se ve sin rol |
 | `03-sesion` | Crear cuenta, cookie httpOnly, navegar entre zonas, salir, crear un proyecto, el slug en la URL |
 
 ⚠️ En `02-guards`, la raíz de cada zona va en su propia prueba **a propósito**:
@@ -341,6 +342,7 @@ declaración.
 | `browserType.launch: Executable doesn't exist` | Falta `pnpm e2e:instalar`. |
 | Solo fallan las `@security` | Es lo esperado mientras el hallazgo siga abierto. |
 | Un fallo que no se reproduce | Las pruebas comparten base de datos y corren con `workers: 1` a propósito. Si añadiste paralelismo, quítalo. |
+| Un login falla con «¿Se ejecutaron los seeds?» | Puede ser el límite de intentos: `/auth/login` corta a los 10 por minuto y la propia suite lo gasta. `entrar()` reintenta, pero **`06-administracion` va antes que `07-seguridad` a propósito** — si reordenas los archivos, vuelve. |
 
 ### `pnpm dev:cli` — el atajo para el día a día
 

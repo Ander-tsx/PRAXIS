@@ -87,17 +87,48 @@ export async function registrar(
   return { ...sesion, email, password };
 }
 
-/** Inicia sesión con credenciales ya existentes. */
+/**
+ * Inicia sesión con credenciales ya existentes.
+ *
+ * ⚠️ **Aguanta un 429 y reintenta.** `/auth/login` está limitado a 10 intentos
+ * por minuto y por IP, y la propia suite gasta ese presupuesto: la prueba de
+ * fuerza bruta de `06-seguridad` dispara catorce a propósito. Sin esta espera,
+ * cualquier login posterior fallaba con «¿Se ejecutaron los seeds?» — un
+ * mensaje que apunta al sitio equivocado y cuesta un rato descartar.
+ *
+ * La espera es de un minuto porque esa es la ventana del límite. Solo se paga
+ * cuando de verdad se topó con él.
+ */
 export async function entrar(
   request: APIRequestContext,
   credenciales: { email: string; password: string },
 ): Promise<Sesion> {
-  const respuesta = await request.post('/api/auth/login', { data: credenciales });
+  let respuesta = await request.post('/api/auth/login', { data: credenciales });
+
+  if (respuesta.status() === 429) {
+    await new Promise((listo) => setTimeout(listo, 61_000));
+    respuesta = await request.post('/api/auth/login', { data: credenciales });
+  }
+
   expect(
     respuesta.status(),
     `Login fallido para ${credenciales.email}. ¿Se ejecutaron los seeds?`,
   ).toBe(200);
   return data<Sesion>(respuesta);
+}
+
+/**
+ * Sesión de administración, pedida **una sola vez** por proceso.
+ *
+ * Cada `entrar()` consume presupuesto del límite de intentos, así que las
+ * pruebas que necesitan al administrador comparten la misma sesión en lugar de
+ * gastar uno cada una.
+ */
+let sesionDeAdmin: Promise<Sesion> | null = null;
+
+export function entrarComoAdmin(request: APIRequestContext): Promise<Sesion> {
+  if (!sesionDeAdmin) sesionDeAdmin = entrar(request, SEED.admin);
+  return sesionDeAdmin;
 }
 
 /** Crea un proyecto y devuelve el registro completo, con su `id` y su `slug`. */
