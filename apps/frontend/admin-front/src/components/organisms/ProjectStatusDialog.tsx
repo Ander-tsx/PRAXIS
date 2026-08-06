@@ -98,11 +98,7 @@ export function ProjectStatusDialog({
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
             Cancelar
           </Button>
-          <Button
-            type="submit"
-            variant={pideMotivo ? 'danger' : 'primary'}
-            isLoading={pending}
-          >
+          <Button type="submit" variant={pideMotivo ? 'danger' : 'primary'} isLoading={pending}>
             {destino === 'ACTIVE' ? tituloDeVuelta(proyecto.status) : copia.boton}
           </Button>
         </footer>
@@ -150,9 +146,9 @@ const COPIA: Record<
     descripcion: (
       <>
         <strong className="text-text-primary">{p.name}</strong> desaparece de la lista de sus
-        miembros y del selector de informes. <strong className="text-text-primary">No se borra
-        nada</strong>: espacios, tableros y tareas se quedan como están, y vuelve desde aquí con un
-        clic.
+        miembros y del selector de informes.{' '}
+        <strong className="text-text-primary">No se borra nada</strong>: espacios, tableros y tareas
+        se quedan como están, y vuelve desde aquí con un clic.
       </>
     ),
   }),

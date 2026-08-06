@@ -58,10 +58,7 @@ const STRIPPED_RESPONSE_HEADERS = new Set([
   'set-cookie',
 ]);
 
-function errorEnvelope(
-  code: ApiEnvelopeError['error']['code'],
-  message: string,
-): ApiEnvelopeError {
+function errorEnvelope(code: ApiEnvelopeError['error']['code'], message: string): ApiEnvelopeError {
   return { success: false, error: { code, message, details: {} } };
 }
 

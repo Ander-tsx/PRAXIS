@@ -39,18 +39,14 @@ import { firstValueFrom } from 'rxjs';
 export class AdminActivityRecorder {
   private readonly logger = new Logger(AdminActivityRecorder.name);
 
-  constructor(
-    @Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy) {}
 
   /**
    * @returns `true` si quedó anotado. `false` si no, ya registrado como error.
    */
   async record(entrada: RecordAdminActionDto): Promise<boolean> {
     try {
-      await firstValueFrom(
-        this.permissionsClient.send({ cmd: 'admin_activity_record' }, entrada),
-      );
+      await firstValueFrom(this.permissionsClient.send({ cmd: 'admin_activity_record' }, entrada));
       return true;
     } catch (error) {
       /* El payload completo y en una sola línea: es lo que permite reconstruir la

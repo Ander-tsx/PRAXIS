@@ -117,15 +117,19 @@ app.get(['/api/alexa/projects/:id/progress', '/projects/:id/progress'], (req, re
 });
 
 // GET /api/alexa/projects/:id/productivity/weekly o /projects/:id/productivity/weekly
-app.get(['/api/alexa/projects/:id/productivity/weekly', '/projects/:id/productivity/weekly'], (req, res) => {
-  const productivity = data.weeklyProductivity[req.params.id];
-  if (!productivity) return sendError(res, 404, 'Proyecto no encontrado');
-  return sendSuccess(res, {
-    projectId: req.params.id,
-    trend: productivity.deltaPercent > 0 ? 'up' : productivity.deltaPercent < 0 ? 'down' : 'stable',
-    ...productivity,
-  });
-});
+app.get(
+  ['/api/alexa/projects/:id/productivity/weekly', '/projects/:id/productivity/weekly'],
+  (req, res) => {
+    const productivity = data.weeklyProductivity[req.params.id];
+    if (!productivity) return sendError(res, 404, 'Proyecto no encontrado');
+    return sendSuccess(res, {
+      projectId: req.params.id,
+      trend:
+        productivity.deltaPercent > 0 ? 'up' : productivity.deltaPercent < 0 ? 'down' : 'stable',
+      ...productivity,
+    });
+  },
+);
 
 // GET /api/alexa/projects/:id/forecast o /projects/:id/forecast
 app.get(['/api/alexa/projects/:id/forecast', '/projects/:id/forecast'], (req, res) => {
@@ -172,15 +176,21 @@ app.get(['/api/alexa/projects/:id/members', '/projects/:id/members'], (req, res)
 });
 
 // GET /api/alexa/projects/:id/members/:memberId/performance o /projects/:id/members/:memberId/performance
-app.get(['/api/alexa/projects/:id/members/:memberId/performance', '/projects/:id/members/:memberId/performance'], (req, res) => {
-  const performance = data.memberPerformance[req.params.memberId];
-  if (!performance) return sendError(res, 404, 'Integrante no encontrado');
-  return sendSuccess(res, {
-    projectId: req.params.id,
-    memberId: req.params.memberId,
-    ...performance,
-  });
-});
+app.get(
+  [
+    '/api/alexa/projects/:id/members/:memberId/performance',
+    '/projects/:id/members/:memberId/performance',
+  ],
+  (req, res) => {
+    const performance = data.memberPerformance[req.params.memberId];
+    if (!performance) return sendError(res, 404, 'Integrante no encontrado');
+    return sendSuccess(res, {
+      projectId: req.params.id,
+      memberId: req.params.memberId,
+      ...performance,
+    });
+  },
+);
 
 // ── Servidor Listening ────────────────────────────────────────────────
 app.listen(PORT, () => {

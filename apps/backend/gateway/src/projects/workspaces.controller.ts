@@ -9,15 +9,11 @@ import {
   Param,
   Patch,
   Post,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   CreateWorkspaceBodyDto,
   ProjectPermission,
@@ -36,18 +32,24 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/workspaces')
 export class WorkspacesController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
-  /** Lista todos los workspaces de un proyecto (la membresía basta) */
+  /**
+   * Lista todos los workspaces de un proyecto.
+   *
+   * `canViewProject` es lo que hace cumplir «la membresía basta»: sin el
+   * decorador, el guard deja pasar a cualquiera con sesión. Ver la nota larga en
+   * `members.controller.ts`.
+   */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Lista todos los workspaces de un proyecto' })
   @ApiResponse({ status: 200, description: 'Lista de workspaces recuperada' })
-  findAll(@Param('projectId') projectId: string) {
+  @ApiResponse({ status: 403, description: 'No eres miembro de este proyecto' })
+  findAll(@Request() req: Express.Request) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'workspace_find_all' }, { projectId }),
+      this.projectsClient.send({ cmd: 'workspace_find_all' }, { projectId: req.projectId }),
     );
   }
 
@@ -57,12 +59,9 @@ export class WorkspacesController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   @ApiOperation({ summary: 'Crea un workspace dentro de un proyecto' })
   @ApiResponse({ status: 201, description: 'Workspace creado exitosamente' })
-  create(
-    @Param('projectId') projectId: string,
-    @Body() body: CreateWorkspaceBodyDto,
-  ) {
+  create(@Request() req: Express.Request, @Body() body: CreateWorkspaceBodyDto) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'workspace_create' }, { projectId, ...body }),
+      this.projectsClient.send({ cmd: 'workspace_create' }, { projectId: req.projectId, ...body }),
     );
   }
 }
@@ -79,11 +78,18 @@ export class WorkspacesResourceController {
     private readonly taskPurge: TaskPurgeService,
   ) {}
 
-  /** Detalle de un workspace por ID (la membresía basta) */
+  /**
+   * Detalle de un workspace por ID.
+   *
+   * `canViewProject` hace cumplir «la membresía basta»; el guard resuelve el
+   * proyecto desde el `:workspaceId`. Ver `members.controller.ts`.
+   */
   @Get(':workspaceId')
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de un workspace por ID' })
   @ApiResponse({ status: 200, description: 'Detalle del workspace recuperado' })
+  @ApiResponse({ status: 403, description: 'No eres miembro de este proyecto' })
   findOne(@Param('workspaceId') workspaceId: string) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_find_one' }, { id: workspaceId }),
@@ -95,10 +101,7 @@ export class WorkspacesResourceController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_BOARD)
   @ApiOperation({ summary: 'Actualiza un workspace' })
   @ApiResponse({ status: 200, description: 'Workspace actualizado exitosamente' })
-  update(
-    @Param('workspaceId') workspaceId: string,
-    @Body() body: UpdateWorkspaceBodyDto,
-  ) {
+  update(@Param('workspaceId') workspaceId: string, @Body() body: UpdateWorkspaceBodyDto) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'workspace_update' }, { id: workspaceId, ...body }),
     );

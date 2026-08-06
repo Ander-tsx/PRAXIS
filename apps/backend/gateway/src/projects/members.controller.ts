@@ -15,12 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   AddMemberBodyDto,
   ChangeMemberRoleBodyDto,
@@ -37,18 +32,38 @@ import { RequireProjectPermission } from '../common/decorators/require-project-p
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/members')
 export class MembersController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
-  /** Lista todos los miembros de un proyecto (la membresía basta) */
+  /**
+   * Lista todos los miembros de un proyecto.
+   *
+   * ⚠️ **`canViewProject` es lo que hace cumplir «la membresía basta».**
+   *
+   * Sin el decorador esto no pedía nada: `ProjectPermissionGuard` empieza con
+   * `if (!requiredPermission) return true`, que es lo correcto para las rutas de
+   * `/me/*` —ya acotadas al usuario del token— pero aquí significaba
+   * «cualquiera con sesión». Con solo el UUID del proyecto, que viaja en
+   * cualquier URL compartida, un extraño se llevaba la lista de miembros con sus
+   * roles y su matriz de permisos completa. `GET /projects/:id` respondía 403 y
+   * esta, 200.
+   *
+   * `canViewProject` es el suelo de la jerarquía —cualquier permiso lo implica—
+   * así que exigirlo es exactamente pedir membresía, sin cerrarle la puerta a
+   * ningún rol.
+   */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Lista todos los miembros de un proyecto' })
   @ApiResponse({ status: 200, description: 'Lista de miembros recuperada' })
-  findAll(@Param('projectId') projectId: string) {
+  @ApiResponse({ status: 403, description: 'No eres miembro de este proyecto' })
+  findAll(@Request() req: Express.Request) {
+    /* `req.projectId` y no el `@Param`: la ruta puede traer un slug y el guard
+       ya lo tradujo. Leerlo del parámetro mandaba la cadena literal al
+       microservicio, que devolvía **200 con una lista vacía** — un desplegable
+       en blanco y ningún error que lo explicara. */
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'member_find_all' }, { projectId }),
+      this.projectsClient.send({ cmd: 'member_find_all' }, { projectId: req.projectId }),
     );
   }
 
@@ -58,12 +73,9 @@ export class MembersController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Agrega un miembro a un proyecto' })
   @ApiResponse({ status: 201, description: 'Miembro agregado exitosamente' })
-  add(
-    @Param('projectId') projectId: string,
-    @Body() body: AddMemberBodyDto,
-  ) {
+  add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'member_add' }, { projectId, ...body }),
+      this.projectsClient.send({ cmd: 'member_add' }, { projectId: req.projectId, ...body }),
     );
   }
 
@@ -106,11 +118,7 @@ export class MembersController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Elimina un miembro de un proyecto' })
   @ApiResponse({ status: 200, description: 'Miembro eliminado exitosamente' })
-  remove(
-    @Param('projectId') projectId: string,
-    @Request() req: Express.Request,
-    @Body() body: RemoveMemberBodyDto,
-  ) {
+  remove(@Request() req: Express.Request, @Body() body: RemoveMemberBodyDto) {
     /**
      * ⚠️ **Nadie se saca a sí mismo por aquí.**
      *
@@ -132,7 +140,7 @@ export class MembersController {
       this.projectsClient.send(
         { cmd: 'member_remove' },
         // `requesterId` solo para poder decir en el aviso quién la sacó.
-        { projectId, ...body, requesterId: req.user!.userId },
+        { projectId: req.projectId, ...body, requesterId: req.user!.userId },
       ),
     );
   }

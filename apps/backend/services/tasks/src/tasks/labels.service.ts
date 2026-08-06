@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 
-import {
-  CreateLabelDto,
-  DeleteLabelDto,
-  FindLabelsDto,
-  UpdateLabelDto,
-} from '@praxis/contracts';
+import { CreateLabelDto, DeleteLabelDto, FindLabelsDto, UpdateLabelDto } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -153,8 +148,6 @@ export class LabelsService {
 /** P2002 de Prisma: violación de restricción única. */
 function isUniqueViolation(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: string }).code === 'P2002'
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002'
   );
 }

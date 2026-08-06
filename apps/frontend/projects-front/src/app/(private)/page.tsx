@@ -1,12 +1,13 @@
 import {
   AppHeader,
-  Pagination,
+  CreateProjectDialog,
   type Paginated,
+  Pagination,
   type Project,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
-import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
+import { createProjectAction } from '@/app/actions';
 import { ProjectGrid } from '@/components/organisms/ProjectGrid';
 import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 
@@ -66,7 +67,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   };
 
   return (
-    <AppHeader title="Proyectos" headerSlot={<CreateProjectDialog />}>
+    <AppHeader title="Proyectos" headerSlot={<CreateProjectDialog action={createProjectAction} />}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-3xl text-text-primary">Tus proyectos</h2>
@@ -76,7 +77,15 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         </div>
 
         {page.items.length === 0 && !search ? (
-          <ProjectsEmptyState action={<CreateProjectDialog triggerLabel="Crear mi primer proyecto" triggerSize="lg" />} />
+          <ProjectsEmptyState
+            action={
+              <CreateProjectDialog
+                action={createProjectAction}
+                triggerLabel="Crear mi primer proyecto"
+                triggerSize="lg"
+              />
+            }
+          />
         ) : (
           <>
             <ProjectGrid

@@ -40,12 +40,12 @@ const LaunchRequestHandler = {
     }
 
     // Extraer array si viene dentro de { items: [...] } o directo
-    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const projects = Array.isArray(responseProjects)
+      ? responseProjects
+      : responseProjects?.items || [];
 
     if (!projects || projects.length === 0) {
-      return handlerInput.responseBuilder
-        .speak(messages.WELCOME_NO_PROJECTS)
-        .getResponse();
+      return handlerInput.responseBuilder.speak(messages.WELCOME_NO_PROJECTS).getResponse();
     }
 
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
@@ -63,7 +63,7 @@ const LaunchRequestHandler = {
     }
 
     // Varios proyectos → listar
-    const namesToList = projects.slice(0, 4).map(p => p.name);
+    const namesToList = projects.slice(0, 4).map((p) => p.name);
     let namesList = joinNaturally(namesToList);
     if (projects.length > 4) {
       namesList += ` y ${projects.length - 4} más`;

@@ -141,7 +141,12 @@ export class VoiceAnalyticsService {
     };
 
     if (remainingTasks === 0 && tasks.length > 0) {
-      return { ...base, estimatedDays: 0, estimatedDate: new Date().toISOString(), reason: 'COMPLETED' };
+      return {
+        ...base,
+        estimatedDays: 0,
+        estimatedDate: new Date().toISOString(),
+        reason: 'COMPLETED',
+      };
     }
 
     // Sin velocidad no hay forma honesta de estimar: se responde null y la skill lo dice
@@ -198,7 +203,7 @@ export class VoiceAnalyticsService {
           status: task.status,
           daysStalled,
           assigneeId: task.assigneeId,
-          assigneeName: task.assigneeId ? nameById.get(task.assigneeId) ?? null : null,
+          assigneeName: task.assigneeId ? (nameById.get(task.assigneeId) ?? null) : null,
           priority: task.priority,
           reason: byStatus ? 'BLOCKED_STATUS' : 'STALLED',
           isBlocked: byStatus || byStaleness,

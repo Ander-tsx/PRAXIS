@@ -61,9 +61,7 @@ const blockedTasks = {
     { title: 'Configuración de notificaciones', daysStalled: 3 },
     { title: 'Módulo de reportes', daysStalled: 2 },
   ],
-  'proj-002': [
-    { title: 'Maquetación responsive', daysStalled: 4 },
-  ],
+  'proj-002': [{ title: 'Maquetación responsive', daysStalled: 4 }],
   'proj-003': [],
 };
 

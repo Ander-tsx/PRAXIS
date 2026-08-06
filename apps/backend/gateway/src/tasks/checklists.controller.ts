@@ -11,12 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
@@ -40,9 +35,7 @@ import {
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('tasks/:taskId/checklists')
 export class ChecklistsController {
-  constructor(
-    @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
-  ) {}
+  constructor(@Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy) {}
 
   /** Agrega un ítem al checklist de una tarea */
   @Post()

@@ -46,10 +46,10 @@ export async function setUserStatusAction(
 
   let actualizado: AdminUser;
   try {
-    actualizado = await createServerApiClient().patch<AdminUser>(
-      `/admin/users/${userId}/status`,
-      { status, ...(reason ? { reason } : {}) },
-    );
+    actualizado = await createServerApiClient().patch<AdminUser>(`/admin/users/${userId}/status`, {
+      status,
+      ...(reason ? { reason } : {}),
+    });
   } catch (error) {
     return { error: describeError(error), done: null };
   }

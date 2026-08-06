@@ -49,10 +49,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <AppHeader
-      title="Configuración"
-      headerSlot={<GlobalRoleBadges roles={roles} />}
-    >
+    <AppHeader title="Configuración" headerSlot={<GlobalRoleBadges roles={roles} />}>
       {/* Sin «← Volver al panel»: ahora quien navega es la barra lateral, y un
           enlace de vuelta junto a su propia entrada resaltada sobra.
 

@@ -65,9 +65,12 @@ export class VoiceTeamService {
 
     for (const task of relevant) {
       const key = task.assigneeId as string;
-      const entry =
-        counters.get(key) ??
-        { assignedCount: 0, completedCount: 0, inProgressCount: 0, openCount: 0 };
+      const entry = counters.get(key) ?? {
+        assignedCount: 0,
+        completedCount: 0,
+        inProgressCount: 0,
+        openCount: 0,
+      };
 
       entry.assignedCount += 1;
       if (this.voiceConfig.isCompleted(task.status)) {
@@ -165,8 +168,7 @@ export class VoiceTeamService {
       inProgressCount,
       blockedCount,
       openCount: assignedCount - completedCount,
-      completionRate:
-        assignedCount === 0 ? 0 : Math.round((completedCount / assignedCount) * 100),
+      completionRate: assignedCount === 0 ? 0 : Math.round((completedCount / assignedCount) * 100),
     };
   }
 }

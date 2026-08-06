@@ -283,8 +283,7 @@ export function ColumnMenu({
                   aria-hidden="true"
                 />
                 <span>
-                  El verde marca la columna de cierre: sus tareas dejan de contar como
-                  pendientes.
+                  El verde marca la columna de cierre: sus tareas dejan de contar como pendientes.
                 </span>
               </span>
 
@@ -362,9 +361,7 @@ export function ColumnMenu({
 
           {view === 'delete' && (
             <div className="flex flex-col gap-2 p-1.5">
-              <p className="font-sans text-xs text-text-primary">
-                ¿Eliminar «{columnName}»?
-              </p>
+              <p className="font-sans text-xs text-text-primary">¿Eliminar «{columnName}»?</p>
               <p className="font-sans text-[11px]" style={{ color: colors.warning }}>
                 {taskCount === 1
                   ? 'Se irá con ella su única tarea.'

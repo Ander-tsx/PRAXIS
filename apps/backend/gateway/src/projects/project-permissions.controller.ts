@@ -36,9 +36,7 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/permissions')
 export class ProjectPermissionsController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   @Get('me')
   @HttpCode(HttpStatus.OK)

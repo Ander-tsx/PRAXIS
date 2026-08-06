@@ -33,11 +33,7 @@
       "locales": {
         "es-MX": {
           "description": "Sample Full Description",
-          "examplePhrases": [
-            "Alexa abre hola mundo",
-            "hola",
-            "ayuda"
-          ],
+          "examplePhrases": ["Alexa abre hola mundo", "hola", "ayuda"],
           "keywords": [],
           "name": "Praxis Skill",
           "summary": "Sample Short Description"

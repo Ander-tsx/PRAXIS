@@ -68,8 +68,8 @@ export function VoiceCallout() {
           </h2>
           <p className="max-w-prose font-sans text-sm text-text-secondary">
             Para entrar en <strong className="font-semibold">Praxis Voice</strong>, la skill de
-            Alexa, necesitas generar tu frase semilla y dictársela. Se hace en Configuración y
-            tarda menos de un minuto.
+            Alexa, necesitas generar tu frase semilla y dictársela. Se hace en Configuración y tarda
+            menos de un minuto.
           </p>
         </div>
       </div>

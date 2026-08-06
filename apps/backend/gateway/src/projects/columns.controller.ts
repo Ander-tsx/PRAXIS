@@ -11,12 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   CreateColumnBodyDto,
   ProjectPermission,
@@ -47,13 +42,8 @@ export class ColumnsController {
   @RequireProjectPermission(ProjectPermission.CAN_CREATE_COLUMN)
   @ApiOperation({ summary: 'Agrega una columna a un board' })
   @ApiResponse({ status: 201, description: 'Columna agregada exitosamente' })
-  create(
-    @Param('boardId') boardId: string,
-    @Body() body: CreateColumnBodyDto,
-  ) {
-    return firstValueFrom(
-      this.projectsClient.send({ cmd: 'column_create' }, { boardId, ...body }),
-    );
+  create(@Param('boardId') boardId: string, @Body() body: CreateColumnBodyDto) {
+    return firstValueFrom(this.projectsClient.send({ cmd: 'column_create' }, { boardId, ...body }));
   }
 
   /**
@@ -69,10 +59,7 @@ export class ColumnsController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_COLUMN)
   @ApiOperation({ summary: 'Reordena las columnas de un board' })
   @ApiResponse({ status: 200, description: 'Columnas reordenadas exitosamente' })
-  reorder(
-    @Param('boardId') boardId: string,
-    @Body() body: ReorderColumnsBodyDto,
-  ) {
+  reorder(@Param('boardId') boardId: string, @Body() body: ReorderColumnsBodyDto) {
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'column_reorder' }, { boardId, ...body }),
     );
@@ -95,10 +82,7 @@ export class ColumnsController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_COLUMN)
   @ApiOperation({ summary: 'Renombra una columna o le cambia el color' })
   @ApiResponse({ status: 200, description: 'Columna actualizada exitosamente' })
-  async update(
-    @Param('id') id: string,
-    @Body() body: UpdateColumnBodyDto,
-  ) {
+  async update(@Param('id') id: string, @Body() body: UpdateColumnBodyDto) {
     const updated = await firstValueFrom(
       this.projectsClient.send({ cmd: 'column_update' }, { id, ...body }),
     );
@@ -124,9 +108,7 @@ export class ColumnsController {
   @ApiOperation({ summary: 'Elimina una columna y sus tareas' })
   @ApiResponse({ status: 200, description: 'Columna eliminada exitosamente' })
   async delete(@Param('id') id: string) {
-    const result = await firstValueFrom(
-      this.projectsClient.send({ cmd: 'column_delete' }, { id }),
-    );
+    const result = await firstValueFrom(this.projectsClient.send({ cmd: 'column_delete' }, { id }));
     await this.taskPurge.afterColumnDeleted(id);
     return result;
   }

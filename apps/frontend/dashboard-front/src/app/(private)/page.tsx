@@ -1,5 +1,6 @@
 import {
   AppHeader,
+  CreateProjectDialog,
   DUE_SOON_DAYS,
   type MyInvitation,
   type Paginated,
@@ -9,7 +10,7 @@ import {
   dueState,
 } from '@praxis/commons';
 import type { Metadata } from 'next';
-import { CreateProjectDialog } from '@/components/organisms/CreateProjectDialog';
+import { createProjectAction } from '@/app/actions';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
@@ -55,10 +56,14 @@ export default async function DashboardPage() {
   const [page, invitations, voiceLinks, dueTasks] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
-    api.get<MyInvitation[]>('/me/invitations').catch(() => [] as MyInvitation[]),
+    api
+      .get<MyInvitation[]>('/me/invitations')
+      .catch(() => [] as MyInvitation[]),
     /* Si alexa-service no responde no se enseña el aviso: es mejor no decir
        nada que invitar a vincular contra un servicio que está caído. */
-    api.get<VoiceLink[]>('/alexa/links').catch(() => [] as VoiceLink[]),
+    api
+      .get<VoiceLink[]>('/alexa/links')
+      .catch(() => [] as VoiceLink[]),
     api
       /* `excludeDone`: una tarea que ya está en la columna de cierre —la verde—
          no es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar
@@ -100,7 +105,9 @@ export default async function DashboardPage() {
   return (
     <AppHeader
       title="Panel"
-      headerSlot={projects.length > 0 ? <CreateProjectDialog /> : undefined}
+      headerSlot={
+        projects.length > 0 ? <CreateProjectDialog action={createProjectAction} /> : undefined
+      }
     >
       <div className="flex flex-col gap-8">
         <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
@@ -125,7 +132,13 @@ export default async function DashboardPage() {
 
         {projects.length === 0 ? (
           <DashboardEmptyState
-            action={<CreateProjectDialog triggerLabel="Crear mi primer proyecto" triggerSize="lg" />}
+            action={
+              <CreateProjectDialog
+                action={createProjectAction}
+                triggerLabel="Crear mi primer proyecto"
+                triggerSize="lg"
+              />
+            }
           />
         ) : (
           <>

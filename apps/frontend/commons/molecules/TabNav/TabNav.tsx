@@ -52,7 +52,9 @@ export function TabNav({ tabs, activeId, renderLink }: TabNavProps) {
               <span
                 className={[
                   'rounded-full px-1.5 py-0.5 font-sans text-[11px] tabular-nums',
-                  isActive ? 'bg-primary-muted text-primary' : 'bg-surface-elevated text-text-disabled',
+                  isActive
+                    ? 'bg-primary-muted text-primary'
+                    : 'bg-surface-elevated text-text-disabled',
                 ].join(' ')}
               >
                 {tab.count}

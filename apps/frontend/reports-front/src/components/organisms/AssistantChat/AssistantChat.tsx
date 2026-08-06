@@ -86,12 +86,7 @@ const SUGERENCIAS = [
  * se sale eligiendo —abrir una conversación o empezar otra—, y las dos llevan
  * al chat, que es donde se puede hacer algo.
  */
-export function AssistantChat({
-  projectId,
-  cuotaInicial,
-  nombres,
-  etiquetas,
-}: AssistantChatProps) {
+export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: AssistantChatProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
@@ -263,172 +258,171 @@ export function AssistantChat({
         />
       ) : (
         <>
+          {mensajes.length > 0 && (
+            <div
+              ref={hiloRef}
+              className="flex max-h-[28rem] flex-col gap-4 overflow-y-auto pr-1"
+              aria-live="polite"
+            >
+              {mensajes.map((mensaje) => (
+                <div key={mensaje.id} className="flex flex-col gap-3">
+                  <Burbuja mensaje={mensaje} />
 
-      {mensajes.length > 0 && (
-        <div
-          ref={hiloRef}
-          className="flex max-h-[28rem] flex-col gap-4 overflow-y-auto pr-1"
-          aria-live="polite"
-        >
-          {mensajes.map((mensaje) => (
-            <div key={mensaje.id} className="flex flex-col gap-3">
-              <Burbuja mensaje={mensaje} />
-
-              {(mensaje.proposals ?? []).map((propuesta, indice) => {
-                if (esPropuestaDeTarea(propuesta)) {
-                  return (
-                    <TaskProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                if (esPropuestaDeAsignacion(propuesta)) {
-                  return (
-                    <AssignProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                if (esPropuestaDeEdicion(propuesta)) {
-                  return (
-                    <EditProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                if (esPropuestaDeMovimiento(propuesta)) {
-                  return (
-                    <MoveProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                if (esPropuestaDeChecklist(propuesta)) {
-                  return (
-                    <ChecklistProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                if (esPropuestaDeComentario(propuesta)) {
-                  return (
-                    <CommentProposalCard
-                      key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                      projectId={projectId}
-                      proposalId={propuesta.id}
-                      estadoGuardado={propuesta.status}
-                      propuesta={propuesta.args}
-                      nombres={nombres}
-                      etiquetas={etiquetas}
-                    />
-                  );
-                }
-                /* Una herramienta que el servicio conozca y esta pantalla no.
+                  {(mensaje.proposals ?? []).map((propuesta, indice) => {
+                    if (esPropuestaDeTarea(propuesta)) {
+                      return (
+                        <TaskProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    if (esPropuestaDeAsignacion(propuesta)) {
+                      return (
+                        <AssignProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    if (esPropuestaDeEdicion(propuesta)) {
+                      return (
+                        <EditProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    if (esPropuestaDeMovimiento(propuesta)) {
+                      return (
+                        <MoveProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    if (esPropuestaDeChecklist(propuesta)) {
+                      return (
+                        <ChecklistProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    if (esPropuestaDeComentario(propuesta)) {
+                      return (
+                        <CommentProposalCard
+                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                          projectId={projectId}
+                          proposalId={propuesta.id}
+                          estadoGuardado={propuesta.status}
+                          propuesta={propuesta.args}
+                          nombres={nombres}
+                          etiquetas={etiquetas}
+                        />
+                      );
+                    }
+                    /* Una herramienta que el servicio conozca y esta pantalla no.
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
-                return null;
-              })}
-            </div>
-          ))}
+                    return null;
+                  })}
+                </div>
+              ))}
 
-          {pendiente && (
-            <div className="flex items-center gap-2">
-              <ThinkingStars />
-              <p className="font-sans text-sm italic text-text-disabled">Pensando…</p>
+              {pendiente && (
+                <div className="flex items-center gap-2">
+                  <ThinkingStars />
+                  <p className="font-sans text-sm italic text-text-disabled">Pensando…</p>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {mensajes.length === 0 && (
-        <div className="flex flex-wrap gap-2">
-          {SUGERENCIAS.map((sugerencia) => (
-            <button
-              key={sugerencia}
-              type="button"
-              disabled={agotada}
-              onClick={() => enviar(sugerencia)}
-              className="rounded-full border border-border px-3 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          {mensajes.length === 0 && (
+            <div className="flex flex-wrap gap-2">
+              {SUGERENCIAS.map((sugerencia) => (
+                <button
+                  key={sugerencia}
+                  type="button"
+                  disabled={agotada}
+                  onClick={() => enviar(sugerencia)}
+                  className="rounded-full border border-border px-3 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {sugerencia}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {agotada && cuota ? (
+            <p
+              role="note"
+              className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
+              style={{
+                background: alpha(colors.warning, 8),
+                borderColor: alpha(colors.warning, 30),
+              }}
             >
-              {sugerencia}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {agotada && cuota ? (
-        <p
-          role="note"
-          className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
-          style={{
-            background: alpha(colors.warning, 8),
-            borderColor: alpha(colors.warning, 30),
-          }}
-        >
-          Has gastado los <strong>{cuota.limite}</strong> mensajes de este mes. Vuelven
-          el <strong>{formatoReinicio(cuota.reinicia)}</strong>.
-        </p>
-      ) : (
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(evento) => {
-            evento.preventDefault();
-            enviar(texto);
-          }}
-        >
-          <label htmlFor={campoId} className="sr-only">
-            Pregunta al asistente
-          </label>
-          <div className="flex items-stretch gap-2">
-            <textarea
-              id={campoId}
-              rows={2}
-              maxLength={2000}
-              value={texto}
-              disabled={pendiente}
-              placeholder="¿Quién puede llevar el formulario de login?"
-              onChange={(evento) => setTexto(evento.target.value)}
-              onKeyDown={(evento) => {
-                /* Enter envía, Mayús+Enter parte la línea: es lo que hace
+              Has gastado los <strong>{cuota.limite}</strong> mensajes de este mes. Vuelven el{' '}
+              <strong>{formatoReinicio(cuota.reinicia)}</strong>.
+            </p>
+          ) : (
+            <form
+              className="flex flex-col gap-2"
+              onSubmit={(evento) => {
+                evento.preventDefault();
+                enviar(texto);
+              }}
+            >
+              <label htmlFor={campoId} className="sr-only">
+                Pregunta al asistente
+              </label>
+              <div className="flex items-stretch gap-2">
+                <textarea
+                  id={campoId}
+                  rows={2}
+                  maxLength={2000}
+                  value={texto}
+                  disabled={pendiente}
+                  placeholder="¿Quién puede llevar el formulario de login?"
+                  onChange={(evento) => setTexto(evento.target.value)}
+                  onKeyDown={(evento) => {
+                    /* Enter envía, Mayús+Enter parte la línea: es lo que hace
                    cualquier chat, y `requestSubmit` respeta la validación del
                    formulario en vez de saltársela. */
-                if (evento.key === 'Enter' && !evento.shiftKey) {
-                  evento.preventDefault();
-                  evento.currentTarget.form?.requestSubmit();
-                }
-              }}
-              className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-            />
-            {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
+                    if (evento.key === 'Enter' && !evento.shiftKey) {
+                      evento.preventDefault();
+                      evento.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                />
+                {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
                 filas el botón por defecto mide una (`size="md"`, 40px) y quedaba
                 anclado abajo, con un hueco encima que rompía la simetría con el
                 campo. Va por `style` y no por una clase `h-full`: la clase
@@ -436,23 +430,23 @@ export function AssistantChat({
                 especificidad, y quién gana depende del orden en que Tailwind
                 generó el CSS, no del orden en el `className` — un `style` en
                 línea no tiene esa ambigüedad. */}
-            <Button
-              type="submit"
-              isLoading={pendiente}
-              disabled={texto.trim().length === 0}
-              style={{ height: 70 }}
-            >
-              Preguntar
-            </Button>
-          </div>
+                <Button
+                  type="submit"
+                  isLoading={pendiente}
+                  disabled={texto.trim().length === 0}
+                  style={{ height: 70 }}
+                >
+                  Preguntar
+                </Button>
+              </div>
 
-          <p className="font-sans text-xs text-text-disabled">
-            El asistente puede equivocarse. Revisa cada propuesta antes de aceptarla.
-          </p>
+              <p className="font-sans text-xs text-text-disabled">
+                El asistente puede equivocarse. Revisa cada propuesta antes de aceptarla.
+              </p>
 
-          {error && <p className="font-sans text-sm text-error">{error}</p>}
-        </form>
-      )}
+              {error && <p className="font-sans text-sm text-error">{error}</p>}
+            </form>
+          )}
         </>
       )}
     </section>
@@ -542,9 +536,7 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
           mio ? 'text-text-primary' : 'text-text-secondary',
         ].join(' ')}
         style={
-          mio
-            ? { background: alpha(colors.primary, 14) }
-            : { background: colors.surfaceElevated }
+          mio ? { background: alpha(colors.primary, 14) } : { background: colors.surfaceElevated }
         }
       >
         <TextoDelModelo texto={mensaje.text} />

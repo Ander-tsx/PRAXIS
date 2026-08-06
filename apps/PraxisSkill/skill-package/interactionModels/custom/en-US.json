@@ -29,23 +29,12 @@
               "type": "AMAZON.SearchQuery"
             }
           ],
-          "samples": [
-            "log in",
-            "login",
-            "sign in",
-            "connect account"
-          ]
+          "samples": ["log in", "login", "sign in", "connect account"]
         },
         {
           "name": "LogoutIntent",
           "slots": [],
-          "samples": [
-            "log out",
-            "logout",
-            "sign out",
-            "disconnect account",
-            "unlink account"
-          ]
+          "samples": ["log out", "logout", "sign out", "disconnect account", "unlink account"]
         },
         {
           "name": "SelectBoardIntent",

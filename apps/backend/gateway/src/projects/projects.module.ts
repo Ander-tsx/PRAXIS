@@ -17,7 +17,6 @@ import {
 import { ColumnStatusSyncService } from './column-status-sync.service';
 import { TaskPurgeService } from './task-purge.service';
 
-
 @Module({
   imports: [
     AuthModule,

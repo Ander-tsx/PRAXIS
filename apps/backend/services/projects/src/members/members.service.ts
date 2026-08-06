@@ -29,7 +29,8 @@ export class MembersService {
     ]);
 
     if (!project) throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
-    if (!role)    throw new RpcException({ statusCode: 404, message: 'Rol de proyecto no encontrado' });
+    if (!role)
+      throw new RpcException({ statusCode: 404, message: 'Rol de proyecto no encontrado' });
 
     const existing = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: dto.projectId, userId: dto.userId } },
@@ -40,8 +41,8 @@ export class MembersService {
 
     const member = await this.prisma.projectMember.create({
       data: {
-        projectId:     dto.projectId,
-        userId:        dto.userId,
+        projectId: dto.projectId,
+        userId: dto.userId,
         projectRoleId: dto.projectRoleId,
       },
       include: { projectRole: true },
@@ -50,6 +51,9 @@ export class MembersService {
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);
+    /* Y su lista de proyectos, que acaba de ganar uno. Ver la nota de
+       `invalidarListasDe` en projects.service. */
+    await this.redis.del(`projects:member:${dto.userId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
     return member;
   }
@@ -73,6 +77,9 @@ export class MembersService {
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);
+    /* Y su lista, que acaba de perder uno: seguir enseñándolo es ofrecer una
+       puerta que el guard ya cerró. */
+    await this.redis.del(`projects:member:${dto.userId}`);
     await this.projectRolesService.invalidatePermissionCache(dto.userId, dto.projectId);
 
     await this.notifications.emit({
@@ -136,7 +143,7 @@ export class MembersService {
     if (cached) return cached;
 
     const members = await this.prisma.projectMember.findMany({
-      where:   { projectId },
+      where: { projectId },
       orderBy: { joinedAt: 'asc' },
       include: { projectRole: true },
     });

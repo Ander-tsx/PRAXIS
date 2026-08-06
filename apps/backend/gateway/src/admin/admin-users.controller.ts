@@ -162,7 +162,10 @@ export class AdminUsersController {
   @ApiOperation({ summary: 'Cambia el estado de una cuenta (solo administradores)' })
   @ApiResponse({ status: 200, description: 'Estado actualizado' })
   @ApiResponse({ status: 400, description: 'Falta el motivo al suspender o desactivar' })
-  @ApiResponse({ status: 403, description: 'Sobre tu propia cuenta, o sobre una de nivel igual o superior' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sobre tu propia cuenta, o sobre una de nivel igual o superior',
+  })
   @ApiResponse({ status: 409, description: 'Dejaría el sistema sin SuperAdmin' })
   async setStatus(
     @Request() req: Express.Request,
@@ -173,9 +176,7 @@ export class AdminUsersController {
 
     /* La regla no cabe en un decorador porque depende del valor de otro campo. */
     if (body.status !== UserStatus.ACTIVE && !body.reason?.trim()) {
-      throw new BadRequestException(
-        'Hace falta un motivo para suspender o desactivar una cuenta.',
-      );
+      throw new BadRequestException('Hace falta un motivo para suspender o desactivar una cuenta.');
     }
 
     await this.exigirMando(actorId, id);
@@ -219,7 +220,10 @@ export class AdminUsersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Fija el rol global de una cuenta (solo administradores)' })
   @ApiResponse({ status: 200, description: 'Rol fijado' })
-  @ApiResponse({ status: 403, description: 'Sobre tu propia cuenta, sobre un igual, o un rol que no puedes repartir' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sobre tu propia cuenta, sobre un igual, o un rol que no puedes repartir',
+  })
   @ApiResponse({ status: 409, description: 'Dejaría el sistema sin SuperAdmin' })
   async setRole(
     @Request() req: Express.Request,
@@ -279,15 +283,11 @@ export class AdminUsersController {
    */
   private async exigirMando(actorId: string, targetId: string): Promise<void> {
     if (actorId === targetId) {
-      throw new ForbiddenException(
-        'No puedes administrar tu propia cuenta desde el panel.',
-      );
+      throw new ForbiddenException('No puedes administrar tu propia cuenta desde el panel.');
     }
 
     if (!(await this.globalRoles.canActOn(actorId, targetId))) {
-      throw new ForbiddenException(
-        'Solo puedes administrar cuentas de nivel inferior al tuyo.',
-      );
+      throw new ForbiddenException('Solo puedes administrar cuentas de nivel inferior al tuyo.');
     }
   }
 

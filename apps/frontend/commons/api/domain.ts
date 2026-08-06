@@ -136,8 +136,7 @@ export function globalRoleLevelOf(roleNames: readonly string[]): number {
   const NIVELES: Record<GlobalRoleName, number> = { User: 0, Admin: 1, SuperAdmin: 2 };
 
   return roleNames.reduce(
-    (nivel, name) =>
-      name in NIVELES ? Math.max(nivel, NIVELES[name as GlobalRoleName]) : nivel,
+    (nivel, name) => (name in NIVELES ? Math.max(nivel, NIVELES[name as GlobalRoleName]) : nivel),
     0,
   );
 }

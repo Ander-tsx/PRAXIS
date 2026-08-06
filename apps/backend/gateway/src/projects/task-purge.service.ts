@@ -51,9 +51,7 @@ export class TaskPurgeService {
 
   private async purgeConversations(projectId: string) {
     try {
-      await firstValueFrom(
-        this.assistantClient.send({ cmd: 'assistant_purge' }, { projectId }),
-      );
+      await firstValueFrom(this.assistantClient.send({ cmd: 'assistant_purge' }, { projectId }));
     } catch (error) {
       this.logger.error(
         `No se pudieron borrar las conversaciones del proyecto ${projectId}: ${
@@ -87,9 +85,7 @@ export class TaskPurgeService {
     what: string,
   ) {
     try {
-      const result = await firstValueFrom(
-        this.tasksClient.send({ cmd: 'task_purge' }, payload),
-      );
+      const result = await firstValueFrom(this.tasksClient.send({ cmd: 'task_purge' }, payload));
       if (result?.deleted > 0) {
         this.logger.log(`Limpieza de tareas: ${result.deleted} borradas al eliminar ${what}`);
       }

@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import {
-  CreateBoardDto,
-  UpdateBoardDto,
-} from '@praxis/contracts';
+import { CreateBoardDto, UpdateBoardDto } from '@praxis/contracts';
 
 const LIST_CACHE_TTL = 60;
 
@@ -65,7 +62,6 @@ export class BoardsService {
     return board;
   }
 
-
   async updateBoard(dto: UpdateBoardDto) {
     const board = await this.prisma.board.findUnique({ where: { id: dto.id } });
     if (!board) {
@@ -74,7 +70,7 @@ export class BoardsService {
 
     const updated = await this.prisma.board.update({
       where: { id: dto.id },
-      data:  { name: dto.name },
+      data: { name: dto.name },
     });
 
     await this.redis.del(`board:${board.id}`);

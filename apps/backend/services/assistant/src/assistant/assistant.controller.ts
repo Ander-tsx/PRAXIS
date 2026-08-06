@@ -92,15 +92,9 @@ export class AssistantController {
   }
 
   @MessagePattern({ cmd: 'assistant_conversation_delete' })
-  async borrar(
-    @Payload() dto: { userId: string; projectId: string; conversationId: string },
-  ) {
+  async borrar(@Payload() dto: { userId: string; projectId: string; conversationId: string }) {
     try {
-      return await this.assistant.borrarConversacion(
-        dto.userId,
-        dto.projectId,
-        dto.conversationId,
-      );
+      return await this.assistant.borrarConversacion(dto.userId, dto.projectId, dto.conversationId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }

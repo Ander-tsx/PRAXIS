@@ -4,13 +4,18 @@ import { Button } from '@praxis/commons';
 import { useEffect } from 'react';
 
 /**
- * Frontera de error del panel.
+ * Frontera de error de **Reportes**.
  *
- * Cubre lo que `loadCurrentUser` o `GET /projects` puedan lanzar. No se enseña
- * `error.message` tal cual: puede traer detalles del backend que no pintan
- * nada en pantalla.
+ * Cubre lo que `loadCurrentUser`, `GET /projects` o el `snapshot` puedan lanzar.
+ * No se enseña `error.message` tal cual: puede traer detalles del backend que no
+ * pintan nada en pantalla.
+ *
+ * ⚠️ Es la que recoge el fallo del índice de la sección, y por eso importa que
+ * exista: esa pantalla atrapaba el error y lo enseñaba como «todavía no estás en
+ * ningún proyecto». Con el `catch` quitado, un corte llega aquí y se lee como lo
+ * que es, con un botón para reintentar.
  */
-export default function DashboardError({
+export default function ReportsError({
   error,
   reset,
 }: {
@@ -18,7 +23,11 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[projects]', error);
+    /* ⚠️ Decía `[projects]`: este archivo se copió de projects-front y la
+       etiqueta se vino con él. Un fallo de Reportes que se anuncia como de
+       Proyectos manda a mirar la zona equivocada, que es justo lo que uno hace
+       con la consola delante. */
+    console.error('[reports]', error);
   }, [error]);
 
   return (

@@ -1,0 +1,19 @@
+{
+  "name": "@praxis/e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pruebas end-to-end de PRAXIS: contrato del gateway y recorridos de navegador sobre el multi-zone.",
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui",
+    "test:regresion": "playwright test --grep-invert @security",
+    "test:seguridad": "playwright test --grep @security",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen http://localhost:4100"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^20.14.0"
+  }
+}

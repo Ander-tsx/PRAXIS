@@ -341,28 +341,27 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                 </button>
               </a>
               {!isAuthenticated && (
-              <a href="/auth/login">
-                <button
-                  type="button"
-                  className="font-sans text-sm font-medium px-7 py-3 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
-                  style={{ borderColor: 'rgba(255,255,255,0.12)' }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(255,255,255,0.25)';
-                    el.style.background = 'rgba(255,255,255,0.04)';
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(255,255,255,0.12)';
-                    el.style.background = 'transparent';
-                  }}
-                >
-                  Iniciar sesión
-                </button>
-              </a>
+                <a href="/auth/login">
+                  <button
+                    type="button"
+                    className="font-sans text-sm font-medium px-7 py-3 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
+                    style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                    onMouseEnter={(e) => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.borderColor = 'rgba(255,255,255,0.25)';
+                      el.style.background = 'rgba(255,255,255,0.04)';
+                    }}
+                    onMouseLeave={(e) => {
+                      const el = e.currentTarget as HTMLButtonElement;
+                      el.style.borderColor = 'rgba(255,255,255,0.12)';
+                      el.style.background = 'transparent';
+                    }}
+                  >
+                    Iniciar sesión
+                  </button>
+                </a>
               )}
             </div>
-
           </div>
 
           {/* Right: Echo Dot 3D */}
@@ -371,7 +370,6 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
           </div>
         </div>
       </div>
-
     </section>
   );
 }

@@ -9,8 +9,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const BlockedTasksIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'BlockedTasksAnalysisIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'BlockedTasksAnalysisIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -40,7 +42,7 @@ const BlockedTasksIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const items = Array.isArray(responseData) ? responseData : (responseData?.items || []);
+    const items = Array.isArray(responseData) ? responseData : responseData?.items || [];
 
     if (!items || items.length === 0) {
       return handlerInput.responseBuilder
@@ -52,7 +54,7 @@ const BlockedTasksIntentHandler = {
     // Máximo 3 tareas principales
     const topTasks = items.slice(0, 3);
     let speakOutput = topTasks
-      .map(task => messages.BLOCKED_TASKS_ITEM(task.title, task.daysStalled))
+      .map((task) => messages.BLOCKED_TASKS_ITEM(task.title, task.daysStalled))
       .join(' ');
 
     if (items.length > 3) {
@@ -61,10 +63,7 @@ const BlockedTasksIntentHandler = {
 
     speakOutput += messages.BLOCKED_TASKS_FOOTER;
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

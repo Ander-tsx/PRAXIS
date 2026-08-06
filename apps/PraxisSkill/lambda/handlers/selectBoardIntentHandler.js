@@ -10,8 +10,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const SelectBoardIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'SelectBoardIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'SelectBoardIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -26,9 +28,7 @@ const SelectBoardIntentHandler = {
 
     const dialogState = Alexa.getDialogState(handlerInput.requestEnvelope);
     if (dialogState !== 'COMPLETED') {
-      return handlerInput.responseBuilder
-        .addDelegateDirective()
-        .getResponse();
+      return handlerInput.responseBuilder.addDelegateDirective().getResponse();
     }
 
     const boardName = Alexa.getSlotValue(handlerInput.requestEnvelope, 'boardName');
@@ -47,7 +47,9 @@ const SelectBoardIntentHandler = {
       return await buildErrorResponse(handlerInput, error);
     }
 
-    const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+    const projects = Array.isArray(responseProjects)
+      ? responseProjects
+      : responseProjects?.items || [];
     const match = findBestMatch(boardName, projects, 'name');
 
     if (!match) {

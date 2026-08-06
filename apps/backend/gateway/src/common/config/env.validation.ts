@@ -2,12 +2,8 @@ import * as Joi from 'joi';
 
 export const envValidationSchema = Joi.object({
   HTTP_PORT: Joi.number().default(3000),
-  NODE_ENV: Joi.string()
-    .valid('development', 'production', 'test')
-    .default('development'),
-  LOG_LEVEL: Joi.string()
-    .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
-    .default('info'),
+  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+  LOG_LEVEL: Joi.string().valid('trace', 'debug', 'info', 'warn', 'error', 'fatal').default('info'),
 
   JWT_SECRET: Joi.string().required(),
 

@@ -4,12 +4,7 @@ import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-import {
-  FindUsersDto,
-  type SetUserStatusDto,
-  UpdateUserDto,
-  UserStatus,
-} from '@praxis/contracts';
+import { FindUsersDto, type SetUserStatusDto, UpdateUserDto, UserStatus } from '@praxis/contracts';
 
 const USER_CACHE_TTL = 300;
 
@@ -21,9 +16,9 @@ export class UsersService {
   ) {}
 
   async findAll(dto: FindUsersDto) {
-    const page  = dto.query?.page  ?? 1;
+    const page = dto.query?.page ?? 1;
     const limit = dto.query?.limit ?? 20;
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
 
     const where: any = {};
 
@@ -31,7 +26,7 @@ export class UsersService {
       const s = dto.filters.search;
       where.OR = [
         { firstName: { contains: s, mode: 'insensitive' } },
-        { lastName:  { contains: s, mode: 'insensitive' } },
+        { lastName: { contains: s, mode: 'insensitive' } },
         { credential: { email: { contains: s, mode: 'insensitive' } } },
       ];
     }
@@ -39,7 +34,7 @@ export class UsersService {
     if (dto.filters?.createdFrom || dto.filters?.createdTo) {
       where.createdAt = {};
       if (dto.filters.createdFrom) where.createdAt.gte = dto.filters.createdFrom;
-      if (dto.filters.createdTo)   where.createdAt.lte = dto.filters.createdTo;
+      if (dto.filters.createdTo) where.createdAt.lte = dto.filters.createdTo;
     }
 
     /* El filtro por estado estaba comentado como TODO en `FindUsersFilter`. Lo
@@ -90,10 +85,10 @@ export class UsersService {
       data: {
         /* camelCase primero; `first_name` sigue aceptándose por compatibilidad
            y se ignora si vienen los dos. Ver `UpdateUserBodyDto`. */
-        ...(dto.firstName  !== undefined && { firstName: dto.firstName }),
+        ...(dto.firstName !== undefined && { firstName: dto.firstName }),
         ...(dto.firstName === undefined &&
           dto.first_name !== undefined && { firstName: dto.first_name }),
-        ...(dto.lastName   !== undefined && { lastName: dto.lastName }),
+        ...(dto.lastName !== undefined && { lastName: dto.lastName }),
         ...(dto.lastName === undefined &&
           dto.last_name !== undefined && { lastName: dto.last_name }),
       },
@@ -141,7 +136,7 @@ export class UsersService {
 
     const updated = await this.prisma.user.update({
       where: { id: dto.id },
-      data:  { status: dto.status },
+      data: { status: dto.status },
       include: { credential: { select: { email: true } } },
     });
 

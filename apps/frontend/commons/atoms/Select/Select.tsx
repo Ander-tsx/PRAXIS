@@ -123,9 +123,7 @@ export function Select({
      barra y el teclado se movería fuera de cuadro. */
   useEffect(() => {
     if (!abierto) return;
-    listaRef.current
-      ?.querySelector('[data-marcada="true"]')
-      ?.scrollIntoView({ block: 'nearest' });
+    listaRef.current?.querySelector('[data-marcada="true"]')?.scrollIntoView({ block: 'nearest' });
   }, [abierto, marcada]);
 
   function abrir() {

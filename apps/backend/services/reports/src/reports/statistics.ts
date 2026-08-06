@@ -47,13 +47,9 @@ export interface Suficiencia {
   faltanDias: number;
 }
 
-export function evaluarSuficiencia(
-  tareasCerradas: number,
-  diasDeHistorial: number,
-): Suficiencia {
+export function evaluarSuficiencia(tareasCerradas: number, diasDeHistorial: number): Suficiencia {
   return {
-    suficiente:
-      tareasCerradas >= MIN_TAREAS_CERRADAS && diasDeHistorial >= MIN_DIAS_HISTORIAL,
+    suficiente: tareasCerradas >= MIN_TAREAS_CERRADAS && diasDeHistorial >= MIN_DIAS_HISTORIAL,
     tareasCerradas,
     faltanTareas: Math.max(0, MIN_TAREAS_CERRADAS - tareasCerradas),
     diasDeHistorial,
@@ -102,8 +98,7 @@ export function simularEntrega(params: {
     let dias = 0;
 
     while (restantes > 0 && dias < TOPE_DIAS) {
-      const muestra =
-        throughputDiario[Math.floor(Math.random() * throughputDiario.length)];
+      const muestra = throughputDiario[Math.floor(Math.random() * throughputDiario.length)];
       restantes -= muestra;
       dias++;
     }
@@ -140,13 +135,47 @@ export function acumularFlujo(
     saldo.set(fila.columnId, (saldo.get(fila.columnId) ?? 0) + fila.entradas - fila.salidas);
   }
 
-  const dias = [...porDia.keys()].sort();
+  const conMovimiento = [...porDia.keys()].sort();
+  if (conMovimiento.length === 0) return [];
+
+  /**
+   * ⚠️ **Se rellenan los días intermedios sin actividad.**
+   *
+   * Solo se emitían los días que tenían alguna fila, y un día en el que no se
+   * movió nada en ninguna columna no la tiene. El resultado: un fin de semana
+   * tranquilo desaparecía de la serie y el eje de tiempo dejaba de ser
+   * uniforme — tres días de pendiente se dibujaban como uno. En un flujo
+   * acumulado eso no es un detalle: la pendiente **es** la lectura.
+   *
+   * Se rellena entre el primer y el último día observados. Fuera de ese rango
+   * no se inventa nada: la ventana la elige quien llama.
+   */
+  const dias = rangoDeDias(conMovimiento[0], conMovimiento[conMovimiento.length - 1]);
   const acumulado: Record<string, number> = Object.fromEntries(columnIds.map((id) => [id, 0]));
 
   return dias.map((dia) => {
-    for (const [columnId, delta] of porDia.get(dia)!) {
+    for (const [columnId, delta] of porDia.get(dia) ?? []) {
       acumulado[columnId] = (acumulado[columnId] ?? 0) + delta;
     }
+    /* Los días sin filas no entran en el bucle y heredan el acumulado tal cual,
+       que es justo lo que tiene que pasar: nadie movió nada. */
     return { day: dia, porColumna: { ...acumulado } };
   });
+}
+
+/** Todos los días entre dos fechas `YYYY-MM-DD`, ambas incluidas. */
+function rangoDeDias(desde: string, hasta: string): string[] {
+  const dias: string[] = [];
+  const cursor = new Date(`${desde}T00:00:00.000Z`);
+  const fin = new Date(`${hasta}T00:00:00.000Z`);
+
+  /* Un tope por si llegan fechas absurdas: más de cinco años de serie diaria no
+     es un gráfico, es un cuelgue. */
+  let guarda = 0;
+  while (cursor.getTime() <= fin.getTime() && guarda++ < 2000) {
+    dias.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return dias;
 }

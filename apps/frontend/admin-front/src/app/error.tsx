@@ -4,13 +4,13 @@ import { Button } from '@praxis/commons';
 import { useEffect } from 'react';
 
 /**
- * Frontera de error del panel.
+ * Frontera de error del panel de administración.
  *
  * Cubre lo que `loadPrivateChrome` o las rutas de `/api/admin` puedan lanzar. No se enseña
  * `error.message` tal cual: puede traer detalles del backend que no pintan
  * nada en pantalla.
  */
-export default function DashboardError({
+export default function AdminError({
   error,
   reset,
 }: {

@@ -2,16 +2,16 @@
 
 import type { INestApplication } from '@nestjs/common';
 import {
-    Body,
-    Controller,
-    ForbiddenException,
-    Get,
-    HttpStatus,
-    Module,
-    NotFoundException,
-    Post,
-    UnauthorizedException,
-    ValidationPipe,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpStatus,
+  Module,
+  NotFoundException,
+  Post,
+  UnauthorizedException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { IsString } from 'class-validator';
@@ -119,7 +119,10 @@ describe('response normalization', () => {
   });
 
   it('wraps validation errors in the standard error envelope', async () => {
-    const response = await request(app.getHttpServer()).post('/test').send({}).expect(HttpStatus.BAD_REQUEST);
+    const response = await request(app.getHttpServer())
+      .post('/test')
+      .send({})
+      .expect(HttpStatus.BAD_REQUEST);
 
     expect(response.body).toEqual({
       success: false,
@@ -134,7 +137,9 @@ describe('response normalization', () => {
   });
 
   it('wraps not found errors in the standard error envelope', async () => {
-    const response = await request(app.getHttpServer()).get('/test/not-found').expect(HttpStatus.NOT_FOUND);
+    const response = await request(app.getHttpServer())
+      .get('/test/not-found')
+      .expect(HttpStatus.NOT_FOUND);
 
     expect(response.body).toEqual({
       success: false,
@@ -147,7 +152,9 @@ describe('response normalization', () => {
   });
 
   it('wraps unauthorized errors in the standard error envelope', async () => {
-    const response = await request(app.getHttpServer()).get('/test/unauthorized').expect(HttpStatus.UNAUTHORIZED);
+    const response = await request(app.getHttpServer())
+      .get('/test/unauthorized')
+      .expect(HttpStatus.UNAUTHORIZED);
 
     expect(response.body).toEqual({
       success: false,

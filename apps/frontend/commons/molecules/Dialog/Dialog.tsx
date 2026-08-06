@@ -83,9 +83,7 @@ export function Dialog({
           <h3 id={titleId} className="font-display text-2xl text-text-primary">
             {title}
           </h3>
-          {description && (
-            <p className="font-sans text-sm text-text-secondary">{description}</p>
-          )}
+          {description && <p className="font-sans text-sm text-text-secondary">{description}</p>}
         </div>
 
         <button

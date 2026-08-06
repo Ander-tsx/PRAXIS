@@ -1,6 +1,13 @@
 'use client';
 
-import { Badge, type ProjectInvitation, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
+import {
+  Badge,
+  type ProjectInvitation,
+  type UserProfile,
+  alpha,
+  colors,
+  personLabel,
+} from '@praxis/commons';
 import { useActionState } from 'react';
 import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
@@ -71,10 +78,7 @@ export function PendingInvitations({
 }
 
 function CancelButton({ projectId, invitationId }: { projectId: string; invitationId: string }) {
-  const [state, formAction, pending] = useActionState(
-    cancelInvitationAction,
-    MEMBER_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useActionState(cancelInvitationAction, MEMBER_INITIAL_STATE);
 
   return (
     <form action={formAction}>

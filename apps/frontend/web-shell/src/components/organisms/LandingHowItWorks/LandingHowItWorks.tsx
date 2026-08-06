@@ -51,7 +51,10 @@ function ProjectRolePanel() {
             className="flex items-center gap-3 rounded-lg px-3 py-2.5"
             style={{ background: 'var(--color-surface-elevated)' }}
           >
-            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: role.color }} />
+            <span
+              className="h-2 w-2 flex-shrink-0 rounded-full"
+              style={{ background: role.color }}
+            />
             <span className="font-sans text-xs text-text-primary">{role.name}</span>
             <span className="ml-auto font-mono text-[0.65rem] text-text-disabled">
               {role.permissions} de 10 permisos
@@ -77,9 +80,24 @@ function ProjectRolePanel() {
 /** Vista del miembro: sus tareas asignadas en el tablero. */
 function MemberTasksPanel() {
   const tasks = [
-    { name: 'Formulario de registro', column: 'En progreso', color: 'var(--color-warning)', priority: 'ALTA' },
-    { name: 'Validar DTOs del gateway', column: 'Por hacer', color: 'var(--color-info)', priority: 'MEDIA' },
-    { name: 'Migración de permisos', column: 'Hecho', color: 'var(--color-success)', priority: 'BAJA' },
+    {
+      name: 'Formulario de registro',
+      column: 'En progreso',
+      color: 'var(--color-warning)',
+      priority: 'ALTA',
+    },
+    {
+      name: 'Validar DTOs del gateway',
+      column: 'Por hacer',
+      color: 'var(--color-info)',
+      priority: 'MEDIA',
+    },
+    {
+      name: 'Migración de permisos',
+      column: 'Hecho',
+      color: 'var(--color-success)',
+      priority: 'BAJA',
+    },
   ];
 
   return (
@@ -91,7 +109,10 @@ function MemberTasksPanel() {
             className="flex items-center gap-2.5 rounded-lg px-3 py-2.5"
             style={{ background: 'var(--color-surface-elevated)' }}
           >
-            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: task.color }} />
+            <span
+              className="h-2 w-2 flex-shrink-0 rounded-full"
+              style={{ background: task.color }}
+            />
             <span className="flex-1 truncate font-sans text-xs text-text-primary">{task.name}</span>
             <span
               className="flex-shrink-0 rounded px-1.5 py-0.5 font-sans text-[0.6rem] font-medium"
@@ -113,8 +134,18 @@ function MemberTasksPanel() {
 function AdminPanel() {
   const users = [
     { name: 'Andrés G.', email: 'andres@praxis.dev', role: 'Admin', color: 'var(--color-accent)' },
-    { name: 'Juan J.', email: 'juan@praxis.dev', role: 'User', color: 'var(--color-text-secondary)' },
-    { name: 'César E.', email: 'cesar@praxis.dev', role: 'User', color: 'var(--color-text-secondary)' },
+    {
+      name: 'Juan J.',
+      email: 'juan@praxis.dev',
+      role: 'User',
+      color: 'var(--color-text-secondary)',
+    },
+    {
+      name: 'César E.',
+      email: 'cesar@praxis.dev',
+      role: 'User',
+      color: 'var(--color-text-secondary)',
+    },
   ];
 
   return (

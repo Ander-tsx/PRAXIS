@@ -43,13 +43,7 @@ export interface PaginationProps {
   nombre?: string;
 }
 
-export function Pagination({
-  page,
-  limit,
-  total,
-  hrefFor,
-  nombre = 'elementos',
-}: PaginationProps) {
+export function Pagination({ page, limit, total, hrefFor, nombre = 'elementos' }: PaginationProps) {
   const paginas = Math.max(1, Math.ceil(total / limit));
   if (paginas <= 1) return null;
 
@@ -100,8 +94,7 @@ function Salto({
   disabled: boolean;
   children: string;
 }) {
-  const clases =
-    'rounded-lg border px-3 py-1.5 font-sans text-sm transition-colors';
+  const clases = 'rounded-lg border px-3 py-1.5 font-sans text-sm transition-colors';
 
   if (disabled) {
     return (

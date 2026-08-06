@@ -82,7 +82,7 @@ export class ColumnsService {
     const updates = dto.columnIds.map((colId, index) =>
       this.prisma.boardColumn.update({
         where: { id: colId },
-        data:  { order: index },
+        data: { order: index },
       }),
     );
 

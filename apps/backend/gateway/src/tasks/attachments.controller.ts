@@ -153,16 +153,9 @@ export class AttachmentsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Descarga el contenido de un adjunto' })
   @ApiResponse({ status: 200, description: 'Bytes del archivo' })
-  async download(
-    @Param('id') id: string,
-    @Request() req: Express.Request,
-    @Res() res: Response,
-  ) {
+  async download(@Param('id') id: string, @Request() req: Express.Request, @Res() res: Response) {
     const file = await firstValueFrom(
-      this.tasksClient.send(
-        { cmd: 'attachment_get_content' },
-        { id, projectId: req.projectId },
-      ),
+      this.tasksClient.send({ cmd: 'attachment_get_content' }, { id, projectId: req.projectId }),
     );
 
     const buffer = Buffer.from(file.content, 'base64');

@@ -36,10 +36,10 @@ import { PrismaClient } from '../src/generated/prisma-client';
 // ─── UUIDs fijos compartidos entre seeders ────────────────────────────────────
 
 // Usuarios (definidos en credentials/seed.ts)
-const ADMIN_USER_ID  = '11111111-1111-4111-8111-111111111111';
-const MARIA_USER_ID  = '22222222-2222-4222-8222-222222222221';
+const ADMIN_USER_ID = '11111111-1111-4111-8111-111111111111';
+const MARIA_USER_ID = '22222222-2222-4222-8222-222222222221';
 const CARLOS_USER_ID = '33333333-3333-4333-8333-333333333331';
-const SOFIA_USER_ID  = '44444444-4444-4444-8444-444444444441';
+const SOFIA_USER_ID = '44444444-4444-4444-8444-444444444441';
 
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
 
@@ -53,9 +53,9 @@ const SOFIA_USER_ID  = '44444444-4444-4444-8444-444444444441';
  * idempotente por sí solo.
  */
 const SEED_USER_ROLES: ReadonlyArray<{ userId: string; roleName: GlobalRole }> = [
-  { userId: ADMIN_USER_ID,  roleName: GLOBAL_ROLES.SUPER_ADMIN },
-  { userId: SOFIA_USER_ID,  roleName: GLOBAL_ROLES.ADMIN },
-  { userId: MARIA_USER_ID,  roleName: GLOBAL_ROLES.USER },
+  { userId: ADMIN_USER_ID, roleName: GLOBAL_ROLES.SUPER_ADMIN },
+  { userId: SOFIA_USER_ID, roleName: GLOBAL_ROLES.ADMIN },
+  { userId: MARIA_USER_ID, roleName: GLOBAL_ROLES.USER },
   { userId: CARLOS_USER_ID, roleName: GLOBAL_ROLES.USER },
 ];
 
@@ -74,7 +74,7 @@ async function main() {
 
     for (const role of GLOBAL_ROLE_SEED) {
       const saved = await prisma.role.upsert({
-        where:  { name: role.name },
+        where: { name: role.name },
         update: { description: role.description },
         create: { name: role.name, description: role.description },
       });
@@ -96,9 +96,13 @@ async function main() {
         await prisma.userRole.create({
           data: { userId: assignment.userId, roleId },
         });
-        console.log(`  ✅  userId: ${assignment.userId}  →  rol: "${assignment.roleName}" (${roleId})`);
+        console.log(
+          `  ✅  userId: ${assignment.userId}  →  rol: "${assignment.roleName}" (${roleId})`,
+        );
       } else {
-        console.log(`  ℹ️   userId: ${assignment.userId} ya tiene rol "${assignment.roleName}". Omitido.`);
+        console.log(
+          `  ℹ️   userId: ${assignment.userId} ya tiene rol "${assignment.roleName}". Omitido.`,
+        );
       }
     }
 
@@ -117,7 +121,9 @@ async function main() {
       where: { userId: ADMIN_USER_ID, roleId: adminRoleId },
     });
     if (count > 0) {
-      console.log(`\n  🧹  Retirada la fila "Admin" heredada de ${ADMIN_USER_ID} (ahora es SuperAdmin).`);
+      console.log(
+        `\n  🧹  Retirada la fila "Admin" heredada de ${ADMIN_USER_ID} (ahora es SuperAdmin).`,
+      );
     }
 
     console.log('\n✅  Seed de permissions completado.');

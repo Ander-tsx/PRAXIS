@@ -36,9 +36,7 @@ import { firstValueFrom } from 'rxjs';
 export class GlobalRolesService {
   private readonly logger = new Logger(GlobalRolesService.name);
 
-  constructor(
-    @Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy) {}
 
   /**
    * Los nombres de los roles globales de un usuario.

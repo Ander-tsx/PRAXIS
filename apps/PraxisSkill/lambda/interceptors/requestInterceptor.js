@@ -66,7 +66,10 @@ const RequestInterceptor = {
           await handlerInput.attributesManager.savePersistentAttributes();
           console.log('[RequestInterceptor] Atributos revocados eliminados de DynamoDB');
         } catch (saveError) {
-          console.log('[RequestInterceptor] Error al guardar atributos en DynamoDB:', saveError.message);
+          console.log(
+            '[RequestInterceptor] Error al guardar atributos en DynamoDB:',
+            saveError.message,
+          );
         }
       }
 

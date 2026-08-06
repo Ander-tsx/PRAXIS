@@ -13,12 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   CreateProjectBodyDto,
   FindProjectsQueryDto,
@@ -49,10 +44,13 @@ export class ProjectsController {
   @ApiResponse({ status: 409, description: 'Ya existe un proyecto con ese nombre' })
   create(@Request() req: Express.Request, @Body() body: CreateProjectBodyDto) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_create' }, {
-        ...body,
-        ownerId: req.user!.userId,
-      }),
+      this.projectsClient.send(
+        { cmd: 'project_create' },
+        {
+          ...body,
+          ownerId: req.user!.userId,
+        },
+      ),
     );
   }
 
@@ -96,15 +94,10 @@ export class ProjectsController {
   @RequireProjectPermission(ProjectPermission.CAN_EDIT_PROJECT)
   @ApiOperation({ summary: 'Actualiza un proyecto' })
   @ApiResponse({ status: 200, description: 'Proyecto actualizado exitosamente' })
-  update(
-    @Request() req: Express.Request,
-    @Body() body: UpdateProjectBodyDto,
-  ) {
+  update(@Request() req: Express.Request, @Body() body: UpdateProjectBodyDto) {
     const id = req.projectId!;
     // El id va después del spread: uno colado en el cuerpo no debe pisar la ruta.
-    return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_update' }, { ...body, id }),
-    );
+    return firstValueFrom(this.projectsClient.send({ cmd: 'project_update' }, { ...body, id }));
   }
 
   /** Elimina un proyecto (requiere poder eliminar boards) */

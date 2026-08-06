@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import {
-  CreateWorkspaceDto,
-  UpdateWorkspaceDto,
-} from '@praxis/contracts';
+import { CreateWorkspaceDto, UpdateWorkspaceDto } from '@praxis/contracts';
 
 const LIST_CACHE_TTL = 60;
 
@@ -80,7 +77,6 @@ export class WorkspacesService {
     return workspace;
   }
 
-
   async updateWorkspace(dto: UpdateWorkspaceDto) {
     const workspace = await this.prisma.workspace.findUnique({ where: { id: dto.id } });
     if (!workspace) {
@@ -113,8 +109,6 @@ export class WorkspacesService {
 /** P2002 de Prisma: violación de restricción única. */
 function isUniqueViolation(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: string }).code === 'P2002'
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2002'
   );
 }

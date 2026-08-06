@@ -68,11 +68,11 @@ export interface ReportPerson {
 export function tokenColor(token: string | null | undefined): string {
   const mapa: Record<string, string> = {
     primary: colors.primary,
-    accent:  colors.accent,
-    info:    colors.info,
+    accent: colors.accent,
+    info: colors.info,
     success: colors.success,
     warning: colors.warning,
-    error:   colors.error,
+    error: colors.error,
   };
   return (token && mapa[token]) || colors.textSecondary;
 }
@@ -94,7 +94,20 @@ export function formatDuration(hours: number | null): string {
 /** `2026-07-21` → `21 jul`. Las series diarias no necesitan el año. */
 export function formatDay(iso: string): string {
   const [, mes, dia] = iso.split('-');
-  const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const meses = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   return `${Number(dia)} ${meses[Number(mes) - 1]}`;
 }
 
@@ -102,7 +115,7 @@ export const PRIORITY_ORDER = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const;
 
 export const PRIORITY_COLOR: Record<string, string> = {
   URGENT: colors.error,
-  HIGH:   colors.warning,
+  HIGH: colors.warning,
   MEDIUM: colors.info,
-  LOW:    colors.textSecondary,
+  LOW: colors.textSecondary,
 };

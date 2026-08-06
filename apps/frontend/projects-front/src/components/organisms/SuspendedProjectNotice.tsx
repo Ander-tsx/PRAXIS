@@ -31,17 +31,14 @@ export interface SuspendedProjectNoticeProps {
  */
 export function SuspendedProjectNotice({ reason, isOwner }: SuspendedProjectNoticeProps) {
   return (
-    <section
-      role="status"
-      className="rounded-2xl border border-error/40 bg-error-muted px-5 py-4"
-    >
+    <section role="status" className="rounded-2xl border border-error/40 bg-error-muted px-5 py-4">
       <h2 className="font-sans text-sm font-semibold text-text-primary">
         Este proyecto está suspendido por la administración
       </h2>
 
       <p className="mt-1 font-sans text-sm text-text-secondary">
-        Se puede consultar todo, y no se puede modificar nada: ni tareas, ni
-        comentarios, ni miembros.{' '}
+        Se puede consultar todo, y no se puede modificar nada: ni tareas, ni comentarios, ni
+        miembros.{' '}
         {isOwner
           ? 'La suspensión no la levanta el dueño del proyecto, sino quien administra la plataforma.'
           : 'No es una cuestión de permisos: pedírselos a quien administra el proyecto no lo va a resolver.'}

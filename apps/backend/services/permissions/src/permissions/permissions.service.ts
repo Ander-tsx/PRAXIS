@@ -13,7 +13,7 @@ import {
   RevokeRoleDto,
 } from '@praxis/contracts';
 
-const ROLES_CACHE_TTL     = 60;  // 1 min
+const ROLES_CACHE_TTL = 60; // 1 min
 const ALL_ROLES_CACHE_TTL = 300; // 5 min — roles globales cambian poco
 
 @Injectable()
@@ -41,7 +41,7 @@ export class PermissionsService implements OnModuleInit {
   async onModuleInit() {
     for (const role of GLOBAL_ROLE_SEED) {
       await this.prisma.role.upsert({
-        where:  { name: role.name },
+        where: { name: role.name },
         update: { description: role.description },
         create: { name: role.name, description: role.description },
       });
@@ -179,8 +179,7 @@ export class PermissionsService implements OnModuleInit {
      */
     if (dto.roleName !== GLOBAL_ROLES.SUPER_ADMIN) {
       const superAdmins = await this.countRoleHolders({ roleName: GLOBAL_ROLES.SUPER_ADMIN });
-      const esElUltimo =
-        superAdmins.count <= 1 && superAdmins.userIds.includes(dto.userId);
+      const esElUltimo = superAdmins.count <= 1 && superAdmins.userIds.includes(dto.userId);
 
       if (esElUltimo) {
         throw new RpcException({
@@ -223,7 +222,7 @@ export class PermissionsService implements OnModuleInit {
     if (unicos.length === 0) return {};
 
     const filas = await this.prisma.userRole.findMany({
-      where:  { userId: { in: unicos } },
+      where: { userId: { in: unicos } },
       select: { userId: true, role: { select: { name: true } } },
     });
 
@@ -248,14 +247,14 @@ export class PermissionsService implements OnModuleInit {
    */
   async countRoleHolders(dto: { roleName: GlobalRole }) {
     const role = await this.prisma.role.findUnique({
-      where:  { name: dto.roleName },
+      where: { name: dto.roleName },
       select: { id: true },
     });
 
     if (!role) return { count: 0, userIds: [] as string[] };
 
     const holders = await this.prisma.userRole.findMany({
-      where:  { roleId: role.id },
+      where: { roleId: role.id },
       select: { userId: true },
     });
 

@@ -87,13 +87,16 @@ export class ProjectRolesService {
       where: { projectId_name: { projectId: dto.projectId, name: dto.name } },
     });
     if (existing) {
-      throw new RpcException({ statusCode: 409, message: `Ya existe el rol '${dto.name}' en este proyecto` });
+      throw new RpcException({
+        statusCode: 409,
+        message: `Ya existe el rol '${dto.name}' en este proyecto`,
+      });
     }
 
     const created = await this.prisma.projectRole.create({
       data: {
-        name:        dto.name,
-        projectId:   dto.projectId,
+        name: dto.name,
+        projectId: dto.projectId,
         permissions: dto.permissions,
       },
     });
@@ -111,7 +114,7 @@ export class ProjectRolesService {
     const updated = await this.prisma.projectRole.update({
       where: { id: dto.id },
       data: {
-        ...(dto.name        !== undefined && { name: dto.name }),
+        ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.permissions !== undefined && { permissions: dto.permissions }),
       },
     });
@@ -120,9 +123,7 @@ export class ProjectRolesService {
     const affected = await this.prisma.projectMember.findMany({
       where: { projectRoleId: dto.id },
     });
-    await Promise.all(
-      affected.map((m) => this.invalidatePermissionCache(m.userId, m.projectId)),
-    );
+    await Promise.all(affected.map((m) => this.invalidatePermissionCache(m.userId, m.projectId)));
     await this.invalidateProjectCache(role.projectId);
 
     return updated;
@@ -220,10 +221,7 @@ export class ProjectRolesService {
   }
 
   /** Los permisos que dan los roles, expandidos por jerarquía. */
-  private async loadEffective(
-    userId: string,
-    projectId: string,
-  ): Promise<Record<string, boolean>> {
+  private async loadEffective(userId: string, projectId: string): Promise<Record<string, boolean>> {
     const cacheKey = `project:${projectId}:user:${userId}:permissions`;
     const cached = await this.redis.get<Record<string, boolean>>(cacheKey);
     const rawPerms = cached ?? (await this.loadPermissions(userId, projectId, cacheKey));

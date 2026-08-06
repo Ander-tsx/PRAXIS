@@ -10,8 +10,10 @@ const { buildErrorResponse } = require('../utils/errors');
 
 const ProjectProgressIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectProgressIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'ProjectProgressIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -38,7 +40,9 @@ const ProjectProgressIntentHandler = {
         return await buildErrorResponse(handlerInput, error);
       }
 
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const projects = Array.isArray(responseProjects)
+        ? responseProjects
+        : responseProjects?.items || [];
       const match = findBestMatch(boardName, projects, 'name');
 
       if (!match) {
@@ -74,13 +78,10 @@ const ProjectProgressIntentHandler = {
       progress.projectName || projectName,
       progress.percentage,
       progress.completedTasks,
-      progress.totalTasks
+      progress.totalTasks,
     );
 
-    return handlerInput.responseBuilder
-      .speak(speakOutput)
-      .reprompt(messages.HELP)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(speakOutput).reprompt(messages.HELP).getResponse();
   },
 };
 

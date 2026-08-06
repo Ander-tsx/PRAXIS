@@ -27,7 +27,6 @@ function validateForm(email: string, password: string): string | null {
  * Renderiza AuthForm (molécula) con átomos Input y Button como slots.
  */
 export default function LoginPage() {
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [emailError, setEmailError] = useState('');

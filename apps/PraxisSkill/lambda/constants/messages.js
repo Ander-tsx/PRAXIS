@@ -42,8 +42,7 @@ module.exports = {
   PROJECT_NOT_FOUND: (query) =>
     `No encontré un proyecto llamado ${query}. ¿Puedes repetir el nombre?`,
 
-  NO_ACTIVE_PROJECT:
-    'Primero necesito saber con qué proyecto quieres trabajar. ¿Cuál sería?',
+  NO_ACTIVE_PROJECT: 'Primero necesito saber con qué proyecto quieres trabajar. ¿Cuál sería?',
 
   // ── Avance del proyecto ────────────────────────────────────────────
   PROJECT_PROGRESS: (projectName, percentage, completedTasks, totalTasks) =>
@@ -83,8 +82,7 @@ module.exports = {
   BLOCKED_TASKS_ITEM: (title, daysStalled) =>
     `La tarea ${title} lleva ${daysStalled} días sin cambios.`,
 
-  BLOCKED_TASKS_SUFFIX: (remaining) =>
-    ` Y ${remaining} tareas más con retraso.`,
+  BLOCKED_TASKS_SUFFIX: (remaining) => ` Y ${remaining} tareas más con retraso.`,
 
   BLOCKED_TASKS_FOOTER:
     ' Si deseas revisar si la carga de trabajo está equilibrada entre los integrantes del equipo, ' +
@@ -95,8 +93,7 @@ module.exports = {
     `${membersList}. Si deseas consultar el desempeño de un integrante específico, ` +
     `puedes decir: ¿Cómo va ${firstMemberName}?`,
 
-  WORKLOAD_ITEM: (name, count) =>
-    `${name} tiene ${count} tareas asignadas`,
+  WORKLOAD_ITEM: (name, count) => `${name} tiene ${count} tareas asignadas`,
 
   // ── Desempeño de miembro ───────────────────────────────────────────
   MEMBER_PERFORMANCE: (name, assigned, completed, inProgress) =>
@@ -119,8 +116,7 @@ module.exports = {
   STOP: 'Hasta luego. Recuerda que puedes volver cuando necesites gestionar tus proyectos.',
 
   // ── Fallback ───────────────────────────────────────────────────────
-  FALLBACK:
-    'Lo siento, no entendí eso. Puedes decir ayuda para conocer las opciones disponibles.',
+  FALLBACK: 'Lo siento, no entendí eso. Puedes decir ayuda para conocer las opciones disponibles.',
 
   // ── Tabla de Errores HTTP Especificados ─────────────────────────────
   ERROR_BAD_REQUEST:
@@ -129,21 +125,16 @@ module.exports = {
   ERROR_UNAUTHORIZED:
     'Tu sesión expiró. Por favor inicia sesión nuevamente diciendo mi semilla es seguido de tu frase.',
 
-  ERROR_FORBIDDEN:
-    'No tienes permisos para consultar la información de este proyecto.',
+  ERROR_FORBIDDEN: 'No tienes permisos para consultar la información de este proyecto.',
 
-  ERROR_NOT_FOUND:
-    'No encontré ese proyecto o integrante.',
+  ERROR_NOT_FOUND: 'No encontré ese proyecto o integrante.',
 
-  ERROR_GONE:
-    'La frase semilla ha expirado. Por favor genera una nueva frase en la app web.',
+  ERROR_GONE: 'La frase semilla ha expirado. Por favor genera una nueva frase en la app web.',
 
   ERROR_TOO_MANY_REQUESTS:
     'Has intentado demasiadas veces. Espera un momento antes de volver a intentar.',
 
-  ERROR_SERVER:
-    'No pude conectarme con Praxis en este momento. Inténtalo más tarde.',
+  ERROR_SERVER: 'No pude conectarme con Praxis en este momento. Inténtalo más tarde.',
 
-  ERROR_GENERIC:
-    'Ocurrió un error inesperado. Por favor intenta de nuevo.',
+  ERROR_GENERIC: 'Ocurrió un error inesperado. Por favor intenta de nuevo.',
 };

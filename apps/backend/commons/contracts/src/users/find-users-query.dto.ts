@@ -16,72 +16,70 @@ import { FindUsersDto } from './find-users.dto';
  * plegar a la forma que espera el microservicio, que no se toca.
  */
 export class FindUsersQueryDto {
-    @ApiPropertyOptional({ minimum: 1, default: 1 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    page?: number;
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 
-    @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    @Max(100)
-    limit?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 
-    @ApiPropertyOptional({ enum: SortOrder })
-    @IsOptional()
-    @IsEnum(SortOrder)
-    sortOrder?: SortOrder;
+  @ApiPropertyOptional({ enum: SortOrder })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 
-    @ApiPropertyOptional()
-    @IsOptional()
-    @IsString()
-    sortBy?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
 
-    @ApiPropertyOptional({ description: 'Busca por nombre, apellido o email' })
-    @IsOptional()
-    @IsString()
-    search?: string;
+  @ApiPropertyOptional({ description: 'Busca por nombre, apellido o email' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 
-    @ApiPropertyOptional({ type: String, format: 'date-time' })
-    @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    createdFrom?: Date;
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  createdFrom?: Date;
 
-    @ApiPropertyOptional({ type: String, format: 'date-time' })
-    @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    createdTo?: Date;
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  createdTo?: Date;
 
-    /** Pliega los params planos a la forma anidada del microservicio. */
-    toFindUsersDto(): FindUsersDto {
-        const query = stripUndefined({
-            page: this.page,
-            limit: this.limit,
-            sortBy: this.sortBy,
-            sortOrder: this.sortOrder,
-        });
+  /** Pliega los params planos a la forma anidada del microservicio. */
+  toFindUsersDto(): FindUsersDto {
+    const query = stripUndefined({
+      page: this.page,
+      limit: this.limit,
+      sortBy: this.sortBy,
+      sortOrder: this.sortOrder,
+    });
 
-        const filters = stripUndefined({
-            search: this.search,
-            createdFrom: this.createdFrom,
-            createdTo: this.createdTo,
-        });
+    const filters = stripUndefined({
+      search: this.search,
+      createdFrom: this.createdFrom,
+      createdTo: this.createdTo,
+    });
 
-        const dto: FindUsersDto = {};
-        if (Object.keys(query).length) dto.query = query;
-        if (Object.keys(filters).length) dto.filters = filters;
-        return dto;
-    }
+    const dto: FindUsersDto = {};
+    if (Object.keys(query).length) dto.query = query;
+    if (Object.keys(filters).length) dto.filters = filters;
+    return dto;
+  }
 }
 
 function stripUndefined<T extends Record<string, unknown>>(input: T): T {
-    return Object.fromEntries(
-        Object.entries(input).filter(([, value]) => value !== undefined),
-    ) as T;
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 }

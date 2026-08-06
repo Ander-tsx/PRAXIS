@@ -8,14 +8,7 @@ import { IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-
  * tema y ninguna se sale de la paleta. Con un hex abierto acabas con
  * veintitrés verdes distintos y ninguno es el del sistema.
  */
-export const LABEL_COLORS = [
-  'primary',
-  'accent',
-  'success',
-  'warning',
-  'error',
-  'info',
-] as const;
+export const LABEL_COLORS = ['primary', 'accent', 'success', 'warning', 'error', 'info'] as const;
 
 export type LabelColor = (typeof LABEL_COLORS)[number];
 

@@ -1,250 +1,246 @@
+<div align="center">
+
 # PRAXIS
 
-Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
+**Gestión de proyectos sobre arquitectura SOFEA.**
+Microfrontends Next.js sobre una malla de microservicios NestJS.
 
-## Stack
+<p>
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2-000000?style=flat-square&logo=nextdotjs&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19.2-087ea4?style=flat-square&logo=react&logoColor=white">
+  <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-e0234e?style=flat-square&logo=nestjs&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white">
+  <img alt="Redis" src="https://img.shields.io/badge/Redis-7-dc382d?style=flat-square&logo=redis&logoColor=white">
+</p>
 
-| Capa | Tecnología |
-|------|------------|
-| Frontend | Next.js 16 + TypeScript · **Multi-Zones** (`basePath` + `rewrites()`) |
-| Backend | NestJS + PostgreSQL (Prisma) + Redis · transporte TCP |
-| Monorepo | pnpm workspaces + Turborepo |
+<p>
+  <img alt="Tests" src="https://img.shields.io/badge/E2E-156_passing-3fb950?style=flat-square&logo=playwright&logoColor=white">
+  <img alt="Unit" src="https://img.shields.io/badge/unit-28_passing-3fb950?style=flat-square&logo=jest&logoColor=white">
+  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-9-f69220?style=flat-square&logo=pnpm&logoColor=white">
+  <img alt="Turborepo" src="https://img.shields.io/badge/Turborepo-2-ef4444?style=flat-square&logo=turborepo&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square">
+</p>
 
-> No usamos Module Federation. Cada microfrontend es una app Next independiente
-> con su propio `basePath`, y `web-shell` las publica bajo un solo origen
-> mediante `rewrites()`. Se entra siempre por el shell (4100), nunca por el
-> puerto de una zona.
-
-## Requisitos
-
-- Node.js 20+
-- pnpm 9+
-- Docker Desktop
-
-## Puertos
-
-| Servicio | Puerto |
-|---|---|
-| gateway (HTTP) | 3000 |
-| credentials-service | 3001 |
-| permissions-service | 3002 |
-| projects-service | 3003 |
-| tasks-service | 3004 |
-| reports-service | 3005 |
-| assistant-service | 3006 |
-| alexa-service | 3007 |
-| web-shell | 4100 |
-| auth-front | 4101 |
-| dashboard-front | 4102 |
-| projects-front | 4103 |
-| reports-front | 4104 |
+</div>
 
 ---
 
-# Primer arranque
+## Arquitectura
 
-Los ocho pasos, en orden. Ninguno es opcional.
+Seis aplicaciones Next.js independientes bajo un único origen vía **Multi-Zones**
+(`basePath` + `rewrites()`), y ocho procesos NestJS detrás de un gateway HTTP que
+habla con ellos por TCP.
 
-## 1. Instalar dependencias
+```mermaid
+graph LR
+  N["Navegador"] --> S["web-shell :4100"]
+
+  subgraph Zonas["Microfrontends"]
+    A["auth :4101"]
+    D["dashboard :4102"]
+    P["projects :4103"]
+    R["reports :4104"]
+    AD["admin :4105"]
+  end
+
+  S -.rewrites.-> Zonas
+  Zonas -->|"/api/gateway"| G["gateway :3000"]
+
+  subgraph Servicios["Microservicios TCP"]
+    C["credentials :3001"]
+    PE["permissions :3002"]
+    PR["projects :3003"]
+    T["tasks :3004"]
+    RE["reports :3005"]
+    AS["assistant :3006"]
+    AL["alexa :3007"]
+  end
+
+  G --> Servicios
+  Servicios --> DB[("PostgreSQL")]
+  Servicios --> RD[("Redis")]
+```
+
+> No hay Module Federation. Cada zona es una app independiente y se puede
+> desplegar sola; el shell solo enruta. Se entra siempre por el `:4100`.
+
+<table>
+<tr><th align="left">Capa</th><th align="left">Decisión</th></tr>
+<tr><td>Sesión</td><td>JWT en cookie <code>httpOnly</code>. Cada zona monta su proxy y añade el <code>Bearer</code>; el token nunca llega al JS del cliente.</td></tr>
+<tr><td>Autorización</td><td>Dos capas: rol global (plataforma) y rol de proyecto (18 permisos con jerarquía).</td></tr>
+<tr><td>Respuestas</td><td>Todo viaja envuelto en <code>{ success, data, meta }</code>.</td></tr>
+<tr><td>Estilos</td><td>Tailwind v4 con <code>@theme static</code>. Tokens definidos una sola vez en <code>commons/styles/theme.css</code>.</td></tr>
+</table>
+
+---
+
+## Requisitos
+
+| | |
+|---|---|
+| Node.js | 20 o superior |
+| pnpm | 9 o superior |
+| Docker | Para PostgreSQL y Redis |
+
+---
+
+## Puesta a punto
+
+### 1. Dependencias
 
 ```bash
 pnpm install
 ```
 
-## 2. Crear los archivos `.env`
+### 2. Secretos
 
-Sin esto no arranca nada. Hay que crear **12 archivos**. Cada servicio trae su
-`.env.example` como plantilla; los valores reales (JWT_SECRET, GEMINI_API_KEY,
-credenciales SMTP) se comparten por fuera del repositorio, nunca se versionan.
+Se necesitan **14 archivos de entorno** (uno por servicio y zona). El asistente
+del paso 3 los genera desde cada `.env.example` y pide lo que falte. Ten a mano:
 
-Backend — copiar el `.env.example` de cada carpeta a `.env` y rellenar:
-
-- `apps/backend/gateway/.env`
-- `apps/backend/services/credentials/.env`
-- `apps/backend/services/permissions/.env`
-- `apps/backend/services/projects/.env`
-- `apps/backend/services/tasks/.env`
-- `apps/backend/services/reports/.env`
-- `apps/backend/services/assistant/.env`
-- `apps/backend/services/alexa/.env`
-
-Frontend — crear un `.env.local` en cada zona:
-
-- `apps/frontend/web-shell/.env.local` → `GATEWAY_URL`, `JWT_SECRET`,
-  `DASHBOARD_FRONT_URL`, `PROJECTS_FRONT_URL`, `REPORTS_FRONT_URL`
-- `apps/frontend/auth-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`, `NODE_ENV`
-- `apps/frontend/dashboard-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-- `apps/frontend/projects-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-- `apps/frontend/reports-front/.env.local` → `GATEWAY_URL`, `JWT_SECRET`
-
-Reglas que rompen el arranque si se ignoran:
-
-- **`JWT_SECRET` debe ser idéntico** en `gateway`, `credentials-service` y las
-  cinco zonas del frontend. Si uno solo difiere, el login devuelve token pero
-  toda petición posterior da 401.
-- **`VOICE_JWT_SECRET`** (alexa-service) es un secreto **distinto**, no se
-  reutiliza el de la plataforma. Generar con `openssl rand -hex 48`.
-- **`GEMINI_API_KEY` vive únicamente** en `services/assistant/.env`. Nunca en el
-  gateway ni en una variable `NEXT_PUBLIC_*`.
-- `infra/docker/compose/.env` **no hace falta**: el compose ya trae valores por
-  defecto (`praxis` / `praxis123` / `praxis`).
-
-## 3. Levantar la infraestructura
-
-```bash
-docker compose -f infra/docker/compose/docker-compose.yml up -d
-```
-
-Levanta PostgreSQL (5432) y Redis (6379).
-
-## 4. Generar los clientes de Prisma
-
-```bash
-for s in credentials permissions projects tasks assistant alexa; do
-  pnpm --filter @praxis/$s-service exec prisma generate
-done
-```
-
-El cliente se genera dentro de `src/generated/` de cada servicio y **no está
-versionado**: en un árbol recién clonado este paso es obligatorio, o el servicio
-arranca y muere con `Cannot find module '../generated/prisma-client'`.
-
-`reports-service` se excluye a propósito: no tiene esquema propio, lee de
-tasks-service y projects-service por TCP y cachea en Redis.
-
-## 5. Recrear las tablas
-
-```bash
-for s in credentials projects permissions tasks assistant alexa; do
-  pnpm --filter @praxis/$s-service exec prisma migrate reset --force --skip-seed
-done
-```
-
-⚠️ Borra todos los datos de la base. Solo para desarrollo.
-
-## 6. Ejecutar los seeds
-
-```bash
-for s in permissions credentials projects tasks; do
-  pnpm --filter @praxis/$s-service run prisma:seed
-done
-```
-
-Solo esos cuatro servicios tienen seed. Deja la base con:
-
-| Usuario | Contraseña | Rol |
+| Variable | Dónde | Nota |
 |---|---|---|
-| `admin@praxis.dev` | `Admin@12345!` | Admin |
-| `maria@praxis.dev` | `User@12345!` | User |
-| `carlos@praxis.dev` | `User@12345!` | User |
+| `JWT_SECRET` | gateway, credentials y las 6 zonas | **Idéntico en los ocho.** Si uno difiere, el login emite token y todo lo demás responde 401. |
+| `VOICE_JWT_SECRET` | alexa | Secreto distinto. `openssl rand -hex 48`. |
+| `GEMINI_API_KEY` | assistant | Solo ahí. Nunca en una variable `NEXT_PUBLIC_*`. |
 
-Más **dos proyectos**:
+`infra/docker/compose/.env` no hace falta: el compose trae valores por defecto.
 
-- **Proyecto PRAXIS Demo** — 1 espacio, 1 tablero de 4 columnas y 7 tareas con
-  etiquetas, checklists y comentarios.
-- **Sprint histórico (datos de demostración)** — 180 tareas y 16 semanas de
-  historial fabricado, que es lo que necesita la sección de **Análisis** para
-  tener algo que enseñar. El historial solo se captura hacia adelante, así que
-  sin esto los siete informes salen vacíos en una base recién creada. Lo genera
-  `prisma/seed-events.ts`, enganchado al `prisma:seed` de tasks-service.
-
-⚠️ Los eventos del segundo llevan `actorId = 00000000-0000-0000-0000-000000000000`:
-son sintéticos y no miden trabajo real. Para regenerar solo ese historial:
-`pnpm --filter @praxis/tasks-service run prisma:seed:events`.
-
-## 7. Compilar el monorepo
-
-```bash
-pnpm build
-```
-
-**Obligatorio antes de arrancar el backend.** `@praxis/contracts` y
-`@praxis/observability` (en `apps/backend/commons/`) publican su `main` como
-`dist/index.js`, y todos los microservicios los importan. Sin este paso mueren
-con `Cannot find module '@praxis/contracts'`.
-
-## 8. Arrancar
-
-Backend (gateway + los 7 microservicios):
-
-```bash
-npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"
-```
-
-Frontend (las 5 zonas):
-
-```bash
-pnpm dev:frontend
-```
-
-Abrir **http://localhost:4100**. Swagger en http://localhost:3000/api/docs.
-
----
-
-## Uso diario
-
-Con la base ya creada, basta con:
-
-```bash
-docker compose -f infra/docker/compose/docker-compose.yml up -d
-npx turbo run dev --filter=@praxis/gateway --filter="@praxis/*-service"
-pnpm dev:frontend
-```
-
-## Scripts disponibles
-
-| Comando | Descripción |
-|---------|-------------|
-| `pnpm dev:cli` | **Asistente interactivo.** Levanta lo que elijas y comprueba que arrancó. |
-| `pnpm dev:frontend` | Levanta las 5 zonas del frontend. |
-| `pnpm build` | Compila todo el monorepo (Turborepo resuelve el orden). |
-| `pnpm lint` | Biome en la raíz, ESLint en `web-shell`. |
-| `pnpm test` | Tests de todos los paquetes. |
-| `pnpm format` | Formatea con Biome. |
-| `pnpm docker:down` | Detiene PostgreSQL y Redis. |
-| `pnpm docker:logs` | Logs de la infraestructura. |
-
-⚠️ `pnpm prisma:generate` y `pnpm prisma:deploy` usan el filtro
-`@praxis/*-service`, que incluye a `reports-service` — un servicio sin Prisma —
-y abortan con `Command "prisma" not found`. Usa los bucles de los pasos 4 y 5
-hasta que se corrijan.
-
-### `pnpm dev:cli` — el atajo para el día a día
-
-Hace los pasos 3 a 8 preguntando qué quieres, y **espera a que cada servicio
-responda en su puerto** antes de dar el arranque por bueno. Con nueve procesos
-escupiendo logs a la vez, saber cuál no llegó a levantar es la mitad del
-trabajo.
+### 3. Arranque
 
 ```bash
 pnpm dev:cli
 ```
 
-Trae cuatro presets —todo, mínimo, solo backend, solo frontend— o selección a
-mano. Después deja un prompt:
+Preset **«Todo»**. Levanta Postgres y Redis, completa los `.env`, compila los
+paquetes compartidos, genera los clientes de Prisma, recrea el esquema, siembra,
+arranca los catorce procesos y **espera a que cada puerto responda** antes de
+darlo por bueno.
 
-| Comando | Qué hace |
-|---|---|
-| `status` | Estado real, comprobando los puertos uno a uno. |
-| `rs <servicio\|all>` | Reinicia. Hace falta tras recompilar `contracts`. |
-| `stop` / `start` | Detiene o vuelve a arrancar algo suelto. |
-| `exit` | Detiene todo y sale sin dejar huérfanos. |
+Al terminar: **http://localhost:4100**
 
-Necesita una terminal interactiva: para CI o scripts, los comandos de arriba.
+<details>
+<summary><b>Uso diario</b></summary>
 
-## Si algo falla
+<br>
 
-| Síntoma | Causa |
-|---|---|
-| `Cannot find module '@praxis/contracts'` | Falta el paso 7 (`pnpm build`). |
-| `Cannot find module '../generated/prisma-client'` | Falta el paso 4 (`prisma generate`). |
-| Login OK pero todo devuelve 401 | `JWT_SECRET` distinto entre gateway, credentials y la zona. |
-| La zona de Reportes va vacía | `reports-service` (3005) no está levantado. |
-| El asistente responde error | Falta `GEMINI_API_KEY` en `services/assistant/.env`. |
-| `nest: command not found` | Se está lanzando `nest` fuera de pnpm; usar siempre `pnpm --filter ... run dev`. |
+Mismo comando, diciendo que **no** a recrear tablas y sembrar.
 
-Si haces `docker compose down -v`, hay que repetir los pasos 5 y 6.
+La CLI deja un prompt: `status` comprueba puertos uno a uno, `rs <servicio|all>`
+reinicia —hace falta tras recompilar `contracts`—, `stop` / `start` para piezas
+sueltas y `exit` cierra sin dejar huérfanos.
+
+Credenciales de los seeds:
+
+| Usuario | Contraseña | Rol |
+|---|---|---|
+| `admin@praxis.dev` | `Admin@12345!` | SuperAdmin |
+| `maria@praxis.dev` | `User@12345!` | User |
+| `carlos@praxis.dev` | `User@12345!` | User |
+
+Incluyen dos proyectos: uno de demostración y otro con 16 semanas de historial
+fabricado, necesario para que la sección de Análisis tenga qué mostrar.
+
+</details>
+
+<details>
+<summary><b>Sin terminal interactiva (CI, scripts)</b></summary>
+
+<br>
+
+```bash
+pnpm install
+pnpm docker:up
+pnpm build:shared      # contracts + observability. Sin esto no arranca nada.
+pnpm prisma:generate   # no están versionados
+pnpm prisma:reset      # recrea y siembra. Borra los datos.
+pnpm dev:backend
+pnpm dev:frontend      # en otra terminal
+```
+
+Los scripts de Prisma excluyen `reports-service`: no tiene tablas propias.
+
+</details>
+
+---
+
+## Pruebas
+
+```bash
+pnpm e2e            # suite completa, con el stack levantado
+pnpm e2e:regresion  # todo menos @security. Verde antes y después de cada cambio
+pnpm e2e:seguridad  # solo @security
+pnpm test           # unitarias de cada paquete
+pnpm e2e:instalar   # una vez: descarga el Chromium de Playwright
+```
+
+Playwright, en [`e2e/`](e2e/). Dos proyectos: `tests/api/` contra el gateway sin
+navegador, y `tests/ui/` en Chromium sobre el multi-zone.
+
+Las etiquetadas `@security` describen el comportamiento objetivo, no el actual:
+viven aparte para que un rojo esperado no oculte uno nuevo.
+
+La matemática de los informes se prueba con **pruebas unitarias**
+(`reports/statistics.spec.ts`): son funciones puras y un percentil incorrecto no
+falla, devuelve un número plausible.
+
+Cada archivo documenta en cabecera qué fija y por qué. El estado de cobertura
+vive en [`docs/AUDITORIA.md`](docs/AUDITORIA.md).
+
+---
 
 ## Estructura
 
-Ver `STRUCTURE.md` y `docs/` para la arquitectura detallada.
+```
+apps/
+  backend/
+    gateway/          Entrada HTTP. Guards, validación, sobre de respuesta
+    services/         Siete microservicios TCP
+    commons/          contracts (DTOs) + observability
+  frontend/
+    web-shell/        Landing, rewrites, renovación de sesión
+    auth-front/       Login y registro
+    dashboard-front/  Panel, avisos, configuración
+    projects-front/   Proyectos, tableros, tareas
+    reports-front/    Análisis y asistente
+    admin-front/      Administración de la plataforma
+    commons/          Átomos, moléculas, organismos, cliente de API, auth
+e2e/                  Playwright
+docs/                 Arquitectura, contrato de API, auditoría
+infra/                Docker, CI, observabilidad
+scripts/dev-cli/      El asistente de arranque
+```
+
+---
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [`docs/frontend/CONTRATO-API.md`](docs/frontend/CONTRATO-API.md) | Rutas, DTOs, permisos y trampas. **Antes de escribir cualquier fetch.** |
+| [`docs/frontend/ESTADO-ACTUAL.md`](docs/frontend/ESTADO-ACTUAL.md) | Arquitectura, estado por zona, deuda priorizada |
+| [`docs/AUDITORIA.md`](docs/AUDITORIA.md) | Registro de la auditoría: qué se revisó, cuándo y con qué prueba |
+| [`docs/backend/permissions.md`](docs/backend/permissions.md) | Modelo de permisos de dos capas |
+| [`STRUCTURE.md`](STRUCTURE.md) | Dónde va cada archivo nuevo |
+
+Swagger en `http://localhost:3000/api/docs`, solo fuera de producción.
+
+---
+
+## Diagnóstico
+
+| Síntoma | Causa |
+|---|---|
+| `Cannot find module '@praxis/contracts'` | Falta `pnpm build:shared` |
+| `Cannot find module '../generated/prisma-client'` | Falta `pnpm prisma:generate` |
+| Login correcto y luego 401 en todo | `JWT_SECRET` distinto entre gateway, credentials y alguna zona |
+| Análisis vacío | `reports-service` (3005) caído |
+| El asistente devuelve error | Falta `GEMINI_API_KEY` |
+| Turbopack entra en pánico | Descriptores de archivo agotados. Detener todo y relanzar |
+| Un 404 recién arrancado | El puerto abre antes de que la ruta compile. Reintentar |
+
+---
+
+<div align="center">
+<sub>MIT · Universidad Tecnológica Emiliano Zapata</sub>
+</div>

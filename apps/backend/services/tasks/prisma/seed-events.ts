@@ -85,10 +85,10 @@ const TAREAS = 180;
 const DIA = 86_400_000;
 
 const COLUMNAS = [
-  { name: 'Por hacer',   color: 'primary', order: 0 },
-  { name: 'En curso',    color: 'accent',  order: 1 },
-  { name: 'En revisión', color: 'info',    order: 2 },
-  { name: 'Hecho',       color: 'success', order: 3 }, // verde = columna de cierre
+  { name: 'Por hacer', color: 'primary', order: 0 },
+  { name: 'En curso', color: 'accent', order: 1 },
+  { name: 'En revisión', color: 'info', order: 2 },
+  { name: 'Hecho', color: 'success', order: 3 }, // verde = columna de cierre
 ];
 
 const TITULOS = [
@@ -135,10 +135,10 @@ const PRIORIDADES = ['LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'HIGH', 'URGENT'] as con
  */
 const ETIQUETAS = [
   { name: 'frontend', color: 'primary' },
-  { name: 'backend',  color: 'accent'  },
-  { name: 'diseño',   color: 'info'    },
-  { name: 'infra',    color: 'warning' },
-  { name: 'datos',    color: 'error'   },
+  { name: 'backend', color: 'accent' },
+  { name: 'diseño', color: 'info' },
+  { name: 'infra', color: 'warning' },
+  { name: 'datos', color: 'error' },
 ] as const;
 
 /**
@@ -155,10 +155,10 @@ const ETIQUETAS = [
  */
 const ESPECIALIDAD: Record<string, number>[] = [
   { frontend: 6, diseño: 3, backend: 1 },
-  { backend:  6, datos:  3, infra:   1 },
-  { diseño:   6, frontend: 3, datos: 1 },
-  { infra:    6, backend: 3, datos:  1 },
-  { datos:    5, backend: 3, frontend: 2 },
+  { backend: 6, datos: 3, infra: 1 },
+  { diseño: 6, frontend: 3, datos: 1 },
+  { infra: 6, backend: 3, datos: 1 },
+  { datos: 5, backend: 3, frontend: 2 },
 ];
 
 const azar = <T>(lista: readonly T[]): T => lista[Math.floor(Math.random() * lista.length)];
@@ -247,12 +247,24 @@ async function main() {
       INSERT INTO projects.project_roles (id, name, "projectId", permissions)
       VALUES (gen_random_uuid(), 'Administrador', ${projectId}::text,
               ${JSON.stringify({
-                canViewProject: true, canCreateTask: true, canEditTask: true,
-                canDeleteTask: true, canMoveTask: true, canComment: true,
-                canCreateBoard: true, canEditBoard: true, canDeleteBoard: true,
-                canCreateColumn: true, canEditColumn: true, canDeleteColumn: true,
-                canManageMembers: true, canManageRoles: true, canManageLabels: true,
-                canEditProject: true, canViewReports: true, canDeleteProject: true,
+                canViewProject: true,
+                canCreateTask: true,
+                canEditTask: true,
+                canDeleteTask: true,
+                canMoveTask: true,
+                canComment: true,
+                canCreateBoard: true,
+                canEditBoard: true,
+                canDeleteBoard: true,
+                canCreateColumn: true,
+                canEditColumn: true,
+                canDeleteColumn: true,
+                canManageMembers: true,
+                canManageRoles: true,
+                canManageLabels: true,
+                canEditProject: true,
+                canViewReports: true,
+                canDeleteProject: true,
               })}::jsonb)
       RETURNING id
     `;
@@ -317,7 +329,7 @@ async function main() {
   const etiquetasPorNombre = new Map<string, string>();
   for (const etiqueta of ETIQUETAS) {
     const fila = await prisma.label.upsert({
-      where:  { projectId_name: { projectId, name: etiqueta.name } },
+      where: { projectId_name: { projectId, name: etiqueta.name } },
       update: { color: etiqueta.color },
       create: { projectId, name: etiqueta.name, color: etiqueta.color, createdAt: arranque },
     });
@@ -358,12 +370,13 @@ async function main() {
      * que da volumen a las bandas intermedias del flujo acumulado.
      */
     const llegaAlFinal = Math.random() < 0.66;
-    const hasta = llegaAlFinal
-      ? columnas.length
-      : 1 + Math.floor(entre(1, columnas.length - 1));
+    const hasta = llegaAlFinal ? columnas.length : 1 + Math.floor(entre(1, columnas.length - 1));
     const paradas = columnas.slice(1, hasta);
     const eventos: {
-      type: string; fromColumnId?: string; toColumnId?: string; occurredAt: Date;
+      type: string;
+      fromColumnId?: string;
+      toColumnId?: string;
+      occurredAt: Date;
     }[] = [{ type: 'CREATED', toColumnId: columnas[0].id, occurredAt: nacida }];
 
     let momento = nacida;
@@ -409,17 +422,17 @@ async function main() {
 
     const tarea = await prisma.task.create({
       data: {
-        title:       titulo,
-        status:      actual.name,
+        title: titulo,
+        status: actual.name,
         boardId,
-        columnId:    actual.id,
-        reporterId:  dueno,
+        columnId: actual.id,
+        reporterId: dueno,
         projectId,
-        priority:    prioridad,
-        order:       i,
-        createdAt:   nacida,
+        priority: prioridad,
+        order: i,
+        createdAt: nacida,
         completedAt: estaCerrada ? momento : null,
-        dueDate:     new Date(nacida.getTime() + entre(3, 20) * DIA),
+        dueDate: new Date(nacida.getTime() + entre(3, 20) * DIA),
         assignees: {
           create: [{ userId: encargado.userId, assignedBy: dueno, assignedAt: nacida }],
         },
@@ -438,13 +451,13 @@ async function main() {
 
     await prisma.taskEvent.createMany({
       data: eventos.map((evento) => ({
-        taskId:    tarea.id,
+        taskId: tarea.id,
         projectId,
         boardId,
-        type:      evento.type as never,
+        type: evento.type as never,
         fromColumnId: evento.fromColumnId ?? null,
-        toColumnId:   evento.toColumnId ?? null,
-        actorId:   ACTOR_SINTETICO,
+        toColumnId: evento.toColumnId ?? null,
+        actorId: ACTOR_SINTETICO,
         taskTitle: titulo,
         occurredAt: evento.occurredAt,
       })),

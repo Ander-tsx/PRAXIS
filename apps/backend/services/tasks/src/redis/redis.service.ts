@@ -10,7 +10,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.client.on('error', (err) => console.warn('Redis error:', err.message));
   }
 
-  onModuleDestroy() { this.client?.quit(); }
+  onModuleDestroy() {
+    this.client?.quit();
+  }
 
   async get<T>(key: string): Promise<T | null> {
     const raw = await this.client.get(key);

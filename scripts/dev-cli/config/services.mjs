@@ -142,12 +142,60 @@ export const BACKEND_SERVICES = [
  * runtime y lejos de aquí.
  */
 export const FRONTEND_APPS = [
-  { key: 'web-shell', pkg: '@praxis/web-shell', dir: 'apps/frontend/web-shell', port: 4100, envFile: '.env.local', color: 95, descripcion: 'Cáscara · landing y rewrites' },
-  { key: 'auth-front', pkg: '@praxis/auth-front', dir: 'apps/frontend/auth-front', port: 4101, envFile: '.env.local', color: 96, descripcion: 'Login y registro' },
-  { key: 'dashboard-front', pkg: '@praxis/dashboard-front', dir: 'apps/frontend/dashboard-front', port: 4102, envFile: '.env.local', color: 96, descripcion: 'Panel, avisos y ajustes' },
-  { key: 'projects-front', pkg: '@praxis/projects-front', dir: 'apps/frontend/projects-front', port: 4103, envFile: '.env.local', color: 96, descripcion: 'Proyectos y tableros' },
-  { key: 'reports-front', pkg: '@praxis/reports-front', dir: 'apps/frontend/reports-front', port: 4104, envFile: '.env.local', color: 96, descripcion: 'Análisis y asistente' },
-  { key: 'admin-front', pkg: '@praxis/admin-front', dir: 'apps/frontend/admin-front', port: 4105, envFile: '.env.local', color: 96, descripcion: 'Administración de la plataforma' },
+  {
+    key: 'web-shell',
+    pkg: '@praxis/web-shell',
+    dir: 'apps/frontend/web-shell',
+    port: 4100,
+    envFile: '.env.local',
+    color: 95,
+    descripcion: 'Cáscara · landing y rewrites',
+  },
+  {
+    key: 'auth-front',
+    pkg: '@praxis/auth-front',
+    dir: 'apps/frontend/auth-front',
+    port: 4101,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Login y registro',
+  },
+  {
+    key: 'dashboard-front',
+    pkg: '@praxis/dashboard-front',
+    dir: 'apps/frontend/dashboard-front',
+    port: 4102,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Panel, avisos y ajustes',
+  },
+  {
+    key: 'projects-front',
+    pkg: '@praxis/projects-front',
+    dir: 'apps/frontend/projects-front',
+    port: 4103,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Proyectos y tableros',
+  },
+  {
+    key: 'reports-front',
+    pkg: '@praxis/reports-front',
+    dir: 'apps/frontend/reports-front',
+    port: 4104,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Análisis y asistente',
+  },
+  {
+    key: 'admin-front',
+    pkg: '@praxis/admin-front',
+    dir: 'apps/frontend/admin-front',
+    port: 4105,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Administración de la plataforma',
+  },
 ];
 
 /**
@@ -246,7 +294,9 @@ export function revisarCatalogo() {
 
     const nombreReal = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).name;
     if (nombreReal !== svc.pkg) {
-      problemas.push(`${svc.key}: el catálogo dice "${svc.pkg}" pero ${svc.dir} se llama "${nombreReal}"`);
+      problemas.push(
+        `${svc.key}: el catálogo dice "${svc.pkg}" pero ${svc.dir} se llama "${nombreReal}"`,
+      );
     }
   }
 

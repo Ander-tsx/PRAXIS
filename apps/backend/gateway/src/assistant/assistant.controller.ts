@@ -91,10 +91,7 @@ export class AssistantController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama' })
   @ApiResponse({ status: 200, description: 'plan, usados, limite, periodo y fecha de reinicio' })
-  quota(
-    @Param('projectId', ParseUUIDPipe) _projectId: string,
-    @Request() req: Express.Request,
-  ) {
+  quota(@Param('projectId', ParseUUIDPipe) _projectId: string, @Request() req: Express.Request) {
     return firstValueFrom(
       this.assistantClient.send({ cmd: 'assistant_quota' }, { userId: req.user!.userId }),
     );

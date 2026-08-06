@@ -14,31 +14,23 @@ import {
  * replican los de los DTO para que no digan cosas distintas.
  */
 
-export const PROJECT_NAME_MIN = 2;
-export const PROJECT_NAME_MAX = 100;
-export const PROJECT_DESCRIPTION_MAX = 500;
-
-export interface ProjectInput {
-  name: string;
-  description?: string;
-}
-
-/** Devuelve el mensaje del primer error, o null si el proyecto es válido. */
-export function validateProject({ name, description }: ProjectInput): string | null {
-  const trimmedName = name.trim();
-
-  if (trimmedName.length < PROJECT_NAME_MIN) {
-    return `El nombre debe tener al menos ${PROJECT_NAME_MIN} caracteres.`;
-  }
-  if (trimmedName.length > PROJECT_NAME_MAX) {
-    return `El nombre no puede superar ${PROJECT_NAME_MAX} caracteres.`;
-  }
-  if ((description?.trim().length ?? 0) > PROJECT_DESCRIPTION_MAX) {
-    return `La descripción no puede superar ${PROJECT_DESCRIPTION_MAX} caracteres.`;
-  }
-
-  return null;
-}
+/**
+ * Validación de proyecto: **reexportada desde commons**.
+ *
+ * La definición vive en `commons/organisms/CreateProjectDialog/project-form.ts`
+ * porque la comparten el organismo y las Server Actions de las dos zonas, y las
+ * tres tienen que decir lo mismo. Estuvo copiada aquí y allí.
+ *
+ * Se reexporta en lugar de cambiar los imports de media zona: el nombre local
+ * ya está en uso y la fuente única es lo que importaba.
+ */
+export {
+  PROJECT_DESCRIPTION_MAX,
+  PROJECT_NAME_MAX,
+  PROJECT_NAME_MIN,
+  type ProjectInput,
+  validateProject,
+} from '@praxis/commons';
 
 /**
  * Validación del perfil.
@@ -73,7 +65,6 @@ export function validateProfile({ firstName, lastName }: ProfileInput): string |
 
   return null;
 }
-
 
 export const ROLE_NAME_MIN = 2;
 export const ROLE_NAME_MAX = 50;

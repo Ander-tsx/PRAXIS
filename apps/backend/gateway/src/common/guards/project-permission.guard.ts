@@ -20,10 +20,6 @@ import {
 const esUuid = (valor: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 
-/** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
-const esUuid = (valor: string): boolean =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
-
 /** Nombres de controladores que usan el param `:id` como projectId */
 const PROJECT_ID_CONTROLLERS = new Set(['ProjectsController']);
 
@@ -169,10 +165,7 @@ export class ProjectPermissionGuard implements CanActivate {
     if (!projectId && (workspaceId || boardId)) {
       try {
         const res = await firstValueFrom(
-          this.projectsClient.send(
-            { cmd: 'project_resolve_resource' },
-            { workspaceId, boardId },
-          ),
+          this.projectsClient.send({ cmd: 'project_resolve_resource' }, { workspaceId, boardId }),
         );
         projectId = res?.projectId;
       } catch {

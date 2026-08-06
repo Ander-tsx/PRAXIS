@@ -8,6 +8,20 @@
 
 export type ThemeName = 'dark' | 'light';
 
+/**
+ * Los temas válidos, en runtime.
+ *
+ * `ThemeName` es un tipo y **desaparece al compilar**: no filtra nada. Hace
+ * falta la lista de verdad para que quien escribe la cookie pueda comprobar lo
+ * que le llega, y no solo confiar en que quien la lee normalice.
+ */
+export const THEME_NAMES = ['dark', 'light'] as const;
+
+/** ¿Es un tema que conocemos? */
+export function esTemaValido(valor: unknown): valor is ThemeName {
+  return typeof valor === 'string' && (THEME_NAMES as readonly string[]).includes(valor);
+}
+
 export const THEME_COOKIE = 'praxis_theme';
 
 /** Sin cookie —primera visita, o el usuario nunca lo cambió— la app sigue oscura. */

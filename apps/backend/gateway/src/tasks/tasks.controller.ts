@@ -14,13 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
@@ -131,9 +125,7 @@ export class TasksController {
         limit: limit ? Number(limit) : undefined,
       },
     };
-    return firstValueFrom(
-      this.tasksClient.send({ cmd: 'task_find_all' }, findDto),
-    );
+    return firstValueFrom(this.tasksClient.send({ cmd: 'task_find_all' }, findDto));
   }
 
   /** Detalle de una tarea (requiere canViewProject) */
@@ -142,12 +134,8 @@ export class TasksController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
   @ApiOperation({ summary: 'Detalle de una tarea' })
   @ApiResponse({ status: 200, description: 'Detalle de la tarea recuperado' })
-  findOne(
-    @Param('id') id: string,
-  ) {
-    return firstValueFrom(
-      this.tasksClient.send({ cmd: 'task_find_one' }, { id }),
-    );
+  findOne(@Param('id') id: string) {
+    return firstValueFrom(this.tasksClient.send({ cmd: 'task_find_one' }, { id }));
   }
 
   /** Actualiza una tarea (requiere canEditTask) */

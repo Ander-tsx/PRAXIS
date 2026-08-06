@@ -1,6 +1,4 @@
-import { Badge, type Project, alpha, colors,
-  projectPath,
-} from '@praxis/commons';
+import { Badge, type Project, alpha, colors, projectPath } from '@praxis/commons';
 import Link from 'next/link';
 import { ProjectSearch } from '../ProjectSearch';
 

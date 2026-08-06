@@ -1,10 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import {
-  AddMemberDto,
-  ChangeMemberRoleDto,
-  RemoveMemberDto,
-} from '@praxis/contracts';
+import { AddMemberDto, ChangeMemberRoleDto, RemoveMemberDto } from '@praxis/contracts';
 import { MembersService } from './members.service';
 
 @Controller()

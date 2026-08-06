@@ -51,9 +51,7 @@ const LogoutIntentHandler = {
     // Limpiar sesión actual
     handlerInput.attributesManager.setSessionAttributes({});
 
-    return handlerInput.responseBuilder
-      .speak(messages.LOGOUT_SUCCESS)
-      .getResponse();
+    return handlerInput.responseBuilder.speak(messages.LOGOUT_SUCCESS).getResponse();
   },
 };
 

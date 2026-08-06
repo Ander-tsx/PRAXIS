@@ -88,9 +88,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       .then((list) =>
         /* `id` es lo que venga en la URL: puede ser el UUID o el slug, así que
            se comparan los dos. */
-        list.find(
-          (candidate) => candidate.project.id === id || candidate.project.slug === id,
-        ),
+        list.find((candidate) => candidate.project.id === id || candidate.project.slug === id),
       )
       .catch(() => undefined);
 
@@ -109,7 +107,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
        tarea—, así que se piden siempre; son una fila por etiqueta. */
-    api.get<Label[]>(`/projects/${project.id}/labels`).catch(() => [] as Label[]),
+    api
+      .get<Label[]>(`/projects/${project.id}/labels`)
+      .catch(() => [] as Label[]),
   ]);
 
   const can = effective.permissions;
@@ -128,16 +128,35 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const suspendido = effective.projectStatus === 'SUSPENDED';
 
   /**
-   * El directorio hace falta en las dos pestañas que enseñan personas: equipo
-   * cruza `userId` con nombre y correo, y espacios lo necesita para las
-   * iniciales de los encargados y para el selector del diálogo de tarea.
+   * Las personas del proyecto, resueltas **una por una desde sus ids**.
+   *
+   * ⚠️ **Antes esto pedía `/users?limit=100` y cruzaba en el cliente.** Eso no
+   * es una lista: es la primera página del directorio de **toda la plataforma**,
+   * y `limit` está topado en 100 por el DTO. En cuanto hubo más de cien cuentas,
+   * los miembros de este proyecto dejaron de estar ahí y la pestaña Equipo pasó
+   * a enseñar el UUID crudo y «Correo no disponible», mientras el selector de
+   * encargados se quedaba vacío — sin ningún error de por medio.
+   *
+   * Lo destapó la suite de pruebas al crear cuentas de usar y tirar, pero no era
+   * suyo: habría pasado igual el día que la plataforma llegara a 101 cuentas.
+   *
+   * Ahora se piden **solo los ids que hacen falta**, en paralelo. El coste va
+   * con el tamaño del proyecto, no con el de la plataforma, y quien falle cae a
+   * `null` sin llevarse la página por delante.
    */
-  const directory =
+  const idsDePersonas =
     activeTab === 'equipo' || activeTab === 'espacios'
-      ? await api
-          .get<Paginated<UserProfile>>('/users?limit=100')
-          .catch(() => ({ items: [] as UserProfile[], total: 0 }))
-      : { items: [] as UserProfile[], total: 0 };
+      ? [...new Set([...members.map((m) => m.userId), project.ownerId])]
+      : [];
+
+  const personas = await Promise.all(
+    idsDePersonas.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
+  );
+
+  const directory = {
+    items: personas.filter((u): u is UserProfile => u !== null),
+    total: idsDePersonas.length,
+  };
 
   const invitations =
     activeTab === 'equipo'
@@ -254,10 +273,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       <div className="flex flex-col gap-6">
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
-          <SuspendedProjectNotice
-            reason={effective.suspendedReason}
-            isOwner={effective.isOwner}
-          />
+          <SuspendedProjectNotice reason={effective.suspendedReason} isOwner={effective.isOwner} />
         )}
 
         <ProjectHeader
@@ -335,7 +351,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             members={members}
             roles={project.roles}
             usersById={usersById}
-            candidates={directory.items}
             ownerId={project.ownerId}
             canManage={can.canManageMembers}
             invitations={invitations}

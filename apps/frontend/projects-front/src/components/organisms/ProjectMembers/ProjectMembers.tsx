@@ -19,8 +19,6 @@ export interface ProjectMembersProps {
   roles: ProjectRole[];
   /** Perfiles indexados por id: los miembros solo traen `userId`. */
   usersById: Map<string, UserProfile>;
-  /** Candidatos a añadir. Solo salen quienes ya tienen cuenta. */
-  candidates: UserProfile[];
   ownerId: string;
   canManage: boolean;
   /** Enviadas y sin responder: todavía no son miembros. */
@@ -48,7 +46,6 @@ export function ProjectMembers({
   members,
   roles,
   usersById,
-  candidates,
   ownerId,
   canManage,
   invitations,
@@ -58,10 +55,15 @@ export function ProjectMembers({
   const memberIds = new Set(members.map((member) => member.userId));
   const invitedIds = new Set(invitations.map((invitation) => invitation.userId));
 
-  /** Ni quienes ya están dentro ni quienes tienen una invitación sin responder. */
-  const available = candidates.filter(
-    (user) => !memberIds.has(user.id) && !invitedIds.has(user.id) && user.id !== ownerId,
-  );
+  /**
+   * A quién **no** ofrecer al invitar: quienes ya están dentro, quienes tienen
+   * una invitación sin responder, y el dueño.
+   *
+   * Antes se filtraba una lista de candidatos que llegaba desde la página. Ya no
+   * llega: buscar en el directorio entero es cosa del diálogo, que lo hace
+   * contra el servidor. Aquí solo se dice a quién descartar de esos resultados.
+   */
+  const excluirIds = [...memberIds, ...invitedIds, ownerId];
 
   const isMember = memberIds.has(currentUserId);
   const canLeave = isMember && currentUserId !== ownerId;
@@ -79,7 +81,7 @@ export function ProjectMembers({
         <div className="flex items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
-            <InviteMemberDialog projectId={projectId} roles={roles} candidates={available} />
+            <InviteMemberDialog projectId={projectId} roles={roles} excluirIds={excluirIds} />
           )}
         </div>
       </div>

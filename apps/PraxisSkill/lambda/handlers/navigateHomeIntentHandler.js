@@ -10,8 +10,10 @@ const { joinNaturally } = require('../utils/speech');
 
 const NavigateHomeIntentHandler = {
   canHandle(handlerInput) {
-    return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-      && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NavigateHomeIntent';
+    return (
+      Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest' &&
+      Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NavigateHomeIntent'
+    );
   },
 
   async handle(handlerInput) {
@@ -26,12 +28,12 @@ const NavigateHomeIntentHandler = {
 
     try {
       const responseProjects = await praxisApi.getProjects(apiClient);
-      const projects = Array.isArray(responseProjects) ? responseProjects : (responseProjects?.items || []);
+      const projects = Array.isArray(responseProjects)
+        ? responseProjects
+        : responseProjects?.items || [];
 
       if (!projects || projects.length === 0) {
-        return handlerInput.responseBuilder
-          .speak(messages.WELCOME_NO_PROJECTS)
-          .getResponse();
+        return handlerInput.responseBuilder.speak(messages.WELCOME_NO_PROJECTS).getResponse();
       }
 
       const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
@@ -47,7 +49,7 @@ const NavigateHomeIntentHandler = {
           .getResponse();
       }
 
-      const namesToList = projects.slice(0, 4).map(p => p.name);
+      const namesToList = projects.slice(0, 4).map((p) => p.name);
       const namesList = joinNaturally(namesToList);
 
       return handlerInput.responseBuilder

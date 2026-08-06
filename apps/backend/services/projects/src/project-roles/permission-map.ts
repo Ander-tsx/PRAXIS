@@ -22,27 +22,25 @@ import { PROJECT_PERMISSIONS } from '@praxis/contracts';
  *   canDelete* → implica canEdit* + canCreate*
  *   canEdit*   → implica canCreate*
  *
- * ⚠️ `expandPermissions` recorre este mapa **una sola vez**, así que la
- * expansión no es transitiva por sí misma: hoy funciona porque el orden de
- * inserción va de mayor a menor alcance. Para no depender de eso, un permiso
- * implicado se escribe en **todas** las entradas que deban concederlo, aunque
- * quede repetido — ver `canEditProject`.
+ * El orden de las entradas **no importa**: `expandPermissions` itera hasta punto
+ * fijo, así que la implicación es transitiva se escriba como se escriba. No
+ * siempre fue así — ver la nota de esa función.
  */
 export const PERMISSION_HIERARCHY: Record<string, string[]> = {
   // Boards
   canDeleteBoard: ['canEditBoard', 'canCreateBoard', 'canEditProject'],
-  canEditBoard:   ['canCreateBoard', 'canEditProject'],
+  canEditBoard: ['canCreateBoard', 'canEditProject'],
   // Quien administra el proyecto ve los reportes.
-  canEditProject:   ['canViewReports'],
+  canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],
   // Columns
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
-  canEditColumn:   ['canCreateColumn'],
+  canEditColumn: ['canCreateColumn'],
   // Tasks
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
   // Editar implica mover y comentar: quien puede reescribir la tarea entera
   // puede, con más razón, cambiarla de columna o dejar una nota. Al revés no.
-  canEditTask:   ['canMoveTask', 'canComment', 'canCreateTask'],
+  canEditTask: ['canMoveTask', 'canComment', 'canCreateTask'],
   // Borrar el proyecto se lleva todos sus tableros por delante, así que quien
   // puede borrarlo puede, con mucha más razón, renombrarlo.
   canDeleteProject: [
@@ -106,16 +104,45 @@ export function normalizePermissions(stored: unknown): Record<string, boolean> {
  *
  * Ejemplo:
  *   { canDeleteBoard: true } → { canDeleteBoard: true, canEditBoard: true, canCreateBoard: true }
+ *
+ * ## Por qué itera hasta punto fijo y no una vez
+ *
+ * Recorría el mapa **una sola pasada**, y con eso la implicación no es
+ * transitiva: `canDeleteBoard` concede `canEditProject`, y `canEditProject`
+ * concede `canViewReports`, pero la segunda regla ya había pasado cuando la
+ * primera la activó. Funcionaba —y solo funcionaba— porque las entradas están
+ * escritas de mayor a menor alcance y `Object.entries` respeta el orden de
+ * inserción.
+ *
+ * ⚠️ **Eso hace que el orden de un objeto literal decida quién ve los
+ * reportes.** Reordenar el mapa, alfabetizarlo o meter un permiso nuevo por
+ * arriba le quitaba `canViewReports` a quien administra tableros, sin error, sin
+ * aviso y sin nada que lo relacionara con el cambio: un rol que deja de conceder
+ * algo no falla, simplemente devuelve 403 más tarde y en otro sitio.
+ *
+ * Con el punto fijo la jerarquía significa lo que dice. El bucle termina siempre:
+ * cada vuelta solo puede añadir permisos de un conjunto finito, así que a lo sumo
+ * hay tantas vueltas como permisos. La cota está escrita igualmente — un bucle
+ * sin salida en el camino de los permisos es peor que un permiso de menos.
  */
 export function expandPermissions(raw: Record<string, boolean>): Record<string, boolean> {
   const expanded = { ...raw };
+  const reglas = Object.entries(PERMISSION_HIERARCHY);
 
-  for (const [key, implied] of Object.entries(PERMISSION_HIERARCHY)) {
-    if (expanded[key]) {
+  for (let vuelta = 0; vuelta <= reglas.length; vuelta++) {
+    let cambió = false;
+
+    for (const [key, implied] of reglas) {
+      if (!expanded[key]) continue;
       for (const impliedPerm of implied) {
-        expanded[impliedPerm] = true;
+        if (!expanded[impliedPerm]) {
+          expanded[impliedPerm] = true;
+          cambió = true;
+        }
       }
     }
+
+    if (!cambió) break;
   }
 
   // Quien puede hacer algo en el proyecto, puede verlo.

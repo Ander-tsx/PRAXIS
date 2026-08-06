@@ -1,6 +1,4 @@
-import { Badge, type Project, alpha, colors,
-  projectHref,
-} from '@praxis/commons';
+import { Badge, type Project, alpha, colors, projectHref } from '@praxis/commons';
 
 export interface ProjectListProps {
   projects: Project[];

@@ -32,9 +32,7 @@ export function puertoOcupado(puerto, host = '127.0.0.1', timeout = 500) {
 
 /** Varios a la vez. Devuelve un Map puerto → booleano. */
 export async function estadoDePuertos(puertos) {
-  const resultados = await Promise.all(
-    puertos.map(async (p) => [p, await puertoOcupado(p)]),
-  );
+  const resultados = await Promise.all(puertos.map(async (p) => [p, await puertoOcupado(p)]));
   return new Map(resultados);
 }
 

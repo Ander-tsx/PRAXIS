@@ -34,9 +34,7 @@ import { JwtGuard } from '../auth/jwt.guard';
 @UseGuards(JwtGuard)
 @Controller('me/notifications')
 export class MyNotificationsController {
-  constructor(
-    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
-  ) {}
+  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
 
   /**
    * Bandeja + contador de no leídas.
@@ -65,10 +63,7 @@ export class MyNotificationsController {
   @ApiResponse({ status: 200, description: 'Aviso marcado' })
   markRead(@Param('id', ParseUUIDPipe) id: string, @Request() req: Express.Request) {
     return firstValueFrom(
-      this.projectsClient.send(
-        { cmd: 'notification_mark_read' },
-        { id, userId: req.user!.userId },
-      ),
+      this.projectsClient.send({ cmd: 'notification_mark_read' }, { id, userId: req.user!.userId }),
     );
   }
 
@@ -79,10 +74,7 @@ export class MyNotificationsController {
   @ApiResponse({ status: 200, description: 'Avisos marcados' })
   markAllRead(@Request() req: Express.Request) {
     return firstValueFrom(
-      this.projectsClient.send(
-        { cmd: 'notification_mark_all_read' },
-        { userId: req.user!.userId },
-      ),
+      this.projectsClient.send({ cmd: 'notification_mark_all_read' }, { userId: req.user!.userId }),
     );
   }
 }

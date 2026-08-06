@@ -27,13 +27,7 @@ export interface ChartCardProps {
  * decir cosas ciertas sobre el equipo, esa es la peor forma de fallar, y hacerla
  * opcional habría bastado para que la mitad se quedara sin ella.
  */
-export function ChartCard({
-  title,
-  description,
-  highlight,
-  howToRead,
-  children,
-}: ChartCardProps) {
+export function ChartCard({ title, description, highlight, howToRead, children }: ChartCardProps) {
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -109,15 +103,10 @@ export function Stat({
 
   return (
     <div className="flex flex-col">
-      <span
-        className="font-display text-3xl leading-none tabular-nums"
-        style={{ color }}
-      >
+      <span className="font-display text-3xl leading-none tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">
-        {label}
-      </span>
+      <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">{label}</span>
     </div>
   );
 }
@@ -141,8 +130,8 @@ export function SyntheticBanner({ eventos }: { eventos: number }) {
       }}
     >
       <strong>Historial de demostración.</strong> Los {eventos.toLocaleString('es-MX')} eventos de
-      este proyecto los fabricó un script para poder enseñar la sección. No miden
-      trabajo real de nadie.
+      este proyecto los fabricó un script para poder enseñar la sección. No miden trabajo real de
+      nadie.
     </p>
   );
 }
@@ -185,9 +174,8 @@ export function NotEnoughData({
         )}
       </p>
       <p className="max-w-md font-sans text-xs text-text-disabled">
-        Se prefiere no enseñar nada a enseñar un número que parecería fiable sin
-        serlo. El historial empieza a contar desde que se registró la primera
-        tarea, no antes.
+        Se prefiere no enseñar nada a enseñar un número que parecería fiable sin serlo. El historial
+        empieza a contar desde que se registró la primera tarea, no antes.
       </p>
     </div>
   );

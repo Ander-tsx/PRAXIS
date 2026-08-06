@@ -138,7 +138,10 @@ export function tabla(cabeceras, filas) {
   }
 
   const render = (fila) =>
-    fila.map((celda, i) => pad(String(celda ?? ''), anchos[i])).join('  ').trimEnd();
+    fila
+      .map((celda, i) => pad(String(celda ?? ''), anchos[i]))
+      .join('  ')
+      .trimEnd();
 
   console.log(gris(render(cabeceras)));
   console.log(gris(anchos.map((a) => '─'.repeat(a)).join('  ')));
@@ -201,7 +204,9 @@ export function spinner(texto) {
 
   const cerrar = (icono, final) => {
     clearInterval(temporizador);
-    process.stdout.write(`\r\x1b[2K  ${icono} ${final ?? etiqueta} ${gris(`${transcurrido()}s`)}\n`);
+    process.stdout.write(
+      `\r\x1b[2K  ${icono} ${final ?? etiqueta} ${gris(`${transcurrido()}s`)}\n`,
+    );
   };
 
   return {

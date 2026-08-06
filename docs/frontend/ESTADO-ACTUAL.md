@@ -44,7 +44,7 @@ Estado por pieza:
 | Lint/format | Biome (raíz) + ESLint (solo `web-shell`) | biome 1.8 |
 | Node | 20 | `.nvmrc` |
 
-⚠️ Next.js 16 es una versión con breaking changes. `apps/frontend/web-shell/AGENTS.md` obliga a consultar `node_modules/next/dist/docs/` antes de usar APIs. Se respeta esa regla.
+⚠️ Next.js 16 es una versión con breaking changes. Hay que consultar `node_modules/next/dist/docs/` antes de usar una API que no esté ya verificada en este repo (regla recogida en CLAUDE.md). Se respeta esa regla.
 
 **No se usa Module Federation** pese a lo que dice el README. La estrategia real es **Next.js Multi-Zones**: cada microfrontend es una app Next independiente con su propio `basePath`, y el `web-shell` la expone vía `rewrites()`.
 
@@ -2092,9 +2092,10 @@ los estilos del sistema.
 
 ## 26. El asistente: propone, y ejecuta el código que ya existe
 
-> Sexto microservicio y un chat dentro de la pantalla de reportes. El diseño
-> entero está en [docs/ENCARGO-ASISTENTE-IA.md](../ENCARGO-ASISTENTE-IA.md);
-> aquí queda lo que se construyó y lo que se aprendió construyéndolo.
+> Sexto microservicio y un chat dentro de la pantalla de reportes. Aquí queda
+> el diseño, lo que se construyó y lo que se aprendió construyéndolo; el
+> contrato de las dos rutas, en
+> [CONTRATO-API «Asistente»](CONTRATO-API.md#asistente-).
 
 ### 26.1 La decisión que sostiene todo lo demás
 

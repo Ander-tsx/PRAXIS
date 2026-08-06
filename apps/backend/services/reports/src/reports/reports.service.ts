@@ -4,12 +4,7 @@ import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservice
 import { firstValueFrom } from 'rxjs';
 
 import { RedisService } from '../redis/redis.service';
-import {
-  acumularFlujo,
-  evaluarSuficiencia,
-  percentile,
-  simularEntrega,
-} from './statistics';
+import { acumularFlujo, evaluarSuficiencia, percentile, simularEntrega } from './statistics';
 
 /** Ventana por defecto de los informes con historial. */
 const DIAS_POR_DEFECTO = 60;
@@ -71,7 +66,9 @@ export class ReportsService {
    */
   private async columnas(projectId: string) {
     const project = await this.ask<{
-      workspaces?: { boards?: { columns?: { id: string; name: string; color: string; order: number }[] }[] }[];
+      workspaces?: {
+        boards?: { columns?: { id: string; name: string; color: string; order: number }[] }[];
+      }[];
     }>(this.projectsClient, 'project_find_one', { id: projectId });
 
     return (project?.workspaces ?? [])
@@ -101,7 +98,7 @@ export class ReportsService {
         byColumn: stats.byColumn
           .map((row: { columnId: string; count: number }) => ({
             ...row,
-            name:  porId.get(row.columnId)?.name ?? 'Columna eliminada',
+            name: porId.get(row.columnId)?.name ?? 'Columna eliminada',
             color: porId.get(row.columnId)?.color ?? null,
             order: porId.get(row.columnId)?.order ?? 999,
           }))
@@ -126,9 +123,7 @@ export class ReportsService {
       >(this.tasksClient, 'task_stats_cycle', { projectId, from: desde.toISOString() });
 
       const lead = muestras.map((m) => m.leadHours);
-      const cycle = muestras
-        .map((m) => m.cycleHours)
-        .filter((h): h is number => h !== null);
+      const cycle = muestras.map((m) => m.cycleHours).filter((h): h is number => h !== null);
 
       return {
         suficiencia: evaluarSuficiencia(muestras.length, dias),
@@ -194,11 +189,9 @@ export class ReportsService {
           projectId,
           from: desde.toISOString(),
         }),
-        this.ask<{ total: number; completed: number }>(
-          this.tasksClient,
-          'task_stats_snapshot',
-          { projectId },
-        ),
+        this.ask<{ total: number; completed: number }>(this.tasksClient, 'task_stats_snapshot', {
+          projectId,
+        }),
       ]);
 
       const suficiencia = evaluarSuficiencia(muestras.length, dias);
@@ -423,11 +416,9 @@ export class ReportsService {
             }[]
           >(this.tasksClient, 'task_stats_experience', { projectId })
         : Promise.resolve([]),
-      this.ask<{ id: string; name: string; color: string }[]>(
-        this.tasksClient,
-        'label_find_all',
-        { projectId },
-      ),
+      this.ask<{ id: string; name: string; color: string }[]>(this.tasksClient, 'label_find_all', {
+        projectId,
+      }),
       /* Los dos informes que contestan «¿cómo estuvo la semana?» y «¿hay algo
          bloqueado?». Van en el briefing y además tienen ruta propia: el
          asistente los necesita aquí, y quien construya otro cliente —la skill
@@ -558,8 +549,8 @@ export class ReportsService {
       prediccion: {
         suficiencia: forecast.suficiencia,
         pendientes: forecast.pendientes,
-        throughputDiario: (forecast as { throughputDiario?: { media: number } }).throughputDiario
-          ?.media ?? null,
+        throughputDiario:
+          (forecast as { throughputDiario?: { media: number } }).throughputDiario?.media ?? null,
         dias: forecast.prediccion,
       },
       /**

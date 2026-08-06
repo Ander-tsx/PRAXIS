@@ -9,16 +9,12 @@
  * https://nextjs.org/docs/messages/invalid-use-server-value
  */
 
-export interface CreateProjectState {
-  error: string | null;
-  /** Nombre del proyecto recién creado, para confirmarlo en la interfaz. */
-  createdName: string | null;
-}
-
-export const CREATE_PROJECT_INITIAL_STATE: CreateProjectState = {
-  error: null,
-  createdName: null,
-};
+/**
+ * `CreateProjectState` y su estado inicial viven en commons, junto al organismo
+ * que los consume: `commons/organisms/CreateProjectDialog/project-form.ts`.
+ * Se reexportan para no tocar los imports existentes.
+ */
+export { CREATE_PROJECT_INITIAL_STATE, type CreateProjectState } from '@praxis/commons';
 
 export interface UpdateProfileState {
   error: string | null;

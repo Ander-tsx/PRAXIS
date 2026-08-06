@@ -112,8 +112,7 @@ export function BoardStrip({
           {columnCount === 0
             ? 'sin columnas'
             : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`}
-          {tasks.length > 0 &&
-            ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}`}
+          {tasks.length > 0 && ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}`}
         </span>
       </header>
 

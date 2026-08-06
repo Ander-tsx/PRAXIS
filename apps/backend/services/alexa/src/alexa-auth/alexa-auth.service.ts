@@ -17,6 +17,17 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { canonicalizePhrase, generateSeedPhrase } from './seed-phrase.util';
 
+/**
+ * Un contador de intentos fallidos y su tope.
+ *
+ * Cada canje comprueba dos: el del aparato —que quien llama elige, así que no
+ * defiende de nadie— y el de la IP, que inyecta el gateway y es el que cuenta.
+ */
+interface Contador {
+  clave: string;
+  max: number;
+}
+
 @Injectable()
 export class AlexaAuthService {
   private readonly logger = new Logger(AlexaAuthService.name);
@@ -76,11 +87,73 @@ export class AlexaAuthService {
 
   // ─── Canje de frase semilla (Alexa Skill) ─────────────────────────────────
 
-  /** La skill envía lo que el usuario dictó; la frase es de un solo uso. */
+  /**
+   * La skill envía lo que el usuario dictó; la frase es de un solo uso.
+   *
+   * ## Dos contadores, y el que importa es el segundo
+   *
+   * El primero va por aparato (`alexaUserId` + `deviceId`) y evita que un
+   * dispositivo mal configurado se quede repitiendo una frase que no vale. **No
+   * es una defensa**: los dos campos llegan en el cuerpo de una ruta pública, así
+   * que quien quiera saltárselo solo tiene que cambiarlos en cada intento. Se
+   * comprobó: doce peticiones rotando `alexaUserId` no producían ni un 429.
+   *
+   * El segundo va por **IP**, que la inyecta el gateway y quien llama no elige.
+   * Ese es el que limita de verdad. Va más holgado porque una IP puede tener
+   * detrás varios aparatos legítimos —una casa, una oficina— y el objetivo no es
+   * cerrarle la puerta a nadie, sino que probar frases a ciegas cueste.
+   *
+   * Si no llega IP —una llamada directa por TCP, que hoy no ocurre desde fuera—
+   * queda solo el primero. Se registra, porque es la señal de que alguien está
+   * hablando con el microservicio sin pasar por el gateway.
+   *
+   * ## Lo que se cuenta son los **fallos**
+   *
+   * Un canje que sale bien no gasta presupuesto. Contar todos los intentos medía
+   * la cosa equivocada: una casa que vincula tres aparatos seguidos gastaba lo
+   * mismo que quien prueba frases a ciegas, y quien acierta a la primera se
+   * quedaba a un intento del bloqueo **por haber acertado**. Lo que hay que
+   * encarecer es equivocarse, que es lo único que produce la fuerza bruta.
+   *
+   * Se vio en la propia suite: `12-voz` canjea frases **válidas** una detrás de
+   * otra y diez pruebas empezaron a fallar con 429 en cuanto el contador por IP
+   * entró en juego. El número no era el problema; lo era qué se contaba.
+   */
   async redeemSeedPhrase(dto: RedeemSeedPhraseDto) {
-    const rateLimitKey = `alexa:redeem:attempts:${dto.alexaUserId}:${dto.deviceId ?? 'default'}`;
-    await this.assertRateLimit(rateLimitKey);
+    const claves = [
+      {
+        clave: `alexa:redeem:attempts:${dto.alexaUserId}:${dto.deviceId ?? 'default'}`,
+        max: this.config.get<number>('VOICE_REDEEM_MAX_ATTEMPTS', 5),
+      },
+    ];
 
+    if (dto.clientIp) {
+      claves.push({
+        clave: `alexa:redeem:ip:${dto.clientIp}`,
+        max: this.config.get<number>('VOICE_REDEEM_MAX_ATTEMPTS_PER_IP', 30),
+      });
+    } else {
+      this.logger.warn(
+        'Canje de frase sin IP de origen: solo se aplicó el límite por dispositivo, ' +
+          'que quien llama controla. ¿Alguien está hablando con el servicio sin pasar por el gateway?',
+      );
+    }
+
+    await this.exigirPresupuesto(claves);
+
+    /* A partir de aquí, todo lo que lance es un fallo del canje y lo anota. El
+       `try` envuelve el resto entero a propósito: si mañana se añade otro motivo
+       de rechazo, entra en la cuenta sin que nadie tenga que acordarse. */
+    try {
+      return await this.canjear(dto);
+    } catch (error) {
+      await this.anotarFallo(claves);
+      throw error;
+    }
+  }
+
+  /** El canje propiamente dicho, sin la contabilidad de intentos. */
+  private async canjear(dto: RedeemSeedPhraseDto) {
     const phraseHash = this.hash(canonicalizePhrase(dto.phrase));
     const record = await this.prisma.alexaLinkCode.findUnique({ where: { phraseHash } });
 
@@ -294,19 +367,49 @@ export class AlexaAuthService {
 
   // ─── Rate Limiting ────────────────────────────────────────────────────────
 
-  private async assertRateLimit(key: string): Promise<void> {
-    const max = this.config.get<number>('VOICE_REDEEM_MAX_ATTEMPTS', 5);
+  /**
+   * ¿Queda presupuesto en todos los contadores?
+   *
+   * **Solo lee.** Quien anota es `anotarFallo`, y únicamente cuando el canje ha
+   * fallado de verdad: separar las dos cosas es lo que hace que acertar no
+   * cueste. Mientras estuvieron juntas, el contador medía «peticiones» en vez de
+   * «errores» y castigaba igual a quien vincula tres aparatos que a quien prueba
+   * frases al azar.
+   */
+  private async exigirPresupuesto(contadores: Contador[]): Promise<void> {
+    for (const { clave, max } of contadores) {
+      const fallos = (await this.redis.get<number>(clave)) ?? 0;
+      if (fallos >= max) {
+        throw new RpcException({
+          statusCode: 429,
+          message: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
+        });
+      }
+    }
+  }
+
+  /**
+   * Anota un intento fallido en todos los contadores.
+   *
+   * La ventana se renueva en cada fallo, así que es deslizante: insistir no
+   * acerca el momento en que vuelve a abrirse, lo aleja. Es lo que se quiere de
+   * un límite contra la fuerza bruta.
+   *
+   * No propaga: quedarse sin anotar un fallo es un contador que va corto; lanzar
+   * desde aquí convertiría un problema de Redis en un error de canje para alguien
+   * que quizá dictó bien la frase.
+   */
+  private async anotarFallo(contadores: Contador[]): Promise<void> {
     const windowSeconds = this.config.get<number>('VOICE_REDEEM_WINDOW_SECONDS', 600);
 
-    const attempts = (await this.redis.get<number>(key)) ?? 0;
-    if (attempts >= max) {
-      throw new RpcException({
-        statusCode: 429,
-        message: 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
-      });
+    for (const { clave } of contadores) {
+      try {
+        const fallos = (await this.redis.get<number>(clave)) ?? 0;
+        await this.redis.set(clave, fallos + 1, windowSeconds);
+      } catch (error) {
+        this.logger.warn(`No se pudo anotar el intento fallido en ${clave}: ${error}`);
+      }
     }
-
-    await this.redis.set(key, attempts + 1, windowSeconds);
   }
 
   // ─── Auditoría ────────────────────────────────────────────────────────────
@@ -334,4 +437,3 @@ export class AlexaAuthService {
       );
   }
 }
-

@@ -9,11 +9,11 @@ import type { VoiceMember, VoiceProject, VoiceTask } from '../common/voice-task.
 /** Alexa corta la espera cerca de los 8 s: ningún viaje TCP debe pasar de 3 s. */
 const RPC_TIMEOUT_MS = 3000;
 
-const PROJECTS_TTL = 60;    // proyectos visibles por usuario
-const PROJECT_TTL = 120;    // detalle de proyecto
-const TASKS_TTL = 60;       // tareas del proyecto
-const MEMBERS_TTL = 120;    // miembros del proyecto (ya enriquecidos con nombre)
-const ACCESS_TTL = 120;     // resultado de la verificación de acceso
+const PROJECTS_TTL = 60; // proyectos visibles por usuario
+const PROJECT_TTL = 120; // detalle de proyecto
+const TASKS_TTL = 60; // tareas del proyecto
+const MEMBERS_TTL = 120; // miembros del proyecto (ya enriquecidos con nombre)
+const ACCESS_TTL = 120; // resultado de la verificación de acceso
 
 /**
  * Única puerta de entrada a los datos de otros microservicios.
@@ -33,9 +33,7 @@ export class PraxisDataService {
 
   private async send<T>(client: ClientProxy, cmd: string, payload: unknown): Promise<T> {
     this.logger.debug(`RPC ${cmd} → ${JSON.stringify(payload)}`);
-    return firstValueFrom(
-      client.send<T>({ cmd }, payload).pipe(timeout(RPC_TIMEOUT_MS)),
-    );
+    return firstValueFrom(client.send<T>({ cmd }, payload).pipe(timeout(RPC_TIMEOUT_MS)));
   }
 
   // ─── Proyectos ────────────────────────────────────────────────────────────
@@ -62,11 +60,9 @@ export class PraxisDataService {
     const cached = await this.redis.get<VoiceProject>(cacheKey);
     if (cached) return cached;
 
-    const project = await this.send<VoiceProject>(
-      this.projectsClient,
-      'project_find_one',
-      { id: projectId },
-    );
+    const project = await this.send<VoiceProject>(this.projectsClient, 'project_find_one', {
+      id: projectId,
+    });
 
     if (!project) {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
@@ -123,11 +119,9 @@ export class PraxisDataService {
     const cached = await this.redis.get<VoiceTask[]>(cacheKey);
     if (cached) return cached;
 
-    const tasks = await this.send<VoiceTask[]>(
-      this.tasksClient,
-      'task_find_by_project',
-      { projectId },
-    );
+    const tasks = await this.send<VoiceTask[]>(this.tasksClient, 'task_find_by_project', {
+      projectId,
+    });
 
     const result = Array.isArray(tasks) ? tasks : [];
     await this.redis.set(cacheKey, result, TASKS_TTL);

@@ -129,9 +129,7 @@ function NotificationRow({
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="font-sans text-sm text-text-primary">
-          {describe(notification, who)}
-        </p>
+        <p className="font-sans text-sm text-text-primary">{describe(notification, who)}</p>
 
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-sans text-[11px] text-text-disabled">

@@ -135,9 +135,7 @@ export function DeleteProjectButton({
             <p className="font-sans text-sm font-semibold text-text-primary">Se eliminarán:</p>
 
             {counting && !inventory ? (
-              <p className="font-sans text-sm text-text-secondary">
-                Contando lo que hay dentro…
-              </p>
+              <p className="font-sans text-sm text-text-secondary">Contando lo que hay dentro…</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {visible.map((line) => (

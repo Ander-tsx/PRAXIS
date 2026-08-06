@@ -178,9 +178,7 @@ export function esPropuestaDeEdicion(
 export function esPropuestaDeMovimiento(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: PropuestaMovimiento } {
-  return (
-    propuesta.tool === 'proponer_movimiento' && typeof propuesta.args.columnId === 'string'
-  );
+  return propuesta.tool === 'proponer_movimiento' && typeof propuesta.args.columnId === 'string';
 }
 
 export function esPropuestaDeChecklist(
