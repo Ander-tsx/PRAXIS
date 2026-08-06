@@ -216,6 +216,53 @@ test.describe('Barrido de control de acceso', () => {
     expect(cedieron, `Rutas que responden a un extraño:\n  ${cedieron.join('\n  ')}`).toEqual([]);
   });
 
+  /**
+   * Cuarto criterio: **que el DTO valide de verdad**.
+   *
+   * `forbidNonWhitelisted` está puesto globalmente, pero eso solo actúa si el
+   * `@Body()` está tipado con un DTO real. Un `@Body()` tipado con
+   * `Omit<XDto, 'algo'>` es `Object` en runtime: acepta cualquier cosa y guarda
+   * nada, devolviendo **200 sin haber hecho el trabajo**. Le pasó a 22 de los 28
+   * endpoints de entonces, y se arregló uno a uno.
+   *
+   * La forma de comprobarlo desde fuera es mandar un campo que ningún DTO
+   * declara: si el pipe está activo son 400; si el `@Body()` es `Object`, pasa.
+   *
+   * Se hace con el **dueño** a propósito: con un extraño el guard rechazaría
+   * antes de llegar a la validación y esto no probaría nada.
+   */
+  test('ninguna escritura acepta un campo que no declara su DTO', async ({ request }) => {
+    const { recurso, tokenDuenno } = await montarRecurso(request);
+    const cabeceras = comoBearer(tokenDuenno);
+
+    const aceptaronBasura: string[] = [];
+
+    for (const { m, ruta, cuerpo } of rutasDeProyecto(recurso)) {
+      /* Solo las que llevan cuerpo: en un GET o un DELETE sin body no hay DTO
+         que probar. Y se saltan las destructivas, que dejarían sin recurso a
+         las siguientes. */
+      if (!cuerpo) continue;
+      if (m === 'DELETE') continue;
+
+      const respuesta = await request.fetch(ruta, {
+        method: m,
+        headers: cabeceras,
+        data: { ...cuerpo, campoQueNingunDtoDeclara: 'basura' },
+      });
+
+      if (respuesta.status() !== 400) {
+        aceptaronBasura.push(
+          `${m} ${ruta.replace(/[0-9a-f-]{36}/g, ':id')} → ${respuesta.status()}`,
+        );
+      }
+    }
+
+    expect(
+      aceptaronBasura,
+      `Escrituras que tragaron un campo desconocido (¿@Body() sin DTO real?):\n  ${aceptaronBasura.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
   test('una miembro de solo lectura lee, y no escribe nada', async ({ request }) => {
     const { recurso, tokenDuenno } = await montarRecurso(request);
     const lectora = await registrar(request);

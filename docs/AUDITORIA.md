@@ -100,7 +100,7 @@ Equipo resolvía a sus miembros contra la primera página del directorio global
 
 | # | Bloque | Estado | Unidades | Cerradas |
 |---|---|---|---|---|
-| 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | 🔄 | 63 (+8 fuera) | 35 |
+| 1 | [Endpoints del gateway](#bloque-1--endpoints-del-gateway) | ✅ | 63 (+8 fuera) | 67 |
 | 2 | [admin-front por dentro](#bloque-2--admin-front-por-dentro) | ⬜ | 11 | 0 |
 | 3 | [Server Actions](#bloque-3--server-actions) | ⬜ | 13 archivos | 0 |
 | 4 | [Microservicios](#bloque-4--microservicios) | ⬜ | 7 servicios | 0 |
@@ -139,30 +139,30 @@ barrido.
 | `DELETE /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
 | `DELETE /alexa/links/:linkId` | ✅ | 2026-08-06 | sonda | Correcto: Filtra por userId: revocar ajena da revoked=0 |
 | `GET /alexa/links` | ✅ | 2026-08-06 | sonda | Correcto: Acotada al userId del token |
-| `GET /alexa/me` | ⬜ | — | — | — |
-| `GET /alexa/projects` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/blocked-tasks` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/forecast` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/members` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/productivity/weekly` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/progress` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/workload` | ⬜ | — | — | — |
+| `GET /alexa/me` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/forecast` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/members` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/progress` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/workload` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
 | `POST /alexa/link` | ✅ | 2026-08-06 | sonda | Correcto: Genera frase para el propio usuario |
 | `POST /alexa/link/redeem` | ⬜ | — | — | — |
-| `POST /alexa/logout` | ⬜ | — | — | — |
-| `POST /alexa/projects/:projectId/select` | ⬜ | — | — | — |
+| `POST /alexa/logout` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `POST /alexa/projects/:projectId/select` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
 | `DELETE /boards/:boardId` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /boards/:boardId/columns/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /boards/:boardId/tasks` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /boards/:boardId` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /boards/:boardId/columns/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `PATCH /boards/:boardId/columns/reorder` | ⬜ | — | — | — |
+| `PATCH /boards/:boardId/columns/reorder` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /me/assistant/quota` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
-| `GET /me/invitations` | ⬜ | — | — | — |
+| `GET /me/invitations` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /permissions/revoke` | ⬜ | — | — | — |
 | `GET /permissions` | ✅ | 2026-08-06 | sonda | Correcto: Catálogo de roles globales, no quién los tiene |
-| `GET /permissions/user/:userId` | ⬜ | — | — | — |
+| `GET /permissions/user/:userId` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `POST /permissions/assign` | ⬜ | — | — | — |
 | `POST /permissions/check` | ⬜ | — | — | — |
 | `DELETE /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
@@ -172,15 +172,15 @@ barrido.
 | `PATCH /projects/:projectId/assistant/conversations/:conversationId` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `POST /projects/:projectId/assistant/chat` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
 | `POST /projects/:projectId/assistant/proposals/:proposalId/resolve` | ⏭️ | 2026-08-06 | — | Fuera de alcance: asistente |
-| `DELETE /projects/:projectId/invitations/:id` | ⬜ | — | — | — |
+| `DELETE /projects/:projectId/invitations/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/invitations` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /projects/:projectId/labels/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/labels` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /projects/:projectId/labels/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `POST /projects/:projectId/labels` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /projects/:projectId/members` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `PATCH /projects/:projectId/members/:userId` | ⬜ | — | — | — |
-| `DELETE /projects/:projectId/membership/me` | ⬜ | — | — | — |
+| `PATCH /projects/:projectId/members/:userId` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `DELETE /projects/:projectId/membership/me` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/reports/blocked` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/reports/cycle-time` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/reports/flow` | ✅ | 2026-08-06 | `10-barrido` | — |
@@ -191,15 +191,15 @@ barrido.
 | `PATCH /projects/:projectId/roles/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /projects/:projectId/workspaces` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /` | ⬜ | — | — | — |
-| `DELETE /tasks/:taskId/attachments/:id` | ⬜ | — | — | — |
+| `DELETE /tasks/:taskId/attachments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /tasks/:taskId/checklists/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `DELETE /tasks/:taskId/comments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /tasks/:taskId/attachments` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `GET /tasks/:taskId/attachments/:id/content` | ⬜ | — | — | — |
+| `GET /tasks/:taskId/attachments/:id/content` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /tasks/:taskId/comments` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `PATCH /tasks/:taskId/comments/:id` | ✅ | 2026-08-06 | `10-barrido` | — |
-| `POST /tasks/:taskId/attachments` | ⬜ | — | — | — |
-| `POST /tasks/:taskId/checklists/:id/toggle` | ⬜ | — | — | — |
+| `POST /tasks/:taskId/attachments` | ✅ | 2026-08-06 | `10-barrido` | — |
+| `POST /tasks/:taskId/checklists/:id/toggle` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /users/:id` | ✅ | 2026-08-06 | sonda | Correcto: Directorio: el flujo de invitar lo necesita |
 | `DELETE /workspaces/:workspaceId` | ✅ | 2026-08-06 | `10-barrido` | — |
 | `GET /workspaces/:workspaceId` | ✅ | 2026-08-06 | `10-barrido` | — |
@@ -313,20 +313,20 @@ Lo que sí queda fuera: el modelo de intenciones y el diálogo de voz.
 |---|---|---|---|---|
 | `POST /alexa/link` | ⬜ | — | — | — |
 | `POST /alexa/link/redeem` | ⬜ | — | — | — |
-| `POST /alexa/logout` | ⬜ | — | — | — |
+| `POST /alexa/logout` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
 | `GET /alexa/links` | ⬜ | — | — | — |
 | `DELETE /alexa/links` | ⬜ | — | — | — |
 | `DELETE /alexa/links/:linkId` | ⬜ | — | — | — |
-| `GET /alexa/me` | ⬜ | — | — | — |
-| `GET /alexa/projects` | ⬜ | — | — | — |
-| `POST /alexa/projects/:projectId/select` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/progress` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/forecast` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/blocked-tasks` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/workload` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/members` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⬜ | — | — | — |
-| `GET /alexa/projects/:projectId/productivity/weekly` | ⬜ | — | — | — |
+| `GET /alexa/me` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `POST /alexa/projects/:projectId/select` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/progress` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/forecast` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/blocked-tasks` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/workload` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/members` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/members/:memberId/performance` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
+| `GET /alexa/projects/:projectId/productivity/weekly` | ⏭️ | 2026-08-06 | — | Va al bloque 7: pide alexaToken, no JWT |
 
 ---
 
@@ -388,4 +388,5 @@ Una línea por sesión. Para saber qué pasó sin releer el historial de git.
 | 2026-08-05 | Integración de `feature/administracion-global` con `main`. Pruebas del panel de administración, de la suspensión y de los avisos. | `52548e7`…`8fe6479` |
 | 2026-08-06 | El directorio de personas se resolvía contra la primera página global: roto con >100 cuentas. Corregido de raíz + barrido de las cuentas que dejaba la suite. | `69bdc42` |
 | 2026-08-06 | Se abre este registro. Línea base medida: 42/113 endpoints cubiertos. | — |
+| 2026-08-06 | **Bloque 1 cerrado.** Los cinco criterios barridos sobre las rutas de proyecto: guard presente, permiso correcto, `req.projectId` en vez de `@Param` crudo, DTO que valida, y las dos mitades (extraño denegado / legítimo admitido). Ningún hallazgo. Las 16 rutas de voz pasan al bloque 7 (piden `alexaToken`). | `4145385` |
 | 2026-08-06 | **Bloque 1, primera pasada.** Sonda de acceso sobre las 91 rutas sondeables, con dos identidades (extraña y miembro de solo lectura). **Ningún agujero nuevo.** Se convierte en prueba permanente: `10-barrido-de-acceso`. 35 unidades cerradas. | `c4b4a7c` |
