@@ -634,9 +634,16 @@ export class TasksService {
         title: true,
         description: true,
         status: true,
+        boardId: true,
+        columnId: true,
+        reporterId: true,
+        projectId: true,
+        parentTaskId: true,
         priority: true,
         dueDate: true,
-        columnId: true,
+        createdAt: true,
+        updatedAt: true,
+        completedAt: true,
         assignees: {
           select: {
             userId: true,
@@ -646,9 +653,16 @@ export class TasksService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    await this.redis.set(cacheKey, tasks, PROJECT_TASKS_TTL);
-    return tasks;
+    const mapped = tasks.map((t) => ({
+      ...t,
+      assigneeId: t.assignees?.[0]?.userId ?? null,
+      assigneeIds: t.assignees?.map((a) => a.userId) ?? [],
+    }));
+
+    await this.redis.set(cacheKey, mapped, PROJECT_TASKS_TTL);
+    return mapped;
   }
+
 
   async findOneTask(dto: FindOneTaskDto) {
     const cacheKey = `task:${dto.id}`;

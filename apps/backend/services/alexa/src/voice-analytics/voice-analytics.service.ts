@@ -29,6 +29,10 @@ export class VoiceAnalyticsService {
     return tasks.filter((task) => this.voiceConfig.isCompleted(task.status));
   }
 
+  private completionDate(task: VoiceTask): Date | string {
+    return task.completedAt ?? task.updatedAt;
+  }
+
   // ─── Avance del proyecto ──────────────────────────────────────────────────
 
   async progress(dto: VoiceProjectQueryDto) {
@@ -73,13 +77,13 @@ export class VoiceAnalyticsService {
     const windows = weekWindows(this.voiceConfig.weekMode);
     const completed = this.completed(tasks);
 
-    // No existe campo completedAt: updatedAt es la mejor señal de cuándo se cerró
+    // Preferir completedAt si existe, con fallback a updatedAt
     const completedThisWeek = completed.filter((task) =>
-      isWithin(task.updatedAt, windows.currentStart, windows.currentEnd),
+      isWithin(this.completionDate(task), windows.currentStart, windows.currentEnd),
     ).length;
 
     const completedLastWeek = completed.filter((task) =>
-      isWithin(task.updatedAt, windows.previousStart, windows.previousEnd),
+      isWithin(this.completionDate(task), windows.previousStart, windows.previousEnd),
     ).length;
 
     let deltaPercent: number;
@@ -125,7 +129,7 @@ export class VoiceAnalyticsService {
     const windowStart = addDays(new Date(), -7 * weeks);
 
     const completedInWindow = completed.filter(
-      (task) => new Date(task.updatedAt) >= windowStart,
+      (task) => new Date(this.completionDate(task)) >= windowStart,
     ).length;
 
     const velocityPerWeek = completedInWindow / weeks;

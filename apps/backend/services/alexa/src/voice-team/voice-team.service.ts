@@ -41,6 +41,12 @@ export class VoiceTeamService {
     };
   }
 
+  private getAssigneeIds(task: VoiceTask): string[] {
+    if (task.assigneeIds && task.assigneeIds.length > 0) return task.assigneeIds;
+    if (task.assigneeId) return [task.assigneeId];
+    return [];
+  }
+
   /** Distribución de carga: cuántas tareas abiertas carga cada integrante. */
   async workload(dto: VoiceProjectQueryDto) {
     const project = await this.data.assertProjectAccess(dto.userId, dto.projectId);
@@ -55,7 +61,7 @@ export class VoiceTeamService {
       queryType: 'workload',
     });
 
-    const relevant = this.topLevel(tasks).filter((task) => task.assigneeId);
+    const relevant = this.topLevel(tasks).filter((task) => this.getAssigneeIds(task).length > 0);
     const nameById = new Map(members.map((member) => [member.id, member.name]));
 
     const counters = new Map<
@@ -64,23 +70,24 @@ export class VoiceTeamService {
     >();
 
     for (const task of relevant) {
-      const key = task.assigneeId as string;
-      const entry = counters.get(key) ?? {
-        assignedCount: 0,
-        completedCount: 0,
-        inProgressCount: 0,
-        openCount: 0,
-      };
+      for (const key of this.getAssigneeIds(task)) {
+        const entry = counters.get(key) ?? {
+          assignedCount: 0,
+          completedCount: 0,
+          inProgressCount: 0,
+          openCount: 0,
+        };
 
-      entry.assignedCount += 1;
-      if (this.voiceConfig.isCompleted(task.status)) {
-        entry.completedCount += 1;
-      } else {
-        entry.openCount += 1;
-        if (this.voiceConfig.isInProgress(task.status)) entry.inProgressCount += 1;
+        entry.assignedCount += 1;
+        if (this.voiceConfig.isCompleted(task.status)) {
+          entry.completedCount += 1;
+        } else {
+          entry.openCount += 1;
+          if (this.voiceConfig.isInProgress(task.status)) entry.inProgressCount += 1;
+        }
+
+        counters.set(key, entry);
       }
-
-      counters.set(key, entry);
     }
 
     const items = [...counters.entries()]
@@ -93,7 +100,8 @@ export class VoiceTeamService {
       .sort((a, b) => b.openCount - a.openCount || b.assignedCount - a.assignedCount);
 
     const unassignedCount = this.topLevel(tasks).filter(
-      (task) => !task.assigneeId && !this.voiceConfig.isCompleted(task.status),
+      (task) =>
+        this.getAssigneeIds(task).length === 0 && !this.voiceConfig.isCompleted(task.status),
     ).length;
 
     return {
@@ -133,7 +141,9 @@ export class VoiceTeamService {
       queryType: 'member_performance',
     });
 
-    const assigned = this.topLevel(tasks).filter((task) => task.assigneeId === dto.memberId);
+    const assigned = this.topLevel(tasks).filter((task) =>
+      this.getAssigneeIds(task).includes(dto.memberId),
+    );
     const staleDays = this.voiceConfig.staleDays;
     const now = new Date();
 

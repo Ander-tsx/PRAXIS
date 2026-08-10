@@ -6,6 +6,7 @@ export interface VoiceTask {
   boardId: string;
   columnId: string;
   assigneeId: string | null;
+  assigneeIds?: string[];
   reporterId: string;
   projectId: string;
   parentTaskId: string | null;
@@ -13,6 +14,7 @@ export interface VoiceTask {
   dueDate: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
+  completedAt?: string | Date | null;
 }
 
 export interface VoiceProject {
