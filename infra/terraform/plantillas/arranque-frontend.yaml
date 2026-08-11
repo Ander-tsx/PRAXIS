@@ -1,0 +1,94 @@
+#cloud-config
+#
+# Arranque de una máquina del frontend: el shell y las 5 zonas.
+#
+# Solo necesita dos cosas de fuera: dónde está el gateway (la IP del
+# balanceador interno) y el JWT_SECRET, que debe coincidir con el del backend
+# para que los guards de cada zona validen la cookie de sesión.
+
+write_files:
+  # ─────────────────────────────────────────────────────────────
+  - path: /etc/praxis/secretos.sh
+    permissions: "0700"
+    owner: root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      PROYECTO="${proyecto}"
+
+      token() {
+        curl -s -H "Metadata-Flavor: Google" \
+          "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
+          | sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p'
+      }
+
+      secreto() {
+        local nombre="$1"
+        curl -s -H "Authorization: Bearer $(token)" \
+          "https://secretmanager.googleapis.com/v1/projects/$PROYECTO/secrets/$nombre/versions/latest:access" \
+          | sed -n 's/.*"data" *: *"\([^"]*\)".*/\1/p' \
+          | base64 -d
+      }
+
+      umask 077
+      cat > /run/praxis.env <<ENV
+      NODE_ENV=production
+      GATEWAY_URL=http://${gateway_host}:3000
+      JWT_SECRET=$(secreto "${prefijo}-jwt-secret")
+      ENV
+
+      chmod 600 /run/praxis.env
+
+  # ─────────────────────────────────────────────────────────────
+  - path: /etc/systemd/system/praxis-frontend.service
+    permissions: "0644"
+    owner: root
+    content: |
+      [Unit]
+      Description=Frontend de PRAXIS (web-shell + 5 zonas)
+      Wants=gcr-online.target docker.service
+      After=gcr-online.target docker.service
+
+      [Service]
+      Type=simple
+      Restart=always
+      RestartSec=10
+      TimeoutStartSec=600
+
+      # ⚠️ La raíz de Container-Optimized OS es de solo lectura y `/root` está
+      # en ella, así que docker-credential-gcr no puede escribir su config.
+      # Detalle completo en arranque-backend.yaml.
+      Environment=HOME=/var/lib/praxis
+
+      ExecStartPre=/bin/mkdir -p /var/lib/praxis
+      ExecStartPre=/etc/praxis/secretos.sh
+      ExecStartPre=/usr/bin/docker-credential-gcr configure-docker --registries=${region}-docker.pkg.dev
+      ExecStartPre=-/usr/bin/docker rm -f praxis-frontend
+      ExecStartPre=/usr/bin/docker pull ${imagen}
+
+      # --network host porque los rewrites() del shell apuntan a
+      # 127.0.0.1:4101-4105. Las zonas solo son alcanzables desde la propia
+      # máquina; el cortafuegos únicamente deja entrar al 4100.
+      ExecStart=/usr/bin/docker run --rm --name praxis-frontend \
+        --network host \
+        --env-file /run/praxis.env \
+        --log-driver=gcplogs \
+        ${imagen}
+
+      ExecStop=/usr/bin/docker stop praxis-frontend
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # ⚠️ El cortafuegos propio de Container-Optimized OS descarta todo lo que no
+  # sea SSH, ICMP o loopback. Sin esto, el shell responde 200 desde dentro de la
+  # máquina y el balanceador lo ve UNHEALTHY. Detalle en arranque-backend.yaml.
+  #
+  # Los dos rangos son de donde llegan tanto las sondas de salud como el tráfico
+  # real de los usuarios: el balanceador externo sale de esas mismas direcciones.
+  - iptables -w -I INPUT 1 -p tcp --dport 4100 -s 130.211.0.0/22 -j ACCEPT
+  - iptables -w -I INPUT 1 -p tcp --dport 4100 -s 35.191.0.0/16 -j ACCEPT
+  - systemctl daemon-reload
+  - systemctl enable --now praxis-frontend.service

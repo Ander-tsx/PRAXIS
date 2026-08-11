@@ -68,3 +68,22 @@ Thumbs.db
 # AI Agent context (local only)
 AGENTS.md
 DESIGN.md
+
+# Terraform
+#
+# El estado vive en un bucket de Cloud Storage, no aquí. Los archivos locales
+# son copias de trabajo y caché de proveedores (cientos de MB).
+#
+# ⚠️ `*.tfvars` lleva la clave de Gemini, y `*.tfstate` —si alguna vez se genera
+# en local— contiene TODOS los secretos en claro, incluida la contraseña de
+# Postgres y el JWT_SECRET. Ninguno de los dos puede acabar en el repo.
+#
+# `.terraform.lock.hcl` SÍ se versiona (fija la versión de cada proveedor, igual
+# que pnpm-lock.yaml), así que no aparece en esta lista.
+infra/terraform/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log

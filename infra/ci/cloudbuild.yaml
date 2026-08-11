@@ -1,0 +1,93 @@
+# Construcción de las imágenes en Cloud Build.
+#
+# ⚠️ **No construyas las imágenes en un Mac con Apple Silicon.** Docker generaría
+# arm64 y las VMs de GCE son x86-64: la imagen sube sin quejarse, la máquina se
+# la baja sin quejarse, y el contenedor muere con `exec format error`. Peor aún
+# en el caso de Prisma, que compila su motor para la plataforma donde se genera.
+#
+# Los trabajadores de Cloud Build son x86-64, así que construir aquí resuelve el
+# problema de raíz y además sube las imágenes sin pasar por tu conexión.
+#
+# Uso:
+#   gcloud builds submit --config infra/ci/cloudbuild.yaml \
+#     --substitutions=_REGION=us-central1,_PREFIJO=praxis,_TAG=latest .
+
+substitutions:
+  _REGION: us-central1
+  _PREFIJO: praxis
+  _TAG: latest
+  # ID de cliente de OAuth para el botón de Google. Va aquí y no en Secret
+  # Manager porque Next lo incrusta en el JavaScript del navegador durante el
+  # build: es público por diseño y no hay forma —ni motivo— de ocultarlo.
+  _GOOGLE_CLIENT_ID: ""
+
+options:
+  # Compilar 6 apps de Next y 8 de Nest en la máquina por defecto tarda mucho.
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+# Los dos builds pesados van en paralelo (no dependen el uno del otro) y el
+# espejo de Redis después. Aun así el conjunto tarda lo suyo.
+timeout: 3600s
+
+# ⚠️ `gcr.io/cloud-builders/docker` arranca con el constructor CLÁSICO, no con
+# BuildKit, y los dos Dockerfiles lo necesitan en tres sitios:
+#
+#   - `RUN --mount=type=cache` para la caché de pnpm
+#   - `COPY --chmod=0755` en migrar.sh (imagen del backend)
+#   - la directiva `# syntax=docker/dockerfile:1.7` de la primera línea
+#
+# Sin BuildKit el primero falla con «the --mount option requires BuildKit» y la
+# directiva `# syntax` se trata como un comentario cualquiera, sin avisar.
+# De ahí el `env` en cada paso que construye.
+steps:
+  # ─────────────────────────── backend ───────────────────────────
+  - id: backend
+    name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - -f
+      - infra/docker/images/backend.Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/backend:${_TAG}
+      - .
+    waitFor: ["-"]
+
+  # ─────────────────────────── frontend ──────────────────────────
+  - id: frontend
+    name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - -f
+      - infra/docker/images/frontend.Dockerfile
+      # Se incrusta en el bundle durante el build. Ver la nota de substitutions.
+      - --build-arg
+      - GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/frontend:${_TAG}
+      - .
+    waitFor: ["-"]
+
+  # ──────────────────────── espejo de Redis ──────────────────────
+  # La imagen oficial se copia a nuestro registro para que la VM de Redis pueda
+  # bajarla sin salida a internet: con el Acceso Privado a Google le basta para
+  # llegar a Artifact Registry, y así nos ahorramos Cloud NAT (~32 USD/mes).
+  - id: redis-espejo
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        docker pull redis:7-alpine
+        docker tag redis:7-alpine ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/redis:7-alpine
+        docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/redis:7-alpine
+    waitFor: ["-"]
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/backend:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/frontend:${_TAG}

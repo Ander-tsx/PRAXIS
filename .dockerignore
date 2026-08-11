@@ -1,0 +1,27 @@
+# Lo que nunca debe entrar al contexto de build.
+#
+# ⚠️ `src/generated/` de cada servicio se excluye a propósito: el cliente de
+# Prisma trae un motor **binario por plataforma**
+# (`libquery_engine-darwin-arm64.dylib.node` en un Mac). Colarlo dentro de una
+# imagen Linux no da error al construir — falla al arrancar. Se regenera dentro
+# del build, que es donde la plataforma ya es la correcta.
+
+node_modules
+**/node_modules
+
+**/dist
+**/.next
+**/src/generated
+**/tsconfig.tsbuildinfo
+
+.git
+.gitignore
+**/.env
+**/.env.local
+**/.env.*.local
+
+e2e/playwright-report
+e2e/test-results
+
+**/.DS_Store
+**/*.log
