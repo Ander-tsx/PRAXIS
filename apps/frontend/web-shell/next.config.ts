@@ -71,6 +71,23 @@ const nextConfig: NextConfig = {
         source: '/admin/:path*',
         destination: `${adminFrontUrl}/admin/:path*`,
       },
+
+      /**
+       * ⚠️ Las rutas de voz (`/api/alexa/*`) **no van aquí**, aunque lo parezca.
+       *
+       * Se intentó y falla de forma engañosa: Next evalúa `rewrites()` al
+       * construir y guarda el destino ya resuelto en `routes-manifest.json`. Con
+       * `GATEWAY_URL` de relleno durante el build, el destino queda cocido como
+       * `http://localhost:3000` y en producción responde 500 pese a que el
+       * proceso tiene la variable correcta.
+       *
+       * Los rewrites de arriba sobreviven a eso por casualidad: las seis apps
+       * comparten máquina, así que `localhost:410x` también es cierto en
+       * producción. El gateway está en otra máquina y no tiene esa suerte.
+       *
+       * Viven en `src/app/api/alexa/[...path]/route.ts`, que sí lee la variable
+       * en cada petición.
+       */
     ];
   },
 
