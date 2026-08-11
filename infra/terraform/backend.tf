@@ -46,11 +46,11 @@ resource "google_compute_instance_template" "backend" {
     google-logging-enabled = "true"
 
     user-data = templatefile("${path.module}/plantillas/arranque-backend.yaml", {
-      proyecto    = var.proyecto
-      prefijo     = var.prefijo
-      region      = var.region
-      imagen      = local.imagen_backend
-      sql_host    = google_sql_database_instance.postgres.private_ip_address
+      proyecto     = var.proyecto
+      prefijo      = var.prefijo
+      region       = var.region
+      imagen       = local.imagen_backend
+      sql_host     = google_sql_database_instance.postgres.private_ip_address
       sql_usuario  = var.usuario_base_datos
       sql_base     = var.nombre_base_datos
       redis_host   = google_compute_address.redis.address

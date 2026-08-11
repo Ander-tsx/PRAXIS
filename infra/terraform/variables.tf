@@ -186,8 +186,14 @@ variable "dominio" {
     resuelve sola y permite un certificado gestionado de Google sin comprar
     nada.
 
-    Cuando tengas dominio propio, ponlo aquí y crea un registro A hacia la IP
-    que aparece en los outputs.
+    Cuando tengas dominio propio, ponlo aquí y crea **dos** registros A hacia
+    la IP del output `ip_publica`: uno para el dominio pelado (`@`) y otro para
+    `www`. El certificado cubre los dos y Google no emite ninguno mientras uno
+    solo no resuelva.
+
+    Crea el DNS ANTES de aplicar, y comprueba que resuelve. Si aplicas primero,
+    el certificado se queda en PROVISIONING y el sitio se queda sin HTTPS hasta
+    que Google reintente.
   EOT
   type        = string
   default     = ""
