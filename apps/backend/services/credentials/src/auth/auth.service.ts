@@ -4,11 +4,18 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'node:crypto';
+import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-library';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
-import { RegisterDto, LoginDto, VerifyTokenDto, JwtPayloadDto } from '@praxis/contracts';
+import {
+  RegisterDto,
+  LoginDto,
+  VerifyTokenDto,
+  JwtPayloadDto,
+  GoogleLoginDto,
+} from '@praxis/contracts';
 
 const SALT_ROUNDS = 10;
 const TOKEN_CACHE_TTL = 300; // 5 min
@@ -23,6 +30,13 @@ export const TOKEN_REFRESCO = 'refresh';
 
 @Injectable()
 export class AuthService {
+  /**
+   * El cliente de Google se crea una sola vez y se reutiliza: mantiene en
+   * memoria las claves públicas con las que verifica las firmas. Crearlo por
+   * petición obligaría a volver a pedírselas a Google en cada entrada.
+   */
+  private clienteGoogle?: OAuth2Client;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -103,6 +117,20 @@ export class AuthService {
     });
 
     if (!credential || !credential.user) {
+      throw new RpcException({ statusCode: 401, message: 'Credenciales inválidas' });
+    }
+
+    /**
+     * ⚠️ Sin contraseña guardada no hay nada que comparar: la cuenta entra solo
+     * con Google.
+     *
+     * Esta comprobación **no es opcional**. `bcrypt.compare` con `null` no
+     * devuelve false de forma limpia, y dejarlo al azar de una librería para
+     * una decisión de autenticación es exactamente el tipo de descuido que
+     * abre una puerta. El mensaje es el genérico de siempre, a propósito: decir
+     * «esta cuenta usa Google» confirmaría que el correo existe.
+     */
+    if (credential.passwordHash === null) {
       throw new RpcException({ statusCode: 401, message: 'Credenciales inválidas' });
     }
 
@@ -206,5 +234,172 @@ export class AuthService {
   async logout(userId: string) {
     await this.redis.del(`auth:session:${userId}`);
     return { success: true };
+  }
+
+  /**
+   * Entrada con Google.
+   *
+   * Recibe el **ID token** que emite Google Identity Services en el navegador y
+   * lo verifica aquí. Nunca se confía en el correo que llegue del cliente: un
+   * `{ email: "quien-sea@gmail.com" }` sin firma sería una suplantación
+   * trivial. Lo único que se acepta es el token, y solo después de comprobar
+   * que Google lo firmó.
+   */
+  async loginWithGoogle(dto: GoogleLoginDto) {
+    const perfil = await this.verificarTokenDeGoogle(dto.idToken);
+
+    /* Si Google no da el correo por verificado, no sirve para identificar a
+       nadie: es exactamente el dato sobre el que se decide la vinculación. */
+    if (!perfil.email || perfil.email_verified !== true) {
+      throw new RpcException({
+        statusCode: 401,
+        message: 'Google no confirma este correo como verificado',
+      });
+    }
+
+    /* 1. ¿Ya conocemos esta identidad de Google? Camino normal a partir de la
+          segunda vez. Se busca por `sub`, no por correo: es lo estable. */
+    const porGoogle = await this.prisma.credential.findUnique({
+      where: { googleSub: perfil.sub },
+      include: { user: true },
+    });
+
+    if (porGoogle?.user) {
+      return this.emitirSesion(porGoogle.user.id, porGoogle.user.status);
+    }
+
+    /* 2. ¿Hay ya una cuenta con ese correo? Aquí está la decisión delicada. */
+    const porCorreo = await this.prisma.credential.findUnique({
+      where: { email: perfil.email },
+      include: { user: true },
+    });
+
+    if (porCorreo) {
+      /**
+       * ⚠️ **No se vincula automáticamente con una cuenta que tiene
+       * contraseña.** Parece lo cómodo y es una toma de cuenta:
+       *
+       *   1. Alguien registra `tu-correo@gmail.com` con una contraseña suya.
+       *      Nadie comprueba que ese buzón sea realmente suyo.
+       *   2. Tú entras más tarde con Google y el sistema, viendo el mismo
+       *      correo, te mete en **su** cuenta.
+       *   3. Él conserva la contraseña, así que entra cuando quiera a lo que
+       *      tú hagas dentro.
+       *
+       * El `email_verified` de Google no protege de esto: verifica que el
+       * correo es tuyo, no que la cuenta preexistente lo sea. La única forma
+       * segura de unir ambas identidades es que alguien demuestre poseer la
+       * contraseña, y eso se hace desde dentro de la sesión, no aquí.
+       */
+      if (porCorreo.passwordHash !== null) {
+        throw new RpcException({
+          statusCode: 409,
+          message:
+            'Ya existe una cuenta con este correo y contraseña. Entra con tu contraseña para poder vincular Google.',
+        });
+      }
+
+      /* Credencial sin contraseña y sin `googleSub` — no debería existir, pero
+         si aparece (un alta a medias, un arreglo a mano), adoptarla es más
+         seguro que dejar a esa persona sin forma de entrar. */
+      const vinculada = await this.prisma.credential.update({
+        where: { id: porCorreo.id },
+        data: { googleSub: perfil.sub },
+        include: { user: true },
+      });
+
+      if (!vinculada.user) {
+        throw new RpcException({ statusCode: 500, message: 'La cuenta no tiene perfil asociado' });
+      }
+
+      return this.emitirSesion(vinculada.user.id, vinculada.user.status);
+    }
+
+    /* 3. Nadie con ese correo: cuenta nueva, sin contraseña. */
+    const creada = await this.prisma.credential.create({
+      data: {
+        email: perfil.email,
+        passwordHash: null,
+        googleSub: perfil.sub,
+        user: {
+          create: {
+            /* `register` los deja vacíos y el perfil se completa después. Aquí
+               Google ya los da, así que se aprovechan — pero se recortan: son
+               campos obligatorios y `undefined` los rompería. */
+            firstName: perfil.given_name ?? '',
+            lastName: perfil.family_name ?? '',
+            avatarUrl: perfil.picture ?? null,
+          },
+        },
+      },
+      include: { user: true },
+    });
+
+    if (!creada.user) {
+      throw new RpcException({ statusCode: 500, message: 'No se pudo crear el perfil' });
+    }
+
+    return this.emitirSesion(creada.user.id, creada.user.status);
+  }
+
+  /**
+   * Comprueba que el token lo firmó Google y que va dirigido a **nuestra** app.
+   *
+   * ⚠️ `audience` no es un detalle de configuración. Sin él se aceptaría
+   * cualquier ID token válido de Google — incluido el que otra aplicación
+   * cualquiera emitió para su propio uso—, y quien tuviera uno entraría aquí
+   * como el usuario que dijera ese token. La librería lo valida junto con la
+   * firma, el emisor y la caducidad.
+   */
+  private async verificarTokenDeGoogle(idToken: string): Promise<TokenPayload> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+
+    /* Se valida aquí y no al arrancar a propósito: sin esta variable el resto
+       de la autenticación funciona igual, así que el servicio debe levantar y
+       fallar solo en este camino, con un mensaje que diga qué falta. */
+    if (!clientId) {
+      throw new RpcException({
+        statusCode: 503,
+        message: 'La entrada con Google no está configurada en este entorno',
+      });
+    }
+
+    const cliente = this.clienteGoogle ?? (this.clienteGoogle = new OAuth2Client(clientId));
+
+    let ticket: LoginTicket;
+    try {
+      ticket = await cliente.verifyIdToken({ idToken, audience: clientId });
+    } catch {
+      /* Firma inválida, caducado, `aud` de otra aplicación, o Google no
+         respondió al pedir sus claves públicas. Ninguno de esos casos se
+         distingue hacia fuera: todos significan «este token no vale». */
+      throw new RpcException({ statusCode: 401, message: 'El token de Google no es válido' });
+    }
+
+    const perfil = ticket.getPayload();
+    if (!perfil) {
+      throw new RpcException({ statusCode: 401, message: 'El token de Google no trae perfil' });
+    }
+
+    return perfil;
+  }
+
+  /**
+   * Los tres pasos finales de cualquier entrada, en un solo sitio.
+   *
+   * `register` y `login` los repiten porque son anteriores; se dejan como
+   * están para no tocar caminos que ya funcionan y están probados.
+   */
+  private async emitirSesion(userId: string, status: string) {
+    if (status !== 'ACTIVE') {
+      throw new RpcException({ statusCode: 403, message: 'Cuenta suspendida o inactiva' });
+    }
+
+    const accessToken = await this.signAccess(userId);
+    const refreshToken = await this.signRefresh(userId);
+
+    await this.redis.set(`auth:session:${userId}`, { refreshToken }, SESSION_TTL);
+
+    return { userId, accessToken, refreshToken };
   }
 }
