@@ -61,6 +61,23 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
   const searchId = useId();
   const roleFieldId = useId();
 
+  /**
+   * Cerrar el diálogo cuando el servidor confirma.
+   *
+   * ⚠️ **La dependencia es `state`, no `state.done`.** `done` vale siempre lo
+   * mismo —la cadena `'invited'`— así que a partir de la **segunda** invitación
+   * sin recargar la página su valor no cambia, el efecto no se vuelve a
+   * ejecutar y el diálogo se queda abierto encima de un formulario que ya se
+   * envió. La primera vez sí funciona, porque ahí pasa de `null` a `'invited'`:
+   * de ahí que pareciera aleatorio.
+   *
+   * `useActionState` devuelve un objeto nuevo por cada ejecución, así que su
+   * identidad sí cambia siempre. La guarda de dentro sigue siendo la que decide
+   * —si la acción falló, `done` es `null` y no se cierra nada—.
+   *
+   * El mismo error estaba en los 18 sitios que hacen esto. Si añades otro, la
+   * dependencia es el estado entero.
+   */
   useEffect(() => {
     if (state.done) {
       setOpen(false);
@@ -68,7 +85,7 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
       setResults(null);
       setSelected(null);
     }
-  }, [state.done]);
+  }, [state]);
 
   async function search() {
     const needle = query.trim();

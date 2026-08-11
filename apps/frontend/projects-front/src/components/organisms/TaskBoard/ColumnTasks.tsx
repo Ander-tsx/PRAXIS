@@ -234,7 +234,7 @@ function NewTaskInline({
       setTitle('');
       inputRef.current?.focus();
     }
-  }, [state.done]);
+  }, [state]);
 
   if (!open) {
     return (

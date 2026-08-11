@@ -106,7 +106,7 @@ export function ColumnMenu({
    */
   useEffect(() => {
     if (updateState.savedName) close();
-  }, [updateState.savedName]);
+  }, [updateState]);
 
   /** Escape y clic fuera. Los dos devuelven el foco al disparador. */
   useEffect(() => {

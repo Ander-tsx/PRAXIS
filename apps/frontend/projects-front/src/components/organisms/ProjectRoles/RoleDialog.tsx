@@ -54,7 +54,7 @@ export function RoleDialog({
       setOpen(false);
       setTouched(false);
     }
-  }, [state.savedName]);
+  }, [state]);
 
   function toggle(permission: ProjectPermission) {
     setSelected((prev) => {

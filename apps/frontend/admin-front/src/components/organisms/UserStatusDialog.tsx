@@ -46,7 +46,7 @@ export function UserStatusDialog({ usuario, open, onClose }: UserStatusDialogPro
      diálogo sigue abierto con el mensaje y con lo escrito. */
   useEffect(() => {
     if (state.done) onClose();
-  }, [state.done, onClose]);
+  }, [state, onClose]);
 
   return (
     <Dialog

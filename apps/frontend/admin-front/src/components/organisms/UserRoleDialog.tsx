@@ -54,7 +54,7 @@ export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDial
 
   useEffect(() => {
     if (state.done) onClose();
-  }, [state.done, onClose]);
+  }, [state, onClose]);
 
   return (
     <Dialog

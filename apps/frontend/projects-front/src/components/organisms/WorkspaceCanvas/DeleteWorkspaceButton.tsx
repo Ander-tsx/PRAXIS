@@ -40,7 +40,7 @@ export function DeleteWorkspaceButton({ projectId, workspace }: DeleteWorkspaceB
       setOpen(false);
       setConfirmation('');
     }
-  }, [state.savedName]);
+  }, [state]);
 
   return (
     <>

@@ -37,7 +37,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
       setName('');
       inputRef.current?.focus();
     }
-  }, [state.savedName]);
+  }, [state]);
 
   if (!editing) {
     return (
