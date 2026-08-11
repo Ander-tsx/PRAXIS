@@ -663,7 +663,6 @@ export class TasksService {
     return mapped;
   }
 
-
   async findOneTask(dto: FindOneTaskDto) {
     const cacheKey = `task:${dto.id}`;
     const cached = await this.redis.get(cacheKey);

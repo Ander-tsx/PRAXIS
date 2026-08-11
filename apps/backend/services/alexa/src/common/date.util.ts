@@ -53,13 +53,9 @@ export function weekWindows(
   };
 }
 
-export function isWithin(
-  date: Date | string | null | undefined,
-  start: Date,
-  end: Date,
-): boolean {
+export function isWithin(date: Date | string | null | undefined, start: Date, end: Date): boolean {
   if (!date) return false;
   const value = date instanceof Date ? date : new Date(date);
-  if (isNaN(value.getTime())) return false;
+  if (Number.isNaN(value.getTime())) return false;
   return value >= start && value < end;
 }
