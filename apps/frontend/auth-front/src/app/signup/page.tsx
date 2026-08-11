@@ -4,6 +4,7 @@ import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
 import { useState } from 'react';
+import { BotonGoogle } from '@/components/organisms/BotonGoogle';
 import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de RegisterDto del backend
@@ -101,6 +102,40 @@ export default function SignupPage() {
     }
   };
 
+  /**
+   * Alta con Google.
+   *
+   * Es el **mismo** endpoint que en el login, y no un «registro con Google»
+   * aparte: quien decide si la cuenta se crea o ya existía es el servidor, que
+   * es el único que puede saberlo. Tener dos rutas obligaría al navegador a
+   * adivinarlo, y adivinar mal significaría rechazar a alguien que ya tiene
+   * cuenta o duplicarla.
+   */
+  const handleGoogle = async (idToken: string) => {
+    setGlobalError('');
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/auth/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (res.ok) {
+        navigateAfterAuth();
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      setGlobalError(data?.message ?? 'No se pudo crear la cuenta con Google.');
+    } catch {
+      setGlobalError('No se pudo conectar con el servidor. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <AuthForm
@@ -112,6 +147,13 @@ export default function SignupPage() {
           <Button type="submit" fullWidth isLoading={isLoading} disabled={isLoading}>
             Crear cuenta
           </Button>
+        }
+        alternatives={
+          <BotonGoogle
+            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
+            onCredencial={handleGoogle}
+            deshabilitado={isLoading}
+          />
         }
         footer={
           <>

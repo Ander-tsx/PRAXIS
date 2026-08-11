@@ -12,6 +12,14 @@ export interface AuthFormProps {
   children: ReactNode;
   /** Botón de submit (átomo Button) */
   submitButton: ReactNode;
+  /**
+   * Otras formas de entrar (ej: el botón de Google), bajo un separador.
+   *
+   * Va fuera del `<form>` a propósito: son caminos alternativos, no campos que
+   * se envíen con él. Meterlas dentro haría que Enter en un campo intentara
+   * enviar también lo que no es un formulario.
+   */
+  alternatives?: ReactNode;
   /** Enlace secundario (ej: "¿Ya tienes cuenta?") */
   footer?: ReactNode;
   /** Handler del submit — la page conecta la lógica */
@@ -30,6 +38,7 @@ export function AuthForm({
   errorMessage,
   children,
   submitButton,
+  alternatives,
   footer,
   onSubmit,
 }: AuthFormProps) {
@@ -63,6 +72,18 @@ export function AuthForm({
 
         <div className="mt-2">{submitButton}</div>
       </form>
+
+      {/* Otras formas de entrar */}
+      {alternatives && (
+        <>
+          <div className="my-6 flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="font-sans text-xs text-text-secondary">o</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+          {alternatives}
+        </>
+      )}
 
       {/* Footer */}
       {footer && (
