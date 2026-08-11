@@ -54,7 +54,7 @@ export function ProjectStatusDialog({
      queda abierto con el mensaje y con el motivo escrito. */
   useEffect(() => {
     if (state.done) onClose();
-  }, [state.done, onClose]);
+  }, [state, onClose]);
 
   const copia = COPIA[destino](proyecto);
   const pideMotivo = destino !== 'ACTIVE';

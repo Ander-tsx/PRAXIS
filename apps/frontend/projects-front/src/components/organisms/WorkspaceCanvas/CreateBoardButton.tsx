@@ -29,7 +29,7 @@ export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonP
       setName('');
       setTouched(false);
     }
-  }, [state.savedName]);
+  }, [state]);
 
   return (
     <>

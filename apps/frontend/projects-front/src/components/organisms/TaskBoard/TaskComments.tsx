@@ -56,7 +56,7 @@ export function TaskComments({
   /** Se vacía al confirmar, no al enviar: si falla, lo escrito sigue ahí. */
   useEffect(() => {
     if (state.done) formRef.current?.reset();
-  }, [state.done]);
+  }, [state]);
 
   return (
     <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
@@ -152,7 +152,7 @@ function CommentRow({
   /** Sale del modo edición cuando el servidor confirma, no al enviar. */
   useEffect(() => {
     if (editState.done) setEditing(false);
-  }, [editState.done]);
+  }, [editState]);
 
   const name = author ? personLabel(author) : 'Alguien que ya no está en el proyecto';
   const error = editState.error ?? deleteState.error;

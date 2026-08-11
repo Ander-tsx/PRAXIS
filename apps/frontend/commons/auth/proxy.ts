@@ -1,6 +1,7 @@
 import { decodeJwt } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
 import type { ApiEnvelopeError } from '../api/envelope';
+import { isTimeout, timeoutSignal } from '../api/timeout';
 import {
   ACCESS_TOKEN_FALLBACK_MAX_AGE,
   REFRESH_COOKIE,
@@ -88,6 +89,7 @@ async function refreshAccessToken(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
       cache: 'no-store',
+      signal: timeoutSignal(),
     });
 
     if (!response.ok) return null;
@@ -147,12 +149,21 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
         ...(body !== undefined && body !== '' ? { body } : {}),
         cache: 'no-store',
         redirect: 'manual',
+        /* Un cuelgue aquí deja al navegador esperando una respuesta que no
+           llega, y al componente que la pidió con su spinner encendido. */
+        signal: timeoutSignal(),
       });
 
     let gatewayResponse: Response;
     try {
       gatewayResponse = await send(accessToken);
-    } catch {
+    } catch (error) {
+      if (isTimeout(error)) {
+        return NextResponse.json(
+          errorEnvelope('BAD_GATEWAY', 'El servidor tardó demasiado en responder.'),
+          { status: 504 },
+        );
+      }
       return NextResponse.json(
         errorEnvelope('BAD_GATEWAY', 'No se pudo conectar con el servidor.'),
         { status: 503 },
@@ -170,7 +181,13 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
       if (renewedToken) {
         try {
           gatewayResponse = await send(renewedToken);
-        } catch {
+        } catch (error) {
+          if (isTimeout(error)) {
+            return NextResponse.json(
+              errorEnvelope('BAD_GATEWAY', 'El servidor tardó demasiado en responder.'),
+              { status: 504 },
+            );
+          }
           return NextResponse.json(
             errorEnvelope('BAD_GATEWAY', 'No se pudo conectar con el servidor.'),
             { status: 503 },

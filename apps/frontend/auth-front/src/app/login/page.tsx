@@ -4,6 +4,7 @@ import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
 import { useState } from 'react';
+import { BotonGoogle } from '@/components/organisms/BotonGoogle';
 import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de LoginDto del backend
@@ -86,6 +87,41 @@ export default function LoginPage() {
     }
   };
 
+  /**
+   * Entrada con Google. La lógica vive aquí, en la page, igual que la del
+   * formulario: `BotonGoogle` solo dibuja y entrega el token.
+   */
+  const handleGoogle = async (idToken: string) => {
+    setEmailError('');
+    setPasswordError('');
+    setGlobalError('');
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/auth/api/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (res.ok) {
+        navigateAfterAuth();
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+
+      /* El 409 se muestra tal cual: es el único mensaje que explica algo que la
+         persona puede resolver —entrar con su contraseña y vincular después—.
+         Generalizarlo la dejaría sin saber qué hacer. */
+      setGlobalError(data?.message ?? 'No se pudo iniciar sesión con Google.');
+    } catch {
+      setGlobalError('No se pudo conectar con el servidor. Intenta de nuevo.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
       <AuthForm
@@ -97,6 +133,13 @@ export default function LoginPage() {
           <Button type="submit" fullWidth isLoading={isLoading} disabled={isLoading}>
             Entrar
           </Button>
+        }
+        alternatives={
+          <BotonGoogle
+            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
+            onCredencial={handleGoogle}
+            deshabilitado={isLoading}
+          />
         }
         footer={
           <>

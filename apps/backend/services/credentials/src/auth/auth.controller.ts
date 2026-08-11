@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
-import { RegisterDto, LoginDto, VerifyTokenDto } from '@praxis/contracts';
+import { RegisterDto, LoginDto, VerifyTokenDto, GoogleLoginDto } from '@praxis/contracts';
 
 import { AuthService } from './auth.service';
 
@@ -17,6 +17,11 @@ export class AuthController {
   @MessagePattern({ cmd: 'auth_login' })
   login(@Payload() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @MessagePattern({ cmd: 'auth_google' })
+  loginWithGoogle(@Payload() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto);
   }
 
   @MessagePattern({ cmd: 'auth_verify_token' })

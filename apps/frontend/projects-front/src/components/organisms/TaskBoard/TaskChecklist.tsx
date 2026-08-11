@@ -49,7 +49,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
    */
   useEffect(() => {
     if (addState.done) addFormRef.current?.reset();
-  }, [addState.done]);
+  }, [addState]);
 
   return (
     <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">

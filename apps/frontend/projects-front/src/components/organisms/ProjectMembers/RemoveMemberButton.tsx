@@ -18,7 +18,7 @@ export function RemoveMemberButton({ projectId, userId, label }: RemoveMemberBut
 
   useEffect(() => {
     if (state.done) setOpen(false);
-  }, [state.done]);
+  }, [state]);
 
   return (
     <>

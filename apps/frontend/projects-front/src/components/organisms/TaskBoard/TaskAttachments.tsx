@@ -52,7 +52,7 @@ export function TaskAttachments({
   /** Se limpia al confirmar el servidor, para poder subir otro seguido. */
   useEffect(() => {
     if (state.done) formRef.current?.reset();
-  }, [state.done]);
+  }, [state]);
 
   const total = attachments.reduce((sum, file) => sum + file.size, 0);
 

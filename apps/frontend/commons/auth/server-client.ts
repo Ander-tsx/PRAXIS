@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { ApiError, unwrapEnvelope } from '../api/envelope';
+import { UPLOAD_TIMEOUT_MS, isTimeout, timeoutError, timeoutSignal } from '../api/timeout';
 import { SESSION_COOKIE } from './cookies';
 
 /**
@@ -88,8 +89,13 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         // Datos de sesión: nunca se cachean entre peticiones de usuarios distintos.
         cache: 'no-store',
+        /* Sin esto, una conexión colgada deja el render de la página sin
+           terminar, y con él la respuesta de la Server Action que lo provocó:
+           el botón se queda cargando para siempre. Ver `api/timeout.ts`. */
+        signal: timeoutSignal(init?.signal),
       });
-    } catch {
+    } catch (error) {
+      if (isTimeout(error)) throw timeoutError();
       throw new ApiError(503, 'BAD_GATEWAY', 'No se pudo conectar con el servidor.');
     }
 
@@ -113,8 +119,11 @@ export function createServerApiClient(options: ServerApiClientOptions = {}): Ser
         headers: { Authorization: `Bearer ${token}` },
         body: form,
         cache: 'no-store',
+        /* El plazo largo: aquí el tiempo se va en mover el archivo. */
+        signal: timeoutSignal(undefined, UPLOAD_TIMEOUT_MS),
       });
-    } catch {
+    } catch (error) {
+      if (isTimeout(error)) throw timeoutError();
       throw new ApiError(503, 'BAD_GATEWAY', 'No se pudo conectar con el servidor.');
     }
 

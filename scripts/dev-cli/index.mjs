@@ -278,6 +278,7 @@ async function reintentarCarreraDePrisma(resultados, buffers) {
   console.log(gris('  nest limpia dist/ y arranca antes de copiar el cliente de Prisma.\n'));
 
   const lista = listaViva(reintentables.map((r) => ({ key: r.svc.key })));
+  listaActiva = lista;
 
   const nuevos = await Promise.all(
     reintentables.map(async ({ svc }) => {
@@ -299,6 +300,7 @@ async function reintentarCarreraDePrisma(resultados, buffers) {
   );
 
   lista.terminar();
+  listaActiva = null;
 
   const porClave = new Map(nuevos.map((r) => [r.svc.key, r]));
   return resultados.map((r) => porClave.get(r.svc.key) ?? r);
@@ -337,6 +339,7 @@ async function arrancarYEsperar(servicios, buffers) {
   const lista = listaViva(
     servicios.map((s) => ({ key: s.key, detalle: gris(s.descripcion ?? '') })),
   );
+  listaActiva = lista;
 
   const esperas = servicios.map(async (svc) => {
     const puertos = svc.puertosVigilados ?? (svc.port ? [svc.port] : []);
@@ -360,6 +363,7 @@ async function arrancarYEsperar(servicios, buffers) {
 
   let resultados = await Promise.all(esperas);
   lista.terminar();
+  listaActiva = null;
 
   resultados = await reintentarCarreraDePrisma(resultados, buffers);
 
@@ -528,19 +532,38 @@ function iniciarRepl(servicios, buffers) {
     rl.prompt();
   });
 
-  /**
-   * Ctrl-C apaga **esperando** a los hijos.
-   *
-   * La versión anterior llamaba a `process.exit(0)` justo después de mandar
-   * SIGTERM, así que el CLI desaparecía antes de que nadie muriera y dejaba
-   * ocho procesos huérfanos con los puertos cogidos. El siguiente arranque
-   * fallaba con EADDRINUSE culpando a nadie.
-   */
-  let apagando = false;
+  /* El manejador de Ctrl-C ya está puesto desde antes de arrancar nada; aquí
+     solo se le dice a quién cerrar. */
+  replActivo = rl;
+}
+
+/**
+ * Ctrl-C apaga **esperando** a los hijos, y desde antes de arrancarlos.
+ *
+ * Dos cosas que costaron procesos huérfanos:
+ *
+ * 1. La primera versión llamaba a `process.exit(0)` justo después de mandar
+ *    SIGTERM, así que el CLI desaparecía antes de que nadie muriera y dejaba
+ *    ocho procesos con los puertos cogidos.
+ * 2. La segunda registraba esto **dentro del REPL**, es decir, después de
+ *    esperar a que levantaran los nueve. Un Ctrl-C durante ese minuto largo
+ *    —justo cuando más ganas dan de cancelar— mataba el CLI con el manejador
+ *    por defecto. Y como los hijos van `detached` (grupo propio, ver
+ *    `proc.mjs`), el Ctrl-C de la terminal **no les llega**: sobrevivían todos.
+ *    Es lo que dejaba las seis zonas de Next escuchando sin nadie que las
+ *    hubiera pedido.
+ */
+let apagando = false;
+let replActivo = null;
+/* La lista viva se repinta sola cada 80 ms: si sigue latiendo mientras se
+   apaga, se come las líneas del apagado. Se para antes de despedirse. */
+let listaActiva = null;
+
+function instalarApagado() {
   process.on('SIGINT', async () => {
     if (apagando) return;
     apagando = true;
-    await salir(rl);
+    await salir(replActivo);
   });
 }
 
@@ -548,6 +571,7 @@ async function salir(rl) {
   /* Se vuelve al escritor simple antes de apagar: repintar el prompt detrás de
      cada línea de despedida deja una columna de «praxis>» que ya no acepta
      nada. Cerrar readline primero evita además que capture el último Enter. */
+  listaActiva?.terminar();
   usarEscritor((texto) => process.stdout.write(texto));
   rl?.close();
 
@@ -620,6 +644,10 @@ async function main() {
     console.log(ambar('\nCancelado. Libera los puertos y vuelve a lanzarlo.'));
     return;
   }
+
+  /* Antes del primer `spawn`: a partir de aquí, un Ctrl-C tiene que llevarse
+     por delante a los hijos, no solo al CLI. */
+  instalarApagado();
 
   /* Un buffer por servicio, compartido entre el arranque y el comando `logs`. */
   const buffers = new Map([['_otros', []]]);

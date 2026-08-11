@@ -27,7 +27,7 @@ export function DeleteRoleButton({ projectId, role, membersUsing }: DeleteRoleBu
 
   useEffect(() => {
     if (state.savedName) setOpen(false);
-  }, [state.savedName]);
+  }, [state]);
 
   return (
     <>

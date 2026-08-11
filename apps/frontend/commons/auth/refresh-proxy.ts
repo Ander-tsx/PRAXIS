@@ -1,5 +1,6 @@
 import { decodeJwt } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
+import { timeoutSignal } from '../api/timeout';
 import {
   ACCESS_TOKEN_FALLBACK_MAX_AGE,
   REFRESH_COOKIE,
@@ -39,26 +40,50 @@ function secondsUntilExpiry(token: string): number | null {
   }
 }
 
+/**
+ * El resultado de intentar renovar, con la distinción que importa.
+ *
+ * ⚠️ **«El refresh ya no vale» y «no pude preguntar» no son lo mismo**, y
+ * tratarlos igual tiene consecuencias: abajo, un fallo de renovación **borra las
+ * dos cookies**. Con un único `null` para ambos casos, un gateway que tarda un
+ * momento de más —o el plazo que ahora corta esa espera— cerraba la sesión de
+ * verdad, y volver a entrar era obligatorio aunque el corte hubiera durado un
+ * segundo. Solo `rechazado` significa que la sesión está muerta.
+ */
+type Renovacion =
+  | { estado: 'renovado'; token: string }
+  | { estado: 'rechazado' }
+  | { estado: 'inalcanzable' };
+
 async function requestNewAccessToken(
   gatewayUrl: string,
   refreshToken: string,
-): Promise<string | null> {
+): Promise<Renovacion> {
   try {
     const response = await fetch(`${gatewayUrl}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
       cache: 'no-store',
+      /* Esto corre en el middleware, **antes de cada petición de la zona**: un
+         cuelgue aquí no deja colgado un botón, sino la navegación entera.
+         El `catch` de abajo lo trata como «no se pudo renovar». */
+      signal: timeoutSignal(),
     });
 
-    if (!response.ok) return null;
+    /* Que el gateway conteste «no» es una respuesta: el refresh no sirve. */
+    if (!response.ok) return { estado: 'rechazado' };
 
     const payload = (await response.json()) as { data?: { accessToken?: unknown } };
     const accessToken = payload?.data?.accessToken;
 
-    return typeof accessToken === 'string' ? accessToken : null;
+    return typeof accessToken === 'string'
+      ? { estado: 'renovado', token: accessToken }
+      : { estado: 'rechazado' };
   } catch {
-    return null;
+    /* Aquí no hubo respuesta: red caída, gateway apagado o plazo agotado. No
+       sabemos si la sesión vale, así que no se toca. */
+    return { estado: 'inalcanzable' };
   }
 }
 
@@ -81,9 +106,9 @@ export function createSessionRefreshProxy(options: CreateSessionRefreshProxyOpti
       }
     }
 
-    const renewed = await requestNewAccessToken(gatewayUrl, refreshToken);
+    const renovacion = await requestNewAccessToken(gatewayUrl, refreshToken);
 
-    if (!renewed) {
+    if (renovacion.estado === 'rechazado') {
       // El refresh también murió: limpiamos para que la UI muestre el estado
       // real en lugar de dejar cookies zombis dando vueltas.
       const response = NextResponse.next();
@@ -91,6 +116,16 @@ export function createSessionRefreshProxy(options: CreateSessionRefreshProxyOpti
       response.cookies.set(REFRESH_COOKIE, '', sessionCookieOptions(0));
       return response;
     }
+
+    /**
+     * No se pudo preguntar. Se sigue con lo que había: si el access token aún
+     * aguanta, la petición pasa como si nada; si ya no, el guard mandará al
+     * login. Lo que **no** se hace es borrar el refresh, que es lo que
+     * permitirá renovar en cuanto el gateway vuelva.
+     */
+    if (renovacion.estado === 'inalcanzable') return NextResponse.next();
+
+    const renewed = renovacion.token;
 
     /**
      * Reescribir la cookie de la petición es lo que hace que el render actual

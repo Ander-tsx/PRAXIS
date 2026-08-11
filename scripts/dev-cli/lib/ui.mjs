@@ -168,6 +168,29 @@ export function sinBorradoDePantalla(texto) {
 const FOTOGRAMAS = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 /**
+ * Cuántas **filas físicas** ocupa una línea al pintarse.
+ *
+ * ⚠️ Es la diferencia entre repintar en su sitio y hacer scrollear la terminal
+ * sin parar. `\x1b[<n>A` sube filas de pantalla, no elementos de la lista: una
+ * línea más ancha que la terminal la parte el terminal en dos filas, y si se
+ * suben tantas filas como elementos hay, el bloque baja una fila por fotograma.
+ * A doce fotogramas por segundo eso es un scroll continuo que deja cientos de
+ * copias de la primera fila en el historial —parece que se están arrancando
+ * muchas veces los primeros servicios— y no para nunca.
+ *
+ * Pasó de verdad: en una terminal estrecha, la fila del frontend con sus seis
+ * puertos (`:4100 … :4105  6.9s`, 68 columnas) desbordaba, y el desbordamiento
+ * empezaba justo cuando esa fila pasaba a ✔.
+ */
+const filasQueOcupa = (linea) => Math.max(1, Math.ceil(ancho(linea) / anchoTerminal()));
+
+/** Recorta a lo que cabe en una fila, contando el ancho visible. */
+const aUnaFila = (texto, reservado) => {
+  const util = anchoTerminal() - reservado - 1;
+  return ancho(texto) > util ? `${texto.slice(0, Math.max(1, util - 1))}…` : texto;
+};
+
+/**
  * Un indicador de «esto está trabajando», con el tiempo transcurrido.
  *
  * ⚠️ **Solo se anima si hay TTY.** Sin terminal, `\r` no vuelve al principio de
@@ -194,9 +217,16 @@ export function spinner(texto) {
   let i = 0;
   let etiqueta = texto;
 
+  /* El recorte no es cosmético: `\r` vuelve al principio de la **fila**, no de
+     la línea lógica, así que una etiqueta que desborde deja la primera fila
+     congelada en pantalla y el spinner animándose en la segunda. */
+  const componer = (icono, texto) => {
+    const tiempo = `${transcurrido()}s`;
+    return `\r\x1b[2K  ${icono} ${aUnaFila(texto, 5 + tiempo.length)} ${gris(tiempo)}`;
+  };
+
   const pintar = () => {
-    const marco = color(96, FOTOGRAMAS[i++ % FOTOGRAMAS.length]);
-    process.stdout.write(`\r\x1b[2K  ${marco} ${etiqueta} ${gris(`${transcurrido()}s`)}`);
+    process.stdout.write(componer(color(96, FOTOGRAMAS[i++ % FOTOGRAMAS.length]), etiqueta));
   };
 
   pintar();
@@ -204,9 +234,7 @@ export function spinner(texto) {
 
   const cerrar = (icono, final) => {
     clearInterval(temporizador);
-    process.stdout.write(
-      `\r\x1b[2K  ${icono} ${final ?? etiqueta} ${gris(`${transcurrido()}s`)}\n`,
-    );
+    process.stdout.write(`${componer(icono, final ?? etiqueta)}\n`);
   };
 
   return {
@@ -239,6 +267,8 @@ export function listaViva(elementos) {
        —una decena de filas— el parpadeo no se aprecia. */
     if (lineasPintadas > 0) process.stdout.write(`\x1b[${lineasPintadas}A`);
 
+    let filas = 0;
+
     for (const el of elementos) {
       const estado = estados.get(el.key);
       const icono =
@@ -258,10 +288,17 @@ export function listaViva(elementos) {
             ? rojo('no responde')
             : gris('arrancando…');
 
-      process.stdout.write(`\x1b[2K  ${icono} ${pad(azul(el.key), 22)} ${detalle}\n`);
+      const linea = `  ${icono} ${pad(azul(el.key), 22)} ${detalle}`;
+      process.stdout.write(`\x1b[2K${linea}\n`);
+      filas += filasQueOcupa(linea);
     }
 
-    lineasPintadas = elementos.length;
+    /* Borra lo que quede por debajo: una fila que pasa de dos líneas a una
+       —«arrancando…» tras un detalle largo— dejaría su cola en pantalla, y el
+       `\x1b[2K` de arriba solo limpia la fila en la que escribe. */
+    process.stdout.write('\x1b[0J');
+
+    lineasPintadas = filas;
     i++;
   };
 

@@ -47,7 +47,7 @@ export function ProjectLabels({ projectId, labels, canManage }: ProjectLabelsPro
       formRef.current?.reset();
       setEditing(null);
     }
-  }, [state.done]);
+  }, [state]);
 
   return (
     <section className="flex flex-col gap-5">

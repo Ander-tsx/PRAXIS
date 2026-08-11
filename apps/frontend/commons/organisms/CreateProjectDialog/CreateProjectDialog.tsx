@@ -66,7 +66,7 @@ export function CreateProjectDialog({
       setDescription('');
       setTouched(false);
     }
-  }, [state.createdName]);
+  }, [state]);
 
   return (
     <>
