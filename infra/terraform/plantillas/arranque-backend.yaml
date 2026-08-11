@@ -1,0 +1,130 @@
+#cloud-config
+#
+# Arranque de una máquina del backend.
+#
+# El sistema operativo es Container-Optimized OS: trae Docker y poco más, no
+# tiene gestor de paquetes y el disco raíz es de solo lectura. No se instala
+# nada — se baja una imagen y se corre.
+#
+# La secuencia es: pedir los secretos a Secret Manager con la identidad de la
+# propia máquina, escribirlos en un archivo de entorno del disco efímero, y
+# arrancar el contenedor con él.
+
+write_files:
+  # ─────────────────────────────────────────────────────────────
+  - path: /etc/praxis/secretos.sh
+    permissions: "0700"
+    owner: root
+    content: |
+      #!/bin/bash
+      #
+      # Trae los secretos y deja /run/praxis.env listo para --env-file.
+      #
+      # /run es tmpfs: vive en memoria y desaparece al apagar. Los secretos no
+      # llegan a tocar el disco.
+      set -euo pipefail
+
+      PROYECTO="${proyecto}"
+
+      # El servidor de metadatos da un token de la cuenta de servicio de esta
+      # VM. No hay ninguna credencial guardada en la máquina ni en la imagen.
+      token() {
+        curl -s -H "Metadata-Flavor: Google" \
+          "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token" \
+          | sed -n 's/.*"access_token" *: *"\([^"]*\)".*/\1/p'
+      }
+
+      # Secret Manager devuelve el valor en base64 dentro de payload.data.
+      # Se extrae con sed en vez de con un parser de JSON porque este sistema
+      # no trae python ni jq, y la forma de la respuesta es fija.
+      secreto() {
+        local nombre="$1"
+        curl -s -H "Authorization: Bearer $(token)" \
+          "https://secretmanager.googleapis.com/v1/projects/$PROYECTO/secrets/$nombre/versions/latest:access" \
+          | sed -n 's/.*"data" *: *"\([^"]*\)".*/\1/p' \
+          | base64 -d
+      }
+
+      umask 077
+      cat > /run/praxis.env <<ENV
+      POSTGRES_HOST=${sql_host}
+      POSTGRES_PORT=5432
+      POSTGRES_USER=${sql_usuario}
+      POSTGRES_DB=${sql_base}
+      POSTGRES_PASSWORD=$(secreto "${prefijo}-password-sql")
+      REDIS_URL=redis://${redis_host}:6379
+      JWT_SECRET=$(secreto "${prefijo}-jwt-secret")
+      VOICE_JWT_SECRET=$(secreto "${prefijo}-voice-jwt-secret")
+      GEMINI_API_KEY=$(secreto "${prefijo}-gemini-api-key")
+      GOOGLE_CLIENT_ID=${google_client_id}
+      LOG_LEVEL=info
+      ENV
+
+      chmod 600 /run/praxis.env
+
+  # ─────────────────────────────────────────────────────────────
+  - path: /etc/systemd/system/praxis-backend.service
+    permissions: "0644"
+    owner: root
+    content: |
+      [Unit]
+      Description=Backend de PRAXIS (gateway + 7 microservicios)
+      Wants=gcr-online.target docker.service
+      After=gcr-online.target docker.service
+
+      [Service]
+      Type=simple
+      Restart=always
+      RestartSec=10
+      # El primer arranque baja ~550 MB de imagen. Sin esto, systemd lo daría
+      # por fallido antes de que termine.
+      TimeoutStartSec=600
+
+      # ⚠️ En Container-Optimized OS la raíz es de SOLO LECTURA, y `/root` va en
+      # ella. Sin esta línea, `docker-credential-gcr configure-docker` muere con
+      #   Unable to save docker config: mkdir /root/.docker: read-only file system
+      # y la máquina se queda reintentando cada 10 s para siempre — la VM figura
+      # como RUNNING y el balanceador la marca UNHEALTHY sin más explicación.
+      #
+      # `/var/lib` sí es escribible. Tanto docker-credential-gcr como el propio
+      # `docker` leen la configuración de $HOME/.docker, así que basta con
+      # mover HOME: lo heredan todos los ExecStart de esta unidad.
+      Environment=HOME=/var/lib/praxis
+
+      ExecStartPre=/bin/mkdir -p /var/lib/praxis
+      ExecStartPre=/etc/praxis/secretos.sh
+      ExecStartPre=/usr/bin/docker-credential-gcr configure-docker --registries=${region}-docker.pkg.dev
+      ExecStartPre=-/usr/bin/docker rm -f praxis-backend
+      ExecStartPre=/usr/bin/docker pull ${imagen}
+
+      # --network host: el gateway escucha en el 3000 de la VM directamente.
+      # Los microservicios (3001-3007) quedan en loopback y el cortafuegos no
+      # los expone, así que no salen de la máquina.
+      ExecStart=/usr/bin/docker run --rm --name praxis-backend \
+        --network host \
+        --env-file /run/praxis.env \
+        --log-driver=gcplogs \
+        ${imagen}
+
+      ExecStop=/usr/bin/docker stop praxis-backend
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # ⚠️ Container-Optimized OS trae su PROPIO cortafuegos, y su política por
+  # defecto en INPUT es DROP: solo pasan SSH, ICMP, loopback y lo ya
+  # establecido. Todo lo demás se descarta en el sistema operativo, antes de
+  # llegar a la aplicación.
+  #
+  # Es una capa distinta de las reglas de VPC, y el síntoma engaña mucho: desde
+  # dentro `curl localhost:3000/api` responde 200 —loopback está permitido— pero
+  # las sondas del balanceador se pierden, el grupo queda UNHEALTHY sin motivo
+  # aparente y el autocurado empieza a recrear máquinas en bucle.
+  #
+  # Quien filtra por origen sigue siendo la VPC; esto solo deja de descartar.
+  - iptables -w -I INPUT 1 -p tcp --dport 3000 -s 130.211.0.0/22 -j ACCEPT
+  - iptables -w -I INPUT 1 -p tcp --dport 3000 -s 35.191.0.0/16 -j ACCEPT
+  - iptables -w -I INPUT 1 -p tcp --dport 3000 -s ${rango_subred} -j ACCEPT
+  - systemctl daemon-reload
+  - systemctl enable --now praxis-backend.service
