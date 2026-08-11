@@ -102,7 +102,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     );
   }
 
-  const [effective, members, labels] = await Promise.all([
+  const [effective, members, labels, invitations] = await Promise.all([
     api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`),
     api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
@@ -110,6 +110,22 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     api
       .get<Label[]>(`/projects/${project.id}/labels`)
       .catch(() => [] as Label[]),
+    /**
+     * Las invitaciones se piden **aquí y no después de resolver a las personas**,
+     * porque quien está invitado también necesita nombre y correo: sus ids
+     * entran en la misma tanda que los de los miembros. Pedirlas más abajo
+     * obligaba a resolver los perfiles antes de saber a quién había que
+     * resolver, y esa era justo la causa de que la invitación pendiente
+     * saliera con el UUID crudo.
+     *
+     * Solo quien gestiona el equipo puede listarlas; para el resto es un 403
+     * esperado y la sección simplemente no las muestra.
+     */
+    activeTab === 'equipo'
+      ? api
+          .get<ProjectInvitation[]>(`/projects/${project.id}/invitations`)
+          .catch(() => [] as ProjectInvitation[])
+      : Promise.resolve([] as ProjectInvitation[]),
   ]);
 
   const can = effective.permissions;
@@ -143,10 +159,24 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * Ahora se piden **solo los ids que hacen falta**, en paralelo. El coste va
    * con el tamaño del proyecto, no con el de la plataforma, y quien falle cae a
    * `null` sin llevarse la página por delante.
+   *
+   * ⚠️ **Las personas invitadas cuentan, y no son miembros.** Una invitación
+   * `PENDING` no crea `ProjectMember` —eso pasa al aceptarla—, así que su id no
+   * está en `members` y hay que sumarlo aparte. Mientras se cruzaba contra el
+   * directorio entero salía bien de casualidad, porque la primera página lo
+   * traía; al pasar a pedir ids sueltos, la invitación se quedó fuera de la
+   * lista y volvió a enseñar el UUID crudo con «Correo no disponible» —el mismo
+   * síntoma que este bloque arregló para los miembros—.
    */
   const idsDePersonas =
     activeTab === 'equipo' || activeTab === 'espacios'
-      ? [...new Set([...members.map((m) => m.userId), project.ownerId])]
+      ? [
+          ...new Set([
+            ...members.map((m) => m.userId),
+            ...invitations.map((invitation) => invitation.userId),
+            project.ownerId,
+          ]),
+        ]
       : [];
 
   const personas = await Promise.all(
@@ -157,15 +187,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     items: personas.filter((u): u is UserProfile => u !== null),
     total: idsDePersonas.length,
   };
-
-  const invitations =
-    activeTab === 'equipo'
-      ? /* Solo quien gestiona el equipo puede listarlas; para el resto es un
-           403 esperado y la sección simplemente no las muestra. */
-        await api
-          .get<ProjectInvitation[]>(`/projects/${project.id}/invitations`)
-          .catch(() => [] as ProjectInvitation[])
-      : ([] as ProjectInvitation[]);
 
   const boardCount = project.workspaces.reduce(
     (total, workspace) => total + workspace.boards.length,
