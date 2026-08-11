@@ -1,4 +1,5 @@
 import { ApiError, unwrapEnvelope } from './envelope';
+import { isTimeout, timeoutError, timeoutSignal } from './timeout';
 
 /**
  * Cliente HTTP contra el gateway, a través del proxy autenticado de la zona.
@@ -52,8 +53,13 @@ export function createApiClient({ gatewayPath }: ApiClientOptions): ApiClient {
           ...init?.headers,
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        /* Los spinners que maneja el propio componente —el botón «Buscar», por
+           ejemplo— se apagan en un `finally`: sin plazo, ese `finally` puede no
+           llegar nunca. Ver `api/timeout.ts`. */
+        signal: timeoutSignal(init?.signal),
       });
-    } catch {
+    } catch (error) {
+      if (isTimeout(error)) throw timeoutError();
       throw new ApiError(503, 'BAD_GATEWAY', 'No se pudo conectar con el servidor.');
     }
 
