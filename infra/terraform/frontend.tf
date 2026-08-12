@@ -257,8 +257,24 @@ resource "google_compute_backend_service" "frontend" {
   protocol              = "HTTP"
   port_name             = "http"
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  timeout_sec           = 60
-  health_checks         = [google_compute_health_check.frontend.id]
+
+  /**
+   * ⚠️ Media hora, y no es para que una página tarde media hora en cargar.
+   *
+   * En un balanceador de aplicación de Google esto **no es un tiempo de
+   * inactividad**: es lo máximo que puede durar una respuesta entera, se esté
+   * enviando o no. Los avisos en vivo van por un flujo SSE que se mantiene
+   * abierto mientras la pestaña lo esté, así que con los 60 s de antes el
+   * balanceador lo cortaba cada minuto. No se rompía nada —`EventSource`
+   * reconecta solo— pero cada corte es una petición nueva, y en el hueco entre
+   * una y otra un aviso se pierde sin que nadie se entere.
+   *
+   * El gateway manda un latido cada 25 s por el mismo motivo, y son cosas
+   * distintas: el latido evita que un intermediario cierre por silencio; esto
+   * evita que se cierre por veteranía.
+   */
+  timeout_sec   = 1800
+  health_checks = [google_compute_health_check.frontend.id]
 
   backend {
     group           = google_compute_region_instance_group_manager.frontend.instance_group
