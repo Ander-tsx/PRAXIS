@@ -1,0 +1,53 @@
+# Copia este archivo como `terraform.tfvars` y rellena lo tuyo.
+#
+# ⚠️ `terraform.tfvars` NO se versiona: lleva la clave de Gemini.
+
+# ───────────────────────────── obligatorio ─────────────────────────────
+
+# El ID del proyecto, no su nombre visible. Se ve en el selector de proyectos
+# de la consola, o con: gcloud projects list
+proyecto = "cambia-esto-por-tu-project-id"
+
+# ───────────────────────────── opcional ─────────────────────────────
+
+region = "us-central1"
+zona   = "us-central1-a"
+
+# Clave de Google AI Studio (https://aistudio.google.com/apikey — es gratuita).
+#
+# ⚠️ Sin ella, assistant-service se queda reiniciándose: exige la clave para
+# arrancar, a propósito. Los otros 7 servicios funcionan igual, así que el
+# sistema es usable salvo el asistente.
+#
+# Si la pones, hace falta además `habilitar_nat = true`: llamar a Gemini es
+# salir a internet, y las máquinas no tienen IP pública.
+gemini_api_key = ""
+
+# Salida a internet para las VMs. Cuesta ~32 USD/mes y solo hace falta para
+# que el asistente pueda llamar a Gemini.
+habilitar_nat = false
+
+# Tamaño de las máquinas. e2-medium (2 vCPU, 4 GB) porque en cada una corren
+# 8 procesos Node (backend) o 6 servidores Next (frontend), a ~150 MB cada uno.
+tipo_maquina_backend  = "e2-medium"
+tipo_maquina_frontend = "e2-medium"
+tipo_maquina_redis    = "e2-micro"
+
+# Autoescalado. El mínimo es lo que pagas siempre; el máximo es el techo.
+minimo_instancias = 1
+maximo_instancias = 3
+objetivo_cpu      = 0.6
+
+# Cloud SQL. db-f1-micro es el más barato y suficiente aquí.
+tipo_maquina_sql = "db-f1-micro"
+
+# Con true, `terraform destroy` se niega a borrar la base de datos.
+borrado_protegido_sql = true
+
+# Vacío = se usa sslip.io sobre la IP del balanceador, con certificado
+# gestionado de Google. Cuando tengas dominio propio, ponlo aquí y crea un
+# registro A hacia la IP que sale en los outputs.
+dominio = ""
+
+# Cambiar esto y aplicar es lo que despliega una versión nueva de las imágenes.
+etiqueta_imagen = "latest"
