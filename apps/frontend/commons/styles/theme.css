@@ -285,6 +285,24 @@ button:disabled,
   animation: entrar-desde-la-derecha 220ms ease-out;
 }
 
+/* Los tres puntos del paso en curso del asistente (FlujoDePensamiento).
+
+   `steps(4)` en vez de una transición continua: los puntos aparecen de uno en
+   uno, como si se estuvieran escribiendo. Con un desvanecido se lee como algo
+   que parpadea, no como algo que avanza. */
+@keyframes puntos-suspensivos {
+  from {
+    transform: translateX(-1em);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-puntos-suspensivos {
+  animation: puntos-suspensivos 1.2s steps(4) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,7 +1,5 @@
 'use client';
 
-import { Badge, Button, Sparkle, alpha, colors } from '@praxis/commons';
-import { useEffect, useId, useRef, useState } from 'react';
 import { cargarConversacionAction, preguntarAction } from '@/app/(private)/[id]/actions';
 import {
   type AssistantProposal,
@@ -14,8 +12,11 @@ import {
   esPropuestaDeTarea,
   formatoReinicio,
 } from '@/lib/assistant';
+import { Badge, Button, alpha, colors } from '@praxis/commons';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ConversationHistory } from './ConversationHistory';
-import { TextoDelModelo } from './TextoDelModelo';
+import { FlujoDePensamiento } from './FlujoDePensamiento';
+import { GrupoDePropuestas } from './GrupoDePropuestas';
 import {
   AssignProposalCard,
   ChecklistProposalCard,
@@ -24,6 +25,7 @@ import {
   MoveProposalCard,
   TaskProposalCard,
 } from './ProposalCard';
+import { TextoDelModelo } from './TextoDelModelo';
 
 interface Mensaje {
   id: string;
@@ -268,98 +270,106 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
                 <div key={mensaje.id} className="flex flex-col gap-3">
                   <Burbuja mensaje={mensaje} />
 
-                  {(mensaje.proposals ?? []).map((propuesta, indice) => {
-                    if (esPropuestaDeTarea(propuesta)) {
-                      return (
-                        <TaskProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    if (esPropuestaDeAsignacion(propuesta)) {
-                      return (
-                        <AssignProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    if (esPropuestaDeEdicion(propuesta)) {
-                      return (
-                        <EditProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    if (esPropuestaDeMovimiento(propuesta)) {
-                      return (
-                        <MoveProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    if (esPropuestaDeChecklist(propuesta)) {
-                      return (
-                        <ChecklistProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    if (esPropuestaDeComentario(propuesta)) {
-                      return (
-                        <CommentProposalCard
-                          key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                          projectId={projectId}
-                          proposalId={propuesta.id}
-                          estadoGuardado={propuesta.status}
-                          propuesta={propuesta.args}
-                          nombres={nombres}
-                          etiquetas={etiquetas}
-                        />
-                      );
-                    }
-                    /* Una herramienta que el servicio conozca y esta pantalla no.
+                  {(mensaje.proposals ?? []).length > 0 && (
+                    <GrupoDePropuestas
+                      /* Las que ya se decidieron en su día no cuentan: al releer
+                         una conversación vieja, «3 propuestas» sobre tres
+                         tarjetas ya aceptadas ofrecería aplicar lo aplicado. */
+                      pendientes={
+                        (mensaje.proposals ?? []).filter(
+                          (propuesta) => !propuesta.status || propuesta.status === 'PENDING',
+                        ).length
+                      }
+                    >
+                      {(mensaje.proposals ?? []).map((propuesta, indice) => {
+                        if (esPropuestaDeTarea(propuesta)) {
+                          return (
+                            <TaskProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeAsignacion(propuesta)) {
+                          return (
+                            <AssignProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeEdicion(propuesta)) {
+                          return (
+                            <EditProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeMovimiento(propuesta)) {
+                          return (
+                            <MoveProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeChecklist(propuesta)) {
+                          return (
+                            <ChecklistProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeComentario(propuesta)) {
+                          return (
+                            <CommentProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        /* Una herramienta que el servicio conozca y esta pantalla no.
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
-                    return null;
-                  })}
+                        return null;
+                      })}
+                    </GrupoDePropuestas>
+                  )}
                 </div>
               ))}
 
-              {pendiente && (
-                <div className="flex items-center gap-2">
-                  <ThinkingStars />
-                  <p className="font-sans text-sm italic text-text-disabled">Pensando…</p>
-                </div>
-              )}
+              {pendiente && <FlujoDePensamiento />}
             </div>
           )}
 
@@ -453,59 +463,6 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
   );
 }
 
-/**
- * Tres `Sparkle` de distinto tamaño, cada una con su propio `animation-delay`.
- *
- * Antes era una sola estrella girando sobre sí misma — un adorno, no una
- * señal de actividad. Tres estrellas que titilan por turnos, cambiando de
- * tamaño y posición sin sincronizarse entre sí, es la misma idea que usan los
- * indicadores de "pensando" de otros asistentes: no gira nada, parpadea.
- */
-function ThinkingStars() {
-  return (
-    <div className="relative h-6 w-11 shrink-0" aria-hidden="true">
-      <Sparkle
-        size={9}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 6,
-          color: colors.accent,
-          animation: 'sparkle-drift 1.6s ease-in-out infinite',
-        }}
-      />
-      <Sparkle
-        size={18}
-        style={{
-          position: 'absolute',
-          left: 12,
-          top: -3,
-          color: colors.primary,
-          animation: 'sparkle-drift 1.9s ease-in-out infinite 0.3s',
-        }}
-      />
-      <Sparkle
-        size={11}
-        style={{
-          position: 'absolute',
-          left: 30,
-          top: 7,
-          color: colors.primary,
-          animation: 'sparkle-drift 1.4s ease-in-out infinite 0.6s',
-        }}
-      />
-    </div>
-  );
-}
-
-/**
- * «187 / 500 este mes».
- *
- * Poner el coste a la vista de quien lo gasta es lo correcto, y además evita la
- * sorpresa de encontrarse el límite de golpe. El número sale **del backend en
- * cada respuesta**, nunca de una cuenta local: un contador que discrepe del que
- * gobierna la cuota es peor que no tener contador.
- */
 function ContadorCuota({ cuota }: { cuota: AssistantQuota }) {
   const quedan = Math.max(0, cuota.limite - cuota.usados);
   const apurado = quedan <= Math.max(3, Math.round(cuota.limite * 0.1));
