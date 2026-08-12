@@ -7,6 +7,7 @@ import * as crypto from 'node:crypto';
 import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-library';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { TokensService } from './tokens.service';
 import { RedisService } from '../redis/redis.service';
 
 import {
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly redis: RedisService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly tokens: TokensService,
   ) {}
 
   private tokenHash(token: string): string {
@@ -102,12 +104,122 @@ export class AuthService {
     }
 
     const userId = credential.user.id;
-    const accessToken = await this.signAccess(userId);
-    const refreshToken = await this.signRefresh(userId);
 
-    await this.redis.set(`auth:session:${userId}`, { refreshToken }, SESSION_TTL);
+    /**
+     * ⚠️ **Registrarse ya no inicia sesión.**
+     *
+     * Devolvía tokens en el acto, y con la confirmación de correo puesta eso
+     * sería la puerta trasera que la anula: bastaría con registrarse y quedarse
+     * dentro sin abrir el correo jamás. Ahora se manda el enlace y se entra por
+     * el login, como todo el mundo.
+     *
+     * El envío va sin `await` a propósito: la respuesta no puede depender de que
+     * el proveedor de correo esté rápido, y `enviar` no lanza nunca. Si falla,
+     * el token queda emitido y «reenviar» lo repite.
+     */
+    void this.tokens.enviarVerificacion(credential.id, credential.email);
 
-    return { userId, accessToken, refreshToken };
+    return { userId, email: credential.email, verificacionPendiente: true };
+  }
+
+  /**
+   * Reenvía el correo de confirmación.
+   *
+   * ⚠️ **Responde igual exista o no la cuenta.** Un «ese correo no está
+   * registrado» convertiría esta ruta en un comprobador de quién tiene cuenta
+   * aquí, que es justo lo que el login se cuida de no revelar.
+   */
+  async resendVerification(email: string) {
+    const credential = await this.prisma.credential.findUnique({ where: { email } });
+
+    if (credential && credential.emailVerifiedAt === null) {
+      await this.tokens.enviarVerificacion(credential.id, credential.email);
+    }
+
+    return { enviado: true };
+  }
+
+  /**
+   * Confirma un correo con el token del enlace.
+   *
+   * Es idempotente hacia la persona: un enlace ya usado responde con el error
+   * genérico, pero si la cuenta ya está verificada no pasa nada malo —vuelve a
+   * intentar entrar y funciona—.
+   */
+  async verifyEmail(token: string) {
+    const credentialId = await this.tokens.canjear(token, 'EMAIL_VERIFICATION');
+
+    if (!credentialId) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este enlace ya no sirve. Pide uno nuevo desde la pantalla de entrada.',
+      });
+    }
+
+    await this.prisma.credential.update({
+      where: { id: credentialId },
+      /* Si ya estaba verificada no se pisa la fecha original: interesa cuándo se
+         confirmó de verdad, no la última vez que alguien abrió un enlace. */
+      data: { emailVerifiedAt: new Date() },
+    });
+
+    return { verificado: true };
+  }
+
+  /**
+   * Arranca la recuperación de contraseña.
+   *
+   * ⚠️ **Siempre responde lo mismo**, exista la cuenta o no, y tenga contraseña
+   * o entre solo con Google. Cualquier diferencia —un mensaje, un código, un
+   * tiempo de respuesta notablemente distinto— convierte esto en un listado de
+   * quién está registrado.
+   */
+  async forgotPassword(email: string) {
+    const credential = await this.prisma.credential.findUnique({ where: { email } });
+
+    /* Solo si tiene contraseña: a una cuenta que entra con Google no se le puede
+       «recuperar» algo que no tiene, y crearle una por esta vía sería una forma
+       de tomar el control sin pasar por Google. */
+    if (credential?.passwordHash) {
+      await this.tokens.enviarRecuperacion(credential.id, credential.email);
+    }
+
+    return { enviado: true };
+  }
+
+  /**
+   * Fija la contraseña nueva y **cierra todas las sesiones**.
+   *
+   * Lo segundo no es un extra: quien recupera la contraseña suele hacerlo porque
+   * sospecha que alguien más entró. Dejar viva la sesión del intruso vaciaría de
+   * sentido el cambio.
+   *
+   * De paso da el correo por verificado: se acaba de demostrar acceso a esa
+   * bandeja de entrada, que es exactamente lo que la verificación comprueba.
+   */
+  async resetPassword(token: string, password: string) {
+    const credentialId = await this.tokens.canjear(token, 'PASSWORD_RESET');
+
+    if (!credentialId) {
+      throw new RpcException({
+        statusCode: 400,
+        message: 'Este enlace ya no sirve. Pide otro desde «Olvidé mi contraseña».',
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const credential = await this.prisma.credential.update({
+      where: { id: credentialId },
+      data: { passwordHash, emailVerifiedAt: new Date() },
+      include: { user: true },
+    });
+
+    if (credential.user) {
+      await this.redis.del(`auth:session:${credential.user.id}`);
+    }
+
+    return { restablecida: true };
   }
 
   async login(dto: LoginDto) {
@@ -141,6 +253,25 @@ export class AuthService {
 
     if (credential.user.status !== 'ACTIVE') {
       throw new RpcException({ statusCode: 403, message: 'Cuenta suspendida o inactiva' });
+    }
+
+    /**
+     * ⚠️ **Sin correo confirmado no se entra.**
+     *
+     * Va **después** de comprobar la contraseña, y el orden es la decisión: al
+     * revés, cualquiera podría escribir un correo ajeno y saber por la respuesta
+     * si esa cuenta existe y está sin confirmar. Aquí solo llega quien ya ha
+     * demostrado saber la contraseña.
+     *
+     * El código viaja aparte del mensaje porque la pantalla hace algo distinto
+     * con este 403 que con el de cuenta suspendida: ofrece reenviar el correo.
+     */
+    if (credential.emailVerifiedAt === null) {
+      throw new RpcException({
+        statusCode: 403,
+        message: 'Confirma tu correo antes de entrar. Te hemos mandado un enlace.',
+        details: { code: 'EMAIL_NOT_VERIFIED', email: credential.email },
+      });
     }
 
     const userId = credential.user.id;
