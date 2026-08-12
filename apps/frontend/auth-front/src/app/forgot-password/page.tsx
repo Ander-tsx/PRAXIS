@@ -15,7 +15,18 @@ import { type FormEvent, useState } from 'react';
  * Por eso el mensaje habla en condicional —«si esa dirección tiene cuenta»— en
  * lugar de prometer un correo que quizá no se ha mandado.
  */
-export default function OlvidePage() {
+export default function ForgotPasswordPage() {
+  /* El mismo envoltorio que login y registro: sin él la tarjeta se pega arriba
+     a la izquierda, porque el layout de la zona no centra nada — lo hace cada
+     página con su propio `<main>`. */
+  return (
+    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+      <Contenido />
+    </main>
+  );
+}
+
+function Contenido() {
   const [email, setEmail] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);

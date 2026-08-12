@@ -19,11 +19,13 @@ type Estado = 'comprobando' | 'listo' | 'fallo' | 'sin-token';
  * llamada encuentra el token ya usado y la pantalla dice que el enlace no vale
  * justo después de haberlo canjeado bien.
  */
-export default function VerificarPage() {
+export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Comprobando…</p>}>
-      <Comprobacion />
-    </Suspense>
+    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+      <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Comprobando…</p>}>
+        <Comprobacion />
+      </Suspense>
+    </main>
   );
 }
 

@@ -141,21 +141,25 @@ export default function SignupPage() {
 
   if (registrado) {
     return (
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
-        <h1 className="mb-2 font-display text-3xl text-text-primary">Mira tu correo</h1>
-        <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
-          Hemos mandado un enlace a <strong className="text-text-primary">{email}</strong>. Ábrelo
-          para confirmar la cuenta y poder entrar. Caduca en 24 horas.
-        </p>
-        <p className="mb-6 font-sans text-xs text-text-disabled">
-          Si no aparece en unos minutos, mira en la carpeta de spam.
-        </p>
-        <Link href="/login">
-          <Button fullWidth variant="secondary">
-            Ir a entrar
-          </Button>
-        </Link>
-      </div>
+      /* Centrado igual que el formulario: esta pantalla lo sustituye, así que
+         sin el `<main>` la tarjeta saltaba a la esquina al registrarse. */
+      <main className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+          <h1 className="mb-2 font-display text-3xl text-text-primary">Mira tu correo</h1>
+          <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+            Hemos mandado un enlace a <strong className="text-text-primary">{email}</strong>. Ábrelo
+            para confirmar la cuenta y poder entrar. Caduca en 24 horas.
+          </p>
+          <p className="mb-6 font-sans text-xs text-text-disabled">
+            Si no aparece en unos minutos, mira en la carpeta de spam.
+          </p>
+          <Link href="/login">
+            <Button fullWidth variant="secondary">
+              Ir a entrar
+            </Button>
+          </Link>
+        </div>
+      </main>
     );
   }
 

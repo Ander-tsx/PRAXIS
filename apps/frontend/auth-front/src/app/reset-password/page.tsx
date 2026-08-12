@@ -17,11 +17,13 @@ import { type FormEvent, Suspense, useState } from 'react';
  * ⚠️ `useSearchParams` obliga a un `<Suspense>` alrededor. Sin él, Next se
  * niega a construir la página: la marcaría como dinámica entera.
  */
-export default function RestablecerPage() {
+export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Cargando…</p>}>
-      <Formulario />
-    </Suspense>
+    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+      <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Cargando…</p>}>
+        <Formulario />
+      </Suspense>
+    </main>
   );
 }
 
