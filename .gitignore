@@ -68,3 +68,17 @@ Thumbs.db
 # AI Agent context (local only)
 AGENTS.md
 DESIGN.md
+
+# Terraform
+#
+# ⚠️ `terraform.tfvars` lleva el JWT_SECRET, la contraseña de la base y la clave
+# de Gemini: no puede subir nunca. El `.example` sí, porque solo tiene huecos.
+#
+# `.terraform/` son los binarios de los proveedores —el de Google pesa 114 MB— y
+# se recrean con `terraform init`. GitHub rechaza el push por tamaño, que fue lo
+# único que impidió que el archivo de secretos acabara publicado.
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.*
