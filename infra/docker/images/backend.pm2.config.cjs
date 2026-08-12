@@ -36,6 +36,14 @@ const {
      token de Google es el nuestro. Sin esa comprobación valdría cualquier ID
      token de Google, incluido el emitido para otra aplicación cualquiera. */
   GOOGLE_CLIENT_ID = '',
+  /* Correo saliente. Solo lo usa credentials-service: confirmar la cuenta y
+     recuperar la contraseña. Sin `MAIL_API_KEY` el servicio arranca igual y
+     escribe los enlaces en el log en vez de mandarlos. */
+  MAIL_API_KEY = '',
+  MAIL_FROM = 'PRAXIS <no-reply@usepraxis.space>',
+  /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
+     desarrollo, cada confirmación apuntaría a la máquina de quien la abre. */
+  PUBLIC_APP_URL = 'http://localhost:4100',
   LOG_LEVEL = 'info',
 } = process.env;
 
@@ -115,6 +123,10 @@ module.exports = {
       /* Solo este servicio verifica tokens de Google. El gateway se limita a
          reenviar, así que no lo necesita. */
       GOOGLE_CLIENT_ID,
+      /* Y solo este manda correo: es el dueño de las cuentas. */
+      MAIL_API_KEY,
+      MAIL_FROM,
+      PUBLIC_APP_URL,
     }),
 
     proceso('permissions', '/app/apps/backend/services/permissions', {

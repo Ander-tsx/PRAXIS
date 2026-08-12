@@ -56,7 +56,12 @@ write_files:
       JWT_SECRET=$(secreto "${prefijo}-jwt-secret")
       VOICE_JWT_SECRET=$(secreto "${prefijo}-voice-jwt-secret")
       GEMINI_API_KEY=$(secreto "${prefijo}-gemini-api-key")
+      MAIL_API_KEY=$(secreto "${prefijo}-mail-api-key")
       GOOGLE_CLIENT_ID=${google_client_id}
+      MAIL_FROM=${mail_from}
+      # ⚠️ La base de los enlaces de los correos. Sin ella apuntarían a
+      # localhost y ninguna confirmación de cuenta funcionaría.
+      PUBLIC_APP_URL=${public_app_url}
       LOG_LEVEL=info
       ENV
 

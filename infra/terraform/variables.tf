@@ -198,3 +198,30 @@ variable "dominio" {
   type        = string
   default     = ""
 }
+
+# ─────────────────────────── correo ───────────────────────────
+
+variable "mail_api_key" {
+  description = <<-EOT
+    Clave de API de Resend, para los correos de confirmación de cuenta y de
+    recuperación de contraseña.
+
+    Se guarda en Secret Manager como el resto. Vacía = el servicio arranca
+    igual, no manda nada y escribe los enlaces en el log: preferimos eso a que
+    un despliegue se caiga por un secreto sin rellenar.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "mail_from" {
+  description = <<-EOT
+    Remitente de los correos.
+
+    ⚠️ Resend solo entrega desde un dominio verificado por ti. Con un gmail
+    responde 403 y no manda nada, un fallo que solo se ve leyendo los logs.
+  EOT
+  type        = string
+  default     = "PRAXIS <no-reply@usepraxis.space>"
+}

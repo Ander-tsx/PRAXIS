@@ -60,6 +60,8 @@ resource "google_compute_instance_template" "backend" {
          así que tratarlo como secreto daría una falsa sensación de protección
          sin añadir ninguna. */
       google_client_id = var.google_client_id
+      mail_from        = var.mail_from
+      public_app_url   = "https://${local.dominio}"
     })
   }
 

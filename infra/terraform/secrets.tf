@@ -47,6 +47,7 @@ locals {
     "voice-jwt-secret" = random_password.voice_jwt_secret.result
     "password-sql"     = random_password.password_sql.result
     "gemini-api-key"   = var.gemini_api_key
+    "mail-api-key"     = var.mail_api_key
   }
 }
 
