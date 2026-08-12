@@ -1,11 +1,12 @@
 'use client';
 
+import { BotonGoogle } from '@/components/organisms/BotonGoogle';
+import { navigateAfterAuth } from '@/lib/navigation';
+import { alpha, colors } from '@praxis/commons';
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
 import { useState } from 'react';
-import { BotonGoogle } from '@/components/organisms/BotonGoogle';
-import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de LoginDto del backend
 // email: formato válido, password: 8-64 caracteres
@@ -33,6 +34,8 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [globalError, setGlobalError] = useState('');
+  /** El correo de esta cuenta está sin confirmar. No es un error del formulario. */
+  const [sinConfirmar, setSinConfirmar] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -42,6 +45,7 @@ export default function LoginPage() {
     setEmailError('');
     setPasswordError('');
     setGlobalError('');
+    setSinConfirmar(false);
 
     // Validación cliente antes de la petición
     const validationError = validateForm(email, password);
@@ -73,7 +77,12 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       // Mapeo de mensajes del backend a español
-      if (res.status === 401) {
+      if (res.status === 403 && data?.code === 'EMAIL_NOT_VERIFIED') {
+        /* No es un error del formulario: es un paso que falta. Se saca del
+           hueco de errores para poder ofrecer el botón de reenviar. */
+        setSinConfirmar(true);
+        setGlobalError('');
+      } else if (res.status === 401) {
         setGlobalError('Credenciales inválidas. Verifica tu email y contraseña.');
       } else if (res.status === 400) {
         setGlobalError(data?.message ?? 'Los datos enviados no son válidos.');
@@ -135,14 +144,24 @@ export default function LoginPage() {
           </Button>
         }
         alternatives={
-          <BotonGoogle
-            clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
-            onCredencial={handleGoogle}
-            deshabilitado={isLoading}
-          />
+          <>
+            {sinConfirmar && <AvisoDeConfirmacion email={email} />}
+            <BotonGoogle
+              clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''}
+              onCredencial={handleGoogle}
+              deshabilitado={isLoading}
+            />
+          </>
         }
         footer={
           <>
+            <Link
+              href="/auth/olvide"
+              className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+            <span className="mx-2 text-text-disabled">·</span>
             ¿No tienes cuenta?{' '}
             <Link
               href="/signup"
@@ -185,5 +204,61 @@ export default function LoginPage() {
         />
       </AuthForm>
     </main>
+  );
+}
+
+/**
+ * Lo que se enseña cuando la cuenta existe pero el correo está sin confirmar.
+ *
+ * No va en el hueco de errores del formulario a propósito: no es que hayas
+ * escrito algo mal, es que falta un paso, y lleva un botón que lo resuelve. Un
+ * mensaje rojo sin salida deja a la persona probando la contraseña otra vez.
+ *
+ * ⚠️ Al reenviar dice «listo» pase lo que pase, igual que el backend: esta
+ * pantalla ya sabe que la cuenta existe —lo acaba de decir el 403— pero el
+ * endpoint es público y responde igual para todos, así que no hay nada más
+ * fino que informar.
+ */
+function AvisoDeConfirmacion({ email }: { email: string }) {
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+
+  async function reenviar() {
+    if (enviando || enviado) return;
+    setEnviando(true);
+    await fetch('/auth/api/reenviar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => undefined);
+    setEnviando(false);
+    setEnviado(true);
+  }
+
+  return (
+    <div
+      className="mb-4 rounded-lg border border-warning/30 p-4"
+      style={{ background: alpha(colors.warning, 8) }}
+    >
+      <p className="font-sans text-sm font-medium text-text-primary">Confirma tu correo</p>
+      <p className="mt-1 font-sans text-xs leading-relaxed text-text-secondary">
+        Te mandamos un enlace a {email} cuando creaste la cuenta. Ábrelo y vuelve a entrar.
+      </p>
+
+      {enviado ? (
+        <p className="mt-3 font-sans text-xs" style={{ color: colors.success }}>
+          Listo, te lo hemos vuelto a mandar. Revisa también la carpeta de spam.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={reenviar}
+          disabled={enviando}
+          className="mt-3 cursor-pointer font-sans text-xs font-semibold text-primary underline underline-offset-2 disabled:opacity-50"
+        >
+          {enviando ? 'Mandando…' : 'Mandármelo otra vez'}
+        </button>
+      )}
+    </div>
   );
 }

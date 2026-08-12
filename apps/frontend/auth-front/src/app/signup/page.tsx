@@ -1,11 +1,11 @@
 'use client';
 
+import { BotonGoogle } from '@/components/organisms/BotonGoogle';
+import { navigateAfterAuth } from '@/lib/navigation';
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
 import { useState } from 'react';
-import { BotonGoogle } from '@/components/organisms/BotonGoogle';
-import { navigateAfterAuth } from '@/lib/navigation';
 
 // Validación espejo de RegisterDto del backend
 // email: formato válido, password: 8-64 caracteres
@@ -48,6 +48,8 @@ export default function SignupPage() {
   const [passwordError, setPasswordError] = useState('');
   const [confirmError, setConfirmError] = useState('');
   const [globalError, setGlobalError] = useState('');
+  /** La cuenta se creó y falta que abra el correo. */
+  const [registrado, setRegistrado] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -79,9 +81,10 @@ export default function SignupPage() {
       });
 
       if (res.ok) {
-        // El BFF ya dejó la sesión iniciada. Navegación dura: router.push('/')
-        // se convertiría en '/auth/' por el basePath y no saldría de la zona.
-        navigateAfterAuth();
+        /* ⚠️ Ya no se navega al panel: registrarse **no inicia sesión** desde
+           que hay confirmación por correo. Antes se entraba en el acto, y eso
+           sería la puerta trasera que anula la confirmación entera. */
+        setRegistrado(true);
         return;
       }
 
@@ -135,6 +138,26 @@ export default function SignupPage() {
       setIsLoading(false);
     }
   };
+
+  if (registrado) {
+    return (
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+        <h1 className="mb-2 font-display text-3xl text-text-primary">Mira tu correo</h1>
+        <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+          Hemos mandado un enlace a <strong className="text-text-primary">{email}</strong>. Ábrelo
+          para confirmar la cuenta y poder entrar. Caduca en 24 horas.
+        </p>
+        <p className="mb-6 font-sans text-xs text-text-disabled">
+          Si no aparece en unos minutos, mira en la carpeta de spam.
+        </p>
+        <Link href="/login">
+          <Button fullWidth variant="secondary">
+            Ir a entrar
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">

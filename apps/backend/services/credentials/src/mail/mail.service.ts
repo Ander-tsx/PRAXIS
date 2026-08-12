@@ -36,6 +36,21 @@ export class MailService {
         'MAIL_API_KEY no está definida: los correos no se envían y sus enlaces se escriben en el log.',
       );
     }
+
+    /**
+     * ⚠️ Resend **solo entrega desde un dominio verificado por ti**.
+     *
+     * Con un `MAIL_FROM` de gmail —o de cualquier dominio ajeno— responde 403 y
+     * no se manda nada. Es un fallo que solo se ve leyendo los logs, así que se
+     * avisa al arrancar en vez de dejar que aparezca como «no me llega el
+     * correo» media hora antes de una presentación.
+     */
+    if (this.apiKey && !/@[\w.-]*usepraxis\.space>?\s*$/i.test(this.remitente)) {
+      this.log.warn(
+        `MAIL_FROM (${this.remitente}) no está en un dominio verificado en Resend. ` +
+          'Los envíos serán rechazados con 403: usa algo como no-reply@usepraxis.space.',
+      );
+    }
   }
 
   /**
@@ -59,7 +74,13 @@ export class MailService {
           Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: this.remitente, to: [para], subject: asunto, html, text: texto }),
+        body: JSON.stringify({
+          from: this.remitente,
+          to: [para],
+          subject: asunto,
+          html,
+          text: texto,
+        }),
         /* Sin tiempo de espera, un proveedor lento deja colgada la respuesta del
            registro. 10 s es de sobra para una API que responde en decenas de ms. */
         signal: AbortSignal.timeout(10_000),

@@ -1,9 +1,9 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { correoDeRecuperacion, correoDeVerificacion } from '../mail/plantillas';
+import { PrismaService } from '../prisma/prisma.service';
 
 type TipoDeToken = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
 
@@ -46,9 +46,20 @@ export class TokensService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /** La base pública, para construir los enlaces del correo. */
+  /**
+   * La base pública, para construir los enlaces del correo.
+   *
+   * `PUBLIC_APP_URL` porque es la que ya existía en el `.env` del servicio —de
+   * un intento anterior de mandar correo que nunca llegó a cablearse—. Inventar
+   * `APP_URL` al lado habría dejado dos variables para lo mismo, y la de antes
+   * esperando a confundir a alguien.
+   */
   private get sitio(): string {
-    return this.config.get<string>('APP_URL') ?? 'http://localhost:4100';
+    return (
+      this.config.get<string>('PUBLIC_APP_URL') ??
+      this.config.get<string>('APP_URL') ??
+      'http://localhost:4100'
+    );
   }
 
   /**
