@@ -200,6 +200,17 @@ module.exports = {
       ...comun,
       HTTP_PORT: 3000,
       JWT_SECRET,
+      /* ⚠️ El gateway necesita Redis, y esto es fácil de pasar por alto porque
+         durante mucho tiempo no lo necesitó: es el único que mantiene abiertas
+         las conexiones SSE de los avisos en vivo, y se suscribe al canal donde
+         projects-service publica.
+
+         Sin esta línea cae al `redis://localhost:6379` por defecto, que dentro
+         de este contenedor no es nadie —Redis vive en otra máquina—. No falla
+         de forma visible: el gateway arranca, sirve todo lo demás y los avisos
+         simplemente no llegan nunca. En desarrollo funcionaba porque allí el
+         valor por defecto resulta ser el correcto. */
+      REDIS_URL,
       ...rutas,
     }),
   ],
