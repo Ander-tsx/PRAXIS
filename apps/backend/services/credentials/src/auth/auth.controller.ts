@@ -1,7 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
-import { RegisterDto, LoginDto, VerifyTokenDto, GoogleLoginDto } from '@praxis/contracts';
+import { GoogleLoginDto, LoginDto, RegisterDto, VerifyTokenDto } from '@praxis/contracts';
 
 import { AuthService } from './auth.service';
 

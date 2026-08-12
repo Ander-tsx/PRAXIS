@@ -156,7 +156,7 @@ export default function LoginPage() {
         footer={
           <>
             <Link
-              href="/auth/olvide"
+              href="/forgot-password"
               className="font-medium text-primary hover:text-primary-hover underline underline-offset-2 transition-colors"
             >
               ¿Olvidaste tu contraseña?
@@ -226,7 +226,7 @@ function AvisoDeConfirmacion({ email }: { email: string }) {
   async function reenviar() {
     if (enviando || enviado) return;
     setEnviando(true);
-    await fetch('/auth/api/reenviar', {
+    await fetch('/auth/api/resend-verification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),

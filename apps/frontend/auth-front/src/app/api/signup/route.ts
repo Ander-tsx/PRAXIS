@@ -1,6 +1,6 @@
+import { gatewayPost } from '@/lib/gateway';
 import { ApiError } from '@praxis/commons/api';
 import { type NextRequest, NextResponse } from 'next/server';
-import { gatewayAuthPost } from '@/lib/gateway';
 
 /**
  * BFF — POST /auth/api/signup
@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await gatewayAuthPost('/auth/register', { email, password });
+    /* ⚠️ `gatewayPost` y no `gatewayAuthPost`: aquel **exige** que la respuesta
+       traiga `{ userId, accessToken, refreshToken }` y lanza un 502 si no. Desde
+       que registrarse no abre sesión, esa validación rechazaba todas las altas
+       correctas y la pantalla decía «no se pudo crear la cuenta» sobre una
+       cuenta que sí se había creado. */
+    await gatewayPost<{ userId: string }>('/auth/register', { email, password });
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 409) {

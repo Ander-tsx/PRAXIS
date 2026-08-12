@@ -1,6 +1,6 @@
+import { SESSION_COOKIE as COOKIE_NAME } from '@/lib/session-cookie';
 import { jwtVerify } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
-import { SESSION_COOKIE as COOKIE_NAME } from '@/lib/session-cookie';
 
 /**
  * BFF — GET /auth/api/session

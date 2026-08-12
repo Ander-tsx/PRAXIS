@@ -52,7 +52,7 @@ function Formulario() {
     setError(null);
     setEnviando(true);
 
-    const respuesta = await fetch('/auth/api/restablecer', {
+    const respuesta = await fetch('/auth/api/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token, password }),
@@ -76,7 +76,7 @@ function Formulario() {
           Esta pantalla se abre desde el enlace que te mandamos por correo. Pide uno nuevo si
           llegaste aquí de otra forma.
         </p>
-        <Link href="/auth/olvide" className="font-sans text-sm text-primary hover:underline">
+        <Link href="/forgot-password" className="font-sans text-sm text-primary hover:underline">
           Pedir un enlace
         </Link>
       </Marco>
@@ -90,7 +90,7 @@ function Formulario() {
           Ya puedes entrar con la nueva. Por seguridad hemos cerrado las sesiones que hubiera
           abiertas en otros dispositivos.
         </p>
-        <Link href="/auth/login" className="font-sans text-sm text-primary hover:underline">
+        <Link href="/login" className="font-sans text-sm text-primary hover:underline">
           Entrar
         </Link>
       </Marco>

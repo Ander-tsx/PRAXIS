@@ -1,9 +1,9 @@
-import { gatewayAuthPost } from '@/lib/gateway';
+import { gatewayPost } from '@/lib/gateway';
 import { ApiError } from '@praxis/commons/api';
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * BFF — POST /auth/api/restablecer
+ * BFF — POST /auth/api/reset-password
  *
  * Fija la contraseña nueva con el token del enlace.
  *
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await gatewayAuthPost('/auth/reset-password', { token, password });
+    await gatewayPost('/auth/reset-password', { token, password });
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 429) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('[restablecer] error inesperado', error);
+    console.error('[reset-password] error inesperado', error);
     return NextResponse.json({ message: 'Ocurrió un error inesperado.' }, { status: 500 });
   }
 

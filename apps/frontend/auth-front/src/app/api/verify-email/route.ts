@@ -1,16 +1,16 @@
-import { gatewayAuthPost } from '@/lib/gateway';
+import { gatewayPost } from '@/lib/gateway';
 import { ApiError } from '@praxis/commons/api';
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * BFF — POST /auth/api/reenviar
+ * BFF — POST /auth/api/verify-email
  *
- * ⚠️ Responde 200 siempre, exista la cuenta o no. Es la misma promesa que hace
- * el gateway y aquí no se puede romper: cualquier diferencia convertiría esto
- * en un comprobador de quién está registrado.
+ * Canjea el token del enlace del correo. Un 400 del gateway significa
+ * «caducado, ya usado o inventado», y se pasa tal cual: desde la pantalla no
+ * hay nada distinto que hacer con cada caso — el remedio siempre es pedir otro.
  */
 export async function POST(request: NextRequest) {
-  let body: { email?: unknown };
+  let body: { token?: unknown };
 
   try {
     body = await request.json();
@@ -18,13 +18,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Cuerpo de la solicitud inválido.' }, { status: 400 });
   }
 
-  const email = body.email;
-  if (typeof email !== 'string' || !email.trim()) {
+  const token = body.token;
+  if (typeof token !== 'string' || !token.trim()) {
     return NextResponse.json({ message: 'Falta un dato obligatorio.' }, { status: 400 });
   }
 
   try {
-    await gatewayAuthPost('/auth/resend-verification', { email: email.trim() });
+    await gatewayPost('/auth/verify-email', { token: token.trim() });
   } catch (error) {
     if (error instanceof ApiError) {
       /* El 429 se distingue del resto: «espera un minuto» y «el enlace no vale»
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('[reenviar] error inesperado', error);
+    console.error('[verify-email] error inesperado', error);
     return NextResponse.json({ message: 'Ocurrió un error inesperado.' }, { status: 500 });
   }
 

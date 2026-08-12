@@ -1,21 +1,21 @@
-import { Injectable } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
 import * as crypto from 'node:crypto';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { RpcException } from '@nestjs/microservices';
+import * as bcrypt from 'bcrypt';
 import { type LoginTicket, OAuth2Client, type TokenPayload } from 'google-auth-library';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { TokensService } from './tokens.service';
 import { RedisService } from '../redis/redis.service';
+import { TokensService } from './tokens.service';
 
 import {
-  RegisterDto,
-  LoginDto,
-  VerifyTokenDto,
-  JwtPayloadDto,
   GoogleLoginDto,
+  JwtPayloadDto,
+  LoginDto,
+  RegisterDto,
+  VerifyTokenDto,
 } from '@praxis/contracts';
 
 const SALT_ROUNDS = 10;

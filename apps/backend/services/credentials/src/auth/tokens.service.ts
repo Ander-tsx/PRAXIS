@@ -120,7 +120,7 @@ export class TokensService {
   /** Manda el correo de confirmación de una cuenta recién creada. */
   async enviarVerificacion(credentialId: string, email: string): Promise<void> {
     const token = await this.emitir(credentialId, 'EMAIL_VERIFICATION');
-    const enlace = `${this.sitio}/auth/verificar?token=${token}`;
+    const enlace = `${this.sitio}/auth/verify-email?token=${token}`;
     const horas = VIGENCIA_MS.EMAIL_VERIFICATION / 3_600_000;
 
     const { asunto, html, texto } = correoDeVerificacion(enlace, horas);
@@ -130,7 +130,7 @@ export class TokensService {
   /** Manda el correo para elegir contraseña nueva. */
   async enviarRecuperacion(credentialId: string, email: string): Promise<void> {
     const token = await this.emitir(credentialId, 'PASSWORD_RESET');
-    const enlace = `${this.sitio}/auth/restablecer?token=${token}`;
+    const enlace = `${this.sitio}/auth/reset-password?token=${token}`;
     const minutos = VIGENCIA_MS.PASSWORD_RESET / 60_000;
 
     const { asunto, html, texto } = correoDeRecuperacion(enlace, minutos);

@@ -1,11 +1,13 @@
-import { gatewayAuthPost } from '@/lib/gateway';
+import { gatewayPost } from '@/lib/gateway';
 import { ApiError } from '@praxis/commons/api';
 import { type NextRequest, NextResponse } from 'next/server';
 
 /**
- * BFF — POST /auth/api/olvide
+ * BFF — POST /auth/api/resend-verification
  *
- * ⚠️ Responde 200 siempre. Ver la nota de `reenviar`: vale exactamente igual.
+ * ⚠️ Responde 200 siempre, exista la cuenta o no. Es la misma promesa que hace
+ * el gateway y aquí no se puede romper: cualquier diferencia convertiría esto
+ * en un comprobador de quién está registrado.
  */
 export async function POST(request: NextRequest) {
   let body: { email?: unknown };
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await gatewayAuthPost('/auth/forgot-password', { email: email.trim() });
+    await gatewayPost('/auth/resend-verification', { email: email.trim() });
   } catch (error) {
     if (error instanceof ApiError) {
       /* El 429 se distingue del resto: «espera un minuto» y «el enlace no vale»
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error('[olvide] error inesperado', error);
+    console.error('[resend-verification] error inesperado', error);
     return NextResponse.json({ message: 'Ocurrió un error inesperado.' }, { status: 500 });
   }
 

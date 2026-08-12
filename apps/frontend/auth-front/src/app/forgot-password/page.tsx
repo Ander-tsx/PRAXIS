@@ -28,7 +28,7 @@ export default function OlvidePage() {
     setError(null);
     setEnviando(true);
 
-    const respuesta = await fetch('/auth/api/olvide', {
+    const respuesta = await fetch('/auth/api/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -66,7 +66,7 @@ export default function OlvidePage() {
         </Button>
       }
       footer={
-        <Link href="/auth/login" className="text-primary hover:underline">
+        <Link href="/login" className="text-primary hover:underline">
           Volver a entrar
         </Link>
       }
@@ -92,7 +92,7 @@ function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
     <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
       <h1 className="mb-2 font-display text-3xl text-text-primary">{titulo}</h1>
       <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">{texto}</p>
-      <Link href="/auth/login" className="font-sans text-sm text-primary hover:underline">
+      <Link href="/login" className="font-sans text-sm text-primary hover:underline">
         Volver a entrar
       </Link>
     </div>

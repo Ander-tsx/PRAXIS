@@ -38,7 +38,7 @@ function Comprobacion() {
     lanzado.current = true;
 
     (async () => {
-      const respuesta = await fetch('/auth/api/verificar', {
+      const respuesta = await fetch('/auth/api/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
@@ -70,7 +70,7 @@ function Comprobacion() {
           <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
             Tu cuenta ya está lista. Entra con tu correo y tu contraseña.
           </p>
-          <Link href="/auth/login">
+          <Link href="/login">
             <Button fullWidth>Entrar</Button>
           </Link>
         </>
@@ -85,7 +85,7 @@ function Comprobacion() {
               : mensaje}{' '}
             Intenta entrar y te ofreceremos mandarte uno nuevo.
           </p>
-          <Link href="/auth/login">
+          <Link href="/login">
             <Button fullWidth variant="secondary">
               Ir a entrar
             </Button>
