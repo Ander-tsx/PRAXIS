@@ -1,0 +1,122 @@
+'use client';
+
+import { type ReactNode, useEffect, useState } from 'react';
+
+export interface TableroExpandibleProps {
+  /** Nombre del tablero, para la cabecera y el texto accesible del botón. */
+  nombre: string;
+  /** «4 columnas · 12 tareas». Lo compone quien nos monta. */
+  resumen: string;
+  /** La tira de columnas. Llega como slot: aquí no se sabe qué hay dentro. */
+  children: ReactNode;
+}
+
+/**
+ * Cabecera del tablero y su botón de pantalla completa.
+ *
+ * Un tablero de cinco columnas en el ancho de la página deja cada una en 288 px
+ * con la lista de tarjetas recortada a `55vh`. Para reorganizar de verdad —mover
+ * varias tarjetas, comparar columnas— hace falta la pantalla entera.
+ *
+ * ⚠️ **No usa la API de pantalla completa del navegador**, y es deliberado. Esa
+ * API entrega un elemento al modo nativo, y el `<dialog open>` del detalle de
+ * tarea se pinta en la capa superior del documento: al abrir una tarea desde un
+ * tablero en pantalla completa nativa, el diálogo aparecía **detrás**. Un
+ * `position: fixed` no tiene ese problema y además sale con Escape, que es lo
+ * que la gente intenta primero.
+ *
+ * ⚠️ El contenedor alterna entre `display: contents` y `position: fixed`, y esa
+ * es la pieza que hace que esto funcione: **son los mismos nodos del DOM en los
+ * dos modos**. Renderizar `children` en dos ramas distintas del árbol los
+ * desmontaría y volvería a montar al expandir, y con ellos se iría el estado de
+ * `BoardColumns` —el orden que estés arrastrando, la tarea que tengas abierta—.
+ * Con `contents` el envoltorio desaparece del layout y la cabecera y las
+ * columnas siguen siendo hijos directos de la sección, exactamente como si esto
+ * no existiera.
+ */
+export function TableroExpandible({ nombre, resumen, children }: TableroExpandibleProps) {
+  const [expandido, setExpandido] = useState(false);
+
+  useEffect(() => {
+    if (!expandido) return;
+
+    function alPulsarTecla(event: KeyboardEvent) {
+      if (event.key === 'Escape') setExpandido(false);
+    }
+
+    /**
+     * Se bloquea el desplazamiento del fondo mientras dura.
+     *
+     * Sin esto, la rueda sobre el tablero expandido mueve la página de debajo:
+     * al salir te encuentras en otro punto del proyecto sin haber navegado.
+     * Se guarda el valor previo en vez de asumir `''`, por si algo más lo
+     * hubiera tocado antes.
+     */
+    const desbordeInicial = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', alPulsarTecla);
+
+    return () => {
+      document.removeEventListener('keydown', alPulsarTecla);
+      document.body.style.overflow = desbordeInicial;
+    };
+  }, [expandido]);
+
+  return (
+    <div
+      className={
+        expandido
+          ? 'scrollbar-slim fixed inset-0 z-40 flex flex-col gap-4 overflow-auto bg-background p-5'
+          : 'contents'
+      }
+    >
+      <header className="flex flex-wrap items-baseline gap-3">
+        <h4 className="font-sans text-base font-semibold text-text-primary">{nombre}</h4>
+        {/* Más contraste que antes: sobre el fondo del lienzo, `text-disabled`
+            se leía como un borrón. */}
+        <span className="font-sans text-xs text-text-secondary">{resumen}</span>
+
+        <button
+          type="button"
+          onClick={() => setExpandido((actual) => !actual)}
+          aria-expanded={expandido}
+          aria-label={
+            expandido
+              ? `Salir de pantalla completa del tablero ${nombre}`
+              : `Ver el tablero ${nombre} en pantalla completa`
+          }
+          title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+          className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            {expandido ? (
+              /* Cuatro flechas hacia dentro: encoger. */
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 9V4M9 9H4M9 9L4 4m11 5V4m0 5h5m-5 0l5-5M9 15v5m0-5H4m5 0l-5 5m11-5v5m0-5h5m-5 0l5 5"
+              />
+            ) : (
+              /* Cuatro flechas hacia fuera: agrandar. */
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 9V4h5M4 4l5 5m11 0V4h-5m5 0l-5 5M4 15v5h5m-5 0l5-5m11 5v-5h-5m5 5l-5-5"
+              />
+            )}
+          </svg>
+          {expandido ? 'Salir' : 'Ampliar'}
+        </button>
+      </header>
+
+      {children}
+    </div>
+  );
+}

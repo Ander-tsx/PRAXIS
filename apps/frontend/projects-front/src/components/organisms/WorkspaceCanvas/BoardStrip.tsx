@@ -1,6 +1,7 @@
 import type { Board, Label, Task, UserProfile } from '@praxis/commons';
 import { alpha, colors } from '@praxis/commons';
 import { BoardColumns } from './BoardColumns';
+import { TableroExpandible } from './TableroExpandible';
 
 export interface BoardStripProps {
   board: Board;
@@ -104,36 +105,36 @@ export function BoardStrip({
       className="flex flex-col gap-4 rounded-2xl border border-border p-5"
       style={BOARD_SURFACE}
     >
-      <header className="flex flex-wrap items-baseline gap-3">
-        <h4 className="font-sans text-base font-semibold text-text-primary">{board.name}</h4>
-        {/* Más contraste que antes: sobre el fondo del lienzo, `text-disabled`
-            se leía como un borrón. */}
-        <span className="font-sans text-xs text-text-secondary">
-          {columnCount === 0
+      {/* La cabecera se fue a `TableroExpandible` con el botón de ampliar: los
+          dos tienen que moverse juntos a la capa de pantalla completa, y desde
+          aquí —que es un componente de servidor— no hay estado que compartir. */}
+      <TableroExpandible
+        nombre={board.name}
+        resumen={`${
+          columnCount === 0
             ? 'sin columnas'
-            : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`}
-          {tasks.length > 0 && ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}`}
-        </span>
-      </header>
-
-      <BoardColumns
-        board={board}
-        projectId={projectId}
-        canCreateColumn={canCreateColumn}
-        canEditColumn={canEditColumn}
-        canDeleteColumn={canDeleteColumn}
-        tasks={tasks}
-        members={members}
-        labels={labels}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canCreateTask={canCreateTask}
-        canMoveTask={canMoveTask}
-        openTaskId={openTaskId}
-        canComment={canComment}
-        canEditTask={canEditTask}
-        canDeleteTask={canDeleteTask}
-      />
+            : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`
+        }${tasks.length > 0 ? ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}` : ''}`}
+      >
+        <BoardColumns
+          board={board}
+          projectId={projectId}
+          canCreateColumn={canCreateColumn}
+          canEditColumn={canEditColumn}
+          canDeleteColumn={canDeleteColumn}
+          tasks={tasks}
+          members={members}
+          labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canCreateTask={canCreateTask}
+          canMoveTask={canMoveTask}
+          openTaskId={openTaskId}
+          canComment={canComment}
+          canEditTask={canEditTask}
+          canDeleteTask={canDeleteTask}
+        />
+      </TableroExpandible>
     </section>
   );
 }

@@ -8,13 +8,29 @@ import {
   MarkNotificationReadDto,
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 
 /** Tope de la bandeja. Por encima de esto nadie baja a mirar. */
 const DEFAULT_LIMIT = 30;
 
+/**
+ * Canal de Redis por persona.
+ *
+ * Uno por usuario y no uno global con el destinatario dentro: el gateway se
+ * suscribe con un patrón y reparte, pero teniendo el `userId` en el **nombre**
+ * del canal, un aviso nunca puede acabar en la conexión equivocada por un fallo
+ * al filtrar. La separación la hace Redis, no nuestro código.
+ */
+export function canalDeAvisos(userId: string): string {
+  return `avisos:${userId}`;
+}
+
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   /**
    * Crea avisos en bloque.
@@ -44,6 +60,30 @@ export class NotificationsService {
         taskTitle: notification.taskTitle ?? null,
       })),
     });
+
+    /**
+     * Aviso en vivo, **después** de guardar y sin esperar a que llegue.
+     *
+     * ⚠️ Va con `void` a propósito: publicar no puede retrasar ni romper la
+     * respuesta. Quien crea la notificación está a mitad de otra operación
+     * —asignar una tarea, invitar a alguien— y el tiempo real es un extra
+     * sobre algo que ya está persistido.
+     *
+     * Se publica lo que se acaba de escribir y no las filas creadas porque
+     * `createMany` no las devuelve. Es suficiente: lleva lo justo para pintar
+     * el aviso emergente, y la bandeja auténtica se pide aparte.
+     */
+    for (const notification of worth) {
+      void this.redis.publish(canalDeAvisos(notification.userId), {
+        type: notification.type,
+        actorId: notification.actorId ?? null,
+        projectId: notification.projectId ?? null,
+        projectName: notification.projectName ?? null,
+        taskId: notification.taskId ?? null,
+        taskTitle: notification.taskTitle ?? null,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     return { created: count };
   }

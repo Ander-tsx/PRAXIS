@@ -69,6 +69,21 @@ export function Dialog({
       }}
       className={[
         'm-auto w-full rounded-2xl border border-border bg-surface p-6 text-left text-text-primary',
+        /**
+         * ⚠️ `cursor-default` no es cosmético: **el cursor se hereda**.
+         *
+         * `showModal()` saca el diálogo a la capa superior, pero **no lo saca
+         * del DOM**: sigue siendo descendiente de donde se renderizó. El
+         * diálogo de una tarea se monta dentro de su columna, que es
+         * `draggable` y lleva `cursor-grab`, así que el modal entero se
+         * mostraba con la mano de arrastrar — prometiendo un gesto que ahí no
+         * existe.
+         *
+         * Se corrige aquí y no en el tablero para que valga para cualquier
+         * diálogo que se monte dentro de algo arrastrable. Los botones y campos
+         * de dentro declaran su propio cursor y siguen mandando sobre este.
+         */
+        'cursor-default',
         /* Sin barra de scroll: en un diálogo alto la barra parte el borde
            redondeado y pesa más de lo que informa. Se sigue desplazando con la
            rueda y con el teclado. */

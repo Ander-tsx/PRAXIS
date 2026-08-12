@@ -4,8 +4,9 @@ import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
-import type { AppNavItem } from './navigation';
+import { AvisosEnVivo } from '../AvisosEnVivo';
 import { NavList } from './NavList';
+import type { AppNavItem } from './navigation';
 
 export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
@@ -87,6 +88,18 @@ export function AppShell({ navItems, zonePath, user, footerSlot, children }: App
 
         {/* ── Contenido ────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+
+        {/**
+         * Los avisos en vivo se enganchan aquí, en el armazón, y no en cada
+         * zona: el armazón vive en el `layout.tsx`, así que la conexión se abre
+         * una vez y **sobrevive a navegar** entre pantallas de la zona. Puesto
+         * en una page, cada navegación la cerraría y volvería a abrir.
+         *
+         * La ruta del proxy sale de `zonePath`, que la zona ya nos da: en
+         * projects-front es `/projects/api/gateway`, y ahí es donde esa zona
+         * monta su `createGatewayProxy()`.
+         */}
+        <AvisosEnVivo gatewayPath={`${zonePath}/api/gateway`} />
 
         {/* ── Cajón lateral (móvil) ────────────────────────────── */}
         {mobileMenuOpen && (

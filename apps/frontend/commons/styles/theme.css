@@ -262,6 +262,29 @@ button:disabled,
   }
 }
 
+/* La entrada de los avisos en vivo (AvisosEnVivo), desde el borde derecho.
+
+   Va con los tokens y no en una zona porque el organismo vive en commons: el
+   armazón privado lo monta en las cinco zonas, y una animación declarada en una
+   sola haría que el aviso se deslizara allí y apareciera de golpe en el resto.
+
+   Se desplaza y se desvanece a la vez: solo con opacidad no se entiende de dónde
+   viene, y solo con desplazamiento entra demasiado seco. */
+@keyframes entrar-desde-la-derecha {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-entrar-desde-la-derecha {
+  animation: entrar-desde-la-derecha 220ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -281,4 +304,38 @@ button:disabled,
 }
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Barra de scroll fina y discreta, para cuando esconderla miente.
+
+   Una columna del tablero con veinte tareas y `scrollbar-none` se ve igual que
+   una con cinco: no hay ninguna pista de que haya más debajo. Aquí la barra sí
+   informa —el tamaño del pulgar dice cuánto queda— pero ocupa 6 px y va en un
+   gris que no compite con las tarjetas.
+
+   El track es transparente a propósito: un carril con fondo dibuja una línea
+   vertical permanente en el borde de la columna, que es justo el ruido que hizo
+   esconder la barra la primera vez. Al pasar por encima el pulgar se refuerza,
+   así que se puede agarrar cuando se busca.
+
+   `scrollbar-gutter: stable` reserva el hueco siempre: sin él, la barra aparece
+   al llenarse la columna y empuja las tarjetas 6 px a la izquierda de golpe. */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+  scrollbar-gutter: stable;
+}
+.scrollbar-slim::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: var(--radius-full);
+}
+.scrollbar-slim:hover::-webkit-scrollbar-thumb {
+  background: var(--color-text-disabled);
 }
