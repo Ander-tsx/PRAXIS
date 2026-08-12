@@ -24,6 +24,26 @@ export class AuthController {
     return this.authService.loginWithGoogle(dto);
   }
 
+  @MessagePattern({ cmd: 'auth_verify_email' })
+  verifyEmail(@Payload() dto: { token: string }) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @MessagePattern({ cmd: 'auth_resend_verification' })
+  resendVerification(@Payload() dto: { email: string }) {
+    return this.authService.resendVerification(dto.email);
+  }
+
+  @MessagePattern({ cmd: 'auth_forgot_password' })
+  forgotPassword(@Payload() dto: { email: string }) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @MessagePattern({ cmd: 'auth_reset_password' })
+  resetPassword(@Payload() dto: { token: string; password: string }) {
+    return this.authService.resetPassword(dto.token, dto.password);
+  }
+
   @MessagePattern({ cmd: 'auth_verify_token' })
   verifyToken(@Payload() dto: VerifyTokenDto) {
     return this.authService.verifyToken(dto);

@@ -12,7 +12,15 @@ import { Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { GoogleLoginDto, LoginDto, RefreshTokenDto, RegisterDto } from '@praxis/contracts';
+import {
+  EmailOnlyDto,
+  GoogleLoginDto,
+  LoginDto,
+  RefreshTokenDto,
+  RegisterDto,
+  ResetPasswordDto,
+  VerifyEmailDto,
+} from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from './jwt.guard';
 
@@ -56,6 +64,58 @@ export class AuthController {
     this.logger.log('POST /auth/register → credentials-service');
     // credentials-service crea la credencial y el perfil de usuario en un solo paso
     return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_register' }, body));
+  }
+
+  /**
+   * Confirma un correo con el token del enlace.
+   *
+   * Pública y con el mismo apretón que el login: el token es la única
+   * credencial y probar a ciegas tiene que costar tiempo.
+   */
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
+  @ApiOperation({ summary: 'Confirma el correo de una cuenta' })
+  @ApiResponse({ status: 200, description: 'Correo confirmado' })
+  @ApiResponse({ status: 400, description: 'El enlace caducó o ya se usó' })
+  async verifyEmail(@Body() body: VerifyEmailDto) {
+    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_verify_email' }, body));
+  }
+
+  /**
+   * Reenvía el correo de confirmación.
+   *
+   * ⚠️ Responde 200 exista o no la cuenta: cualquier otra cosa la convierte en
+   * un comprobador de quién está registrado aquí.
+   */
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
+  @ApiOperation({ summary: 'Reenvía el correo de confirmación' })
+  @ApiResponse({ status: 200, description: 'Si la cuenta existe y falta confirmar, se envió' })
+  async resendVerification(@Body() body: EmailOnlyDto) {
+    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_resend_verification' }, body));
+  }
+
+  /** Arranca la recuperación. Responde igual exista o no la cuenta. */
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
+  @ApiOperation({ summary: 'Manda el enlace para elegir contraseña nueva' })
+  @ApiResponse({ status: 200, description: 'Si la cuenta existe, se envió el enlace' })
+  async forgotPassword(@Body() body: EmailOnlyDto) {
+    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_forgot_password' }, body));
+  }
+
+  /** Fija la contraseña nueva con el token del enlace y cierra las sesiones. */
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle(LIMITE_AUTENTICACION)
+  @ApiOperation({ summary: 'Fija una contraseña nueva con el enlace recibido' })
+  @ApiResponse({ status: 200, description: 'Contraseña cambiada' })
+  @ApiResponse({ status: 400, description: 'El enlace caducó o ya se usó' })
+  async resetPassword(@Body() body: ResetPasswordDto) {
+    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_reset_password' }, body));
   }
 
   @Post('google')

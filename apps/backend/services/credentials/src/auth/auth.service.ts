@@ -435,7 +435,9 @@ export class AuthService {
          seguro que dejar a esa persona sin forma de entrar. */
       const vinculada = await this.prisma.credential.update({
         where: { id: porCorreo.id },
-        data: { googleSub: perfil.sub },
+        /* Y verificada: entrar por Google demuestra la posesión del buzón, que
+           es exactamente lo que comprueba la verificación por correo. */
+        data: { googleSub: perfil.sub, emailVerifiedAt: new Date() },
         include: { user: true },
       });
 
@@ -452,6 +454,10 @@ export class AuthService {
         email: perfil.email,
         passwordHash: null,
         googleSub: perfil.sub,
+        /* Nace verificada: `loginWithGoogle` ya exige `email_verified` en el
+           token, así que mandarle un correo para confirmar lo que Google acaba
+           de confirmar sería ceremonia sin ninguna garantía añadida. */
+        emailVerifiedAt: new Date(),
         user: {
           create: {
             /* `register` los deja vacíos y el perfil se completa después. Aquí

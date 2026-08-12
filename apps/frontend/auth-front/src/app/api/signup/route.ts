@@ -1,18 +1,19 @@
 import { ApiError } from '@praxis/commons/api';
 import { type NextRequest, NextResponse } from 'next/server';
 import { gatewayAuthPost } from '@/lib/gateway';
-import { setSessionCookies } from '@/lib/session-cookie';
 
 /**
  * BFF — POST /auth/api/signup
  *
  * 1. Recibe { email, password } del cliente
  * 2. Llama al gateway POST /api/auth/register
- * 3. Guarda las cookies de sesión y responde { success: true }
+ * 3. Responde { success: true } **sin abrir sesión**
  *
- * No hace falta un auto-login: credentials-service ya emite accessToken y
- * refreshToken en el propio registro. (La versión anterior encadenaba un
- * segundo POST /auth/login innecesario.)
+ * ⚠️ **Registrarse ya no deja dentro, y es el punto entero de la confirmación
+ * por correo.** Aquí se guardaban las cookies de sesión que devolvía el
+ * registro; con eso puesto, cualquiera se registraba con un correo inventado y
+ * se quedaba usando el sistema sin abrirlo jamás. Ahora se entra por el login,
+ * después de confirmar.
  *
  * Nota de producto: RegisterDto solo acepta email y password. El perfil se
  * crea con nombre y apellido vacíos y se completa después desde la página de
@@ -33,10 +34,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Email y contraseña son requeridos.' }, { status: 400 });
   }
 
-  let tokens: Awaited<ReturnType<typeof gatewayAuthPost>>;
-
   try {
-    tokens = await gatewayAuthPost('/auth/register', { email, password });
+    await gatewayAuthPost('/auth/register', { email, password });
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.status === 409) {
@@ -57,7 +56,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Ocurrió un error al crear la cuenta.' }, { status: 500 });
   }
 
-  const response = NextResponse.json({ success: true, userId: tokens.userId });
-  setSessionCookies(response, tokens);
-  return response;
+  /* El correo vuelve tal cual lo escribió: la pantalla lo enseña en «te hemos
+     escrito a…», y verlo escrito es lo que hace notar una errata antes de
+     ponerse a esperar un correo que no va a llegar. */
+  return NextResponse.json({ success: true, email });
 }
