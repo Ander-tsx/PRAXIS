@@ -1,8 +1,9 @@
 'use client';
 
+import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import { type AdminUser, Avatar, Badge, Button, globalRoleLevelOf } from '@praxis/commons';
 import { useState } from 'react';
-import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
+import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
 import { UserStatusDialog } from './UserStatusDialog';
 
@@ -38,6 +39,7 @@ export interface UsersTableProps {
 export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
   const [estadoDe, setEstadoDe] = useState<AdminUser | null>(null);
   const [rolDe, setRolDe] = useState<AdminUser | null>(null);
+  const [planDe, setPlanDe] = useState<AdminUser | null>(null);
 
   const miNivel = globalRoleLevelOf(misRoles);
 
@@ -45,10 +47,11 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
     <>
       <div className="overflow-hidden rounded-2xl border border-border">
         {/* Cabecera: solo en escritorio, donde de verdad hay columnas. */}
-        <div className="hidden border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary md:grid md:grid-cols-[minmax(0,2.5fr)_1fr_1fr_1fr_auto] md:gap-4">
+        <div className="hidden border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_0.8fr_1fr_auto] md:gap-4">
           <span>Cuenta</span>
           <span>Estado</span>
           <span>Rol global</span>
+          <span>Plan IA</span>
           <span>Se registró</span>
           <span className="text-right">Acciones</span>
         </div>
@@ -70,7 +73,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
             return (
               <li
                 key={usuario.id}
-                className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,2.5fr)_1fr_1fr_1fr_auto] md:items-center md:gap-4"
+                className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_0.8fr_1fr_auto] md:items-center md:gap-4"
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Avatar label={nombreDe(usuario)} mine={esMiCuenta} size="md" />
@@ -101,6 +104,18 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                   </Badge>
                 </div>
 
+                <div>
+                  <span className="mr-2 font-sans text-xs text-text-disabled md:hidden">
+                    Plan IA
+                  </span>
+                  {/* El plan no es un rol y no se pinta como tal: PRO destaca
+                      porque es lo que se concede a mano; FREE es el valor por
+                      defecto de casi todas las cuentas y no necesita color. */}
+                  <Badge variant={usuario.assistantPlan === 'PRO' ? 'success' : 'default'}>
+                    {usuario.assistantPlan}
+                  </Badge>
+                </div>
+
                 <p className="font-sans text-xs text-text-secondary">
                   {fechaYHora(usuario.createdAt)}
                 </p>
@@ -125,6 +140,16 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                   >
                     Cambiar rol
                   </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!puedoTocarla}
+                    title={puedoTocarla ? undefined : motivoBloqueo}
+                    onClick={() => setPlanDe(usuario)}
+                  >
+                    Plan IA
+                  </Button>
                 </div>
               </li>
             );
@@ -133,6 +158,8 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
       </div>
 
       {estadoDe && <UserStatusDialog usuario={estadoDe} open onClose={() => setEstadoDe(null)} />}
+
+      {planDe && <UserPlanDialog usuario={planDe} open onClose={() => setPlanDe(null)} />}
 
       {rolDe && (
         <UserRoleDialog usuario={rolDe} miNivel={miNivel} open onClose={() => setRolDe(null)} />

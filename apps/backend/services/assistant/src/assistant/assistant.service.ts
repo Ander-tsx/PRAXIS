@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
-import { type AssistantChatResult, type AssistantProposal, MAX_HISTORIAL } from '@praxis/contracts';
+import {
+  type AssistantChatResult,
+  type AssistantPlanName,
+  type AssistantProposal,
+  MAX_HISTORIAL,
+} from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
 import { ConversationsService } from './conversations.service';
@@ -70,6 +75,16 @@ export class AssistantService {
   /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */
   estadoCuota(userId: string) {
     return this.quota.estado(userId);
+  }
+
+  /** Asignar plan a mano: no hay pasarela de pago. Lo llama administración. */
+  cambiarPlan(userId: string, plan: AssistantPlanName) {
+    return this.quota.cambiarPlan(userId, plan);
+  }
+
+  /** Los planes de una tanda de usuarios, para la lista de administración. */
+  planesDe(userIds: string[]) {
+    return this.quota.planesDe(userIds);
   }
 
   /**

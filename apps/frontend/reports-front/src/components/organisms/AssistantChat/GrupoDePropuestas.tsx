@@ -165,9 +165,9 @@ export function GrupoDePropuestas({ children }: GrupoDePropuestasProps) {
        * activa desplazado hacia abajo y algo más estrecho, que es lo que dibuja
        * el mazo. No reciben clics.
        */}
-      <div className="relative">
-        {total > 2 && <Capa desplazamientoPx={14} escala={0.94} opacidad={0.5} />}
-        <Capa desplazamientoPx={7} escala={0.97} opacidad={0.8} />
+      <div className="relative pb-4">
+        {total > 2 && <Capa margenLateral={24} desde={0} opacidad={0.45} />}
+        <Capa margenLateral={12} desde={8} opacidad={0.75} />
 
         <div className="relative">
           {tarjetas.map((tarjeta, posicion) => {
@@ -189,24 +189,43 @@ export function GrupoDePropuestas({ children }: GrupoDePropuestasProps) {
   );
 }
 
-/** Una de las cartas de detrás del mazo. */
+/**
+ * Una de las cartas de detrás del mazo.
+ *
+ * ⚠️ **Vive entera en el relleno inferior del contenedor y no toca la tarjeta.**
+ *
+ * La primera versión era un `inset-0` con `scale()`, que parecía lo natural:
+ * copiar el hueco de la tarjeta y encogerlo. Pero `scale()` encoge **desde el
+ * centro**, así que la capa se metía por dentro de los cuatro lados, y como el
+ * fondo de la tarjeta es translúcido —un 6 % de primario— se veía a través de
+ * ella: un rectángulo fantasma flotando encima del contenido.
+ *
+ * Con geometría explícita no hay solape que transparentar. La capa ocupa una
+ * franja de 8 px justo debajo de la tarjeta, más estrecha por los lados, y eso
+ * es todo lo que hace falta para que se lea como un mazo. Solo redondea abajo:
+ * arriba nace pegada a lo que tiene encima.
+ */
 function Capa({
-  desplazamientoPx,
-  escala,
+  margenLateral,
+  desde,
   opacidad,
 }: {
-  desplazamientoPx: number;
-  escala: number;
+  /** Cuánto se estrecha por cada lado. Cuanto más al fondo, más estrecha. */
+  margenLateral: number;
+  /** Píxeles desde el borde inferior del contenedor. */
+  desde: number;
   opacidad: number;
 }) {
   return (
     <span
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 rounded-xl border"
+      className="pointer-events-none absolute h-2 rounded-b-xl border border-t-0"
       style={{
+        left: margenLateral,
+        right: margenLateral,
+        bottom: desde,
         borderColor: alpha(colors.primary, 25),
         background: colors.surface,
-        transform: `translateY(${desplazamientoPx}px) scale(${escala})`,
         opacity: opacidad,
       }}
     />

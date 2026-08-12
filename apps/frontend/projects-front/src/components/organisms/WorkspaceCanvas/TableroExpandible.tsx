@@ -1,6 +1,8 @@
 'use client';
 
+import { colors } from '@praxis/commons';
 import { type ReactNode, useEffect, useState } from 'react';
+import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface TableroExpandibleProps {
   /** Nombre del tablero, para la cabecera y el texto accesible del botón. */
@@ -66,9 +68,22 @@ export function TableroExpandible({ nombre, resumen, children }: TableroExpandib
     <div
       className={
         expandido
-          ? 'scrollbar-slim fixed inset-0 z-40 flex flex-col gap-4 overflow-auto bg-background p-5'
+          ? 'scrollbar-slim fixed inset-0 z-40 flex flex-col gap-4 overflow-auto p-5'
           : 'contents'
       }
+      /**
+       * En pantalla completa se lleva consigo la retícula de puntos del lienzo.
+       *
+       * Sin ella, ampliar cambiaba el tablero de sitio **y** de aspecto: pasabas
+       * de una superficie con textura a un rectángulo liso, y costaba reconocer
+       * que seguías en lo mismo.
+       *
+       * ⚠️ `backgroundColor` va **después** del `background` de `BOARD_SURFACE`,
+       * y el orden importa: la forma corta pone el color en transparente al
+       * aplicar el degradado, así que sin esta línea detrás se vería la página
+       * por debajo de una capa que se supone opaca.
+       */
+      style={expandido ? { ...BOARD_SURFACE, backgroundColor: colors.background } : undefined}
     >
       <header className="flex flex-wrap items-baseline gap-3">
         <h4 className="font-sans text-base font-semibold text-text-primary">{nombre}</h4>

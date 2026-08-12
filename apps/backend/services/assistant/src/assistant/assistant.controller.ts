@@ -1,6 +1,7 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
+import type { AssistantPlanName } from '@praxis/contracts';
 import { AssistantService } from './assistant.service';
 
 /**
@@ -44,6 +45,24 @@ export class AssistantController {
   @MessagePattern({ cmd: 'assistant_quota' })
   quota(@Payload() dto: { userId: string }) {
     return this.assistant.estadoCuota(dto.userId);
+  }
+
+  /**
+   * Cambia el plan de una persona. Lo usa el panel de administración.
+   *
+   * ⚠️ Exigir el rol global de la plataforma es cosa del gateway, como en el
+   * resto de comandos: aquí no hay sesión que mirar. Vale lo que dice la nota de
+   * arriba sobre quien pueda hablar por TCP con el 3006.
+   */
+  @MessagePattern({ cmd: 'assistant_plan_set' })
+  cambiarPlan(@Payload() dto: { userId: string; plan: AssistantPlanName }) {
+    return this.assistant.cambiarPlan(dto.userId, dto.plan);
+  }
+
+  /** Los planes de varias personas, para pintar la lista de administración. */
+  @MessagePattern({ cmd: 'assistant_plans_of' })
+  planesDe(@Payload() dto: { userIds: string[] }) {
+    return this.assistant.planesDe(dto.userIds);
   }
 
   /**

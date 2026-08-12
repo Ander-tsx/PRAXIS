@@ -17,6 +17,7 @@ import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
 import { MinimizarIcono } from './TableroExpandible';
+import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface BoardColumnsProps {
   board: Board;
@@ -458,7 +459,24 @@ export function BoardColumns({
        * detrás. La de la tira ya se encarga de ese caso.
        */}
       {columnaExpandida && (
-        <div className="fixed inset-0 z-40 flex flex-col gap-4 bg-background p-5">
+        /**
+         * ⚠️ **El lienzo de puntos, y la columna encima como una tarjeta de
+         * `bg-surface`.** No es adorno: sin él no había contraste ninguno.
+         *
+         * Esta capa era `bg-background` y las tarjetas de tarea también son
+         * `bg-background` — el mismo color exacto. Las tareas no se distinguían
+         * del fondo: se leía una lista de textos flotando, y solo el borde de
+         * 1 px insinuaba dónde empezaba cada una.
+         *
+         * Ahora se reproduce la jerarquía del tablero, que ya la tenía resuelta:
+         * lienzo con textura al fondo, la columna como superficie elevada encima
+         * y las tarjetas sobre ella. Además de verse, se entiende — es la misma
+         * columna, agrandada, no otra pantalla.
+         */
+        <div
+          className="fixed inset-0 z-40 flex flex-col gap-4 p-5"
+          style={{ ...BOARD_SURFACE, backgroundColor: colors.background }}
+        >
           <header className="flex flex-wrap items-center gap-3">
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -489,25 +507,33 @@ export function BoardColumns({
             </button>
           </header>
 
-          <ColumnTasks
-            projectId={projectId}
-            boardId={board.id}
-            column={columnaExpandida}
-            tasks={tasksByColumn.get(columnaExpandida.id) ?? []}
-            members={members}
-            labels={labels}
-            usersById={usersById}
-            currentUserId={currentUserId}
-            canCreate={canCreateTask}
-            canMove={canMoveTask}
-            canComment={canComment}
-            canEdit={canEditTask}
-            canDelete={canDeleteTask}
-            draggingTaskId={draggingTaskId}
-            onDragTask={setDraggingTaskId}
-            onDropTask={dropTask}
-            layout="rejilla"
-          />
+          {/* La columna, con la misma superficie y el mismo redondeo que en la
+              tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
+              que se reconozca como la columna de siempre. */}
+          <div
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-surface p-2"
+            style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
+          >
+            <ColumnTasks
+              projectId={projectId}
+              boardId={board.id}
+              column={columnaExpandida}
+              tasks={tasksByColumn.get(columnaExpandida.id) ?? []}
+              members={members}
+              labels={labels}
+              usersById={usersById}
+              currentUserId={currentUserId}
+              canCreate={canCreateTask}
+              canMove={canMoveTask}
+              canComment={canComment}
+              canEdit={canEditTask}
+              canDelete={canDeleteTask}
+              draggingTaskId={draggingTaskId}
+              onDragTask={setDraggingTaskId}
+              onDropTask={dropTask}
+              layout="rejilla"
+            />
+          </div>
         </div>
       )}
     </>

@@ -47,6 +47,7 @@ enum AdminActionType {
   PROJECT_REACTIVATED
   PROJECT_ARCHIVED
   PROJECT_RESTORED
+  ASSISTANT_PLAN_CHANGED
 
   @@schema("permissions")
 }
