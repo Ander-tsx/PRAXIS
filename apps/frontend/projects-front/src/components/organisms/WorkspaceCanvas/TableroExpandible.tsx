@@ -88,35 +88,60 @@ export function TableroExpandible({ nombre, resumen, children }: TableroExpandib
           title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
           className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            {expandido ? (
-              /* Cuatro flechas hacia dentro: encoger. */
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 9V4M9 9H4M9 9L4 4m11 5V4m0 5h5m-5 0l5-5M9 15v5m0-5H4m5 0l-5 5m11-5v5m0-5h5m-5 0l5 5"
-              />
-            ) : (
-              /* Cuatro flechas hacia fuera: agrandar. */
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 9V4h5M4 4l5 5m11 0V4h-5m5 0l-5 5M4 15v5h5m-5 0l5-5m11 5v-5h-5m5 5l-5-5"
-              />
-            )}
-          </svg>
+          {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
           {expandido ? 'Salir' : 'Ampliar'}
         </button>
       </header>
 
       {children}
     </div>
+  );
+}
+
+/**
+ * `maximize-2` de Lucide.
+ *
+ * Dos flechas en diagonal, no las cuatro esquinas que había: a 16 px, cuatro
+ * flechas son ocho trazos que se juntan y se leen como una mancha. Lucide dibuja
+ * a 24×24 con trazo 2 y remates redondos, igual que los Heroicons del resto del
+ * repo, así que conviven sin desentonar.
+ */
+export function MaximizarIcono() {
+  return (
+    <IconoLucide>
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" x2="14" y1="3" y2="10" />
+      <line x1="3" x2="10" y1="21" y2="14" />
+    </IconoLucide>
+  );
+}
+
+/** `minimize-2` de Lucide: la pareja de arriba, para salir. */
+export function MinimizarIcono() {
+  return (
+    <IconoLucide>
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="14" x2="21" y1="10" y2="3" />
+      <line x1="3" x2="10" y1="21" y2="14" />
+    </IconoLucide>
+  );
+}
+
+function IconoLucide({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      className="h-4 w-4 shrink-0"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
   );
 }

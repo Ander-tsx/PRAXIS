@@ -16,6 +16,7 @@ import { useActionState, useEffect, useRef, useState } from 'react';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
+import { MinimizarIcono } from './TableroExpandible';
 
 export interface BoardColumnsProps {
   board: Board;
@@ -483,20 +484,7 @@ export function BoardColumns({
               title="Salir de pantalla completa (Esc)"
               className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 9V4M9 9H4M9 9L4 4m11 5V4m0 5h5m-5 0l5-5M9 15v5m0-5H4m5 0l-5 5m11-5v5m0-5h5m-5 0l5 5"
-                />
-              </svg>
+              <MinimizarIcono />
               Salir
             </button>
           </header>

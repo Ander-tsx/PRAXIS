@@ -12,6 +12,7 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
+import { MaximizarIcono } from './TableroExpandible';
 
 export interface ColumnMenuProps {
   boardId: string;
@@ -198,7 +199,7 @@ export function ColumnMenu({
                   onFullscreen();
                 }}
               >
-                <ExpandIcon />
+                <MaximizarIcono />
                 Pantalla completa
               </MenuItem>
 
@@ -466,25 +467,6 @@ function MenuBack({ onClick }: { onClick: () => void }) {
     >
       ← Volver
     </button>
-  );
-}
-
-function ExpandIcon() {
-  return (
-    <svg
-      className="h-3.5 w-3.5 shrink-0"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4 9V4h5M4 4l5 5m11 0V4h-5m5 0l-5 5M4 15v5h5m-5 0l5-5m11 5v-5h-5m5 5l-5-5"
-      />
-    </svg>
   );
 }
 

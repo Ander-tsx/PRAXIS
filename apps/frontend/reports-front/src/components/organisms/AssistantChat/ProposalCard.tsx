@@ -48,7 +48,20 @@ import { TextoDelModelo } from './TextoDelModelo';
  * va a pasar, por qué se propone, y entonces aceptar o descartar.
  */
 
-type Estado = 'pendiente' | 'enviando' | 'hecho' | 'descartada';
+export type Estado = 'pendiente' | 'enviando' | 'hecho' | 'descartada';
+
+/**
+ * Por dónde una tarjeta cuenta en qué estado está.
+ *
+ * Lo necesita el grupo que las apila: para pintar el punto de cada una y para
+ * saber cuántas quedan sin decidir tiene que conocer un estado que vive dentro
+ * de cada tarjeta. Va por contexto igual que la señal de aceptar todas, y por lo
+ * mismo: `Marco` es el único sitio que hay que tocar.
+ *
+ * `null` cuando nadie escucha —una tarjeta suelta fuera de un grupo—, y ahí no
+ * se informa a nadie.
+ */
+export const RegistroDeEstado = createContext<((estado: Estado) => void) | null>(null);
 
 /**
  * Señal de «aceptar todas», como contador.
@@ -588,6 +601,18 @@ function Marco({
     senalAtendida.current = senal;
     if (estado === 'pendiente' && !decididaAntes) onAceptar();
   }, [senal, estado, decididaAntes, onAceptar]);
+
+  /**
+   * Le cuenta al grupo en qué estado está.
+   *
+   * Una propuesta que ya venía decidida de una conversación vieja se anuncia
+   * como tal desde el principio, no como pendiente: si no, el grupo ofrecería
+   * «Aceptar todas» sobre tarjetas que ya se aceptaron en su día.
+   */
+  const registrar = useContext(RegistroDeEstado);
+  useEffect(() => {
+    registrar?.(decididaAntes ? (estadoGuardado === 'ACCEPTED' ? 'hecho' : 'descartada') : estado);
+  }, [registrar, estado, decididaAntes, estadoGuardado]);
 
   /**
    * Lo que se decidió en su día, al releer una conversación vieja.

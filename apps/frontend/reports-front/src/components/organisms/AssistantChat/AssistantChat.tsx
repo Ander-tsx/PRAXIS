@@ -271,16 +271,11 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
                   <Burbuja mensaje={mensaje} />
 
                   {(mensaje.proposals ?? []).length > 0 && (
-                    <GrupoDePropuestas
-                      /* Las que ya se decidieron en su día no cuentan: al releer
-                         una conversación vieja, «3 propuestas» sobre tres
-                         tarjetas ya aceptadas ofrecería aplicar lo aplicado. */
-                      pendientes={
-                        (mensaje.proposals ?? []).filter(
-                          (propuesta) => !propuesta.status || propuesta.status === 'PENDING',
-                        ).length
-                      }
-                    >
+                    /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
+                       tarjeta le informa de su estado, así que también cuenta
+                       las que se acepten o descarten aquí mismo, no solo las que
+                       ya vinieran decididas de una conversación vieja. */
+                    <GrupoDePropuestas>
                       {(mensaje.proposals ?? []).map((propuesta, indice) => {
                         if (esPropuestaDeTarea(propuesta)) {
                           return (
