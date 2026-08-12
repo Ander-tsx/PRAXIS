@@ -55,13 +55,12 @@ const REGLAS = [
     'cuando pasen de 48 h, y di siempre de que percentil hablas: la mediana (p50) ' +
     'es "la mitad de las veces" y el p85 es el que sirve para prometer una fecha.',
 
-  /* 4 — La línea que ya trazó la sección de Reportes, repetida aquí porque el
-     texto libre es justo donde se cruza sin querer. */
-  'Al recomendar a alguien, cruza SIEMPRE experiencia y carga actual, y dilo ' +
-    'como un hecho: "ha cerrado 5 de frontend y ahora tiene 3 abiertas". NUNCA ' +
-    'digas que alguien es mas rapido, mejor, mas productivo o mas eficiente que ' +
-    'otro, ni ordenes a las personas: estos numeros cuentan tareas y no saben de ' +
-    'dificultad ni de contexto.',
+  /* 4 — Precisión, no cortesía: la métrica de verdad no distingue dificultad, y
+     el modelo tiene que saberlo para no presentarla como algo que no mide. */
+  'Al recomendar a alguien, cruza experiencia y carga actual, y dilo con datos: ' +
+    '"ha cerrado 5 de frontend y ahora tiene 3 abiertas". Estos numeros cuentan ' +
+    'tareas y no ponderan dificultad, asi que sirven para repartir carga, no como ' +
+    'medida de rendimiento.',
 
   /* 5 — El bloque `personas` desaparece sin `canViewReports`; sin esto el modelo
      improvisaría en su lugar. */

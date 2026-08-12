@@ -116,7 +116,10 @@ export function ColumnTasks({
           onDropTask(column.id);
         }}
         className={[
-          'flex flex-col gap-2 rounded-xl px-2 pb-2 transition-colors',
+          /* `px-1` y no `px-2`: los otros 4 px los pone la lista de dentro, que
+             los necesita para no recortar el borde de las tarjetas. El ancho
+             total no cambia. */
+          'flex flex-col gap-2 rounded-xl px-1 pb-2 transition-colors',
           /* En pantalla completa la zona de suelta ocupa el alto disponible:
              si no, con tres tarjetas queda una franja de 100 px y el resto de
              la pantalla deja de aceptar la suelta. */
@@ -148,12 +151,22 @@ export function ColumnTasks({
          * que una con cinco, sin ninguna pista de que hubiera más debajo. El
          * contador de la cabecera dice el total, pero no dónde estás dentro de
          * él. El tamaño del pulgar sí.
+         *
+         * ⚠️ **El relleno de 1 (4 px) es lo que deja ver entero el borde azul de
+         * las tarjetas al pasar por encima.**
+         *
+         * Un contenedor que desborda en un eje **recorta también el otro**: en
+         * cuanto `overflow-y` deja de ser `visible`, `overflow-x` no puede
+         * seguir siéndolo, así que el `outline` de 2 px de la tarjeta se cortaba
+         * limpio por los dos costados y el borde se veía abierto por izquierda y
+         * derecha. Los 4 px de aire por dentro le dan sitio; el padre bajó de
+         * `px-2` a `px-1` para que la columna mida exactamente igual que antes.
          */}
         <div
           className={
             enRejilla
-              ? 'scrollbar-slim grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] content-start gap-3 overflow-y-auto pr-1'
-              : 'scrollbar-slim flex max-h-[55vh] flex-col gap-2 overflow-y-auto'
+              ? 'scrollbar-slim grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] content-start gap-3 overflow-y-auto p-1'
+              : 'scrollbar-slim flex max-h-[55vh] flex-col gap-2 overflow-y-auto p-1'
           }
         >
           {tasks.length === 0 ? (

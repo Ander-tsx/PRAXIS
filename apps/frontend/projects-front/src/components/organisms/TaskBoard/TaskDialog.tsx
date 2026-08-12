@@ -19,6 +19,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useId, useState } from 'react';
+import { SelectorDeFecha } from '../../molecules/SelectorDeFecha/SelectorDeFecha';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskComments } from './TaskComments';
@@ -207,9 +208,12 @@ export function TaskDialog({
             }))}
           />
 
-          <Input
+          {/* Calendario propio en vez de `<input type="date">`: el nativo lo
+              dibuja el navegador, sale distinto en cada uno y en tema oscuro
+              aparece en claro. Manda el mismo `yyyy-mm-dd` en un campo oculto,
+              así que la acción de servidor no se entera del cambio. */}
+          <SelectorDeFecha
             name="dueDate"
-            type="date"
             label="Fecha límite (opcional)"
             defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
