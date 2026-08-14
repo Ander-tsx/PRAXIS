@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { comoBearer, data, entrarComoAdmin, error, registrar } from '../../fixtures/api';
+import {
+  comoBearer,
+  data,
+  entrarComoAdmin,
+  error,
+  intentarLogin,
+  registrar,
+} from '../../fixtures/api';
 import { crearMundo, crearTarea } from '../../fixtures/mundo';
 
 /**
@@ -237,8 +244,9 @@ test.describe('Suspender una cuenta', () => {
       data: { status: 'SUSPENDED', reason: 'Prueba de login tras suspensión' },
     });
 
-    const respuesta = await request.post('/api/auth/login', {
-      data: { email: victima.email, password: victima.password },
+    const respuesta = await intentarLogin(request, {
+      email: victima.email,
+      password: victima.password,
     });
     expect(respuesta.status()).toBe(403);
   });
@@ -271,8 +279,9 @@ test.describe('Suspender una cuenta', () => {
     });
     expect(reactivacion.status()).toBe(200);
 
-    const entrada = await request.post('/api/auth/login', {
-      data: { email: victima.email, password: victima.password },
+    const entrada = await intentarLogin(request, {
+      email: victima.email,
+      password: victima.password,
     });
     expect(entrada.status(), 'Reactivar tiene que devolver el acceso de verdad').toBe(200);
   });

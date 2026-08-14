@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { comoBearer, data, nombreUnico } from '../../fixtures/api';
-import { crearMundo, crearTarea, type Mundo } from '../../fixtures/mundo';
+import { type Mundo, crearMundo, crearTarea } from '../../fixtures/mundo';
 
 /**
  * # Una tarea vive en una columna de su propio tablero

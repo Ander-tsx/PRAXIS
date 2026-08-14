@@ -1,6 +1,6 @@
 import type { APIRequestContext } from '@playwright/test';
 import { expect } from '@playwright/test';
-import { comoBearer, crearProyecto, data, nombreUnico, registrar, type Usuario } from './api';
+import { type Usuario, comoBearer, crearProyecto, data, nombreUnico, registrar } from './api';
 
 /**
  * Un proyecto completo y utilizable, montado por API.

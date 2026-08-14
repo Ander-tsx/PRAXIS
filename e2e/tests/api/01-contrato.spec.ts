@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { comoBearer, data, error, registrar } from '../../fixtures/api';
+import { comoBearer, data, error, intentarLogin, registrar } from '../../fixtures/api';
 
 /**
  * El contrato de respuesta del gateway.
@@ -30,8 +30,9 @@ test.describe('Contrato de respuesta', () => {
   });
 
   test('el error viene envuelto en {success:false, error:{code,message}}', async ({ request }) => {
-    const respuesta = await request.post('/api/auth/login', {
-      data: { email: 'nadie@praxis.test', password: 'NoExiste@12345!' },
+    const respuesta = await intentarLogin(request, {
+      email: 'nadie@praxis.test',
+      password: 'NoExiste@12345!',
     });
 
     expect(respuesta.status()).toBe(401);

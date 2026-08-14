@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
-import { comoBearer, data, registrar, type Usuario } from '../../fixtures/api';
+import { type Usuario, comoBearer, data, registrar } from '../../fixtures/api';
 import { crearMundo, crearTarea } from '../../fixtures/mundo';
 
 /**

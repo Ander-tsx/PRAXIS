@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { comoBearer, data, entrarComoAdmin, registrar, type Usuario } from '../../fixtures/api';
+import { type Usuario, comoBearer, data, entrarComoAdmin, registrar } from '../../fixtures/api';
 
 /**
  * # La jerarquía de la administración

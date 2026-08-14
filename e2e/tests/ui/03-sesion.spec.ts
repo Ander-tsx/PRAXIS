@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { request as contextoDePeticion } from '@playwright/test';
 import { registrar } from '../../fixtures/api';
-import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
+import { campos, crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
 
 /**
  * El recorrido completo en navegador: crear cuenta, entrar, moverse entre zonas
@@ -13,10 +13,43 @@ import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui
  */
 
 test.describe('Sesión en el navegador', () => {
-  test('crear cuenta deja la sesión abierta y aterriza en el panel', async ({ page }) => {
+  /**
+   * ⚠️ **El nombre de esta prueba decía lo contrario, y era el contrato viejo.**
+   *
+   * «Crear cuenta deja la sesión abierta» describía el comportamiento anterior a
+   * la confirmación por correo. Ahora el alta **no** deja dentro: enseña «Mira tu
+   * correo» y hay que confirmar antes de poder entrar. `crearCuentaYEntrar` hace
+   * los tres pasos.
+   */
+  test('crear cuenta, confirmar y entrar aterriza en el panel', async ({ page }) => {
     await crearCuentaYEntrar(page);
 
     await expect(page).toHaveURL(/\/dashboard/);
+  });
+
+  /**
+   * 🔒 La otra mitad, y el motivo entero de que exista la confirmación: el alta
+   * **no abre sesión**. Con sesión desde el registro, cualquiera se daba de alta
+   * con un correo inventado y se quedaba usando el sistema sin abrirlo jamás.
+   */
+  test('crear cuenta NO abre sesión: se queda esperando la confirmación', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/auth/signup');
+    const email = `ui-sinconfirmar-${Date.now()}@praxis.test`;
+    await page.locator(campos.email).fill(email);
+    await page.locator(campos.password).fill('Prueba@12345!');
+    await page.locator(campos.confirmarPassword).fill('Prueba@12345!');
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Mira tu correo' })).toBeVisible();
+
+    const cookies = await context.cookies();
+    expect(
+      cookies.some((cookie) => cookie.name === 'praxis_session'),
+      'registrarse no puede dejar cookie de sesión',
+    ).toBe(false);
   });
 
   /**

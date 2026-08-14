@@ -3102,3 +3102,296 @@ sigue viendo por la suya.
 Las cuatro pantallas nuevas de `admin-front` **no se han abierto en un
 navegador**. Compilan, y el contrato que consumen está verificado petición a
 petición contra el backend en marcha, pero el render no.
+
+---
+
+## 32. El chat: un modelo, dos conversaciones
+
+Chat de equipo por proyecto y conversaciones privadas, sobre **una sola
+estructura**. Responder, reaccionar, mencionar, silenciar y contar lo no leído
+tienen que funcionar igual en los dos; con estructuras paralelas serían cinco
+cosas duplicadas que divergen a la primera corrección aplicada solo en una.
+
+```
+ChatChannel       { kind: PROJECT | DIRECT, projectId? , directUserA/B? }
+ChatChannelState  { channelId, userId, lastReadAt?, mutedAt? }
+ChatMessage       { channelId, authorId, body, replyToId? }
+ChatReaction      { messageId, userId, emoji }   ← PK el trío
+```
+
+### 32.1 Quién participa se responde distinto según el tipo
+
+- **PROJECT** — los miembros del proyecto, y eso vive en `project_members`. **No
+  se copia.** Duplicarlo obligaría a sincronizar cada alta y cada baja, y un
+  fallo de sincronización es alguien que sigue leyendo un chat del que le
+  echaron.
+- **DIRECT** — estructuralmente las dos personas del canal, con sus ids
+  **ordenados**. Sin ordenarlos, que Ana escriba a Juan y Juan a Ana crearía dos
+  conversaciones y cada uno vería la mitad de lo hablado.
+
+🔴 `ChatChannelState` **no dice quién participa**: se crea sola al abrir un chat
+o silenciarlo. Tratarla como control de acceso daría entrada a cualquiera que
+haya pasado por ahí una vez.
+
+### 32.2 El tiempo real es el que ya había
+
+No se abre ninguna conexión nueva. `AvisosEnVivo` mantiene **un** flujo SSE por
+persona para toda la aplicación; el chat se pinta en el servidor y el
+`router.refresh()` de cada evento lo repinta. Eso es lo que hace que el aviso
+llegue **fuera del chat** — estés en el tablero, en los informes o en otro
+proyecto.
+
+⚠️ Los mensajes viajan con `type: 'CHAT_MESSAGE'` y **no crean fila en
+`notifications`**: cincuenta mensajes serían cincuenta avisos por persona.
+⚠️ El aviso **no lleva el texto**: lo enseñaría en la pantalla de quien tenga el
+portátil abierto en una reunión.
+⚠️ **Silenciar se filtra en el servidor**, no en el navegador: un aviso que llega
+y se descarta al pintarlo ya ha sonado. Y no deja de contar lo no leído — son dos
+cosas distintas.
+
+### 32.3 Menciones y referencias, con el nombre dentro
+
+`@[Juan Pérez](user:2222…)` · `/[Sprint 1](board:88ab…)`
+
+Si sacan a Juan o borran el tablero, **el nombre ya está escrito en el mensaje**:
+degradar es no hacer nada. Es también lo que hace que un mensaje viejo se lea
+como se escribió aunque hayan renombrado las cosas.
+
+El control es **el catálogo** (`/mentionables`), que solo devuelve lo que quien
+pregunta ya puede ver. Revalidar al enviar no protegería de nada: el nombre lo
+escribe quien manda. ⚠️ Eso cambia el día que una mención genere un aviso.
+
+### 32.4 Lo que aporta cada zona
+
+`ChatPanel` vive en `commons` porque lo usan dos zonas. `ProjectChat` y
+`DirectConversation` son envoltorios de veinte líneas: encabezado y las acciones
+de servidor de su zona. Cuando eran dos componentes, cada arreglo iba dos veces.
+
+### 32.5 El asistente
+
+Lee los últimos 20 mensajes **como contexto, no como herramienta**: una lectura
+que casi siempre hace falta no debe gastar un turno ni depender de que el modelo
+decida llamarla. Escribe con `proponer_mensaje`, que sigue el mismo camino que
+las demás — propuesta, autorización, y el endpoint de siempre con su permiso.
+
+⚠️ Es la propuesta de **más alcance**: un comentario queda en una tarea, un
+mensaje suena en el teléfono de todo el equipo. Nunca alcanza a un chat privado:
+darle esa capacidad sería dejarle escribir a nombre de alguien en una
+conversación que el proyecto no contiene.
+
+---
+
+## 33. Análisis deja de ser un informe y pasa a ser un lienzo
+
+> La pantalla enseñaba cinco informes fijos, todos, siempre, en un orden que
+> nadie eligió. Ahora arranca vacía y cada cual monta la suya.
+
+### 33.1 El problema era la primera impresión, no los gráficos
+
+Los cinco informes estaban bien y siguen estando. Lo que estaba mal es que se
+pintaban los cinco pasara lo que pasara, y en un proyecto sin historial —que es
+todo proyecto durante sus primeras semanas— tres de ellos se disculpaban:
+«faltan 10 tareas cerradas», «faltan días de historial», «todavía no hay
+suficiente historial». **La pantalla pedía perdón antes de servir para nada.**
+
+El segundo problema era el orden. Estaba elegido y argumentado (§25.12: cuánto
+trabajo hay, cómo se mueve, cuánto tarda, qué cabe esperar) y sigue siendo un
+buen orden por defecto — pero era el único posible, y quien necesitaba tener
+delante el reparto por persona lo tenía siempre el último.
+
+### 33.2 La decisión que definió el alcance: el lienzo es de la persona
+
+Se resolvió **antes de escribir el modelo**, porque cambiaba el modelo entero.
+
+| | Por persona | Por proyecto |
+|---|---|---|
+| Fila | `(userId, projectId)` | `projectId` |
+| Leer | `canViewReports` | `canViewReports` |
+| Reorganizar | el mismo: es tuyo | haría falta `canEditProject` |
+| Concurrencia | tus dos pestañas | dos personas pisándose en silencio |
+| Interfaz | ninguna extra | un estado «solo lectura» que explicarse |
+
+Se eligió **por persona**. Es la misma línea que ya siguen las conversaciones
+del asistente —de una persona en un proyecto— y hace que reorganizar no necesite
+ningún permiso nuevo: si llegaste a la pantalla tienes `canViewReports`, y tu
+lienzo no lo ve nadie.
+
+Lo que se pierde, dicho: **el equipo no comparte vista**, y montar la del
+compañero es volver a arrastrar. Si algún día hace falta, la forma de añadirlo es
+una tabla de **plantilla del proyecto** aparte con una regla de precedencia, no
+convertir esta en compartida.
+
+### 33.3 `report_layouts` vive en projects-service, no en reports
+
+`reports-service` **no tiene base de datos, y eso es una decisión** (§25.6): lee
+de tasks y projects, calcula y responde. Darle Prisma para una tabla de
+preferencias le añadiría una migración, un `DATABASE_URL` y un esquema propio a
+un servicio cuya identidad entera es no tener ninguno.
+
+`projects-service` ya guarda estado por persona dentro de un proyecto
+—`ChatChannelState`, las membresías—, así que la tabla es suya. El coste está
+escrito en el módulo del gateway: **`/projects/:id/reports/layout` va a
+`PROJECTS_SERVICE` y sus siete hermanas a `REPORTS_SERVICE`**. El cliente ya
+estaba registrado ahí porque lo necesita `ProjectPermissionGuard`, así que no
+añade ninguna dependencia.
+
+⚠️ **Sí tiene clave foránea con `Project`, al revés que `Notification`.** Un
+aviso es un hecho del pasado y tiene que sobrevivir al proyecto del que habla;
+un lienzo **no significa nada sin el suyo** —sus widgets apuntan a columnas y
+etiquetas que se van con él—, así que cascadea y nadie tiene que acordarse de
+limpiarlo desde el código que borra.
+
+### 33.4 El coste de carga se ha invertido
+
+Antes se pedían los cinco informes en cada carga, dos recorriendo el historial,
+hubiera o no algo que enseñar con ellos. Ahora la page lee el lienzo, junta lo
+que come (`informesNecesarios`) y **pide solo eso**.
+
+- Lienzo vacío → **una** petición de informe.
+- Solo la instantánea puesta → una, y no recorre el historial.
+
+Cuesta **dos viajes en serie** donde antes había uno. Se acepta: el primero es
+una lectura por clave primaria de una tabla de preferencias.
+
+⚠️ **La instantánea se pide siempre, aunque el lienzo no la use.** Es la única
+que sabe si el historial está fabricado, y ese aviso no puede depender de qué
+gráficos tenga puesto cada cual (§25.12).
+
+### 33.5 `react-grid-layout` 2.x, y por qué se pudo
+
+Vive **solo en `reports-front`**, que es el argumento de multi-zone que el repo
+ya cobró con Recharts. Se verificó antes de construir nada encima, igual que se
+hizo con el peer de React de Recharts:
+
+- `react-grid-layout` 2.2.4 trae **sus propios tipos** (`@types/react-grid-layout`
+  está deprecado y sobra: se instaló y se quitó);
+- su `react-draggable` resuelve a **4.7.1**, que usa `nodeRef` — las versiones
+  anteriores llamaban a `ReactDOM.findDOMNode`, que **React 19 eliminó**. Con la
+  1.x esto no habría arrancado.
+
+**El CSS se escribió a mano en vez de importar el suyo.** El de la librería pinta
+el hueco de destino en rojo puro y los tiradores con `rgba(0,0,0,.4)`: sobre el
+tema oscuro el tirador es invisible y el hueco se lee como un error. Sobrescribir
+eso era más CSS que escribirlo. Y de paso se evita un `@import` a `node_modules`
+dentro de un CSS global, que aquí depende de que la cadena de PostCSS lo
+resuelva y fallaría **en silencio** (la forma en que Tailwind ya nos ha mordido
+dos veces).
+
+### 33.6 Tres decisiones de gesto
+
+- **No hay «modo edición».** Un modo obliga a entrar y salir, y quien entra a
+  mirar no lo descubre nunca. Lo que evita los arrastres accidentales es el
+  **tirador**: solo se arrastra por la cabecera, así que seleccionar texto o
+  abrir el «cómo se lee» dentro de un gráfico no lo mueve.
+- **Se guarda solo y en silencio**, 700 ms después del último gesto. Un botón
+  «Guardar disposición» es una forma de perder el trabajo de quien no lo pulsa.
+  Solo se dice algo si falla.
+- **Quitar no pregunta.** Se deshace volviéndolo a añadir del catálogo.
+
+⚠️ **Solo se persiste en el ancho grande.** `ResponsiveGridLayout` deriva las
+disposiciones estrechas compactando la ancha, que es lo que se quiere al pintar
+y un desastre al guardar: si `onLayoutChange` persistiera lo que llega en un
+móvil, **una sola visita desde el teléfono convertiría la composición de alguien
+en una columna apilada** sin que nadie haya arrastrado nada. Y se compara contra
+el ancho **medido del contenedor**, no contra `window.innerWidth`: el lienzo
+tiene la barra lateral al lado y esos dos números no coinciden.
+
+### 33.7 El gráfico generado: elegir, no inventar
+
+Había dos lecturas posibles y solo una es aceptable:
+
+| | |
+|---|---|
+| ❌ Que el modelo genere la consulta o el código | Un `SELECT` inventado, o cifras estimadas. Va contra la regla 1 del prompt, que prohíbe **inventar el dato de partida** |
+| ✅ Que elija y parametrice de un conjunto cerrado | Forma + métrica + filtro + rango, sobre agregados que `reports-service` ya calcula |
+
+El conjunto vive en `contracts/src/reports/report-widget.ts`: diez métricas, cada
+una **con el agregado del que sale escrito al lado**. Esa columna no es
+documentación — es la comprobación de que ninguna necesita una consulta nueva, y
+por tanto de que ninguna puede devolver una cifra que nadie haya calculado.
+
+**Y cada métrica declara qué opciones acepta.** Un eje de «filtro» genérico
+habría sido más cómodo y habría mentido: `people` ya trae abiertas, cerradas y
+vencidas por separado —ahí el filtro **es** la métrica—, mientras que
+`snapshot.byColumn` cuenta lo que hay ahora y no sabe separarlo. Ofrecer «solo
+abiertas» sobre esa habría devuelto el mismo número con otra etiqueta, que es la
+peor clase de error: se lee bien y es falso. `validarGrafico` rechaza además una
+serie temporal pedida como dona o un rango sobre una foto del momento — un
+conjunto cerrado que admite combinaciones sin sentido no es un conjunto cerrado.
+
+`validarGrafico` se aplica en **dos puertas y a propósito**: el DTO del gateway
+al guardar el lienzo, y `validarPropuesta` al validar lo que devolvió Gemini. Una
+la cruza la pantalla y la otra el modelo, y ninguna puede fiarse de que la otra
+ya miró. El `enum` que se le declara a Gemini es una sugerencia con buena tasa de
+acierto, no una garantía.
+
+#### `proponer_grafico` es la novena herramienta, y la primera que no toca el proyecto
+
+Las otras ocho proponen tocar el tablero; esta propone tocar **el lienzo de quien
+habla**. Por eso cuelga de `canViewReports` —el permiso que ya hizo falta para
+llegar al asistente— y es **la única que alcanza a un rol de solo lectura**, que
+hasta ahora no podía proponer absolutamente nada. Tiene sentido que sea justo
+esta: mirar los datos de otra forma no es tocar el trabajo de nadie.
+
+**Sigue llegando como propuesta con su tarjeta.** Un gráfico es inofensivo y la
+tentación era añadirlo directo para ahorrar un clic. No se hace: nunca aparece un
+gráfico en la pantalla de alguien sin que lo haya aceptado. Un asistente que
+empieza a cambiar cosas sin preguntar porque «esta es pequeña» es el que deja de
+dar confianza para las grandes.
+
+⚠️ **Y sigue sin haber borrado.** `proponer_grafico` solo **añade**; no existe la
+de quitar y no se va a añadir, por lo mismo que las demás (nota al pie de
+`tools.ts`). Quitar un gráfico es un clic en su aspa.
+
+#### La única acción que sí revalida
+
+`aceptarGraficoAction` llama a `revalidatePath`, al contrario que las ocho de
+§26.6. No es una excepción caprichosa: lo que cambian aquellas vive en otra zona
+que no comparte caché con esta, y lo que cambia esta **es esta misma página**.
+Sin revalidar, el gráfico aceptado no aparecería hasta recargar, que se lee como
+que aceptar no hizo nada.
+
+### 33.8 Una paleta de series, medida y no elegida a ojo
+
+Las columnas y las prioridades **traen su color** y se respeta: un gráfico de
+columnas pintado de otro color dejaría de leerse igual que el tablero. Las
+etiquetas y las personas no traen ninguno, y ahí hacía falta una paleta.
+
+Seis tonos en `theme.css` (`--color-serie-1..6`), y son **los mismos en los dos
+temas** porque pasan las cinco comprobaciones medibles en ambos: banda de
+luminosidad, suelo de croma, separación bajo protanopía y deuteranopía (ΔE ≥ 8 en
+OKLab), suelo de visión normal y contraste 3:1 contra la superficie. El par que
+más se acerca es serie-2 ↔ serie-3, con ΔE 9,3.
+
+⚠️ **No son los colores de estado.** `success`, `warning` y `error` significan
+algo; reutilizarlos como «serie 3» convierte una etiqueta cualquiera en una
+alarma.
+
+⚠️ **El orden es fijo y no se cicla.** A partir de la sexta categoría se agrupa en
+«Otras» —y el resto se **suma**, no se tira: una dona de las cinco etiquetas
+mayores sin ese resto parece el reparto completo del proyecto y no lo es.
+
+Y una decisión que ahorró la mitad del problema: **las barras van de un solo
+color**. En unas barras horizontales el nombre está escrito al lado de cada
+barra, así que pintarlas de seis colores es codificar dos veces lo mismo. La
+paleta hace falta de verdad en la **dona**, que no tiene eje.
+
+### 33.9 Verificado contra el stack
+
+| Caso | Resultado |
+|---|---|
+| Lienzo de quien nunca lo tocó | `{ widgets: [], actualizadoEn: null }` — **200, no 404** |
+| Guardar y releer | Vuelve igual, con `actualizadoEn` |
+| Métrica inventada | 400, con la lista de las válidas |
+| `flujo_por_columna` como dona | 400 · «no se puede dibujar como dona» |
+| `dias` sobre `tareas_por_columna` | 400 · «es una foto del momento: no admite rango» |
+| `soloVencidas` sobre prioridad | 400 · «no distingue las vencidas» |
+| `topN: 99` | 400 · «el top N va de 2 a 20» |
+| Un campo de más en el widget | 400 · «property colorFavorito should not exist» |
+| `paradas_por_columna` con rango y `soloVencidas` | **200** — la métrica sí los acepta |
+| `cierres_por_semana` como barras | **200** |
+| Un no-miembro pidiendo el lienzo | **403** |
+
+**La separación entre personas no se puede probar por la API, y esa es la
+garantía:** no hay ninguna ruta que acepte un `userId`. Lo pone el gateway desde
+el token y la clave primaria es `(userId, projectId)`.

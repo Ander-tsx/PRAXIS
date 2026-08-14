@@ -1,5 +1,15 @@
 import { expect, test } from '@playwright/test';
-import { comoBearer, correoUnico, data, entrar, error, registrar, SEED } from '../../fixtures/api';
+import {
+  SEED,
+  comoBearer,
+  correoUnico,
+  data,
+  entrar,
+  error,
+  intentarLogin,
+  registrar,
+  registrarSinConfirmar,
+} from '../../fixtures/api';
 
 /**
  * Autenticación: registro, login, renovación y cierre de sesión.
@@ -13,7 +23,20 @@ import { comoBearer, correoUnico, data, entrar, error, registrar, SEED } from '.
 test.describe.configure({ timeout: 90_000 });
 
 test.describe('Autenticación', () => {
-  test('el registro devuelve 201 con los tres campos en camelCase', async ({ request }) => {
+  /**
+   * ⚠️ **Registrarse ya NO abre sesión, y esta prueba existe para fijarlo.**
+   *
+   * Antes comprobaba que el registro devolvía `accessToken`. Desde `2bc9983`
+   * devuelve `{ userId, email, verificacionPendiente }` sin tokens: la cuenta
+   * nace sin confirmar y se entra por el login, después de confirmar. Es el
+   * punto entero de la verificación por correo — con tokens en el registro,
+   * cualquiera se daba de alta con un correo inventado y se quedaba dentro.
+   *
+   * La prueba vieja siguió afirmando el contrato anterior y **arrastró a toda la
+   * suite**: `accessToken` valía `undefined`, todo salía con
+   * `Authorization: Bearer undefined` y caía en 401.
+   */
+  test('el registro no abre sesión: la cuenta nace sin confirmar', async ({ request }) => {
     const email = correoUnico();
 
     const respuesta = await request.post('/api/auth/register', {
@@ -22,15 +45,46 @@ test.describe('Autenticación', () => {
 
     expect(respuesta.status()).toBe(201);
 
-    const sesion = await data<Record<string, unknown>>(respuesta);
+    const alta = await data<Record<string, unknown>>(respuesta);
 
-    /* camelCase, no snake_case: el backend devolvió `access_token` en su día y
-       el frontend leía `undefined` sin error hasta la siguiente petición. */
-    expect(sesion).toHaveProperty('userId');
-    expect(sesion).toHaveProperty('accessToken');
-    expect(sesion).toHaveProperty('refreshToken');
-    expect(sesion).not.toHaveProperty('access_token');
-    expect(typeof sesion.accessToken).toBe('string');
+    expect(alta).toHaveProperty('userId');
+    expect(alta).toHaveProperty('verificacionPendiente', true);
+
+    /* Lo importante es lo que NO viene: un token aquí sería saltarse la
+       confirmación. */
+    expect(alta).not.toHaveProperty('accessToken');
+    expect(alta).not.toHaveProperty('refreshToken');
+    expect(alta).not.toHaveProperty('access_token');
+  });
+
+  /**
+   * La otra mitad: sin confirmar no se entra.
+   *
+   * Va con `EMAIL_NOT_VERIFIED` en `details` y no solo con un 403, porque es lo
+   * que la pantalla de login mira para ofrecer el botón de reenviar en vez de
+   * decir «credenciales incorrectas».
+   */
+  test('sin confirmar el correo, el login lo rechaza y dice por qué', async ({ request }) => {
+    const { email, password } = await registrarSinConfirmar(request);
+
+    const respuesta = await intentarLogin(request, { email, password });
+
+    expect(respuesta.status()).toBe(403);
+    const fallo = await error(respuesta);
+    expect((fallo.details as { code?: string })?.code).toBe('EMAIL_NOT_VERIFIED');
+  });
+
+  /* Y confirmada, se entra con los tres campos en camelCase de siempre.
+     camelCase y no snake_case: el backend devolvió `access_token` en su día y
+     el frontend leía `undefined` sin error hasta la siguiente petición. */
+  test('una vez confirmada, el login devuelve los tres campos en camelCase', async ({
+    request,
+  }) => {
+    const usuario = await registrar(request);
+
+    expect(typeof usuario.accessToken).toBe('string');
+    expect(typeof usuario.refreshToken).toBe('string');
+    expect(typeof usuario.userId).toBe('string');
   });
 
   test('el registro no acepta firstName ni lastName', async ({ request }) => {
@@ -71,8 +125,9 @@ test.describe('Autenticación', () => {
   test('una contraseña incorrecta da 401 sin decir cuál de los dos falla', async ({ request }) => {
     const usuario = await registrar(request);
 
-    const respuesta = await request.post('/api/auth/login', {
-      data: { email: usuario.email, password: 'Incorrecta@12345!' },
+    const respuesta = await intentarLogin(request, {
+      email: usuario.email,
+      password: 'Incorrecta@12345!',
     });
 
     expect(respuesta.status()).toBe(401);
@@ -89,14 +144,16 @@ test.describe('Autenticación', () => {
      * devuelve el login, así que el límite de intentos que añadimos nosotros la
      * tumba: sale 429 donde espera 401 y el fallo parece de autenticación.
      */
-    let respuesta = await request.post('/api/auth/login', {
-      data: { email: correoUnico('fantasma'), password: 'Prueba@12345!' },
+    let respuesta = await intentarLogin(request, {
+      email: correoUnico('fantasma'),
+      password: 'Prueba@12345!',
     });
 
     if (respuesta.status() === 429) {
       await new Promise((listo) => setTimeout(listo, 61_000));
-      respuesta = await request.post('/api/auth/login', {
-        data: { email: correoUnico('fantasma'), password: 'Prueba@12345!' },
+      respuesta = await intentarLogin(request, {
+        email: correoUnico('fantasma'),
+        password: 'Prueba@12345!',
       });
     }
 

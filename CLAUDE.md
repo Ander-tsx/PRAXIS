@@ -64,6 +64,49 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     - Los 403 de suspensión llevan **`error.code === 'PROJECT_SUSPENDED'`** (`PROJECT_SUSPENDED_CODE` en `commons/api/domain.ts`). Distinguirlo de un `FORBIDDEN` normal importa: uno se arregla pidiendo permiso a quien administra el proyecto, el otro no se arregla —hay que esperar a que la plataforma lo reactive—.
     - `suspendedBy` **no sale por ninguna ruta de usuario**: sería decir qué cuenta es administradora, y el rol global es privado.
 
+12. 🔴 **El sobre `{success, data, meta}` NO puede envolver un flujo SSE.** El
+    interceptor global mapea **cada valor emitido**, así que un
+    `{ type: 'aviso', data }` se convertía en `{ success, data: {...}, meta }` —un
+    objeto sin `type` en la raíz—. Nest solo escribe la línea `event:` si hay
+    `type`, así que el navegador lo recibía como evento genérico `message` y el
+    `addEventListener('aviso', …)` de `AvisosEnVivo` **no se disparaba nunca**:
+    los avisos en vivo llegaban hasta el navegador y morían ahí, sin tarjeta, sin
+    sonido y sin un solo error ni en el servidor ni en la consola. Se arregla
+    exceptuando los handlers marcados con `SSE_METADATA` en
+    `StandardResponseInterceptor`. **Si añades otro interceptor global, acuérdate
+    de esto.**
+13. ⚠️ **Los latidos de 25 s del SSE no son la latencia.** Son un byte por una
+    conexión en silencio para que ningún intermediario la cierre —el balanceador
+    corta a los 60 s—. Lo que hay que enviar se envía en el momento.
+14. ⚠️ **`CHAT_MESSAGE` viaja por el flujo de avisos pero NO es un
+    `NotificationType`** y no deja fila en la bandeja: cincuenta mensajes serían
+    cincuenta avisos por persona. Trata el `type` del flujo como texto libre.
+
+15. 🔴 **Registrarse ya no abre sesión, y hay que confirmar el correo antes de
+    entrar.** `POST /auth/register` devuelve `{ userId, email,
+    verificacionPendiente }` —sin tokens— y el login responde **403
+    `EMAIL_NOT_VERIFIED`** hasta que se confirma. Es el punto entero de la
+    verificación. Dos consecuencias que ya han mordido:
+    - **El seed tiene que marcar `emailVerifiedAt`.** No lo hacía: las cuentas
+      sembradas funcionaban solo porque la migración de la v7 rellenó las que ya
+      existían. Tras un `prisma:reset` **nadie podía entrar**, ni la de
+      administración. Arreglado en `credentials/prisma/seed.ts`.
+    - **Las pruebas end-to-end no pueden confirmar por la API**: el token del
+      enlace se guarda con hash y en claro solo existe dentro del correo. Por eso
+      `e2e/fixtures/verificacion.ts` escribe en la base — es lo único de toda la
+      suite que no pasa por el gateway, y está ahí explicado.
+16. ⚠️ **El login está limitado a 10 por minuto y por IP, y la suite lo gasta
+    sola.** Desde que registrarse no abre sesión, cada una de las 84 cuentas que
+    crea necesita un login. Cualquier `POST /auth/login` en una prueba va por
+    `intentarLogin()`, que espera y reintenta; a pelo, una prueba que espera un
+    401 recibe un 429 y falla **por el reloj, no por el código**.
+17. ⚠️ **Una constante `process.env.X` en el cuerpo de un módulo NO ve el
+    `.env`.** `ConfigModule.forRoot()` lo carga al **inicializar** el módulo, y
+    los `import` se evalúan antes. Lo que se lea arriba del archivo solo ve las
+    variables del proceso. Si hace falta configurar algo que se usa en un
+    decorador —`@Throttle`, por ejemplo—, no vale leerlo así: parece que
+    funciona y silenciosamente coge el valor por defecto.
+
 **Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
 `projectHref` / `projectPath` / `reportHref` / `reportPath`, en
 `commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son

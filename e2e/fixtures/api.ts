@@ -1,5 +1,6 @@
 import type { APIRequestContext, APIResponse } from '@playwright/test';
 import { expect } from '@playwright/test';
+import { confirmarCorreo } from './verificacion';
 
 /**
  * Ayudas compartidas por las pruebas de API.
@@ -72,19 +73,53 @@ export function nombreUnico(prefijo = 'Proyecto E2E'): string {
   return `${prefijo} ${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** Registra un usuario nuevo y devuelve sus credenciales y su sesión. */
+/**
+ * Registra un usuario nuevo, **le confirma el correo** y devuelve su sesión.
+ *
+ * ⚠️ **Registrarse ya no abre sesión, y por eso hay tres pasos donde había uno.**
+ * Desde `2bc9983` el registro responde `{ userId, email, verificacionPendiente }`
+ * sin tokens, y el login rechaza con 403 `EMAIL_NOT_VERIFIED` hasta que la cuenta
+ * se confirma.
+ *
+ * Esta función seguía esperando el contrato viejo y leía `accessToken` de una
+ * respuesta que ya no lo traía: valía `undefined`, todas las peticiones salían
+ * con `Authorization: Bearer undefined` y **la suite entera caía en 401** desde
+ * el primer archivo. Nada de eso apuntaba a la causa.
+ *
+ * La confirmación se hace escribiendo en la base (ver `verificacion.ts`): el
+ * token del enlace se guarda con hash y en claro solo existe dentro del correo,
+ * así que es un paso fuera de banda que una prueba no puede dar por la API.
+ */
 export async function registrar(
   request: APIRequestContext,
   password = 'Prueba@12345!',
 ): Promise<Usuario> {
   const email = correoUnico();
-  const respuesta = await request.post('/api/auth/register', {
-    data: { email, password },
-  });
-  expect(respuesta.status(), 'El registro debería devolver 201').toBe(201);
 
-  const sesion = await data<Sesion>(respuesta);
+  const alta = await request.post('/api/auth/register', { data: { email, password } });
+  expect(alta.status(), 'El registro debería devolver 201').toBe(201);
+
+  await confirmarCorreo(email);
+
+  /* Ahora sí hay sesión que obtener, y por la puerta de siempre. */
+  const sesion = await entrar(request, { email, password });
   return { ...sesion, email, password };
+}
+
+/**
+ * Registra una cuenta y **la deja sin confirmar**.
+ *
+ * Es lo que hace falta para probar justo eso: que el login la rechaza. Devuelve
+ * las credenciales, no una sesión, porque no hay ninguna.
+ */
+export async function registrarSinConfirmar(
+  request: APIRequestContext,
+  password = 'Prueba@12345!',
+): Promise<{ email: string; password: string }> {
+  const email = correoUnico();
+  const alta = await request.post('/api/auth/register', { data: { email, password } });
+  expect(alta.status(), 'El registro debería devolver 201').toBe(201);
+  return { email, password };
 }
 
 /**
@@ -103,6 +138,33 @@ export async function entrar(
   request: APIRequestContext,
   credenciales: { email: string; password: string },
 ): Promise<Sesion> {
+  const respuesta = await intentarLogin(request, credenciales);
+
+  expect(
+    respuesta.status(),
+    `Login fallido para ${credenciales.email}. ¿Se ejecutaron los seeds?`,
+  ).toBe(200);
+  return data<Sesion>(respuesta);
+}
+
+/**
+ * Un intento de login que **espera si se topó con el límite**, y devuelve la
+ * respuesta tal cual sea.
+ *
+ * ⚠️ Úsalo en vez de `request.post('/api/auth/login')` a pelo **siempre**, aunque
+ * la prueba espere un 401 o un 403. El límite son 10 por minuto y por IP, y la
+ * suite los gasta sola: desde que registrarse dejó de abrir sesión, cada cuenta
+ * nueva necesita un login, y son 84. Sin esto, una prueba que comprueba que una
+ * contraseña mala da 401 recibe un 429 y falla **por el reloj, no por el
+ * código** — que es exactamente lo que pasó al arreglar la suite.
+ *
+ * La espera es de un minuto porque esa es la ventana. Solo se paga cuando de
+ * verdad se topó con el límite.
+ */
+export async function intentarLogin(
+  request: APIRequestContext,
+  credenciales: { email: string; password: string },
+): Promise<APIResponse> {
   let respuesta = await request.post('/api/auth/login', { data: credenciales });
 
   if (respuesta.status() === 429) {
@@ -110,11 +172,7 @@ export async function entrar(
     respuesta = await request.post('/api/auth/login', { data: credenciales });
   }
 
-  expect(
-    respuesta.status(),
-    `Login fallido para ${credenciales.email}. ¿Se ejecutaron los seeds?`,
-  ).toBe(200);
-  return data<Sesion>(respuesta);
+  return respuesta;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { correoUnico } from './api';
+import { confirmarCorreo } from './verificacion';
 
 /**
  * Ayudas de navegador.
@@ -25,7 +26,7 @@ export const campos = {
 } as const;
 
 /**
- * Crea una cuenta desde la interfaz y espera a aterrizar en el panel.
+ * Crea una cuenta desde la interfaz, **la confirma** y entra.
  *
  * Devuelve el correo por si la prueba necesita volver a entrar con él.
  */
@@ -38,20 +39,75 @@ export async function crearCuentaYEntrar(page: Page): Promise<string> {
   await page.locator(campos.confirmarPassword).fill(CONTRASENNA_DE_PRUEBA);
   await page.getByRole('button', { name: 'Crear cuenta' }).click();
 
-  /* Navegación dura al salir de la zona: `router.push` se convertiría en
-     `/auth/...` por el basePath. Por eso se espera la URL y no un elemento. */
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  /**
+   * ⚠️ **Registrarse ya no deja dentro, y aquí se nota en tres pasos.**
+   *
+   * Antes de la confirmación por correo, el alta abría sesión y aterrizaba en
+   * `/dashboard`; esta función solo tenía que esperar esa URL. Ahora la cuenta
+   * nace sin confirmar, la pantalla se queda en «te hemos escrito a…» y el
+   * login responde 403 hasta que se confirma — así que hay que confirmar y
+   * entrar a mano.
+   *
+   * La confirmación se hace escribiendo en la base (ver `verificacion.ts`): el
+   * token del enlace se guarda con hash y en claro solo existe dentro del
+   * correo. Es un paso fuera de banda que una prueba no puede dar.
+   *
+   * Se espera a que el alta haya llegado al servidor antes de tocar la base:
+   * sin esto, `confirmarCorreo` puede adelantarse a la fila que va a confirmar.
+   */
+  await page.getByRole('heading', { name: 'Mira tu correo' }).waitFor({ timeout: 15_000 });
+
+  await confirmarCorreo(email);
+  await entrarConCuenta(page, email);
 
   return email;
 }
 
-/** Entra con una cuenta que ya existe. */
+/**
+ * Entra con una cuenta que ya existe.
+ *
+ * ⚠️ **Reintenta una vez si se topó con el límite de login.** `/auth/login`
+ * acepta 10 intentos por minuto y por IP, y la suite se los gasta sola: desde
+ * que registrarse dejó de abrir sesión, cada cuenta que crea necesita un login,
+ * y las de navegador se suman a las de API.
+ *
+ * Cuando eso pasa, el formulario se queda en su sitio con un error y **la
+ * navegación no ocurre nunca**: el `waitForURL` expiraba y el fallo salía como
+ * un timeout limpio a los 30 s que no apunta a nada. Es el mismo problema que
+ * resuelve `intentarLogin()` en las pruebas de API, aquí visto desde el
+ * navegador.
+ *
+ * Se ve enseguida si vuelve a pasar: varias pruebas de UI fallando **todas
+ * alrededor de los 30 s** no es un problema de código, es el reloj.
+ */
 export async function entrarConCuenta(page: Page, email: string): Promise<void> {
-  await page.goto('/auth/login');
-  await page.locator(campos.email).fill(email);
-  await page.locator(campos.password).fill(CONTRASENNA_DE_PRUEBA);
-  await page.getByRole('button', { name: 'Entrar' }).click();
-  await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
+  async function intentar(espera: number): Promise<boolean> {
+    await page.goto('/auth/login');
+    await page.locator(campos.email).fill(email);
+    await page.locator(campos.password).fill(CONTRASENNA_DE_PRUEBA);
+    await page.getByRole('button', { name: 'Entrar' }).click();
+
+    try {
+      await page.waitForURL(/\/dashboard/, { timeout: espera });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /* 15 s de primer intento: si el login va a funcionar, funciona en menos de
+     dos. Esperar 30 solo alarga el diagnóstico cuando no va a funcionar. */
+  if (await intentar(15_000)) return;
+
+  /* Un minuto es la ventana del límite. Solo se paga cuando de verdad se topó. */
+  await page.waitForTimeout(61_000);
+
+  if (!(await intentar(15_000))) {
+    throw new Error(
+      `No se pudo entrar con ${email} ni tras esperar el límite de login. ` +
+        'Si el error de la pantalla no habla de intentos, el fallo es otro.',
+    );
+  }
 }
 
 /** Crea un proyecto desde el diálogo de `/projects` y devuelve su nombre. */

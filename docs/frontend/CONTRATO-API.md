@@ -805,7 +805,161 @@ leer la bandeja de cualquiera.
 - No hay `TASK_EDITED` a propósito: emitirlo en cada `PATCH` llenaría la bandeja
   de ruido y el aviso útil se perdería.
 
-⚠️ **No hay tiempo real.** Ni WebSocket ni SSE: la interfaz reconsulta cada 60 s.
+### Tiempo real — `GET /me/notifications/stream` (SSE)
+
+Un flujo SSE **de una sola vía**: el servidor empuja y el navegador nunca
+escribe por aquí. No hay WebSocket a propósito — una conexión bidireccional
+habría que autorizarla por mensaje, y aquí la autorización es la de siempre: el
+guard del controlador, una vez, al abrir.
+
+```
+event: aviso          data: { type, actorId, projectId, projectName, taskId, taskTitle, createdAt }
+event: latido         data: { t }        cada 25 s
+```
+
+- ⚠️ **`EventSource` no puede mandar cabeceras.** El token no viaja desde el
+  navegador: llega porque la petición cruza **el proxy de la zona**, que lee la
+  cookie httpOnly y añade el `Authorization`. Llamar a esta ruta directamente
+  contra el gateway da 401, y así debe ser.
+- Los **latidos cada 25 s no son la latencia**. Solo existen para que ningún
+  intermediario cierre una conexión en silencio: el balanceador de Google corta
+  a los 60 s sin tráfico. Cuando hay algo que enviar, se envía en el momento.
+- El `latido` se ignora en el cliente. Existe como tipo propio para no
+  confundirlo con un aviso vacío.
+- ⚠️ **Por aquí viaja también `CHAT_MESSAGE`, que NO está en el enum de
+  `Notification` y no deja fila en la bandeja.** Ver la sección del chat. Trata
+  `type` como texto libre: la lista no está cerrada.
+- 🔴 **El sobre `{success, data, meta}` NO se aplica aquí.** Envolverlo tapaba el
+  `type` del `MessageEvent` y Nest dejaba de escribir la línea `event:`, así que
+  `addEventListener('aviso', …)` no se disparaba **nunca** y los avisos morían
+  en el navegador sin ningún error. Arreglado exceptuando los handlers `@Sse()`
+  en `StandardResponseInterceptor`.
+
+---
+
+## Chat del proyecto 🔒
+
+### Chat de proyecto
+
+| Método | Ruta | Body | Permiso |
+|---|---|---|---|
+| GET | `/projects/:id/chat/messages?limit&before` | — | `canViewProject` |
+| POST | `/projects/:id/chat/messages` | `{ body, replyToId? }` | `canComment` |
+| POST | `/projects/:id/chat/read` | — | `canViewProject` |
+| POST | `/projects/:id/chat/mute` | `{ muted }` | `canViewProject` |
+| POST | `/projects/:id/chat/messages/:mid/react` | `{ emoji, on }` | `canComment` |
+| GET | `/projects/:id/chat/mentionables` | — | `canViewProject` |
+| DELETE | `/projects/:id/chat/messages/:mid` | — | autor, o `canManageMembers` |
+
+### Chat privado — cuelga de `/me`, sin proyecto en la ruta
+
+| Método | Ruta | Body |
+|---|---|---|
+| GET | `/me/chats` | — · tus conversaciones |
+| GET | `/me/chats/contacts` | — · quién comparte proyecto contigo, con sus roles |
+| GET | `/me/chats/projects` | — · tus chats de proyecto, para el centro de mensajes |
+| GET | `/me/chats/:peerId/messages?limit&before` | — |
+| POST | `/me/chats/:peerId/messages` | `{ body, replyToId? }` |
+| POST | `/me/chats/:peerId/read` · `/mute` | — · `{ muted }` |
+| POST | `/me/chats/:peerId/messages/:mid/react` | `{ emoji, on }` |
+| GET | `/me/chats/:peerId/mentionables` | — |
+| DELETE | `/me/chats/:peerId/messages/:mid` | — · **solo propios** |
+
+```ts
+ChatMessage = { id, channelId, authorId, body, createdAt,
+                replyTo: { id, authorId, body } | null,
+                reactions: { messageId, userId, emoji }[] }
+
+GET → { items, hasMore, unread, muted }   // items del más antiguo al más nuevo
+```
+
+🔴 **Solo puedes escribir a quien comparta algún proyecto contigo.** Es la única
+regla del chat privado y la aplica projects-service en el único camino por el que
+se resuelve un canal. Sin ella esto sería mensajería abierta a toda la
+plataforma.
+
+### Menciones y referencias — van **dentro del texto**
+
+```
+@[Juan Pérez](user:2222…)        /[Sprint 1](board:88ab…)
+```
+
+⚠️ **El nombre va escrito dentro a propósito.** Si sacan a Juan del equipo o
+borran el tablero, el nombre ya está en el mensaje y se pinta como texto plano —
+**degradar es no hacer nada**, sin una sola consulta. Es también lo que hace que
+un mensaje viejo se lea como se escribió aunque hayan renombrado las cosas.
+
+Tipos: `user`, `project`, `workspace`, `board`, `task`.
+
+- **El catálogo (`/mentionables`) es el control de acceso**, no una validación al
+  enviar. Devuelve solo lo que quien pregunta ya puede ver: en un chat de
+  proyecto, lo de ese proyecto; en uno privado, **solo los proyectos que
+  compartís**.
+- 🔴 **Al enviar no se revalidan las referencias, y es correcto**: el nombre de la
+  etiqueta lo escribe quien manda, así que fabricar una a mano no le enseña nada
+  que no supiera. Al pulsarla, quien la recibe pasa por sus permisos de siempre.
+- ⚠️ **El día que una mención genere un aviso, esto cambia**: entonces sí serviría
+  para hacer sonar el teléfono de cualquiera y habría que validarla al enviar.
+
+- ⚠️ **El `projectId` va en la ruta y NUNCA en el cuerpo**: mandarlo da 400. Es
+  la misma regla que tareas y checklists.
+- **Escribir pide `canComment`, no un `canChat`.** Los permisos de un rol son un
+  diccionario, así que una clave nueva nace en `false` para todos los roles que
+  ya existen y el chat saldría mudo hasta editarlos uno a uno en cada proyecto.
+- El `projectId` de las rutas anidadas es el **UUID**, no el slug.
+- **Se pagina hacia atrás con cursor (`before`), no con `page`.** En un chat el
+  número de página de un mensaje cambia cada vez que alguien escribe, así que
+  «la página 2» devolvería mensajes ya vistos y se saltaría otros.
+- `unread` **no cuenta los propios**: nadie tiene pendiente de leer lo suyo. Y
+  escribir adelanta tu marca de lectura.
+- Lo no leído es **un instante por persona** (`project_chat_reads`), no una
+  marca por mensaje.
+- **Un mensaje nuevo publica un aviso en vivo a todos los miembros menos el
+  autor**, con `type: 'CHAT_MESSAGE'`, por el mismo flujo SSE de arriba. Eso es
+  lo que hace que suene y salga la tarjeta **aunque no estés en el chat**.
+- ⚠️ **Ese aviso NO crea fila en `notifications`** y no sale en la bandeja: una
+  conversación de cincuenta mensajes serían cincuenta avisos por persona y
+  taparía el aviso que sí importa.
+- ⚠️ **El aviso no lleva el texto del mensaje**, a propósito: reproducirlo lo
+  enseñaría en la pantalla de quien tenga el portátil abierto en una reunión.
+- Borrar uno que no existe —o ajeno sin moderar— responde **404**, no 403.
+- Los mensajes de un proyecto **cascadean** al borrarlo. Los privados **no**:
+  no son del proyecto, y lo que dos personas se dijeron no desaparece porque
+  alguien borre uno.
+- Reaccionar es **idempotente en las dos direcciones**. El emoji sale de una
+  lista cerrada (`CHAT_REACTIONS`); otro da 400.
+- Una respuesta tiene que citar un mensaje **del mismo canal**: si no, 400.
+- Borrar el original **no borra las respuestas** (`SET NULL`): se quedan sin
+  cita, que es lo correcto — son de otras personas.
+
+---
+
+## Facturación 🔒
+
+| Método | Ruta | Body | Notas |
+|---|---|---|---|
+| GET | `/me/billing/estado` | — | `{ disponible, gestionable }` |
+| POST | `/me/billing/checkout` | — | → `{ url }` de Stripe Checkout |
+| POST | `/me/billing/portal` | — | → `{ url }` del portal. 400 si no eres cliente |
+| POST | `/webhooks/stripe` | crudo | **público, sin JWT**. Su auth es la firma |
+
+- Cuelga de `/me` y **nunca acepta un `userId`**: quien paga es quien trae el
+  token. Un parámetro aquí sería abrir el portal —con sus recibos dentro— a
+  nombre de otro.
+- **Devuelve la URL en vez de redirigir**: un 303 lo seguiría el propio `fetch`
+  en lugar de mover la pestaña.
+- `disponible` depende de que **el backend** tenga claves de Stripe, cosa que el
+  navegador no puede saber. Sin ellas, `/me/billing/*` responde **503** con un
+  mensaje claro y la interfaz no debe ofrecer el botón.
+- `gestionable` es «ya eres cliente de Stripe». Alguien con PRO puesto a mano
+  desde administración **no** tiene suscripción que gestionar.
+- 🔴 **El plan lo concede el webhook, JAMÁS la vuelta del navegador.** La
+  `success_url` la puede escribir cualquiera en la barra de direcciones; si
+  diera PRO, PRO sería gratis.
+- El webhook es **idempotente**: Stripe reintenta hasta recibir un 2xx y manda
+  eventos que se solapan. Todo lo que hace es un `upsert` de estado final.
+- Sin firma válida → **400**. Sin `STRIPE_WEBHOOK_SECRET` configurado rechaza
+  **todo**: es su única autenticación.
 
 ---
 

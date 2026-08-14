@@ -73,7 +73,23 @@ export default defineConfig({
    */
   retries: 0,
 
-  timeout: 30_000,
+  /**
+   * 90 s por prueba, no 30.
+   *
+   * ⚠️ **No es holgura por si acaso: es exactamente la espera del límite de
+   * login.** `/auth/login` acepta 10 intentos por minuto y por IP, y la suite se
+   * los gasta sola — desde que registrarse dejó de abrir sesión, cada una de las
+   * 84 cuentas que crea necesita un login. Cuando se topa, `intentarLogin()`
+   * espera 61 s y reintenta; con el tope en 30 s la prueba moría **a mitad de esa
+   * espera**, y el fallo salía como un timeout limpio que no apunta a nada.
+   *
+   * 120 s y no 90: en el navegador hay que sumar el alta, la confirmación y los
+   * dos intentos de login alrededor de esa misma espera de 61 s.
+   *
+   * Se ve enseguida si vuelve a pasar: varias pruebas fallando **todas a los
+   * 30.0 s exactos** no es un problema de código, es el reloj.
+   */
+  timeout: 120_000,
   expect: { timeout: 10_000 },
 
   reporter: process.env.CI
