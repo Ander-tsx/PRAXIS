@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import { CreateBoardDto, UpdateBoardDto, DeleteBoardDto, FindOneBoardDto } from '@praxis/contracts';
+import { CreateBoardDto, DeleteBoardDto, FindOneBoardDto, UpdateBoardDto } from '@praxis/contracts';
 import { BoardsService } from './boards.service';
 
 @Controller()

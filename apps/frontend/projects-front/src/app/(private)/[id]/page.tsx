@@ -1,5 +1,14 @@
+import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
+import { ProjectChat } from '@/components/organisms/ProjectChat';
+import { ProjectHeader } from '@/components/organisms/ProjectHeader';
+import { ProjectLabels } from '@/components/organisms/ProjectLabels';
+import { ProjectMembers } from '@/components/organisms/ProjectMembers';
+import { ProjectRoles } from '@/components/organisms/ProjectRoles';
+import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
+import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 import {
   AppHeader,
+  type ChatMessagePage,
   type EffectivePermissions,
   type Label,
   type MyInvitation,
@@ -10,20 +19,13 @@ import {
   TabNav,
   type Task,
   type UserProfile,
-  tabLinkClasses,
   projectPath,
+  tabLinkClasses,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
-import { ProjectHeader } from '@/components/organisms/ProjectHeader';
-import { ProjectLabels } from '@/components/organisms/ProjectLabels';
-import { ProjectMembers } from '@/components/organisms/ProjectMembers';
-import { ProjectRoles } from '@/components/organisms/ProjectRoles';
-import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
-import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -42,6 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 const TABS = [
   { id: 'espacios', label: 'Espacios' },
+  { id: 'chat', label: 'Chat' },
   { id: 'equipo', label: 'Equipo' },
   { id: 'etiquetas', label: 'Etiquetas' },
   { id: 'roles', label: 'Roles' },
@@ -102,7 +105,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     );
   }
 
-  const [effective, members, labels, invitations] = await Promise.all([
+  const [effective, members, labels, invitations, chat] = await Promise.all([
     api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`),
     api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
     /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
@@ -126,6 +129,24 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           .get<ProjectInvitation[]>(`/projects/${project.id}/invitations`)
           .catch(() => [] as ProjectInvitation[])
       : Promise.resolve([] as ProjectInvitation[]),
+
+    /**
+     * El chat.
+     *
+     * Se pide **siempre**, pero con `limit=1` fuera de su pestaña: la respuesta
+     * trae `unread`, que es lo que pinta la insignia, y esa tiene que verse
+     * estando en cualquier otra pestaña — es medio motivo de que el chat exista.
+     * Traer un mensaje en vez de cincuenta es la diferencia entre pagar el
+     * contador y pagar la conversación entera en cada carga.
+     *
+     * Cae a página vacía si falla: perder el chat no puede llevarse por delante
+     * el proyecto.
+     */
+    api
+      .get<ChatMessagePage>(
+        `/projects/${project.id}/chat/messages?limit=${activeTab === 'chat' ? 50 : 1}`,
+      )
+      .catch(() => ({ items: [], hasMore: false, unread: 0, muted: false }) as ChatMessagePage),
   ]);
 
   const can = effective.permissions;
@@ -168,12 +189,19 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * lista y volvió a enseñar el UUID crudo con «Correo no disponible» —el mismo
    * síntoma que este bloque arregló para los miembros—.
    */
+  /**
+   * ⚠️ **Quien escribió en el chat cuenta, y puede no ser miembro.** A alguien
+   * a quien sacaron del proyecto sus mensajes se le quedan, así que su id no
+   * está en `members` y hay que sumarlo aparte o la burbuja saldría con el UUID
+   * crudo — el mismo síntoma que ya tuvieron las invitaciones pendientes.
+   */
   const idsDePersonas =
-    activeTab === 'equipo' || activeTab === 'espacios'
+    activeTab === 'equipo' || activeTab === 'espacios' || activeTab === 'chat'
       ? [
           ...new Set([
             ...members.map((m) => m.userId),
             ...invitations.map((invitation) => invitation.userId),
+            ...(activeTab === 'chat' ? chat.items.map((message) => message.authorId) : []),
             project.ownerId,
           ]),
         ]
@@ -282,8 +310,16 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const assignableMembers = directory.items.filter((user) => memberIds.has(user.id));
   const usersById = new Map(directory.items.map((user) => [user.id, user]));
 
+  /**
+   * El número de cada pestaña.
+   *
+   * El del chat es **lo no leído**, no el total de mensajes: cuántos mensajes
+   * hay acumulados desde que existe el proyecto no le sirve a nadie, y lo que
+   * hace mirar es que haya algo nuevo.
+   */
   const counts: Record<TabId, number> = {
     espacios: project.workspaces.length,
+    chat: chat.unread,
     equipo: members.length,
     etiquetas: labels.length,
     roles: project.roles.length,
@@ -363,6 +399,23 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             /* Comentar deja de exigir editar: el observador ya puede responder. */
             canComment={can.canComment}
             canDeleteTask={can.canDeleteTask}
+          />
+        )}
+
+        {activeTab === 'chat' && (
+          <ProjectChat
+            projectId={project.id}
+            projectName={project.name}
+            page={chat}
+            usersById={usersById}
+            currentUserId={userId}
+            /* Escribir es `canComment`, el mismo permiso que comentar en una
+               tarea. No hay un `canChat`: una clave nueva en el diccionario de
+               permisos nace en `false` para todos los roles que ya existen. */
+            canWrite={can.canComment}
+            /* Modera quien lleva el equipo, no quien borra tareas: lo que se
+               modera aquí es una conversación entre personas. */
+            canModerate={can.canManageMembers}
           />
         )}
 

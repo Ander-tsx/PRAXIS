@@ -115,6 +115,73 @@ export class QuotaService {
     return Object.fromEntries(filas.map((fila) => [fila.userId, fila.plan as AssistantPlanName]));
   }
 
+  /* ─── Facturación ─────────────────────────────────────────────────── */
+
+  /**
+   * Lo que Stripe necesita saber de una persona antes de cobrarle.
+   *
+   * Devuelve el cliente que ya tuviera, si lo tiene. Reutilizarlo es lo que
+   * mantiene su historial de facturación en un solo sitio: crear un cliente
+   * nuevo en cada compra funciona, pero parte los recibos de la misma persona
+   * entre varios clientes que Stripe no relaciona entre sí.
+   */
+  async facturacionDe(userId: string): Promise<{ stripeCustomerId: string | null }> {
+    const fila = await this.prisma.assistantSubscription.findUnique({
+      where: { userId },
+      select: { stripeCustomerId: true },
+    });
+    return { stripeCustomerId: fila?.stripeCustomerId ?? null };
+  }
+
+  /**
+   * Aplica lo que dijo Stripe: el plan y sus identificadores.
+   *
+   * ⚠️ **Es idempotente, y tiene que serlo.** Stripe reintenta un webhook hasta
+   * que le contestas 2xx, así que el mismo pago puede llegar aquí varias veces;
+   * también manda eventos solapados —`checkout.session.completed` y
+   * `customer.subscription.updated`— que describen el mismo hecho. Un `upsert`
+   * que escribe el estado final, en vez de un incremento o una transición,
+   * hace que repetirlo no cambie nada.
+   */
+  async vincularSuscripcion(datos: {
+    userId: string;
+    plan: AssistantPlanName;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+  }): Promise<{ userId: string; plan: AssistantPlanName }> {
+    const { userId, plan, stripeCustomerId, stripeSubscriptionId } = datos;
+
+    const fila = await this.prisma.assistantSubscription.upsert({
+      where: { userId },
+      create: { userId, plan, stripeCustomerId, stripeSubscriptionId },
+      /* Los ids solo se escriben si vienen. Una baja llega sin ellos y no debe
+         borrar el cliente: esa persona puede volver a suscribirse y su
+         historial tiene que seguir colgando del mismo cliente de Stripe. */
+      update: {
+        plan,
+        ...(stripeCustomerId && { stripeCustomerId }),
+        ...(stripeSubscriptionId && { stripeSubscriptionId }),
+      },
+    });
+
+    return { userId: fila.userId, plan: fila.plan as AssistantPlanName };
+  }
+
+  /**
+   * De quién es una suscripción de Stripe.
+   *
+   * Hace falta para las bajas: el webhook de `customer.subscription.deleted`
+   * **no trae nuestro `userId`** —Stripe no lo conoce fuera del momento del
+   * checkout—, solo sus propios identificadores.
+   */
+  async porSuscripcion(stripeSubscriptionId: string): Promise<{ userId: string } | null> {
+    const fila = await this.prisma.assistantSubscription.findUnique({
+      where: { stripeSubscriptionId },
+      select: { userId: true },
+    });
+    return fila ?? null;
+  }
+
   /**
    * Consume un mensaje.
    *

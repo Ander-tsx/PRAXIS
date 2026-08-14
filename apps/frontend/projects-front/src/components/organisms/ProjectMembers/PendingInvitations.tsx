@@ -1,5 +1,7 @@
 'use client';
 
+import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
+import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 import {
   Badge,
   type ProjectInvitation,
@@ -9,8 +11,6 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { useActionState } from 'react';
-import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
-import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
 export interface PendingInvitationsProps {
   projectId: string;
@@ -45,26 +45,31 @@ export function PendingInvitations({
           const label = user ? personLabel(user) : invitation.userId;
 
           return (
+            /* Se apila en móvil por lo mismo que las filas del equipo: dos
+               insignias y un botón no se encogen, y quien cedía el sitio era el
+               nombre. Ver la nota de `ProjectMembers`. */
             <li
               key={invitation.id}
-              className="flex flex-wrap items-center gap-3 rounded-xl px-4 py-3"
+              className="flex flex-col gap-3 rounded-xl px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center"
               style={{ background: alpha(colors.warning, 6) }}
             >
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-sans text-sm font-bold"
-                style={{ background: alpha(colors.warning, 15), color: colors.warning }}
-              >
-                {label[0]?.toUpperCase() ?? '?'}
-              </span>
+              <span className="flex min-w-0 flex-1 items-center gap-3">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-sans text-sm font-bold"
+                  style={{ background: alpha(colors.warning, 15), color: colors.warning }}
+                >
+                  {label[0]?.toUpperCase() ?? '?'}
+                </span>
 
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-sans text-sm text-text-primary">{label}</span>
-                <span className="truncate font-sans text-xs text-text-secondary">
-                  {user?.credential.email ?? 'Correo no disponible'}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-sans text-sm text-text-primary">{label}</span>
+                  <span className="truncate font-sans text-xs text-text-secondary">
+                    {user?.credential.email ?? 'Correo no disponible'}
+                  </span>
                 </span>
               </span>
 
-              <span className="flex shrink-0 items-center gap-2">
+              <span className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <Badge variant="warning">SIN RESPONDER</Badge>
                 <Badge variant="primary">{invitation.projectRole.name}</Badge>
                 {canManage && <CancelButton projectId={projectId} invitationId={invitation.id} />}

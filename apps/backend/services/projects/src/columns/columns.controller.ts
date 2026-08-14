@@ -2,9 +2,9 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   CreateColumnDto,
-  ReorderColumnsDto,
   DeleteColumnDto,
   FindColumnsByIdsDto,
+  ReorderColumnsDto,
   UpdateColumnDto,
 } from '@praxis/contracts';
 import { ColumnsService } from './columns.service';

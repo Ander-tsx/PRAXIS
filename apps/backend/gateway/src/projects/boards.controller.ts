@@ -16,9 +16,9 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { CreateBoardBodyDto, ProjectPermission, UpdateBoardBodyDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { TaskPurgeService } from './task-purge.service';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { TaskPurgeService } from './task-purge.service';
 
 // ─── Colección: boards de un workspace ─────────────────────────────────────
 

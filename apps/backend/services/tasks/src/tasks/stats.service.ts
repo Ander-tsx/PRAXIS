@@ -357,6 +357,24 @@ export class StatsService {
         completedAt: true,
         assignees: { select: { userId: true } },
         labels: { select: { labelId: true } },
+        /**
+         * Los pasos, **con su id y su estado**.
+         *
+         * Sin esto, «en curso» era todo lo que el asistente sabía de una tarea a
+         * medias: no distinguía una recién empezada de otra a la que le falta un
+         * paso. Y sin los ids no podría proponer marcar ninguno.
+         *
+         * Se ordenan como en la pantalla para que «el siguiente paso» signifique
+         * lo mismo en los dos sitios.
+         */
+        checklists: {
+          select: { id: true, text: true, completed: true },
+          orderBy: { order: 'asc' },
+        },
+        /* Solo cuántos hay, no el texto: los comentarios pueden ser largos y
+           esto viaja en cada turno. El número basta para que note que hay
+           conversación y lo diga. */
+        _count: { select: { comments: true } },
       },
       /**
        * Las abiertas primero y las recientes antes: si algún día se baja el
@@ -383,6 +401,16 @@ export class StatsService {
       cerrada: tarea.completedAt !== null,
       encargados: tarea.assignees.map((a) => a.userId),
       etiquetas: tarea.labels.map((l) => l.labelId),
+      /* Solo si tiene: una tarea sin checklist no debe gastar dos claves vacías
+         en cada turno de cada conversación. */
+      ...(tarea.checklists.length > 0 && {
+        pasos: tarea.checklists.map((paso) => ({
+          id: paso.id,
+          texto: paso.text,
+          hecho: paso.completed,
+        })),
+      }),
+      ...(tarea._count.comments > 0 && { comentarios: tarea._count.comments }),
     }));
   }
 

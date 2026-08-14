@@ -19,3 +19,5 @@ export {
   RemoveMemberDto,
 } from './member.dto';
 export * from './find-projects-by-member.dto';
+export * from './chat.dto';
+export * from './chat-refs';

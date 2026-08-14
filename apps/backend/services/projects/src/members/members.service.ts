@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import {
   AddMemberDto,
   ChangeMemberRoleDto,
@@ -9,7 +7,9 @@ import {
   RemoveMemberDto,
 } from '@praxis/contracts';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
+import { RedisService } from '../redis/redis.service';
 
 const LIST_CACHE_TTL = 60;
 

@@ -1,10 +1,10 @@
 'use client';
 
-import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
-import { useActionState } from 'react';
 import { respondInvitationAction } from '@/app/invitations-actions';
 import { NoticePanel } from '@/components/molecules/NoticePanel';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
+import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
+import { useActionState } from 'react';
 
 export interface MyInvitationsProps {
   invitations: MyInvitation[];

@@ -8,13 +8,13 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ClientProxy } from '@nestjs/microservices';
-import { firstValueFrom } from 'rxjs';
-import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
 import {
   PROJECT_SUSPENDED_CODE,
   ProjectPermission,
   READ_ONLY_PROJECT_PERMISSIONS,
 } from '@praxis/contracts';
+import { firstValueFrom } from 'rxjs';
+import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
 
 /** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
 const esUuid = (valor: string): boolean =>

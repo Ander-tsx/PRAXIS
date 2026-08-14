@@ -10,9 +10,9 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { DONE_COLUMN_COLOR, FindMyTasksQueryDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { DONE_COLUMN_COLOR, FindMyTasksQueryDto } from '@praxis/contracts';
 
 /** Suficiente para cubrir a quien esté en muchos proyectos sin paginar aquí. */
 const MAX_PROJECTS = 100;

@@ -1,9 +1,9 @@
 'use client';
 
-import { Button, Dialog, type ProjectRole, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useState } from 'react';
 import { deleteRoleAction } from '@/app/(private)/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/action-state';
+import { Button, Dialog, type ProjectRole, alpha, colors } from '@praxis/commons';
+import { useActionState, useEffect, useState } from 'react';
 
 export interface DeleteRoleButtonProps {
   projectId: string;

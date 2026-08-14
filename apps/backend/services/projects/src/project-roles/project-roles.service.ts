@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
+import {
+  CheckProjectPermissionDto,
+  CreateProjectRoleDto,
+  READ_ONLY_PROJECT_PERMISSIONS,
+  UpdateProjectRoleDto,
+} from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import {
-  CreateProjectRoleDto,
-  UpdateProjectRoleDto,
-  CheckProjectPermissionDto,
-  READ_ONLY_PROJECT_PERMISSIONS,
-} from '@praxis/contracts';
 import {
   expandPermissions,
   fullPermissionMap,

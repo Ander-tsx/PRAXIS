@@ -1,13 +1,13 @@
 'use client';
 
-import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState, useTransition } from 'react';
 import {
   type ProjectInventory,
   deleteProjectAction,
   projectInventoryAction,
 } from '@/app/(private)/[id]/actions';
 import { DELETE_PROJECT_INITIAL_STATE } from '@/lib/action-state';
+import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
+import { useActionState, useEffect, useId, useState, useTransition } from 'react';
 
 export interface DeleteProjectButtonProps {
   projectId: string;

@@ -1,9 +1,10 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
-  IsInt,
   IsISO8601,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
@@ -11,7 +12,6 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Priority } from './priority.enum';
 
 /**

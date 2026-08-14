@@ -82,7 +82,7 @@ export function reportPath(project: ConSlug): string {
  */
 export interface ProjectParams {
   /** Pestaña activa. La página cae en «espacios» si no reconoce el valor. */
-  tab?: 'espacios' | 'equipo' | 'etiquetas' | 'roles';
+  tab?: 'espacios' | 'chat' | 'equipo' | 'etiquetas' | 'roles';
   /** Espacio de trabajo a abrir. */
   ws?: string;
   /** Tablero donde vive la tarea: sin él se aterriza en el primer espacio. */

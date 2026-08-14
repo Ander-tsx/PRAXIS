@@ -1,4 +1,4 @@
-import { IsUUID, IsString } from 'class-validator';
+import { IsString, IsUUID } from 'class-validator';
 
 export class LogoutDto {
   @IsUUID('4')

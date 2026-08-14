@@ -10,6 +10,15 @@ export interface SelectorDeFechaProps {
   /** `yyyy-mm-dd`, o cadena vacía si no hay fecha. */
   defaultValue?: string;
   disabled?: boolean;
+  /**
+   * Avisa de cada cambio, con el valor ya nuevo.
+   *
+   * El campo sigue sin controlarse desde fuera —el valor lo lleva este
+   * componente—, así que esto es un aviso, no un mando. Lo usa el autoguardado
+   * del detalle de tarea, que necesita saber cuándo enviar y no puede
+   * enterarse por el `<input type="hidden">`: los ocultos no emiten `change`.
+   */
+  onValueChange?: (valor: string) => void;
 }
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -96,6 +105,7 @@ export function SelectorDeFecha({
   label,
   defaultValue = '',
   disabled = false,
+  onValueChange,
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
@@ -134,8 +144,20 @@ export function SelectorDeFecha({
     };
   }, [abierto]);
 
+  /**
+   * Único sitio por el que cambia el valor.
+   *
+   * Las tres formas de cambiarlo —elegir un día, la «×» del campo y «Quitar
+   * fecha»— pasan por aquí para que `onValueChange` no se olvide en ninguna.
+   * Estaban las tres escribiendo el estado por su cuenta.
+   */
+  function aplicar(nuevo: string) {
+    setValor(nuevo);
+    onValueChange?.(nuevo);
+  }
+
   function elegir(dia: Date) {
-    setValor(aValor(dia));
+    aplicar(aValor(dia));
     setMesVisible(new Date(dia.getFullYear(), dia.getMonth(), 1));
     setAbierto(false);
     disparador.current?.focus();
@@ -194,7 +216,7 @@ export function SelectorDeFecha({
               title="Quitar la fecha"
               onClick={(evento) => {
                 evento.stopPropagation();
-                setValor('');
+                aplicar('');
               }}
               className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
             >
@@ -286,7 +308,7 @@ export function SelectorDeFecha({
               <button
                 type="button"
                 onClick={() => {
-                  setValor('');
+                  aplicar('');
                   setAbierto(false);
                   disparador.current?.focus();
                 }}

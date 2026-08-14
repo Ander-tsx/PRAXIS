@@ -49,7 +49,7 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
  * | Que se le declare `proponer_tarea` | `canCreateTask` |
  * | `proponer_asignacion`, `proponer_edicion`, `proponer_checklist` | `canEditTask` |
  * | `proponer_movimiento` | `canMoveTask` |
- * | `proponer_comentario` | `canComment` |
+ * | `proponer_comentario`, `proponer_mensaje` | `canComment` |
  *
  * Solo la primera fila es un guard. Las demás son **datos que viajan** y que
  * recortan lo que el modelo puede sugerir. El guard de verdad sigue estando
@@ -59,6 +59,12 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
  * ⚠️ Y el permiso **no basta para las conversaciones**: son de quien las
  * escribió, así que el `userId` viaja en cada comando y el servicio filtra por
  * él. Ver la nota de `conversaciones`.
+ *
+ * ⚠️ `proponer_mensaje` es la de **más alcance**: un comentario queda en una
+ * tarea, pero un mensaje del chat le suena a todo el equipo. Cuelga del mismo
+ * `canComment` porque es el mismo acto —participar en una conversación sin poder
+ * editar el trabajo de nadie— y el listón extra se pone en el prompt y en la
+ * tarjeta, que enseña el texto entero antes de enviarlo.
  *
  * ⚠️ **Este controlador no escribe nada.** No crea tareas, no asigna y no toca
  * el tablero. Devuelve texto y propuestas.
@@ -123,9 +129,10 @@ export class AssistantController {
   ) {
     const userId = req.user!.userId;
 
-    const [permisos, miembros] = await Promise.all([
+    const [permisos, miembros, chat] = await Promise.all([
       this.permisosEfectivos(userId, projectId),
       this.miembrosConNombre(projectId),
+      this.chatReciente(projectId, userId),
     ]);
 
     return firstValueFrom(
@@ -140,6 +147,7 @@ export class AssistantController {
           conversationId: body.conversationId,
           permisos,
           miembros,
+          chat,
         },
       ),
     );
@@ -268,6 +276,47 @@ export class AssistantController {
    * aquí en vez de fiarse de nada que venga del cliente: quien decide qué
    * herramientas ve el modelo no puede ser el navegador.
    */
+  /**
+   * Lo último que se ha dicho en el chat del equipo.
+   *
+   * ## Leer el chat es contexto, no una herramienta
+   *
+   * Se le da hecho en vez de declararle un `leer_chat` que tuviera que invocar:
+   * una herramienta de lectura gasta un turno entero del modelo para traer algo
+   * que casi siempre hace falta, y encima puede decidir no llamarla justo cuando
+   * era relevante. Es el mismo trato que ya reciben los miembros y los permisos.
+   *
+   * ⚠️ **Solo el chat de ESTE proyecto.** Las conversaciones privadas no entran
+   * aquí ni entrarán: son de dos personas, y meterlas en el contexto de un
+   * asistente de proyecto sería enseñárselas a quien tenga acceso al proyecto.
+   *
+   * Veinte mensajes: suficiente para entender de qué se está hablando sin
+   * comerse la ventana de contexto con una conversación de meses.
+   *
+   * Si falla, se devuelve vacío en vez de tumbar el turno: perder el contexto
+   * del chat empeora la respuesta, perder el turno la borra.
+   */
+  private async chatReciente(
+    projectId: string,
+    userId: string,
+  ): Promise<{ autor: string; texto: string; cuando: string }[]> {
+    try {
+      const pagina = await firstValueFrom(
+        this.projectsClient.send<{
+          items?: { authorId: string; body: string; createdAt: string }[];
+        }>({ cmd: 'chat_project_find_all' }, { projectId, requesterId: userId, limit: 20 }),
+      );
+
+      return (pagina?.items ?? []).map((mensaje) => ({
+        autor: mensaje.authorId,
+        texto: mensaje.body,
+        cuando: mensaje.createdAt,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   private async permisosEfectivos(
     userId: string,
     projectId: string,

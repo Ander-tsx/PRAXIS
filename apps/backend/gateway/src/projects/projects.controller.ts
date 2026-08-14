@@ -22,9 +22,9 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { TaskPurgeService } from './task-purge.service';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
+import { TaskPurgeService } from './task-purge.service';
 
 @ApiTags('Projects')
 @ApiBearerAuth()

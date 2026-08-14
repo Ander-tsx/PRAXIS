@@ -3,10 +3,10 @@ import { ConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
 
 import { ObservabilityModule } from '@praxis/observability';
-import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
 import { AdminActivityModule } from './admin-activity/admin-activity.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [

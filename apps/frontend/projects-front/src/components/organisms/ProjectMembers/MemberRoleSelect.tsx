@@ -1,9 +1,9 @@
 'use client';
 
-import { type ProjectRole, Select } from '@praxis/commons';
-import { useActionState, useRef, useState } from 'react';
 import { changeMemberRoleAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
+import { type ProjectRole, Select } from '@praxis/commons';
+import { useActionState, useRef, useState } from 'react';
 
 /**
  * El rol de un miembro, editable en su propia fila.
@@ -48,28 +48,47 @@ export function MemberRoleSelect({
   const [rolId, setRolId] = useState(currentRoleId);
 
   return (
-    <form ref={formRef} action={action} className="flex items-center gap-2">
+    <form
+      ref={formRef}
+      action={action}
+      /* En móvil ocupa el ancho que le den —comparte fila con «Quitar»—; a
+         partir de `sm` se encoge a lo que mida el desplegable. */
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-none"
+    >
       <input type="hidden" name="projectId" value={projectId} />
       <input type="hidden" name="userId" value={userId} />
 
-      <Select
-        name="projectRoleId"
-        value={rolId}
-        disabled={pending}
-        onValueChange={(valor) => {
-          setRolId(valor);
-          /* En el microtask siguiente: el input oculto del Select tiene que
-             haber recibido el valor nuevo antes de que se envíe el formulario. */
-          queueMicrotask(() => formRef.current?.requestSubmit());
-        }}
-        options={roles.map((rol) => ({ value: rol.id, label: rol.name }))}
-        className="h-8 min-w-36 text-xs"
-      />
+      {/**
+       * El ancho lo pone este envoltorio, no el `className` del Select: aquel
+       * viaja al botón de dentro, que ya es `w-full`, así que fijarlo ahí no
+       * cambiaba la caja que lo contiene.
+       *
+       * ⚠️ Antes era `min-w-36` a secas —144 px en cualquier pantalla— y en
+       * móvil no cabía: la fila reparte el sitio y el nombre y el correo, que
+       * son los que pueden encogerse, se quedaban en nada.
+       */}
+      <div className="min-w-0 flex-1 sm:w-36 sm:flex-none">
+        <Select
+          name="projectRoleId"
+          value={rolId}
+          disabled={pending}
+          onValueChange={(valor) => {
+            setRolId(valor);
+            /* En el microtask siguiente: el input oculto del Select tiene que
+               haber recibido el valor nuevo antes de que se envíe el formulario. */
+            queueMicrotask(() => formRef.current?.requestSubmit());
+          }}
+          options={roles.map((rol) => ({ value: rol.id, label: rol.name }))}
+          fullWidth
+          className="h-8 text-xs"
+        />
+      </div>
 
       {/* El error va aquí y no en un aviso global: quien lo lee necesita saber
-          de qué fila habla, y la fila es donde está mirando. */}
+          de qué fila habla, y la fila es donde está mirando. En móvil baja a su
+          propia línea en vez de robarle sitio al desplegable. */}
       {state.error && (
-        <span className="font-sans text-xs text-error" role="alert">
+        <span className="w-full font-sans text-xs text-error sm:w-auto" role="alert">
           {state.error}
         </span>
       )}

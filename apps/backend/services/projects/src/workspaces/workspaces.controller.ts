@@ -2,9 +2,9 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   CreateWorkspaceDto,
-  UpdateWorkspaceDto,
   DeleteWorkspaceDto,
   FindOneWorkspaceDto,
+  UpdateWorkspaceDto,
 } from '@praxis/contracts';
 import { WorkspacesService } from './workspaces.service';
 

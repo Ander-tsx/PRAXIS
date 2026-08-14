@@ -1,14 +1,14 @@
+import { AutoRefresh } from '@/components/molecules/AutoRefresh';
+import { NotificationList } from '@/components/organisms/NotificationList';
 import {
   AppHeader,
   type NotificationPage,
-  Pagination,
   type Paginated,
+  Pagination,
   type UserProfile,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
-import { AutoRefresh } from '@/components/molecules/AutoRefresh';
-import { NotificationList } from '@/components/organisms/NotificationList';
 
 export const metadata: Metadata = {
   title: 'Notificaciones',

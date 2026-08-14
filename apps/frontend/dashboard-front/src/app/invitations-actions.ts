@@ -1,9 +1,9 @@
 'use server';
 
+import type { InvitationResponseState } from '@/lib/action-state';
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
-import type { InvitationResponseState } from '@/lib/action-state';
 
 /**
  * Responder a una invitación.

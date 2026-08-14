@@ -121,7 +121,10 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
   return reenviar(request, context);
 }
 
-export async function POST(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ path?: string[] }> },
+) {
   return reenviar(request, context);
 }
 

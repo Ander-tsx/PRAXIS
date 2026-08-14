@@ -91,6 +91,26 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
        Ya lo hay: reports-service en el 3005 y la zona en el 4104. */
   },
   {
+    /**
+     * Las conversaciones privadas.
+     *
+     * Va antes de Notificaciones porque es un sitio donde se **trabaja**, no un
+     * registro que se consulta. Las dos últimas entradas —Notificaciones y
+     * Configuración— son de mirar; esta es de usar, como Proyectos y Análisis.
+     */
+    label: 'Chat',
+    href: '/dashboard/chat',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Notificaciones',
     href: '/dashboard/notifications',
     icon: (

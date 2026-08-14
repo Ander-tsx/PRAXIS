@@ -1,9 +1,9 @@
 'use client';
 
-import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
-import { useActionState } from 'react';
 import { respondInvitationAction } from '@/app/(private)/[id]/invitation-actions';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
+import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
+import { useActionState } from 'react';
 
 export interface PendingInvitationGateProps {
   invitation: MyInvitation;

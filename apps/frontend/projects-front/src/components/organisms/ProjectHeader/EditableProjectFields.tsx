@@ -1,10 +1,10 @@
 'use client';
 
-import { alpha, colors } from '@praxis/commons';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { saveProjectFieldAction, settleProjectAction } from '@/app/(private)/[id]/actions';
 import type { ProjectFieldState } from '@/lib/action-state';
 import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX, validateProject } from '@/lib/validation';
+import { alpha, colors } from '@praxis/commons';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 export interface EditableProjectFieldsProps {
   projectId: string;

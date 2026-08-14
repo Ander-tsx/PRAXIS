@@ -14,11 +14,11 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CreateCommentBodyDto, ProjectPermission, UpdateCommentBodyDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
-import { CreateCommentBodyDto, ProjectPermission, UpdateCommentBodyDto } from '@praxis/contracts';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
 /**
  * Comentarios de una tarea.

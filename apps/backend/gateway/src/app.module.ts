@@ -6,17 +6,18 @@ import { ObservabilityModule } from '@praxis/observability';
 import { envValidationSchema } from './common/config/env.validation';
 
 import { AdminModule } from './admin/admin.module';
-import { AssistantModule } from './assistant/assistant.module';
-import { AuthModule } from './auth/auth.module';
-import { UserModule } from './users/user.module';
-import { PermissionsModule } from './permissions/permissions.module';
-import { ProjectsModule } from './projects/projects.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { ReportsModule } from './reports/reports.module';
-import { TasksModule } from './tasks/tasks.module';
 import { AlexaModule } from './alexa/alexa.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AssistantModule } from './assistant/assistant.module';
+import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PermissionsModule } from './permissions/permissions.module';
+import { ProjectsModule } from './projects/projects.module';
+import { ReportsModule } from './reports/reports.module';
+import { TasksModule } from './tasks/tasks.module';
+import { UserModule } from './users/user.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { AppService } from './app.service';
     AssistantModule,
     AlexaModule,
     AdminModule,
+    BillingModule,
   ],
   /* El health check. ⚠️ Estaba escrito y **sin declarar aquí**, así que la ruta
      salía en el inventario al escanear decoradores y respondía 404. Ver la nota

@@ -1,13 +1,13 @@
 'use client';
 
-import { Input, ProgressBar, type Task, alpha, checklistProgress, colors } from '@praxis/commons';
-import { useActionState, useEffect, useRef } from 'react';
 import {
   addChecklistItemAction,
   deleteChecklistItemAction,
   toggleChecklistItemAction,
 } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { Input, ProgressBar, type Task, alpha, checklistProgress, colors } from '@praxis/commons';
+import { useActionState, useEffect, useRef } from 'react';
 
 export interface TaskChecklistProps {
   projectId: string;

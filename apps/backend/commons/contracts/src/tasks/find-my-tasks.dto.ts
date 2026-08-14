@@ -3,8 +3,8 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
-  IsInt,
   IsISO8601,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,

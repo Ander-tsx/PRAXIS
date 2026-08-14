@@ -1,5 +1,7 @@
 'use client';
 
+import { inviteMemberAction } from '@/app/(private)/[id]/actions';
+import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 import {
   Button,
   Dialog,
@@ -14,8 +16,6 @@ import {
 } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons/api';
 import { useActionState, useEffect, useId, useState } from 'react';
-import { inviteMemberAction } from '@/app/(private)/[id]/actions';
-import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 
 export interface InviteMemberDialogProps {
   projectId: string;

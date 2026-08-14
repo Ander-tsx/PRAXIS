@@ -2,20 +2,23 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
-import { ProjectsController } from './projects.controller';
-import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 import { BoardsController, BoardsResourceController } from './boards.controller';
+import { ColumnStatusSyncService } from './column-status-sync.service';
 import { ColumnsController } from './columns.controller';
-import { MembersController } from './members.controller';
-import { ProjectRolesController } from './project-roles.controller';
-import { ProjectPermissionsController } from './project-permissions.controller';
+import { DirectChatController } from './direct-chat.controller';
 import {
   MyInvitationsController,
   ProjectInvitationsController,
   ProjectMembershipController,
 } from './invitations.controller';
-import { ColumnStatusSyncService } from './column-status-sync.service';
+import { MembersController } from './members.controller';
+import { MentionablesService } from './mentionables.service';
+import { ProjectChatController } from './project-chat.controller';
+import { ProjectPermissionsController } from './project-permissions.controller';
+import { ProjectRolesController } from './project-roles.controller';
+import { ProjectsController } from './projects.controller';
 import { TaskPurgeService } from './task-purge.service';
+import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
 @Module({
   imports: [
@@ -75,7 +78,9 @@ import { TaskPurgeService } from './task-purge.service';
     ProjectInvitationsController,
     MyInvitationsController,
     ProjectMembershipController,
+    ProjectChatController,
+    DirectChatController,
   ],
-  providers: [ColumnStatusSyncService, TaskPurgeService],
+  providers: [ColumnStatusSyncService, TaskPurgeService, MentionablesService],
 })
 export class ProjectsModule {}

@@ -18,7 +18,7 @@ import {
   colors,
   personLabel,
 } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState } from 'react';
+import { type FocusEvent, useActionState, useEffect, useRef, useState } from 'react';
 import { SelectorDeFecha } from '../../molecules/SelectorDeFecha/SelectorDeFecha';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
@@ -62,6 +62,27 @@ export interface TaskDialogProps {
  * remonta con `key` al cambiar de tarea. Controlarlos obligaba a sincronizar
  * siete estados con la tarea entrante en un `useEffect`, y la primera versión
  * ya perdía cambios al reabrir.
+ *
+ * ## Se guarda solo
+ *
+ * **No hay botón de «Guardar».** Lo había, y convivía con un checklist, unos
+ * archivos y unos comentarios que se guardaban al instante: en la misma ventana,
+ * marcar un paso quedaba hecho y cambiar la prioridad no, sin nada que
+ * distinguiera unos campos de otros. Es el mismo razonamiento que ya seguía el
+ * desplegable de rol en el equipo (`MemberRoleSelect`).
+ *
+ * El reparto no es uniforme, y a propósito:
+ *
+ * - **Al cambiar** los campos de opciones cerradas —prioridad, fecha, etiquetas,
+ *   encargados—. Elegir ya es haber terminado de decidir.
+ * - **Al salir del campo** el título y la descripción. Guardar en cada tecla
+ *   sería una petición por pulsación, y con varias en vuelo la última en salir
+ *   no es la última en llegar.
+ *
+ * Se envía el formulario entero cada vez, no el campo suelto: `updateTaskAction`
+ * ya manda la tarea completa —los encargados y las etiquetas *tienen* que ir
+ * enteros o se borrarían los que no viajen—, así que reutilizarlo evita
+ * inventar un segundo camino de escritura que se desincronizaría con el primero.
  */
 export function TaskDialog({
   open,
@@ -86,24 +107,124 @@ export function TaskDialog({
     TASK_INITIAL_STATE,
   );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const formId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  const readOnly = !canEdit;
 
-  /** Cuando el servidor confirma, se cierra. No antes: si falla, sigue abierto. */
+  /**
+   * Solo el borrado cierra la ventana.
+   *
+   * ⚠️ Antes cerraba también con `state.done`, que era correcto cuando `done`
+   * solo podía venir de pulsar «Guardar». Con el autoguardado ese mismo `done`
+   * llega al cambiar la prioridad, y dejarlo así cerraba el detalle en la cara
+   * de quien acababa de tocar un campo.
+   */
   useEffect(() => {
-    if (state.done || deleteState.done) onClose();
-  }, [state.done, deleteState.done, onClose]);
+    if (deleteState.done) onClose();
+  }, [deleteState.done, onClose]);
 
   /** Reabrir tras un borrado cancelado no debe recordar la confirmación. */
   useEffect(() => {
     if (!open) setConfirmingDelete(false);
   }, [open]);
 
-  const readOnly = !canEdit;
+  /**
+   * Hay otro cambio esperando a que termine el que está en vuelo.
+   *
+   * Sin esto, cambiar prioridad y fecha seguidas lanza dos escrituras a la vez
+   * y **la última en salir no tiene por qué ser la última en llegar**: el
+   * servidor podría acabar guardando la primera. Se envía de una en una, y lo
+   * que llegue mientras tanto espera turno — como se manda el formulario
+   * entero, un solo envío al final recoge todos los cambios acumulados.
+   */
+  const queued = useRef(false);
+
+  /**
+   * Hay una escritura lanzada.
+   *
+   * ⚠️ Es una `ref` y no el `pending` de `useActionState` **a propósito**. Ese
+   * llega en el render siguiente, y dos cambios dentro del mismo —tocar
+   * prioridad y fecha casi a la vez— lo verían todavía en `false` y lanzarían
+   * los dos, que es justo lo que esto evita. La `ref` se marca en el acto.
+   */
+  const inFlight = useRef(false);
+
+  function save() {
+    if (readOnly) return;
+    if (inFlight.current) {
+      queued.current = true;
+      return;
+    }
+    inFlight.current = true;
+    formRef.current?.requestSubmit();
+  }
+
+  /* Terminó la que estaba en vuelo: si mientras tanto llegó otra, sale ahora.
+     Reenvía a mano en vez de llamar a `save()` para no depender de una
+     función que se recrea en cada render. */
+  useEffect(() => {
+    if (pending || !inFlight.current) return;
+    inFlight.current = false;
+    if (!queued.current) return;
+    queued.current = false;
+    inFlight.current = true;
+    formRef.current?.requestSubmit();
+  }, [pending]);
+
+  /**
+   * Guarda tras dejar que React pinte el cambio.
+   *
+   * Los desplegables y el calendario no son campos nativos: escriben su valor
+   * en un `<input type="hidden">` a través del estado de React. Enviar en el
+   * mismo tick mandaría el valor **anterior**. Es el mismo `queueMicrotask` que
+   * usa `MemberRoleSelect`.
+   */
+  function saveAfterPaint() {
+    queueMicrotask(save);
+  }
+
+  /**
+   * Lo que el título y la descripción tenían al recibir el foco.
+   *
+   * Comparar contra esto al salir evita guardar por el mero hecho de haber
+   * pasado por un campo, y no necesita saber si la escritura anterior salió
+   * bien: cada ciclo de entrar y salir con un cambio real vuelve a intentarlo.
+   */
+  const valueOnFocus = useRef('');
+
+  function rememberOnFocus(evento: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    valueOnFocus.current = evento.currentTarget.value;
+  }
+
+  function saveIfChanged(evento: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    if (evento.currentTarget.value !== valueOnFocus.current) save();
+  }
+
+  /** ¿Hay texto escrito que todavía no ha viajado? */
+  function hasUnsavedText(): boolean {
+    if (readOnly || !formRef.current) return false;
+    const datos = new FormData(formRef.current);
+    return (
+      String(datos.get('title') ?? '') !== task.title ||
+      String(datos.get('description') ?? '') !== (task.description ?? '')
+    );
+  }
+
+  /**
+   * Cerrar no descarta nada, pero sí tiene que recoger lo último.
+   *
+   * Pulsar «Cerrar» saca el foco del campo y dispara su `onBlur`, así que por
+   * ahí ya estaría; **con `Escape` no**, y esa es la vía por la que se pierde
+   * una descripción recién escrita. La comprobación cubre las dos.
+   */
+  function close() {
+    if (hasUnsavedText()) save();
+    onClose();
+  }
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
       size="lg"
       title={task.title}
       description={
@@ -153,20 +274,28 @@ export function TaskDialog({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              {readOnly ? 'Cerrar' : 'Cancelar'}
-            </Button>
+          <div className="flex items-center gap-3">
+            {/**
+             * El acuse de recibo, en el hueco que dejó «Guardar».
+             *
+             * Sin él, tocar la prioridad no produce ninguna reacción visible y
+             * el autoguardado se siente como que no ha pasado nada. El botón
+             * hacía ese trabajo con su «Guardando…» sin que se notara.
+             */}
             {canEdit && (
-              <Button type="submit" form={formId} disabled={pending}>
-                {pending ? 'Guardando…' : 'Guardar'}
-              </Button>
+              <SaveStatus saving={pending} failure={state.error} saved={state.done !== null} />
             )}
+
+            {/* «Cerrar», nunca «Cancelar»: no queda nada que cancelar, y
+                ofrecerlo prometería deshacer unos cambios que ya están hechos. */}
+            <Button type="button" variant="secondary" onClick={close}>
+              Cerrar
+            </Button>
           </div>
         </div>
       }
     >
-      <form id={formId} action={formAction} className="flex flex-col gap-4" noValidate>
+      <form ref={formRef} action={formAction} className="flex flex-col gap-4" noValidate>
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="boardId" value={boardId} />
         <input type="hidden" name="columnId" value={columnId} />
@@ -182,6 +311,8 @@ export function TaskDialog({
           maxLength={255}
           disabled={readOnly}
           required
+          onFocus={rememberOnFocus}
+          onBlur={saveIfChanged}
         />
 
         <Textarea
@@ -191,6 +322,8 @@ export function TaskDialog({
           placeholder="Contexto, criterios de aceptación, enlaces…"
           rows={4}
           disabled={readOnly}
+          onFocus={rememberOnFocus}
+          onBlur={saveIfChanged}
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -206,6 +339,7 @@ export function TaskDialog({
               label: PRIORITY_LABELS[priority],
               color: PRIORITY_COLORS[priority],
             }))}
+            onValueChange={saveAfterPaint}
           />
 
           {/* Calendario propio en vez de `<input type="date">`: el nativo lo
@@ -217,6 +351,7 @@ export function TaskDialog({
             label="Fecha límite (opcional)"
             defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
+            onValueChange={saveAfterPaint}
           />
         </div>
 
@@ -233,6 +368,7 @@ export function TaskDialog({
                   key={label.id}
                   label={label}
                   defaultChecked={task.labels.some((l) => l.labelId === label.id)}
+                  onToggle={save}
                 />
               ))}
             </div>
@@ -252,6 +388,7 @@ export function TaskDialog({
                   key={member.id}
                   member={member}
                   defaultChecked={task.assignees.some((a) => a.userId === member.id)}
+                  onToggle={save}
                 />
               ))}
             </div>
@@ -299,6 +436,66 @@ export function TaskDialog({
 }
 
 /**
+ * Qué ha pasado con lo último que se tocó.
+ *
+ * Tres estados y ninguno más: se está guardando, no se pudo, o está guardado.
+ * El **detalle** del fallo no vive aquí sino junto al formulario, donde ya se
+ * pintaba; repetirlo en el pie diría dos veces lo mismo y con menos sitio.
+ *
+ * Callado hasta el primer cambio: anunciar «Guardado» nada más abrir una tarea
+ * que nadie ha tocado es ruido, y encima resta credibilidad al aviso cuando de
+ * verdad significa algo.
+ */
+function SaveStatus({
+  saving,
+  failure,
+  saved,
+}: {
+  saving: boolean;
+  failure: string | null;
+  /** El servidor ha confirmado al menos una vez en esta tarea. */
+  saved: boolean;
+}) {
+  if (saving) {
+    return (
+      <span className="font-sans text-xs text-text-secondary" aria-live="polite">
+        Guardando…
+      </span>
+    );
+  }
+
+  if (failure) {
+    return (
+      <span className="font-sans text-xs" style={{ color: colors.error }} aria-live="polite">
+        Sin save
+      </span>
+    );
+  }
+
+  if (!saved) return null;
+
+  return (
+    <span
+      className="flex items-center gap-1 font-sans text-xs text-text-secondary"
+      aria-live="polite"
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        style={{ color: colors.success }}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={3}
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+      </svg>
+      Guardado
+    </span>
+  );
+}
+
+/**
  * Una persona a la que asignar la tarea.
  *
  * Usaba el átomo `Checkbox` de commons, que es una caja con borde y `p-3`
@@ -319,9 +516,12 @@ export function TaskDialog({
 function AssigneeToggle({
   member,
   defaultChecked,
+  onToggle,
 }: {
   member: UserProfile;
   defaultChecked: boolean;
+  /** Marcar o desmarcar guarda: aquí no hay botón que confirme. */
+  onToggle: () => void;
 }) {
   return (
     <label className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated has-[:disabled]:cursor-not-allowed">
@@ -330,6 +530,7 @@ function AssigneeToggle({
         name="assigneeIds"
         value={member.id}
         defaultChecked={defaultChecked}
+        onChange={onToggle}
         className="peer sr-only"
       />
 
@@ -373,7 +574,16 @@ function AssigneeToggle({
  * etiqueta. Dos señales para el mismo estado, que es lo que hace que se lea sin
  * fijarse.
  */
-function LabelToggle({ label, defaultChecked }: { label: LabelType; defaultChecked: boolean }) {
+function LabelToggle({
+  label,
+  defaultChecked,
+  onToggle,
+}: {
+  label: LabelType;
+  defaultChecked: boolean;
+  /** Ídem que en los encargados: marcar ya es haber decidido. */
+  onToggle: () => void;
+}) {
   const tone = colors[label.color];
 
   return (
@@ -386,6 +596,7 @@ function LabelToggle({ label, defaultChecked }: { label: LabelType; defaultCheck
         name="labelIds"
         value={label.id}
         defaultChecked={defaultChecked}
+        onChange={onToggle}
         className="peer sr-only"
       />
 

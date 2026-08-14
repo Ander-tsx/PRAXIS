@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
+import { CreateBoardDto, UpdateBoardDto } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { CreateBoardDto, UpdateBoardDto } from '@praxis/contracts';
 
 const LIST_CACHE_TTL = 60;
 

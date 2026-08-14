@@ -1,3 +1,12 @@
+import { createProjectAction } from '@/app/actions';
+import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
+import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
+import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
+import { MyInvitations } from '@/components/organisms/MyInvitations';
+import { ProjectList } from '@/components/organisms/ProjectList';
+import { TaskAlerts } from '@/components/organisms/TaskAlerts';
+import { VoiceCallout } from '@/components/organisms/VoiceCallout';
+import { type VoiceLink, estaActiva } from '@/lib/voice';
 import {
   AppHeader,
   CreateProjectDialog,
@@ -9,17 +18,8 @@ import {
   displayName,
   dueState,
 } from '@praxis/commons';
-import type { Metadata } from 'next';
-import { createProjectAction } from '@/app/actions';
-import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
-import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
-import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
-import { MyInvitations } from '@/components/organisms/MyInvitations';
-import { ProjectList } from '@/components/organisms/ProjectList';
-import { TaskAlerts } from '@/components/organisms/TaskAlerts';
-import { VoiceCallout } from '@/components/organisms/VoiceCallout';
-import { estaActiva, type VoiceLink } from '@/lib/voice';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Panel',

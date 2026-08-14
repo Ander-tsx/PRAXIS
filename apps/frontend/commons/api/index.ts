@@ -4,3 +4,4 @@ export * from './auth';
 export * from './client';
 export * from './timeout';
 export * from './routes';
+export * from './chat-refs';

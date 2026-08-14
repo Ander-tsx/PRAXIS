@@ -1,13 +1,13 @@
 'use client';
 
-import { type TaskComment, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
 import {
   addCommentAction,
   deleteCommentAction,
   editCommentAction,
 } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import { type TaskComment, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { SECTION_PANEL } from './section-panel';
 
 /**

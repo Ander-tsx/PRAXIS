@@ -1,8 +1,34 @@
 'use server';
 
+import type {
+  BoardState,
+  ColumnState,
+  DeleteProjectState,
+  MemberState,
+  ProjectFieldState,
+  RoleState,
+  TaskState,
+  WorkspaceState,
+} from '@/lib/action-state';
+import {
+  normalizeMultiline,
+  validateAttachment,
+  validateBoard,
+  validateChatMessage,
+  validateChecklistItem,
+  validateColumn,
+  validateColumnColor,
+  validateComment,
+  validateLabel,
+  validateProject,
+  validateRole,
+  validateTask,
+  validateWorkspace,
+} from '@/lib/validation';
 import {
   ApiError,
   type Board,
+  type ChatMessage,
   type ChecklistItem,
   type Column,
   type Label,
@@ -19,30 +45,6 @@ import {
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type {
-  BoardState,
-  ColumnState,
-  DeleteProjectState,
-  MemberState,
-  ProjectFieldState,
-  RoleState,
-  TaskState,
-  WorkspaceState,
-} from '@/lib/action-state';
-import {
-  validateBoard,
-  validateChecklistItem,
-  validateColumn,
-  validateColumnColor,
-  normalizeMultiline,
-  validateAttachment,
-  validateComment,
-  validateLabel,
-  validateProject,
-  validateRole,
-  validateTask,
-  validateWorkspace,
-} from '@/lib/validation';
 
 /**
  * Acciones del detalle de proyecto.
@@ -1192,6 +1194,131 @@ export async function deleteAttachmentAction(
 
   revalidateProject(projectId);
   return { error: null, done: 'deleted' };
+}
+
+/* ─── Chat del proyecto ─────────────────────────────────────────────── */
+
+/**
+ * ## Funciones normales, no `useActionState`
+ *
+ * El redactor **controla su propio texto** —insertar una mención obliga a
+ * reescribirlo y a recolocar el cursor—, así que no hay `FormData` que mandar:
+ * el cuerpo ya viene montado. Server Actions llamadas como funciones desde un
+ * componente de cliente es una forma tan válida como el formulario, y aquí es la
+ * que encaja.
+ */
+
+/**
+ * Escribe en el chat del proyecto.
+ *
+ * Exige `canComment`, el mismo permiso que comentar en una tarea. No hay un
+ * `canChat` a propósito: los permisos de un rol son un diccionario, así que una
+ * clave nueva nace en `false` para todos los roles que ya existen y el chat
+ * saldría mudo hasta editarlos uno a uno en cada proyecto.
+ */
+export async function sendChatMessageAction(
+  projectId: string,
+  cuerpo: string,
+  replyToId: string | null,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  const body = normalizeMultiline(cuerpo);
+  const invalid = validateChatMessage(body);
+  if (invalid) return { error: invalid };
+
+  try {
+    /* Se confirma contra el `data` de la respuesta y no contra el status: un
+       200 sin cuerpo ya nos ha mentido antes. */
+    const created = await api.post<ChatMessage>(`/projects/${projectId}/chat/messages`, {
+      body,
+      ...(replyToId && { replyToId }),
+    });
+    if (!created?.id) return { error: 'El servidor no guardó el mensaje.' };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo enviar el mensaje.') };
+  }
+
+  revalidateProject(projectId);
+  return { error: null };
+}
+
+/** Lo borra su autor, o quien gestione el equipo. El gateway lo resuelve. */
+export async function deleteChatMessageAction(
+  projectId: string,
+  messageId: string,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await api.delete(`/projects/${projectId}/chat/messages/${messageId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el mensaje.') };
+  }
+
+  revalidateProject(projectId);
+  return { error: null };
+}
+
+/**
+ * Pone o quita una reacción.
+ *
+ * ⚠️ **No revalida.** Reaccionar repintaría el proyecto entero por un emoji, y
+ * con varias personas reaccionando seguido eso es un parpadeo constante. El
+ * panel se queda con lo que devuelve el servidor para ese mensaje.
+ */
+export async function reactChatAction(
+  projectId: string,
+  messageId: string,
+  emoji: string,
+  on: boolean,
+): Promise<void> {
+  const api = await requireApi();
+  if (!api) return;
+
+  await api
+    .post(`/projects/${projectId}/chat/messages/${messageId}/react`, { emoji, on })
+    .catch(() => undefined);
+}
+
+/**
+ * Deja el chat por leído.
+ *
+ * ⚠️ **No revalida.** La llama el propio chat al abrirse, y revalidar desde ahí
+ * volvería a renderizar la página que acaba de pintarse —y con ella el chat, que
+ * volvería a llamar—: un bucle. El contador se pone al día en la siguiente
+ * navegación o con el refresco que ya dispara cualquier aviso en vivo.
+ */
+export async function markChatReadAction(projectId: string): Promise<void> {
+  const api = await requireApi();
+  if (!api) return;
+
+  await api.post(`/projects/${projectId}/chat/read`, {}).catch(() => undefined);
+}
+
+/**
+ * Silencia el chat del proyecto, o le devuelve el sonido.
+ *
+ * ⚠️ **Silenciar no deja de contar lo no leído.** Lo que se apaga es la tarjeta
+ * emergente y el sonido; la insignia de la pestaña sigue. Son dos cosas
+ * distintas y confundirlas dejaría a alguien sin enterarse nunca de un chat que
+ * sí quiere leer, solo porque le molestaba el ruido.
+ */
+export async function muteChatAction(
+  projectId: string,
+  muted: boolean,
+): Promise<{ muted: boolean } | null> {
+  const api = await requireApi();
+  if (!api) return null;
+
+  const confirmado = await api
+    .post<{ muted: boolean }>(`/projects/${projectId}/chat/mute`, { muted })
+    .catch(() => null);
+
+  if (confirmado) revalidateProject(projectId);
+  return confirmado;
 }
 
 /* ─── Utilidades ────────────────────────────────────────────────────── */

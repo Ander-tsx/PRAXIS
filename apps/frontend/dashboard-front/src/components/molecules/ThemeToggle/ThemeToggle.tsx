@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
 import { setThemeAction } from '@/app/(private)/settings/actions';
+import { useState, useTransition } from 'react';
 
 /**
  * Copia local de `ThemeName` (`@praxis/commons/theme`).

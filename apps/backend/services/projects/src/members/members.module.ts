@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { MembersController } from './members.controller';
-import { MembersService } from './members.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectRolesModule } from '../project-roles/project-roles.module';
+import { MembersController } from './members.controller';
+import { MembersService } from './members.service';
 
 @Module({
   imports: [NotificationsModule, ProjectRolesModule],

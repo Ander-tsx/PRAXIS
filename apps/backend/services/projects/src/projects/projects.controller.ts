@@ -3,13 +3,13 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
   CreateProjectDto,
+  DeleteProjectDto,
+  FindOneProjectDto,
   FindProjectsByMemberDto,
   FindProjectsDto,
-  FindOneProjectDto,
   type ProjectStatus,
   SetProjectStatusDto,
   UpdateProjectDto,
-  DeleteProjectDto,
 } from '@praxis/contracts';
 
 import { ProjectsService } from './projects.service';

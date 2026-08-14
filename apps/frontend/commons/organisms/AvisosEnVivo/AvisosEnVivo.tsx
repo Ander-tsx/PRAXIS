@@ -2,14 +2,43 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { NotificationType } from '../../api/domain';
+import { CHAT_EVENT_TYPE, type NotificationType } from '../../api/domain';
+import { projectHref } from '../../api/routes';
 import { alpha, colors } from '../../tokens';
 
-/** Lo que publica el gateway por el flujo. Espejo de `AvisoEnVivo` allí. */
+/**
+ * Lo que publica el gateway por el flujo. Espejo de `AvisoEnVivo` allí.
+ *
+ * ⚠️ `type` es **texto libre**, no `NotificationType`. Por este flujo viaja
+ * todo lo que hay que anunciar en el momento, y no todo deja fila en la
+ * bandeja: los mensajes de chat llegan como `CHAT_MESSAGE` y no existen en el
+ * enum de `notifications`. Tiparlo como el enum haría creer al resto del
+ * archivo que la lista está cerrada, que es justo lo que no está.
+ */
 interface AvisoRecibido {
-  type: NotificationType;
+  type: NotificationType | typeof CHAT_EVENT_TYPE | (string & {});
+  /** Quién lo provocó. En un mensaje privado es con quien hay que hablar. */
+  actorId?: string | null;
+  /**
+   * Solo en los avisos de chat: de qué tipo de conversación viene.
+   *
+   * Es lo que decide a dónde lleva la tarjeta — al chat del proyecto o a la
+   * conversación privada—, y no se puede deducir del resto: un mensaje privado
+   * llega sin proyecto, así que sin esto sería indistinguible de un aviso al
+   * que simplemente le falta el dato.
+   */
+  channelKind?: 'PROJECT' | 'DIRECT' | null;
   projectId: string | null;
   projectName: string | null;
+  /**
+   * Solo lo llevan los avisos de chat.
+   *
+   * Los demás se construyen desde una fila de `notifications`, que guarda el
+   * nombre del proyecto como copia del momento pero no su slug. Cuando falta se
+   * cae al `projectId`: el guard acepta las dos formas, así que el enlace
+   * funciona igual — solo sale una URL más fea.
+   */
+  projectSlug?: string | null;
   taskId: string | null;
   taskTitle: string | null;
   createdAt: string;
@@ -19,6 +48,8 @@ interface AvisoEnPantalla {
   id: number;
   texto: string;
   tono: string;
+  /** A dónde lleva al pulsarla. `null` si el aviso no tiene destino. */
+  destino: string | null;
 }
 
 /** Cuánto se queda un aviso en pantalla antes de irse solo. */
@@ -136,7 +167,7 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
       setAvisos((actuales) =>
         [
           ...actuales,
-          { id, texto: describir(aviso), tono: TONO_POR_TIPO[aviso.type] ?? colors.primary },
+          { id, texto: describir(aviso), tono: tonoDe(aviso.type), destino: destinoDe(aviso) },
         ].slice(-MAXIMO_APILADO),
       );
 
@@ -172,21 +203,7 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
       className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
     >
       {avisos.map((aviso) => (
-        <article
-          key={aviso.id}
-          className="animate-entrar-desde-la-derecha pointer-events-auto flex items-start gap-3 rounded-xl border border-border p-3"
-          style={{
-            background: colors.surfaceElevated,
-            boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}`,
-          }}
-        >
-          <span
-            className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-            style={{ background: aviso.tono }}
-            aria-hidden="true"
-          />
-          <p className="font-sans text-sm leading-snug text-text-primary">{aviso.texto}</p>
-        </article>
+        <Tarjeta key={aviso.id} aviso={aviso} />
       ))}
     </div>
   );
@@ -203,6 +220,15 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
 function describir(aviso: AvisoRecibido): string {
   const proyecto = aviso.projectName ?? 'un proyecto';
   const tarea = aviso.taskTitle ?? 'una tarea';
+
+  /**
+   * ⚠️ **Sin el texto del mensaje, a propósito.** El aviso no lo trae y no debe:
+   * reproducir lo escrito lo enseñaría en la pantalla de quien tenga el portátil
+   * abierto en una reunión. Para leerlo está el chat, que comprueba permisos.
+   */
+  if (aviso.type === CHAT_EVENT_TYPE) {
+    return `Mensaje nuevo en el chat de «${proyecto}».`;
+  }
 
   switch (aviso.type) {
     case 'INVITATION_RECEIVED':
@@ -222,6 +248,109 @@ function describir(aviso: AvisoRecibido): string {
     default:
       return 'Tienes un aviso nuevo.';
   }
+}
+
+/**
+ * Una tarjeta.
+ *
+ * Con destino es un **enlace de verdad**, no un `onClick` sobre un `div`: así se
+ * puede abrir en otra pestaña, se ve a dónde va en la barra de estado y el
+ * teclado lo alcanza sin añadirle `role` ni `tabIndex` a mano.
+ *
+ * ⚠️ Y es `<a>` y no `next/link`: la tarjeta aparece en cualquier zona y el
+ * destino vive en otra —el aviso te llega estando en el panel y lleva a
+ * `projects`—, así que la navegación tiene que ser dura. Misma regla que la
+ * barra lateral (ESTADO-ACTUAL §16).
+ */
+function Tarjeta({ aviso }: { aviso: AvisoEnPantalla }) {
+  const caja =
+    'animate-entrar-desde-la-derecha pointer-events-auto flex items-start gap-3 rounded-xl border border-border p-3';
+  const estilo = {
+    background: colors.surfaceElevated,
+    boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}`,
+  };
+
+  const contenido = (
+    <>
+      <span
+        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+        style={{ background: aviso.tono }}
+        aria-hidden="true"
+      />
+      <p className="font-sans text-sm leading-snug text-text-primary">{aviso.texto}</p>
+    </>
+  );
+
+  if (!aviso.destino) {
+    return (
+      <article className={caja} style={estilo}>
+        {contenido}
+      </article>
+    );
+  }
+
+  return (
+    <a
+      href={aviso.destino}
+      className={`${caja} cursor-pointer transition-colors hover:border-border-strong`}
+      style={estilo}
+    >
+      {contenido}
+    </a>
+  );
+}
+
+/**
+ * A dónde lleva la tarjeta al pulsarla, o `null` si no lleva a ninguna parte.
+ *
+ * ⚠️ **Se usa `projectHref` y no una plantilla a mano.** El slug va en la URL y
+ * el UUID en la API, los dos son `string`, y confundirlos no da error de
+ * compilación: sale una URL fea, un 403 o un desplegable vacío. Ya se coló en
+ * cinco sitios (CLAUDE.md, trampa 10).
+ *
+ * Sin `projectSlug` se cae al `projectId`, que el guard también resuelve. Es
+ * mejor una URL fea que una tarjeta que no lleva a ningún sitio.
+ */
+function destinoDe(aviso: AvisoRecibido): string | null {
+  /* Un mensaje privado no tiene proyecto: lleva a la conversación con quien
+     escribió. Se resuelve antes que nada porque `projectId` viene vacío y la
+     comprobación de abajo lo descartaría. */
+  if (aviso.type === CHAT_EVENT_TYPE && aviso.channelKind === 'DIRECT') {
+    return aviso.actorId ? `/dashboard/chat/${aviso.actorId}` : null;
+  }
+
+  const identificador = aviso.projectSlug || aviso.projectId;
+  if (!identificador) return null;
+
+  if (aviso.type === CHAT_EVENT_TYPE) {
+    return projectHref({ slug: identificador }, { tab: 'chat' });
+  }
+
+  /* Los avisos de tarea abren la tarea directamente. La página resuelve el
+     tablero desde `?task=`, así que no hace falta saberlo aquí. */
+  if (aviso.taskId) {
+    return projectHref({ slug: identificador }, { task: aviso.taskId });
+  }
+
+  /* Los de equipo —invitaciones, altas y bajas— llevan al proyecto sin más.
+     `MEMBER_REMOVED` es la excepción: te acaban de sacar, así que el enlace
+     daría 403 y sería peor que no ofrecerlo. */
+  if (aviso.type === 'MEMBER_REMOVED') return null;
+
+  return projectHref({ slug: identificador });
+}
+
+/**
+ * El color del punto del aviso.
+ *
+ * Va por función y no por índice directo al mapa porque `type` ya no es una
+ * lista cerrada: un `CHAT_MESSAGE` —o cualquier tipo que el gateway estrene
+ * antes que el navegador— no está en `TONO_POR_TIPO` y leerlo daría `undefined`
+ * sin que nada avise.
+ */
+function tonoDe(tipo: AvisoRecibido['type']): string {
+  if (tipo === CHAT_EVENT_TYPE) return colors.info;
+  return TONO_POR_TIPO[tipo as NotificationType] ?? colors.primary;
 }
 
 /** Mismos colores que la bandeja: equipo en ámbar, tareas en violeta, salidas en rojo. */

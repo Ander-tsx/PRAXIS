@@ -705,3 +705,92 @@ export interface NotificationPage {
   /** No leídas en total, **sin recortar por `limit`**: es lo que pinta la insignia. */
   unread: number;
 }
+
+/**
+ * El `type` con el que viaja un mensaje de chat por el flujo de avisos.
+ *
+ * ⚠️ **No está en `NOTIFICATION_TYPES` y no debe estarlo.** Esa lista es espejo
+ * del enum de la tabla `notifications`, y un mensaje de chat **no crea fila**:
+ * una conversación de cincuenta mensajes serían cincuenta avisos por persona y
+ * taparían el que importa. Comparte el flujo SSE —que es lo que hace que suene
+ * y salga en pantalla estés donde estés— pero no la bandeja.
+ *
+ * Espejo de `CHAT_EVENT_TYPE` en `projects-service/src/chat/chat.service.ts`.
+ */
+export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
+
+/**
+ * Las reacciones que acepta el backend.
+ *
+ * Lista **cerrada** y espejo de `CHAT_REACTIONS` en `@praxis/contracts`: el
+ * emoji viaja en el cuerpo y acaba en la base, así que dejarlo abierto sería un
+ * campo más donde meter lo que sea.
+ */
+export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+
+export type ChatReactionEmoji = (typeof CHAT_REACTIONS)[number];
+
+export interface ChatReaction {
+  messageId: string;
+  userId: string;
+  emoji: string;
+}
+
+/**
+ * Un mensaje de chat, de proyecto o privado.
+ *
+ * ⚠️ **Las menciones y las referencias viven dentro de `body`**, con el nombre
+ * incluido: `@[Juan Pérez](user:2222…)`. Es lo que hace que no se rompan — si
+ * sacan a Juan del equipo, el nombre ya está escrito y se pinta como texto
+ * plano, sin consultar nada.
+ */
+export interface ChatMessage {
+  id: string;
+  channelId: string;
+  /** Quién lo escribió. El nombre lo resuelve la pantalla contra el directorio. */
+  authorId: string;
+  body: string;
+  createdAt: string;
+  /** A qué mensaje responde, con lo justo para pintar la cita. */
+  replyTo: { id: string; authorId: string; body: string } | null;
+  reactions: ChatReaction[];
+}
+
+/** Lo que devuelve la lista de mensajes, de proyecto o privada. */
+export interface ChatMessagePage {
+  /** Del más antiguo al más nuevo, que es como se pinta una conversación. */
+  items: ChatMessage[];
+  /** Queda historial por encima. Lo usa el botón de «ver mensajes anteriores». */
+  hasMore: boolean;
+  /** Sin leer de esta persona en este canal. Es lo que pinta la insignia. */
+  unread: number;
+  /**
+   * Si esta persona silenció el canal.
+   *
+   * ⚠️ Silenciar **no deja de contar lo no leído**: la insignia sigue. Lo que se
+   * apaga es la tarjeta y el sonido.
+   */
+  muted: boolean;
+}
+
+/** Una conversación privada en la bandeja de `/me/chats`. */
+export interface DirectConversation {
+  channelId: string;
+  /** Con quién hablas. El perfil se resuelve contra el directorio. */
+  peerId: string;
+  ultimo: { body: string; authorId: string; createdAt: string } | null;
+  unread: number;
+  muted: boolean;
+}
+
+/**
+ * Alguien a quien puedes escribir, con **dónde coincidís y qué es allí**.
+ *
+ * El rol es por proyecto, no global: la misma persona puede ser quien administra
+ * en uno y solo mirar en otro. Enseñar un único rol sería inventarse una
+ * jerarquía que no existe.
+ */
+export interface ChatContact {
+  userId: string;
+  proyectos: { id: string; name: string; slug: string; rol: string }[];
+}

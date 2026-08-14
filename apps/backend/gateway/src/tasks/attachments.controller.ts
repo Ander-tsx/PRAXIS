@@ -14,8 +14,8 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { ClientProxy } from '@nestjs/microservices';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -24,18 +24,18 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ATTACHMENT_ALLOWED_MIME,
+  ATTACHMENT_MAX_BYTES,
+  ProjectPermission,
+  empiezaPorPdf,
+  isInlineMime,
+} from '@praxis/contracts';
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
-import {
-  ATTACHMENT_ALLOWED_MIME,
-  empiezaPorPdf,
-  ATTACHMENT_MAX_BYTES,
-  ProjectPermission,
-  isInlineMime,
-} from '@praxis/contracts';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
 /**
  * Archivos adjuntos a una tarea.

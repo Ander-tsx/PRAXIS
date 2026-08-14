@@ -9,7 +9,19 @@ import { StandardExceptionFilter } from './common/filters/standard-exception.fil
 import { StandardResponseInterceptor } from './common/interceptors/standard-response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  /**
+   * `rawBody: true` guarda el cuerpo **sin parsear** en `req.rawBody`.
+   *
+   * ⚠️ Lo exige la firma del webhook de Stripe, y es la trampa clásica de esta
+   * integración: la firma se calcula sobre los bytes exactos que se enviaron, y
+   * el parser de JSON de Express los reconstruye —reordena claves, cambia el
+   * espaciado—, así que verificar contra `req.body` re-serializado falla
+   * **siempre**, con un error que solo dice «firma inválida» y no por qué.
+   *
+   * No cambia nada para el resto de rutas: `req.body` sigue llegando parseado
+   * como hasta ahora; esto solo añade una copia de los bytes originales.
+   */
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
 
   app.useLogger(app.get(Logger));
 

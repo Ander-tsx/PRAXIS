@@ -3,11 +3,11 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
   AssignRoleDto,
-  RevokeRoleDto,
   CheckRoleDto,
   GetRolesForUsersDto,
   GetUserRolesDto,
   type GlobalRole,
+  RevokeRoleDto,
   SetUserRoleDto,
 } from '@praxis/contracts';
 

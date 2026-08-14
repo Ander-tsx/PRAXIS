@@ -1,5 +1,3 @@
-import { getSession } from '@praxis/commons/auth';
-import type { Metadata } from 'next';
 import { LandingCTA } from '@/components/organisms/LandingCTA';
 import { LandingFeatures } from '@/components/organisms/LandingFeatures';
 import { LandingHero } from '@/components/organisms/LandingHero';
@@ -7,6 +5,8 @@ import { LandingHowItWorks } from '@/components/organisms/LandingHowItWorks';
 import { PublicFooter } from '@/components/organisms/PublicFooter';
 import { PublicNavbar } from '@/components/organisms/PublicNavbar';
 import { LandingTemplate } from '@/components/templates/LandingTemplate';
+import { getSession } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Praxis — Gestión de proyectos para equipos',

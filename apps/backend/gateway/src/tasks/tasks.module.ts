@@ -2,12 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
-import { TasksController } from './tasks.controller';
-import { ChecklistsController } from './checklists.controller';
-import { MyTasksController } from './my-tasks.controller';
-import { LabelsController } from './labels.controller';
-import { CommentsController } from './comments.controller';
 import { AttachmentsController } from './attachments.controller';
+import { ChecklistsController } from './checklists.controller';
+import { CommentsController } from './comments.controller';
+import { LabelsController } from './labels.controller';
+import { MyTasksController } from './my-tasks.controller';
+import { TasksController } from './tasks.controller';
 
 @Module({
   imports: [

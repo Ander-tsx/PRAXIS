@@ -1,3 +1,6 @@
+import { createProjectAction } from '@/app/actions';
+import { ProjectGrid } from '@/components/organisms/ProjectGrid';
+import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 import {
   AppHeader,
   CreateProjectDialog,
@@ -7,9 +10,6 @@ import {
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
-import { createProjectAction } from '@/app/actions';
-import { ProjectGrid } from '@/components/organisms/ProjectGrid';
-import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 
 export const metadata: Metadata = {
   title: 'Proyectos',

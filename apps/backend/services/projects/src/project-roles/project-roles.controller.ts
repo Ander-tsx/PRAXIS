@@ -1,10 +1,10 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
-  CreateProjectRoleDto,
-  UpdateProjectRoleDto,
-  DeleteProjectRoleDto,
   CheckProjectPermissionDto,
+  CreateProjectRoleDto,
+  DeleteProjectRoleDto,
+  UpdateProjectRoleDto,
 } from '@praxis/contracts';
 import { ProjectRolesService } from './project-roles.service';
 

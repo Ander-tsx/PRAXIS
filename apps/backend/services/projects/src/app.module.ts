@@ -3,16 +3,18 @@ import { ConfigModule } from '@nestjs/config';
 import * as Joi from 'joi';
 
 import { ObservabilityModule } from '@praxis/observability';
-import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
-import { ProjectsModule } from './projects/projects.module';
-import { WorkspacesModule } from './workspaces/workspaces.module';
 import { BoardsModule } from './boards/boards.module';
+import { ChatModule } from './chat/chat.module';
 import { ColumnsModule } from './columns/columns.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { MembersModule } from './members/members.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { ProjectRolesModule } from './project-roles/project-roles.module';
+import { ProjectsModule } from './projects/projects.module';
+import { RedisModule } from './redis/redis.module';
+import { ReportLayoutsModule } from './report-layouts/report-layouts.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { ProjectRolesModule } from './project-roles/project-roles.module';
     MembersModule,
     NotificationsModule,
     ProjectRolesModule,
+    ChatModule,
+    ReportLayoutsModule,
   ],
 })
 export class AppModule {}

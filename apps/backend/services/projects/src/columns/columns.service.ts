@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import {
   CreateColumnDto,
   ReorderColumnsDto,
   UpdateColumnDto,
   defaultColumnColor,
 } from '@praxis/contracts';
+import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class ColumnsService {

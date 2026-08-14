@@ -1,19 +1,19 @@
 'use server';
 
+import type { UpdateProfileState, VoiceLinkState } from '@/lib/action-state';
+import { validateProfile } from '@/lib/validation';
+import type { VoiceSeedPhrase } from '@/lib/voice';
 import { ApiError } from '@praxis/commons';
+import type { UserProfile } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import {
   THEME_COOKIE,
+  type ThemeName,
   esTemaValido,
   themeCookieOptions,
-  type ThemeName,
 } from '@praxis/commons/theme';
-import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import type { UpdateProfileState, VoiceLinkState } from '@/lib/action-state';
-import type { UserProfile } from '@praxis/commons';
-import type { VoiceSeedPhrase } from '@/lib/voice';
-import { validateProfile } from '@/lib/validation';
+import { cookies } from 'next/headers';
 
 /**
  * Guarda nombre y apellido del usuario identificado.

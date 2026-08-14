@@ -1,9 +1,9 @@
 'use server';
 
+import type { NotificationState } from '@/lib/action-state';
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
-import type { NotificationState } from '@/lib/action-state';
 
 /**
  * Acciones de la bandeja de avisos.

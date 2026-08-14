@@ -37,4 +37,38 @@ export const envValidationSchema = Joi.object({
   // alexa-service (capa de voz, solo lectura) — TCP 3007
   ALEXA_SERVICE_HOST: Joi.string().default('localhost'),
   ALEXA_SERVICE_PORT: Joi.number().default(3007),
+
+  /**
+   * Stripe. Las tres **opcionales**, y a propósito.
+   *
+   * ⚠️ Marcarlas obligatorias dejaría el gateway sin arrancar en cualquier
+   * entorno sin cuenta de Stripe: el de cada persona del equipo y el de CI. Con
+   * esto, la facturación se apaga sola, `StripeService` lo avisa una vez al
+   * arrancar y los endpoints de pago responden 503 con un mensaje claro. Es la
+   * misma decisión que ya toma `MAIL_API_KEY` en credentials-service.
+   *
+   * ⚠️ Esta es la **única** excepción a que el gateway no hable con terceros —la
+   * clave de Gemini vive solo en assistant-service, ver la nota de arriba—, y
+   * no hay alternativa: el webhook de Stripe necesita una URL pública, y la
+   * única superficie pública que tiene el sistema es el gateway.
+   */
+  STRIPE_SECRET_KEY: Joi.string().optional().allow(''),
+  /** El precio recurrente del plan PRO, `price_...`. Sin él no hay qué cobrar. */
+  STRIPE_PRICE_PRO: Joi.string().optional().allow(''),
+  /**
+   * El secreto con el que se firma el webhook, `whsec_...`.
+   *
+   * Sin él, el manejador rechaza **todo**: es la única autenticación que tiene
+   * ese endpoint, y aceptarlo sin firma sería regalar el plan PRO a cualquiera
+   * con un `curl`.
+   */
+  STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
+
+  /**
+   * La base de las URLs de vuelta del pago.
+   *
+   * La misma variable que ya usan los enlaces de los correos. Sin ella, Stripe
+   * devolvería el navegador a `localhost` desde producción.
+   */
+  PUBLIC_APP_URL: Joi.string().optional().allow(''),
 });

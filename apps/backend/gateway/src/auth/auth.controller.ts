@@ -125,14 +125,23 @@ export class AuthController {
   @Throttle(LIMITE_AUTENTICACION)
   @ApiOperation({ summary: 'Iniciar sesión con Google' })
   @ApiBody({ type: GoogleLoginDto })
-  @ApiResponse({ status: 200, description: 'Sesión iniciada; devuelve los mismos tokens que login' })
-  @ApiResponse({ status: 401, description: 'El token de Google no es válido o el correo no está verificado' })
+  @ApiResponse({
+    status: 200,
+    description: 'Sesión iniciada; devuelve los mismos tokens que login',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'El token de Google no es válido o el correo no está verificado',
+  })
   @ApiResponse({
     status: 409,
     description:
       'Ya existe una cuenta con ese correo y contraseña. No se vincula sola: hay que entrar con la contraseña primero',
   })
-  @ApiResponse({ status: 503, description: 'La entrada con Google no está configurada en este entorno' })
+  @ApiResponse({
+    status: 503,
+    description: 'La entrada con Google no está configurada en este entorno',
+  })
   async google(@Body() body: GoogleLoginDto) {
     this.logger.log('POST /auth/google → credentials-service');
     return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_google' }, body));

@@ -105,27 +105,63 @@ export function ProjectMembers({
             const isOwner = member.userId === ownerId;
 
             return (
+              /**
+               * ⚠️ **En móvil es una tarjeta, no una fila.**
+               *
+               * Era una sola línea con todo dentro, y los controles no se
+               * encogen —el desplegable de rol mide lo que mide—, así que lo
+               * único que podía ceder sitio era la identidad: en un teléfono el
+               * nombre y el correo se recortaban hasta desaparecer justo debajo
+               * del avatar, que es lo que hacía falta leer.
+               *
+               * Apilar en dos filas no solo lo arregla; deja el desplegable a
+               * ancho completo, que además se toca mejor con el dedo.
+               */
               <li
                 key={member.id}
-                className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface p-4"
+                className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-center"
               >
-                {/* El mismo círculo que el tablero y la barra lateral: el rojo
-                    dice «eres tú» en todo el producto. */}
-                <Avatar label={label} mine={member.userId === currentUserId} size="md" />
+                {/* Identidad. Va junta en su propio bloque para que el avatar y
+                    el nombre no se separen al apilar. */}
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  {/* El mismo círculo que el tablero y la barra lateral: el rojo
+                      dice «eres tú» en todo el producto. */}
+                  <Avatar label={label} mine={member.userId === currentUserId} size="md" />
 
-                <div className="flex min-w-0 flex-1 flex-col">
-                  {/* Siempre dos líneas, con o sin nombre: si no lo hay,
-                      `personLabel` usa la parte local del correo. */}
-                  <span className="truncate font-sans text-sm font-semibold text-text-primary">
-                    {label}
-                  </span>
-                  <span className="truncate font-sans text-xs text-text-secondary">
-                    {/* Puede faltar si el directorio se cortó por paginación. */}
-                    {user?.credential.email ?? 'Correo no disponible'}
-                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    {/**
+                     * Siempre dos líneas, con o sin nombre: si no lo hay,
+                     * `personLabel` usa la parte local del correo.
+                     *
+                     * El nombre lleva a la conversación privada con esa persona,
+                     * salvo el tuyo — escribirte a ti mismo no existe, y el
+                     * backend lo rechaza con un 400.
+                     *
+                     * ⚠️ Es un `<a>` y no `next/link`: el chat privado vive en
+                     * la zona `dashboard` y esto es `projects`, así que la
+                     * navegación tiene que ser dura (ESTADO-ACTUAL §16).
+                     */}
+                    {member.userId === currentUserId ? (
+                      <span className="truncate font-sans text-sm font-semibold text-text-primary">
+                        {label}
+                      </span>
+                    ) : (
+                      <a
+                        href={`/dashboard/chat/${member.userId}`}
+                        title={`Escribir a ${label} en privado`}
+                        className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
+                      >
+                        {label}
+                      </a>
+                    )}
+                    <span className="truncate font-sans text-xs text-text-secondary">
+                      {/* Puede faltar si el directorio se cortó por paginación. */}
+                      {user?.credential.email ?? 'Correo no disponible'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                   {isOwner && <Badge variant="accent">DUEÑO</Badge>}
                   {/**
                    * Al dueño no se le cambia el rol: tiene bypass en el guard,

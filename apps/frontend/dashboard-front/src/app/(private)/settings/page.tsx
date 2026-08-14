@@ -1,14 +1,14 @@
-import { AppHeader, GlobalRoleBadges } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
-import { getTheme } from '@praxis/commons/theme';
-import type { Metadata } from 'next';
-import type { AssistantQuota } from '@/lib/billing';
 import { SettingsSection } from '@/components/molecules/SettingsSection';
 import { ThemeToggle } from '@/components/molecules/ThemeToggle';
 import { BillingSummary } from '@/components/organisms/BillingSummary';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
 import { VoiceLinking } from '@/components/organisms/VoiceLinking';
+import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import type { VoiceLink } from '@/lib/voice';
+import { AppHeader, GlobalRoleBadges } from '@praxis/commons';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { getTheme } from '@praxis/commons/theme';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Configuración',
@@ -37,7 +37,7 @@ export default async function SettingsPage() {
   /* Cada `catch` deja su bloque en el estado «no se pudo cargar» en vez de
      tumbar la pantalla entera: que alexa-service esté caído no es motivo para
      no poder cambiar tu nombre. */
-  const [{ profile, roles }, theme, quota, voiceLinks] = await Promise.all([
+  const [{ profile, roles }, theme, quota, voiceLinks, billing] = await Promise.all([
     loadCurrentUser(),
     getTheme(),
     createServerApiClient()
@@ -45,6 +45,11 @@ export default async function SettingsPage() {
       .catch(() => null),
     createServerApiClient()
       .get<VoiceLink[]>('/alexa/links')
+      .catch(() => null),
+    /* `null` se trata como apagado en `BillingSummary`: si no se puede
+       preguntar si hay pasarela, no se ofrece comprar. */
+    createServerApiClient()
+      .get<EstadoDeFacturacion>('/me/billing/estado')
       .catch(() => null),
   ]);
 
@@ -88,7 +93,7 @@ export default async function SettingsPage() {
           title="Facturación"
           description="Tu plan del asistente de IA y cuántos mensajes te quedan este mes."
         >
-          <BillingSummary quota={quota} />
+          <BillingSummary quota={quota} billing={billing} />
         </SettingsSection>
       </div>
     </AppHeader>

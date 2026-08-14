@@ -194,6 +194,24 @@ export function validateComment(body: string): string | null {
   return null;
 }
 
+/**
+ * Tope de un mensaje del chat. El mismo que un comentario, y a propósito: que
+ * los dos campos de texto largo del producto acepten lo mismo evita que el
+ * límite dependa de en qué pantalla estés escribiendo.
+ *
+ * Espejo de `CHAT_MESSAGE_MAX` en `@praxis/contracts`.
+ */
+export const CHAT_MESSAGE_MAX = 4000;
+
+export function validateChatMessage(body: string): string | null {
+  const trimmed = body.trim();
+  if (trimmed.length === 0) return 'Escribe algo antes de enviar.';
+  if (trimmed.length > CHAT_MESSAGE_MAX) {
+    return `El mensaje no puede superar ${CHAT_MESSAGE_MAX} caracteres.`;
+  }
+  return null;
+}
+
 export const COLUMN_NAME_MIN = 1;
 export const COLUMN_NAME_MAX = 100;
 

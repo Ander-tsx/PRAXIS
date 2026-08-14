@@ -65,6 +65,40 @@ export class AssistantController {
     return this.assistant.planesDe(dto.userIds);
   }
 
+  /* ─── Facturación ─────────────────────────────────────────────────── */
+
+  /** El cliente de Stripe de una persona, si ya tiene uno. */
+  @MessagePattern({ cmd: 'assistant_billing_of' })
+  facturacionDe(@Payload() dto: { userId: string }) {
+    return this.assistant.facturacionDe(dto.userId);
+  }
+
+  /**
+   * Aplica lo que dijo Stripe.
+   *
+   * ⚠️ Lo llama **solo** el manejador del webhook del gateway, después de haber
+   * verificado la firma. Vale aquí lo de siempre: este servicio no distingue
+   * quién le habla por TCP, y por eso el 3006 no sale de la red privada.
+   */
+  @MessagePattern({ cmd: 'assistant_billing_link' })
+  vincularSuscripcion(
+    @Payload()
+    dto: {
+      userId: string;
+      plan: AssistantPlanName;
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
+    },
+  ) {
+    return this.assistant.vincularSuscripcion(dto);
+  }
+
+  /** De quién es una suscripción. Lo pide la baja, que no trae `userId`. */
+  @MessagePattern({ cmd: 'assistant_billing_by_subscription' })
+  porSuscripcion(@Payload() dto: { stripeSubscriptionId: string }) {
+    return this.assistant.porSuscripcion(dto.stripeSubscriptionId);
+  }
+
   /**
    * Los comandos de conversaciones.
    *

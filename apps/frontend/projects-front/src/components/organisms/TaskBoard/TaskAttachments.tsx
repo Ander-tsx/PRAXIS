@@ -1,8 +1,9 @@
 'use client';
 
+import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(private)/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
   ATTACHMENT_ALLOWED_MIME,
-  isViewablePdf,
   ATTACHMENT_MAX_BYTES,
   type TaskAttachment,
   type UserProfile,
@@ -10,11 +11,10 @@ import {
   colors,
   formatBytes,
   isPreviewableImage,
+  isViewablePdf,
   personLabel,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef } from 'react';
-import { deleteAttachmentAction, uploadAttachmentAction } from '@/app/(private)/[id]/actions';
-import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { PdfViewer } from './PdfViewer';
 import { SECTION_PANEL } from './section-panel';
 

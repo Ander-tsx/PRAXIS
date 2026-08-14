@@ -1,10 +1,10 @@
 'use server';
 
+import type { InvitationResponseState } from '@/lib/action-state';
 import { ApiError } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { InvitationResponseState } from '@/lib/action-state';
 
 /**
  * Responder a una invitación **desde la página del proyecto**.

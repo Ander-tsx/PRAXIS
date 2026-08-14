@@ -1,9 +1,9 @@
 'use client';
 
-import { Button, Dialog, alpha, colors } from '@praxis/commons';
-import { useActionState, useState } from 'react';
 import { leaveProjectAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
+import { Button, Dialog, alpha, colors } from '@praxis/commons';
+import { useActionState, useState } from 'react';
 
 export interface LeaveProjectButtonProps {
   projectId: string;

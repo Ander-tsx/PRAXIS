@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { NotificationType } from '@praxis/contracts';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
 import { exigirProyectoActivo } from '../projects/project-status.guard';
+import { RedisService } from '../redis/redis.service';
 
 /**
  * Invitaciones a un proyecto.

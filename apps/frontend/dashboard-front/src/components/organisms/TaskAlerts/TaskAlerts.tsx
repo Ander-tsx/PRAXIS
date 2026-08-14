@@ -1,3 +1,4 @@
+import { NoticePanel } from '@/components/molecules/NoticePanel';
 import {
   PRIORITY_LABELS,
   type Priority,
@@ -8,7 +9,6 @@ import {
   colors,
   projectHref,
 } from '@praxis/commons';
-import { NoticePanel } from '@/components/molecules/NoticePanel';
 
 export interface TaskAlertsProps {
   /** Vencidas: la fecha ya pasó. */

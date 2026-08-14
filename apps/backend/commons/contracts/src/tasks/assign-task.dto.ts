@@ -1,5 +1,5 @@
-import { ArrayMaxSize, IsArray, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { ArrayMaxSize, IsArray, IsUUID } from 'class-validator';
 
 /**
  * Cuerpo que envía el cliente.

@@ -12,16 +12,16 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { firstValueFrom } from 'rxjs';
-import { JwtGuard } from '../auth/jwt.guard';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
-import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import {
   CreateChecklistBodyDto,
   DeleteChecklistBodyDto,
   ProjectPermission,
   ToggleChecklistBodyDto,
 } from '@praxis/contracts';
+import { firstValueFrom } from 'rxjs';
+import { JwtGuard } from '../auth/jwt.guard';
+import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
 /**
  * Ítems de checklist de una tarea.

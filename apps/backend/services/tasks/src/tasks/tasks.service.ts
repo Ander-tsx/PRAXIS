@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
 import { ConfigService } from '@nestjs/config';
+import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
 import { Prisma } from '../generated/prisma-client';
@@ -9,16 +9,16 @@ import { RedisService } from '../redis/redis.service';
 
 import {
   AssignTaskDto,
-  NotificationType,
   CreateChecklistDto,
   CreateTaskDto,
   DeleteChecklistDto,
   DeleteTaskDto,
   FindMyTasksDto,
   FindOneTaskDto,
-  FindTasksDto,
   FindTasksByProjectDto,
+  FindTasksDto,
   MoveTaskDto,
+  NotificationType,
   PurgeTasksDto,
   RestatusTasksDto,
   ToggleChecklistDto,

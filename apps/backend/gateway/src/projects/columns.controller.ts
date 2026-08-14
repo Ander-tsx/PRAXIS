@@ -20,10 +20,10 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
+import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { ColumnStatusSyncService } from './column-status-sync.service';
 import { TaskPurgeService } from './task-purge.service';
-import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
-import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 
 @ApiTags('Columns')
 @ApiBearerAuth()

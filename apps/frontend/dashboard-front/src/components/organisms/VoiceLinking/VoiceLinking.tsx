@@ -1,10 +1,10 @@
 'use client';
 
-import { Badge, Button, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useMemo, useState } from 'react';
 import { generateSeedPhraseAction, revokeVoiceLinkAction } from '@/app/(private)/settings/actions';
 import { VOICE_LINK_INITIAL_STATE } from '@/lib/action-state';
-import { estaActiva, formatoCuentaAtras, formatoFecha, type VoiceLink } from '@/lib/voice';
+import { type VoiceLink, estaActiva, formatoCuentaAtras, formatoFecha } from '@/lib/voice';
+import { Badge, Button, alpha, colors } from '@praxis/commons';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 
 export interface VoiceLinkingProps {
   /** Vinculaciones que ya existen. Las pinta el Server Component de la pantalla. */
