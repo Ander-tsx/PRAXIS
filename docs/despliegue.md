@@ -191,13 +191,44 @@ Ya está hecho, pero si hubiera que rehacerlo:
      --substitutions=_GOOGLE_CLIENT_ID=…
    ```
 
-3. Darle a la cuenta de servicio de Cloud Build permiso para reemplazar
-   instancias, que no lo tiene por defecto:
+2 bis. ⚠️ **Un trigger de 2ª generación exige `serviceAccount` explícito.** Sin
+   él la API devuelve `INVALID_ARGUMENT` **a secas, sin decir qué campo**, y
+   `gcloud builds triggers create github` tampoco lo pide. Se tarda más en
+   averiguarlo que en arreglarlo: si `gcloud` falla así, crea el trigger por la
+   API con `serviceAccount` puesto.
+
+3. Los permisos de la cuenta que corre el build. Necesita **tres**, y ninguno
+   viene puesto:
 
    ```bash
    PROY=$(gcloud config get-value project)
    NUM=$(gcloud projects describe "$PROY" --format='value(projectNumber)')
+   SA="$NUM-compute@developer.gserviceaccount.com"
+
+   # 1. Reemplazar instancias de los grupos.
    gcloud projects add-iam-policy-binding "$PROY" \
-     --member="serviceAccount:$NUM-compute@developer.gserviceaccount.com" \
-     --role=roles/compute.instanceAdmin.v1
+     --member="serviceAccount:$SA" --role=roles/compute.instanceAdmin.v1
+
+   # 2. Actuar como la cuenta que llevan las máquinas. Sin esto el reemplazo
+   #    falla, y falla al FINAL del build: 20 minutos de compilación tirados.
+   gcloud iam service-accounts add-iam-policy-binding \
+     "praxis-vm@$PROY.iam.gserviceaccount.com" \
+     --member="serviceAccount:$SA" --role=roles/iam.serviceAccountUser
+
+   # 3. Usar el health check del grupo, que `instanceAdmin.v1` NO incluye:
+   #      Required 'compute.healthChecks.use' permission for
+   #      '…/healthChecks/praxis-backend-hc-autocurado'
+   #    El único rol predefinido que lo trae es compute.loadBalancerAdmin, que
+   #    además deja administrar balanceadores, reglas y certificados enteros —
+   #    demasiado para reemplazar dos grupos. De ahí el rol a medida:
+   gcloud iam roles create praxis_despliegue --project="$PROY" \
+     --title="Despliegue de PRAXIS" --stage=GA \
+     --permissions=compute.healthChecks.use
+   gcloud projects add-iam-policy-binding "$PROY" \
+     --member="serviceAccount:$SA" \
+     --role="projects/$PROY/roles/praxis_despliegue"
    ```
+
+   ⚠️ Los tres se descubren **cuando falla el paso de despliegue**, que es el
+   último. Si vas a rehacer esto en otro proyecto, ponlos antes de la primera
+   ejecución y te ahorras tres builds completos.

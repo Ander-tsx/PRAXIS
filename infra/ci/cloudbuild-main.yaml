@@ -104,10 +104,19 @@ steps:
   # levanta la nueva antes de retirar la vieja, igual que el `update_policy` de
   # Terraform. Sin eso, un despliegue es un minuto de 502.
   #
-  # No se espera a que termine (`--max-surge` y adelante): el rollout tarda
-  # varios minutos por el arranque de las VMs y bloquear el build aquí solo
-  # consume tiempo de Cloud Build sin aportar nada. Si algo falla, el grupo se
-  # queda con las instancias viejas sirviendo.
+  # ⚠️ **`--max-surge=3` y no 1**, y no es un número elegido al azar: los dos
+  # grupos son **regionales** y us-east1 les da tres zonas. Con un valor fijo,
+  # la API exige 0 o al menos tantas como zonas, y rechaza el resto:
+  #
+  #   Fixed updatePolicy.maxSurge for regional managed instance group has to
+  #   be either 0 or at least equal to the number of zones.
+  #
+  # Es el mismo 3 que ya tenía el `update_policy` de Terraform. Si algún día el
+  # grupo cambia de región o de número de zonas, este número va detrás.
+  #
+  # No se espera a que el rollout termine: tarda varios minutos por el arranque
+  # de las VMs y bloquear el build aquí solo consume tiempo de Cloud Build sin
+  # aportar nada. Si algo falla, el grupo se queda con las viejas sirviendo.
   - id: desplegar
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
@@ -120,6 +129,6 @@ steps:
             ${_PREFIJO}-$$grupo-${_REGION} \
             --region=${_REGION} \
             --max-unavailable=0 \
-            --max-surge=1
+            --max-surge=3
         done
     waitFor: [publicar]
