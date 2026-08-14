@@ -10,3 +10,6 @@
 
 export * from './cookie';
 export * from './theme';
+/* La barra lateral plegada vive aquí por lo mismo que el tema: es una
+   preferencia que el servidor tiene que conocer al pintar, o parpadea. */
+export * from './sidebar';

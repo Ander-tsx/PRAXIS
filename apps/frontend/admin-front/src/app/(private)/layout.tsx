@@ -1,6 +1,7 @@
 import { AccessDenied } from '@/components/organisms/AccessDenied';
 import { AppHeader, AppShell, LogoutButton, displayName, hasAdminRole } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
+import { getSidebarPlegada } from '@praxis/commons/theme';
 
 /**
  * Armazón de la zona, y **la puerta del rol**.
@@ -25,11 +26,16 @@ import { loadPrivateChrome } from '@praxis/commons/auth';
  */
 export default async function PrivateLayout({ children }: { children: React.ReactNode }) {
   const { profile, roles, navItems } = await loadPrivateChrome();
+  /* La cookie del pliegue, leída en el servidor: sin esto la barra se
+     serviría desplegada y se plegaría al hidratar, parpadeando en cada
+     navegación —y en Multi-Zones cada cambio de zona es una carga entera. */
+  const plegada = await getSidebarPlegada();
 
   return (
     <AppShell
       navItems={navItems}
       zonePath="/admin"
+      plegadaInicial={plegada}
       user={{ name: displayName(profile), email: profile.credential.email }}
       footerSlot={<LogoutButton />}
     >

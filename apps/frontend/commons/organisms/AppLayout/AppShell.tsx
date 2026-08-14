@@ -28,6 +28,15 @@ export interface AppShellProps {
   user: AppShellUser;
   /** Pie de la barra lateral. Normalmente cerrar sesión. */
   footerSlot?: ReactNode;
+  /**
+   * Si la barra sale plegada, **resuelto en el servidor**.
+   *
+   * Lo lee el `layout.tsx` de la zona con `getSidebarPlegada()`. Va por props y
+   * no se lee aquí porque este componente es de cliente y la cookie hay que
+   * conocerla **antes** de pintar: si se leyera al hidratar, la barra saldría
+   * desplegada y se plegaría a la vista en cada navegación.
+   */
+  plegadaInicial?: boolean;
   children: ReactNode;
 }
 
@@ -60,9 +69,46 @@ export function useAppShell() {
   return context;
 }
 
-export function AppShell({ navItems, zonePath, user, footerSlot, children }: AppShellProps) {
+/**
+ * La cookie que recuerda el pliegue. Espejo de `commons/theme/sidebar.ts`.
+ *
+ * ⚠️ Se repite el nombre aquí en vez de importarlo porque aquel es un **módulo
+ * de servidor** —usa `next/headers`— y este componente es de cliente. Importarlo
+ * arrastraría `next/headers` al navegador, que es el error que documenta el
+ * índice de `theme/`. Si cambia allí, cambia aquí.
+ */
+const SIDEBAR_COOKIE = 'praxis_sidebar';
+const UN_ANO = 60 * 60 * 24 * 365;
+
+export function AppShell({
+  navItems,
+  zonePath,
+  user,
+  footerSlot,
+  plegadaInicial = false,
+  children,
+}: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  /**
+   * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
+   *
+   * Estaba en `localStorage` y se leía tras hidratar, así que el servidor
+   * siempre servía la barra desplegada y el cliente la plegaba un instante
+   * después. En Multi-Zones **cada cambio de zona es una carga completa**, así
+   * que ese parpadeo salía en cada navegación. Con la cookie, el HTML ya viene
+   * con el ancho correcto y no hay nada que corregir.
+   */
+  const [plegada, setPlegada] = useState(plegadaInicial);
   const pathname = usePathname();
+
+  function alternarPliegue() {
+    const siguiente = !plegada;
+    setPlegada(siguiente);
+    /* Se escribe desde el cliente: no hace falta una Server Action para una
+       preferencia de tamaño, y así el cambio es inmediato. `path=/` para que
+       las cinco zonas la vean — sin eso, plegarla aquí no la pliega allí. */
+    document.cookie = `${SIDEBAR_COOKIE}=${siguiente ? '1' : '0'}; path=/; max-age=${UN_ANO}; samesite=lax`;
+  }
 
   /* `/` es la raíz de la zona: su ruta pública es el prefijo a secas. */
   const activePath = pathname === '/' ? zonePath : `${zonePath}${pathname}`;
@@ -71,17 +117,38 @@ export function AppShell({ navItems, zonePath, user, footerSlot, children }: App
     <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true) }}>
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
-        <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface md:flex">
-          <div className="flex h-16 items-center border-b border-border px-6">
-            <Wordmark />
+        <aside
+          className={`hidden shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200 md:flex ${
+            plegada ? 'w-[4.5rem]' : 'w-64'
+          }`}
+        >
+          {/* El pliegue vive **en la cabecera, al lado de la marca**: es donde
+              se busca por costumbre, y ahí no compite con «Cerrar sesión», que
+              era el vecino que tenía abajo y con el que se podía confundir. */}
+          <div
+            className={`flex h-16 items-center border-b border-border ${
+              plegada ? 'flex-col justify-center gap-1 px-0' : 'justify-between px-6'
+            }`}
+          >
+            {plegada ? <Isotipo /> : <Wordmark />}
+            <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-6">
-            <NavList navItems={navItems} activePath={activePath} />
+          <div className={`flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}>
+            <NavList navItems={navItems} activePath={activePath} plegada={plegada} />
           </div>
 
-          <div className="border-t border-border p-4">
-            <UserCard user={user} />
+          <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
+            {/* Plegada, la tarjeta de usuario se queda en el avatar: el nombre y
+                el correo no caben, y el avatar ya identifica de quién es la
+                sesión, que es lo que esa tarjeta viene a decir. */}
+            {plegada ? (
+              <div className="mb-2 flex justify-center" title={user.name.trim() || user.email}>
+                <Avatar label={user.name.trim() || user.email} mine size="md" />
+              </div>
+            ) : (
+              <UserCard user={user} />
+            )}
             {footerSlot}
           </div>
         </aside>
@@ -175,6 +242,63 @@ function Wordmark() {
   return (
     <span className="select-none font-serif text-xl font-black tracking-tight text-primary">
       PRAXIS
+    </span>
+  );
+}
+
+/**
+ * El botón de plegar: **un icono, sin texto**.
+ *
+ * Vive en la cabecera junto a la marca. Es un icono de paneles —no una flecha
+ * suelta— porque una flecha en un borde se lee como «atrás»; dos rectángulos con
+ * uno estrecho dicen de qué va sin necesidad de leer nada.
+ *
+ * El `aria-label` sí es texto completo y cambia con el estado: lo que se pierde
+ * al quitar la palabra es para el ratón, no para quien navega con lector.
+ */
+function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={!plegada}
+      aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
+      title={plegada ? 'Desplegar' : 'Plegar'}
+      className="shrink-0 cursor-pointer rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
+    >
+      <svg
+        className="h-4 w-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      >
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        {/* La divisoria se mueve de lado según el estado: plegada queda a la
+            izquierda —el panel estrecho— y desplegada a la derecha. Es la misma
+            forma diciendo dos cosas, en vez de dos iconos distintos. */}
+        <path strokeLinecap="round" d={plegada ? 'M9 4v16' : 'M15 4v16'} />
+      </svg>
+    </button>
+  );
+}
+
+/**
+ * La marca cuando no cabe entera.
+ *
+ * Una `P` y no un logotipo nuevo: es la misma tipografía, el mismo color y la
+ * primera letra de lo que pone desplegada, así que se lee como la misma marca
+ * encogida y no como otra cosa. `aria-label` con el nombre completo, que es lo
+ * que de verdad representa.
+ */
+function Isotipo() {
+  return (
+    <span
+      aria-label="PRAXIS"
+      className="select-none font-serif text-xl font-black tracking-tight text-primary"
+    >
+      P
     </span>
   );
 }
