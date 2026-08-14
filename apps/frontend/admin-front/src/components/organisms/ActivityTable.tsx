@@ -1,5 +1,5 @@
-import { type AdminActivityEntry, Badge } from '@praxis/commons';
 import { ACCIONES, fechaYHora } from '@/lib/admin';
+import { type AdminActivityEntry, Badge } from '@praxis/commons';
 
 /**
  * El registro, una fila por acción.

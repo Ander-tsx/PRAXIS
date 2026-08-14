@@ -1,5 +1,8 @@
 'use client';
 
+import { setProjectStatusAction } from '@/app/(private)/proyectos/actions';
+import { ADMIN_PROJECT_INITIAL_STATE } from '@/lib/action-state';
+import { ESTADOS_PROYECTO } from '@/lib/admin';
 import {
   type AdminProject,
   Button,
@@ -8,9 +11,6 @@ import {
   Textarea,
 } from '@praxis/commons';
 import { useActionState, useEffect } from 'react';
-import { setProjectStatusAction } from '@/app/(private)/proyectos/actions';
-import { ADMIN_PROJECT_INITIAL_STATE } from '@/lib/action-state';
-import { ESTADOS_PROYECTO } from '@/lib/admin';
 
 export interface ProjectStatusDialogProps {
   proyecto: AdminProject;

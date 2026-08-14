@@ -1,10 +1,10 @@
-import { AppHeader, Pagination, type ProjectStatusName } from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
-import type { Metadata } from 'next';
 import { AdminTabs } from '@/components/organisms/AdminTabs';
 import { ProjectsTable } from '@/components/organisms/ProjectsTable';
 import { ProjectsToolbar } from '@/components/organisms/ProjectsToolbar';
 import { type AdminProjectPage, FILAS_POR_PAGINA } from '@/lib/admin';
+import { AppHeader, Pagination, type ProjectStatusName } from '@praxis/commons';
+import { createServerApiClient } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Proyectos' };
 

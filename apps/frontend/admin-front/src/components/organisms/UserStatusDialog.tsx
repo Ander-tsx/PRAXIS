@@ -1,10 +1,10 @@
 'use client';
 
-import { type AdminUser, Button, Dialog, Textarea } from '@praxis/commons';
-import { useActionState, useEffect } from 'react';
 import { setUserStatusAction } from '@/app/(private)/actions';
 import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
 import { ESTADOS, nombreDe } from '@/lib/admin';
+import { type AdminUser, Button, Dialog, Textarea } from '@praxis/commons';
+import { useActionState, useEffect } from 'react';
 
 export interface UserStatusDialogProps {
   usuario: AdminUser;

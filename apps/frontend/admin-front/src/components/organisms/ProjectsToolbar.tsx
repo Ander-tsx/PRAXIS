@@ -1,9 +1,9 @@
 'use client';
 
+import { ESTADOS_PROYECTO } from '@/lib/admin';
 import { Input, type ProjectStatusName } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
-import { ESTADOS_PROYECTO } from '@/lib/admin';
 
 export interface ProjectsToolbarProps {
   busqueda: string;

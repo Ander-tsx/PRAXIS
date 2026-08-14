@@ -1,9 +1,9 @@
 'use server';
 
+import type { AdminProjectState } from '@/lib/action-state';
 import { type AdminProject, ApiError, PROJECT_STATUSES } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
-import type { AdminProjectState } from '@/lib/action-state';
 
 /**
  * Suspende, reactiva o archiva un proyecto.

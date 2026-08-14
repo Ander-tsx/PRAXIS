@@ -1,9 +1,9 @@
 'use client';
 
+import { ESTADOS } from '@/lib/admin';
 import { Input, type UserStatusName } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
-import { ESTADOS } from '@/lib/admin';
 
 export interface UsersToolbarProps {
   busqueda: string;

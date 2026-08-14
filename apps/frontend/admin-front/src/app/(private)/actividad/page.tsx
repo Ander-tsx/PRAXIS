@@ -1,10 +1,10 @@
-import { ADMIN_ACTIONS, type AdminActionName, AppHeader, Pagination } from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
-import type { Metadata } from 'next';
 import { ActivityTable } from '@/components/organisms/ActivityTable';
 import { ActivityToolbar } from '@/components/organisms/ActivityToolbar';
 import { AdminTabs } from '@/components/organisms/AdminTabs';
 import { type AdminActivityPage, FILAS_POR_PAGINA } from '@/lib/admin';
+import { ADMIN_ACTIONS, type AdminActionName, AppHeader, Pagination } from '@praxis/commons';
+import { createServerApiClient } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Actividad' };
 

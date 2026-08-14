@@ -1,5 +1,8 @@
 'use client';
 
+import { setUserRoleAction } from '@/app/(private)/actions';
+import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
+import { ROLES, nombreDe } from '@/lib/admin';
 import {
   type AdminUser,
   Button,
@@ -11,9 +14,6 @@ import {
   globalRoleLevelOf,
 } from '@praxis/commons';
 import { useActionState, useEffect, useState } from 'react';
-import { setUserRoleAction } from '@/app/(private)/actions';
-import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
-import { ROLES, nombreDe } from '@/lib/admin';
 
 export interface UserRoleDialogProps {
   usuario: AdminUser;

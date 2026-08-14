@@ -1,10 +1,10 @@
-import { AppHeader, Pagination, type UserStatusName } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
-import type { Metadata } from 'next';
 import { AdminTabs } from '@/components/organisms/AdminTabs';
 import { UsersTable } from '@/components/organisms/UsersTable';
 import { UsersToolbar } from '@/components/organisms/UsersToolbar';
 import { type AdminUserPage, FILAS_POR_PAGINA } from '@/lib/admin';
+import { AppHeader, Pagination, type UserStatusName } from '@praxis/commons';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Cuentas' };
 

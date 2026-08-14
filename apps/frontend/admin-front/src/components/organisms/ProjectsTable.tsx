@@ -1,8 +1,8 @@
 'use client';
 
+import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
 import { type AdminProject, Badge, Button, type ProjectStatusName } from '@praxis/commons';
 import { useState } from 'react';
-import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
 import { ProjectStatusDialog } from './ProjectStatusDialog';
 
 export interface ProjectsTableProps {

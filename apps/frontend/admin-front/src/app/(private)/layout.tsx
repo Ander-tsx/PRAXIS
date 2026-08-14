@@ -1,6 +1,6 @@
+import { AccessDenied } from '@/components/organisms/AccessDenied';
 import { AppHeader, AppShell, LogoutButton, displayName, hasAdminRole } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
-import { AccessDenied } from '@/components/organisms/AccessDenied';
 
 /**
  * Armazón de la zona, y **la puerta del rol**.
