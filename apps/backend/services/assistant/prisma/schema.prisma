@@ -28,10 +28,26 @@ enum AssistantPlan {
 /// esquema y bajo otro dueño. Es la misma regla que siguen `task_events` y
 /// `notifications`.
 ///
-/// ⚠️ **No hay pasarela de pago.** Pasar a PRO es hoy un UPDATE a mano.
+/// El pago va por **Stripe Checkout alojado**: la página de la tarjeta la sirve
+/// Stripe, no nosotros, así que ningún dato de tarjeta pasa jamás por este
+/// sistema. Aquí solo quedan los dos identificadores que Stripe devuelve, que
+/// no son secretos y no sirven para cobrar nada.
+///
+/// ⚠️ **Quien decide el plan es el webhook, nunca la vuelta del navegador.** La
+/// URL de éxito la puede escribir cualquiera en la barra de direcciones; si
+/// pasar a PRO dependiera de visitarla, PRO sería gratis.
 model AssistantSubscription {
   userId    String        @id
   plan      AssistantPlan @default(FREE)
+
+  /// El cliente en Stripe. Se reutiliza entre compras para que el historial de
+  /// facturación de una persona no se parta en varios clientes sueltos.
+  stripeCustomerId String? @unique
+
+  /// La suscripción activa. Es la clave por la que se busca al cancelar: el
+  /// webhook de baja **no trae nuestro `userId`**, solo lo que es de Stripe.
+  stripeSubscriptionId String? @unique
+
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 

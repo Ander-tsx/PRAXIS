@@ -1,10 +1,13 @@
-import { alpha, Badge, colors } from '@praxis/commons';
+import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import { formatoPeriodo, formatoReinicio } from '@/lib/billing';
-import type { AssistantQuota } from '@/lib/billing';
+import { Badge, alpha, colors } from '@praxis/commons';
+import { PlanActionButton } from './PlanActionButton';
 
 export interface BillingSummaryProps {
   /** `null` cuando `GET /me/assistant/quota` falló: assistant-service abajo, no rompe la pantalla. */
   quota: AssistantQuota | null;
+  /** Qué se puede ofrecer. `null` si no se pudo preguntar: se trata como apagado. */
+  billing: EstadoDeFacturacion | null;
 }
 
 const PLAN_COPY = {
@@ -22,10 +25,20 @@ const PLAN_COPY = {
  * Plan del asistente de IA: el actual, con sus números reales, y el otro, en
  * palabras.
  *
- * **No hay botón de compra.** Hoy pasar a PRO es un `UPDATE` a mano en
- * `assistant.assistant_subscriptions` — no existe pasarela de pago, así que el
- * botón del plan que no es el tuyo queda desactivado en vez de prometer un
- * checkout que no está.
+ * ## El botón de compra
+ *
+ * Va contra **Stripe Checkout alojado**: la página de la tarjeta la sirve
+ * Stripe. Aquí no hay ni un campo de pago, y por eso no hay nada que proteger
+ * en esta pantalla.
+ *
+ * Solo sale si `billing.disponible`, o sea, si el backend tiene claves de
+ * Stripe configuradas. En un entorno sin ellas se vuelve al aviso de siempre:
+ * **más vale decir que no está a ofrecer un botón que responde 503**.
+ *
+ * ⚠️ Volver del pago **no cambia nada de esta pantalla por sí mismo**. Quien
+ * concede el plan es el webhook de Stripe; esto lee el resultado de
+ * `/me/assistant/quota` al renderizarse. Si al volver todavía pone FREE, es que
+ * el webhook aún no ha llegado — recargar lo resuelve.
  *
  * El plan que no es el tuyo **no lleva cifra**: `ASSISTANT_LIMITS` vive en el
  * backend y esta pantalla no tiene forma de saber el límite de PRO si hoy eres
@@ -33,7 +46,7 @@ const PLAN_COPY = {
  * `reports-front/src/lib/assistant.ts`. Cuando ese plan sea el tuyo, sus
  * números reales salen de la misma cuota.
  */
-export function BillingSummary({ quota }: BillingSummaryProps) {
+export function BillingSummary({ quota, billing }: BillingSummaryProps) {
   if (!quota) {
     return (
       <div className="rounded-2xl border border-border bg-surface p-6">
@@ -79,6 +92,13 @@ export function BillingSummary({ quota }: BillingSummaryProps) {
         <p className="font-sans text-xs text-text-secondary">
           Se reinician el {formatoReinicio(quota.reinicia)}.
         </p>
+
+        {/* Solo para quien ya es cliente de Stripe. Cambiar tarjeta, ver recibos
+            y darse de baja se hacen en su portal: reimplementarlo aquí sería
+            rehacer prorrateos y reintentos que ya existen ahí. */}
+        {billing?.gestionable && (
+          <PlanActionButton accion="portal">Gestionar suscripción</PlanActionButton>
+        )}
       </div>
 
       <div
@@ -95,18 +115,31 @@ export function BillingSummary({ quota }: BillingSummaryProps) {
             : 'El plan gratuito, con menos conversaciones al mes.'}
         </p>
 
-        <button
-          type="button"
-          disabled
-          aria-disabled
-          className="mt-auto w-fit rounded-lg px-4 py-2 font-sans text-sm font-medium"
-          style={{
-            background: alpha(colors.textSecondary, 10),
-            color: colors.textDisabled,
-          }}
-        >
-          Aún no disponible
-        </button>
+        {otro === 'PRO' && billing?.disponible ? (
+          <PlanActionButton accion="checkout">Pasar a PRO</PlanActionButton>
+        ) : (
+          /**
+           * Dos casos distintos con la misma pinta, y es correcto:
+           *
+           * - Ya eres PRO, así que «el otro» es FREE y bajar de plan se hace
+           *   desde el portal de Stripe, no desde aquí.
+           * - No hay pasarela configurada en este entorno.
+           *
+           * En los dos, ofrecer un botón sería prometer algo que no ocurre.
+           */
+          <button
+            type="button"
+            disabled
+            aria-disabled
+            className="mt-auto w-fit rounded-lg px-4 py-2 font-sans text-sm font-medium"
+            style={{
+              background: alpha(colors.textSecondary, 10),
+              color: colors.textDisabled,
+            }}
+          >
+            {otro === 'PRO' ? 'Aún no disponible' : 'Se gestiona desde tu suscripción'}
+          </button>
+        )}
       </div>
     </div>
   );

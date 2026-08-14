@@ -24,6 +24,22 @@ export interface AssistantQuota {
   reinicia: string;
 }
 
+/**
+ * Qué puede ofrecer la pantalla, según `GET /me/billing/estado`.
+ *
+ * Se pregunta en vez de deducirse del plan porque son cosas distintas:
+ * `disponible` depende de que el **backend** tenga claves de Stripe —cosa que
+ * el navegador no puede saber— y `gestionable`, de que esta persona ya sea
+ * cliente. Alguien con plan PRO puesto a mano desde administración no tiene
+ * suscripción que gestionar.
+ */
+export interface EstadoDeFacturacion {
+  /** Hay pasarela configurada. Sin esto no se enseña ningún botón de compra. */
+  disponible: boolean;
+  /** Ya es cliente de Stripe: se le puede abrir el portal de facturación. */
+  gestionable: boolean;
+}
+
 /** «2026-07» → «julio de 2026». Si el formato no cuadra, se enseña tal cual. */
 export function formatoPeriodo(periodo: string): string {
   const [anio, mes] = periodo.split('-').map(Number);
