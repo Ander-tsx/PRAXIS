@@ -46,6 +46,33 @@ export const colors = {
   infoMuted: 'var(--color-info-muted)',
 } as const;
 
+/**
+ * Los seis tonos de serie, **en orden fijo**.
+ *
+ * Para categorías que no traen color propio —etiquetas, personas— y solo
+ * cuando el gráfico no las nombra ya en un eje: en unas barras horizontales el
+ * nombre está escrito al lado de cada barra y pintarlas de seis colores es
+ * repetir la misma información dos veces. Donde hace falta de verdad es en una
+ * dona, que no tiene eje.
+ *
+ * ⚠️ **No se cicla.** A partir de la sexta, las categorías se agrupan en
+ * «Otras»: un séptimo tono generado deja de distinguirse de alguno de estos, y
+ * un gráfico donde dos series comparten color miente sobre cuántas hay.
+ *
+ * Los valores y el porqué de cada uno, en `commons/styles/theme.css`.
+ */
+export const serieColors = [
+  'var(--color-serie-1)',
+  'var(--color-serie-2)',
+  'var(--color-serie-3)',
+  'var(--color-serie-4)',
+  'var(--color-serie-5)',
+  'var(--color-serie-6)',
+] as const;
+
+/** Cuántas categorías caben antes de agrupar en «Otras». */
+export const MAX_SERIES = serieColors.length;
+
 export type ColorToken = keyof typeof colors;
 
 /** Valores hex directos (usar solo en contextos que no soportan CSS vars) */

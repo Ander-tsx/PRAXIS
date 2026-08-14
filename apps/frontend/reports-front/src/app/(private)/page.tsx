@@ -1,7 +1,7 @@
+import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 import { AppHeader, type Paginated, type Project, reportPath } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import { redirect } from 'next/navigation';
-import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 
 /**
  * Puerta de la sección.

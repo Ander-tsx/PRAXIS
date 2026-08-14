@@ -59,6 +59,37 @@ export interface ReportPerson {
 }
 
 /**
+ * Lo que está parado: abiertas que llevan `dias` sin cambiar de columna.
+ *
+ * ⚠️ `sinHistorial` **no significa antigua**: son las anteriores a la captura de
+ * eventos, donde lo que se mide es la edad y no el parón. Cualquier gráfico que
+ * las cuente tiene que poder decirlo, o acusa de paradas a tareas que solo son
+ * viejas.
+ */
+export interface ReportBlocked {
+  dias: number;
+  total: number;
+  tareas: {
+    taskId: string;
+    titulo: string;
+    columna: string;
+    columnId: string;
+    diasParada: number;
+    sinHistorial: boolean;
+    vencida: boolean;
+  }[];
+}
+
+/** Cierres y entradas por semana. La última de la serie está a medias. */
+export interface ReportWeekly {
+  semana: { semana: string; cerradas: number; creadas: number; diasTranscurridos: number };
+  anterior: { semana: string; cerradas: number; creadas: number };
+  variacion: number | null;
+  ritmoDiario: { semana: number; anterior: number };
+  serie: { semana: string; cerradas: number; creadas: number }[];
+}
+
+/**
  * Del token de color del sistema al color real.
  *
  * Las columnas y las etiquetas guardan un token (`primary`, `success`…), no un

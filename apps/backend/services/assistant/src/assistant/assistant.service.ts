@@ -6,6 +6,9 @@ import {
   type AssistantPlanName,
   type AssistantProposal,
   MAX_HISTORIAL,
+  type ReportChartShape,
+  type ReportMetric,
+  validarGrafico,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
@@ -33,6 +36,17 @@ interface ChatPayload {
   /** Mapa efectivo, ya expandido por jerarquía. Lo resuelve el gateway. */
   permisos: Record<string, boolean>;
   miembros: { userId: string; nombre: string }[];
+  /**
+   * Lo último que se dijo en el chat del equipo, ya resuelto por el gateway.
+   *
+   * ⚠️ **Solo el de este proyecto.** Las conversaciones privadas no llegan aquí
+   * ni deben: son de dos personas, y meterlas en el contexto de un asistente de
+   * proyecto sería enseñárselas a cualquiera con acceso al proyecto.
+   *
+   * Opcional para que una petición vieja —o un gateway sin actualizar— no
+   * reviente el turno.
+   */
+  chat?: { autor: string; texto: string; cuando: string }[];
 }
 
 /** La forma del briefing, en lo que hace falta para validar lo que propone. */
@@ -40,7 +54,15 @@ interface Briefing {
   columnas: { id: string; nombre: string; orden: number }[];
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
-  tareas?: { id: string; titulo: string; cerrada: boolean; columnId: string; columna: string }[];
+  tareas?: {
+    id: string;
+    titulo: string;
+    cerrada: boolean;
+    columnId: string;
+    columna: string;
+    /** Los pasos del checklist, si los tiene. Es lo que permite validar los ids. */
+    pasos?: { id: string; texto: string; hecho: boolean }[];
+  }[];
 }
 
 @Injectable()
@@ -77,7 +99,12 @@ export class AssistantService {
     return this.quota.estado(userId);
   }
 
-  /** Asignar plan a mano: no hay pasarela de pago. Lo llama administración. */
+  /**
+   * Asignar plan a mano. Lo llama administración.
+   *
+   * Sigue existiendo con la pasarela puesta: es la vía para regalar PRO, para
+   * arreglar un cobro que salió mal y para quitarlo sin pasar por Stripe.
+   */
   cambiarPlan(userId: string, plan: AssistantPlanName) {
     return this.quota.cambiarPlan(userId, plan);
   }
@@ -85,6 +112,26 @@ export class AssistantService {
   /** Los planes de una tanda de usuarios, para la lista de administración. */
   planesDe(userIds: string[]) {
     return this.quota.planesDe(userIds);
+  }
+
+  /** Lo que hace falta para abrir un pago: el cliente de Stripe, si ya lo hay. */
+  facturacionDe(userId: string) {
+    return this.quota.facturacionDe(userId);
+  }
+
+  /** Aplica lo que dijo el webhook de Stripe. Idempotente a propósito. */
+  vincularSuscripcion(datos: {
+    userId: string;
+    plan: AssistantPlanName;
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+  }) {
+    return this.quota.vincularSuscripcion(datos);
+  }
+
+  /** De quién es una suscripción de Stripe. Para las bajas, que no traen userId. */
+  porSuscripcion(stripeSubscriptionId: string) {
+    return this.quota.porSuscripcion(stripeSubscriptionId);
   }
 
   /**
@@ -147,6 +194,11 @@ export class AssistantService {
         briefing,
         payload.miembros,
         herramientas.map((herramienta) => herramienta.name),
+        payload.chat ?? [],
+        /* Quién pregunta sale de la lista de miembros que ya llega resuelta: no
+           hace falta ninguna consulta más. Si no estuviera —no debería pasar—
+           el prompt simplemente omite el bloque en vez de mentir con un id. */
+        payload.miembros.find((miembro) => miembro.userId === payload.userId),
       ),
       /* Sale de la base, ya recortado a MAX_HISTORIAL. */
       history,
@@ -327,6 +379,115 @@ export class AssistantService {
              sobre qué tarea es sin ir a buscarla. */
           ...(tarea ? { taskTitle: tarea.titulo } : {}),
           assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /**
+     * Un mensaje para el chat del equipo.
+     *
+     * ⚠️ **No apunta a ninguna tarea**, así que va antes del filtro de abajo: si
+     * pasara por él se descartaría siempre por no traer `taskId`, y el modelo
+     * parecería estar ignorando la herramienta.
+     *
+     * Las menciones que traiga el texto **no se validan aquí**, y es a propósito:
+     * el nombre lo escribe quien redacta, así que una etiqueta apuntando a
+     * alguien que ya no está solo se pinta como texto plano — que es justo lo que
+     * hace el formato. Lo único que se comprueba es que haya texto.
+     */
+    if (call.name === 'proponer_mensaje') {
+      const body = String(call.args.body ?? '').trim();
+      if (!body) return null;
+
+      return {
+        tool: call.name,
+        args: {
+          body: body.slice(0, 2000),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /**
+     * Marcar pasos del checklist.
+     *
+     * ⚠️ **Los ids se comprueban contra los pasos de esa tarea**, no solo contra
+     * el inventario: un id de otro paso —o de otra tarea— llegaría a la tarjeta
+     * y moriría en un 404 al aceptar. Y se descartan los que **ya están
+     * hechos**: marcarlos otra vez no hace nada y confunde a quien revise.
+     *
+     * Si no queda ninguno válido se descarta la propuesta entera: una tarjeta
+     * que no va a cambiar nada es peor que ninguna tarjeta.
+     */
+    if (call.name === 'proponer_marcar_pasos') {
+      const taskId = String(call.args.taskId ?? '');
+      const tarea = briefing.tareas?.find((t) => t.id === taskId);
+      if (!tarea) {
+        this.log.warn(`El modelo propuso marcar pasos de ${taskId}, que no esta en el proyecto`);
+        return null;
+      }
+
+      const pendientes = new Set(
+        (tarea.pasos ?? []).filter((paso) => !paso.hecho).map((paso) => paso.id),
+      );
+      const itemIds = this.soloConocidos(call.args.itemIds, pendientes);
+      if (itemIds.length === 0) return null;
+
+      return {
+        tool: call.name,
+        args: {
+          taskId,
+          taskTitle: tarea.titulo,
+          itemIds,
+          /* Los textos viajan con la propuesta: la tarjeta tiene que poder decir
+             QUÉ pasos se van a marcar sin ir a buscarlos. */
+          items: (tarea.pasos ?? [])
+            .filter((paso) => itemIds.includes(paso.id))
+            .map((paso) => paso.texto),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /**
+     * Un gráfico para el lienzo de quien pregunta.
+     *
+     * ⚠️ **Aquí es donde se cierra el conjunto cerrado.** El `enum` que se le
+     * declara a Gemini es una sugerencia con muy buena tasa de acierto, no una
+     * garantía: nada impide que devuelva una métrica inventada o una
+     * combinación que no se puede dibujar. `validarGrafico` es la comprobación
+     * de verdad, y es la **misma función** que aplica el DTO del gateway al
+     * guardar el lienzo — dos puertas, una sola definición de qué es válido.
+     *
+     * Cuando no pasa se descarta la propuesta y se registra el motivo. No se
+     * «arregla» cayendo a una forma que sí valga, al contrario que
+     * `proponer_tarea` con su columna: ahí el destino es un matiz de algo que
+     * se pidió, aquí la forma **es** lo que se pidió, y dibujar otra cosa
+     * distinta de la que dice la tarjeta sería mentir en la propia tarjeta.
+     */
+    if (call.name === 'proponer_grafico') {
+      const grafico = {
+        forma: String(call.args.forma ?? '') as ReportChartShape,
+        metrica: String(call.args.metrica ?? '') as ReportMetric,
+        ...(Number.isInteger(call.args.dias) ? { dias: Number(call.args.dias) } : {}),
+        ...(call.args.soloVencidas === true ? { soloVencidas: true } : {}),
+        ...(Number.isInteger(call.args.topN) ? { topN: Number(call.args.topN) } : {}),
+        titulo: String(call.args.titulo ?? '')
+          .trim()
+          .slice(0, 80),
+      };
+
+      const problema = validarGrafico(grafico);
+      if (problema) {
+        this.log.warn(`El modelo propuso un grafico que no se puede dibujar: ${problema}`);
+        return null;
+      }
+
+      return {
+        tool: call.name,
+        args: {
+          grafico,
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };

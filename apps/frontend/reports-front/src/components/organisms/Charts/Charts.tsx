@@ -1,5 +1,6 @@
 'use client';
 
+import { type ReportCycleTime, type ReportFlow, formatDay, formatDuration } from '@/lib/reports';
 import { alpha, colors } from '@praxis/commons';
 import {
   Area,
@@ -16,7 +17,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { type ReportCycleTime, type ReportFlow, formatDay, formatDuration } from '@/lib/reports';
 
 /**
  * Los gráficos, todos aquí y todos de cliente.

@@ -111,6 +111,57 @@ export interface PropuestaComentario extends SobreTarea {
   body: string;
 }
 
+/**
+ * `proponer_mensaje`. Se envía al chat del equipo, a nombre de quien acepta.
+ *
+ * ⚠️ **No extiende `SobreTarea`**: es la única propuesta que no apunta a una
+ * tarea. Va al chat del proyecto entero.
+ *
+ * El cuerpo puede traer menciones en el formato `@[Nombre](user:id)`. No se
+ * resuelven aquí: el nombre ya está escrito dentro, así que la tarjeta lo pinta
+ * tal cual y el chat lo convierte en etiqueta al mostrarlo.
+ */
+export interface PropuestaMensaje {
+  body: string;
+  porQue?: string;
+}
+
+/**
+ * `proponer_marcar_pasos`. Marca pasos del checklist como hechos.
+ *
+ * ⚠️ **Solo marca.** No desmarca ni borra: el asistente no deshace trabajo.
+ * `items` son los textos, para que la tarjeta pueda decir QUÉ se marca sin ir a
+ * buscarlo; `itemIds` es lo que se manda al aceptar.
+ */
+export interface PropuestaMarcarPasos extends SobreTarea {
+  itemIds: string[];
+  items: string[];
+}
+
+/**
+ * `proponer_grafico`. Un gráfico para **el lienzo de quien acepta**.
+ *
+ * ⚠️ **La única propuesta que no toca el proyecto.** Aceptarla no cambia
+ * ninguna tarea, ningún comentario y nada de lo que ve el resto del equipo: el
+ * lienzo de Análisis es de cada persona. La tarjeta lo dice, porque «el
+ * asistente quiere añadir algo» se lee peor de lo que es.
+ *
+ * `grafico` viene **ya validado contra el conjunto cerrado** por el servicio, y
+ * se vuelve a validar en el gateway al guardarlo. El modelo eligió la forma y la
+ * métrica; los números salen de los agregados de siempre.
+ */
+export interface PropuestaGrafico {
+  grafico: {
+    forma: string;
+    metrica: string;
+    dias?: number;
+    soloVencidas?: boolean;
+    topN?: number;
+    titulo: string;
+  };
+  porQue?: string;
+}
+
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /** Una conversación en la lista lateral, sin sus mensajes. */
@@ -191,6 +242,28 @@ export function esPropuestaDeComentario(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: PropuestaComentario } {
   return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
+}
+
+export function esPropuestaDeMarcarPasos(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaMarcarPasos } {
+  return propuesta.tool === 'proponer_marcar_pasos' && Array.isArray(propuesta.args.itemIds);
+}
+
+export function esPropuestaDeGrafico(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaGrafico } {
+  return (
+    propuesta.tool === 'proponer_grafico' &&
+    typeof propuesta.args.grafico === 'object' &&
+    propuesta.args.grafico !== null
+  );
+}
+
+export function esPropuestaDeMensaje(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: PropuestaMensaje } {
+  return propuesta.tool === 'proponer_mensaje' && typeof propuesta.args.body === 'string';
 }
 
 /**

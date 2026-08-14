@@ -1,7 +1,6 @@
 'use server';
 
-import { ApiError, type ProjectDetail, type Task } from '@praxis/commons';
-import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { randomUUID } from 'node:crypto';
 import {
   type AssistantChatResult,
   type AssistantQuota,
@@ -11,9 +10,15 @@ import {
   type PropuestaChecklist,
   type PropuestaComentario,
   type PropuestaEdicion,
+  type PropuestaGrafico,
+  type PropuestaMarcarPasos,
   type PropuestaMovimiento,
   type PropuestaTarea,
 } from '@/lib/assistant';
+import { CATALOGO, MAX_WIDGETS, type Widget, siguienteFila } from '@/lib/widgets';
+import { ApiError, type ProjectDetail, type Task } from '@praxis/commons';
+import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { revalidatePath } from 'next/cache';
 
 /**
  * Las acciones del asistente.
@@ -34,9 +39,18 @@ import {
  * | `aceptarMovimientoAction` | `POST /tasks/:id/move` | `canMoveTask` |
  * | `aceptarChecklistAction` | `POST /tasks/:id/checklists` | `canEditTask` |
  * | `aceptarComentarioAction` | `POST /tasks/:id/comments` | `canComment` |
+ * | `aceptarMarcarPasosAction` | `POST /tasks/:id/checklists/:item/toggle` | `canMoveTask` |
+ * | `aceptarMensajeAction` | `POST /projects/:id/chat/messages` | `canComment` |
+ * | `aceptarGraficoAction` | `PUT /projects/:id/reports/layout` | `canViewReports` |
  *
  * No se abre ninguna vía de escritura nueva: sin `canCreateTask`, aceptar falla
  * igual que le fallaría a esa persona pulsando el botón a mano.
+ *
+ * ⚠️ **La última de la tabla es la excepción que conviene entender.** No escribe
+ * en el proyecto sino en el **lienzo de quien acepta**, y usa el mismo endpoint,
+ * el mismo permiso y la misma fila que el propio lienzo al arrastrar un gráfico.
+ * Sigue sin haber una vía nueva: si esa persona puede colocar un gráfico a mano,
+ * puede aceptarlo propuesto; y si no puede entrar aquí, tampoco hay asistente.
  *
  * **Y no hay ninguna que borre.** No existe `aceptarBorradoAction` ni la va a
  * haber: ver la nota al pie de `tools.ts`.
@@ -49,11 +63,14 @@ import {
  * viaja como POST a la ruta donde se usa y un cambio de `matcher` en `proxy.ts`
  * podría dejarla fuera del guard.
  *
- * ⚠️ **Ninguna llama a `revalidatePath`, y es a propósito.** Lo que cambia al
- * aceptar es el tablero, que vive en otra zona y no comparte caché con esta;
- * revalidar aquí solo conseguiría volver a renderizar la página de reportes
- * —cinco informes, dos de ellos recorriendo el historial— para no cambiar ni un
- * píxel de lo que se está viendo.
+ * ⚠️ **Ninguna de las del tablero llama a `revalidatePath`, y es a propósito.**
+ * Lo que cambian vive en otra zona y no comparte caché con esta; revalidar aquí
+ * solo conseguiría volver a renderizar los informes para no cambiar ni un píxel
+ * de lo que se está viendo.
+ *
+ * `aceptarGraficoAction` **sí** revalida, y es la excepción exacta que confirma
+ * la regla: lo que cambia es esta misma página. Sin revalidar, el gráfico
+ * aceptado no aparecería hasta que alguien recargue.
  */
 
 async function requireApi() {
@@ -604,6 +621,67 @@ export async function aceptarChecklistAction(
 }
 
 /**
+ * Marcar pasos del checklist como hechos.
+ *
+ * Va a `POST /tasks/:id/checklists/:item/toggle`, que pide **`canMoveTask`** y no
+ * `canEditTask`: marcar un paso es decir que se hizo el trabajo, no redefinir en
+ * qué consistía.
+ *
+ * ⚠️ **Se comprueba el estado real antes de alternar.** `toggle` invierte, así
+ * que uno que ya estuviera hecho —porque alguien lo marcó entre la propuesta y
+ * el clic— se **desmarcaría**. Eso convertiría una propuesta de «dar por hecho»
+ * en deshacer trabajo ajeno, que es justo lo que el asistente no puede hacer.
+ */
+export async function aceptarMarcarPasosAction(
+  projectId: string,
+  propuesta: PropuestaMarcarPasos,
+): Promise<AceptarSobreTareaState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, hecha: null };
+
+  const { tarea } = encontrada;
+  const pedidos = new Set((propuesta.itemIds ?? []).map((id: string) => String(id)));
+
+  /* Solo los que siguen pendientes **ahora**, no cuando se propuso. */
+  const porMarcar = (tarea.checklists ?? []).filter(
+    (paso) => pedidos.has(paso.id) && !paso.completed,
+  );
+
+  if (porMarcar.length === 0) {
+    return { error: 'Esos pasos ya estaban marcados.', hecha: null };
+  }
+
+  let marcados = 0;
+  try {
+    for (const paso of porMarcar) {
+      await api.post(`/tasks/${tarea.id}/checklists/${paso.id}/toggle`, { completed: true });
+      marcados += 1;
+    }
+  } catch (error) {
+    if (marcados === 0) {
+      return { error: describe(error, 'No se pudieron marcar los pasos.'), hecha: null };
+    }
+    return {
+      error: `Se marcaron ${marcados} de ${porMarcar.length} pasos antes de fallar.`,
+      hecha: null,
+    };
+  }
+
+  return {
+    error: null,
+    hecha: {
+      id: tarea.id,
+      title: tarea.title,
+      boardId: tarea.boardId,
+      detalle: marcados === 1 ? 'Se marcó 1 paso.' : `Se marcaron ${marcados} pasos.`,
+    },
+  };
+}
+
+/**
  * Publicar un comentario en una tarea.
  *
  * Va a `POST /tasks/:taskId/comments`, que pide `canComment`. El autor sale del
@@ -646,6 +724,45 @@ export async function aceptarComentarioAction(
 }
 
 /**
+ * Enviar un mensaje al chat del equipo.
+ *
+ * Va a `POST /projects/:id/chat/messages`, que pide `canComment` — el mismo
+ * permiso que el asistente necesitaba para que se le declarara la herramienta.
+ * El autor sale del token, así que **el mensaje queda a nombre de quien acepta**,
+ * no del asistente.
+ *
+ * ⚠️ Es la propuesta **con más alcance de todas**: un comentario queda en una
+ * tarea, pero esto suena en el teléfono de todo el equipo. Por eso la tarjeta
+ * enseña el texto entero antes de enviarlo — nadie debería firmar algo que no ha
+ * leído, y menos algo que va a interrumpir a otros.
+ *
+ * ⚠️ **No devuelve `AceptarSobreTareaState`** como las demás: no hay tarea a la
+ * que enlazar después. Se devuelve solo el resultado, y por eso la tarjeta usa
+ * un marco distinto.
+ */
+export async function aceptarMensajeAction(
+  projectId: string,
+  propuesta: { body?: unknown },
+): Promise<{ error: string | null; enviado: boolean }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', enviado: false };
+
+  const body = String(propuesta.body ?? '').trim();
+  if (body.length === 0) return { error: 'El mensaje está vacío.', enviado: false };
+
+  try {
+    /* Se confirma contra el `data`, no contra el status: un 200 sin cuerpo ya
+       nos ha mentido antes. */
+    const creado = await api.post<{ id: string }>(`/projects/${projectId}/chat/messages`, { body });
+    if (!creado?.id) return { error: 'El servidor no envió el mensaje.', enviado: false };
+
+    return { error: null, enviado: true };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo enviar el mensaje.'), enviado: false };
+  }
+}
+
+/**
  * `YYYY-MM-DD` → ISO al final de ese día.
  *
  * Igual que en el tablero: una fecha de vencimiento se cumple **durante** el día,
@@ -654,4 +771,116 @@ export async function aceptarComentarioAction(
 function toIsoDueDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
+}
+
+/* ─── El lienzo ───────────────────────────────────────────────────────── */
+
+/**
+ * Guarda la disposición del lienzo de quien llama.
+ *
+ * ⚠️ **No lleva `revalidatePath`, por el mismo motivo que las del asistente.**
+ * Mover un gráfico ya lo ha movido el navegador; volver a renderizar la page en
+ * el servidor solo pediría otra vez los mismos informes para pintar exactamente
+ * lo que ya se está viendo. Quien sí lo necesita es *añadir* un widget, porque
+ * su informe todavía no se ha pedido — y eso lo hace el propio lienzo con
+ * `router.refresh()`, que es una decisión del gesto y no de la escritura.
+ *
+ * El `userId` **no viaja**: lo pone el gateway desde el token. Aquí no hay forma
+ * de escribir en el lienzo de otra persona ni equivocándose.
+ */
+export async function guardarLienzoAction(
+  projectId: string,
+  widgets: Widget[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const api = await requireApi();
+  if (!api) return { ok: false, error: 'Tu sesión ha caducado.' };
+
+  try {
+    /* Solo los campos que el DTO declara: uno de sobra ya da 400. `tipo` y
+       `grafico` viajan tal cual porque el servidor los valida contra el
+       catálogo cerrado, que es donde tiene que estar esa comprobación. */
+    await api.put(`/projects/${projectId}/reports/layout`, {
+      widgets: widgets.map((widget) => ({
+        id: widget.id,
+        tipo: widget.tipo,
+        x: widget.x,
+        y: widget.y,
+        w: widget.w,
+        h: widget.h,
+        ...(widget.grafico ? { grafico: widget.grafico } : {}),
+      })),
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: describe(error, 'No se pudo guardar la disposición.') };
+  }
+}
+
+/**
+ * Acepta un gráfico propuesto: lo **añade al lienzo de quien acepta**.
+ *
+ * ⚠️ **No es una vía de escritura nueva sobre el proyecto**, y conviene decirlo
+ * porque es la primera acción del asistente que no llama a un endpoint del
+ * tablero. Escribe en `PUT /projects/:id/reports/layout`, que es exactamente el
+ * mismo endpoint que usa el lienzo al arrastrar un gráfico, con el mismo permiso
+ * —`canViewReports`, que ya hizo falta para llegar al asistente— y sobre la
+ * misma fila: la de esta persona en este proyecto. No hay forma de tocar el
+ * lienzo de nadie más, porque el `userId` lo pone el gateway desde el token.
+ *
+ * Se lee el lienzo antes de escribirlo en vez de mandar solo el gráfico nuevo,
+ * porque la ruta guarda la disposición **entera**. Se acepta la carrera que eso
+ * abre —mover una tarjeta en otra pestaña entre la lectura y la escritura— por
+ * lo mismo que no hay control de concurrencia en la tabla: las dos pestañas que
+ * podrían pisarse son las de la misma persona.
+ *
+ * La parametrización se manda **tal cual vino**: el gateway la valida contra el
+ * catálogo cerrado, que es donde esa comprobación se puede garantizar. Si el
+ * modelo hubiera colado algo imposible, esto devuelve el 400 y la tarjeta lo
+ * dice, en vez de dibujar un gráfico que no significa nada.
+ */
+export async function aceptarGraficoAction(
+  projectId: string,
+  propuesta: PropuestaGrafico,
+): Promise<{ anadido: boolean; error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { anadido: false, error: 'Tu sesión ha caducado.' };
+
+  try {
+    const lienzo = await api.get<{ widgets: Widget[] }>(`/projects/${projectId}/reports/layout`);
+    const widgets = lienzo.widgets ?? [];
+
+    if (widgets.length >= MAX_WIDGETS) {
+      return {
+        anadido: false,
+        error: `Tu lienzo ya tiene ${MAX_WIDGETS} gráficos. Quita alguno para añadir este.`,
+      };
+    }
+
+    const nuevo: Widget = {
+      id: randomUUID(),
+      tipo: 'generado',
+      x: 0,
+      y: siguienteFila(widgets),
+      w: CATALOGO.generado.w,
+      h: CATALOGO.generado.h,
+      grafico: propuesta.grafico as Widget['grafico'],
+    };
+
+    const resultado = await guardarLienzoAction(projectId, [...widgets, nuevo]);
+    if (!resultado.ok) return { anadido: false, error: resultado.error };
+
+    /**
+     * ⚠️ **Esta sí revalida, al revés que las otras ocho.**
+     *
+     * Las del tablero no lo hacen porque lo que cambian vive en otra zona, que
+     * no comparte caché con esta: revalidar aquí volvería a renderizar los
+     * informes para no cambiar un píxel. Esta es la excepción exacta — lo que
+     * cambia **es esta página**, y sin revalidar el gráfico aceptado no aparece
+     * hasta que alguien recargue, que se lee como que aceptar no hizo nada.
+     */
+    revalidatePath(`/${projectId}`);
+    return { anadido: true, error: null };
+  } catch (error) {
+    return { anadido: false, error: describe(error, 'No se pudo añadir el gráfico.') };
+  }
 }

@@ -263,6 +263,195 @@ const PROPONER_COMENTARIO: FunctionDeclaration = {
 };
 
 /**
+ * Escribir en el chat del equipo.
+ *
+ * ⚠️ **Solo el chat del proyecto que se está mirando, nunca uno privado.** El
+ * asistente vive dentro de un proyecto y lo que sabe es de ese proyecto; darle
+ * la capacidad de escribirle a alguien por privado sería dejarle mandar mensajes
+ * a nombre de una persona en una conversación que el proyecto no contiene. Si
+ * hace falta avisar a alguien, se le menciona aquí — que es público y queda a la
+ * vista de todo el equipo.
+ *
+ * Cuelga de `canComment` por lo mismo que el chat: es el permiso de participar
+ * en una conversación sin poder editar el trabajo de nadie.
+ */
+const PROPONER_MENSAJE: FunctionDeclaration = {
+  name: 'proponer_mensaje',
+  description:
+    'Prepara un mensaje para el chat del equipo de ESTE proyecto. NO lo envia: ' +
+    'la persona tiene que aceptarlo, y se enviara a SU nombre, no al tuyo. ' +
+    'Usalo cuando haya algo que el equipo deba saber —un bloqueo, un ' +
+    'vencimiento que se echa encima, una decision que se acaba de tomar— y la ' +
+    'persona no lo haya pedido explicitamente: ofrecelo como pregunta.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      body: {
+        type: 'STRING',
+        description:
+          'El mensaje, redactado en primera persona como lo escribiria quien lo ' +
+          'envia. Corto y concreto. Para dirigirte a alguien del equipo usa ' +
+          'EXACTAMENTE el formato @[Nombre](user:userId) con el userId de ' +
+          '"PERSONAS DEL PROYECTO": la interfaz lo pinta como mencion. Para ' +
+          'referirte a una tarea usa /[Titulo](task:taskId) con un id de ' +
+          '"tareas". Nunca inventes un id. Maximo 2000 caracteres.',
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase sobre por que el equipo deberia saber esto.',
+      },
+    },
+    required: ['body', 'porQue'],
+  },
+};
+
+/**
+ * Marcar pasos de un checklist como hechos.
+ *
+ * ⚠️ Cuelga de **`canMoveTask`, no de `canEditTask`**, igual que su endpoint y
+ * por el mismo motivo que mover una tarjeta: quien ejecuta el trabajo tiene que
+ * poder decir que terminó un paso sin poder redefinir en qué consistía. Añadir o
+ * quitar pasos sigue siendo `canEditTask` — eso sí es decidir el trabajo.
+ *
+ * Es la contrapartida natural de tener los pasos en el contexto: sin esto, el
+ * asistente puede decir «te faltan dos pasos» y no puede hacer nada al respecto.
+ */
+const PROPONER_MARCAR_PASOS: FunctionDeclaration = {
+  name: 'proponer_marcar_pasos',
+  description:
+    'Prepara una propuesta para marcar como HECHOS uno o varios pasos del ' +
+    'checklist de una tarea. NO los marca: la persona tiene que aceptarla. ' +
+    'Usalo cuando cuenten que han terminado algo que corresponde a un paso ' +
+    'concreto. Solo marca; no puede desmarcar ni borrar.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description: 'id de una tarea de "tareas" del contexto. Nunca lo inventes.',
+      },
+      itemIds: {
+        type: 'ARRAY',
+        items: { type: 'STRING' },
+        description:
+          'ids de los pasos, sacados del campo "pasos" de esa tarea. Incluye ' +
+          'SOLO los que estan con "hecho": false — marcar uno ya hecho no hace ' +
+          'nada y confunde a quien lo revise.',
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Una frase sobre por que se dan por hechos.',
+      },
+    },
+    required: ['taskId', 'itemIds', 'porQue'],
+  },
+};
+
+/**
+ * Añadir un gráfico al lienzo de Análisis de quien pregunta.
+ *
+ * ## Es la única que no escribe en el proyecto
+ *
+ * Las otras ocho proponen tocar el tablero. Esta propone tocar **el lienzo de
+ * quien está hablando**, que es suyo y de nadie más: aceptar no cambia ni una
+ * tarea, ni un comentario, ni lo que ve ningún compañero. Por eso cuelga de
+ * `canViewReports`, el permiso que ya hizo falta para llegar al asistente, y no
+ * de ninguno de escritura — no hay ninguno que conceder porque no hay nada
+ * ajeno que escribir.
+ *
+ * Sigue llegando **como propuesta con su tarjeta**, igual que las demás. No es
+ * una formalidad: un gráfico que apareciera solo en la pantalla de alguien es
+ * exactamente la clase de cosa que hace desconfiar de un asistente, por
+ * inofensiva que sea.
+ *
+ * ## Lo que el modelo elige, y lo que no
+ *
+ * Elige **de un conjunto cerrado**: forma, métrica, recorte y rango. No escribe
+ * consultas, no escribe código y no produce ni una cifra — los números salen de
+ * los agregados que `reports-service` ya calcula, exactamente los mismos que
+ * alimentan los gráficos del catálogo.
+ *
+ * Es la línea de la regla 1 del prompt aplicada a los gráficos: **inventar el
+ * dato de partida está prohibido**. Un `SELECT` redactado por un modelo, o unas
+ * cifras estimadas «para ilustrar», serían justo eso, y se leerían con la misma
+ * autoridad que los medidos. `validarGrafico` rechaza además las combinaciones
+ * que no se sostienen —una serie temporal pedida como dona, un rango sobre una
+ * foto del momento—, porque un conjunto cerrado que admite combinaciones sin
+ * sentido no es un conjunto cerrado.
+ */
+const PROPONER_GRAFICO: FunctionDeclaration = {
+  name: 'proponer_grafico',
+  description:
+    'Prepara un grafico para anadirlo al panel de Analisis de quien te habla. NO lo ' +
+    'anade: tiene que aceptarlo. El panel es SUYO y de nadie mas, asi que esto no ' +
+    'cambia nada del proyecto ni lo ve el resto del equipo. Elige SOLO de las ' +
+    'opciones de abajo: no puedes inventar una metrica, ni calcular tu los numeros, ' +
+    'ni pedir un corte que no este en la lista. Usalo cuando te pidan ver algo de una ' +
+    'forma concreta, o cuando lo que estas explicando se entienda mejor mirandolo.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      metrica: {
+        type: 'STRING',
+        enum: [
+          'tareas_por_columna',
+          'tareas_por_prioridad',
+          'tareas_por_etiqueta',
+          'carga_por_persona',
+          'cerradas_por_persona',
+          'vencidas_por_persona',
+          'paradas_por_columna',
+          'flujo_por_columna',
+          'cierres_por_semana',
+          'creadas_por_semana',
+        ],
+        description:
+          'Que se cuenta. Las cuatro primeras y "paradas_por_columna" son una foto ' +
+          'del momento; las tres ultimas son una evolucion en el tiempo.',
+      },
+      forma: {
+        type: 'STRING',
+        enum: ['barras', 'barras_horizontales', 'dona', 'lineas', 'area_apilada'],
+        description:
+          'Como se dibuja. Las metricas de foto admiten barras, barras_horizontales ' +
+          'y dona. "flujo_por_columna" solo lineas o area_apilada. Las semanales ' +
+          'admiten lineas, area_apilada y barras. Pedir otra combinacion se rechaza.',
+      },
+      dias: {
+        type: 'INTEGER',
+        description:
+          'Opcional, de 1 a 365. SOLO para "paradas_por_columna" (ahi es el umbral: ' +
+          'cuantos dias sin moverse), "flujo_por_columna" y las semanales. En las de ' +
+          'foto NO se puede: cuentan lo que hay ahora, no un periodo.',
+      },
+      soloVencidas: {
+        type: 'BOOLEAN',
+        description: 'Opcional. SOLO para "paradas_por_columna". En el resto se rechaza.',
+      },
+      topN: {
+        type: 'INTEGER',
+        description:
+          'Opcional, de 2 a 20. Quedarse con las N mayores y agrupar el resto en ' +
+          '"Otras". Solo para etiquetas y personas, que son las que pueden ser muchas.',
+      },
+      titulo: {
+        type: 'STRING',
+        description:
+          'Como se llamara la tarjeta. Corto y en el idioma de la conversacion. ' +
+          'Maximo 80 caracteres. Que diga QUE se ve, no "Grafico 1".',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Una frase sobre que pregunta responde este grafico y por que ' +
+          'esa forma. La tarjeta lo enseña junto a la propuesta.',
+      },
+    },
+    required: ['metrica', 'forma', 'titulo', 'porQue'],
+  },
+};
+
+/**
  * Las herramientas que le tocan a esta persona.
  *
  * `canEditTask` implica `canMoveTask` y demás por jerarquía, y el mapa que llega
@@ -285,8 +474,20 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
    * `canMoveTask` por jerarquía, quien edita la recibe igual sin repetirla
    * arriba.
    */
-  if (permisos.canMoveTask) tools.push(PROPONER_MOVIMIENTO);
-  if (permisos.canComment) tools.push(PROPONER_COMENTARIO);
+  if (permisos.canMoveTask) tools.push(PROPONER_MOVIMIENTO, PROPONER_MARCAR_PASOS);
+  if (permisos.canComment) tools.push(PROPONER_COMENTARIO, PROPONER_MENSAJE);
+  /**
+   * El gráfico va con `canViewReports`, que **lo tiene todo el que llega aquí**
+   * desde §29.1: las dos rutas del asistente lo exigen. No es una comprobación
+   * de adorno — es la que dice de qué permiso depende esta capacidad el día que
+   * alguien abra otra puerta al asistente, igual que `incluirPersonas` se dejó
+   * puesta por eso mismo.
+   *
+   * Y es la única que le queda a un rol de solo lectura, que hasta ahora no
+   * podía proponer absolutamente nada. Tiene sentido que sea justo esta: mirar
+   * los datos de otra forma no es tocar el trabajo de nadie.
+   */
+  if (permisos.canViewReports) tools.push(PROPONER_GRAFICO);
   return tools;
 }
 
@@ -307,4 +508,10 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
  *
  * Si alguna vez alguien añade aquí algo destructivo, que sea sabiendo que
  * rompe las tres a la vez.
+ *
+ * **`proponer_grafico` no es la excepción**, aunque sea la primera que no toca
+ * el tablero. Solo **añade** al lienzo de quien habla; no existe la de quitar, y
+ * no se va a añadir por lo mismo que las demás: quitar un gráfico es un clic en
+ * su aspa, y darle al asistente la capacidad de vaciarle el panel a alguien solo
+ * abre una forma de que se lo vacíe sin querer.
  */

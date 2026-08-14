@@ -1,20 +1,30 @@
-import { ChartCard, NotEnoughData, Stat, SyntheticBanner } from '@/components/molecules/ChartCard';
+import { SyntheticBanner } from '@/components/molecules/ChartCard';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
-import { AssistantChat } from '@/components/organisms/AssistantChat';
-import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/organisms/Charts';
+import { GeneratedChart } from '@/components/organisms/Charts';
 import { ProjectPicker } from '@/components/organisms/ProjectPicker';
-import type { AssistantQuota } from '@/lib/assistant';
 import {
-  PRIORITY_COLOR,
-  PRIORITY_ORDER,
-  type ReportCycleTime,
-  type ReportFlow,
-  type ReportForecast,
-  type ReportPerson,
-  type ReportSnapshot,
-  formatDuration,
-  tokenColor,
+  CicloWidget,
+  FlujoWidget,
+  PersonasWidget,
+  PorColumnaWidget,
+  PorPrioridadWidget,
+  PrediccionWidget,
+  ResumenWidget,
+  TiemposWidget,
+} from '@/components/organisms/ReportWidgets';
+import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
+import type { AssistantQuota } from '@/lib/assistant';
+import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
+import type {
+  ReportBlocked,
+  ReportCycleTime,
+  ReportFlow,
+  ReportForecast,
+  ReportPerson,
+  ReportSnapshot,
+  ReportWeekly,
 } from '@/lib/reports';
+import { type Widget, informesNecesarios } from '@/lib/widgets';
 import {
   AppHeader,
   type EffectivePermissions,
@@ -29,6 +39,9 @@ import {
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
+
+import { guardarLienzoAction } from './actions';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -44,28 +57,38 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-const PRIORITY_LABEL: Record<string, string> = {
-  URGENT: 'Urgente',
-  HIGH: 'Alta',
-  MEDIUM: 'Media',
-  LOW: 'Baja',
-};
+/** Lo que devuelven las dos rutas del lienzo. */
+interface LienzoGuardado {
+  widgets: Widget[];
+  actualizadoEn: string | null;
+}
 
 /**
- * Los reportes de un proyecto, **todos en la misma página**.
+ * Análisis: un **lienzo configurable**, no cinco informes fijos.
  *
- * Estuvieron repartidos en cuatro pestañas y se juntaron. El motivo es que las
- * cuatro cuentan partes de una misma historia: cuánto trabajo hay, cómo se
- * mueve, cuánto tarda y qué cabe esperar. Separadas, comparar dos de ellas
- * obligaba a recordar la primera mientras se cargaba la segunda, que es
- * exactamente lo que un informe debería ahorrarte.
+ * ## Qué cambió respecto a la versión anterior
  *
- * El coste es explícito y se acepta: **se piden los cinco informes en cada
- * carga**, también los que recorren el historial. Van en paralelo y el servicio
- * los cachea 60 s, así que la espera es la del más lento, no la suma.
+ * La pantalla pintaba los cinco informes, todos, siempre, en un orden que nadie
+ * eligió. En un proyecto sin historial —que es todo proyecto durante sus
+ * primeras semanas— eso significaba tres avisos de «no hay suficientes datos» al
+ * abrirla: la pantalla se disculpaba antes de servir para nada. Y quien quería
+ * ver primero lo que a su equipo le importaba no podía.
  *
- * Cambiar de proyecto es un desplegable, no un viaje a otra pantalla: comparar
- * dos proyectos era ida y vuelta cada vez.
+ * Ahora el lienzo arranca vacío y cada cual pone lo que quiere, donde quiere y
+ * del tamaño que quiere. Es **de la persona, no del proyecto**: nadie ve el tuyo
+ * ni tú el suyo, así que reorganizarlo no necesita ningún permiso más allá del
+ * que ya te dejó entrar.
+ *
+ * ## Y el coste de carga se ha invertido
+ *
+ * Antes se pedían los cinco informes en cada carga, dos de ellos recorriendo el
+ * historial, hubiera o no algo que enseñar con ellos. Ahora **se mira el lienzo
+ * primero y se pide solo lo que come**: un lienzo vacío cuesta la instantánea y
+ * nada más, y uno con la instantánea puesta no paga el recorrido del historial.
+ *
+ * Eso obliga a **dos viajes en serie** —el lienzo y después sus informes— donde
+ * antes había uno. Se acepta: el primero es una lectura por clave primaria de una
+ * tabla de preferencias, y lo que ahorra el segundo es de otro orden de magnitud.
  */
 export default async function ProjectReportsPage({ params }: PageProps) {
   const { id } = await params;
@@ -75,15 +98,29 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   if (!project) return notFound();
 
   /**
+   * El UUID, resuelto, en una constante propia.
+   *
+   * ⚠️ **La ruta puede traer el slug**, y solo `GET /projects/:id` lo traduce:
+   * todo lo anidado —informes, permisos, lienzo, asistente— espera el UUID, y
+   * pasarle el slug no da error de compilación, da un 403.
+   *
+   * Va en una constante y no se lee de `project` dentro de la Server Action de
+   * abajo porque el `'use server'` corta el estrechamiento de tipos: allí
+   * `project` vuelve a ser `ProjectDetail | null` y haría falta un `!` que
+   * afirma algo que ya se comprobó tres líneas antes.
+   */
+  const projectId = project.id;
+
+  /**
    * `canViewReports` es la puerta del informe entero, no solo del desglose por
    * persona: sin él no hay agregados, ni tabla de personas, ni asistente.
    *
    * Se comprueba aquí aunque el gateway ya lo exija en las nueve rutas, porque
-   * el `Promise.all` de abajo caería en cascada a `null` y la pantalla
-   * enseñaría cinco tarjetas rotas en vez de decir qué pasa. El guard es la
+   * los `Promise.all` de abajo caerían en cascada a `null` y la pantalla
+   * enseñaría tarjetas rotas en vez de decir qué pasa. El guard es la
    * seguridad; esto es la explicación.
    */
-  const effective = await api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`);
+  const effective = await api.get<EffectivePermissions>(`/projects/${projectId}/permissions/me`);
   if (!effective.permissions.canViewReports) {
     return (
       <AppHeader title={`${project.name}`}>
@@ -93,45 +130,73 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   }
 
   /**
-   * Todo a la vez. Cada informe que falle cae a `null` y su tarjeta lo dice, en
-   * vez de tumbar la página entera: perder un gráfico es mucho mejor que perder
-   * el informe completo, y es el mismo criterio que ya usa el tablero con sus
-   * tareas por tablero.
+   * Primero el lienzo, porque decide todo lo demás.
+   *
+   * Va junto con lo que no depende de él: el selector, los miembros, las
+   * etiquetas y la cuota, que hacen falta con lienzo y sin él.
    */
-  const [proyectos, snapshot, flow, cycle, forecast, people, members, etiquetas, cuota] =
-    await Promise.all([
-      /* El selector solo ofrece lo que se puede abrir. `permission` filtra en la
-         consulta, así que no hace falta preguntar por los permisos de cada
-         proyecto uno a uno para acabar descartando casi todos. */
-      api
-        .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
-        .catch(() => ({ items: [] as Project[], total: 0 })),
-      api.get<ReportSnapshot>(`/projects/${project.id}/reports/snapshot`),
-      api.get<ReportFlow>(`/projects/${project.id}/reports/flow?days=60`).catch(() => null),
-      api.get<ReportCycleTime>(`/projects/${project.id}/reports/cycle-time`).catch(() => null),
-      api.get<ReportForecast>(`/projects/${project.id}/reports/forecast`).catch(() => null),
-      /* Ya no va condicionado: si llegas hasta aquí tienes `canViewReports`, y
-         el desglose por persona dejó de ser un permiso aparte. */
-      api
-        .get<ReportPerson[]>(`/projects/${project.id}/reports/people`)
-        .catch(() => []),
-      /* Los miembros y el directorio piden solo `canViewProject`: el asistente
-         necesita poner nombre a un `userId` para pintar una propuesta, y esas
-         dos rutas también las usa quien nunca abre esta pantalla. */
-      api
-        .get<ProjectMember[]>(`/projects/${project.id}/members`)
-        .catch(() => []),
-      /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
-         id, y la tarjeta tiene que enseñar el nombre. */
-      api
-        .get<Label[]>(`/projects/${project.id}/labels`)
-        .catch(() => [] as Label[]),
-      /* La cuota, al cargar y antes de escribir nada: poner el coste a la vista
-         de quien lo gasta evita encontrarse el límite de golpe. */
-      api
-        .get<AssistantQuota>(`/projects/${project.id}/assistant/quota`)
-        .catch(() => null),
-    ]);
+  const [lienzo, proyectos, members, etiquetas, cuota] = await Promise.all([
+    api
+      .get<LienzoGuardado>(`/projects/${projectId}/reports/layout`)
+      /* Un lienzo que no se puede leer se trata como vacío, no como un error:
+         perder la disposición es molesto, perder la pantalla entera es peor. */
+      .catch(() => ({ widgets: [] as Widget[], actualizadoEn: null })),
+    /* El selector solo ofrece lo que se puede abrir. `permission` filtra en la
+       consulta, así que no hace falta preguntar por los permisos de cada
+       proyecto uno a uno para acabar descartando casi todos. */
+    api
+      .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
+      .catch(() => ({ items: [] as Project[], total: 0 })),
+    /* Los miembros y el directorio piden solo `canViewProject`: el asistente
+       necesita poner nombre a un `userId` para pintar una propuesta. */
+    api
+      .get<ProjectMember[]>(`/projects/${projectId}/members`)
+      .catch(() => []),
+    /* El vocabulario con el que el modelo clasifica: en la propuesta viaja el
+       id, y la tarjeta tiene que enseñar el nombre. */
+    api
+      .get<Label[]>(`/projects/${projectId}/labels`)
+      .catch(() => [] as Label[]),
+    /* La cuota, al cargar y antes de escribir nada: poner el coste a la vista
+       de quien lo gasta evita encontrarse el límite de golpe. */
+    api
+      .get<AssistantQuota>(`/projects/${projectId}/assistant/quota`)
+      .catch(() => null),
+  ]);
+
+  const widgets = lienzo.widgets;
+  const necesarios = informesNecesarios(widgets);
+
+  /**
+   * La instantánea se pide **siempre**, aunque el lienzo no la use.
+   *
+   * Es la única que sabe si el historial de este proyecto está fabricado, y ese
+   * aviso no puede depender de qué gráficos tenga puesto cada cual: durante una
+   * demostración nadie distingue un dato medido de uno generado, y quien lo vea
+   * se llevará una conclusión falsa sobre gente real. Es además la más barata:
+   * es una foto del momento y no recorre el historial.
+   */
+  const [snapshot, flow, cycle, forecast, people, blocked, weekly] = await Promise.all([
+    api.get<ReportSnapshot>(`/projects/${projectId}/reports/snapshot`).catch(() => null),
+    pedirSi(necesarios.has('flow'), () =>
+      api.get<ReportFlow>(`/projects/${projectId}/reports/flow?days=60`),
+    ),
+    pedirSi(necesarios.has('cycle'), () =>
+      api.get<ReportCycleTime>(`/projects/${projectId}/reports/cycle-time`),
+    ),
+    pedirSi(necesarios.has('forecast'), () =>
+      api.get<ReportForecast>(`/projects/${projectId}/reports/forecast`),
+    ),
+    pedirSi(necesarios.has('people'), () =>
+      api.get<ReportPerson[]>(`/projects/${projectId}/reports/people`),
+    ),
+    pedirSi(necesarios.has('blocked'), () =>
+      api.get<ReportBlocked>(`/projects/${projectId}/reports/blocked`),
+    ),
+    pedirSi(necesarios.has('weekly'), () =>
+      api.get<ReportWeekly>(`/projects/${projectId}/reports/weekly`),
+    ),
+  ]);
 
   /**
    * Los perfiles de quienes salen en esta pantalla, **pedidos por id**.
@@ -140,16 +205,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * directorio de toda la plataforma, con el `limit` topado en 100 por el DTO.
    * Con más de cien cuentas, los miembros de este proyecto dejaban de caber ahí y
    * el asistente pintaba propuestas con el UUID en crudo donde va un nombre.
-   *
-   * Es el mismo fallo que tenía la pestaña Equipo de projects-front. Se arregló
-   * allí primero y este se quedó atrás: se corrigió el síntoma y no el patrón.
-   * Por eso ahora se piden solo los ids que hacen falta, que aquí son los
-   * miembros del proyecto y nadie más.
    */
   const idsDePersonas = [...new Set([...members.map((m) => m.userId), project.ownerId])];
 
   const personas = await Promise.all(
-    idsDePersonas.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
+    idsDePersonas.map((idDePersona) =>
+      api.get<UserProfile>(`/users/${idDePersona}`).catch(() => null),
+    ),
   );
 
   const usersById = new Map(
@@ -167,11 +229,69 @@ export default async function ProjectReportsPage({ params }: PageProps) {
     etiquetas.map((etiqueta) => [etiqueta.id, etiqueta.name]),
   );
 
-  const abiertas = snapshot.total - snapshot.completed;
-  const checklistPct =
-    snapshot.checklistItems > 0
-      ? Math.round((snapshot.checklistDone / snapshot.checklistItems) * 100)
-      : null;
+  /**
+   * El contenido de cada widget, renderizado aquí y entregado al lienzo por id.
+   *
+   * Es la regla del repo llevada a la cuadrícula: **la lógica de negocio vive en
+   * la page** y el organismo recibe `ReactNode`. El lienzo mueve cajas y no sabe
+   * qué hay dentro; los gráficos siguen siendo las mismas islas de Recharts que
+   * ya existían, sin enterarse de que ahora viven en una cuadrícula.
+   */
+  const slots: Record<string, ReactNode> = {};
+  for (const widget of widgets) {
+    slots[widget.id] = contenidoDe(widget);
+  }
+
+  function contenidoDe(widget: Widget): ReactNode {
+    switch (widget.tipo) {
+      case 'resumen':
+        return snapshot ? <ResumenWidget snapshot={snapshot} /> : <NoDisponible />;
+      case 'por_columna':
+        return snapshot ? <PorColumnaWidget snapshot={snapshot} /> : <NoDisponible />;
+      case 'por_prioridad':
+        return snapshot ? <PorPrioridadWidget snapshot={snapshot} /> : <NoDisponible />;
+      case 'flujo':
+        return <FlujoWidget flow={flow} />;
+      case 'tiempos':
+        return <TiemposWidget cycle={cycle} />;
+      case 'ciclo':
+        return <CicloWidget cycle={cycle} />;
+      case 'prediccion':
+        return <PrediccionWidget forecast={forecast} />;
+      case 'personas':
+        return people ? (
+          <PersonasWidget people={people} members={members} usersById={usersById} />
+        ) : (
+          <NoDisponible />
+        );
+      case 'generado': {
+        if (!widget.grafico) return <NoDisponible />;
+        const datos = construirDatos(
+          widget.grafico,
+          { snapshot, people, blocked, flow, weekly },
+          { personas: nombres, etiquetas: nombresDeEtiquetas },
+        );
+        /* El aviso de la semana a medias viaja con el gráfico, no dentro de
+           `construirDatos`: es algo que hay que decir sobre el dato, no una
+           forma de recortarlo. */
+        const aviso =
+          widget.grafico.metrica === 'cierres_por_semana' ||
+          widget.grafico.metrica === 'creadas_por_semana'
+            ? avisoDeSemanaIncompleta(weekly)
+            : null;
+        return <GeneratedChart datos={datos} forma={widget.grafico.forma} aviso={aviso} />;
+      }
+      default:
+        return <NoDisponible />;
+    }
+  }
+
+  /* La acción llega al cliente ya atada a este proyecto: el lienzo no tiene por
+     qué saber contra qué proyecto guarda, y así no puede equivocarse de uno. */
+  async function guardar(siguientes: Widget[]) {
+    'use server';
+    return guardarLienzoAction(projectId, siguientes);
+  }
 
   return (
     <AppHeader title={`${project.name}`}>
@@ -182,375 +302,56 @@ export default async function ProjectReportsPage({ params }: PageProps) {
               Cómo va el trabajo
             </h2>
             <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
-              Cuánto hay, cómo se mueve, cuánto tarda y qué cabe esperar.
+              Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
           </div>
 
           {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
               de los proyectos es el activo, y comparando contra el slug de la
-              URL no encontraba ninguno — el desplegable se quedaba en «Elige un
-              proyecto» con el informe ya cargado debajo. */}
+              URL no encontraba ninguno. */}
           <ProjectPicker projects={proyectos.items} activeId={project.id} />
         </div>
 
-        {snapshot.eventosSinteticos > 0 && <SyntheticBanner eventos={snapshot.eventosSinteticos} />}
+        {snapshot && snapshot.eventosSinteticos > 0 && (
+          <SyntheticBanner eventos={snapshot.eventosSinteticos} />
+        )}
 
-        {/* Arriba del todo y no al final: lee este mismo informe, y quien llega
-            con una pregunta concreta no debería tener que recorrer cinco
-            gráficos antes de poder hacerla. */}
         {/* `project.id` y no el parámetro de la ruta: las acciones del asistente
             llaman a `/projects/:projectId/assistant/...`, que espera el UUID.
             Con el slug de la URL respondían 403. */}
-        <AssistantChat
-          projectId={project.id}
+        <AnalysisScreen
+          projectId={projectId}
+          lienzoInicial={widgets}
+          slots={slots}
+          guardar={guardar}
           cuotaInicial={cuota}
           nombres={nombres}
           etiquetas={nombresDeEtiquetas}
         />
-
-        {/* ── 1. Dónde está el trabajo ahora ─────────────────────────── */}
-
-        <div className="grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-4">
-          <Stat value={snapshot.total} label="Tareas" />
-          <Stat value={abiertas} label="Abiertas" tone="muted" />
-          <Stat
-            value={snapshot.overdue}
-            label="Vencidas"
-            tone={snapshot.overdue > 0 ? 'error' : 'muted'}
-          />
-          <Stat
-            value={checklistPct === null ? '—' : `${checklistPct}%`}
-            label="Checklist"
-            tone="success"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard
-            title="Dónde está el trabajo"
-            description="Cuántas tareas hay ahora mismo en cada columna del tablero."
-            howToRead={
-              <>
-                <p>
-                  Es una <strong>foto del momento</strong>, no una evolución. No necesita historial:
-                  funciona desde el primer día del proyecto.
-                </p>
-                <p>
-                  Busca <strong>acumulaciones</strong>. Una columna intermedia con muchas más tareas
-                  que sus vecinas señala un cuello de botella: entra trabajo más rápido de lo que
-                  sale.
-                </p>
-              </>
-            }
-          >
-            <DistributionBars
-              unit="tareas"
-              data={snapshot.byColumn.map((columna) => ({
-                name: columna.name,
-                value: columna.count,
-                color: tokenColor(columna.color),
-              }))}
-            />
-          </ChartCard>
-
-          <ChartCard
-            title="Reparto por prioridad"
-            description="Si casi todo es urgente, en la práctica no hay prioridades."
-            howToRead={
-              <>
-                <p>
-                  Un reparto operativo tiene forma de pirámide: pocas urgentes, muchas medias. Si la
-                  barra de <strong>Urgente</strong> es la más larga, la prioridad ha dejado de
-                  discriminar y todo compite por el mismo puesto.
-                </p>
-                <p>
-                  Conviene cruzarlo con las vencidas: una tarea urgente y antigua pesa más que diez
-                  urgentes recién creadas.
-                </p>
-              </>
-            }
-          >
-            <DistributionBars
-              unit="tareas"
-              data={PRIORITY_ORDER.map((prioridad) => ({
-                name: PRIORITY_LABEL[prioridad],
-                value: snapshot.byPriority.find((p) => p.priority === prioridad)?.count ?? 0,
-                color: PRIORITY_COLOR[prioridad],
-              })).filter((fila) => fila.value > 0)}
-            />
-          </ChartCard>
-        </div>
-
-        {snapshot.unassigned > 0 && (
-          <p className="font-sans text-sm text-text-disabled">
-            <strong className="text-text-secondary tabular-nums">{snapshot.unassigned}</strong>{' '}
-            {snapshot.unassigned === 1
-              ? 'tarea no tiene a nadie asignado.'
-              : 'tareas no tienen a nadie asignado.'}
-          </p>
-        )}
-
-        {/* ── 2. Cómo se mueve ───────────────────────────────────────── */}
-
-        <ChartCard
-          title="Flujo acumulado"
-          description="Cuántas tareas hay en cada columna, día a día, durante los últimos 60 días."
-          howToRead={
-            <>
-              <p>
-                Cada banda es una columna, apiladas <strong>en el orden del tablero</strong>. Su
-                grosor es el número de tareas que hay ahí ese día.
-              </p>
-              <p>
-                <strong>Bandas paralelas:</strong> el trabajo entra y sale al mismo ritmo.{' '}
-                <strong>Una banda que engorda:</strong> se está acumulando en esa columna.{' '}
-                <strong>La banda superior plana:</strong> no se está cerrando nada.
-              </p>
-              <p>
-                El ancho <em>horizontal</em> de las bandas intermedias aproxima el tiempo de
-                tránsito por el tablero. Si se ensancha, los tiempos están creciendo.
-              </p>
-              <p>
-                Solo refleja movimientos <strong>registrados</strong>: lo anterior al inicio del
-                historial no aparece.
-              </p>
-            </>
-          }
-        >
-          {flow && flow.serie.length > 1 ? (
-            <FlowChart flow={flow} />
-          ) : (
-            <NotEnoughData faltanTareas={0} faltanDias={2} />
-          )}
-        </ChartCard>
-
-        {/* ── 3. Cuánto tarda ────────────────────────────────────────── */}
-
-        <ChartCard
-          title="Cuánto tarda una tarea"
-          description="De crear a cerrar. Cada punto es una tarea; las líneas marcan la mediana y el percentil 85."
-          highlight={
-            cycle?.suficiencia.suficiente ? (
-              <div className="flex gap-6">
-                <Stat value={formatDuration(cycle.lead.p50)} label="mediana" tone="primary" />
-                <Stat value={formatDuration(cycle.lead.p85)} label="p85" tone="warning" />
-              </div>
-            ) : undefined
-          }
-          howToRead={
-            <>
-              <p>
-                <strong>La mediana (p50)</strong> es el tiempo que no supera la mitad de las tareas.{' '}
-                <strong>El p85</strong> es el que cumplen 85 de cada 100, y es el que sirve para
-                comprometer una fecha.
-              </p>
-              <p>
-                <strong>No se muestra la media, y es deliberado.</strong> La distribución tiene cola
-                larga y la media se desplaza hacia los casos extremos, describiendo un escenario que
-                no representa al conjunto.
-              </p>
-              <p>
-                Observa <strong>la dispersión</strong>, no solo las líneas. Dos equipos con la misma
-                mediana y distinta dispersión no ofrecen la misma previsibilidad.
-              </p>
-              <p>Puntos que ascienden conforme avanza la fecha indican tiempos crecientes.</p>
-            </>
-          }
-        >
-          {cycle?.suficiencia.suficiente ? (
-            <CycleTimeScatter cycle={cycle} />
-          ) : (
-            <NotEnoughData
-              faltanTareas={cycle?.suficiencia.faltanTareas ?? 10}
-              faltanDias={cycle?.suficiencia.faltanDias ?? 0}
-            />
-          )}
-        </ChartCard>
-
-        {cycle?.suficiencia.suficiente && (
-          <ChartCard
-            title="Tiempo de ciclo"
-            description="Del primer movimiento a cerrar: lo que tarda el trabajo una vez empieza de verdad."
-            highlight={
-              <div className="flex gap-6">
-                <Stat value={formatDuration(cycle.cycle.p50)} label="mediana" tone="primary" />
-                <Stat value={formatDuration(cycle.cycle.p85)} label="p85" tone="warning" />
-              </div>
-            }
-            howToRead={
-              <>
-                <p>
-                  Es <strong>siempre menor</strong> que el tiempo de entrega, por definición:
-                  empieza a contar más tarde. La diferencia entre ambos es{' '}
-                  <strong>el tiempo de espera</strong> previo al inicio de la tarea.
-                </p>
-                <p>
-                  Si la entrega supera con mucho al ciclo, el margen de mejora está en cuándo se
-                  abren las tareas, no en la velocidad de ejecución.
-                </p>
-              </>
-            }
-          >
-            <p className="font-sans text-sm text-text-secondary">
-              Sobre{' '}
-              <strong className="text-text-primary tabular-nums">
-                {cycle.cycle.muestrasConMovimiento}
-              </strong>{' '}
-              tareas que se movieron antes de cerrarse. Las que se crearon ya terminadas no tienen
-              tiempo de ciclo y no entran en el cálculo.
-            </p>
-          </ChartCard>
-        )}
-
-        {/* ── 4. Qué cabe esperar ────────────────────────────────────── */}
-
-        <ChartCard
-          title="Cuándo estaría vacío el tablero"
-          description="Simulación sobre el ritmo de las últimas semanas, no sobre estimaciones."
-          highlight={
-            forecast?.prediccion ? (
-              <div className="flex gap-6">
-                <Stat value={`${forecast.prediccion.p50} d`} label="mitad de las veces" />
-                <Stat
-                  value={`${forecast.prediccion.p85} d`}
-                  label="85 de cada 100"
-                  tone="warning"
-                />
-              </div>
-            ) : undefined
-          }
-          howToRead={
-            <>
-              <p>
-                Es una <strong>simulación de Monte Carlo</strong>: se muestrea al azar el ritmo de
-                cierre diario del historial, día tras día, hasta agotar las tareas abiertas.
-                Repetido <strong>5 000 veces</strong>, el reparto de resultados es la predicción.
-              </p>
-              <p>
-                De ahí que se dé un rango y no un dato único.{' '}
-                <strong>Usa el p85 para comprometer</strong> una fecha y el p50 como referencia
-                interna.
-              </p>
-              <p>
-                <strong>No emplea estimaciones de esfuerzo:</strong> el dato se deriva del propio
-                flujo del tablero, sin nada que mantener a mano en cada tarjeta.
-              </p>
-              <p>
-                Incluye <strong>los días sin cierres</strong>. Omitirlos inflaría el ritmo y
-                sesgaría la predicción hacia el optimismo.
-              </p>
-              <p>
-                Asume que el ritmo se mantiene. Un cambio de equipo, un periodo de vacaciones o una
-                variación de alcance la invalidan.
-              </p>
-            </>
-          }
-        >
-          {forecast?.prediccion ? (
-            <p className="font-sans text-sm text-text-secondary">
-              Quedan{' '}
-              <strong className="text-text-primary tabular-nums">{forecast.pendientes}</strong>{' '}
-              tareas abiertas y se cierran{' '}
-              <strong className="text-text-primary tabular-nums">
-                {forecast.throughputDiario?.media.toFixed(2).replace('.', ',')}
-              </strong>{' '}
-              al día de media. Con ese ritmo, el tablero queda vacío en{' '}
-              <strong className="text-text-primary">{forecast.prediccion.p50} días</strong> la mitad
-              de las veces, y en{' '}
-              <strong className="text-text-primary">{forecast.prediccion.p85}</strong> en 85 de cada
-              100. El peor caso simulado son {forecast.prediccion.p95} días.
-            </p>
-          ) : (
-            <NotEnoughData
-              faltanTareas={forecast?.suficiencia.faltanTareas ?? 10}
-              faltanDias={forecast?.suficiencia.faltanDias ?? 0}
-            />
-          )}
-        </ChartCard>
-
-        {/* ── 5. Quién lleva qué ─────────────────────────────────────── */}
-
-        <ChartCard
-          title="Cómo está repartido el trabajo"
-          description="Carga y flujo de cada persona."
-          howToRead={
-            <>
-              <p>
-                Mide <strong>reparto de carga</strong>, no rendimiento. Cuenta tareas sin ponderar
-                dificultad ni alcance, así que dos filas iguales pueden representar trabajos muy
-                distintos.
-              </p>
-              <p>
-                Lo que sí indica bien es el <strong>equilibrio</strong>: una persona con el triple
-                de tareas abiertas que el resto apunta a un problema de asignación, y las{' '}
-                <strong>vencidas concentradas</strong> suelen ser síntoma de sobrecarga.
-              </p>
-              <p>
-                La <strong>mediana</strong> corresponde a sus tareas cerradas, de creación a cierre.
-                Con pocas tareas cerradas un caso atípico la desplaza entera: conviene leerla junto
-                a la columna «cerradas».
-              </p>
-            </>
-          }
-        >
-          {people.length === 0 ? (
-            <p className="py-8 text-center font-sans text-sm text-text-disabled">
-              Nadie tiene tareas asignadas todavía.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[520px] border-collapse">
-                <thead>
-                  <tr className="border-b border-border text-left">
-                    {['Persona', 'Abiertas', 'Cerradas', 'Vencidas', 'Mediana'].map((th) => (
-                      <th
-                        key={th}
-                        className="pb-2 font-sans text-xs uppercase tracking-wider text-text-disabled"
-                      >
-                        {th}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {people.map((persona) => {
-                    const user = usersById.get(persona.userId);
-                    const rol = members.find((m) => m.userId === persona.userId)?.projectRole;
-                    return (
-                      <tr key={persona.userId} className="border-b border-border-subtle">
-                        <td className="py-3 font-sans text-sm text-text-primary">
-                          {user ? personLabel(user) : 'Alguien que ya no está'}
-                          {rol && (
-                            <span className="ml-2 font-sans text-xs text-text-disabled">
-                              {rol.name}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
-                          {persona.abiertas}
-                        </td>
-                        <td className="py-3 font-sans text-sm tabular-nums text-success">
-                          {persona.cerradas}
-                        </td>
-                        <td
-                          className={`py-3 font-sans text-sm tabular-nums ${
-                            persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
-                          }`}
-                        >
-                          {persona.vencidas}
-                        </td>
-                        <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
-                          {formatDuration(persona.medianaHoras)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </ChartCard>
       </div>
     </AppHeader>
+  );
+}
+
+/**
+ * Pide un informe **solo si el lienzo lo necesita**.
+ *
+ * Devuelve `null` sin llamar a nadie cuando no hace falta, y también cuando la
+ * llamada falla: perder un gráfico es mucho mejor que perder el informe
+ * completo, que es el mismo criterio que ya usaba el tablero con sus tareas.
+ */
+function pedirSi<T>(necesario: boolean, pedir: () => Promise<T>): Promise<T | null> {
+  if (!necesario) return Promise.resolve(null);
+  return pedir().catch(() => null);
+}
+
+/** El informe de este gráfico no se pudo leer. Los demás siguen en pie. */
+function NoDisponible() {
+  return (
+    <div className="flex h-full min-h-24 items-center justify-center px-4 text-center">
+      <p className="font-sans text-sm text-text-disabled">
+        No se pudo cargar este informe. Vuelve a intentarlo en un momento.
+      </p>
+    </div>
   );
 }

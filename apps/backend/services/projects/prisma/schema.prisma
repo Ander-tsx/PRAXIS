@@ -54,6 +54,9 @@ model Project {
   members     ProjectMember[]
   roles       ProjectRole[]
   invitations ProjectInvitation[]
+  chatChannel ChatChannel?
+  /// Los lienzos de Análisis, uno por persona. Cascadean con el proyecto.
+  reportLayouts ReportLayout[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
@@ -260,4 +263,223 @@ model Notification {
   @@index([userId, readAt])
   @@schema("projects")
   @@map("notifications")
+}
+
+/// De qué es un canal de chat.
+enum ChatChannelKind {
+  /// El chat del equipo de un proyecto. Quién entra lo dice la membresía.
+  PROJECT
+  /// Una conversación privada entre dos personas.
+  DIRECT
+
+  @@schema("projects")
+}
+
+/// Un canal de chat.
+///
+/// ## Por qué un modelo común para el chat de proyecto y el privado
+///
+/// Responder, reaccionar, mencionar, silenciar y contar lo no leído tienen que
+/// funcionar **igual en los dos**. Con dos estructuras paralelas serían cinco
+/// cosas duplicadas que divergen a la primera corrección que se aplique solo en
+/// una. Aquí el canal es lo único que cambia; todo lo que cuelga de él es común.
+///
+/// ## Quién participa se responde distinto según el tipo, y es a propósito
+///
+/// - **PROJECT** — participan los miembros del proyecto, y eso vive en
+///   `project_members`. **No se copia aquí.** Duplicarlo obligaría a
+///   sincronizar cada alta y cada baja, y un fallo de sincronización es alguien
+///   que sigue leyendo un chat del que le echaron.
+/// - **DIRECT** — participan exactamente las dos personas de `directUserA` y
+///   `directUserB`. Es estructural: no hay tabla que consultar ni que mantener.
+///
+/// Por eso `ChatChannelState` **no** dice quién participa: solo guarda el
+/// estado de cada cual (hasta dónde leyó, si lo silenció).
+model ChatChannel {
+  id   String          @id @default(uuid())
+  kind ChatChannelKind
+
+  /// Solo en PROJECT. Único: un proyecto tiene un chat, y solo uno.
+  projectId String?  @unique
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Los dos participantes de un DIRECT, **siempre ordenados** (A < B).
+  ///
+  /// ⚠️ El orden no es cosmético: es lo que hace que el par sea único. Sin
+  /// ordenarlos, que Ana escriba a Juan y Juan escriba a Ana crearía dos
+  /// conversaciones distintas y cada uno vería la mitad de lo hablado.
+  directUserA String?
+  directUserB String?
+
+  createdAt DateTime @default(now())
+
+  states   ChatChannelState[]
+  messages ChatMessage[]
+
+  @@unique([directUserA, directUserB])
+  /// La bandeja de conversaciones de alguien: las suyas, por los dos lados.
+  @@index([directUserA])
+  @@index([directUserB])
+  @@schema("projects")
+  @@map("chat_channels")
+}
+
+/// El estado de una persona en un canal: hasta dónde leyó y si lo silenció.
+///
+/// ⚠️ **Que exista esta fila NO significa que puedas entrar al canal.** Se crea
+/// sola en cuanto alguien abre un chat o lo silencia. Quién puede leer lo decide
+/// el guard del gateway con los permisos del proyecto, o los dos `directUser`
+/// del canal. Tratar esta tabla como control de acceso sería dar acceso a
+/// cualquiera que haya pasado por ahí una vez.
+///
+/// ⚠️ **Lo no leído es un instante, no una marca por mensaje.** La alternativa
+/// crece con el producto de mensajes por lectores para responder a lo que es un
+/// contador: mil mensajes y seis personas son seis mil filas para pintar un
+/// número.
+model ChatChannelState {
+  channelId String
+  channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
+
+  /// Sin valor = nunca lo ha abierto = todo está sin leer.
+  lastReadAt DateTime?
+
+  /// Cuándo lo silenció. `null` = suena. Guarda el cuándo y no solo el si, por
+  /// el mismo motivo que `Notification.readAt`.
+  mutedAt DateTime?
+
+  @@id([channelId, userId])
+  @@index([userId])
+  @@schema("projects")
+  @@map("chat_channel_states")
+}
+
+/// Un mensaje.
+///
+/// ## Tiene clave foránea, al revés que `Notification`
+///
+/// Un aviso es un hecho del pasado y debe sobrevivir al borrado de aquello de lo
+/// que habla; por eso guarda copias del nombre. Un mensaje no: sin su canal no
+/// significa nada y nadie puede leerlo, así que cascadea en vez de dejar
+/// huérfanos que ocupan sitio para siempre.
+///
+/// ## Las menciones y las referencias viven **dentro del texto**
+///
+/// No hay tabla de menciones. El cuerpo las guarda con el nombre dentro:
+///
+///     @[Juan Pérez](user:2222…)      /[Sprint 1](board:88ab…)
+///
+/// ⚠️ Es lo que hace que **no se rompan**: si sacan a Juan del equipo o borran
+/// el tablero, el nombre ya está escrito en el mensaje y se pinta como texto
+/// plano. Degradar no necesita ninguna consulta, que es justo lo que falla
+/// cuando la referencia es solo un id.
+model ChatMessage {
+  id        String      @id @default(uuid())
+  channelId String
+  channel   ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  /// Quién lo escribió. **Sin clave foránea**: el usuario vive en
+  /// credentials-service, en otro esquema y bajo otro dueño. Misma regla que
+  /// `Notification.userId` y `ProjectMember.userId`.
+  authorId String
+  body     String
+
+  /// A qué mensaje responde.
+  ///
+  /// `SetNull` y no `Cascade`: borrar un mensaje **no** puede llevarse por
+  /// delante las respuestas que provocó, que son de otras personas y siguen
+  /// teniendo sentido. La respuesta se queda sin cita, no desaparece.
+  replyToId String?
+  replyTo   ChatMessage?  @relation("respuestas", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  replies   ChatMessage[] @relation("respuestas")
+
+  createdAt DateTime @default(now())
+
+  reactions ChatReaction[]
+
+  /// El único acceso que existe: los últimos mensajes de un canal, y los
+  /// anteriores a uno dado al subir por el historial. Las dos consultas son
+  /// este índice leído al revés.
+  @@index([channelId, createdAt])
+  @@index([replyToId])
+  @@schema("projects")
+  @@map("chat_messages")
+}
+
+/// Una reacción a un mensaje.
+///
+/// La clave primaria es el trío: la misma persona puede poner varias reacciones
+/// distintas al mismo mensaje, pero **la misma dos veces no**. Eso convierte
+/// «reaccionar» en una operación idempotente y hace que quitarla sea un borrado
+/// exacto, sin buscar cuál de las suyas era.
+model ChatReaction {
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  /// El emoji tal cual. Se valida contra una lista corta antes de guardarlo:
+  /// un campo de texto libre aquí es un sitio más donde meter lo que sea.
+  emoji     String
+  createdAt DateTime    @default(now())
+
+  @@id([messageId, userId, emoji])
+  @@index([messageId])
+  @@schema("projects")
+  @@map("chat_reactions")
+}
+
+/// La disposición del lienzo de Análisis: **de una persona en un proyecto**.
+///
+/// ## Por qué es de la persona y no del proyecto
+///
+/// Se decidió antes de escribir el modelo, porque cambia el modelo entero. Un
+/// lienzo por proyecto necesitaría una segunda línea de permiso —leerlo con
+/// `canViewReports`, reorganizarlo con `canEditProject`—, una pantalla que
+/// explique por qué el botón de mover está apagado, y convivir con que dos
+/// personas reorganizando a la vez es un último-que-guarda-gana silencioso.
+/// Por persona no hace falta nada de eso: si llegas a la pantalla tienes
+/// `canViewReports`, y tu lienzo es tuyo. Es la misma línea que ya siguen las
+/// conversaciones del asistente, que también son de una persona en un proyecto.
+///
+/// Lo que se pierde y conviene decir: el equipo no comparte vista, y montar la
+/// del compañero es volver a arrastrar. Si algún día hace falta, la forma de
+/// añadirlo es una tabla de **plantilla del proyecto** aparte y una regla de
+/// precedencia, no convertir esta en compartida.
+///
+/// ## Y por qué sí tiene clave foránea, al revés que `Notification`
+///
+/// Un aviso es un hecho del pasado y tiene que sobrevivir al proyecto del que
+/// habla; por eso guarda copias del nombre y no cascadea. Un lienzo es lo
+/// contrario: **no significa nada sin su proyecto**. Sus widgets apuntan a
+/// columnas y etiquetas que dejan de existir con él, y conservarlo solo dejaría
+/// filas que nadie puede volver a leer. Como vive en el mismo esquema que
+/// `Project`, la cascada es de la base y no hay que acordarse de limpiarla al
+/// borrar —que es justo donde se olvidan estas cosas.
+///
+/// No hay clave foránea hacia el usuario: vive en credentials-service, bajo otro
+/// dueño. Ahí sí se aplica la regla de siempre.
+model ReportLayout {
+  userId    String
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  /// Los widgets con su posición y su tamaño, tal cual los deja el lienzo.
+  ///
+  /// Es `Json` y no una tabla por widget **a propósito**: se escribe entero en
+  /// cada guardado y se lee entero en cada carga; nunca se consulta un widget
+  /// suelto ni se agrega nada sobre ellos. Una tabla obligaría a un `delete` +
+  /// `createMany` en transacción para conseguir exactamente lo mismo.
+  ///
+  /// ⚠️ Lo que Postgres no valida lo valida `SaveReportLayoutDto` **antes** de
+  /// llegar aquí: tipo de widget dentro del catálogo, métricas dentro del
+  /// conjunto cerrado y un tope de widgets. Un `Json` sin esa puerta delante es
+  /// un campo de texto libre con otro nombre.
+  widgets   Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// El único acceso que existe: «mi lienzo de este proyecto».
+  @@id([userId, projectId])
+  @@schema("projects")
+  @@map("report_layouts")
 }

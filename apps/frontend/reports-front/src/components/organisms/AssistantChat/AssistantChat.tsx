@@ -8,6 +8,9 @@ import {
   esPropuestaDeChecklist,
   esPropuestaDeComentario,
   esPropuestaDeEdicion,
+  esPropuestaDeGrafico,
+  esPropuestaDeMarcarPasos,
+  esPropuestaDeMensaje,
   esPropuestaDeMovimiento,
   esPropuestaDeTarea,
   formatoReinicio,
@@ -19,9 +22,12 @@ import { FlujoDePensamiento } from './FlujoDePensamiento';
 import { GrupoDePropuestas } from './GrupoDePropuestas';
 import {
   AssignProposalCard,
+  ChartProposalCard,
   ChecklistProposalCard,
   CommentProposalCard,
   EditProposalCard,
+  MarkStepsProposalCard,
+  MessageProposalCard,
   MoveProposalCard,
   TaskProposalCard,
 } from './ProposalCard';
@@ -41,6 +47,19 @@ export interface AssistantChatProps {
   cuotaInicial: AssistantQuota | null;
   nombres: Record<string, string>;
   etiquetas: Record<string, string>;
+  /**
+   * Un texto que otro sitio de la pantalla deja escrito en el compositor.
+   *
+   * Lo usa el botón «Generar» del lienzo: lleva aquí, deja la frase puesta y
+   * enfoca el campo — **sin enviarla**. Enviar por su cuenta gastaría un turno
+   * de cuota que nadie pidió y, peor, daría un gráfico que quien pulsó todavía
+   * no ha decidido cómo quiere.
+   *
+   * `sello` es lo que hace que pulsar dos veces vuelva a funcionar: sin él, el
+   * segundo clic trae el mismo texto, React no ve ningún cambio y el campo se
+   * queda como estaba, como si el botón se hubiera roto.
+   */
+  sugerenciaExterna?: { texto: string; sello: number } | null;
 }
 
 const SUGERENCIAS = [
@@ -88,7 +107,13 @@ const SUGERENCIAS = [
  * se sale eligiendo —abrir una conversación o empezar otra—, y las dos llevan
  * al chat, que es donde se puede hacer algo.
  */
-export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: AssistantChatProps) {
+export function AssistantChat({
+  projectId,
+  cuotaInicial,
+  nombres,
+  etiquetas,
+  sugerenciaExterna = null,
+}: AssistantChatProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
@@ -113,7 +138,25 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
   const [cuota, setCuota] = useState<AssistantQuota | null>(cuotaInicial);
 
   const hiloRef = useRef<HTMLDivElement>(null);
+  const seccionRef = useRef<HTMLElement>(null);
+  const campoRef = useRef<HTMLTextAreaElement>(null);
   const campoId = useId();
+
+  /**
+   * Lo que deja escrito el botón «Generar» del lienzo.
+   *
+   * Vuelve al chat y al modo conversación —si estabas en el historial, ahí no
+   * hay dónde escribir—, deja la frase y enfoca. La pregunta la termina de
+   * escribir quien la va a hacer.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el sello es el disparador; el texto viaja con él y añadirlo repetiría el gesto al reenfocar.
+  useEffect(() => {
+    if (!sugerenciaExterna) return;
+    setVista('chat');
+    setTexto(sugerenciaExterna.texto);
+    seccionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    campoRef.current?.focus();
+  }, [sugerenciaExterna?.sello]);
 
   const agotada = cuota !== null && cuota.usados >= cuota.limite;
 
@@ -198,6 +241,7 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
 
   return (
     <section
+      ref={seccionRef}
       className="flex flex-col gap-4 rounded-2xl border p-5"
       style={{ borderColor: alpha(colors.primary, 25), background: colors.surface }}
       aria-label="Asistente del proyecto"
@@ -355,6 +399,45 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
                             />
                           );
                         }
+                        if (esPropuestaDeMarcarPasos(propuesta)) {
+                          return (
+                            <MarkStepsProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeMensaje(propuesta)) {
+                          return (
+                            <MessageProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
+                        if (esPropuestaDeGrafico(propuesta)) {
+                          return (
+                            <ChartProposalCard
+                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                              projectId={projectId}
+                              proposalId={propuesta.id}
+                              estadoGuardado={propuesta.status}
+                              propuesta={propuesta.args}
+                              nombres={nombres}
+                              etiquetas={etiquetas}
+                            />
+                          );
+                        }
                         /* Una herramienta que el servicio conozca y esta pantalla no.
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
                         return null;
@@ -409,6 +492,7 @@ export function AssistantChat({ projectId, cuotaInicial, nombres, etiquetas }: A
               </label>
               <div className="flex items-stretch gap-2">
                 <textarea
+                  ref={campoRef}
                   id={campoId}
                   rows={2}
                   maxLength={2000}

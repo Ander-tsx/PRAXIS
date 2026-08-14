@@ -6,6 +6,9 @@ import {
   aceptarChecklistAction,
   aceptarComentarioAction,
   aceptarEdicionAction,
+  aceptarGraficoAction,
+  aceptarMarcarPasosAction,
+  aceptarMensajeAction,
   aceptarMovimientoAction,
   aceptarTareaAction,
   resolverPropuestaAction,
@@ -16,6 +19,9 @@ import type {
   PropuestaChecklist,
   PropuestaComentario,
   PropuestaEdicion,
+  PropuestaGrafico,
+  PropuestaMarcarPasos,
+  PropuestaMensaje,
   PropuestaMovimiento,
   PropuestaTarea,
 } from '@/lib/assistant';
@@ -518,6 +524,235 @@ export function CommentProposalCard({
     </CambioSobreTarea>
   );
 }
+
+/**
+ * Marcar pasos del checklist como hechos.
+ *
+ * Enseña **los pasos, uno a uno y con su texto**, no «se marcarán 3 pasos»: dar
+ * por terminado el trabajo de alguien pide ver exactamente qué se da por hecho.
+ */
+export function MarkStepsProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaMarcarPasos }) {
+  return (
+    <CambioSobreTarea
+      titulo="Pasos que se darían por hechos"
+      taskId={propuesta.taskId}
+      taskTitle={propuesta.taskTitle}
+      porQue={propuesta.porQue}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+      ejecutar={() => aceptarMarcarPasosAction(projectId, propuesta)}
+    >
+      <ul className="flex flex-col gap-1">
+        {(propuesta.items ?? []).map((paso, indice) => (
+          <li
+            // biome-ignore lint/suspicious/noArrayIndexKey: los textos pueden repetirse y no traen id propio en la tarjeta
+            key={indice}
+            className="flex items-center gap-2 font-sans text-sm text-text-primary"
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded border"
+              style={{ borderColor: colors.success, color: colors.success }}
+            >
+              ✓
+            </span>
+            {paso}
+          </li>
+        ))}
+      </ul>
+      <p className="font-sans text-xs text-text-disabled">
+        Solo se marcan. El asistente no puede desmarcar ni borrar pasos.
+      </p>
+    </CambioSobreTarea>
+  );
+}
+
+/**
+ * Un mensaje para el chat del equipo.
+ *
+ * ⚠️ **Es la propuesta con más alcance de todas, y la tarjeta lo dice.** Las
+ * demás cambian algo dentro de una tarea; esta **suena en el teléfono de todo el
+ * equipo**. Por eso enseña el texto entero —nadie debería firmar algo que no ha
+ * leído, y menos algo que va a interrumpir a otros— y lo advierte en su pie.
+ *
+ * No usa `CambioSobreTarea` porque no hay tarea a la que enlazar después: el
+ * resultado es «enviado», y a dónde lleva es al chat del proyecto.
+ */
+export function MessageProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaMensaje }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await aceptarMensajeAction(projectId, propuesta);
+
+    if (respuesta.error || !respuesta.enviado) {
+      setError(respuesta.error ?? 'No se pudo enviar el mensaje.');
+      setEstado('pendiente');
+      return;
+    }
+
+    setResultado({
+      texto: 'Mensaje enviado al chat del equipo.',
+      href: `/projects/${projectId}?tab=chat`,
+    });
+    setEstado('hecho');
+  }
+
+  return (
+    <Marco
+      titulo="Mensaje propuesto para el equipo"
+      sinAplicar="Todavía no se ha enviado a nadie."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      {/* El texto entero y tal cual se va a enviar. */}
+      <p
+        className="whitespace-pre-wrap rounded-lg px-3 py-2 font-sans text-sm leading-relaxed text-text-primary"
+        style={{ background: alpha(colors.primary, 8) }}
+      >
+        {propuesta.body}
+      </p>
+      <p className="font-sans text-xs text-text-disabled">
+        Lo verá todo el equipo del proyecto y les llegará un aviso. Se enviaría a tu nombre, no al
+        del asistente.
+      </p>
+    </Marco>
+  );
+}
+
+/**
+ * Un gráfico para el lienzo de Análisis.
+ *
+ * ⚠️ **Es la propuesta con menos alcance de todas, y la tarjeta también lo
+ * dice.** Las otras ocho cambian algo del proyecto; esta solo añade una tarjeta
+ * al panel de quien acepta. Decirlo importa tanto como decir lo contrario en la
+ * del mensaje: sin esa frase, «el asistente quiere añadir un gráfico» se lee
+ * como si fuera a tocar algo del equipo, y quien duda no acepta.
+ *
+ * Y sigue habiendo tarjeta, que era la pregunta de diseño de verdad. Un gráfico
+ * es inofensivo, así que la tentación es añadirlo directamente y ahorrar un
+ * clic. No se hace: **nunca aparece un gráfico en la pantalla de alguien sin que
+ * lo haya aceptado**. Un asistente que empieza a cambiar cosas sin preguntar
+ * porque «esta es pequeña» es exactamente el que deja de dar confianza para las
+ * grandes.
+ *
+ * Enseña la parametrización entera —métrica, forma, recorte— y no solo el
+ * título, por el mismo motivo que las demás enseñan sus campos: quien acepta
+ * tiene que ver qué va a salir, no fiarse de que el título lo resuma bien.
+ */
+export function ChartProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: PropuestaGrafico }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await aceptarGraficoAction(projectId, propuesta);
+
+    if (respuesta.error || !respuesta.anadido) {
+      setError(respuesta.error ?? 'No se pudo añadir el gráfico.');
+      setEstado('pendiente');
+      return;
+    }
+
+    /* Sin `href`: el gráfico está en esta misma página, al final del lienzo.
+       Un enlace que lleva a donde ya estás es ruido. */
+    setResultado({ texto: 'Añadido al final de tu lienzo.', href: null });
+    setEstado('hecho');
+  }
+
+  const { grafico } = propuesta;
+
+  return (
+    <Marco
+      titulo="Gráfico propuesto para tu lienzo"
+      sinAplicar="Todavía no está en tu lienzo."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <p className="font-sans text-sm text-text-primary">
+        <strong>{grafico.titulo}</strong>
+      </p>
+
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Campo termino="Qué mide" valor={ETIQUETA_METRICA[grafico.metrica] ?? grafico.metrica} />
+        <Campo termino="Cómo se dibuja" valor={ETIQUETA_FORMA[grafico.forma] ?? grafico.forma} />
+        {grafico.dias !== undefined && (
+          <Campo
+            termino={grafico.metrica === 'paradas_por_columna' ? 'Sin moverse desde' : 'Periodo'}
+            valor={`${grafico.dias} días`}
+          />
+        )}
+        {grafico.soloVencidas && <Campo termino="Filtro" valor="Solo las vencidas" />}
+        {grafico.topN !== undefined && (
+          <Campo termino="Recorte" valor={`Las ${grafico.topN} mayores, el resto en «Otras»`} />
+        )}
+      </dl>
+
+      <p className="font-sans text-xs text-text-disabled">
+        Va a tu panel y solo al tuyo: no cambia nada del proyecto y no lo ve el resto del equipo.
+        Puedes moverlo, cambiarle el tamaño o quitarlo cuando quieras.
+      </p>
+    </Marco>
+  );
+}
+
+const ETIQUETA_METRICA: Record<string, string> = {
+  tareas_por_columna: 'Tareas por columna',
+  tareas_por_prioridad: 'Tareas por prioridad',
+  tareas_por_etiqueta: 'Tareas por etiqueta',
+  carga_por_persona: 'Carga por persona',
+  cerradas_por_persona: 'Tareas cerradas por persona',
+  vencidas_por_persona: 'Tareas vencidas por persona',
+  paradas_por_columna: 'Tareas paradas, por columna',
+  flujo_por_columna: 'Flujo acumulado por columna',
+  cierres_por_semana: 'Tareas cerradas por semana',
+  creadas_por_semana: 'Tareas creadas por semana',
+};
+
+const ETIQUETA_FORMA: Record<string, string> = {
+  barras: 'Barras',
+  barras_horizontales: 'Barras horizontales',
+  dona: 'Dona',
+  lineas: 'Líneas',
+  area_apilada: 'Áreas apiladas',
+};
 
 /**
  * El marco común: cabecera, cuerpo y los dos botones.

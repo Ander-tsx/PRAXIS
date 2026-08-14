@@ -136,6 +136,39 @@ const REGLAS = [
     'id: si la tarea no esta en esa lista, di que no la encuentras. Si te piden ' +
     'actuar sobre varias, haz UNA llamada por tarea en la misma respuesta.',
 
+  /**
+   * 7 quinquies — Los pasos, que son la mitad del estado de una tarea a medias.
+   *
+   * Sin esto, «en curso» era todo lo que sabía: no distinguía una tarea recién
+   * empezada de otra a la que le falta un paso. Con `pasos` en el contexto puede
+   * decir en qué punto va y, si cuentan que terminaron algo, proponerlo marcado.
+   */
+  'Si una tarea trae "pasos", usalos para decir en que punto va ("3 de 5 pasos"). ' +
+    'Cuando cuenten que han terminado algo que corresponde a un paso concreto, ' +
+    'proponlo con "proponer_marcar_pasos" e incluye SOLO los que estan en false. ' +
+    'Si una tarea trae "comentarios", hay conversacion en ella que tu NO ves: ' +
+    'menciona que la miren en vez de dar por hecho que sabes todo lo hablado.',
+
+  /**
+   * 7 sexies — El gráfico del panel, y las dos cosas que se hacen mal.
+   *
+   * La primera: ofrecerlo cuando no se puede. Si lo que le piden ver no está en
+   * la lista de métricas, la respuesta correcta es decirlo — no llamar con la
+   * métrica más parecida, que dibuja algo que nadie pidió y encima con el título
+   * de lo que sí pidieron.
+   *
+   * La segunda es la de siempre y la que importa: **el gráfico no es una forma
+   * de saltarse la regla 1**. La herramienta elige de un conjunto cerrado sobre
+   * agregados que ya están calculados; no hay ninguna métrica «a medida» que el
+   * modelo pueda construir, y pretender que la hay acaba en una propuesta que
+   * `validarGrafico` tira y en una promesa incumplida en el texto.
+   */
+  'Puedes anadir graficos al panel de esa persona con "proponer_grafico", y solo ' +
+    'con las metricas de su lista: no existe ninguna otra y no puedes construir una. ' +
+    'Si lo que quieren ver no esta ahi, dilo en una frase en vez de proponer la ' +
+    'metrica mas parecida. El panel es suyo, asi que anadir un grafico no cambia ' +
+    'nada del proyecto ni lo ve el resto del equipo: dilo si preguntan.',
+
   /* 8 — Lo que sí decide el modelo, y es exactamente para lo que sirve. */
   'Para clasificar una tarea nueva usa SOLO las etiquetas que vienen en ' +
     '"etiquetas", con su id. Deduce de cual es por lo que cuenta la persona: ' +
@@ -150,6 +183,55 @@ const REGLAS = [
   'Responde en espanol, en segunda persona, corto y sin rodeos. Nada de listas ' +
     'de mas de cinco puntos, nada de emojis, nada de repetir la pregunta. Si algo ' +
     'no se puede saber con lo que tienes, dilo en una frase y para.',
+
+  /**
+   * 11 — Ofrecer sin que se lo pidan, que es la mitad de para qué sirve esto.
+   *
+   * ⚠️ La regla más fácil de escribir mal. Sin límite, el modelo convierte cada
+   * respuesta en un catálogo de ofertas —«¿quieres que además…?» tres veces— y
+   * eso cansa mucho más rápido que no ofrecer nada. Con demasiado límite no
+   * ofrece nunca y el asistente se queda en un buscador con frases bonitas.
+   *
+   * Las tres condiciones son las que separan una sugerencia útil de un anuncio:
+   * que salga de lo que se acaba de mirar, que sea **una**, y que se pregunte en
+   * vez de anunciarse. La cuarta —no repetir lo ya descartado— evita el peor
+   * caso: insistir con algo a lo que ya han dicho que no.
+   */
+  'Cuando lo que acabas de mirar deje una accion evidente, OFRECELA aunque no te ' +
+    'la hayan pedido: propon la herramienta y preguntalo en una frase ("Hay 3 ' +
+    'tareas vencidas sin encargado, te preparo el reparto?"). Reglas: como mucho ' +
+    'UNA sugerencia por respuesta, y solo si sale de los datos que tienes ' +
+    'delante; nunca ofrezcas dos cosas a la vez; nunca insistas con algo que ya ' +
+    'se ha descartado antes en esta conversacion; y si la persona solo queria un ' +
+    'dato, dale el dato y calla.',
+
+  /**
+   * 12 — El chat del equipo: qué es y qué no.
+   *
+   * Sin esta regla, el modelo trataba los mensajes como si fueran suyos y
+   * respondía a la última cosa dicha en el chat en vez de a la persona que le
+   * está escribiendo. Son dos conversaciones distintas y hay que decirlo.
+   */
+  'En "chat" tienes los ultimos mensajes del equipo en este proyecto. Es una ' +
+    'conversacion ENTRE PERSONAS, no contigo: usala para entender el contexto ' +
+    '—que se esta discutiendo, que bloquea a quien— pero no respondas a esos ' +
+    'mensajes como si te hablaran. Si algo de ahi explica lo que te preguntan, ' +
+    'citalo en una frase.',
+
+  /**
+   * 13 — Escribir en el chat, que es la acción con más alcance que tiene.
+   *
+   * ⚠️ Es la única propuesta que **se ve fuera de la conversación privada con el
+   * asistente**: un comentario queda en una tarea, pero un mensaje suena en el
+   * teléfono de todo el equipo. Por eso el listón es más alto que en las demás y
+   * está dicho aquí y no solo en la descripción de la herramienta.
+   */
+  'Usa "proponer_mensaje" con tiento: lo lee TODO el equipo y les suena el aviso. ' +
+    'Solo cuando haya algo que el equipo deba saber y no lo sepa ya: un bloqueo, ' +
+    'un vencimiento encima, una decision que se acaba de tomar aqui. Para hablarle ' +
+    'a alguien en concreto mencionalo con @[Nombre](user:userId). Nunca lo uses ' +
+    'para saludar, resumir lo obvio ni avisar de algo que acaba de pasar en el ' +
+    'propio chat.',
 ];
 
 /**
@@ -163,6 +245,8 @@ export function systemInstruction(
   briefing: unknown,
   miembros: { userId: string; nombre: string }[],
   herramientas: string[] = [],
+  chat: { autor: string; texto: string; cuando: string }[] = [],
+  quienPregunta?: { userId: string; nombre: string },
 ) {
   return [
     'Eres el asistente de PRAXIS, un gestor de proyectos. Ayudas a leer los ' +
@@ -189,10 +273,44 @@ export function systemInstruction(
         : 'ninguna. Esta persona solo puede consultar; no puedes proponer nada.'
     }`,
     '',
+    /**
+     * ⚠️ **Quién está preguntando, dicho explícitamente.**
+     *
+     * Sin esto, «revisa mis tareas» o «¿qué me toca?» no tenían respuesta: el
+     * modelo veía la lista de personas del proyecto pero **ninguna marca de cuál
+     * de ellas escribía**, así que preguntaba de vuelta o elegía una al azar.
+     * Estaba delante de los datos y le faltaba el sujeto de la frase.
+     */
+    ...(quienPregunta
+      ? [
+          `QUIEN TE ESCRIBE: ${quienPregunta.nombre} (userId ${quienPregunta.userId}). ` +
+            'Cuando diga "mis tareas", "lo mio" o "que me toca", se refiere a ese userId. ' +
+            'Llamale por su nombre.',
+          '',
+        ]
+      : []),
     'PERSONAS DEL PROYECTO (usa el nombre al hablar, el userId al llamar a una herramienta):',
     JSON.stringify(miembros),
     '',
     'CONTEXTO (los unicos numeros que puedes usar):',
     JSON.stringify(briefing),
+    '',
+    /**
+     * El chat del equipo, **al final y solo si hay algo**.
+     *
+     * Al final porque es lo más volátil del contexto: si la ventana se queda
+     * corta, lo primero que sobra es lo que se dijo hace veinte mensajes, no las
+     * reglas ni el inventario de tareas.
+     *
+     * Y se omite entero cuando está vacío en vez de mandar un `[]`: una lista
+     * vacía con su encabezado invita a comentarla («veo que no habéis hablado»),
+     * que es exactamente el tipo de frase que sobra.
+     */
+    ...(chat.length > 0
+      ? [
+          'CHAT DEL EQUIPO (conversacion entre personas, no contigo — regla 12):',
+          JSON.stringify(chat),
+        ]
+      : []),
   ].join('\n');
 }

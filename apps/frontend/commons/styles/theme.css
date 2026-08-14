@@ -85,6 +85,33 @@
   --color-info: #60a5fa;
   --color-info-muted: rgba(96, 165, 250, 0.12);
 
+  /* ── SERIES DE GRÁFICO ───────────────────────────────────────
+     Seis tonos para distinguir categorías **que no tienen color propio**:
+     las porciones de una dona de etiquetas o de personas. Una columna del
+     tablero o una prioridad NO usan esto — traen el suyo, y el color tiene
+     que seguir a la entidad o el gráfico deja de leerse igual que el tablero.
+
+     ⚠️ **No son los colores de estado, y no se pueden sustituir por ellos.**
+     `success`, `warning` y `error` significan algo; reutilizarlos como
+     «serie 3» convierte una etiqueta cualquiera en una alarma.
+
+     Los seis valores están **medidos, no elegidos a ojo**: pasan la banda de
+     luminosidad, el suelo de croma, la separación bajo daltonismo (protan y
+     deutan, ΔE ≥ 8 en OKLab) y el contraste 3:1 contra la superficie, en los
+     **dos temas con los mismos hexadecimales** — por eso no se redefinen
+     abajo, al contrario que el resto. Si tocas uno, vuelve a medirlo: el
+     par que más se acerca es serie-2 ↔ serie-3, con ΔE 9,3 bajo protanopía.
+
+     El orden es fijo y **no se cicla**: a partir de la sexta categoría se
+     agrupa en «Otras», porque un séptimo tono generado ya no se distingue
+     de alguno de estos seis. */
+  --color-serie-1: #4a90d9;
+  --color-serie-2: #c07f22;
+  --color-serie-3: #0f9b76;
+  --color-serie-4: #a05fc4;
+  --color-serie-5: #c8543c;
+  --color-serie-6: #1b9ea6;
+
   /* ── TIPOGRAFÍA ──────────────────────────────────────────── */
   /* display  → titulos hero, nombre del producto, highlights grandes */
   /* serif    → subtitulos de sección importantes, citas, detalles */
