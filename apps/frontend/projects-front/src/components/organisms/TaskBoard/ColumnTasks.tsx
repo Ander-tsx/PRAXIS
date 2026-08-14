@@ -1,10 +1,10 @@
 'use client';
 
+import { createTaskAction } from '@/app/(private)/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
 import { DONE_COLUMN_COLOR, alpha, colors } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { createTaskAction } from '@/app/(private)/[id]/actions';
-import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
 
@@ -31,6 +31,14 @@ export interface ColumnTasksProps {
   onDragTask: (taskId: string | null) => void;
   /** La suelta la gestiona el tablero, que conoce todas las columnas. */
   onDropTask: (columnId: string) => void;
+  /**
+   * Cómo se colocan las tarjetas.
+   *
+   * `columna` es lo de siempre: una tira de 288 px con la altura recortada.
+   * `rejilla` es para la columna en pantalla completa, donde el ancho sobra y
+   * apilar treinta tarjetas en una sola fila desperdiciaría toda la pantalla.
+   */
+  layout?: 'columna' | 'rejilla';
 }
 
 /**
@@ -58,7 +66,9 @@ export function ColumnTasks({
   draggingTaskId,
   onDragTask,
   onDropTask,
+  layout = 'columna',
 }: ColumnTasksProps) {
+  const enRejilla = layout === 'rejilla';
   /**
    * Si la URL pide una tarea y está en esta columna, se abre ya en el primer
    * render: hacerlo en un `useEffect` mostraría el tablero y el diálogo saltando
@@ -105,7 +115,18 @@ export function ColumnTasks({
           setIsOver(false);
           onDropTask(column.id);
         }}
-        className="flex flex-col gap-2 rounded-xl px-2 pb-2 transition-colors"
+        className={[
+          /* `px-1` y no `px-2`: los otros 4 px los pone la lista de dentro, que
+             los necesita para no recortar el borde de las tarjetas. El ancho
+             total no cambia. */
+          'flex flex-col gap-2 rounded-xl px-1 pb-2 transition-colors',
+          /* En pantalla completa la zona de suelta ocupa el alto disponible:
+             si no, con tres tarjetas queda una franja de 100 px y el resto de
+             la pantalla deja de aceptar la suelta. */
+          enRejilla ? 'min-h-0 flex-1' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         style={{
           background: isOver ? alpha(colors.primary, 10) : 'transparent',
           outline: isOver ? `1px dashed ${alpha(colors.primary, 45)}` : 'none',
@@ -123,13 +144,41 @@ export function ColumnTasks({
          * único que hace falta cuando la columna está llena. La zona de suelta
          * sigue cubriendo las dos cosas.
          *
-         * `scrollbar-none`: en una columna de 288 px la barra se come el ancho
-         * útil y parte el borde redondeado. Rueda y teclado siguen funcionando.
+         * `scrollbar-slim`: la barra **sí se ve**, fina y en gris.
+         *
+         * Estuvo oculta con `scrollbar-none` y eso escondía algo que hacía
+         * falta saber: una columna con veinte tareas se veía exactamente igual
+         * que una con cinco, sin ninguna pista de que hubiera más debajo. El
+         * contador de la cabecera dice el total, pero no dónde estás dentro de
+         * él. El tamaño del pulgar sí.
+         *
+         * ⚠️ **El relleno de 1 (4 px) es lo que deja ver entero el borde azul de
+         * las tarjetas al pasar por encima.**
+         *
+         * Un contenedor que desborda en un eje **recorta también el otro**: en
+         * cuanto `overflow-y` deja de ser `visible`, `overflow-x` no puede
+         * seguir siéndolo, así que el `outline` de 2 px de la tarjeta se cortaba
+         * limpio por los dos costados y el borde se veía abierto por izquierda y
+         * derecha. Los 4 px de aire por dentro le dan sitio; el padre bajó de
+         * `px-2` a `px-1` para que la columna mida exactamente igual que antes.
          */}
-        <div className="scrollbar-none flex max-h-[55vh] flex-col gap-2 overflow-y-auto">
+        <div
+          className={
+            enRejilla
+              ? 'scrollbar-slim grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] content-start gap-3 overflow-y-auto p-1'
+              : 'scrollbar-slim flex max-h-[55vh] flex-col gap-2 overflow-y-auto p-1'
+          }
+        >
           {tasks.length === 0 ? (
             <div
-              className="flex min-h-24 items-center justify-center rounded-lg"
+              /* En rejilla ocupa el ancho entero: si no, «Sin tareas» sale
+                 encajado en una celda de 240 px con la pantalla vacía al lado. */
+              className={[
+                'flex min-h-24 items-center justify-center rounded-lg',
+                enRejilla ? 'col-span-full' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               style={{ background: alpha(colors.background, 50) }}
             >
               <span className="font-sans text-xs text-text-disabled">

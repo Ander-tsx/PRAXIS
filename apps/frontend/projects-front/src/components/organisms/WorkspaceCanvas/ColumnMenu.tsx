@@ -1,17 +1,18 @@
 'use client';
 
+import { deleteColumnAction, updateColumnAction } from '@/app/(private)/[id]/actions';
+import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
+import { COLUMN_NAME_MAX } from '@/lib/validation';
 import {
   COLUMN_COLORS,
   COLUMN_COLOR_LABELS,
-  DONE_COLUMN_COLOR,
   type ColumnColor,
+  DONE_COLUMN_COLOR,
   alpha,
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteColumnAction, updateColumnAction } from '@/app/(private)/[id]/actions';
-import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
-import { COLUMN_NAME_MAX } from '@/lib/validation';
+import { MaximizarIcono } from './TableroExpandible';
 
 export interface ColumnMenuProps {
   boardId: string;
@@ -34,6 +35,14 @@ export interface ColumnMenuProps {
    * mientras esto esté abierto.
    */
   onOpenChange: (open: boolean) => void;
+  /**
+   * Abrir esta columna a pantalla completa.
+   *
+   * Lo resuelve el tablero, que es quien tiene las tareas: aquí solo llega el
+   * gesto. No pide ningún permiso —solo cambia cómo se mira lo que ya se ve—,
+   * así que este menú existe aunque no se pueda editar ni borrar nada.
+   */
+  onFullscreen: () => void;
 }
 
 /** Vista actual del panel. Una sola cosa a la vez: es un menú, no un formulario. */
@@ -64,6 +73,7 @@ export function ColumnMenu({
   canEdit,
   canDelete,
   onOpenChange,
+  onFullscreen,
 }: ColumnMenuProps) {
   const [view, setView] = useState<View | null>(null);
   const [name, setName] = useState(columnName);
@@ -137,9 +147,9 @@ export function ColumnMenu({
     }
   }, [view]);
 
-  // Sin ninguno de los dos permisos no hay menú que enseñar.
-  if (!canEdit && !canDelete) return null;
-
+  /* Antes esto devolvía `null` sin `canEdit` ni `canDelete`. Ya no: ver la
+     columna a pantalla completa no toca nada y no pide permiso, así que el menú
+     tiene algo que ofrecer a todo el mundo. */
   const error = updateState.error ?? deleteState.error;
 
   return (
@@ -183,6 +193,16 @@ export function ColumnMenu({
         >
           {view === 'menu' && (
             <>
+              <MenuItem
+                onClick={() => {
+                  close();
+                  onFullscreen();
+                }}
+              >
+                <MaximizarIcono />
+                Pantalla completa
+              </MenuItem>
+
               {canEdit && (
                 <>
                   <MenuItem onClick={() => show('color')}>

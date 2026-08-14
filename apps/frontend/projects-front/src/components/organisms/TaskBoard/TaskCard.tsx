@@ -12,6 +12,18 @@ import {
   dueState,
   personLabel,
 } from '@praxis/commons';
+import { useRef } from 'react';
+
+/**
+ * Cuántos píxeles puede desplazarse el puntero entre pulsar y soltar sin que
+ * deje de contar como clic.
+ *
+ * Es lo que separa «abrir la tarea» de «he empezado a arrastrar y me he
+ * arrepentido». Cero sería inservible —nadie mantiene el ratón perfectamente
+ * quieto, y menos en un trackpad—; demasiado convertiría un arrastre corto en
+ * una ventana que se abre sola, que es exactamente lo que teníamos.
+ */
+const UMBRAL_DE_CLIC = 4;
 
 export interface TaskCardProps {
   task: Task;
@@ -57,22 +69,26 @@ export interface TaskCardProps {
  * iniciales y los contadores, y un botón con contenido estructurado se anuncia
  * fatal en un lector de pantalla.
  *
- * **El diálogo se abre con el icono, no pulsando la tarjeta.**
- * Antes un botón invisible la cubría entera con `absolute inset-0`, y eso
- * competía con el gesto principal del tablero: un arrastre que se queda en dos
- * píxeles cuenta como clic, y abrías un modal cuando lo que querías era mover la
- * tarjeta. Además no había ninguna pista visual de que la tarjeta se pudiera
- * abrir. Ahora hay un control explícito, y la superficie queda libre para
- * arrastrar y para seleccionar el texto.
+ * **La tarjeta entera abre la tarea, y el borde azul al pasar por encima lo
+ * anuncia.**
  *
- * El icono se ve siempre, tenue, y sube a opacidad plena al pasar por encima o
- * al recibir el foco. Enseñarlo solo en `hover` lo dejaría inalcanzable en una
- * pantalla táctil.
+ * ⚠️ Esto ya se intentó una vez con un botón invisible en `absolute inset-0` y
+ * salió mal: competía con el gesto principal del tablero, porque un arrastre
+ * que se queda en dos píxeles termina como un clic y abría una ventana cuando
+ * lo que querías era mover la tarjeta. Por eso hubo un botón de ojo en medio.
  *
- * Es un **ojo**, no un engranaje. Un engranaje promete ajustes, y para quien no
- * puede editar tareas el diálogo es exactamente lo contrario: seis campos
- * desactivados que solo se leen. El ojo describe lo único que el botón garantiza
- * —abrir y ver—, y el texto accesible sí distingue los dos casos.
+ * Lo que lo hace viable ahora es que el clic se **mide**: se guarda dónde se
+ * pulsó y solo se abre si al soltar el puntero sigue a menos de
+ * `UMBRAL_DE_CLIC` píxeles. Un arrastre real supera ese umbral en el primer
+ * movimiento, así que los dos gestos dejan de pisarse. Se comprueba además que
+ * no haya texto seleccionado: arrastrar para copiar un título terminaba
+ * abriendo la tarea.
+ *
+ * **El teclado entra por el título**, que es un `<button>` de verdad. Enter y
+ * Espacio sobre él llegan como un `click` con `detail === 0` —no hay puntero
+ * detrás—, y ahí el umbral no aplica ni debe: se abre directamente. Así la
+ * tarjeta se puede abrir sin ratón sin necesidad de poner `role="button"` en el
+ * `<article>`, que aplanaría todo su contenido para un lector de pantalla.
  */
 export function TaskCard({
   task,
@@ -90,8 +106,44 @@ export function TaskCard({
   const due = dueState(task.dueDate);
   const priorityColor = PRIORITY_COLORS[task.priority];
 
+  /** Dónde se pulsó, para saber al soltar si aquello fue un clic o un arrastre. */
+  const origenDelPuntero = useRef<{ x: number; y: number } | null>(null);
+
+  /**
+   * Decide si este clic abre la tarea.
+   *
+   * `detail === 0` es un clic sin puntero detrás: lo genera el navegador al
+   * pulsar Enter o Espacio sobre el botón del título. Ahí no hay distancia que
+   * medir y se abre directo.
+   */
+  function alPulsar(event: React.MouseEvent) {
+    if (event.detail !== 0) {
+      const origen = origenDelPuntero.current;
+      if (!origen) return;
+
+      const recorrido = Math.max(
+        Math.abs(event.clientX - origen.x),
+        Math.abs(event.clientY - origen.y),
+      );
+      if (recorrido > UMBRAL_DE_CLIC) return;
+
+      /* Soltar tras seleccionar texto no debe abrir nada: el gesto era copiar
+         el título, y perder la selección bajo una ventana modal es peor que no
+         hacer nada. */
+      const seleccion = window.getSelection();
+      if (seleccion && !seleccion.isCollapsed) return;
+    }
+
+    onOpen();
+  }
+
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado es el <button> del título, cuyo click burbujea hasta aquí; poner role="button" en el <article> aplanaría su contenido para un lector de pantalla
     <article
+      onPointerDown={(event) => {
+        origenDelPuntero.current = { x: event.clientX, y: event.clientY };
+      }}
+      onClick={alPulsar}
       draggable={draggable}
       onDragStart={(event) => {
         /**
@@ -112,11 +164,24 @@ export function TaskCard({
         onDragEnd();
       }}
       className={[
-        'group relative flex flex-col gap-2 rounded-xl bg-background p-3 text-left',
-        'transition-[transform,box-shadow,opacity] duration-150 ease-out',
-        /* Sin permiso para mover, el cursor no promete nada: la tarjeta ya no se
-           pulsa entera, el que abre es el icono. */
-        draggable ? 'cursor-grab active:cursor-grabbing' : '',
+        'relative flex flex-col gap-2 rounded-xl bg-background p-3 text-left',
+        'transition-[transform,box-shadow,opacity,outline-color] duration-150 ease-out',
+        /**
+         * El borde azul al pasar por encima: es la pista de que la tarjeta se
+         * abre, que es justo lo que faltaba cuando el gesto vivía en un icono.
+         *
+         * El grosor está puesto **siempre**, en transparente, y solo cambia el
+         * color. Aparecer y desaparecer el `outline` entero movería la tarjeta
+         * dos píxeles en cada pasada y haría temblar la columna al recorrerla.
+         *
+         * `has-[:focus-visible]` lo enciende también cuando el título recibe el
+         * foco por teclado, para que quien tabula vea lo mismo que quien apunta.
+         */
+        'outline-2 outline-transparent hover:outline-primary has-[:focus-visible]:outline-primary',
+        /* Se puede mover: la mano de arrastrar manda sobre el puntero, porque
+           describe el gesto que hay que aprender. Sin ese permiso, la tarjeta
+           solo se abre y el cursor lo dice. */
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         isDragging ? 'scale-[1.02] opacity-60' : '',
       ]
         .filter(Boolean)
@@ -128,43 +193,28 @@ export function TaskCard({
           urgentes, pintaba las cuatro familias a la vez y una columna llena se
           leía como un arcoíris sin jerarquía. La prioridad no se pierde — sigue
           abajo, en su chip, escrita con palabras y con el mismo color. */}
-      <div className="flex items-start gap-2">
-        <h6 className="min-w-0 flex-1 font-sans text-sm leading-snug text-text-primary">
-          {task.title}
-        </h6>
-
+      {/**
+       * El título es un `<button>`, y es lo único que hace falta para que la
+       * tarjeta se pueda abrir sin ratón. No lleva `onClick` propio a
+       * propósito: su clic burbujea hasta el `<article>`, que ya sabe decidir.
+       * Dárselo también aquí abriría la tarea dos veces por cada pulsación.
+       *
+       * Sin fondo, sin borde y sin cursor propio: tiene que seguir leyéndose
+       * como el título de la tarjeta, no como un control dentro de ella.
+       */}
+      <h6 className="min-w-0 font-sans text-sm leading-snug text-text-primary">
         <button
           type="button"
-          onClick={onOpen}
           aria-label={
             canEdit
               ? `Ver y editar la tarea ${task.title}`
               : `Ver los detalles de la tarea ${task.title}`
           }
-          title={canEdit ? 'Ver y editar' : 'Ver los detalles'}
-          className="-mr-1 -mt-1 shrink-0 cursor-pointer rounded-lg p-1 text-text-disabled opacity-50 transition-[opacity,color] hover:bg-surface hover:text-text-primary hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary group-hover:opacity-100"
+          className="w-full cursor-[inherit] text-left outline-none"
         >
-          <svg
-            className="h-3.5 w-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-            />
-          </svg>
+          {task.title}
         </button>
-      </div>
+      </h6>
 
       {/* Las etiquetas van arriba del todo: son el filtro visual con el que se
           barre un tablero, antes que cualquier metadato de la tarea. */}

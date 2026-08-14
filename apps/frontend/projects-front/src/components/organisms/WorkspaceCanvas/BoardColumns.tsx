@@ -1,5 +1,7 @@
 'use client';
 
+import { moveTaskAction, reorderColumnsAction } from '@/app/(private)/[id]/actions';
+import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
   type Board,
   type Column,
@@ -11,11 +13,11 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { moveTaskAction, reorderColumnsAction } from '@/app/(private)/[id]/actions';
-import { COLUMN_INITIAL_STATE, TASK_INITIAL_STATE } from '@/lib/action-state';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
+import { MinimizarIcono } from './TableroExpandible';
+import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface BoardColumnsProps {
   board: Board;
@@ -119,6 +121,9 @@ export function BoardColumns({
    */
   const [menuOpenColumnId, setMenuOpenColumnId] = useState<string | null>(null);
 
+  /** Columna abierta a pantalla completa, si hay alguna. */
+  const [columnaExpandidaId, setColumnaExpandidaId] = useState<string | null>(null);
+
   /** Tarea en vuelo. Mientras haya una, el arrastre de columnas se desactiva. */
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   /** Movimiento pendiente de guardar; lo dispara el formulario oculto. */
@@ -192,6 +197,37 @@ export function BoardColumns({
   useEffect(() => {
     setColumns([...board.columns].sort((a, b) => a.order - b.order));
   }, [board.columns]);
+
+  /** Escape sale de la columna a pantalla completa, y el fondo no se desplaza. */
+  useEffect(() => {
+    if (!columnaExpandidaId) return;
+
+    function alPulsarTecla(event: KeyboardEvent) {
+      /**
+       * ⚠️ Solo si no hay un diálogo abierto. Con una tarea abierta encima, el
+       * `<dialog>` nativo ya cierra con Escape por su cuenta; si además
+       * cerráramos aquí, una sola pulsación se llevaría las dos capas y
+       * volverías al tablero sin haberlo pedido.
+       */
+      if (event.key !== 'Escape') return;
+      if (document.querySelector('dialog[open]')) return;
+      setColumnaExpandidaId(null);
+    }
+
+    const desbordeInicial = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', alPulsarTecla);
+
+    return () => {
+      document.removeEventListener('keydown', alPulsarTecla);
+      document.body.style.overflow = desbordeInicial;
+    };
+  }, [columnaExpandidaId]);
+
+  /** La columna expandida, resuelta contra el orden vivo. */
+  const columnaExpandida = columnaExpandidaId
+    ? (columns.find((column) => column.id === columnaExpandidaId) ?? null)
+    : null;
 
   function startDrag(id: string) {
     setDraggingId(id);
@@ -375,6 +411,7 @@ export function BoardColumns({
                     canEdit={canEditColumn}
                     canDelete={canDeleteColumn}
                     onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}
+                    onFullscreen={() => setColumnaExpandidaId(column.id)}
                   />
                 </span>
               </header>
@@ -408,6 +445,97 @@ export function BoardColumns({
           <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
         )}
       </div>
+
+      {/**
+       * Una columna ocupando la pantalla.
+       *
+       * Es la misma `ColumnTasks` de la tira, solo que en rejilla: así el
+       * diálogo de tarea, el arrastre y el formulario de añadir siguen siendo
+       * los de siempre, sin una segunda implementación que se desincronice.
+       *
+       * ⚠️ **`openTaskId` no se pasa aquí.** Esta instancia convive con la de la
+       * tira, y las dos abrirían la tarea que llega en la URL: dos `<dialog
+       * open>` apilados sobre la misma tarea, y al cerrar uno queda el otro
+       * detrás. La de la tira ya se encarga de ese caso.
+       */}
+      {columnaExpandida && (
+        /**
+         * ⚠️ **El lienzo de puntos, y la columna encima como una tarjeta de
+         * `bg-surface`.** No es adorno: sin él no había contraste ninguno.
+         *
+         * Esta capa era `bg-background` y las tarjetas de tarea también son
+         * `bg-background` — el mismo color exacto. Las tareas no se distinguían
+         * del fondo: se leía una lista de textos flotando, y solo el borde de
+         * 1 px insinuaba dónde empezaba cada una.
+         *
+         * Ahora se reproduce la jerarquía del tablero, que ya la tenía resuelta:
+         * lienzo con textura al fondo, la columna como superficie elevada encima
+         * y las tarjetas sobre ella. Además de verse, se entiende — es la misma
+         * columna, agrandada, no otra pantalla.
+         */
+        <div
+          className="fixed inset-0 z-40 flex flex-col gap-4 p-5"
+          style={{ ...BOARD_SURFACE, backgroundColor: colors.background }}
+        >
+          <header className="flex flex-wrap items-center gap-3">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{
+                background: tintOf(columnaExpandida.color, columns.indexOf(columnaExpandida)),
+              }}
+              aria-hidden="true"
+            />
+            <h4 className="font-sans text-lg font-semibold text-text-primary">
+              {columnaExpandida.name}
+            </h4>
+            <span className="font-sans text-xs text-text-secondary">
+              {board.name} · {(() => {
+                const total = tasksByColumn.get(columnaExpandida.id)?.length ?? 0;
+                return `${total} ${total === 1 ? 'tarea' : 'tareas'}`;
+              })()}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setColumnaExpandidaId(null)}
+              aria-label={`Salir de pantalla completa de la columna ${columnaExpandida.name}`}
+              title="Salir de pantalla completa (Esc)"
+              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <MinimizarIcono />
+              Salir
+            </button>
+          </header>
+
+          {/* La columna, con la misma superficie y el mismo redondeo que en la
+              tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
+              que se reconozca como la columna de siempre. */}
+          <div
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-surface p-2"
+            style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
+          >
+            <ColumnTasks
+              projectId={projectId}
+              boardId={board.id}
+              column={columnaExpandida}
+              tasks={tasksByColumn.get(columnaExpandida.id) ?? []}
+              members={members}
+              labels={labels}
+              usersById={usersById}
+              currentUserId={currentUserId}
+              canCreate={canCreateTask}
+              canMove={canMoveTask}
+              canComment={canComment}
+              canEdit={canEditTask}
+              canDelete={canDeleteTask}
+              draggingTaskId={draggingTaskId}
+              onDragTask={setDraggingTaskId}
+              onDropTask={dropTask}
+              layout="rejilla"
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

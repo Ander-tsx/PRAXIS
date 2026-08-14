@@ -50,6 +50,14 @@ export enum AdminActionType {
   PROJECT_ARCHIVED = 'PROJECT_ARCHIVED',
   /** Se recuperó un proyecto archivado. */
   PROJECT_RESTORED = 'PROJECT_RESTORED',
+  /**
+   * Se cambió el plan del asistente de una cuenta. Va en `metadata.assistantPlan`.
+   *
+   * Tiene verbo propio y no se cuela en uno genérico porque **es lo que hace
+   * las veces de una compra**: mientras no haya pasarela de pago, esta línea
+   * del registro es la única prueba de quién concedió PRO a quién.
+   */
+  ASSISTANT_PLAN_CHANGED = 'ASSISTANT_PLAN_CHANGED',
 }
 
 /** Sobre qué clase de cosa se actuó. */

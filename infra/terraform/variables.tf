@@ -186,9 +186,42 @@ variable "dominio" {
     resuelve sola y permite un certificado gestionado de Google sin comprar
     nada.
 
-    Cuando tengas dominio propio, ponlo aquí y crea un registro A hacia la IP
-    que aparece en los outputs.
+    Cuando tengas dominio propio, ponlo aquí y crea **dos** registros A hacia
+    la IP del output `ip_publica`: uno para el dominio pelado (`@`) y otro para
+    `www`. El certificado cubre los dos y Google no emite ninguno mientras uno
+    solo no resuelva.
+
+    Crea el DNS ANTES de aplicar, y comprueba que resuelve. Si aplicas primero,
+    el certificado se queda en PROVISIONING y el sitio se queda sin HTTPS hasta
+    que Google reintente.
   EOT
   type        = string
   default     = ""
+}
+
+# ─────────────────────────── correo ───────────────────────────
+
+variable "mail_api_key" {
+  description = <<-EOT
+    Clave de API de Resend, para los correos de confirmación de cuenta y de
+    recuperación de contraseña.
+
+    Se guarda en Secret Manager como el resto. Vacía = el servicio arranca
+    igual, no manda nada y escribe los enlaces en el log: preferimos eso a que
+    un despliegue se caiga por un secreto sin rellenar.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "mail_from" {
+  description = <<-EOT
+    Remitente de los correos.
+
+    ⚠️ Resend solo entrega desde un dominio verificado por ti. Con un gmail
+    responde 403 y no manda nada, un fallo que solo se ve leyendo los logs.
+  EOT
+  type        = string
+  default     = "PRAXIS <no-reply@usepraxis.space>"
 }

@@ -1,7 +1,7 @@
-import { ApiError } from '@praxis/commons/api';
-import { type NextRequest, NextResponse } from 'next/server';
 import { gatewayAuthPost } from '@/lib/gateway';
 import { setSessionCookies } from '@/lib/session-cookie';
+import { ApiError } from '@praxis/commons/api';
+import { type NextRequest, NextResponse } from 'next/server';
 
 /**
  * BFF — POST /auth/api/google
@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return NextResponse.json({ message: 'No se pudo iniciar sesión con Google.' }, { status: 400 });
+      return NextResponse.json(
+        { message: 'No se pudo iniciar sesión con Google.' },
+        { status: 400 },
+      );
     }
 
     console.error('[google] error inesperado', error);

@@ -7,5 +7,7 @@
  */
 
 export * from './AppLayout';
+export * from './AvisosEnVivo';
 export * from './CreateProjectDialog';
 export * from './LogoutButton';
+export * from './NotFound';

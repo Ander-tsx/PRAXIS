@@ -2,12 +2,12 @@ import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import {
-  FindUsersDto,
+  DeleteUserDto,
   FindOneUserDto,
   FindUsersByIdsDto,
+  FindUsersDto,
   SetUserStatusDto,
   UpdateUserDto,
-  DeleteUserDto,
 } from '@praxis/contracts';
 
 import { UsersService } from './users.service';

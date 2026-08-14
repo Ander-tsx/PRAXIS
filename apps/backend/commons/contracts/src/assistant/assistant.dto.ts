@@ -23,12 +23,32 @@ import {
  * `assistant.assistant_subscriptions`. No inventes una pantalla de suscripción:
  * prometería algo que no existe.
  */
+/**
+ * Peticiones al asistente por mes y plan.
+ *
+ * ⚠️ El gratuito da para probarlo, no para trabajar con él, y es deliberado:
+ * cada pregunta cuesta una llamada a Gemini contra una clave nuestra, así que
+ * una cuenta recién creada no puede vaciar la cuota de todos. Con 50 bastaba
+ * una tarde para agotarla.
+ *
+ * PRO se asigna a mano desde el panel de administración —no hay pasarela de
+ * pago— y es lo que se le da a quien tiene que usarlo de verdad.
+ */
 export const ASSISTANT_LIMITS = {
-  FREE: 50,
-  PRO: 500,
+  FREE: 5,
+  PRO: 250,
 } as const;
 
 export type AssistantPlanName = keyof typeof ASSISTANT_LIMITS;
+
+/**
+ * Los planes que existen, como lista.
+ *
+ * Sale de las claves de `ASSISTANT_LIMITS` y no se escribe aparte: son la misma
+ * verdad, y dos listas a mano acaban discrepando el día que se añada un plan.
+ * Lo usan el validador del panel y el desplegable que lo pinta.
+ */
+export const ASSISTANT_PLANS = Object.keys(ASSISTANT_LIMITS) as AssistantPlanName[];
 
 /** Los cuatro papeles de un mensaje del hilo. */
 export const ASSISTANT_ROLES = ['user', 'model'] as const;

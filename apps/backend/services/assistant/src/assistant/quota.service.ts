@@ -70,6 +70,52 @@ export class QuotaService {
   }
 
   /**
+   * Cambia el plan de una persona.
+   *
+   * ⚠️ **Aquí no se comprueba quién llama, y no es un descuido.** Este servicio
+   * habla por TCP dentro de la red privada y no sabe de sesiones ni de roles;
+   * quien exige ser administrador de la plataforma es el gateway, en la ruta que
+   * llega hasta aquí. Repetir la comprobación exigiría traerse el rol global a
+   * este esquema, que pertenece a credentials-service.
+   *
+   * `upsert` porque **no hay fila hasta que hace falta**: la mayoría de las
+   * cuentas nunca han tenido suscripción, y pasar a PRO es justo el momento en
+   * que empieza a existir. Volver a FREE deja la fila puesta con ese valor, que
+   * es equivalente a no tenerla.
+   */
+  async cambiarPlan(
+    userId: string,
+    plan: AssistantPlanName,
+  ): Promise<{ userId: string; plan: AssistantPlanName }> {
+    const fila = await this.prisma.assistantSubscription.upsert({
+      where: { userId },
+      create: { userId, plan },
+      update: { plan },
+    });
+
+    return { userId: fila.userId, plan: fila.plan as AssistantPlanName };
+  }
+
+  /**
+   * El plan de varias personas de una vez.
+   *
+   * Lo pide el panel de administración para su lista: una consulta por fila
+   * serían veinte llamadas TCP para pintar una tabla. Devuelve un diccionario y
+   * **omite a quien no tiene fila**, que es quien está en FREE — el consumidor
+   * ya sabe cuál es el valor por defecto.
+   */
+  async planesDe(userIds: string[]): Promise<Record<string, AssistantPlanName>> {
+    if (userIds.length === 0) return {};
+
+    const filas = await this.prisma.assistantSubscription.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, plan: true },
+    });
+
+    return Object.fromEntries(filas.map((fila) => [fila.userId, fila.plan as AssistantPlanName]));
+  }
+
+  /**
    * Consume un mensaje.
    *
    * ⚠️ **Se llama DESPUÉS de una respuesta correcta de Gemini, nunca antes.** Si

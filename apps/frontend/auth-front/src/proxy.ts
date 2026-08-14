@@ -1,6 +1,6 @@
+import { POST_AUTH_DESTINATION } from '@/lib/navigation';
 import { SESSION_COOKIE, hasValidSessionToken, redirectToZone } from '@praxis/commons/auth';
 import { type NextRequest, NextResponse } from 'next/server';
-import { POST_AUTH_DESTINATION } from '@/lib/navigation';
 
 /**
  * Guard de auth-front: quien ya tiene sesión no debe ver login ni registro.

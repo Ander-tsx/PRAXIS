@@ -54,6 +54,21 @@ export type UserStatusName = (typeof USER_STATUSES)[number];
  * estado de la cuenta y el rol global, y por eso es otra ruta detrás del rol de
  * administrador en vez de un campo más de `GET /users`.
  */
+/**
+ * Planes del asistente y lo que da cada uno al mes.
+ *
+ * Espejo de `ASSISTANT_LIMITS` en `@praxis/contracts`. El gratuito da para
+ * probarlo, no para trabajar: cada pregunta cuesta una llamada real a Gemini.
+ */
+export const ASSISTANT_PLAN_LIMITS = {
+  FREE: 5,
+  PRO: 250,
+} as const;
+
+export type AssistantPlanName = keyof typeof ASSISTANT_PLAN_LIMITS;
+
+export const ASSISTANT_PLANS = Object.keys(ASSISTANT_PLAN_LIMITS) as AssistantPlanName[];
+
 export interface AdminUser {
   id: string;
   firstName: string | null;
@@ -65,6 +80,12 @@ export interface AdminUser {
   globalRole: GlobalRoleName;
   /** Los roles tal cual. Vacío en la mayoría de las cuentas reales. */
   globalRoles: string[];
+  /**
+   * Plan del asistente. `FREE` cuando la cuenta no tiene suscripción.
+   *
+   * No hay pasarela de pago: PRO se concede desde este mismo panel.
+   */
+  assistantPlan: AssistantPlanName;
 }
 
 /** Acciones que registra el panel. Espejo de `AdminActionType`. */
@@ -78,6 +99,7 @@ export const ADMIN_ACTIONS = [
   'PROJECT_REACTIVATED',
   'PROJECT_ARCHIVED',
   'PROJECT_RESTORED',
+  'ASSISTANT_PLAN_CHANGED',
 ] as const;
 
 export type AdminActionName = (typeof ADMIN_ACTIONS)[number];

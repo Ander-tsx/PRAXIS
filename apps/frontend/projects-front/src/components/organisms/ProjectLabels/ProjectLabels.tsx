@@ -1,5 +1,7 @@
 'use client';
 
+import { deleteLabelAction, saveLabelAction } from '@/app/(private)/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
   Button,
   Input,
@@ -12,8 +14,6 @@ import {
   colors,
 } from '@praxis/commons';
 import { useActionState, useEffect, useRef, useState } from 'react';
-import { deleteLabelAction, saveLabelAction } from '@/app/(private)/[id]/actions';
-import { TASK_INITIAL_STATE } from '@/lib/action-state';
 
 export interface ProjectLabelsProps {
   projectId: string;
@@ -64,10 +64,15 @@ export function ProjectLabels({ projectId, labels, canManage }: ProjectLabelsPro
           {canManage ? 'Crea la primera abajo.' : 'Quien edite tareas puede crearlas.'}
         </p>
       ) : (
-        <ul className="flex flex-wrap gap-2">
+        /* Una lista, no una nube de chips: los chips son el formato con el que
+           la etiqueta se **usa** —en la tarjeta, en el diálogo—, donde tiene que
+           ocupar poco. Esta pestaña es donde se **administra**, y ahí hace falta
+           un renglón por etiqueta con sitio para su nombre y sus dos acciones.
+           Apretados en una nube, los botones acababan en 12 px pegados al texto. */
+        <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-surface">
           {labels.map((label) => (
             <li key={label.id}>
-              <LabelChip
+              <LabelRow
                 label={label}
                 canManage={canManage}
                 projectId={projectId}
@@ -140,7 +145,18 @@ export function ProjectLabels({ projectId, labels, canManage }: ProjectLabelsPro
   );
 }
 
-function LabelChip({
+/**
+ * Una etiqueta en la pestaña que las administra.
+ *
+ * Enseña la etiqueta **tal como se verá** —su píldora, con su color— y al lado
+ * las dos acciones, ya con tamaño de botón de verdad (32 px) en vez de los
+ * iconos de 12 px pegados al texto que había antes.
+ *
+ * El de borrar es una **papelera**, no una «×». La cruz se lee como «quitar de
+ * aquí» y esto no quita nada de una tarea: borra la etiqueta del proyecto y la
+ * arranca de todas las tareas que la tuvieran. El icono tiene que prometer eso.
+ */
+function LabelRow({
   label,
   canManage,
   projectId,
@@ -158,86 +174,154 @@ function LabelChip({
   const tone = labelColor(label.color);
 
   return (
-    <span
-      className="flex items-center gap-1.5 rounded-full py-1 pl-3 pr-1.5 font-sans text-xs"
-      style={{
-        background: alpha(tone, 15),
-        color: tone,
-        outline: isEditing ? `1px solid ${tone}` : 'none',
-      }}
+    <div
+      className="flex flex-wrap items-center gap-3 px-4 py-3 transition-colors"
+      style={{ background: isEditing ? alpha(tone, 8) : undefined }}
     >
-      {label.name}
+      {/* Cuadro de color aparte de la píldora: es lo que se recorre con la
+          vista para encontrar una etiqueta en una lista larga, y dentro de la
+          píldora el color queda diluido al 15 %. */}
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        style={{ background: alpha(tone, 15) }}
+        aria-hidden="true"
+      >
+        <span className="h-3.5 w-3.5 rounded-full" style={{ background: tone }} />
+      </span>
+
+      <span
+        className="rounded-full px-3 py-1 font-sans text-sm font-medium"
+        style={{ background: alpha(tone, 15), color: tone }}
+      >
+        {label.name}
+      </span>
+
+      {isEditing && (
+        <span className="font-sans text-xs" style={{ color: tone }}>
+          editando
+        </span>
+      )}
 
       {canManage && !confirming && (
-        <>
-          <button
-            type="button"
-            onClick={onEdit}
-            aria-label={`Editar la etiqueta ${label.name}`}
-            title="Editar"
-            className="cursor-pointer rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"
-          >
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          <IconButton onClick={onEdit} label={`Editar la etiqueta ${label.name}`} title="Editar">
+            <PencilIcon />
+          </IconButton>
+          <IconButton
             onClick={() => setConfirming(true)}
-            aria-label={`Eliminar la etiqueta ${label.name}`}
+            label={`Eliminar la etiqueta ${label.name}`}
             title="Eliminar"
-            className="cursor-pointer rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"
+            danger
           >
-            <svg
-              className="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </>
+            <TrashIcon />
+          </IconButton>
+        </span>
       )}
 
       {confirming && (
         /* Se avisa de que desaparece de las tareas: la relación cascadea y
            borrarla en silencio quitaría información sin decirlo. */
-        <form action={deleteAction} className="flex items-center gap-1">
+        <form action={deleteAction} className="ml-auto flex items-center gap-2">
           <input type="hidden" name="projectId" value={projectId} />
           <input type="hidden" name="labelId" value={label.id} />
-          <span className="text-[10px] opacity-80">se quita de sus tareas</span>
+          <span className="font-sans text-xs text-text-secondary">Se quitará de sus tareas.</span>
           <button
             type="submit"
             disabled={deleting}
-            className="cursor-pointer rounded px-1 font-semibold underline disabled:opacity-50"
+            className="cursor-pointer rounded-lg px-2.5 py-1.5 font-sans text-xs font-semibold transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            style={{ background: alpha(colors.error, 20), color: colors.error }}
           >
-            {deleting ? '…' : 'Sí'}
+            {deleting ? 'Eliminando…' : 'Sí, eliminar'}
           </button>
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="cursor-pointer rounded px-1 opacity-70"
+            className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
           >
             No
           </button>
         </form>
       )}
 
-      {state.error && <span className="text-[10px]">{state.error}</span>}
-    </span>
+      {state.error && (
+        <p role="alert" className="w-full font-sans text-xs" style={{ color: colors.error }}>
+          {state.error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Botón cuadrado de 36 px para las acciones de una fila. */
+function IconButton({
+  onClick,
+  label,
+  title,
+  danger,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  title: string;
+  /** El borrado se tiñe de rojo al apuntarlo, no antes: en reposo sería alarma constante. */
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={title}
+      className={[
+        'flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl',
+        'text-text-secondary transition-colors hover:bg-surface-elevated',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        danger ? 'hover:text-error' : 'hover:text-text-primary',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* Heroicons v2 «pencil-square», con trazo de 1.5: el lápiz que había era el de
+   la v1 a grosor 2, que a este tamaño se ve tosco y macizo. */
+function PencilIcon() {
+  return (
+    <svg
+      className="h-[18px] w-[18px]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"
+      />
+    </svg>
+  );
+}
+
+/* Heroicons v2 «trash». */
+function TrashIcon() {
+  return (
+    <svg
+      className="h-[18px] w-[18px]"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+      />
+    </svg>
   );
 }

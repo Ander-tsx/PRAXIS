@@ -1,7 +1,7 @@
-import { ApiError } from '@praxis/commons/api';
-import { type NextRequest, NextResponse } from 'next/server';
 import { gatewayAuthPost } from '@/lib/gateway';
 import { setSessionCookies } from '@/lib/session-cookie';
+import { ApiError } from '@praxis/commons/api';
+import { type NextRequest, NextResponse } from 'next/server';
 
 /**
  * BFF — POST /auth/api/login
@@ -40,7 +40,17 @@ export async function POST(request: NextRequest) {
       if (error.status === 401) {
         return NextResponse.json({ message: 'Credenciales inválidas.' }, { status: 401 });
       }
-      if (error.status === 403 || error.status === 503) {
+      /* El 403 de correo sin confirmar viaja con su código: la pantalla hace
+         algo distinto con él —ofrece reenviar el enlace— que con el de cuenta
+         suspendida, donde no hay nada que la persona pueda hacer. */
+      if (error.status === 403) {
+        const codigo = (error.details as { code?: unknown } | undefined)?.code;
+        return NextResponse.json(
+          { message: error.message, ...(codigo === 'EMAIL_NOT_VERIFIED' ? { code: codigo } : {}) },
+          { status: 403 },
+        );
+      }
+      if (error.status === 503) {
         return NextResponse.json({ message: error.message }, { status: error.status });
       }
       return NextResponse.json({ message: 'Credenciales inválidas.' }, { status: 400 });

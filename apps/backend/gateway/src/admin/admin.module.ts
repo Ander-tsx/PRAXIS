@@ -62,6 +62,21 @@ import { AdminUsersController } from './admin-users.controller';
           },
         }),
       },
+      /* El plan del asistente vive en assistant-service, con su propia tabla de
+         suscripciones. Se registra aquí por lo mismo que ALEXA: su módulo no lo
+         exporta. */
+      {
+        name: 'ASSISTANT_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('ASSISTANT_SERVICE_HOST'),
+            port: config.get<number>('ASSISTANT_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [AdminActivityController, AdminUsersController, AdminProjectsController],

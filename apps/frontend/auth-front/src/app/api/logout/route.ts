@@ -1,5 +1,5 @@
-import { type NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
+import { type NextRequest, NextResponse } from 'next/server';
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
 

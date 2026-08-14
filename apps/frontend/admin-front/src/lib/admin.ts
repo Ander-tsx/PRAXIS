@@ -123,6 +123,7 @@ export const ACCIONES: Record<
   PROJECT_SUSPENDED: { etiqueta: 'Suspendió el proyecto', variante: 'error' },
   PROJECT_REACTIVATED: { etiqueta: 'Reactivó el proyecto', variante: 'success' },
   PROJECT_ARCHIVED: { etiqueta: 'Archivó el proyecto', variante: 'warning' },
+  ASSISTANT_PLAN_CHANGED: { etiqueta: 'Cambió el plan de IA', variante: 'info' },
   PROJECT_RESTORED: { etiqueta: 'Recuperó el proyecto', variante: 'success' },
 };
 

@@ -1,10 +1,10 @@
 'use client';
 
-import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState } from 'react';
 import { createBoardAction } from '@/app/(private)/[id]/actions';
 import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
+import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
+import { useActionState, useEffect, useId, useState } from 'react';
 
 export interface CreateBoardButtonProps {
   workspaceId: string;

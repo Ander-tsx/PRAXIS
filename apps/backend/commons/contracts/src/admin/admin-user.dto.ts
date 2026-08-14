@@ -12,6 +12,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { ASSISTANT_PLANS, type AssistantPlanName } from '../assistant/assistant.dto';
 import { GLOBAL_ROLES, type GlobalRole } from '../roles/global-role';
 
 /**
@@ -89,6 +90,26 @@ export class SetUserRoleBodyDto {
     message: `role debe ser uno de: ${Object.values(GLOBAL_ROLES).join(', ')}`,
   })
   role: GlobalRole;
+
+  @ApiPropertyOptional({ description: 'Opcional. Se guarda en el registro.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(4, { message: 'El motivo debe tener al menos 4 caracteres' })
+  @MaxLength(500)
+  reason?: string;
+}
+
+/**
+ * Cambia el plan del asistente de una cuenta.
+ *
+ * ⚠️ **No hay pasarela de pago y esto es lo que hace las veces.** Pasar a PRO es
+ * una decisión administrativa, no una compra: por eso vive en el panel y exige
+ * el rol global, en vez de estar en la pantalla de la persona.
+ */
+export class SetAssistantPlanBodyDto {
+  @ApiProperty({ enum: ASSISTANT_PLANS })
+  @IsIn(ASSISTANT_PLANS, { message: `plan debe ser uno de: ${ASSISTANT_PLANS.join(', ')}` })
+  plan: AssistantPlanName;
 
   @ApiPropertyOptional({ description: 'Opcional. Se guarda en el registro.' })
   @IsOptional()

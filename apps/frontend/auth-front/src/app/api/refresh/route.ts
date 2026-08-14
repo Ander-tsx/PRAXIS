@@ -1,8 +1,8 @@
+import { gatewayPost } from '@/lib/gateway';
+import { REFRESH_COOKIE, SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
 import { ApiError, type RefreshedToken } from '@praxis/commons/api';
 import { decodeJwt } from 'jose';
 import { type NextRequest, NextResponse } from 'next/server';
-import { gatewayPost } from '@/lib/gateway';
-import { REFRESH_COOKIE, SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
 
 /**
  * BFF — POST /auth/api/refresh

@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { MyNotificationsController } from './my-notifications.controller';
+import { NotificationsStreamService } from './notifications-stream.service';
 
 /**
  * Los avisos viven en projects-service, así que este módulo solo necesita ese
@@ -28,5 +29,6 @@ import { MyNotificationsController } from './my-notifications.controller';
     ]),
   ],
   controllers: [MyNotificationsController],
+  providers: [NotificationsStreamService],
 })
 export class NotificationsModule {}

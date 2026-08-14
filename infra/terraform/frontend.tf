@@ -164,25 +164,87 @@ locals {
    * resuelve públicamente, Google puede validarlo y emitir un certificado
    * gestionado. Con una IP pelada no se puede — no existe autoridad que firme
    * un certificado para una dirección IP.
+   *
+   * ⚠️ Es un apaño para no tener dominio, no un destino. Los cortafuegos
+   * corporativos y de campus clasifican sslip.io y nip.io como *dynamic DNS* y
+   * los bloquean por categoría: un FortiGate en la red de la UTEZ resuelve el
+   * nombre a una IP de bloqueo y firma la respuesta con su propia CA, así que
+   * el sitio parece caído aunque el balanceador esté perfecto. Si hay que
+   * enseñar el sistema desde una red así, `var.dominio` no es opcional.
    */
-  dominio = var.dominio != "" ? var.dominio : "${replace(google_compute_global_address.frontend.address, ".", "-")}.sslip.io"
+  dominio_sslip = "${replace(google_compute_global_address.frontend.address, ".", "-")}.sslip.io"
+
+  /** El nombre que se publica y sale en los outputs. */
+  dominio = var.dominio != "" ? var.dominio : local.dominio_sslip
+
+  /**
+   * Con dominio propio se cubren el pelado y el `www`: la gente teclea el
+   * segundo por costumbre, y sin él se lleva un error de DNS en vez de una
+   * redirección.
+   *
+   * ⚠️ Los dos tienen que tener su registro A hacia la IP del balanceador
+   * ANTES de aplicar. Google valida el certificado gestionado dominio por
+   * dominio y no emite nada mientras uno solo falle: basta con olvidar el
+   * `www` para dejar el certificado entero en un `PROVISIONING` que no caduca
+   * ni explica por qué.
+   */
+  dominios_propios = var.dominio != "" ? [var.dominio, "www.${var.dominio}"] : []
 }
 
 /**
  * ⚠️ Emitir este certificado tarda entre 15 y 60 minutos. Durante ese rato el
  * sitio responde con un error de certificado y todo parece roto. Es normal: el
  * estado se sigue con
- *   gcloud compute ssl-certificates describe praxis-cert --global
+ *   gcloud compute ssl-certificates list --global
  * y hay que esperar a que ponga ACTIVE.
  *
  * Google solo lo emite si el dominio ya resuelve a la IP del balanceador. Con
- * sslip.io eso es cierto desde el primer segundo, que es la gracia.
+ * sslip.io eso es cierto desde el primer segundo, que es la gracia; con dominio
+ * propio hay que crear los registros A primero y esperar a que propaguen.
+ *
+ * ⚠️ Este es el certificado de sslip.io y se deja **exactamente como está**,
+ * también cuando ya hay dominio propio. `domains` es inmutable: tocarlo obliga
+ * a reemplazar el certificado, y un certificado gestionado nace en
+ * `PROVISIONING` hasta una hora. Como el proxy HTTPS solo puede servir lo que
+ * tiene atado, sustituir este dejaría el sitio sin HTTPS válido en ninguna URL
+ * durante ese rato. El dominio propio se añade aparte, en su propio recurso.
  */
 resource "google_compute_managed_ssl_certificate" "frontend" {
   name = "${var.prefijo}-cert"
 
   managed {
-    domains = [local.dominio]
+    domains = [local.dominio_sslip]
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+/**
+ * El certificado del dominio propio. Va **junto** al de sslip.io, no en su
+ * lugar: el proxy admite varios y elige por SNI, así que el sitio nunca se
+ * queda sin certificado válido.
+ *
+ * El relevo sale gratis. Mientras Google emite este —de 15 a 60 minutos—, quien
+ * entre por sslip.io sigue con HTTPS correcto, y quien entre por el dominio
+ * nuevo se lleva un aviso de certificado hasta que pase a ACTIVE. En cuanto lo
+ * está, las dos URLs funcionan y no hay ventana de caída.
+ *
+ * ⚠️ El nombre lleva un hash de los dominios, y no es cosmético. Si algún día
+ * se cambia el dominio o se añade un subdominio hay que reemplazar el recurso,
+ * el proxy lo referencia, y `create_before_destroy` con nombre fijo moriría en
+ * `alreadyExists` — el mismo bloqueo que ya costó el cambio de región de los
+ * MIGs. Con el hash, el sustituto nace con otro nombre y el relevo se resuelve
+ * solo.
+ */
+resource "google_compute_managed_ssl_certificate" "propio" {
+  count = length(local.dominios_propios) > 0 ? 1 : 0
+
+  name = "${var.prefijo}-cert-propio-${substr(sha1(join(",", local.dominios_propios)), 0, 8)}"
+
+  managed {
+    domains = local.dominios_propios
   }
 
   lifecycle {
@@ -195,8 +257,24 @@ resource "google_compute_backend_service" "frontend" {
   protocol              = "HTTP"
   port_name             = "http"
   load_balancing_scheme = "EXTERNAL_MANAGED"
-  timeout_sec           = 60
-  health_checks         = [google_compute_health_check.frontend.id]
+
+  /**
+   * ⚠️ Media hora, y no es para que una página tarde media hora en cargar.
+   *
+   * En un balanceador de aplicación de Google esto **no es un tiempo de
+   * inactividad**: es lo máximo que puede durar una respuesta entera, se esté
+   * enviando o no. Los avisos en vivo van por un flujo SSE que se mantiene
+   * abierto mientras la pestaña lo esté, así que con los 60 s de antes el
+   * balanceador lo cortaba cada minuto. No se rompía nada —`EventSource`
+   * reconecta solo— pero cada corte es una petición nueva, y en el hueco entre
+   * una y otra un aviso se pierde sin que nadie se entere.
+   *
+   * El gateway manda un latido cada 25 s por el mismo motivo, y son cosas
+   * distintas: el latido evita que un intermediario cierre por silencio; esto
+   * evita que se cierre por veteranía.
+   */
+  timeout_sec   = 1800
+  health_checks = [google_compute_health_check.frontend.id]
 
   backend {
     group           = google_compute_region_instance_group_manager.frontend.instance_group
@@ -231,9 +309,20 @@ resource "google_compute_url_map" "frontend" {
 }
 
 resource "google_compute_target_https_proxy" "frontend" {
-  name             = "${var.prefijo}-https-proxy"
-  url_map          = google_compute_url_map.frontend.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.frontend.id]
+  name    = "${var.prefijo}-https-proxy"
+  url_map = google_compute_url_map.frontend.id
+
+  /**
+   * Los dos certificados a la vez: el de sslip.io y, si hay, el del dominio
+   * propio. El balanceador elige por SNI según el nombre que pida el navegador.
+   * Tenerlos juntos es lo que permite añadir un dominio sin ninguna ventana de
+   * caída, y deja sslip.io como red de seguridad si el DNS del registrador
+   * falla.
+   */
+  ssl_certificates = concat(
+    [google_compute_managed_ssl_certificate.frontend.id],
+    google_compute_managed_ssl_certificate.propio[*].id,
+  )
 }
 
 resource "google_compute_global_forwarding_rule" "https" {

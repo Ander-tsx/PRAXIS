@@ -49,7 +49,6 @@ build/
 out/
 
 # Env
-.env
 .env.local
 .env.*.local
 
@@ -58,7 +57,6 @@ out/
 .uat-logs/
 
 # OS
-.DS_Store
 Thumbs.db
 
 # IDE
@@ -71,6 +69,17 @@ DESIGN.md
 
 # Terraform
 #
+# ⚠️ `terraform.tfvars` lleva el JWT_SECRET, la contraseña de la base y la clave
+# de Gemini: no puede subir nunca. El `.example` sí, porque solo tiene huecos.
+#
+# `.terraform/` son los binarios de los proveedores —el de Google pesa 114 MB— y
+# se recrean con `terraform init`. GitHub rechaza el push por tamaño, que fue lo
+# único que impidió que el archivo de secretos acabara publicado.
+*.tfvars
+!*.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.*
 # El estado vive en un bucket de Cloud Storage, no aquí. Los archivos locales
 # son copias de trabajo y caché de proveedores (cientos de MB).
 #
@@ -81,9 +90,5 @@ DESIGN.md
 # `.terraform.lock.hcl` SÍ se versiona (fija la versión de cada proveedor, igual
 # que pnpm-lock.yaml), así que no aparece en esta lista.
 infra/terraform/.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-!*.tfvars.example
 crash.log
 crash.*.log

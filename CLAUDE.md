@@ -89,6 +89,14 @@ Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy au
 
 ⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm prisma:generate`.
 
+⚠️ **Y si eso pasa con `dev:backend` ya corriendo, `prisma:generate` no basta.** El
+servicio se ejecuta desde `dist/`, y `nest start --watch` copia el cliente allí
+como *asset*. Regenerar con el vigilante en marcha deja esa copia a medias —falta
+`index.js`— y el servicio se queda en un bucle de `MODULE_NOT_FOUND` que no se
+arregla volviendo a generar, porque cada recompilación borra `dist` y repite la
+copia incompleta. Hay que **parar el backend, borrar `dist/` del servicio,
+regenerar y arrancar en frío**.
+
 **El shell no sirve páginas de negocio.** Es la cáscara: landing pública, `rewrites()` y la renovación de sesión. Cada pantalla privada va en su zona, que trae su propio guard en `proxy.ts` y se puede levantar sola. Checklist de zona nueva en ESTADO-ACTUAL §17.7.
 
 ⚠️ El `matcher` de `proxy.ts` con lookahead negativo **no casa la raíz**: hay que añadir `'/'` como entrada aparte o la página raíz de la zona se queda sin guard. Detalle en ESTADO-ACTUAL §17.6.

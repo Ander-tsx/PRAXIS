@@ -1,17 +1,3 @@
-import {
-  AppHeader,
-  type EffectivePermissions,
-  type Label,
-  type Paginated,
-  type Project,
-  type ProjectDetail,
-  type ProjectMember,
-  type UserProfile,
-  personLabel,
-} from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { ChartCard, NotEnoughData, Stat, SyntheticBanner } from '@/components/molecules/ChartCard';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 import { AssistantChat } from '@/components/organisms/AssistantChat';
@@ -29,6 +15,20 @@ import {
   formatDuration,
   tokenColor,
 } from '@/lib/reports';
+import {
+  AppHeader,
+  type EffectivePermissions,
+  type Label,
+  type Paginated,
+  type Project,
+  type ProjectDetail,
+  type ProjectMember,
+  type UserProfile,
+  personLabel,
+} from '@praxis/commons';
+import { createServerApiClient } from '@praxis/commons/auth';
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -232,13 +232,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Es una <strong>foto del momento</strong>, no una evolución: no necesita historial,
-                  así que funciona desde el primer día del proyecto.
+                  Es una <strong>foto del momento</strong>, no una evolución. No necesita historial:
+                  funciona desde el primer día del proyecto.
                 </p>
                 <p>
-                  Lo que se busca aquí es una <strong>acumulación</strong>. Si una columna
-                  intermedia —«En revisión», «Bloqueado»— tiene muchas más que sus vecinas, ahí hay
-                  un cuello de botella: entra trabajo más rápido de lo que sale.
+                  Busca <strong>acumulaciones</strong>. Una columna intermedia con muchas más tareas
+                  que sus vecinas señala un cuello de botella: entra trabajo más rápido de lo que
+                  sale.
                 </p>
               </>
             }
@@ -259,13 +259,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Un reparto sano tiene forma de pirámide: pocas urgentes, muchas medias. Si la
+                  Un reparto operativo tiene forma de pirámide: pocas urgentes, muchas medias. Si la
                   barra de <strong>Urgente</strong> es la más larga, la prioridad ha dejado de
-                  distinguir nada y todo compite por el mismo primer puesto.
+                  discriminar y todo compite por el mismo puesto.
                 </p>
                 <p>
-                  Ojo con leerlo solo: una tarea urgente y vieja es peor señal que diez urgentes
-                  recién creadas. Cruza esto con las vencidas.
+                  Conviene cruzarlo con las vencidas: una tarea urgente y antigua pesa más que diez
+                  urgentes recién creadas.
                 </p>
               </>
             }
@@ -298,24 +298,21 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                Cada banda es una columna del tablero, apiladas{' '}
-                <strong>en el mismo orden en que están en el tablero</strong>. El grosor de una
-                banda es cuántas tareas hay ahí ese día.
+                Cada banda es una columna, apiladas <strong>en el orden del tablero</strong>. Su
+                grosor es el número de tareas que hay ahí ese día.
               </p>
               <p>
-                <strong>Bandas paralelas que suben juntas</strong> = el trabajo entra y sale al
-                mismo ritmo. <strong>Una banda que engorda</strong> = entra más rápido de lo que
-                sale, y ahí se está acumulando. <strong>La banda de arriba plana</strong> = no se
-                está cerrando nada.
+                <strong>Bandas paralelas:</strong> el trabajo entra y sale al mismo ritmo.{' '}
+                <strong>Una banda que engorda:</strong> se está acumulando en esa columna.{' '}
+                <strong>La banda superior plana:</strong> no se está cerrando nada.
               </p>
               <p>
-                El ancho <em>horizontal</em> de las bandas intermedias es, aproximadamente, lo que
-                tarda una tarea en atravesar el tablero. Si se ensancha con el tiempo, cada vez se
-                tarda más.
+                El ancho <em>horizontal</em> de las bandas intermedias aproxima el tiempo de
+                tránsito por el tablero. Si se ensancha, los tiempos están creciendo.
               </p>
               <p>
-                Solo cuenta movimientos <strong>registrados</strong>: lo que pasó antes de que
-                existiera el historial no aparece.
+                Solo refleja movimientos <strong>registrados</strong>: lo anterior al inicio del
+                historial no aparece.
               </p>
             </>
           }
@@ -343,21 +340,20 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                <strong>La mediana (p50)</strong> es el punto donde la mitad de las tareas tardan
-                menos. <strong>El p85</strong>, donde tardan menos 85 de cada 100: es el número que
-                sirve para prometer una fecha, porque se cumple casi siempre.
+                <strong>La mediana (p50)</strong> es el tiempo que no supera la mitad de las tareas.{' '}
+                <strong>El p85</strong> es el que cumplen 85 de cada 100, y es el que sirve para
+                comprometer una fecha.
               </p>
               <p>
-                <strong>Aquí no verás una media, y es deliberado.</strong> Estos tiempos tienen cola
-                larga —unas pocas tareas que se eternizan— y la media se va detrás de esa cola:
-                acaba describiendo un caso que no le pasa a nadie.
+                <strong>No se muestra la media, y es deliberado.</strong> La distribución tiene cola
+                larga y la media se desplaza hacia los casos extremos, describiendo un escenario que
+                no representa al conjunto.
               </p>
               <p>
-                Mira <strong>la dispersión</strong>, no solo las líneas. Dos equipos con la misma
-                mediana pueden tener uno los puntos apretados y el otro la mitad disparados hacia
-                arriba; solo el segundo tiene un problema, porque no puede prometer nada.
+                Observa <strong>la dispersión</strong>, no solo las líneas. Dos equipos con la misma
+                mediana y distinta dispersión no ofrecen la misma previsibilidad.
               </p>
-              <p>Puntos que suben según avanza la fecha = cada vez se tarda más.</p>
+              <p>Puntos que ascienden conforme avanza la fecha indican tiempos crecientes.</p>
             </>
           }
         >
@@ -384,14 +380,13 @@ export default async function ProjectReportsPage({ params }: PageProps) {
             howToRead={
               <>
                 <p>
-                  Es <strong>siempre menor</strong> que el de arriba, por definición: empieza a
-                  contar más tarde. La diferencia entre los dos es{' '}
-                  <strong>cuánto tiempo pasa una tarea esperando</strong> antes de que alguien la
-                  empiece.
+                  Es <strong>siempre menor</strong> que el tiempo de entrega, por definición:
+                  empieza a contar más tarde. La diferencia entre ambos es{' '}
+                  <strong>el tiempo de espera</strong> previo al inicio de la tarea.
                 </p>
                 <p>
-                  Si el de entrega es mucho mayor que este, el problema no es la velocidad del
-                  equipo: es que se abren tareas mucho antes de poder atenderlas.
+                  Si la entrega supera con mucho al ciclo, el margen de mejora está en cuándo se
+                  abren las tareas, no en la velocidad de ejecución.
                 </p>
               </>
             }
@@ -427,29 +422,26 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                Se toma cuántas tareas se cerraron cada día del historial y se{' '}
-                <strong>sortea al azar</strong> ese ritmo, día tras día, hasta vaciar lo que queda
-                abierto. Repetido <strong>5 000 veces</strong>, el reparto de resultados es la
-                predicción.
+                Es una <strong>simulación de Monte Carlo</strong>: se muestrea al azar el ritmo de
+                cierre diario del historial, día tras día, hasta agotar las tareas abiertas.
+                Repetido <strong>5 000 veces</strong>, el reparto de resultados es la predicción.
               </p>
               <p>
-                Por eso no hay un número único sino un rango: la respuesta honesta a «¿cuándo
-                acaba?» no es un día, es una probabilidad.{' '}
-                <strong>Usa el p85 para comprometerte</strong> y el p50 solo para hacerte una idea.
+                De ahí que se dé un rango y no un dato único.{' '}
+                <strong>Usa el p85 para comprometer</strong> una fecha y el p50 como referencia
+                interna.
               </p>
               <p>
-                <strong>No usa estimaciones de esfuerzo</strong>, y es a propósito: no existen en el
-                modelo, porque son un número que alguien tiene que mantener en cada tarjeta y se
-                abandona a las dos semanas. Aquí el dato se recoge solo, del propio flujo del
-                tablero.
+                <strong>No emplea estimaciones de esfuerzo:</strong> el dato se deriva del propio
+                flujo del tablero, sin nada que mantener a mano en cada tarjeta.
               </p>
               <p>
-                Cuenta también <strong>los días en que no se cerró nada</strong>. Si se omitieran,
-                el ritmo saldría inflado y la predicción sería siempre optimista.
+                Incluye <strong>los días sin cierres</strong>. Omitirlos inflaría el ritmo y
+                sesgaría la predicción hacia el optimismo.
               </p>
               <p>
-                Supone que el ritmo se mantiene. Un cambio de equipo, unas vacaciones o un cambio de
-                alcance la invalidan.
+                Asume que el ritmo se mantiene. Un cambio de equipo, un periodo de vacaciones o una
+                variación de alcance la invalidan.
               </p>
             </>
           }
@@ -484,20 +476,19 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           howToRead={
             <>
               <p>
-                <strong>Esto no es una clasificación</strong>, y no debe usarse como tal. Estos
-                números cuentan tareas: no saben de dificultad, ni de a quién le tocó lo difícil, ni
-                de quién pasó la semana ayudando a otro. Ordenan tareas, no personas.
+                Mide <strong>reparto de carga</strong>, no rendimiento. Cuenta tareas sin ponderar
+                dificultad ni alcance, así que dos filas iguales pueden representar trabajos muy
+                distintos.
               </p>
               <p>
-                Lo que sí dice bien es el <strong>reparto</strong>: si una persona tiene el triple
-                de abiertas que el resto, es un problema de planificación, no suyo. Y las{' '}
-                <strong>vencidas concentradas</strong> en alguien suelen significar que se le asignó
-                más de lo que cabe.
+                Lo que sí indica bien es el <strong>equilibrio</strong>: una persona con el triple
+                de tareas abiertas que el resto apunta a un problema de asignación, y las{' '}
+                <strong>vencidas concentradas</strong> suelen ser síntoma de sobrecarga.
               </p>
               <p>
-                La <strong>mediana</strong> es de sus tareas cerradas, de crear a cerrar. Con pocas
-                tareas cerradas, un solo caso raro la mueve entera: míralas junto a la columna de
-                «cerradas».
+                La <strong>mediana</strong> corresponde a sus tareas cerradas, de creación a cierre.
+                Con pocas tareas cerradas un caso atípico la desplaza entera: conviene leerla junto
+                a la columna «cerradas».
               </p>
             </>
           }

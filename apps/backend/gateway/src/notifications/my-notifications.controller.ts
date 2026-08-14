@@ -4,19 +4,33 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  type MessageEvent,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
   Query,
   Request,
+  Sse,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { FindNotificationsQueryDto } from '@praxis/contracts';
-import { firstValueFrom } from 'rxjs';
+import { type Observable, firstValueFrom, interval, map, merge } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { NotificationsStreamService } from './notifications-stream.service';
+
+/**
+ * Cada cuánto se manda un latido por el flujo abierto.
+ *
+ * Una conexión SSE sin tráfico la cierra cualquier intermediario que haya en
+ * medio —el balanceador de Google corta a los 60 s de silencio, y el proxy de
+ * la zona tiene su propio tiempo de espera—. El navegador reconectaría solo,
+ * pero cada reconexión es una petición nueva y un hueco en el que un aviso se
+ * pierde. Con 25 s vamos cómodamente por debajo del más corto.
+ */
+const LATIDO_MS = 25_000;
 
 /**
  * Los avisos de quien pregunta.
@@ -34,7 +48,43 @@ import { JwtGuard } from '../auth/jwt.guard';
 @UseGuards(JwtGuard)
 @Controller('me/notifications')
 export class MyNotificationsController {
-  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly avisosEnVivo: NotificationsStreamService,
+  ) {}
+
+  /**
+   * Los avisos según ocurren, en un flujo abierto (SSE).
+   *
+   * Es de **una sola vía**: el servidor empuja, el navegador nunca escribe por
+   * aquí. Para eso no hacen falta websockets, y evitarlos importa —una conexión
+   * bidireccional habría que autenticarla y autorizarla por mensaje, y aquí la
+   * autorización es la misma de siempre: el `JwtGuard` del controlador, una vez,
+   * al abrir.
+   *
+   * ⚠️ **`EventSource` no puede mandar cabeceras**, así que el token no llega
+   * desde el navegador: llega porque la petición cruza el proxy de la zona, que
+   * lee la cookie httpOnly y añade el `Authorization`. Llamar a esta ruta
+   * directamente contra el gateway desde el navegador da 401, y así debe ser.
+   *
+   * El `userId` sale del token, nunca de la petición: no hay forma de pedir el
+   * flujo de otra persona.
+   */
+  @Sse('stream')
+  @ApiOperation({ summary: 'Flujo de avisos en vivo de quien hace la petición' })
+  stream(@Request() req: Express.Request): Observable<MessageEvent> {
+    const avisos = this.avisosEnVivo
+      .suscribir(req.user!.userId)
+      .pipe(map((aviso): MessageEvent => ({ type: 'aviso', data: aviso })));
+
+    /* El latido va como un tipo de evento propio para que el cliente pueda
+       ignorarlo sin confundirlo con un aviso vacío. */
+    const latido = interval(LATIDO_MS).pipe(
+      map((): MessageEvent => ({ type: 'latido', data: { t: Date.now() } })),
+    );
+
+    return merge(avisos, latido);
+  }
 
   /**
    * Bandeja + contador de no leídas.

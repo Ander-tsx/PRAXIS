@@ -138,6 +138,21 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
       }
     });
 
+    /**
+     * ⚠️ Una petición de flujo de eventos (SSE) se trata distinto **en dos
+     * sitios**, y sin los dos no funciona.
+     *
+     * Aquí, el tiempo de espera: `timeoutSignal()` aborta la petición pasados
+     * unos segundos, y en un flujo que por definición no termina eso corta la
+     * conexión justo cuando empieza a servir. Más abajo, el cuerpo: se
+     * transmite en vez de acumularse.
+     *
+     * Se decide por la cabecera `Accept` que manda el navegador —`EventSource`
+     * siempre envía `text/event-stream`—, no por la ruta: así no hay una lista
+     * de rutas especiales que mantener sincronizada con el gateway.
+     */
+    const esFlujoDeEventos = (request.headers.get('accept') ?? '').includes('text/event-stream');
+
     const send = (token: string) =>
       fetch(target, {
         method: request.method,
@@ -151,7 +166,7 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
         redirect: 'manual',
         /* Un cuelgue aquí deja al navegador esperando una respuesta que no
            llega, y al componente que la pidió con su spinner encendido. */
-        signal: timeoutSignal(),
+        ...(esFlujoDeEventos ? {} : { signal: timeoutSignal() }),
       });
 
     let gatewayResponse: Response;
@@ -194,6 +209,40 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
           );
         }
       }
+    }
+
+    /**
+     * ⚠️ **Un flujo de eventos se reenvía sin tocarlo y se sale de aquí.**
+     *
+     * El `arrayBuffer()` de abajo espera a que la respuesta **termine**, y una
+     * conexión SSE no termina: la petición se quedaría colgada para siempre sin
+     * que llegara ni un solo aviso al navegador. Aquí se pasa el cuerpo tal
+     * cual, que es un `ReadableStream`, y cada trozo sale en cuanto el gateway
+     * lo escribe.
+     *
+     * `x-accel-buffering: no` es para los intermediarios que acumulan la
+     * respuesta antes de entregarla: sin esa cabecera, un proxy con búfer
+     * guardaría los avisos hasta llenar un bloque y llegarían todos de golpe,
+     * que es exactamente lo contrario de lo que esto sirve.
+     *
+     * No se renueva el token en mitad del flujo: la conexión ya está abierta y
+     * autenticada, y cuando caduque el navegador reconectará solo —`EventSource`
+     * lo hace— pasando otra vez por el camino de arriba, que sí renueva.
+     */
+    if (gatewayResponse.headers.get('content-type')?.includes('text/event-stream')) {
+      const streamHeaders = new Headers();
+      gatewayResponse.headers.forEach((value, key) => {
+        if (!STRIPPED_RESPONSE_HEADERS.has(key.toLowerCase())) {
+          streamHeaders.set(key, value);
+        }
+      });
+      streamHeaders.set('cache-control', 'no-cache, no-transform');
+      streamHeaders.set('x-accel-buffering', 'no');
+
+      return new NextResponse(gatewayResponse.body, {
+        status: gatewayResponse.status,
+        headers: streamHeaders,
+      });
     }
 
     /**
