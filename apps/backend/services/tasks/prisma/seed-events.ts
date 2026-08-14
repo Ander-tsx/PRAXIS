@@ -50,6 +50,15 @@ import { PrismaClient } from '../src/generated/prisma-client';
  */
 const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 
+/**
+ * La cuenta de administración, fijada en `credentials/seed.ts`.
+ *
+ * Se repite aquí porque los seeders no se importan entre sí —cada uno corre con
+ * su propio cliente de Prisma y contra su propio esquema— y es el mismo UUID que
+ * ya está a fuego en los seeders de `permissions` y `projects`.
+ */
+const SUPERADMIN_USER_ID = '11111111-1111-4111-8111-111111111111';
+
 const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
 
 /**
@@ -195,17 +204,53 @@ async function main() {
   const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 
   /**
-   * El dueño y los miembros salen del proyecto de demostración que ya existe:
-   * así las tareas se asignan a personas reales y la pestaña de equipo enseña
-   * nombres en vez de UUID sueltos.
+   * El dueño es **siempre la cuenta de administración**, y esto era un bug.
+   *
+   * Antes salía de `SELECT DISTINCT "userId" FROM projects.project_members
+   * LIMIT 5` y se tomaba el primero. Sin `ORDER BY`, Postgres no promete ningún
+   * orden: el proyecto histórico acababa siendo de María o de Carlos según cómo
+   * hubiera quedado la tabla, y el resultado cambiaba entre dos sembrados de la
+   * misma base. Ahora es fijo.
+   *
+   * Es el mismo UUID que fija `credentials/seed.ts` para la cuenta de
+   * administración, y el que `permissions/seed.ts` promueve a SuperAdmin.
    */
-  const personas = await prisma.$queryRaw<{ userId: string }[]>`
-    SELECT DISTINCT "userId" FROM projects.project_members LIMIT 5
+  const dueno = SUPERADMIN_USER_ID;
+
+  /**
+   * Quién más hay para repartir el trabajo.
+   *
+   * El dueño va primero y siempre; los demás salen de lo que haya en la base,
+   * **ordenados** para que dos sembrados den lo mismo. En una instalación recién
+   * creada no habrá nadie más, y entonces el reparto es solo suyo — o de nadie,
+   * si se pidió no asignar.
+   */
+  const otros = await prisma.$queryRaw<{ userId: string }[]>`
+    SELECT DISTINCT "userId" FROM projects.project_members
+     WHERE "userId" <> ${dueno}::text
+     ORDER BY "userId" LIMIT 4
   `;
-  if (personas.length === 0) {
-    throw new Error('No hay ningún miembro de proyecto en la base. Ejecuta antes el seed normal.');
-  }
-  const dueno = personas[0].userId;
+  const personas = [{ userId: dueno }, ...otros];
+
+  /**
+   * Sin encargados, a propósito.
+   *
+   * Se activa con `SEED_SIN_ASIGNAR=1` y sirve para arrancar una instalación
+   * limpia en la que las cuentas todavía no existen: se siembra el historial y
+   * el reparto se hace después, a mano, desde la interfaz.
+   *
+   * ⚠️ **Lo que cuesta, dicho antes de usarlo:** las tres consultas por persona
+   * salen de `tasks.task_assignees`, así que mientras no se asigne nada el
+   * reparto por persona sale vacío y la instantánea dirá que ninguna tarea tiene
+   * a nadie. Lo demás —flujo, tiempos, ciclo y predicción— no mira los
+   * encargados y sale igual.
+   *
+   * Y lo que **no** cuesta: asignar después no falsea nada. Las medianas por
+   * persona se calculan con el `createdAt` y el `completedAt` fabricados de cada
+   * tarea, no con la fecha en que se asignó, así que en cuanto se reparta el
+   * informe sale correcto y con los tiempos del histórico.
+   */
+  const sinAsignar = process.env.SEED_SIN_ASIGNAR === '1';
 
   /* El esquema `projects` se toca con SQL crudo: el cliente tipado de este
      servicio solo conoce el esquema `tasks`. Es la misma conexión y la misma
@@ -408,8 +453,14 @@ async function main() {
      * quién lleva algo y de qué es queda en el dato. Sorteadas por separado no
      * habría nada que aprender: todo el mundo tendría de todo.
      */
-    const encargado = personas[Math.floor(Math.random() * personas.length)];
-    const reparto = ESPECIALIDAD[personas.indexOf(encargado) % ESPECIALIDAD.length];
+    const indiceEncargado = Math.floor(Math.random() * personas.length);
+    const encargado = personas[indiceEncargado];
+    /* El sesgo de etiquetas se conserva **también sin encargados**: quien mira
+       el reparto por etiqueta tiene que ver una mezcla creíble, y con un sorteo
+       uniforme saldrían las cuatro iguales, que es lo que delata un dato
+       inventado. Lo que se pierde sin asignar es la correlación entre persona y
+       especialidad, no la forma del reparto. */
+    const reparto = ESPECIALIDAD[indiceEncargado % ESPECIALIDAD.length];
 
     /* Casi siempre una etiqueta, a veces dos: una tarea puede ser de frontend y
        de diseño a la vez, y el modelo tiene que ver que eso pasa. Un 15 % se
@@ -433,9 +484,11 @@ async function main() {
         createdAt: nacida,
         completedAt: estaCerrada ? momento : null,
         dueDate: new Date(nacida.getTime() + entre(3, 20) * DIA),
-        assignees: {
-          create: [{ userId: encargado.userId, assignedBy: dueno, assignedAt: nacida }],
-        },
+        assignees: sinAsignar
+          ? undefined
+          : {
+              create: [{ userId: encargado.userId, assignedBy: dueno, assignedAt: nacida }],
+            },
         labels: {
           create: [...etiquetas].map((nombre) => ({
             labelId: etiquetasPorNombre.get(nombre)!,
@@ -467,8 +520,14 @@ async function main() {
   }
 
   console.log(`\n  ${creadas} tareas, ${cerradas} cerradas, ${SEMANAS} semanas de historial.`);
-  console.log(`  ${ETIQUETAS.length} etiquetas repartidas con sesgo por persona.`);
+  console.log(`  ${ETIQUETAS.length} etiquetas repartidas con sesgo.`);
   console.log(`  Proyecto: ${NOMBRE_PROYECTO}`);
+  console.log(`  Dueño: ${dueno}`);
+  if (sinAsignar) {
+    console.log('  ⚠️  SIN ENCARGADOS (SEED_SIN_ASIGNAR=1): el reparto por persona saldrá vacío');
+    console.log('      hasta que se asigne a mano. Los tiempos por persona serán correctos');
+    console.log('      cuando se asigne, porque salen de las fechas de la tarea.');
+  }
   console.log(`  ⚠️  Todos los eventos llevan actorId=${ACTOR_SINTETICO}: son fabricados.`);
 
   await prisma.$disconnect();

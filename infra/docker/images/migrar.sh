@@ -16,6 +16,15 @@
 #
 #   ... --command "sudo docker exec praxis-backend /app/migrar.sh --con-seeds"
 #
+# ⚠️ `--con-seeds` es para una base LOCAL o de pruebas: siembra las cuatro
+# cuentas de desarrollo, y sus contraseñas están escritas en el repositorio.
+# Para una instalación expuesta va `--arranque-limpio`, que siembra una sola
+# cuenta con la contraseña que le pases por entorno:
+#
+#   ... --command "sudo docker exec \
+#         -e SEED_SUPERADMIN_EMAIL=... -e SEED_SUPERADMIN_PASSWORD=... \
+#         praxis-backend /app/migrar.sh --arranque-limpio"
+#
 # ⚠️ Ejecútalo en UNA sola máquina. Prisma toma un bloqueo en la base, así que
 # dos a la vez no corrompen nada, pero la segunda falla con un error confuso
 # sobre migraciones ya aplicadas.
@@ -25,7 +34,11 @@ set -euo pipefail
 cd /app
 
 CON_SEEDS=0
-[ "${1:-}" = "--con-seeds" ] && CON_SEEDS=1
+ARRANQUE_LIMPIO=0
+case "${1:-}" in
+  --con-seeds)      CON_SEEDS=1 ;;
+  --arranque-limpio) ARRANQUE_LIMPIO=1 ;;
+esac
 
 : "${POSTGRES_HOST:?falta POSTGRES_HOST}"
 : "${POSTGRES_USER:?falta POSTGRES_USER}"
@@ -80,6 +93,50 @@ if [ "$CON_SEEDS" -eq 1 ]; then
     ( cd "apps/backend/services/$servicio" \
       && DATABASE_URL="$(url_para "$servicio")" pnpm exec prisma db seed )
   done
+fi
+
+if [ "$ARRANQUE_LIMPIO" -eq 1 ]; then
+  echo
+  echo "──────────────────────────────────────────────"
+  echo " Arranque limpio"
+  echo "──────────────────────────────────────────────"
+  #
+  # Para una instalación **expuesta**, no para una local.
+  #
+  # Se diferencia de `--con-seeds` en tres cosas, y las tres importan:
+  #
+  #   1. Siembra UNA cuenta, no cuatro, y con la contraseña que llega por
+  #      entorno. Las de `--con-seeds` están escritas en el repositorio.
+  #   2. NO siembra `projects` ni `tasks`: nada de «Proyecto PRAXIS Demo» ni de
+  #      sus tareas de ejemplo. La instalación arranca sin proyectos de mentira.
+  #   3. SÍ siembra `seed-events`, que es el proyecto con historial fabricado, y
+  #      lo deja **sin encargados** para poder repartirlo a mano después.
+  #
+  # Exige SEED_SUPERADMIN_EMAIL y SEED_SUPERADMIN_PASSWORD en el entorno; sin
+  # ellas el seeder de credentials falla a propósito en vez de caer a la
+  # contraseña del repositorio.
+  : "${SEED_SUPERADMIN_EMAIL:?falta SEED_SUPERADMIN_EMAIL}"
+  : "${SEED_SUPERADMIN_PASSWORD:?falta SEED_SUPERADMIN_PASSWORD}"
+
+  export SEED_SOLO_SUPERADMIN=1
+  export SEED_SIN_ASIGNAR=1
+
+  echo
+  echo "▸ permissions (catálogo de roles + SuperAdmin)"
+  ( cd apps/backend/services/permissions \
+    && DATABASE_URL="$(url_para permissions)" pnpm exec prisma db seed )
+
+  echo
+  echo "▸ credentials (una sola cuenta: $SEED_SUPERADMIN_EMAIL)"
+  ( cd apps/backend/services/credentials \
+    && DATABASE_URL="$(url_para credentials)" pnpm exec prisma db seed )
+
+  echo
+  echo "▸ tasks (proyecto con historial fabricado, sin encargados)"
+  # `prisma db seed` corre `seed.ts`, que siembra el proyecto de demostración.
+  # Aquí hace falta el OTRO: `seed-events.ts`. Se invoca por su script.
+  ( cd apps/backend/services/tasks \
+    && DATABASE_URL="$(url_para tasks)" pnpm run prisma:seed:events )
 fi
 
 echo

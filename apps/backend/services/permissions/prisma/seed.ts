@@ -59,6 +59,22 @@ const SEED_USER_ROLES: ReadonlyArray<{ userId: string; roleName: GlobalRole }> =
   { userId: CARLOS_USER_ID, roleName: GLOBAL_ROLES.USER },
 ];
 
+/**
+ * Los roles que se reparten en esta ejecución.
+ *
+ * Con `SEED_SOLO_SUPERADMIN=1` solo el del SuperAdmin — el mismo modo que usa
+ * `credentials/seed.ts` para sembrar una única cuenta. Dar `Admin` a un `userId`
+ * cuya cuenta no existe no rompe nada —aquí no hay clave foránea hacia el
+ * usuario, vive en otro servicio— pero deja filas que el panel de
+ * administración enseñaría como administradores fantasma.
+ *
+ * **Los roles en sí se crean siempre, los cuatro.** Son el catálogo de la
+ * plataforma, no datos de prueba: sin ellos no se puede promover a nadie más
+ * adelante desde la interfaz.
+ */
+const rolesASembrar: ReadonlyArray<{ userId: string; roleName: GlobalRole }> =
+  process.env.SEED_SOLO_SUPERADMIN === '1' ? [SEED_USER_ROLES[0]] : SEED_USER_ROLES;
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -84,7 +100,7 @@ async function main() {
 
     // 2. Asignaciones — usamos los IDs reales, no las constantes
     console.log('\n  👤  Asignando roles a usuarios…');
-    for (const assignment of SEED_USER_ROLES) {
+    for (const assignment of rolesASembrar) {
       const roleId = roleIdByName.get(assignment.roleName)!;
 
       // @@unique([userId, roleId]) — findFirst + create para idempotencia

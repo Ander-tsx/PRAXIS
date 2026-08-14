@@ -42,8 +42,8 @@
  */
 
 import 'dotenv/config';
-import { PrismaClient } from '../src/generated/prisma-client';
 import * as bcrypt from 'bcrypt';
+import { PrismaClient } from '../src/generated/prisma-client';
 
 // ─── UUIDs fijos compartidos entre seeders ────────────────────────────────────
 
@@ -101,26 +101,109 @@ const SEED_USERS = [
   },
 ] as const;
 
+/**
+ * Las cuentas que hay que sembrar en esta ejecución.
+ *
+ * Por defecto, las cuatro de desarrollo. Con `SEED_SOLO_SUPERADMIN=1` sale
+ * **una sola**: la de administración, con el correo y la contraseña que llegan
+ * por entorno.
+ *
+ * ## Por qué existe este modo
+ *
+ * Las contraseñas de las cuatro cuentas de desarrollo están escritas en este
+ * archivo, y este archivo está en un repositorio público. Eso es correcto para
+ * una base local de usar y tirar y es **inaceptable en una instalación
+ * expuesta**: sembrar ahí `Admin@12345!` sobre la cuenta de SuperAdmin es
+ * regalar el control de la plataforma a quien sepa leer el código.
+ *
+ * Reutiliza `ADMIN_USER_ID` a propósito: es el UUID que `permissions/seed.ts`
+ * promueve a SuperAdmin y del que `tasks/seed-events.ts` hace dueño del
+ * proyecto histórico. Cambiarlo obligaría a tocar los tres.
+ */
+interface CuentaSembrada {
+  credentialId: string;
+  email: string;
+  password: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+}
+
+/* ⚠️ El tipo se declara aparte y no como `(typeof SEED_USERS)[number]`. Ese
+   array es `as const`, así que su tipo de elemento lleva los literales exactos
+   («admin@praxis.dev», «Admin@12345!»…) y un objeto construido en tiempo de
+   ejecución, con `string` corriente, no encaja: cuatro errores 2322 que además
+   solo aparecen al ejecutar el seed, porque `prisma db seed` compila con
+   ts-node y el `tsc` del servicio no mira la carpeta `prisma/`. */
+function cuentasASembrar(): ReadonlyArray<CuentaSembrada> {
+  if (process.env.SEED_SOLO_SUPERADMIN !== '1') return SEED_USERS;
+
+  const email = process.env.SEED_SUPERADMIN_EMAIL;
+  const password = process.env.SEED_SUPERADMIN_PASSWORD;
+
+  /* Se falla aquí y no se cae a un valor por defecto: un defecto silencioso en
+     este camino concreto significa sembrar la contraseña del repositorio en una
+     instalación expuesta, que es justo lo que este modo existe para evitar. */
+  if (!email) throw new Error('SEED_SOLO_SUPERADMIN=1 exige SEED_SUPERADMIN_EMAIL');
+  if (!password || password.length < 12) {
+    throw new Error('SEED_SOLO_SUPERADMIN=1 exige SEED_SUPERADMIN_PASSWORD de 12+ caracteres');
+  }
+
+  return [
+    {
+      credentialId: ADMIN_CREDENTIAL_ID,
+      email,
+      password,
+      userId: ADMIN_USER_ID,
+      firstName: process.env.SEED_SUPERADMIN_NOMBRE ?? 'Super',
+      lastName: process.env.SEED_SUPERADMIN_APELLIDO ?? 'Admin',
+    },
+  ];
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const prisma = new PrismaClient();
   await prisma.$connect();
 
-  console.log('🌱  Iniciando seed de credentials…\n');
+  const cuentas = cuentasASembrar();
+  console.log(
+    `🌱  Iniciando seed de credentials (${cuentas.length} ${
+      cuentas.length === 1 ? 'cuenta' : 'cuentas'
+    })…\n`,
+  );
 
   try {
-    for (const userData of SEED_USERS) {
+    for (const userData of cuentas) {
       const passwordHash = await bcrypt.hash(userData.password, SALT_ROUNDS);
+
+      /**
+       * ⚠️ **`emailVerifiedAt` va puesto, y sin él los seeds no sirven de nada.**
+       *
+       * Desde que existe la confirmación por correo, el login rechaza con
+       * `EMAIL_NOT_VERIFIED` a quien no la tenga. Una cuenta sembrada no pasa por
+       * un correo —no hay buzón al que escribir— así que sin esta línea
+       * `prisma:reset` deja una base en la que **nadie puede entrar**, incluida
+       * la cuenta de administración.
+       *
+       * No se notó al desplegar la v7 porque su migración rellenó las cuentas
+       * que ya existían (`SET "emailVerifiedAt" = "createdAt"`). El agujero solo
+       * aparece al sembrar de cero: en una máquina recién clonada y en CI.
+       *
+       * Va también en el `update` para reparar una base ya sembrada sin él.
+       */
+      const verificado = new Date();
 
       // Upsert credential
       const credential = await prisma.credential.upsert({
         where: { email: userData.email },
-        update: { passwordHash },
+        update: { passwordHash, emailVerifiedAt: verificado },
         create: {
           id: userData.credentialId,
           email: userData.email,
           passwordHash,
+          emailVerifiedAt: verificado,
         },
       });
 
