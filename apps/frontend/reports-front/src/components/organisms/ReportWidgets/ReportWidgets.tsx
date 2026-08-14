@@ -8,6 +8,8 @@ import {
   type ReportForecast,
   type ReportPerson,
   type ReportSnapshot,
+  cuentaTableros,
+  etiquetaDeColumna,
   formatDuration,
   tokenColor,
 } from '@/lib/reports';
@@ -72,12 +74,16 @@ export function ResumenWidget({ snapshot }: { snapshot: ReportSnapshot }) {
 /* ─── Dónde está el trabajo ────────────────────────────────────────────── */
 
 export function PorColumnaWidget({ snapshot }: { snapshot: ReportSnapshot }) {
+  /* Con varios tableros, el nombre de la columna solo no identifica nada: casi
+     todos tienen su «Por hacer». Ver `etiquetaDeColumna`. */
+  const variosTableros = cuentaTableros(snapshot.byColumn) > 1;
+
   return (
     <div className="flex flex-col gap-3">
       <DistributionBars
         unit="tareas"
         data={snapshot.byColumn.map((columna) => ({
-          name: columna.name,
+          name: etiquetaDeColumna(columna, variosTableros),
           value: columna.count,
           color: tokenColor(columna.color),
         }))}
@@ -90,6 +96,11 @@ export function PorColumnaWidget({ snapshot }: { snapshot: ReportSnapshot }) {
         <p>
           Busca <strong>acumulaciones</strong>. Una columna intermedia con muchas más tareas que sus
           vecinas señala un cuello de botella: entra trabajo más rápido de lo que sale.
+        </p>
+        <p>
+          Cuenta <strong>todos los tableros del proyecto</strong>, de todos los espacios. Si hay más
+          de uno, cada barra lleva el suyo detrás del nombre — dos tableros suelen tener su propia
+          columna «Por hacer», y sin esa marca serían indistinguibles.
         </p>
       </HowToRead>
     </div>

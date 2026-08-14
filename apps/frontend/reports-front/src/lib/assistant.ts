@@ -47,6 +47,14 @@ export interface PropuestaTarea {
   columnId: string;
   /** El nombre de la columna destino. Viaja en la propuesta: `status` lo iguala. */
   columnName: string;
+  /**
+   * En qué tablero cae.
+   *
+   * ⚠️ Sin esto la tarjeta decía «columna Por hacer» y no identificaba ningún
+   * sitio: un proyecto con cuatro tableros tiene cuatro columnas con ese nombre.
+   * Opcional porque un assistant-service sin actualizar no lo manda.
+   */
+  boardName?: string;
   priority: string;
   dueDate?: string;
   assigneeIds?: string[];
@@ -99,6 +107,10 @@ export interface PropuestaMovimiento extends SobreTarea {
   columnName: string;
   /** De dónde sale, para que la tarjeta pueda decir «de X a Y». */
   columnaActual?: string;
+  /** Tablero destino y tablero de origen. Mover entre tableros es válido, y es
+      un cambio mayor que cambiar de columna: la tarjeta tiene que enseñarlo. */
+  boardName?: string;
+  tableroActual?: string;
 }
 
 /** `proponer_checklist`. Los pasos se suman a los que ya hubiera. */

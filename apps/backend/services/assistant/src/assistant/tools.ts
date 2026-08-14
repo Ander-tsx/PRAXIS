@@ -49,8 +49,12 @@ const PROPONER_TAREA: FunctionDeclaration = {
       columnId: {
         type: 'STRING',
         description:
-          'id de una columna de "columnas" del contexto. Salvo que digan otra cosa, ' +
-          'la de menor "orden": una tarea nueva empieza por el principio del tablero.',
+          'id de una columna de "tableros" del contexto. ⚠️ El proyecto puede tener ' +
+          'VARIOS tableros y cada uno tiene sus propias columnas: elige primero el ' +
+          'tablero y despues la columna DENTRO de ese tablero. Si no dicen cual, usa ' +
+          'el tablero del que se venga hablando; si no hay ninguno claro y hay mas de ' +
+          'uno, PREGUNTA en vez de elegir. Dentro del tablero, y salvo que digan otra ' +
+          'cosa, la columna de menor "orden": una tarea nueva empieza por el principio.',
       },
       priority: {
         type: 'STRING',
@@ -191,8 +195,10 @@ const PROPONER_MOVIMIENTO: FunctionDeclaration = {
       columnId: {
         type: 'STRING',
         description:
-          'id de una columna de "columnas" del contexto, distinta de la que ya ' +
-          'tiene la tarea. Nunca inventes uno.',
+          'id de una columna de "tableros" del contexto, distinta de la que ya tiene ' +
+          'la tarea. Nunca inventes uno. ⚠️ Puede estar en OTRO tablero: mover una ' +
+          'tarea entre tableros es valido y es lo que se pide cuando dicen "pasalo al ' +
+          'tablero de X". Cada tarea trae su tablero actual en "tablero".',
       },
       porQue: {
         type: 'STRING',

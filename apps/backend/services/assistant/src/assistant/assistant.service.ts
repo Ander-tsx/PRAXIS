@@ -51,7 +51,27 @@ interface ChatPayload {
 
 /** La forma del briefing, en lo que hace falta para validar lo que propone. */
 interface Briefing {
-  columnas: { id: string; nombre: string; orden: number }[];
+  /**
+   * Las columnas de **todo** el proyecto, con el tablero de cada una.
+   *
+   * ⚠️ `tableroId` es lo que faltaba. Sin él esta lista mezclaba las columnas de
+   * todos los tableros —cada uno numera las suyas desde 0— y cualquier «la
+   * primera» era una cualquiera.
+   */
+  columnas: {
+    id: string;
+    nombre: string;
+    orden: number;
+    tableroId?: string;
+    tablero?: string;
+  }[];
+  /** La jerarquía real. La fuente de verdad desde que hay varios tableros. */
+  tableros?: {
+    id: string;
+    nombre: string;
+    espacio: string;
+    columnas: { id: string; nombre: string; orden: number }[];
+  }[];
   etiquetas: { id: string; nombre: string }[];
   /** El inventario con ids: lo que permite validar un `taskId` antes de enseñarlo. */
   tareas?: {
@@ -60,6 +80,9 @@ interface Briefing {
     cerrada: boolean;
     columnId: string;
     columna: string;
+    /** En qué tablero está. Lo resuelve reports-service. */
+    boardId?: string;
+    tablero?: string | null;
     /** Los pasos del checklist, si los tiene. Es lo que permite validar los ids. */
     pasos?: { id: string; texto: string; hecho: boolean }[];
   }[];
@@ -321,7 +344,31 @@ export class AssistantService {
       if (columnas.length === 0) return null;
 
       const pedida = String(call.args.columnId ?? '');
-      const columna = columnas.find((c) => c.id === pedida) ?? columnas[0];
+      const elegida = columnas.find((c) => c.id === pedida);
+
+      /**
+       * ⚠️ **Con varios tableros ya no se adivina, y ese era el fallo.**
+       *
+       * Esto hacía `?? columnas[0]`: si el modelo no daba una columna válida se
+       * caía a «la primera» de una lista que mezcla los tableros de todo el
+       * proyecto. La tarjeta decía «se creará en Por hacer» y la tarea aparecía
+       * en un tablero que nadie había mencionado — sin error, sin aviso, y con
+       * la propuesta pareciendo correcta.
+       *
+       * Con **un solo** tablero la caída sigue siendo válida: solo hay un sitio
+       * posible y ahorrarle a la persona decirlo es la conveniencia de siempre.
+       * Con varios se descarta la propuesta, y la regla del prompt hace que el
+       * modelo pregunte en vez de callarse.
+       */
+      const tableros = new Set(columnas.map((c) => c.tableroId ?? 'unico'));
+      const columna = elegida ?? (tableros.size === 1 ? columnas[0] : undefined);
+
+      if (!columna) {
+        this.log.warn(
+          `El modelo propuso una tarea sin columna valida y hay ${tableros.size} tableros: se descarta`,
+        );
+        return null;
+      }
 
       const etiquetas = this.soloConocidos(
         call.args.labelIds,
@@ -340,6 +387,10 @@ export class AssistantService {
              columna destino, y el frontend no tiene por qué volver a buscarlo.
              También es lo que enseña la tarjeta. */
           columnName: columna.nombre,
+          /* El tablero viaja con la propuesta para que la tarjeta pueda decir
+             DONDE se va a crear. Con varios tableros, «columna Por hacer» no
+             identifica ningun sitio: las cuatro lo tienen. */
+          ...(columna.tablero ? { boardName: columna.tablero } : {}),
           priority: this.prioridadValida(call.args.priority),
           ...(this.fechaValida(call.args.dueDate) ? { dueDate: call.args.dueDate } : {}),
           ...(encargados.length > 0 ? { assigneeIds: encargados } : {}),
@@ -547,7 +598,12 @@ export class AssistantService {
           /* El nombre viaja para la tarjeta y para el `status`, que el contrato
              exige que iguale al de la columna destino. */
           columnName: columna.nombre,
+          /* El tablero destino y el de origen: mover entre tableros es valido, y
+             una tarjeta que solo diga «a Por hacer» no deja ver que la tarea
+             cambia de tablero, que es el cambio grande de los dos. */
+          ...(columna.tablero ? { boardName: columna.tablero } : {}),
           ...(tarea ? { columnaActual: tarea.columna } : {}),
+          ...(tarea?.tablero ? { tableroActual: tarea.tablero } : {}),
         },
       };
     }
@@ -589,7 +645,14 @@ export class AssistantService {
     briefing: Briefing,
   ): {
     taskId: string;
-    tarea?: { id: string; titulo: string; columnId?: string; columna?: string };
+    tarea?: {
+      id: string;
+      titulo: string;
+      columnId?: string;
+      columna?: string;
+      /** En qué tablero está hoy. Lo usa la tarjeta para decir «de X a Y». */
+      tablero?: string | null;
+    };
   } | null {
     const taskId = String(call.args.taskId ?? '').trim();
     if (!taskId) return null;

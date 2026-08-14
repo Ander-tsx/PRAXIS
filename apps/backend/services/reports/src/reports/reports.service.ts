@@ -67,13 +67,41 @@ export class ReportsService {
   private async columnas(projectId: string) {
     const project = await this.ask<{
       workspaces?: {
-        boards?: { columns?: { id: string; name: string; color: string; order: number }[] }[];
+        id: string;
+        name: string;
+        boards?: {
+          id: string;
+          name: string;
+          columns?: { id: string; name: string; color: string; order: number }[];
+        }[];
       }[];
     }>(this.projectsClient, 'project_find_one', { id: projectId });
 
-    return (project?.workspaces ?? [])
-      .flatMap((ws) => ws.boards ?? [])
-      .flatMap((board) => board.columns ?? []);
+    /**
+     * ⚠️ **Cada columna sale sabiendo de qué tablero es, y antes no.**
+     *
+     * Esto hacía un doble `flatMap` que aplanaba espacios y tableros y devolvía
+     * las columnas sueltas. Para pintar un gráfico daba igual —lo único que hace
+     * falta es ponerle nombre y color a un `columnId`— pero el mismo helper
+     * alimenta el briefing del asistente, y ahí la pérdida era el fallo: el
+     * modelo recibía las columnas de todos los tableros mezcladas, cada tablero
+     * con las suyas en orden 0,1,2,3, y «la de menor orden» acababa siendo una
+     * cualquiera. Siempre trabajaba sobre el mismo tablero.
+     *
+     * Los informes siguen ignorando los campos nuevos, así que nada cambia para
+     * ellos: agregan por proyecto entero, que es lo correcto y ya lo hacían.
+     */
+    return (project?.workspaces ?? []).flatMap((ws) =>
+      (ws.boards ?? []).flatMap((board) =>
+        (board.columns ?? []).map((columna) => ({
+          ...columna,
+          boardId: board.id,
+          boardName: board.name,
+          workspaceId: ws.id,
+          workspaceName: ws.name,
+        })),
+      ),
+    );
   }
 
   /**
@@ -95,14 +123,34 @@ export class ReportsService {
         ...stats,
         /* Se le pone nombre y color a cada columna aquí: tasks-service no los
            conoce y el frontend no tiene por qué volver a pedirlos. */
+        /**
+         * ⚠️ **Cada fila dice de qué tablero es, y sin eso el gráfico mentía.**
+         *
+         * Los agregados siempre cubrieron el proyecto entero —se filtra por
+         * `projectId`, no por tablero— pero esta lista salía como columnas
+         * anónimas. En un proyecto con dos tableros que tengan una columna «Por
+         * hacer» cada uno, el resultado eran **dos barras idénticas llamadas
+         * igual**: se lee exactamente como si solo saliera un tablero, y no hay
+         * forma de saber cuál es cuál.
+         *
+         * Se ordena por tablero y luego por el orden de la columna dentro de él,
+         * que es como se leen en la pantalla del tablero.
+         */
         byColumn: stats.byColumn
           .map((row: { columnId: string; count: number }) => ({
             ...row,
             name: porId.get(row.columnId)?.name ?? 'Columna eliminada',
             color: porId.get(row.columnId)?.color ?? null,
             order: porId.get(row.columnId)?.order ?? 999,
+            board: porId.get(row.columnId)?.boardName ?? null,
+            workspace: porId.get(row.columnId)?.workspaceName ?? null,
           }))
-          .sort((a: { order: number }, b: { order: number }) => a.order - b.order),
+          .sort(
+            (
+              a: { order: number; board: string | null },
+              b: { order: number; board: string | null },
+            ) => (a.board ?? '').localeCompare(b.board ?? '') || a.order - b.order,
+          ),
       };
     });
   }
@@ -168,7 +216,15 @@ export class ReportsService {
       );
 
       return {
-        columnas: ordenadas.map((c) => ({ id: c.id, name: c.name, color: c.color })),
+        /* Con su tablero, por lo mismo que la instantánea: dos bandas llamadas
+           «Por hacer» son dos columnas distintas de dos tableros distintos, y la
+           leyenda tiene que poder decirlo. */
+        columnas: ordenadas.map((c) => ({
+          id: c.id,
+          name: c.name,
+          color: c.color,
+          board: c.boardName,
+        })),
         serie,
       };
     });
@@ -439,25 +495,73 @@ export class ReportsService {
           cerrada: boolean;
           encargados: string[];
           etiquetas: string[];
+          /* El tablero al que pertenece. Lo añade tasks-service; aquí se le
+             pone el nombre, que es lo único que le sirve al modelo. */
+          boardId: string;
         }[]
       >(this.tasksClient, 'task_inventory', { projectId }),
     ]);
 
     const ordenadas = [...columnas].sort((a, b) => a.order - b.order);
 
+    /**
+     * Los tableros del proyecto, **agrupados**, y no una lista plana de columnas.
+     *
+     * Esta es la corrección de fondo. Antes el briefing mandaba `columnas` a
+     * secas, ordenadas por `orden`; con varios tableros eso mezcla las columnas
+     * de todos —cada tablero numera las suyas desde 0— y el modelo no podía ni
+     * saber que existía más de uno. El resultado era el que se reportó: creaba y
+     * movía siempre en el mismo tablero, aunque le pidieras otro.
+     *
+     * Se manda la jerarquía real —espacio › tablero › columnas— porque es la que
+     * usa la persona al hablar: «pásalo al tablero de diseño» solo se puede
+     * resolver si «tablero de diseño» existe en el contexto.
+     */
+    const porTablero = new Map<
+      string,
+      {
+        id: string;
+        nombre: string;
+        espacio: string;
+        columnas: { id: string; nombre: string; color: string; orden: number }[];
+      }
+    >();
+    for (const c of ordenadas) {
+      const tablero = porTablero.get(c.boardId) ?? {
+        id: c.boardId,
+        nombre: c.boardName,
+        espacio: c.workspaceName,
+        columnas: [],
+      };
+      tablero.columnas.push({ id: c.id, nombre: c.name, color: c.color, orden: c.order });
+      porTablero.set(c.boardId, tablero);
+    }
+    const tableros = [...porTablero.values()];
+    /* `boardId` → nombre, para etiquetar el inventario sin recorrerlo dos veces. */
+    const nombreDeTablero = new Map(tableros.map((t) => [t.id, t.nombre]));
+
     return {
       proyecto: {
         nombre: proyecto?.name ?? 'Proyecto',
         descripcion: proyecto?.description ?? null,
       },
-      /* Con `order` y todo: la última columna suele ser la de cierre, y el
-         modelo tiene que poder proponer una tarea nueva en la primera sin que
-         se lo digamos por su nombre. */
+      /**
+       * ⚠️ **`tableros` es la fuente de verdad; `columnas` se mantiene por
+       * compatibilidad.**
+       *
+       * Un assistant-service sin actualizar seguiría leyendo `columnas` y
+       * funcionaría como hasta ahora —mal con varios tableros, bien con uno—
+       * en vez de quedarse sin contexto y dejar de proponer nada. Cuando no
+       * quede nadie leyéndola, se quita.
+       */
+      tableros,
       columnas: ordenadas.map((c) => ({
         id: c.id,
         nombre: c.name,
         color: c.color,
         orden: c.order,
+        tableroId: c.boardId,
+        tablero: c.boardName,
       })),
       etiquetas: (etiquetas ?? []).map((l) => ({ id: l.id, nombre: l.name })),
       /**
@@ -478,8 +582,16 @@ export class ReportsService {
        * ⚠️ Esto viaja en **cada turno** de la conversación, dentro de la
        * instrucción de sistema. Es, con diferencia, el bloque más caro del
        * briefing, y crece con el proyecto mientras el resto no.
+       *
+       * ⚠️ Cada tarea sale con el **nombre** de su tablero, no solo el id. Un
+       * id no le dice nada al modelo al redactar («la he movido dentro de
+       * a3f1-…»), y sin el nombre no puede responder a «¿qué hay en el tablero
+       * de diseño?» aunque tenga los datos delante.
        */
-      tareas,
+      tareas: tareas.map((tarea) => ({
+        ...tarea,
+        tablero: nombreDeTablero.get(tarea.boardId) ?? null,
+      })),
       /**
        * El avance, **ya calculado aquí**.
        *

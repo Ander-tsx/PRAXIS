@@ -352,6 +352,17 @@ export class StatsService {
         title: true,
         status: true,
         columnId: true,
+        /**
+         * ⚠️ **El tablero, que faltaba y era el fallo.**
+         *
+         * Un proyecto tiene varios espacios y cada espacio varios tableros, pero
+         * el inventario solo llevaba `columnId`. El asistente veía una lista
+         * plana de columnas de todos los tableros mezclados —cada uno con las
+         * suyas numeradas 0,1,2,3— y no tenía forma de saber cuál era de cuál:
+         * cuando le pedían mover o crear algo, acertaba solo si el proyecto
+         * tenía un tablero. Con varios, siempre caía en el mismo.
+         */
+        boardId: true,
         priority: true,
         dueDate: true,
         completedAt: true,
@@ -395,6 +406,9 @@ export class StatsService {
       titulo: tarea.title,
       columna: tarea.status,
       columnId: tarea.columnId,
+      /* Sin nombre: tasks-service no conoce los tableros, viven en projects.
+         Se lo pone `reports-service`, que es quien cruza las dos mitades. */
+      boardId: tarea.boardId,
       prioridad: tarea.priority,
       /* Solo el día: la hora no la usa nadie para decidir y ocupa en cada turno. */
       vence: tarea.dueDate ? tarea.dueDate.toISOString().slice(0, 10) : null,

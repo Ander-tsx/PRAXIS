@@ -18,7 +18,19 @@ export interface ReportSnapshot {
   /** > 0 significa que el historial de este proyecto está **fabricado**. */
   eventosSinteticos: number;
   byPriority: { priority: string; count: number }[];
-  byColumn: { columnId: string; name: string; color: string | null; count: number }[];
+  /**
+   * ⚠️ `board` es lo que hace legible este reparto en un proyecto con varios
+   * tableros: sin él, dos columnas llamadas «Por hacer» salen como dos barras
+   * idénticas y parece que solo se está viendo una.
+   */
+  byColumn: {
+    columnId: string;
+    name: string;
+    color: string | null;
+    count: number;
+    board?: string | null;
+    workspace?: string | null;
+  }[];
   byLabel: { labelId: string; count: number }[];
   byAssignee: { userId: string; count: number }[];
 }
@@ -39,7 +51,7 @@ export interface ReportCycleTime {
 }
 
 export interface ReportFlow {
-  columnas: { id: string; name: string; color: string | null }[];
+  columnas: { id: string; name: string; color: string | null; board?: string | null }[];
   serie: { day: string; porColumna: Record<string, number> }[];
 }
 
@@ -150,3 +162,26 @@ export const PRIORITY_COLOR: Record<string, string> = {
   MEDIUM: colors.info,
   LOW: colors.textSecondary,
 };
+
+/**
+ * La etiqueta de una columna, **con su tablero solo cuando hace falta**.
+ *
+ * En un proyecto de un tablero, poner «Por hacer · Desarrollo» en cada barra es
+ * repetir la misma palabra en todas y no distingue nada. En cuanto hay dos, es
+ * lo único que las distingue: cada tablero numera sus columnas desde cero y los
+ * nombres se repiten casi siempre («Por hacer», «Hecho»).
+ *
+ * Por eso la regla es el número de tableros presentes y no una preferencia: se
+ * añade cuando aporta y se calla cuando no.
+ */
+export function etiquetaDeColumna(
+  columna: { name: string; board?: string | null },
+  variosTableros: boolean,
+): string {
+  return variosTableros && columna.board ? `${columna.name} · ${columna.board}` : columna.name;
+}
+
+/** Cuántos tableros distintos aparecen en un reparto por columna. */
+export function cuentaTableros(filas: { board?: string | null }[]): number {
+  return new Set(filas.map((fila) => fila.board).filter(Boolean)).size;
+}

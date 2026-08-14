@@ -114,6 +114,8 @@ export function FlowChart({ flow }: { flow: ReportFlow }) {
     ...punto.porColumna,
   }));
 
+  const variosTableros = new Set(flow.columnas.map((c) => c.board).filter(Boolean)).size > 1;
+
   return (
     <div className="flex flex-col gap-3">
       {/**
@@ -137,7 +139,10 @@ export function FlowChart({ flow }: { flow: ReportFlow }) {
               className="h-2.5 w-2.5 rounded-full"
               style={{ background: tokenFill(columna.color) }}
             />
-            {columna.name}
+            {/* Con varios tableros el nombre a secas no distingue: cada uno
+                tiene su «Por hacer», y la leyenda es lo único que permite saber
+                qué banda es cuál. */}
+            {variosTableros && columna.board ? `${columna.name} · ${columna.board}` : columna.name}
           </li>
         ))}
       </ul>
@@ -155,7 +160,11 @@ export function FlowChart({ flow }: { flow: ReportFlow }) {
                 key={columna.id}
                 type="monotone"
                 dataKey={columna.id}
-                name={columna.name}
+                name={
+                  variosTableros && columna.board
+                    ? `${columna.name} · ${columna.board}`
+                    : columna.name
+                }
                 stackId="flujo"
                 stroke={color}
                 fill={color}

@@ -169,6 +169,28 @@ const REGLAS = [
     'metrica mas parecida. El panel es suyo, asi que anadir un grafico no cambia ' +
     'nada del proyecto ni lo ve el resto del equipo: dilo si preguntan.',
 
+  /**
+   * 7 septies — Que hay más de un tablero, y que no todo pasa en el primero.
+   *
+   * ⚠️ **El fallo que arregla esta regla era de datos, no de prompt**, y conviene
+   * que quede escrito para que nadie la borre pensando que sobra: el briefing
+   * mandaba las columnas de todos los tableros **aplanadas en una sola lista**,
+   * cada tablero con las suyas numeradas desde 0. El modelo no podía saber que
+   * existía más de uno, así que «la columna de menor orden» acababa siendo una
+   * cualquiera y todo caía siempre en el mismo tablero.
+   *
+   * Ahora el contexto trae `tableros` con su jerarquía y cada tarea sabe en cuál
+   * está. Esta regla es lo que hace que el modelo **lo use**: sin ella tiene el
+   * dato delante y sigue tratándolo como una lista plana.
+   */
+  'El proyecto puede tener VARIOS espacios y VARIOS tableros, cada uno con sus ' +
+    'propias columnas: los tienes en "tableros" y cada tarea trae el suyo en ' +
+    '"tablero". Cuando te pidan crear o mover algo, decide PRIMERO en que tablero ' +
+    'y despues la columna dentro de ese tablero. Si no dicen cual y solo hay uno, ' +
+    'ese; si hay varios y no queda claro por lo que estabais hablando, PREGUNTA en ' +
+    'una frase en vez de elegir por tu cuenta. Al responder nombra el tablero ' +
+    '("en Diseno, columna Por hacer"): sin eso no se puede comprobar que acertaste.',
+
   /* 8 — Lo que sí decide el modelo, y es exactamente para lo que sirve. */
   'Para clasificar una tarea nueva usa SOLO las etiquetas que vienen en ' +
     '"etiquetas", con su id. Deduce de cual es por lo que cuenta la persona: ' +

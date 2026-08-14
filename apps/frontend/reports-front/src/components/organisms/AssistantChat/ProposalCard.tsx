@@ -171,6 +171,9 @@ export function TaskProposalCard({
       )}
 
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {/* El tablero antes que la columna: es lo que sitúa. Sin él, «Por hacer»
+            puede ser cualquiera de los cuatro tableros del proyecto. */}
+        {propuesta.boardName && <Campo termino="Tablero" valor={propuesta.boardName} />}
         <Campo termino="Columna" valor={propuesta.columnName} />
         <Campo
           termino="Prioridad"
@@ -451,6 +454,26 @@ export function MoveProposalCard({
         )}
         <strong className="text-text-primary">{propuesta.columnName}</strong>.
       </p>
+
+      {/**
+       * El cambio de tablero, dicho aparte y solo cuando lo hay.
+       *
+       * Un proyecto puede tener varios tableros y cada uno sus propias columnas,
+       * así que «pasaría a Por hacer» no identifica ningún sitio por sí solo. Y
+       * si además cambia de tablero, ese es el cambio grande de los dos: la
+       * tarea desaparece de donde la gente la estaba mirando.
+       */}
+      {propuesta.boardName &&
+        (propuesta.tableroActual && propuesta.tableroActual !== propuesta.boardName ? (
+          <p className="font-sans text-sm" style={{ color: colors.warning }}>
+            Y cambiaría de tablero: de <strong>{propuesta.tableroActual}</strong> a{' '}
+            <strong>{propuesta.boardName}</strong>.
+          </p>
+        ) : (
+          <p className="font-sans text-xs text-text-disabled">
+            En el tablero <strong className="text-text-secondary">{propuesta.boardName}</strong>.
+          </p>
+        ))}
     </CambioSobreTarea>
   );
 }
