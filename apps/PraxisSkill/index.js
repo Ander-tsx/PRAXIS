@@ -432,7 +432,7 @@ const ConnectSkillIntentHandler = {
     return name === 'ConnectSkillIntent' || name === 'LoginIntent';
   },
   async handle(handlerInput) {
-    let seed =
+    const seed =
       Alexa.getSlotValue(handlerInput.requestEnvelope, 'seed') ||
       Alexa.getSlotValue(handlerInput.requestEnvelope, 'SeedPhrase');
     if (!seed || !seed.trim()) {

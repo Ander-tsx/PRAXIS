@@ -22,7 +22,7 @@ const ConnectSkillIntentHandler = {
   },
 
   async handle(handlerInput) {
-    let seed =
+    const seed =
       Alexa.getSlotValue(handlerInput.requestEnvelope, 'seed') ||
       Alexa.getSlotValue(handlerInput.requestEnvelope, 'SeedPhrase') ||
       Alexa.getSlotValue(handlerInput.requestEnvelope, 'phrase');

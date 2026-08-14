@@ -2,9 +2,9 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { firstValueFrom, timeout } from 'rxjs';
 
-import { RedisService } from '../redis/redis.service';
 import { displayName } from '../common/text.util';
 import type { VoiceMember, VoiceProject, VoiceTask } from '../common/voice-task.types';
+import { RedisService } from '../redis/redis.service';
 
 /** Alexa corta la espera cerca de los 8 s: ningún viaje TCP debe pasar de 3 s. */
 const RPC_TIMEOUT_MS = 3000;

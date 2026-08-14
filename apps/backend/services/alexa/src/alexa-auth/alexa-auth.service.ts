@@ -1,7 +1,7 @@
+import * as crypto from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RpcException } from '@nestjs/microservices';
-import * as crypto from 'node:crypto';
 
 import {
   FindAlexaLinksDto,
