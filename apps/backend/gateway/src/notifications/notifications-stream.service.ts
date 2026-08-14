@@ -1,6 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import Redis from 'ioredis';
-import { Observable, Subject } from 'rxjs';
+import { Observable, Subject, firstValueFrom } from 'rxjs';
+import { timeout } from 'rxjs/operators';
 
 /** Lo que viaja por el canal. Lo justo para pintar el aviso emergente. */
 export interface AvisoEnVivo {
@@ -11,7 +13,34 @@ export interface AvisoEnVivo {
   taskId: string | null;
   taskTitle: string | null;
   createdAt: string;
+  /**
+   * El nombre de quien lo provocó, resuelto **aquí** y no por el emisor.
+   *
+   * projects-service publica solo el `actorId` porque no conoce a los usuarios:
+   * viven en credentials-service, en otro esquema y bajo otro dueño. Hacer que
+   * los resolviera él añadiría un salto de red **por cada mensaje de chat**, que
+   * es el evento más frecuente de todo el sistema.
+   *
+   * El gateway sí sabe hacerlo —ya cruza `userId` con nombres para el asistente—
+   * y además es el último punto por el que pasa el aviso antes del navegador. Se
+   * resuelve una vez por persona y se guarda en memoria: un chat activo entre
+   * cinco personas son cinco consultas en toda la sesión, no una por mensaje.
+   *
+   * `null` cuando no se pudo resolver o cuando el aviso no tiene actor. La
+   * pantalla ya sabe leerlo en impersonal, que es como se leía antes.
+   */
+  actorName?: string | null;
 }
+
+/**
+ * Cuánto se recuerda un nombre.
+ *
+ * Diez minutos: lo suficiente para que una conversación entera no vuelva a
+ * preguntar, y lo bastante poco para que un cambio de nombre se note sin tener
+ * que reiniciar el gateway. No es una caché de datos sensibles —un nombre ya se
+ * ve en cualquier listado— así que el riesgo de tenerlo viejo es cosmético.
+ */
+const CADUCIDAD_DEL_NOMBRE_MS = 10 * 60 * 1000;
 
 /**
  * El patrón al que se suscribe el gateway. Espejo de `canalDeAvisos()` en
@@ -47,6 +76,18 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
    * pestañas, y las dos tienen que recibir el aviso.
    */
   private readonly oyentes = new Map<string, Set<Subject<AvisoEnVivo>>>();
+
+  /**
+   * `userId` → nombre, con caducidad.
+   *
+   * En memoria del proceso y no en Redis a propósito: es una caché de
+   * conveniencia sobre un dato público, y meterla en Redis costaría una ida y
+   * vuelta por aviso, que es exactamente lo que se está evitando. Se pierde al
+   * reiniciar y no pasa nada.
+   */
+  private readonly nombres = new Map<string, { nombre: string; hasta: number }>();
+
+  constructor(@Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy) {}
 
   onModuleInit() {
     this.suscriptor = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
@@ -84,8 +125,53 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
         return;
       }
 
-      for (const destinatario of destinatarios) destinatario.next(aviso);
+      /* El nombre se resuelve aparte y el aviso sale igual si falla o si tarda:
+         un aviso que llega tarde por esperar un nombre es peor que uno que
+         llega a tiempo en impersonal, que es como se leía hasta ahora. */
+      void this.conNombre(aviso).then((completo) => {
+        for (const destinatario of destinatarios) destinatario.next(completo);
+      });
     });
+  }
+
+  /**
+   * El aviso con el nombre de quien lo provocó, si se puede saber.
+   *
+   * Nunca lanza: cualquier fallo devuelve el aviso tal cual. La alternativa
+   * —dejar caer el aviso porque no se pudo poner un nombre— convertiría una
+   * degradación cosmética en una pérdida de información.
+   */
+  private async conNombre(aviso: AvisoEnVivo): Promise<AvisoEnVivo> {
+    if (!aviso.actorId) return aviso;
+
+    const guardado = this.nombres.get(aviso.actorId);
+    if (guardado && guardado.hasta > Date.now()) {
+      return { ...aviso, actorName: guardado.nombre };
+    }
+
+    try {
+      const perfil = await firstValueFrom(
+        this.credentialsClient
+          .send<{ firstName?: string | null; lastName?: string | null } | null>(
+            { cmd: 'user_find_one' },
+            { id: aviso.actorId },
+          )
+          /* Sin tope, un credentials-service lento congelaría el aviso —y con él
+             el sonido y la tarjeta— hasta que la petición cayera por su cuenta. */
+          .pipe(timeout(1500)),
+      );
+
+      const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
+      if (!nombre) return aviso;
+
+      this.nombres.set(aviso.actorId, {
+        nombre,
+        hasta: Date.now() + CADUCIDAD_DEL_NOMBRE_MS,
+      });
+      return { ...aviso, actorName: nombre };
+    } catch {
+      return aviso;
+    }
   }
 
   onModuleDestroy() {

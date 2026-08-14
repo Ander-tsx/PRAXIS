@@ -9,7 +9,7 @@ import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Chat',
+  title: 'Mensajes directos',
 };
 
 /**
@@ -85,8 +85,17 @@ export default async function ChatLayout({
   const activo = (await params)?.peerId ?? null;
 
   return (
-    <AppHeader title="Chat">
-      <div className="flex flex-col gap-5 sm:flex-row">
+    <AppHeader title="Mensajes directos">
+      {/**
+       * Alto fijo en función del viewport, y no `flex-1`.
+       *
+       * `AppHeader` mete el contenido en un `<main>` con desplazamiento propio y
+       * relleno; un `flex-1` aquí dentro no tiene contra qué crecer, así que el
+       * panel se quedaba en su tope y dejaba una franja vacía hasta el borde de
+       * la pantalla. Restando la cabecera (4rem) y el relleno del `main` (3rem
+       * arriba y abajo en escritorio) el chat llega justo hasta abajo.
+       */}
+      <div className="flex h-[calc(100vh-7rem)] flex-col gap-5 sm:flex-row">
         <ChatDirectory
           conversaciones={conversaciones}
           contactos={contactos}

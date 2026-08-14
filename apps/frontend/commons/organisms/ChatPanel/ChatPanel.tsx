@@ -31,6 +31,15 @@ export interface ChatAcciones {
 }
 
 export interface ChatPanelProps {
+  /**
+   * Que el panel ocupe todo el alto que le dé su padre.
+   *
+   * Falso por defecto —el chat de un proyecto convive con pestañas y ahí un
+   * tope de 58vh evita que la conversación empuje el resto fuera de la vista—
+   * y verdadero en la pantalla dedicada de mensajes, donde no compite con nada
+   * y el tope solo dejaba una franja vacía contra el borde inferior.
+   */
+  llenarAlto?: boolean;
   page: ChatMessagePage;
   usersById: Map<string, UserProfile>;
   currentUserId: string;
@@ -74,6 +83,7 @@ export interface ChatPanelProps {
  * uno termina donde empieza el otro.
  */
 export function ChatPanel({
+  llenarAlto = false,
   page,
   usersById,
   currentUserId,
@@ -256,7 +266,27 @@ export function ChatPanel({
     <div className="flex min-h-0 flex-1 flex-col">
       {encabezado}
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      {/**
+       * ⚠️ **El tope de altura vive aquí, no en el scroller de dentro.**
+       *
+       * Estaba en el scroller (`max-h-[58vh]`) mientras este contenedor era
+       * `flex-1`. En cuanto el tope se aplicaba, el contenedor seguía creciendo
+       * hasta llenar lo que le daba el padre y el scroller se quedaba corto: todo
+       * ese sobrante quedaba como **hueco muerto entre el último mensaje y el
+       * compositor**.
+       *
+       * ⚠️ Y el tope **solo se pone cuando el chat comparte pantalla con otra
+       * cosa** (`llenarAlto` en falso), que es el caso de la pestaña de un
+       * proyecto: ahí 58vh evita que la conversación empuje el resto fuera de la
+       * vista. En la pantalla dedicada de mensajes no hay nada más con lo que
+       * competir, así que el tope solo dejaba una franja vacía contra el borde
+       * inferior — que es lo que se veía.
+       */}
+      <div
+        className={`relative flex flex-col ${
+          llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
+        }`}
+      >
         <div
           ref={scrollerRef}
           onScroll={alDesplazar}
@@ -265,7 +295,7 @@ export function ChatPanel({
              píxel —una etiqueta larga, una palabra sin espacios— saca una barra
              horizontal en toda la conversación. Aquí nada debe desbordar a lo
              ancho: si algo no cabe, se parte. */
-          className="flex max-h-[58vh] min-h-72 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 py-3"
+          className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
         >
           {hasMore && (
             <div className="mb-2 flex justify-center">

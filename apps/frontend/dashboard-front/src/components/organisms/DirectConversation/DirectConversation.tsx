@@ -53,6 +53,9 @@ export function DirectConversation({
 
   return (
     <ChatPanel
+      /* Pantalla dedicada: el chat es lo único que hay, así que llena el alto.
+         Con el tope de 58vh quedaba una franja muerta contra el borde inferior. */
+      llenarAlto
       page={page}
       usersById={usersById}
       currentUserId={currentUserId}

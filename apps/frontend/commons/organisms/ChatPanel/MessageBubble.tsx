@@ -54,6 +54,21 @@ export function MessageBubble({
   nombreDeAutor,
 }: MessageBubbleProps) {
   const [eligiendoReaccion, setEligiendoReaccion] = useState(false);
+  /**
+   * Borrar pide confirmación **en la propia barra**, no en un diálogo.
+   *
+   * El aspa estaba pegada a «Responder», del mismo tamaño y sin ninguna
+   * defensa: un clic de más en la acción de al lado y el mensaje ya no estaba.
+   * Y borrar un mensaje **no se deshace** — no hay papelera ni historial de
+   * ediciones—, así que es la única acción del chat cuyo error no tiene arreglo.
+   *
+   * Se resuelve pidiendo un segundo clic sobre un botón que **cambia de sitio,
+   * de tamaño y de color**: quien iba a por «Responder» no encuentra ahí lo que
+   * esperaba y para. Un `window.confirm` habría servido igual de bien y habría
+   * bloqueado la pestaña entera; un diálogo propio son cuarenta líneas para
+   * preguntar una cosa.
+   */
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const nombre = author ? personLabel(author) : 'Alguien que ya no está';
 
   /** Las reacciones agrupadas por emoji, con cuántos y si estás dentro. */
@@ -67,7 +82,7 @@ export function MessageBubble({
 
   return (
     <article
-      className={`group relative flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
+      className={`relative flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
         continued ? 'mt-0.5' : 'mt-3'
       }`}
     >
@@ -104,8 +119,20 @@ export function MessageBubble({
           </span>
         )}
 
+        {/**
+         * ⚠️ **El `group` está aquí, en la burbuja, y no en el `<article>`.**
+         *
+         * Estaba en la fila entera, que ocupa todo el ancho del panel: pasar el
+         * ratón por el hueco vacío de la derecha —o por el avatar, o por el
+         * nombre— ya sacaba los tres botones. Con varios mensajes seguidos, se
+         * encendían y apagaban solos al mover el ratón por la conversación.
+         *
+         * Se nombra (`group/burbuja`) a propósito: sin nombre, cualquier `group`
+         * que alguien añada más arriba volvería a capturarlo sin avisar.
+         */}
         <div
-          className="relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
+          className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
+          onMouseLeave={() => setConfirmandoBorrado(false)}
           style={{
             background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
             /* La esquina que apunta al avatar se queda cuadrada solo en el
@@ -142,11 +169,23 @@ export function MessageBubble({
 
           <RichText cuerpo={message.body} hrefDeRef={hrefDeRef} currentUserId={currentUserId} />
 
-          {/* Las acciones, flotando fuera de la burbuja para no robarle ancho. */}
+          {/**
+           * Las acciones, flotando fuera de la burbuja para no robarle ancho.
+           *
+           * ⚠️ **`top-1` y no `-top-3.5`.** Estaba por encima del borde superior
+           * de la burbuja, y en el primer mensaje del hilo eso quedaba fuera del
+           * contenedor con scroll: la barra se recortaba contra el borde de
+           * arriba. Ahora cae **dentro**, alineada con la primera línea de texto.
+           *
+           * ⚠️ Y se ancla al lado **contrario** al avatar, hacia dentro de la
+           * conversación (`-right-1` en los ajenos, `-left-1` en los tuyos), en
+           * vez de a `right-0`/`left-0`: ahí sobresalía por el costado y en una
+           * pantalla estrecha se salía del viewport.
+           */}
           <div
-            className={`absolute -top-3.5 ${
-              mine ? 'left-0' : 'right-0'
-            } flex items-center gap-0.5 rounded-full border border-border px-1 py-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100`}
+            className={`absolute top-1 ${
+              mine ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'
+            } z-10 flex items-center gap-0.5 rounded-full border border-border px-1 py-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/burbuja:opacity-100`}
             style={{ background: colors.surface }}
           >
             {canReact && (
@@ -179,32 +218,79 @@ export function MessageBubble({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
               </svg>
             </button>
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => onBorrar(message.id)}
-                aria-label="Eliminar mensaje"
-                title="Eliminar"
-                className="cursor-pointer rounded-full px-1.5 py-0.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-error"
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden="true"
+
+            {canDelete &&
+              (confirmandoBorrado ? (
+                /* Al confirmar, el botón **cambia de forma**: deja de ser un
+                   icono del tamaño de sus vecinos y pasa a ser una palabra en
+                   rojo. Quien llegó aquí por error lo lee antes de volver a
+                   pulsar; quien venía a borrar lo tiene igual de cerca. */
+                <span className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBorrado(false);
+                      onBorrar(message.id);
+                    }}
+                    aria-label="Confirmar que se elimina el mensaje"
+                    className="cursor-pointer rounded-full px-2 py-0.5 font-sans text-[11px] font-semibold transition-colors"
+                    style={{ background: alpha(colors.error, 18), color: colors.error }}
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoBorrado(false)}
+                    aria-label="No eliminar"
+                    title="Cancelar"
+                    className="cursor-pointer rounded-full px-1.5 py-0.5 font-sans text-[11px] text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    No
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBorrado(true)}
+                  aria-label="Eliminar mensaje"
+                  title="Eliminar"
+                  /* Separado del resto por un filete: es la única acción de la
+                     barra que no se deshace, y no debe leerse como una más. */
+                  className="ml-0.5 cursor-pointer rounded-full border-l border-border py-0.5 pl-1.5 pr-1 text-text-disabled transition-colors hover:text-error"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            )}
+                  <svg
+                    className="h-3.5 w-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                    />
+                  </svg>
+                </button>
+              ))}
           </div>
 
           {eligiendoReaccion && (
+            /**
+             * **Justo debajo de la barra de opciones, y alineado con ella.**
+             *
+             * Estuvo flotando sobre la burbuja (`-top-11`) y se salía por arriba
+             * en el primer mensaje del hilo. Ahora cuelga del mismo sitio del que
+             * salió —el botón de la carita— así que el gesto es continuo: se
+             * abre donde estaba el ratón, no en la otra punta del mensaje.
+             *
+             * `top-10` es la altura de la barra (`top-1` + su alto) más un hueco;
+             * si cambia el tamaño de aquella, este número va detrás.
+             */
             <div
-              className={`absolute -top-11 ${
-                mine ? 'left-0' : 'right-0'
+              className={`absolute top-10 ${
+                mine ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'
               } z-20 flex items-center gap-0.5 rounded-full border border-border px-1.5 py-1`}
               style={{
                 background: colors.surfaceElevated,

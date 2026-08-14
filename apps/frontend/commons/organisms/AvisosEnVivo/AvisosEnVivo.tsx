@@ -19,6 +19,9 @@ interface AvisoRecibido {
   type: NotificationType | typeof CHAT_EVENT_TYPE | (string & {});
   /** Quién lo provocó. En un mensaje privado es con quien hay que hablar. */
   actorId?: string | null;
+  /** El nombre de quien lo provocó. Lo resuelve el gateway al relevar el
+      evento; `null` o ausente cuando no se pudo, y entonces se lee impersonal. */
+  actorName?: string | null;
   /**
    * Solo en los avisos de chat: de qué tipo de conversación viene.
    *
@@ -212,14 +215,31 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
 /**
  * El texto del aviso emergente.
  *
- * Sin el nombre de quien lo provocó, a diferencia de la bandeja: por el flujo
- * solo viaja `actorId`, y resolverlo contra el directorio costaría una petición
- * por aviso para una tarjeta que dura seis segundos. En impersonal se lee igual
- * de bien, y el nombre está en la bandeja para quien lo quiera.
+ * ## Con nombre desde que el gateway lo resuelve
+ *
+ * Antes iba todo en impersonal —«Te han asignado…»— porque por el flujo solo
+ * viajaba `actorId` y resolverlo desde aquí habría costado una petición por
+ * aviso. Ahora lo resuelve el gateway al relevar el evento, con caché, así que
+ * el nombre llega puesto y **quién lo hizo es la mitad del aviso**: en un chat de
+ * equipo, «mensaje nuevo» sin remitente obliga a abrirlo para saber si te
+ * incumbe.
+ *
+ * Sigue degradando a impersonal cuando `actorName` no viene —credentials caído,
+ * una cuenta borrada, un emisor que no lo manda— y esa es la forma que tenía
+ * antes: se pierde un dato, no el aviso.
+ *
+ * ## Y el proyecto solo cuando distingue algo
+ *
+ * En un mensaje privado no hay proyecto que nombrar, y decir «un proyecto» ahí
+ * sería inventarse un contexto que no existe.
  */
 function describir(aviso: AvisoRecibido): string {
-  const proyecto = aviso.projectName ?? 'un proyecto';
+  const proyecto = aviso.projectName ?? null;
   const tarea = aviso.taskTitle ?? 'una tarea';
+  const quien = aviso.actorName?.trim() || null;
+  /* «en «Proyecto»» o nada. Se compone una vez y se reutiliza abajo para que
+     ninguna rama se olvide de contemplar el caso sin proyecto. */
+  const donde = proyecto ? ` en «${proyecto}»` : '';
 
   /**
    * ⚠️ **Sin el texto del mensaje, a propósito.** El aviso no lo trae y no debe:
@@ -227,24 +247,39 @@ function describir(aviso: AvisoRecibido): string {
    * abierto en una reunión. Para leerlo está el chat, que comprueba permisos.
    */
   if (aviso.type === CHAT_EVENT_TYPE) {
-    return `Mensaje nuevo en el chat de «${proyecto}».`;
+    if (quien && proyecto) return `${quien} ha escrito en «${proyecto}».`;
+    if (quien) return `${quien} te ha escrito.`;
+    if (proyecto) return `Mensaje nuevo en el chat de «${proyecto}».`;
+    return 'Tienes un mensaje nuevo.';
   }
 
   switch (aviso.type) {
     case 'INVITATION_RECEIVED':
-      return `Te han invitado a «${proyecto}».`;
+      return quien
+        ? `${quien} te ha invitado a «${proyecto ?? 'un proyecto'}».`
+        : `Te han invitado a «${proyecto ?? 'un proyecto'}».`;
     case 'INVITATION_ACCEPTED':
-      return `Han aceptado tu invitación a «${proyecto}».`;
+      return quien
+        ? `${quien} ha aceptado tu invitación a «${proyecto ?? 'un proyecto'}».`
+        : `Han aceptado tu invitación a «${proyecto ?? 'un proyecto'}».`;
     case 'INVITATION_REJECTED':
-      return `Han rechazado tu invitación a «${proyecto}».`;
+      return quien
+        ? `${quien} ha rechazado tu invitación a «${proyecto ?? 'un proyecto'}».`
+        : `Han rechazado tu invitación a «${proyecto ?? 'un proyecto'}».`;
     case 'MEMBER_LEFT':
-      return `Alguien ha salido de «${proyecto}».`;
+      return quien
+        ? `${quien} ha salido de «${proyecto ?? 'un proyecto'}».`
+        : `Alguien ha salido de «${proyecto ?? 'un proyecto'}».`;
     case 'MEMBER_REMOVED':
-      return `Te han sacado de «${proyecto}».`;
+      return `Te han sacado de «${proyecto ?? 'un proyecto'}».`;
     case 'TASK_ASSIGNED':
-      return `Te han asignado «${tarea}» en «${proyecto}».`;
+      return quien
+        ? `${quien} te ha asignado «${tarea}»${donde}.`
+        : `Te han asignado «${tarea}»${donde}.`;
     case 'TASK_UNASSIGNED':
-      return `Te han quitado de «${tarea}» en «${proyecto}».`;
+      return quien
+        ? `${quien} te ha quitado de «${tarea}»${donde}.`
+        : `Te han quitado de «${tarea}»${donde}.`;
     default:
       return 'Tienes un aviso nuevo.';
   }

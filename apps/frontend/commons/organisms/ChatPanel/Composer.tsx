@@ -1,6 +1,14 @@
 'use client';
 
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { type ChatRefKind, componerReferencia } from '../../api/chat-refs';
 import { alpha, colors } from '../../tokens';
 
@@ -185,15 +193,38 @@ export function Composer({
     setCursor(posicion);
     setEtiquetas((previas) => [...previas, { kind: sugerencia.kind, id: sugerencia.id, visible }]);
 
-    /* En el siguiente tick: el textarea todavía tiene el valor viejo hasta que
-       React lo repinta, así que colocar el cursor ahora lo pondría mal. */
-    queueMicrotask(() => {
-      const area = areaRef.current;
-      if (!area) return;
-      area.focus();
-      area.setSelectionRange(posicion, posicion);
-    });
+    /**
+     * ⚠️ **El cursor se coloca en un efecto de layout, no aquí ni en un
+     * `queueMicrotask`.**
+     *
+     * Aquí estaba lo segundo, con un comentario que explicaba bien el problema y
+     * elegía mal la herramienta: una microtarea corre **antes** de que React
+     * confirme el DOM, así que `setSelectionRange` se aplicaba sobre el valor
+     * viejo del textarea. Al repintar con el texto nuevo, el navegador recolocaba
+     * la selección por su cuenta —normalmente al final— y el efecto era el que se
+     * veía: el cursor «se adelantaba» al texto y seguir escribiendo metía las
+     * letras donde no era.
+     *
+     * `useLayoutEffect` corre **después** del commit y antes de que el navegador
+     * pinte, así que la posición se aplica sobre el valor definitivo y no se ve
+     * ningún salto intermedio.
+     */
+    setCursorPendiente(posicion);
   }
+
+  /* `null` = no hay nada que recolocar. Se usa un objeto y no el número a secas
+     para que insertar dos menciones en la misma posición vuelva a disparar el
+     efecto: con un número, la segunda no cambiaría el estado y no correría. */
+  const [cursorPendiente, setCursorPendiente] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    if (cursorPendiente === null) return;
+    const area = areaRef.current;
+    if (!area) return;
+    area.focus();
+    area.setSelectionRange(cursorPendiente, cursorPendiente);
+    setCursorPendiente(null);
+  }, [cursorPendiente]);
 
   /**
    * Los trozos del texto, marcando cuáles son etiqueta.
