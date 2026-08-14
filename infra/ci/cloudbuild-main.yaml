@@ -1,0 +1,125 @@
+# Despliegue automático: lo que corre en cada push a `main`.
+#
+# Lo lanza un trigger de Cloud Build conectado al repositorio de GitHub. No hay
+# ninguna clave de servicio guardada en ninguna parte: la conexión la hace la
+# app oficial de GitHub y el build corre con la cuenta de servicio del proyecto.
+#
+# ## Qué hace, y qué NO hace
+#
+# Construye las dos imágenes, las etiqueta con el SHA del commit **y** con
+# `latest`, y reemplaza las instancias de los dos grupos para que se bajen la
+# nueva. El arranque de cada VM hace `docker pull` al iniciar el servicio, así
+# que reemplazarla es lo que despliega.
+#
+# ⚠️ **No aplica migraciones, y es a propósito.** `migrar.sh` avisa de que hay
+# que ejecutarlo en UNA sola máquina porque Prisma toma un bloqueo en la base;
+# lanzarlo desde varias VMs que arrancan a la vez es exactamente el escenario que
+# ese aviso describe. Cuando un despliegue traiga una migración, se aplica a mano
+# **antes** de que entre el código nuevo. Está en `docs/despliegue.md`.
+#
+# ⚠️ **Tampoco toca Terraform.** El estado y el `terraform.tfvars` con las claves
+# no están en el repositorio, así que meter `terraform apply` aquí obligaría a
+# subirlos a Secret Manager y a darle a este build permiso para cambiar la
+# infraestructura entera. Para cambiar máquinas, red o secretos se sigue
+# aplicando Terraform a mano desde tu portátil; esto solo despliega **código**.
+#
+# ## Por qué `latest` y además el SHA
+#
+# Las plantillas de instancia apuntan a una etiqueta fija. Si apuntaran al SHA,
+# cada despliegue exigiría un `terraform apply` para cambiarla — que es justo lo
+# que este archivo existe para evitar. Así que apuntan a `latest`, que es mutable
+# y por eso se guarda **también** el SHA: sin él no habría forma de saber qué
+# está corriendo ni de volver atrás. Para revertir, ver `docs/despliegue.md`.
+
+substitutions:
+  _REGION: us-east1
+  _PREFIJO: praxis
+  # El ID de cliente de OAuth para el botón de Google. Va aquí y no en Secret
+  # Manager porque Next lo incrusta en el JavaScript del navegador durante el
+  # build: es público por diseño y no hay forma —ni motivo— de ocultarlo.
+  _GOOGLE_CLIENT_ID: ""
+
+options:
+  # Compilar 6 apps de Next y 8 de Nest en la máquina por defecto tarda mucho.
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 3600s
+
+steps:
+  # ─────────────────────────── backend ───────────────────────────
+  # ⚠️ `gcr.io/cloud-builders/docker` arranca con el constructor CLÁSICO. Los dos
+  # Dockerfiles necesitan BuildKit en tres sitios: `RUN --mount=type=cache`,
+  # `COPY --chmod=0755` y la directiva `# syntax` de la primera línea. Sin él, el
+  # primero falla y la directiva se trata como un comentario, sin avisar.
+  - id: backend
+    name: gcr.io/cloud-builders/docker
+    env: [DOCKER_BUILDKIT=1]
+    args:
+      - build
+      - -f
+      - infra/docker/images/backend.Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/backend:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/backend:latest
+      - .
+    waitFor: ["-"]
+
+  # ─────────────────────────── frontend ──────────────────────────
+  - id: frontend
+    name: gcr.io/cloud-builders/docker
+    env: [DOCKER_BUILDKIT=1]
+    args:
+      - build
+      - -f
+      - infra/docker/images/frontend.Dockerfile
+      - --build-arg
+      - GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/frontend:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/frontend:latest
+      - .
+    waitFor: ["-"]
+
+  # ──────────────────────── subir las cuatro etiquetas ────────────────────────
+  # `images:` al final del archivo solo sube las que se listen ahí y no acepta
+  # dos etiquetas de la misma imagen con claridad, así que se empujan aquí.
+  - id: publicar
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        for destino in backend frontend; do
+          docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/$$destino:$SHORT_SHA
+          docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_PREFIJO}/$$destino:latest
+        done
+    waitFor: [backend, frontend]
+
+  # ──────────────────────── reemplazar las instancias ─────────────────────────
+  # `--max-unavailable=0` mantiene el sitio en pie mientras se cambian: se
+  # levanta la nueva antes de retirar la vieja, igual que el `update_policy` de
+  # Terraform. Sin eso, un despliegue es un minuto de 502.
+  #
+  # No se espera a que termine (`--max-surge` y adelante): el rollout tarda
+  # varios minutos por el arranque de las VMs y bloquear el build aquí solo
+  # consume tiempo de Cloud Build sin aportar nada. Si algo falla, el grupo se
+  # queda con las instancias viejas sirviendo.
+  - id: desplegar
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        for grupo in backend frontend; do
+          gcloud compute instance-groups managed rolling-action replace \
+            ${_PREFIJO}-$$grupo-${_REGION} \
+            --region=${_REGION} \
+            --max-unavailable=0 \
+            --max-surge=1
+        done
+    waitFor: [publicar]
