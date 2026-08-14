@@ -1,0 +1,155 @@
+'use client';
+
+import {
+  deleteChatMessageAction,
+  markChatReadAction,
+  muteChatAction,
+  reactChatAction,
+  sendChatMessageAction,
+} from '@/app/(private)/[id]/actions';
+import { type ChatMessagePage, ChatPanel, type UserProfile, alpha, colors } from '@praxis/commons';
+import { useMemo, useState } from 'react';
+
+export interface ProjectChatProps {
+  projectId: string;
+  projectName: string;
+  /** La última página, ya pedida en el servidor. Del más antiguo al más nuevo. */
+  page: ChatMessagePage;
+  usersById: Map<string, UserProfile>;
+  currentUserId: string;
+  /** `canComment`: el mismo permiso que comentar en una tarea. */
+  canWrite: boolean;
+  /** `canManageMembers`: quien lleva el equipo retira mensajes ajenos. */
+  canModerate: boolean;
+}
+
+/**
+ * El chat del equipo de un proyecto.
+ *
+ * Es un envoltorio fino sobre `ChatPanel`: lo único que aporta es el encabezado
+ * y atar las acciones de esta zona. Todo el comportamiento —historial, envío,
+ * respuestas, reacciones, menciones— es **el mismo código** que la conversación
+ * privada, y esa es la razón de que el panel viva en `commons`. Cuando esto eran
+ * dos componentes, cualquier arreglo había que aplicarlo dos veces.
+ */
+export function ProjectChat({
+  projectId,
+  projectName,
+  page,
+  usersById,
+  currentUserId,
+  canWrite,
+  canModerate,
+}: ProjectChatProps) {
+  /* Estable entre renders: `ChatPanel` tiene `marcarLeido` en las dependencias
+     de un efecto, y recreada en cada render marcaría como leído en bucle. */
+  const acciones = useMemo(
+    () => ({
+      enviar: (cuerpo: string, replyToId: string | null) =>
+        sendChatMessageAction(projectId, cuerpo, replyToId),
+      borrar: (messageId: string) => deleteChatMessageAction(projectId, messageId),
+      reaccionar: (messageId: string, emoji: string, on: boolean) =>
+        reactChatAction(projectId, messageId, emoji, on),
+      marcarLeido: () => markChatReadAction(projectId),
+    }),
+    [projectId],
+  );
+
+  return (
+    <ChatPanel
+      page={page}
+      usersById={usersById}
+      currentUserId={currentUserId}
+      acciones={acciones}
+      gatewayPath="/projects/api/gateway"
+      rutaCanal={`/projects/${projectId}/chat`}
+      canWrite={canWrite}
+      canModerate={canModerate}
+      motivoSinEscribir="Puedes leer la conversación del equipo, pero tu rol no incluye escribir en ella."
+      vacio={
+        canWrite
+          ? 'Todavía no hay mensajes. Escribe el primero.'
+          : 'Todavía no hay mensajes en este proyecto.'
+      }
+      /**
+       * Pulsar sobre quien escribió abre la conversación privada con esa
+       * persona. ⚠️ Cruza de zona —el chat privado vive en `dashboard`— así que
+       * la ruta lleva el prefijo completo y `ChatPanel` navega con un `<a>` duro.
+       */
+      hrefDePersona={(userId) => `/dashboard/chat/${userId}`}
+      /* Las menciones sí: en el chat del equipo hay a quién nombrar. */
+      permiteMenciones
+      encabezado={
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h3 className="font-display text-2xl text-text-primary">Chat del equipo</h3>
+            <p className="font-sans text-sm text-text-secondary">
+              Lo que se escriba aquí lo ve todo el equipo de {projectName}.
+            </p>
+          </div>
+
+          <BotonSilenciar projectId={projectId} inicial={page.muted} />
+        </div>
+      }
+    />
+  );
+}
+
+/**
+ * ⚠️ El texto dice **«avisos»** y no «notificaciones» a propósito: silenciar
+ * apaga la tarjeta y el sonido, pero **el contador de la pestaña sigue**. Un
+ * botón que dijera «silenciar el chat» prometería no volver a saber nada de él,
+ * que no es lo que hace.
+ */
+function BotonSilenciar({ projectId, inicial }: { projectId: string; inicial: boolean }) {
+  const [muted, setMuted] = useState(inicial);
+  const [enviando, setEnviando] = useState(false);
+
+  async function alternar() {
+    setEnviando(true);
+    const confirmado = await muteChatAction(projectId, !muted);
+    /* Se corrige con lo que confirma el servidor, no con lo que se pidió: si
+       falla, el interruptor vuelve a la verdad en vez de enseñar la intención. */
+    if (confirmado) setMuted(confirmado.muted);
+    setEnviando(false);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={alternar}
+      disabled={enviando}
+      aria-pressed={muted}
+      title={
+        muted
+          ? 'Los avisos de este chat están apagados. Los mensajes sin leer se siguen contando.'
+          : 'Apagar la tarjeta y el sonido de este chat. Los mensajes sin leer se siguen contando.'
+      }
+      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 font-sans text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      style={{
+        borderColor: muted ? colors.border : colors.border,
+        background: muted ? alpha(colors.textSecondary, 10) : 'transparent',
+        color: muted ? colors.textSecondary : colors.textSecondary,
+      }}
+    >
+      <svg
+        className="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0m6 0H9"
+        />
+        {/* La barra que tacha la campana solo cuando está silenciado: es la
+            diferencia que se lee de un vistazo, sin leer el texto. */}
+        {muted && <path strokeLinecap="round" d="M4 4l16 16" />}
+      </svg>
+      {muted ? 'Avisos apagados' : 'Silenciar avisos'}
+    </button>
+  );
+}
