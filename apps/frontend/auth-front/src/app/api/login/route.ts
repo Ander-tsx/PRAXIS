@@ -53,6 +53,16 @@ export async function POST(request: NextRequest) {
       if (error.status === 503) {
         return NextResponse.json({ message: error.message }, { status: error.status });
       }
+      /* El gateway limita a 10 logins/minuto por IP (§16 de CLAUDE.md). Un 429
+         aquí casi nunca es un fallo de credenciales —es que se agotó la ventana,
+         también con los reintentos— y confundirlo con una contraseña mala lleva
+         al usuario a encerrarse reintentando. Se avisa aparte. */
+      if (error.status === 429) {
+        return NextResponse.json(
+          { message: 'Demasiados intentos. Espera un minuto y vuelve a intentarlo.' },
+          { status: 429 },
+        );
+      }
       return NextResponse.json({ message: 'Credenciales inválidas.' }, { status: 400 });
     }
 

@@ -4,11 +4,13 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import type { ChatRefKind } from '../../api/chat-refs';
 import { textoPlano } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
-import type { ChatMessage, ChatMessagePage, UserProfile } from '../../api/domain';
+import type { ChatAttachment, ChatMessage, ChatMessagePage, UserProfile } from '../../api/domain';
 import { personLabel } from '../../api/domain';
+import type { LinkPreview } from '../../api/link-preview';
 import { alpha, colors } from '../../tokens';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
+import { ThreadPanel } from './ThreadPanel';
 
 /** Cuántos mensajes trae cada tirón del historial. */
 const PAGINA = 50;
@@ -23,11 +25,49 @@ const PAGINA = 50;
 const CORTE_DE_BLOQUE_MS = 5 * 60_000;
 
 export interface ChatAcciones {
-  enviar: (cuerpo: string, replyToId: string | null) => Promise<{ error: string | null }>;
+  enviar: (
+    cuerpo: string,
+    replyToId: string | null,
+    attachmentIds: string[],
+  ) => Promise<{ error: string | null }>;
   borrar: (messageId: string) => Promise<{ error: string | null }>;
   reaccionar: (messageId: string, emoji: string, on: boolean) => Promise<void>;
+  /**
+   * Fija o desfija un mensaje.
+   *
+   * Devuelve el estado nuevo para que el panel lo pinte al instante sin
+   * revalidar — como reaccionar.
+   */
+  fijar: (
+    messageId: string,
+    on: boolean,
+  ) => Promise<{
+    error: string | null;
+    pinned: boolean;
+    pinnedById: string | null;
+  }>;
+  /**
+   * Edita el texto de un mensaje propio.
+   *
+   * Devuelve el mensaje nuevo para que el panel lo pinte al instante sin
+   * revalidar — el servidor es quien sabe si el autor coincide.
+   */
+  editar: (
+    messageId: string,
+    body: string,
+  ) => Promise<{ error: string | null; message: ChatMessage | null }>;
   /** Sin argumentos: la zona ya sabe de qué canal habla. */
   marcarLeido: () => Promise<void>;
+  /** Sube un archivo como borrador y devuelve sus metadatos para el chip. */
+  adjuntar: (file: File) => Promise<{ error: string | null; attachment: ChatAttachment | null }>;
+  /** Borra un borrador antes de enviarlo. */
+  quitarAdjunto: (attachmentId: string) => Promise<{ error: string | null }>;
+  /**
+   * Preview de una URL del mensaje (título, imagen…). La pone la zona, que es
+   * quien tiene el server action. Si no se da, los links se pintan clicables y
+   * sin card.
+   */
+  previewDeLink?: (url: string) => Promise<LinkPreview | null>;
 }
 
 export interface ChatPanelProps {
@@ -132,6 +172,40 @@ export function ChatPanel({
   const [respondiendo, setRespondiendo] = useState<ChatMessage | null>(null);
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
   const [alFinal, setAlFinal] = useState(true);
+  /** Los borradores que esperan al envío del mensaje. */
+  const [adjuntosPendientes, setAdjuntosPendientes] = useState<ChatAttachment[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
+
+  /**
+   * El hilo abierto en el panel lateral, si hay uno.
+   *
+   * Guarda el mensaje raíz —el que pulsó quien abrió el hilo— y sus respuestas
+   * en el orden que trajo el servidor. El panel lateral las reúne bajo el raíz;
+   * en el historial las mismas respuestas fluyen como mensajes normales.
+   */
+  const [hiloRaiz, setHiloRaiz] = useState<ChatMessage | null>(null);
+  const [hiloReplies, setHiloReplies] = useState<ChatMessage[]>([]);
+  const [hiloCargando, setHiloCargando] = useState(false);
+  const [hiloError, setHiloError] = useState<string | null>(null);
+
+  /**
+   * Búsqueda en la conversación.
+   *
+   * `busquedaAbierta` es la lupa que sustituye al historial; `termino` es el
+   * texto que se está escribiendo en el campo; `resultados` son los mensajes que
+   * devolvió el servidor (`null` = no se ha buscado nada todavía).
+   *
+   * ⚠️ La búsqueda **reemplaza** la vista del historial en lugar de filtrarlo
+   * encima: el historial es una página con cursor y un filtro local solo
+   * encontraría lo que ya está cargado, que es justo lo que la búsqueda se
+   * trae al caso de encontrar. Al pulsar un resultado se vuelve al historial y
+   * se salta al mensaje (cargando lo que falte por delante).
+   */
+  const [busquedaAbierta, setBusquedaAbierta] = useState(false);
+  const [termino, setTermino] = useState('');
+  const [resultados, setResultados] = useState<ChatMessage[] | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
   /**
    * Las reacciones que este navegador ya ha aplicado, encima de lo que trajo el
@@ -146,12 +220,53 @@ export function ChatPanel({
     new Map(),
   );
 
-  const mensajes = [...older, ...page.items].map((mensaje) =>
-    reaccionesLocales.has(mensaje.id)
-      ? { ...mensaje, reactions: reaccionesLocales.get(mensaje.id) as ChatMessage['reactions'] }
-      : mensaje,
-  );
+  /**
+   * Los fijados que este navegador ya ha aplicado, encima de lo que trajo el
+   * servidor. Mismo motivo que `reaccionesLocales`: fijar no revalida, así que
+   * sin esta corrección la marca no se vería hasta el siguiente render.
+   */
+  const [fijadosLocales, setFijadosLocales] = useState<
+    Map<string, { pinnedAt: string | null; pinnedById: string | null }>
+  >(new Map());
+
+  /**
+   * Los textos editados que este navegador ya ha aplicado, encima de lo que
+   * trajo el servidor. Mismo motivo que los otros dos: editar no revalida, así
+   * que sin esta corrección el cambio no se vería hasta el siguiente render.
+   */
+  const [editadosLocales, setEditadosLocales] = useState<
+    Map<string, { body: string; editedAt: string }>
+  >(new Map());
+
+  const mensajes = [...older, ...page.items].map((mensaje) => {
+    const reacciones = reaccionesLocales.has(mensaje.id)
+      ? (reaccionesLocales.get(mensaje.id) as ChatMessage['reactions'])
+      : mensaje.reactions;
+    const fijado = fijadosLocales.get(mensaje.id);
+    const editado = editadosLocales.get(mensaje.id);
+    return {
+      ...mensaje,
+      reactions: reacciones,
+      ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
+      ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+    };
+  });
   const ultimoId = mensajes.at(-1)?.id;
+
+  /** Las respuestas del hilo con las mismas correcciones locales que el historial. */
+  const hiloMensajes = hiloReplies.map((mensaje) => {
+    const reacciones = reaccionesLocales.has(mensaje.id)
+      ? (reaccionesLocales.get(mensaje.id) as ChatMessage['reactions'])
+      : mensaje.reactions;
+    const fijado = fijadosLocales.get(mensaje.id);
+    const editado = editadosLocales.get(mensaje.id);
+    return {
+      ...mensaje,
+      reactions: reacciones,
+      ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
+      ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+    };
+  });
 
   const nombreDeAutor = useCallback(
     (userId: string) => {
@@ -256,13 +371,36 @@ export function ChatPanel({
     }
   }, [gatewayPath, rutaCanal, usersById, currentUserId]);
 
-  async function enviar(cuerpo: string) {
+  async function enviar(cuerpo: string, attachmentIds: string[]) {
     setEnviando(true);
     setError(null);
-    const resultado = await acciones.enviar(cuerpo, respondiendo?.id ?? null);
+    const resultado = await acciones.enviar(cuerpo, respondiendo?.id ?? null, attachmentIds);
     if (resultado.error) setError(resultado.error);
-    else setRespondiendo(null);
+    else {
+      setRespondiendo(null);
+      setAdjuntosPendientes([]);
+    }
     setEnviando(false);
+  }
+
+  async function adjuntar(file: File) {
+    setSubiendo(true);
+    setError(null);
+    const resultado = await acciones.adjuntar(file);
+    if (resultado.error) setError(resultado.error);
+    else if (resultado.attachment) {
+      setAdjuntosPendientes((previos) => [...previos, resultado.attachment as ChatAttachment]);
+    }
+    setSubiendo(false);
+  }
+
+  async function quitarAdjunto(attachmentId: string) {
+    setError(null);
+    const resultado = await acciones.quitarAdjunto(attachmentId);
+    if (resultado.error) setError(resultado.error);
+    else {
+      setAdjuntosPendientes((previos) => previos.filter((a) => a.id !== attachmentId));
+    }
   }
 
   /**
@@ -316,6 +454,250 @@ export function ChatPanel({
     if (resultado.error) setError(resultado.error);
   }
 
+  /**
+   * Fijar o desfijar, **con el resultado pintado al instante**.
+   *
+   * Igual que reaccionar: se calcula el estado nuevo aquí —sabemos el id y el
+   * interruptor— y se pinta en el mismo fotograma; si el servidor rechaza, se
+   * deshace. Fijar no revalida, y con varias personas fijando seguido el
+   * repintado por mensaje parpadearía la conversación entera.
+   */
+  async function fijar(messageId: string, on: boolean) {
+    const actual = mensajes.find((mensaje) => mensaje.id === messageId);
+    const previo = {
+      pinnedAt: fijadosLocales.get(messageId)?.pinnedAt ?? actual?.pinnedAt ?? null,
+      pinnedById: fijadosLocales.get(messageId)?.pinnedById ?? actual?.pinnedById ?? null,
+    };
+
+    setFijadosLocales((previos) =>
+      new Map(previos).set(messageId, {
+        pinnedAt: on ? new Date().toISOString() : null,
+        pinnedById: on ? currentUserId : null,
+      }),
+    );
+
+    try {
+      const resultado = await acciones.fijar(messageId, on);
+      if (resultado.error) throw new Error(resultado.error);
+      /* Se usa lo que devuelve el servidor, no lo que se pidió: es la única
+         fuente honesta de quién fijó y cuándo. */
+      setFijadosLocales((previos) =>
+        new Map(previos).set(messageId, {
+          pinnedAt: resultado.pinned ? new Date().toISOString() : null,
+          pinnedById: resultado.pinnedById,
+        }),
+      );
+    } catch {
+      setFijadosLocales((previos) => new Map(previos).set(messageId, previo));
+      setError('No se pudo guardar el fijado.');
+    }
+  }
+
+  /**
+   * Editar, **con el resultado pintado al instante**.
+   *
+   * Igual que reaccionar y fijar: no se revalida y se usa lo que devuelve el
+   * servidor —que es quien sabe si el mensaje era tuyo—. Si rechaza, no hay
+   * nada que deshacer porque todavía no se ha pintado nada.
+   */
+  async function editar(messageId: string, body: string) {
+    const resultado = await acciones.editar(messageId, body);
+    if (resultado.error) {
+      setError(resultado.error);
+      return false;
+    }
+    if (!resultado.message) {
+      setError('El servidor no devolvió el mensaje editado.');
+      return false;
+    }
+    const editado = resultado.message;
+    setEditadosLocales((previos) =>
+      new Map(previos).set(messageId, {
+        body: editado.body,
+        editedAt: editado.editedAt ?? new Date().toISOString(),
+      }),
+    );
+    return true;
+  }
+
+  /**
+   * Abrir el hilo de un mensaje: guardar el raíz y pedir sus respuestas.
+   *
+   * Las respuestas van a la ruta `…/messages/<id>/thread`, que devuelve el raíz
+   * y sus respuestas de primer nivel en orden. El panel lateral las reúne bajo
+   * el mensaje que las provocó.
+   */
+  async function abrirHilo(message: ChatMessage) {
+    setHiloRaiz(message);
+    setHiloReplies([]);
+    setHiloCargando(true);
+    setHiloError(null);
+    try {
+      const api = createApiClient({ gatewayPath });
+      const hilo = await api.get<{ root: ChatMessage; replies: ChatMessage[] }>(
+        `${rutaCanal}/messages/${message.id}/thread`,
+      );
+      setHiloReplies(hilo.replies);
+    } catch {
+      setHiloError('No se pudo cargar el hilo.');
+    } finally {
+      setHiloCargando(false);
+    }
+  }
+
+  function cerrarHilo() {
+    setHiloRaiz(null);
+    setHiloReplies([]);
+    setHiloError(null);
+  }
+
+  /**
+   * Enviar una respuesta del hilo.
+   *
+   * Va al servidor con `replyToId` = el mensaje raíz; al volver, la respuesta
+   * se añade al panel lateral al instante (además de fluir por el historial al
+   * siguiente refresco).
+   */
+  async function enviarEnHilo(cuerpo: string, attachmentIds: string[]) {
+    if (!hiloRaiz) return;
+    setEnviando(true);
+    setError(null);
+    const resultado = await acciones.enviar(cuerpo, hiloRaiz.id, attachmentIds);
+    if (resultado.error) setError(resultado.error);
+    else setAdjuntosPendientes([]);
+    setEnviando(false);
+    await abrirHilo(hiloRaiz);
+  }
+
+  /**
+   * Borrar una respuesta del hilo, o cerrarlo si el borrado es el raíz.
+   *
+   * El servidor no devuelve el mensaje, así que la respuesta se quita de la
+   * lista local — si se borrara el raíz, no queda hilo que mostrar.
+   */
+  async function borrarEnHilo(messageId: string) {
+    const resultado = await acciones.borrar(messageId);
+    if (resultado.error) setError(resultado.error);
+    else if (messageId === hiloRaiz?.id) cerrarHilo();
+    else setHiloReplies((actuales) => actuales.filter((mensaje) => mensaje.id !== messageId));
+  }
+
+  /**
+   * Buscar, y colgar el resultado del término exacto que se pidió.
+   *
+   * Se guarda el término junto con los resultados para que una búsqueda
+   * anterior no pinte sus hallazgos sobre el texto nuevo que se está tecleando:
+   * entre el último Enter y la respuesta, el campo puede contener otra cosa.
+   */
+  const [terminoBuscado, setTerminoBuscado] = useState('');
+
+  async function buscar() {
+    const t = termino.trim();
+    if (!t) return;
+    setBuscando(true);
+    setErrorBusqueda(null);
+    try {
+      const api = createApiClient({ gatewayPath });
+      const pagina = await api.get<ChatMessagePage>(
+        `${rutaCanal}/messages?q=${encodeURIComponent(t)}`,
+      );
+      setResultados(pagina.items);
+      setTerminoBuscado(t);
+    } catch {
+      setResultados(null);
+      setErrorBusqueda('No se pudo buscar.');
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  function abrirBusqueda() {
+    setBusquedaAbierta(true);
+    setTermino('');
+    setResultados(null);
+    setErrorBusqueda(null);
+    setTerminoBuscado('');
+  }
+
+  function cerrarBusqueda() {
+    setBusquedaAbierta(false);
+    setTermino('');
+    setResultados(null);
+    setErrorBusqueda(null);
+    setTerminoBuscado('');
+  }
+
+  /**
+   * Saltar a un mensaje y enseñarlo en su sitio del historial.
+   *
+   * ## Por qué puede haber que cargar historial
+   *
+   * La búsqueda viaja a la base, que recuerda mensajes que esta página nunca
+   * llegó a cargar. Si el resultado es de antes del primer mensaje visible, hay
+   * que pedir las páginas anteriores —la misma ruta con `before` que usa el
+   * botón «ver mensajes anteriores»— hasta alcanzarlo, y solo entonces se puede
+   * hacer scroll a su sitio.
+   *
+   * Si el historial se agota sin encontrarlo —un mensaje borrado mientras la
+   * búsqueda estaba abierta, digamos— se avisa y se vuelve al final del chat.
+   */
+  async function saltarAlMensaje(messageId: string) {
+    setBusquedaAbierta(false);
+    setResultados(null);
+
+    /* Ya estaba en pantalla: solo hace falta llevarlo al centro. */
+    const scroller = scrollerRef.current;
+    const yaCargado = document.querySelector<HTMLElement>(`[data-msg-id="${messageId}"]`);
+    if (yaCargado && scroller) {
+      scroller.scrollTo({
+        top: yaCargado.offsetTop - scroller.clientHeight / 3,
+        behavior: 'smooth',
+      });
+      return;
+    }
+
+    /* No está cargado: se sube el historial hasta llegar a él. Se marca el
+       bloqueo para que el salto automático de `ultimoId` no nos arrastre de
+       vuelta abajo. */
+    bloqueoDeSalto.current = true;
+    try {
+      const api = createApiClient({ gatewayPath });
+      let antes = mensajes[0]?.id;
+      /* Tope de seguridad: subir de 100 en 100 hasta encontrar el mensaje o
+         agotar el historial. 30 tirones son 3000 mensajes, bastante más de lo
+         que esta pantalla va a encontrar jamás. */
+      for (let i = 0; i < 30; i++) {
+        const previos = await api.get<ChatMessagePage>(
+          `${rutaCanal}/messages?limit=100&before=${antes}`,
+        );
+        if (previos.items.some((m) => m.id === messageId)) {
+          setOlder((actuales) => [...previos.items, ...actuales]);
+          setHasMore(previos.hasMore);
+          /* Se espera un turno para que React pinte las páginas nuevas y el
+             elemento exista en el DOM antes de intentar hacerle scroll. */
+          requestAnimationFrame(() => {
+            const elemento = document.querySelector<HTMLElement>(`[data-msg-id="${messageId}"]`);
+            if (elemento && scroller) {
+              scroller.scrollTo({
+                top: elemento.offsetTop - scroller.clientHeight / 3,
+                behavior: 'smooth',
+              });
+            }
+          });
+          return;
+        }
+        if (!previos.hasMore || previos.items.length === 0) break;
+        const masAntiguo = previos.items[0];
+        if (!masAntiguo) break;
+        antes = masAntiguo.id;
+      }
+      setError('No se encontró el mensaje en el historial.');
+      irAlFinal();
+    } catch {
+      setError('No se pudo cargar el historial hasta el mensaje.');
+    }
+  }
+
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${
@@ -332,195 +714,385 @@ export function ChatPanel({
       {encabezado}
 
       {/**
-       * ⚠️ **El tope de altura vive aquí, no en el scroller de dentro.**
+       * El chat y el hilo, en una fila.
        *
-       * Estaba en el scroller (`max-h-[58vh]`) mientras este contenedor era
-       * `flex-1`. En cuanto el tope se aplicaba, el contenedor seguía creciendo
-       * hasta llenar lo que le daba el padre y el scroller se quedaba corto: todo
-       * ese sobrante quedaba como **hueco muerto entre el último mensaje y el
-       * compositor**.
-       *
-       * ⚠️ Y el tope **solo se pone cuando el chat comparte pantalla con otra
-       * cosa** (`llenarAlto` en falso), que es el caso de la pestaña de un
-       * proyecto: ahí 58vh evita que la conversación empuje el resto fuera de la
-       * vista. En la pantalla dedicada de mensajes no hay nada más con lo que
-       * competir, así que el tope solo dejaba una franja vacía contra el borde
-       * inferior — que es lo que se veía.
+       * Sin hilo abierto, `flex` con un único hijo equivale a `flex-col`: el
+       * chat ocupa todo el ancho. Con hilo, el panel lateral se cuela a la
+       * derecha desde `sm` y en móvil (max-sm) es fijo, a pantalla entera.
        */}
-      <div
-        className={`relative flex flex-col ${
-          llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
-        }`}
-      >
-        <div
-          ref={scrollerRef}
-          onScroll={alDesplazar}
-          /* ⚠️ `overflow-x-hidden` explícito: `overflow-y-auto` a secas deja el
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/**
+           * ⚠️ **El tope de altura vive aquí, no en el scroller de dentro.**
+           *
+           * Estaba en el scroller (`max-h-[58vh]`) mientras este contenedor era
+           * `flex-1`. En cuanto el tope se aplicaba, el contenedor seguía creciendo
+           * hasta llenar lo que le daba el padre y el scroller se quedaba corto: todo
+           * ese sobrante quedaba como **hueco muerto entre el último mensaje y el
+           * compositor**.
+           *
+           * ⚠️ Y el tope **solo se pone cuando el chat comparte pantalla con otra
+           * cosa** (`llenarAlto` en falso), que es el caso de la pestaña de un
+           * proyecto: ahí 58vh evita que la conversación empuje el resto fuera de la
+           * vista. En la pantalla dedicada de mensajes no hay nada más con lo que
+           * competir, así que el tope solo dejaba una franja vacía contra el borde
+           * inferior — que es lo que se veía.
+           */}
+          <div
+            className={`relative flex flex-col ${
+              llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
+            }`}
+          >
+            <div
+              ref={scrollerRef}
+              onScroll={alDesplazar}
+              /* ⚠️ `overflow-x-hidden` explícito: `overflow-y-auto` a secas deja el
              eje horizontal en `auto`, así que **cualquier** cosa que se pase un
              píxel —una etiqueta larga, una palabra sin espacios— saca una barra
              horizontal en toda la conversación. Aquí nada debe desbordar a lo
              ancho: si algo no cabe, se parte. */
-          className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
-        >
-          {hasMore && (
-            <div className="mb-2 flex justify-center">
+              className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
+            >
+              {hasMore && (
+                <div className="mb-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={cargarHistorial}
+                    disabled={cargandoHistorial}
+                    className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {cargandoHistorial ? 'Cargando…' : 'Ver mensajes anteriores'}
+                  </button>
+                </div>
+              )}
+
+              {mensajes.length === 0 ? (
+                <div className="m-auto flex max-w-xs flex-col items-center gap-2 text-center">
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-full"
+                    style={{ background: alpha(colors.primary, 12) }}
+                    aria-hidden="true"
+                  >
+                    <svg
+                      className="h-5 w-5"
+                      style={{ color: colors.primary }}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                  </span>
+                  <p className="font-sans text-sm text-text-secondary">{vacio}</p>
+                </div>
+              ) : (
+                mensajes.map((mensaje, indice) => {
+                  const anterior = mensajes[indice - 1];
+                  const separador = etiquetaDeDia(mensaje.createdAt, anterior?.createdAt);
+
+                  return (
+                    <div key={mensaje.id} data-msg-id={mensaje.id}>
+                      {separador && (
+                        <div className="my-3 flex items-center gap-3">
+                          <span className="h-px flex-1" style={{ background: colors.border }} />
+                          <span className="font-sans text-[11px] uppercase tracking-wide text-text-disabled">
+                            {separador}
+                          </span>
+                          <span className="h-px flex-1" style={{ background: colors.border }} />
+                        </div>
+                      )}
+
+                      <MessageBubble
+                        message={mensaje}
+                        author={usersById.get(mensaje.authorId)}
+                        mine={mensaje.authorId === currentUserId}
+                        continued={
+                          !separador &&
+                          anterior?.authorId === mensaje.authorId &&
+                          new Date(mensaje.createdAt).getTime() -
+                            new Date(anterior.createdAt).getTime() <
+                            CORTE_DE_BLOQUE_MS
+                        }
+                        canDelete={mensaje.authorId === currentUserId || canModerate}
+                        canReact={canWrite}
+                        canFijar={canWrite}
+                        currentUserId={currentUserId}
+                        hrefDePersona={hrefDePersona?.(mensaje.authorId) ?? null}
+                        {...(hrefDeRef ? { hrefDeRef } : {})}
+                        /* Mismo origen que la aplicación: el proxy de la zona pone
+                       la cabecera de autorización y la cookie viaja sola. */
+                        hrefDeAdjunto={(id) =>
+                          `${gatewayPath}${rutaCanal}/attachments/${id}/content`
+                        }
+                        scrollerRef={scrollerRef}
+                        onResponder={setRespondiendo}
+                        onReaccionar={reaccionar}
+                        onFijar={fijar}
+                        onEditar={editar}
+                        onBorrar={borrar}
+                        onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
+                        nombreDeAutor={nombreDeAutor}
+                        {...(acciones.previewDeLink
+                          ? { previewDeLink: acciones.previewDeLink }
+                          : {})}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Solo cuando te has ido hacia arriba: pegado abajo no dice nada. */}
+            {!alFinal && mensajes.length > 0 && (
               <button
                 type="button"
-                onClick={cargarHistorial}
-                disabled={cargandoHistorial}
-                className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {cargandoHistorial ? 'Cargando…' : 'Ver mensajes anteriores'}
-              </button>
-            </div>
-          )}
-
-          {mensajes.length === 0 ? (
-            <div className="m-auto flex max-w-xs flex-col items-center gap-2 text-center">
-              <span
-                className="flex h-11 w-11 items-center justify-center rounded-full"
-                style={{ background: alpha(colors.primary, 12) }}
-                aria-hidden="true"
+                onClick={irAlFinal}
+                aria-label="Ir al último mensaje"
+                className="absolute bottom-3 right-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
+                style={{
+                  background: colors.surfaceElevated,
+                  boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
+                }}
               >
                 <svg
-                  className="h-5 w-5"
-                  style={{ color: colors.primary }}
+                  className="h-4 w-4 text-text-secondary"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={1.75}
+                  strokeWidth={2}
                   aria-hidden="true"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7-7-7" />
                 </svg>
-              </span>
-              <p className="font-sans text-sm text-text-secondary">{vacio}</p>
-            </div>
-          ) : (
-            mensajes.map((mensaje, indice) => {
-              const anterior = mensajes[indice - 1];
-              const separador = etiquetaDeDia(mensaje.createdAt, anterior?.createdAt);
+              </button>
+            )}
 
-              return (
-                <div key={mensaje.id}>
-                  {separador && (
-                    <div className="my-3 flex items-center gap-3">
-                      <span className="h-px flex-1" style={{ background: colors.border }} />
-                      <span className="font-sans text-[11px] uppercase tracking-wide text-text-disabled">
-                        {separador}
-                      </span>
-                      <span className="h-px flex-1" style={{ background: colors.border }} />
-                    </div>
-                  )}
+            {/* La lupa siempre está: buscar no depende de estar arriba o abajo. */}
+            <button
+              type="button"
+              onClick={abrirBusqueda}
+              aria-label="Buscar en la conversación"
+              className="absolute right-4 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
+              style={{
+                background: colors.surfaceElevated,
+                boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
+              }}
+            >
+              <svg
+                className="h-4 w-4 text-text-secondary"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
+                />
+              </svg>
+            </button>
 
-                  <MessageBubble
-                    message={mensaje}
-                    author={usersById.get(mensaje.authorId)}
-                    mine={mensaje.authorId === currentUserId}
-                    continued={
-                      !separador &&
-                      anterior?.authorId === mensaje.authorId &&
-                      new Date(mensaje.createdAt).getTime() -
-                        new Date(anterior.createdAt).getTime() <
-                        CORTE_DE_BLOQUE_MS
-                    }
-                    canDelete={mensaje.authorId === currentUserId || canModerate}
-                    canReact={canWrite}
-                    currentUserId={currentUserId}
-                    hrefDePersona={hrefDePersona?.(mensaje.authorId) ?? null}
-                    hrefDeRef={hrefDeRef}
-                    onResponder={setRespondiendo}
-                    onReaccionar={reaccionar}
-                    onBorrar={borrar}
-                    nombreDeAutor={nombreDeAutor}
-                  />
+            {/**
+             * La vista de búsqueda, encima del historial.
+             *
+             * Ocupa el área del scroll en lugar de empujarlo: así quien buscó y
+             * cierra vuelve a donde estaba, sin que la conversación se mueva un
+             * píxel por haber consultado otra cosa.
+             */}
+            {busquedaAbierta && (
+              <div
+                className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-xl border border-border p-3"
+                style={{ background: colors.background }}
+              >
+                <div className="flex shrink-0 items-center gap-2">
+                  <div
+                    className="flex flex-1 items-center gap-2 rounded-lg border border-border px-3 py-2"
+                    style={{ background: colors.surface }}
+                  >
+                    <svg
+                      className="h-4 w-4 shrink-0 text-text-secondary"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
+                      />
+                    </svg>
+                    <input
+                      value={termino}
+                      onChange={(e) => setTermino(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void buscar();
+                        if (e.key === 'Escape') cerrarBusqueda();
+                      }}
+                      placeholder="Busca en esta conversación…"
+                      className="min-w-0 flex-1 bg-transparent font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled"
+                      aria-label="Buscar en la conversación"
+                    />
+                    {buscando && (
+                      <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-text-disabled border-t-transparent" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cerrarBusqueda}
+                    aria-label="Cerrar búsqueda"
+                    className="shrink-0 cursor-pointer rounded-lg border border-border px-3 py-2 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    Cerrar
+                  </button>
                 </div>
-              );
-            })
+
+                {errorBusqueda ? (
+                  <p className="mt-3 font-sans text-xs" style={{ color: colors.error }}>
+                    {errorBusqueda}
+                  </p>
+                ) : resultados === null ? (
+                  <p className="mt-3 font-sans text-sm text-text-secondary">
+                    {terminoBuscado ? 'Sin resultados.' : 'Escribe algo y pulsa Enter para buscar.'}
+                  </p>
+                ) : resultados.length === 0 ? (
+                  <p className="mt-3 font-sans text-sm text-text-secondary">
+                    Nada que coincida con «{terminoBuscado}».
+                  </p>
+                ) : (
+                  <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+                    {resultados.map((mensaje) => (
+                      <li key={mensaje.id}>
+                        <button
+                          type="button"
+                          onClick={() => void saltarAlMensaje(mensaje.id)}
+                          className="w-full cursor-pointer rounded-lg px-2 py-2 text-left transition-colors hover:bg-overlay/5"
+                        >
+                          <span className="flex items-center gap-2 font-sans text-xs">
+                            <span className="font-semibold text-text-primary">
+                              {nombreDeAutor(mensaje.authorId)}
+                            </span>
+                            <span className="text-text-disabled">
+                              {new Date(mensaje.createdAt).toLocaleString('es', {
+                                day: 'numeric',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                            {mensaje.pinnedAt && <span className="text-text-disabled">📌</span>}
+                          </span>
+                          <span className="mt-0.5 line-clamp-2 block font-sans text-sm text-text-secondary">
+                            {textoPlano(mensaje.body)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+
+          {canWrite ? (
+            <Composer
+              onEnviar={enviar}
+              enviando={enviando}
+              placeholder="Escribe un mensaje…"
+              permiteMenciones={permiteMenciones}
+              sugerencias={sugerencias}
+              onPedirSugerencias={pedirSugerencias}
+              adjuntosPendientes={adjuntosPendientes}
+              onAdjuntar={adjuntar}
+              onQuitarAdjunto={quitarAdjunto}
+              subiendo={subiendo}
+              respuestaSlot={
+                respondiendo && (
+                  <div
+                    className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
+                    style={{ borderColor: colors.primary, background: alpha(colors.primary, 8) }}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span
+                        className="font-sans text-[11px] font-semibold"
+                        style={{ color: colors.primary }}
+                      >
+                        Respondiendo a {nombreDeAutor(respondiendo.authorId)}
+                      </span>
+                      <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+                        {textoPlano(respondiendo.body)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setRespondiendo(null)}
+                      aria-label="Dejar de responder"
+                      className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              }
+            />
+          ) : (
+            <p
+              className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-text-secondary"
+              style={{ background: alpha(colors.overlay, 12) }}
+            >
+              {motivoSinEscribir ?? 'Puedes leer la conversación, pero no escribir en ella.'}
+            </p>
+          )}
+
+          {error && (
+            <p role="alert" className="mt-2 font-sans text-xs" style={{ color: colors.error }}>
+              {error}
+            </p>
           )}
         </div>
 
-        {/* Solo cuando te has ido hacia arriba: pegado abajo no dice nada. */}
-        {!alFinal && mensajes.length > 0 && (
-          <button
-            type="button"
-            onClick={irAlFinal}
-            aria-label="Ir al último mensaje"
-            className="absolute bottom-3 right-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
-            style={{
-              background: colors.surfaceElevated,
-              boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
-            }}
-          >
-            <svg
-              className="h-4 w-4 text-text-secondary"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7-7-7" />
-            </svg>
-          </button>
+        {hiloRaiz && (
+          <ThreadPanel
+            raiz={hiloRaiz}
+            replies={hiloMensajes}
+            cargando={hiloCargando}
+            error={hiloError}
+            onCerrar={cerrarHilo}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            canWrite={canWrite}
+            canModerate={canModerate}
+            permiteMenciones={permiteMenciones}
+            motivoSinEscribir={motivoSinEscribir ?? null}
+            gatewayPath={gatewayPath}
+            rutaCanal={rutaCanal}
+            onEnviar={enviarEnHilo}
+            enviando={enviando}
+            onReaccionar={reaccionar}
+            onFijar={fijar}
+            onEditar={editar}
+            onBorrar={borrarEnHilo}
+            adjuntosPendientes={adjuntosPendientes}
+            onAdjuntar={adjuntar}
+            onQuitarAdjunto={quitarAdjunto}
+            subiendo={subiendo}
+            sugerencias={sugerencias}
+            onPedirSugerencias={() => void pedirSugerencias()}
+            {...(hrefDePersona ? { hrefDePersona } : {})}
+            nombreDeAutor={nombreDeAutor}
+            {...(acciones.previewDeLink ? { previewDeLink: acciones.previewDeLink } : {})}
+          />
         )}
       </div>
-
-      {canWrite ? (
-        <Composer
-          onEnviar={enviar}
-          enviando={enviando}
-          placeholder="Escribe un mensaje…"
-          permiteMenciones={permiteMenciones}
-          sugerencias={sugerencias}
-          onPedirSugerencias={pedirSugerencias}
-          respuestaSlot={
-            respondiendo && (
-              <div
-                className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
-                style={{ borderColor: colors.primary, background: alpha(colors.primary, 8) }}
-              >
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    className="font-sans text-[11px] font-semibold"
-                    style={{ color: colors.primary }}
-                  >
-                    Respondiendo a {nombreDeAutor(respondiendo.authorId)}
-                  </span>
-                  <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                    {textoPlano(respondiendo.body)}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setRespondiendo(null)}
-                  aria-label="Dejar de responder"
-                  className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
-                >
-                  ✕
-                </button>
-              </div>
-            )
-          }
-        />
-      ) : (
-        <p
-          className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-text-secondary"
-          style={{ background: alpha(colors.overlay, 12) }}
-        >
-          {motivoSinEscribir ?? 'Puedes leer la conversación, pero no escribir en ella.'}
-        </p>
-      )}
-
-      {error && (
-        <p role="alert" className="mt-2 font-sans text-xs" style={{ color: colors.error }}>
-          {error}
-        </p>
-      )}
     </div>
   );
 }

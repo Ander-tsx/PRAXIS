@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsBoolean,
   IsIn,
   IsInt,
@@ -11,7 +12,9 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+import { CHAT_ATTACHMENT_MAX_PER_MESSAGE } from './chat-attachment.dto';
 
 /**
  * Tope de un mensaje del chat.
@@ -36,13 +39,19 @@ export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄']
  *
  * ⚠️ **No lleva `projectId` ni `peerId`.** Los resuelve la ruta, como en tareas,
  * checklists y comentarios. Mandarlos da 400.
+ *
+ * `body` es opcional **si** el mensaje lleva adjuntos: un mensaje puede ser
+ * solo un archivo. `ValidateIf` en vez de `IsOptional` porque `body` sigue
+ * siendo obligatorio cuando no hay adjuntos — los dos casos son reales y
+ * confundirlos dejaría mensajes vacíos en la base.
  */
 export class SendChatMessageBodyDto {
-  @ApiProperty({ maxLength: CHAT_MESSAGE_MAX })
+  @ValidateIf((o) => !(o.attachmentIds && o.attachmentIds.length > 0))
+  @ApiProperty({ maxLength: CHAT_MESSAGE_MAX, required: false })
   @IsString()
   @MinLength(1)
   @MaxLength(CHAT_MESSAGE_MAX)
-  body: string;
+  body?: string;
 
   /**
    * A qué mensaje responde.
@@ -54,6 +63,37 @@ export class SendChatMessageBodyDto {
   @IsOptional()
   @IsUUID('4')
   replyToId?: string;
+
+  /**
+   * Los adjuntos que ya se subieron como borradores y este mensaje reclama.
+   *
+   * ⚠️ **Los archivos se suben aparte** —`POST …/attachments`— y aquí solo van
+   * los ids. El servidor comprueba que cada uno sea de esta conversación, de
+   * quien escribe y que siga sin dueño; si alguno falla, el mensaje no se
+   * crea y el adjunto se queda en borrador.
+   */
+  @ApiPropertyOptional({ maxItems: CHAT_ATTACHMENT_MAX_PER_MESSAGE })
+  @IsOptional()
+  @ArrayMaxSize(CHAT_ATTACHMENT_MAX_PER_MESSAGE)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
+}
+
+/**
+ * Lo que manda el cliente al editar un mensaje.
+ *
+ * ⚠️ **No lleva `projectId` ni `peerId`**, igual que el de escribir: los resuelve
+ * la ruta. Mandarlos da 400.
+ *
+ * Solo cambia el texto: el autor y el momento original quedan intactos, y se
+ * marca `editedAt` para que la marca «editado» no mienta.
+ */
+export class EditChatMessageBodyDto {
+  @ApiProperty({ maxLength: CHAT_MESSAGE_MAX })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(CHAT_MESSAGE_MAX)
+  body: string;
 }
 
 /**
@@ -77,6 +117,35 @@ export class FindChatMessagesQueryDto {
   @IsOptional()
   @IsUUID('4')
   before?: string;
+
+  /**
+   * `true`: solo los fijados, del más reciente al más antiguo. Para la lista de
+   * anclados.
+   *
+   * ⚠️ Cuando va en `true`, `before` y `limit` se ignoran a propósito: la lista
+   * de fijados es corta y se pinta entera, no paginada — una página con cursor
+   * sobre algo que cabe en pantalla sería fricción sin beneficio.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  pinned?: boolean;
+
+  /**
+   * Término de búsqueda sobre el texto del mensaje.
+   *
+   * Cuando viene, el endpoint deja de paginar el historial y devuelve los
+   * mensajes que lo contienen —insensible a mayúsculas—, del más reciente al
+   * más antiguo y hasta `limit`. Se ignoran `before` y `pinned` a propósito:
+   * es una búsqueda, no una página del historial.
+   */
+  @ApiPropertyOptional({ maxLength: CHAT_MESSAGE_MAX })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(CHAT_MESSAGE_MAX)
+  q?: string;
 }
 
 /** Silenciar o devolver el sonido. */
@@ -98,6 +167,18 @@ export class ReactChatBodyDto {
   @IsIn(CHAT_REACTIONS as unknown as string[])
   emoji: string;
 
+  @ApiProperty()
+  @IsBoolean()
+  on: boolean;
+}
+
+/**
+ * Fijar o desfijar un mensaje.
+ *
+ * `on` en vez de dos rutas, igual que las reacciones: es un interruptor y quien
+ * lo pulsa ya sabe en qué estado está.
+ */
+export class PinChatMessageBodyDto {
   @ApiProperty()
   @IsBoolean()
   on: boolean;

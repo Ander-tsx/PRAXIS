@@ -1,6 +1,12 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import {
+  CreateChatAttachmentDto,
+  DeleteChatAttachmentDto,
+  GetChatAttachmentContentDto,
+} from '@praxis/contracts';
 import { ChannelsService } from './channels.service';
+import { ChatAttachmentsService } from './chat-attachments.service';
 import { ChatService } from './chat.service';
 
 /** Lo que trae toda operación sobre el chat de un proyecto. */
@@ -36,20 +42,59 @@ export class ChatController {
   constructor(
     private readonly chat: ChatService,
     private readonly channels: ChannelsService,
+    private readonly attachments: ChatAttachmentsService,
   ) {}
 
   /* ─── Chat de proyecto ────────────────────────────────────────────── */
 
   @MessagePattern({ cmd: 'chat_project_find_all' })
-  async proyectoMensajes(@Payload() dto: DeProyecto & { limit?: number; before?: string }) {
+  async proyectoMensajes(
+    @Payload() dto: DeProyecto & { limit?: number; before?: string; pinned?: boolean; q?: string },
+  ) {
     const canal = await this.channels.deProyecto(dto.projectId);
     return this.chat.findAll({ ...dto, channelId: canal.id });
   }
 
   @MessagePattern({ cmd: 'chat_project_send' })
-  async proyectoEnviar(@Payload() dto: DeProyecto & { body: string; replyToId?: string | null }) {
+  async proyectoEnviar(
+    @Payload() dto: DeProyecto & {
+      body: string;
+      replyToId?: string | null;
+      attachmentIds?: string[];
+    },
+  ) {
     const canal = await this.channels.deProyecto(dto.projectId);
     return this.chat.send({ ...dto, channelId: canal.id });
+  }
+
+  /** El hilo de un mensaje del chat de proyecto: el raíz y sus respuestas. */
+  @MessagePattern({ cmd: 'chat_project_thread' })
+  async proyectoHilo(@Payload() dto: DeProyecto & { messageId: string }) {
+    const canal = await this.channels.deProyecto(dto.projectId);
+    return this.chat.thread({ ...dto, channelId: canal.id });
+  }
+
+  /**
+   * Sube un adjunto al chat de un proyecto y lo deja en borrador.
+   *
+   * El permiso lo aplica el gateway (canComment) antes de llegar aquí; este
+   * handler solo resuelve el canal y guarda. El `projectId` sale de la ruta,
+   * nunca del cuerpo.
+   */
+  @MessagePattern({ cmd: 'chat_project_attachment_create' })
+  async proyectoAdjuntar(@Payload() dto: CreateChatAttachmentDto) {
+    return this.attachments.create(dto);
+  }
+
+  @MessagePattern({ cmd: 'chat_project_attachment_get_content' })
+  async proyectoContenido(@Payload() dto: GetChatAttachmentContentDto) {
+    return this.attachments.getContent(dto);
+  }
+
+  /** Borra un adjunto propio, o cualquiera si `canModerate`. */
+  @MessagePattern({ cmd: 'chat_project_attachment_delete' })
+  async proyectoQuitarAdjunto(@Payload() dto: DeleteChatAttachmentDto) {
+    return this.attachments.delete(dto);
   }
 
   @MessagePattern({ cmd: 'chat_project_mark_read' })
@@ -78,6 +123,20 @@ export class ChatController {
     return this.chat.react({ ...dto, channelId: canal.id });
   }
 
+  /** Fija o desfija un mensaje del chat del proyecto. */
+  @MessagePattern({ cmd: 'chat_project_pin' })
+  async proyectoFijar(@Payload() dto: DeProyecto & { messageId: string; on: boolean }) {
+    const canal = await this.channels.deProyecto(dto.projectId);
+    return this.chat.pin({ ...dto, channelId: canal.id });
+  }
+
+  /** Edita el texto de un mensaje propio del chat del proyecto. */
+  @MessagePattern({ cmd: 'chat_project_edit' })
+  async proyectoEditar(@Payload() dto: DeProyecto & { id: string; body: string }) {
+    const canal = await this.channels.deProyecto(dto.projectId);
+    return this.chat.edit({ ...dto, channelId: canal.id });
+  }
+
   /* ─── Chat privado ────────────────────────────────────────────────── */
 
   /**
@@ -87,15 +146,48 @@ export class ChatController {
    * escribir a cualquiera.
    */
   @MessagePattern({ cmd: 'chat_direct_find_all' })
-  async directoMensajes(@Payload() dto: Directo & { limit?: number; before?: string }) {
+  async directoMensajes(
+    @Payload() dto: Directo & { limit?: number; before?: string; pinned?: boolean; q?: string },
+  ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId);
     return this.chat.findAll({ ...dto, channelId: canal.id });
   }
 
   @MessagePattern({ cmd: 'chat_direct_send' })
-  async directoEnviar(@Payload() dto: Directo & { body: string; replyToId?: string | null }) {
+  async directoEnviar(
+    @Payload() dto: Directo & { body: string; replyToId?: string | null; attachmentIds?: string[] },
+  ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId);
     return this.chat.send({ ...dto, channelId: canal.id });
+  }
+
+  /** El hilo de un mensaje de una conversación privada. */
+  @MessagePattern({ cmd: 'chat_direct_thread' })
+  async directoHilo(@Payload() dto: Directo & { messageId: string }) {
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    return this.chat.thread({ ...dto, channelId: canal.id });
+  }
+
+  /**
+   * Sube un adjunto a una conversación privada.
+   *
+   * ⚠️ Pasa por `channels.directo`, que comprueba que compartís algún proyecto
+   * antes de crear o devolver nada. Sin eso, adjuntar sería mensajería abierta.
+   */
+  @MessagePattern({ cmd: 'chat_direct_attachment_create' })
+  async directoAdjuntar(@Payload() dto: CreateChatAttachmentDto) {
+    return this.attachments.create(dto);
+  }
+
+  @MessagePattern({ cmd: 'chat_direct_attachment_get_content' })
+  async directoContenido(@Payload() dto: GetChatAttachmentContentDto) {
+    return this.attachments.getContent(dto);
+  }
+
+  /** En privado no hay moderación: cada cual borra lo suyo. */
+  @MessagePattern({ cmd: 'chat_direct_attachment_delete' })
+  async directoQuitarAdjunto(@Payload() dto: DeleteChatAttachmentDto) {
+    return this.attachments.delete({ ...dto, canModerate: false });
   }
 
   @MessagePattern({ cmd: 'chat_direct_mark_read' })
@@ -129,6 +221,20 @@ export class ChatController {
   ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId);
     return this.chat.react({ ...dto, channelId: canal.id });
+  }
+
+  /** Fija o desfija un mensaje de una conversación privada. */
+  @MessagePattern({ cmd: 'chat_direct_pin' })
+  async directoFijar(@Payload() dto: Directo & { messageId: string; on: boolean }) {
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    return this.chat.pin({ ...dto, channelId: canal.id });
+  }
+
+  /** Edita el texto de un mensaje propio de una conversación privada. */
+  @MessagePattern({ cmd: 'chat_direct_edit' })
+  async directoEditar(@Payload() dto: Directo & { id: string; body: string }) {
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    return this.chat.edit({ ...dto, channelId: canal.id });
   }
 
   /* ─── Bandeja del chat privado ────────────────────────────────────── */

@@ -4,9 +4,46 @@ import { canalDeAvisos } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { ChannelsService } from './channels.service';
+import { ChatAttachmentsService } from './chat-attachments.service';
 
 /** Cuántos mensajes trae una página del historial si no se pide otra cosa. */
 const DEFAULT_LIMIT = 50;
+
+/**
+ * Lo que se devuelve con cada mensaje, sin los bytes de los adjuntos.
+ *
+ * Es un `select` y no un `include` a propósito: `include` solo acepta relaciones
+ * y hay que devolver escalares —`pinnedAt` y `pinnedById` entre ellos—. Con
+ * `select` se enumeran los escalares que el cliente espera y las relaciones que
+ * pinta. Si se añade una columna al modelo y no aparece aquí, se calla.
+ */
+const CON_MENSAJE = {
+  id: true,
+  channelId: true,
+  authorId: true,
+  body: true,
+  createdAt: true,
+  editedAt: true,
+  pinnedAt: true,
+  pinnedById: true,
+  reactions: true,
+  replyTo: { select: { id: true, authorId: true, body: true } },
+  attachments: {
+    select: {
+      id: true,
+      channelId: true,
+      messageId: true,
+      filename: true,
+      mimeType: true,
+      size: true,
+      uploadedBy: true,
+      createdAt: true,
+    },
+  },
+  /* Cuántas respuestas tiene. Lo usa la marca de hilo en el chat: el raíz
+     enseña «N respuestas» sin tener que pedir el hilo para saber si existe. */
+  _count: { select: { replies: true } },
+} as const;
 
 /**
  * Las reacciones que se aceptan.
@@ -49,6 +86,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly channels: ChannelsService,
+    private readonly attachments: ChatAttachmentsService,
   ) {}
 
   /**
@@ -63,6 +101,7 @@ export class ChatService {
     requesterId: string;
     body: string;
     replyToId?: string | null;
+    attachmentIds?: string[];
   }) {
     /* Una respuesta tiene que apuntar a un mensaje **de este mismo canal**. Sin
        esta comprobación, un id conocido de otra conversación se citaría dentro
@@ -80,17 +119,33 @@ export class ChatService {
       }
     }
 
+    /* Un mensaje no puede quedarse vacío: o tiene texto, o lleva adjuntos. El
+       `body` del DTO es opcional solo en el caso de que haya archivos, así que
+       aquí se exige que haya al menos uno de los dos. */
+    const attachmentIds = dto.attachmentIds ?? [];
+    const cuerpo = dto.body?.trim() ?? '';
+    if (cuerpo.length === 0 && attachmentIds.length === 0) {
+      throw new RpcException({ statusCode: 400, message: 'Escribe algo antes de enviar.' });
+    }
+
     const message = await this.prisma.chatMessage.create({
       data: {
         channelId: dto.channelId,
         authorId: dto.requesterId,
         /* Se recorta el espacio de los extremos: un mensaje de solo espacios
            pasa el `MinLength(1)` del DTO y sale como una burbuja vacía. */
-        body: dto.body.trim(),
+        body: cuerpo,
         replyToId: dto.replyToId ?? null,
       },
-      include: { reactions: true, replyTo: { select: { id: true, authorId: true, body: true } } },
+      select: CON_MENSAJE,
     });
+
+    if (attachmentIds.length > 0) {
+      /* Todos o ninguno: si alguno no es de quien envía, o ya tiene mensaje, el
+         mensaje entero se rechaza y el archivo se queda en borrador. Ver
+         `ChatAttachmentsService.claim`. */
+      await this.attachments.claim(message.id, dto.channelId, dto.requesterId, attachmentIds);
+    }
 
     /**
      * Escribir es haber leído: se adelanta la marca del autor.
@@ -101,7 +156,13 @@ export class ChatService {
     void this.touchRead(dto.channelId, dto.requesterId, message.createdAt);
     void this.notifyOthers(dto.channelId, dto.requesterId, message.createdAt);
 
-    return message;
+    /* Se releen los adjuntos después de reclamarlos: los borradores recién
+       atados al mensaje no estaban en la creación. */
+    const conAdjuntos = await this.prisma.chatMessage.findUnique({
+      where: { id: message.id },
+      select: CON_MENSAJE,
+    });
+    return conAdjuntos ?? message;
   }
 
   /**
@@ -111,7 +172,64 @@ export class ChatService {
    * antes de devolverlo: la consulta rápida es «los últimos N», que es el índice
    * leído hacia atrás, pero pintar una conversación se hace de arriba abajo.
    */
-  async findAll(dto: { channelId: string; requesterId: string; limit?: number; before?: string }) {
+  async findAll(dto: {
+    channelId: string;
+    requesterId: string;
+    limit?: number;
+    before?: string;
+    pinned?: boolean;
+    q?: string;
+  }) {
+    /* La búsqueda se pide como una página aparte, no como un modo del
+       historial: el término filtra el texto y el resultado se ordena del más
+       reciente al más antiguo, como los fijados, sin cursor — un cursor sobre
+       coincidencias salteadas no tendría sentido. Se ignora `before` y `pinned`
+       a propósito. */
+    if (dto.q?.trim()) {
+      const termino = dto.q.trim();
+      const limit = dto.limit ?? DEFAULT_LIMIT;
+      const hallados = await this.prisma.chatMessage.findMany({
+        where: {
+          channelId: dto.channelId,
+          /* Una respuesta de un hilo no es un mensaje del chat: el término solo
+             busca mensajes raíz. Buscar dentro de un hilo se hace en el panel
+             del hilo. */
+          replyToId: null,
+          /* Insensible a mayúsculas: «Hoy» encuentra «hoy». El modo de Postgres,
+             no una normalización que rompería el índice. */
+          body: { contains: termino, mode: 'insensitive' },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: CON_MENSAJE,
+      });
+
+      return {
+        items: hallados,
+        hasMore: false,
+        unread: 0,
+        muted: false,
+      };
+    }
+
+    /* La lista de fijados se pide entera, sin paginar: cabe en pantalla y un
+       cursor sobre algo así sería fricción sin beneficio. Se ignora `before` y
+       `limit` a propósito (el gateway ya documenta lo mismo en el DTO). */
+    if (dto.pinned) {
+      const fijados = await this.prisma.chatMessage.findMany({
+        where: { channelId: dto.channelId, replyToId: null, pinnedAt: { not: null } },
+        orderBy: { pinnedAt: 'desc' },
+        select: CON_MENSAJE,
+      });
+
+      return {
+        items: fijados,
+        hasMore: false,
+        unread: 0,
+        muted: false,
+      };
+    }
+
     const limit = dto.limit ?? DEFAULT_LIMIT;
 
     /* El cursor es un mensaje, no una página: en un chat el número de página de
@@ -131,13 +249,16 @@ export class ChatService {
     const newest = await this.prisma.chatMessage.findMany({
       where: {
         channelId: dto.channelId,
+        /* Las respuestas de los hilos viven en el panel del hilo, no en el
+           flujo del chat: aquí solo fluyen los mensajes raíz. */
+        replyToId: null,
         ...(cursorAt && { createdAt: { lt: cursorAt } }),
       },
       orderBy: { createdAt: 'desc' },
       /* Uno de más: sirve para saber si queda historial por encima sin tener que
          contar la tabla entera. No se devuelve. */
       take: limit + 1,
-      include: { reactions: true, replyTo: { select: { id: true, authorId: true, body: true } } },
+      select: CON_MENSAJE,
     });
 
     const hasMore = newest.length > limit;
@@ -166,6 +287,45 @@ export class ChatService {
   }
 
   /**
+   * Un hilo: el mensaje que lo abre y sus respuestas.
+   *
+   * ## Qué es un hilo aquí
+   *
+   * Un hilo es un mensaje con respuestas, y una respuesta es un mensaje con
+   * `replyToId` apuntando a él. **Las respuestas no fluyen por el historial**:
+   * `findAll` filtra `replyToId: null`, así que en el chat solo se ve el raíz
+   * con su marca «N respuestas» — las respuestas viven en este panel lateral.
+   *
+   * ⚠️ Solo las de **primer nivel**: una respuesta a una respuesta cuelga del
+   * mensaje del medio, no de aquí. No hay hilos dentro de hilos — el árbol no
+   * existe en el modelo, cada mensaje mira a uno solo.
+   */
+  async thread(dto: { messageId: string; channelId: string; requesterId: string }) {
+    const raiz = await this.prisma.chatMessage.findUnique({
+      where: { id: dto.messageId },
+      select: { id: true, channelId: true },
+    });
+    /* Un id de otra conversación no encuentra hilo, igual que en el resto de
+       operaciones: se comprueba el canal y se rechaza antes de leer nada. */
+    if (!raiz || raiz.channelId !== dto.channelId) {
+      throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
+    }
+
+    const respuestas = await this.prisma.chatMessage.findMany({
+      where: { replyToId: dto.messageId, channelId: dto.channelId },
+      orderBy: { createdAt: 'asc' },
+      select: CON_MENSAJE,
+    });
+
+    const root = await this.prisma.chatMessage.findUnique({
+      where: { id: dto.messageId },
+      select: CON_MENSAJE,
+    });
+
+    return { root, replies: respuestas };
+  }
+
+  /**
    * Silencia o devuelve el sonido a un canal.
    *
    * Silenciar **no deja de contar lo no leído**: la insignia sigue apareciendo.
@@ -186,13 +346,52 @@ export class ChatService {
   }
 
   /**
+   * Edita el texto de un mensaje propio.
+   *
+   * Solo el autor: aquí no hay moderación que valga, lo que se edita es tu
+   * mensaje. El `authorId` va en el `where` del `updateMany` —igual que el
+   * borrado— para que no exista el hueco entre comprobar y escribir, y editar el
+   * de otro **no encuentra fila**.
+   *
+   * No se avisa por SSE: es una corrección, no un mensaje nuevo, y abrir una
+   * notificación por cada reescritura sería ruido.
+   */
+  async edit(dto: {
+    id: string;
+    channelId: string;
+    requesterId: string;
+    body: string;
+  }) {
+    /* Se recorta el espacio de los extremos igual que en `send`: un cuerpo de
+       solo espacios pasa el `MinLength(1)` del DTO y dejaría una burbuja vacía
+       que antes no estaba. */
+    const cuerpo = dto.body.trim();
+    if (cuerpo.length === 0) {
+      throw new RpcException({ statusCode: 400, message: 'Escribe algo antes de guardar.' });
+    }
+
+    const { count } = await this.prisma.chatMessage.updateMany({
+      where: { id: dto.id, channelId: dto.channelId, authorId: dto.requesterId },
+      data: { body: cuerpo, editedAt: new Date() },
+    });
+
+    if (count === 0) {
+      throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
+    }
+
+    return this.prisma.chatMessage.findUnique({
+      where: { id: dto.id },
+      select: CON_MENSAJE,
+    });
+  }
+
+  /**
    * Borra un mensaje.
    *
    * El `authorId` va en el `where` cuando no hay moderación, no en una
    * comprobación previa: así no existe el hueco entre leer y borrar, y borrar el
    * de otro **no encuentra fila** en vez de encontrarla y rechazarla.
-   */
-  async delete(dto: {
+   */  async delete(dto: {
     id: string;
     channelId: string;
     requesterId: string;
@@ -259,6 +458,49 @@ export class ChatService {
     });
 
     return { messageId: dto.messageId, reactions };
+  }
+
+  /**
+   * Fija o desfija un mensaje.
+   *
+   * Fijar **no cambia el texto ni el autor**: deja el mensaje anclado a la
+   * conversación —`pinnedAt` deja de ser nulo— y desfijar lo devuelve al
+   * historial normal. Es idempotente en las dos direcciones, como las
+   * reacciones: pedir fijar lo que ya está fijado no es un error.
+   */
+  async pin(dto: {
+    messageId: string;
+    channelId: string;
+    requesterId: string;
+    on: boolean;
+  }) {
+    /* Se escribe con `updateMany` y el `channelId` en el `where` —no con un
+       `findUnique` y luego un `update`— para que no exista el hueco entre
+       comprobar y escribir: un id de otra conversación no encuentra fila y no
+       hay nada que decidir. El `authorId` no limita: cualquiera que pueda
+       entrar al chat puede fijar, igual que puede reaccionar. */
+    const resultado = await this.prisma.chatMessage.updateMany({
+      where: { id: dto.messageId, channelId: dto.channelId },
+      data: {
+        pinnedAt: dto.on ? new Date() : null,
+        pinnedById: dto.on ? dto.requesterId : null,
+      },
+    });
+
+    if (resultado.count === 0) {
+      throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
+    }
+
+    const fijado = await this.prisma.chatMessage.findUnique({
+      where: { id: dto.messageId },
+      select: { id: true, pinnedAt: true, pinnedById: true },
+    });
+
+    return {
+      messageId: dto.messageId,
+      pinned: Boolean(fijado?.pinnedAt),
+      pinnedById: fijado?.pinnedById ?? null,
+    };
   }
 
   /**

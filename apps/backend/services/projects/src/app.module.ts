@@ -29,6 +29,12 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
           .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
           .default('info'),
         NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+        /* Dónde viven los bytes de los adjuntos de chat. `postgres` por
+           defecto; `gcs` activa el proveedor de GCS, que hoy está escrito pero
+           sin conexión. Ver `storage/blob-storage.module.ts`. */
+        STORAGE_DRIVER: Joi.string().valid('postgres', 'gcs').default('postgres'),
+        GCS_PROJECT_ID: Joi.string().allow(''),
+        GCS_BUCKET: Joi.string().allow(''),
       }),
     }),
     PrismaModule,

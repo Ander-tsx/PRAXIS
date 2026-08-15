@@ -1,3 +1,4 @@
+import { Fragment, type ReactNode } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { trocearMensaje } from '../../api/chat-refs';
 import { alpha, colors } from '../../tokens';
@@ -85,6 +86,99 @@ export interface RichTextProps {
  * fallar: como mucho pierde el enlace. Es justo lo que se buscaba al meter el
  * nombre en el formato.
  */
+/**
+ * Marcadores de Markdown que se pintan dentro de un trozo de texto.
+ *
+ * ⚠️ **Nada de aquí puede producir HTML** (y no lo hace): se parsea a nodos de
+ * React. `**negrita**`, `*cursiva*`, `` `código` ``, `~~tachado~~` y viñetas.
+ *
+ * El alias `[texto](url)` es lo que hace que una URL se lea con su etiqueta
+ * (`[docs](https://…/docs)`) en vez de pegar el enlace crudo.
+ *
+ * La viñeta usa `^` con la bandera `m` (multilínea) y **no** `(^|\n)`: aquella
+ * se comería el salto y dos ítems de lista se fundirían en una sola línea. Con
+ * `^` el salto queda en el texto y `whitespace-pre-wrap` lo conserva.
+ */
+const PATRON_MARKDOWN =
+  /(\*\*([^*\n]+)\*\*)|(\*([^*\n]+)\*)|(`([^`\n]+)`)|(\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]+)\))|^[-*] /gm;
+
+/**
+ * Troceado **rápido y sin estado** de los marcadores de un trozo de texto.
+ *
+ * Un `RegExp` con bandera `g` guarda `lastIndex` entre `exec`, así que **nunca**
+ * se reutiliza una instancia compartida: se crea una nueva por llamada (el mismo
+ * patrón que usa `trocearMensaje` por el mismo motivo).
+ */
+export function pintarMarkdown(texto: string): ReactNode[] {
+  const patron = new RegExp(PATRON_MARKDOWN.source, 'gim');
+  const nodos: ReactNode[] = [];
+  let desde = 0;
+
+  for (const coincidencia of texto.matchAll(patron)) {
+    const indice = coincidencia.index;
+    if (indice > desde) nodos.push(texto.slice(desde, indice));
+
+    const [
+      ,
+      negrita,
+      contenidoNegrita,
+      cursiva,
+      contenidoCursiva,
+      codigo,
+      contenidoCodigo,
+      enlace,
+      etiqueta,
+      url,
+    ] = coincidencia;
+
+    if (negrita) {
+      nodos.push(
+        <strong key={nodos.length} className="font-semibold">
+          {contenidoNegrita}
+        </strong>,
+      );
+    } else if (cursiva) {
+      nodos.push(<em key={nodos.length}>{contenidoCursiva}</em>);
+    } else if (codigo) {
+      nodos.push(
+        <code
+          key={nodos.length}
+          className="rounded bg-surface-elevated px-1 py-0.5 font-mono text-[0.85em] text-text-secondary"
+        >
+          {contenidoCodigo}
+        </code>,
+      );
+    } else if (enlace) {
+      nodos.push(
+        <a
+          key={nodos.length}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-primary underline underline-offset-2 transition-opacity hover:opacity-80"
+        >
+          {etiqueta}
+        </a>,
+      );
+    } else {
+      /* Una viñeta `- ` o `* ` al principio de una línea. El salto lo conserva
+         `whitespace-pre-wrap`; aquí solo se pinta el marcador. */
+      nodos.push(
+        <span key={nodos.length} aria-hidden="true" className="text-text-secondary">
+          •
+        </span>,
+        ' ',
+      );
+    }
+
+    desde = indice + coincidencia[0].length;
+  }
+
+  if (desde < texto.length) nodos.push(texto.slice(desde));
+
+  return nodos;
+}
+
 export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
   const trozos = trocearMensaje(cuerpo);
 
@@ -96,7 +190,25 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
       {trozos.map((trozo, indice) => {
         if (trozo.tipo === 'texto') {
           // biome-ignore lint/suspicious/noArrayIndexKey: los trozos no tienen id propio y la lista solo cambia si cambia el mensaje entero
-          return <span key={indice}>{trozo.texto}</span>;
+          return <Fragment key={indice}>{pintarMarkdown(trozo.texto)}</Fragment>;
+        }
+
+        if (trozo.tipo === 'url') {
+          /* Una URL se abre en pestaña nueva y sin heredar `window.opener`:
+             es contenido ajeno con su propio JS y no hay que darle referencia
+             a esta ventana. `noopener` además rompe el enlace con la app. */
+          return (
+            <a
+              // biome-ignore lint/suspicious/noArrayIndexKey: ídem
+              key={indice}
+              href={trozo.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline underline-offset-2 transition-opacity hover:opacity-80"
+            >
+              {trozo.url}
+            </a>
+          );
         }
 
         const estilo = ESTILO_POR_TIPO[trozo.kind];

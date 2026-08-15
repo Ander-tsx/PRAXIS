@@ -10,6 +10,12 @@ import {
   useState,
 } from 'react';
 import { type ChatRefKind, componerReferencia } from '../../api/chat-refs';
+import {
+  CHAT_ATTACHMENT_ALLOWED_MIME,
+  CHAT_ATTACHMENT_MAX_PER_MESSAGE,
+  type ChatAttachment,
+  formatBytes,
+} from '../../api/domain';
 import { alpha, colors } from '../../tokens';
 
 /** Tope de un mensaje. Espejo de `CHAT_MESSAGE_MAX` en `@praxis/contracts`. */
@@ -44,7 +50,7 @@ interface Etiqueta {
 }
 
 export interface ComposerProps {
-  onEnviar: (cuerpo: string) => void;
+  onEnviar: (cuerpo: string, attachmentIds: string[]) => void;
   enviando: boolean;
   deshabilitado?: boolean;
   placeholder: string;
@@ -59,6 +65,14 @@ export interface ComposerProps {
    */
   permiteMenciones: boolean;
   respuestaSlot?: ReactNode;
+  /** Los archivos que esperan a que envíes el mensaje. */
+  adjuntosPendientes: ChatAttachment[];
+  /** Llamar al elegir un archivo del selector: ya subido como borrador. */
+  onAdjuntar: (file: File) => void;
+  /** Quitar un borrador antes de enviar: se borra del almacenamiento. */
+  onQuitarAdjunto: (attachmentId: string) => void;
+  /** Verdadero mientras el archivo elegido está subiendo. */
+  subiendo: boolean;
 }
 
 /** Qué se está escribiendo tras un `@` o un `/`, y desde dónde. */
@@ -138,6 +152,10 @@ export function Composer({
   onPedirSugerencias,
   permiteMenciones,
   respuestaSlot,
+  adjuntosPendientes,
+  onAdjuntar,
+  onQuitarAdjunto,
+  subiendo,
 }: ComposerProps) {
   const [texto, setTexto] = useState('');
   const [cursor, setCursor] = useState(0);
@@ -145,6 +163,7 @@ export function Composer({
   const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const capaRef = useRef<HTMLDivElement>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   const pedidas = useRef(false);
 
   const disparador = useMemo(() => disparadorEn(texto, cursor), [texto, cursor]);
@@ -268,8 +287,14 @@ export function Composer({
   }
 
   function enviar() {
-    if (!texto.trim() || enviando) return;
-    onEnviar(serializar().trim());
+    /* Un mensaje puede ir solo con archivos: si no hay texto ni adjuntos, no
+       hay nada que enviar. */
+    const puedeEnviar = adjuntosPendientes.length > 0 || texto.trim().length > 0;
+    if (!puedeEnviar || enviando || subiendo) return;
+    onEnviar(
+      serializar().trim(),
+      adjuntosPendientes.map((a) => a.id),
+    );
     setTexto('');
     setCursor(0);
     setEtiquetas([]);
@@ -312,6 +337,40 @@ export function Composer({
 
   const restantes = CHAT_MESSAGE_MAX - texto.length;
 
+  /* Al elegir un archivo se lo pasa al panel, que lo sube como borrador. El
+     campo se vacía para que elegir el mismo archivo dos veces vuelva a
+     disparar `onChange`. */
+  function alElegirArchivo(evento: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = evento.target.files?.[0];
+    if (!archivo) return;
+    onAdjuntar(archivo);
+    evento.target.value = '';
+  }
+
+  /**
+   * Pegar una imagen con Ctrl+V la sube como adjunto, como hace Slack.
+   *
+   * ⚠️ Solo se traga el portapapeles cuando lo que viaja es **imagen** (una
+   * captura de pantalla, un recorte). Si hay texto —o no hay nada—, se deja
+   * pasar sin `preventDefault` y el pegado normal del textarea sigue su curso.
+   * Una captura puede venir en varios formatos (`image/png`, `image/jpeg`…);
+   * solo se acepta si además está en la whitelist, que es lo que el backend
+   * admite al subir.
+   */
+  function alPegar(evento: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = Array.from(evento.clipboardData.items);
+    const imagen = items.find(
+      (item) =>
+        item.kind === 'file' &&
+        (CHAT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(item.type),
+    );
+    const archivo = imagen?.getAsFile();
+    if (!archivo) return;
+
+    evento.preventDefault();
+    if (adjuntosPendientes.length < CHAT_ATTACHMENT_MAX_PER_MESSAGE) onAdjuntar(archivo);
+  }
+
   /* Las dos capas tienen que medir igual carácter a carácter, así que comparten
      estas clases exactas. Cualquier diferencia de fuente o relleno desplaza el
      resaltado respecto al cursor. */
@@ -320,6 +379,44 @@ export function Composer({
   return (
     <div className="relative flex flex-col gap-2">
       {respuestaSlot}
+
+      {adjuntosPendientes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {adjuntosPendientes.map((adjunto) => (
+            <span
+              key={adjunto.id}
+              className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-text-secondary"
+              style={{ background: colors.surfaceElevated }}
+            >
+              <span className="max-w-40 truncate" title={adjunto.filename}>
+                {adjunto.filename}
+              </span>
+              <span className="shrink-0 text-[10px] text-text-disabled">
+                {formatBytes(adjunto.size)}
+              </span>
+              <button
+                type="button"
+                onClick={() => onQuitarAdjunto(adjunto.id)}
+                disabled={subiendo}
+                aria-label={`Quitar ${adjunto.filename}`}
+                title="Quitar"
+                className="shrink-0 cursor-pointer rounded p-0.5 text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {abierto && (
         /* Mismo patrón que el átomo `Select`: un `listbox` propio porque el
@@ -450,6 +547,7 @@ export function Composer({
             onKeyUp={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
             onClick={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
             onKeyDown={alTeclear}
+            onPaste={alPegar}
             /* Las dos capas se desplazan juntas: si no, al pasar de cuatro
                líneas el resaltado se queda quieto y el texto sube. */
             onScroll={(evento) => {
@@ -469,8 +567,56 @@ export function Composer({
 
         <button
           type="button"
+          onClick={() => archivoRef.current?.click()}
+          disabled={
+            deshabilitado ||
+            subiendo ||
+            adjuntosPendientes.length >= CHAT_ATTACHMENT_MAX_PER_MESSAGE
+          }
+          aria-label="Adjuntar un archivo"
+          title="Adjuntar archivo"
+          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {subiendo ? (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 10-5.656-5.656l-1.1 1.1"
+              />
+            </svg>
+          )}
+        </button>
+
+        {/* Escondido: lo abre el botón del clip. Se elige un archivo y se sube
+            al instante; no se guarda en el formulario. */}
+        <input
+          ref={archivoRef}
+          type="file"
+          multiple={false}
+          accept={CHAT_ATTACHMENT_ALLOWED_MIME.join(',')}
+          onChange={alElegirArchivo}
+          className="hidden"
+        />
+
+        <button
+          type="button"
           onClick={enviar}
-          disabled={enviando || deshabilitado || texto.trim().length === 0}
+          disabled={
+            enviando ||
+            deshabilitado ||
+            subiendo ||
+            (adjuntosPendientes.length === 0 && texto.trim().length === 0)
+          }
           aria-label="Enviar mensaje"
           className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
           style={{ background: alpha(colors.primary, 22), color: colors.primary }}
@@ -504,6 +650,8 @@ export function Composer({
           )}
           {' · '}
           <kbd className="font-sans">/</kbd> enlaza una tarea
+          {' · '}
+          <kbd className="font-sans">Ctrl+V</kbd> pega una imagen
         </p>
 
         {/* Solo cuando de verdad queda poco: enseñarlo siempre es ruido. */}

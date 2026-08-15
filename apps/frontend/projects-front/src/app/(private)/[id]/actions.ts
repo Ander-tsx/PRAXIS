@@ -28,6 +28,8 @@ import {
 import {
   ApiError,
   type Board,
+  CHAT_ATTACHMENT_MAX_BYTES,
+  type ChatAttachment,
   type ChatMessage,
   type ChecklistItem,
   type Column,
@@ -42,6 +44,7 @@ import {
   type TaskComment,
   type Workspace,
 } from '@praxis/commons';
+import { type LinkPreview, obtenerPreviewDeEnlace } from '@praxis/commons/api/link-preview';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -1339,20 +1342,25 @@ export async function sendChatMessageAction(
   projectId: string,
   cuerpo: string,
   replyToId: string | null,
+  attachmentIds: string[] = [],
 ): Promise<{ error: string | null }> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.' };
 
   const body = normalizeMultiline(cuerpo);
-  const invalid = validateChatMessage(body);
+  /* El mensaje puede ir sin texto si lleva archivos; la validación del cuerpo
+     solo se aplica cuando hay texto. */
+  const invalid = body.trim() ? validateChatMessage(body) : null;
   if (invalid) return { error: invalid };
+  if (attachmentIds.length > 5) return { error: 'Un mensaje no puede llevar más de 5 archivos.' };
 
   try {
     /* Se confirma contra el `data` de la respuesta y no contra el status: un
        200 sin cuerpo ya nos ha mentido antes. */
     const created = await api.post<ChatMessage>(`/projects/${projectId}/chat/messages`, {
-      body,
+      ...(body.trim() ? { body } : {}),
       ...(replyToId && { replyToId }),
+      ...(attachmentIds.length > 0 && { attachmentIds }),
     });
     if (!created?.id) return { error: 'El servidor no guardó el mensaje.' };
   } catch (error) {
@@ -1403,6 +1411,65 @@ export async function reactChatAction(
 }
 
 /**
+ * Fija o desfija un mensaje del chat del proyecto.
+ *
+ * ⚠️ **No revalida**, igual que reaccionar: el panel pinta el resultado con lo
+ * que esto devuelve, y revalidar repintaría la conversación entera por un pin.
+ */
+export async function pinChatMessageAction(
+  projectId: string,
+  messageId: string,
+  on: boolean,
+): Promise<{ error: string | null; pinned: boolean; pinnedById: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', pinned: false, pinnedById: null };
+
+  try {
+    const resultado = await api.post<{
+      messageId: string;
+      pinned: boolean;
+      pinnedById: string | null;
+    }>(`/projects/${projectId}/chat/messages/${messageId}/pin`, { on });
+    if (!resultado)
+      return { error: 'El servidor no guardó el fijado.', pinned: false, pinnedById: null };
+    return { error: null, pinned: resultado.pinned, pinnedById: resultado.pinnedById };
+  } catch (error) {
+    return {
+      error: describe(error, 'No se pudo fijar el mensaje.'),
+      pinned: false,
+      pinnedById: null,
+    };
+  }
+}
+
+/**
+ * Edita el texto de un mensaje propio del chat del proyecto.
+ *
+ * ⚠️ **No revalida**, igual que fijar y reaccionar: el panel pinta el resultado
+ * con lo que esto devuelve. Solo el autor puede editar; el servidor lo
+ * comprueba y devuelve 404 si no es suyo.
+ */
+export async function editChatMessageAction(
+  projectId: string,
+  messageId: string,
+  body: string,
+): Promise<{ error: string | null; message: ChatMessage | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', message: null };
+
+  try {
+    const resultado = await api.patch<ChatMessage>(
+      `/projects/${projectId}/chat/messages/${messageId}`,
+      { body },
+    );
+    if (!resultado) return { error: 'El servidor no guardó el cambio.', message: null };
+    return { error: null, message: resultado };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo editar el mensaje.'), message: null };
+  }
+}
+
+/**
  * Deja el chat por leído.
  *
  * ⚠️ **No revalida.** La llama el propio chat al abrirse, y revalidar desde ahí
@@ -1432,6 +1499,65 @@ export async function markChatReadAction(projectId: string): Promise<void> {
 }
 
 /**
+ * Sube un archivo al chat del proyecto y lo deja en **borrador**.
+ *
+ * El adjunto se sube solo y queda sin mensaje; al enviar, los `attachmentIds`
+ * del mensaje lo reclaman. Devuelve los metadatos para que el redactor lo pinte
+ * como chip pendiente.
+ *
+ * No revalida: revalidar repintaría el proyecto entero por cada archivo que se
+ * adjunta, y además el borrador no se ve en ninguna lista todavía.
+ */
+export async function uploadChatAttachmentAction(
+  projectId: string,
+  file: File,
+): Promise<{ error: string | null; attachment: ChatAttachment | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', attachment: null };
+
+  if (file.size === 0) return { error: 'El archivo está vacío.', attachment: null };
+  if (file.size > CHAT_ATTACHMENT_MAX_BYTES) {
+    return {
+      error: `El archivo supera el máximo de ${Math.round(CHAT_ATTACHMENT_MAX_BYTES / 1024 / 1024)} MB.`,
+      attachment: null,
+    };
+  }
+
+  const upload = new FormData();
+  upload.append('file', file);
+
+  try {
+    const created = await api.postForm<ChatAttachment>(
+      `/projects/${projectId}/chat/attachments`,
+      upload,
+    );
+    if (!created?.id) {
+      return { error: 'El servidor no guardó el archivo.', attachment: null };
+    }
+    return { error: null, attachment: created };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo subir el archivo.'), attachment: null };
+  }
+}
+
+/** Borra un adjunto del chat: un borrador propio, o cualquiera si moderas. */
+export async function deleteChatAttachmentAction(
+  projectId: string,
+  attachmentId: string,
+): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await api.delete(`/projects/${projectId}/chat/attachments/${attachmentId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el archivo.') };
+  }
+
+  return { error: null };
+}
+
+/**
  * Silencia el chat del proyecto, o le devuelve el sonido.
  *
  * ⚠️ **Silenciar no deja de contar lo no leído.** Lo que se apaga es la tarjeta
@@ -1452,6 +1578,21 @@ export async function muteChatAction(
 
   if (confirmado) revalidateProject(projectId);
   return confirmado;
+}
+
+/**
+ * Preview de la primera URL de un mensaje del chat.
+ *
+ * ⚠️ **Solo se ejecuta en el servidor** (archivo `'use server'`) y es una
+ * **lectura de una URL ajena**, así que va por `obtenerPreviewDeEnlace`, que
+ * lleva el guard SSRF —bloquea IPs privadas, valida cada redirección—. El
+ * cliente nunca hace este fetch directo. Un fallo devuelve `null`: una preview
+ * que no sale no debe romper el mensaje.
+ */
+export async function previewDeEnlaceAction(url: string): Promise<LinkPreview | null> {
+  const session = await getSession();
+  if (!session) return null;
+  return obtenerPreviewDeEnlace(url);
 }
 
 /* ─── Utilidades ────────────────────────────────────────────────────── */

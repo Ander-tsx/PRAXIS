@@ -1,11 +1,16 @@
 'use client';
 
 import {
+  deleteChatAttachmentAction,
   deleteChatMessageAction,
+  editChatMessageAction,
   markChatReadAction,
   muteChatAction,
+  pinChatMessageAction,
+  previewDeEnlaceAction,
   reactChatAction,
   sendChatMessageAction,
+  uploadChatAttachmentAction,
 } from '@/app/(private)/[id]/actions';
 import { type ChatMessagePage, ChatPanel, type UserProfile, alpha, colors } from '@praxis/commons';
 import { useMemo, useState } from 'react';
@@ -54,12 +59,18 @@ export function ProjectChat({
      de un efecto, y recreada en cada render marcaría como leído en bucle. */
   const acciones = useMemo(
     () => ({
-      enviar: (cuerpo: string, replyToId: string | null) =>
-        sendChatMessageAction(projectId, cuerpo, replyToId),
+      enviar: (cuerpo: string, replyToId: string | null, attachmentIds: string[]) =>
+        sendChatMessageAction(projectId, cuerpo, replyToId, attachmentIds),
       borrar: (messageId: string) => deleteChatMessageAction(projectId, messageId),
       reaccionar: (messageId: string, emoji: string, on: boolean) =>
         reactChatAction(projectId, messageId, emoji, on),
+      fijar: (messageId: string, on: boolean) => pinChatMessageAction(projectId, messageId, on),
+      editar: (messageId: string, body: string) =>
+        editChatMessageAction(projectId, messageId, body),
       marcarLeido: () => markChatReadAction(projectId),
+      adjuntar: (file: File) => uploadChatAttachmentAction(projectId, file),
+      quitarAdjunto: (attachmentId: string) => deleteChatAttachmentAction(projectId, attachmentId),
+      previewDeLink: previewDeEnlaceAction,
     }),
     [projectId],
   );

@@ -844,12 +844,15 @@ event: latido         data: { t }        cada 25 s
 | Método | Ruta | Body | Permiso |
 |---|---|---|---|
 | GET | `/projects/:id/chat/messages?limit&before` | — | `canViewProject` |
-| POST | `/projects/:id/chat/messages` | `{ body, replyToId? }` | `canComment` |
+| POST | `/projects/:id/chat/messages` | `{ body?, replyToId?, attachmentIds? }` | `canComment` |
 | POST | `/projects/:id/chat/read` | — | `canViewProject` |
 | POST | `/projects/:id/chat/mute` | `{ muted }` | `canViewProject` |
 | POST | `/projects/:id/chat/messages/:mid/react` | `{ emoji, on }` | `canComment` |
 | GET | `/projects/:id/chat/mentionables` | — | `canViewProject` |
 | DELETE | `/projects/:id/chat/messages/:mid` | — | autor, o `canManageMembers` |
+| POST | `/projects/:id/chat/attachments` | **multipart**, campo `file` → 201 | `canComment` |
+| GET | `/projects/:id/chat/attachments/:aid/content` | — | `canViewProject` |
+| DELETE | `/projects/:id/chat/attachments/:aid` | — | autor, o `canManageMembers` |
 
 ### Chat privado — cuelga de `/me`, sin proyecto en la ruta
 
@@ -859,19 +862,52 @@ event: latido         data: { t }        cada 25 s
 | GET | `/me/chats/contacts` | — · quién comparte proyecto contigo, con sus roles |
 | GET | `/me/chats/projects` | — · tus chats de proyecto, para el centro de mensajes |
 | GET | `/me/chats/:peerId/messages?limit&before` | — |
-| POST | `/me/chats/:peerId/messages` | `{ body, replyToId? }` |
+| POST | `/me/chats/:peerId/messages` | `{ body?, replyToId?, attachmentIds? }` |
 | POST | `/me/chats/:peerId/read` · `/mute` | — · `{ muted }` |
 | POST | `/me/chats/:peerId/messages/:mid/react` | `{ emoji, on }` |
 | GET | `/me/chats/:peerId/mentionables` | — |
 | DELETE | `/me/chats/:peerId/messages/:mid` | — · **solo propios** |
+| POST | `/me/chats/:peerId/attachments` | **multipart**, campo `file` → 201 |
+| GET | `/me/chats/:peerId/attachments/:aid/content` | — |
+| DELETE | `/me/chats/:peerId/attachments/:aid` | — · **solo propios** |
 
 ```ts
 ChatMessage = { id, channelId, authorId, body, createdAt,
                 replyTo: { id, authorId, body } | null,
-                reactions: { messageId, userId, emoji }[] }
+                reactions: { messageId, userId, emoji }[],
+                attachments: ChatAttachment[] }
+
+ChatAttachment = { id, channelId, messageId: string | null,
+                   filename, mimeType, size, uploadedBy, createdAt }
 
 GET → { items, hasMore, unread, muted }   // items del más antiguo al más nuevo
 ```
+
+### Adjuntos del chat — se suben aparte, antes de enviar
+
+- **El archivo viaja por su propia ruta y queda como borrador** (`messageId`
+  `null`). Al enviar, `attachmentIds` del mensaje lo reclama. Así se pueden
+  adjuntar varios, verlos como chips y mandarlos todos de una vez — si fuera con
+  el mensaje, cada intento de enviar volvería a subir el archivo.
+- `body` es opcional **solo** si el mensaje lleva adjuntos: un mensaje puede ser
+  un archivo a secas. Sin adjuntos, el cuerpo sigue siendo obligatorio.
+- ⚠️ **El `mimetype` lo declara quien sube**: el gateway comprueba la firma de
+  los primeros bytes contra el tipo declarado (el texto se verifica como «no
+  arranca como binario»). Renombrar un ejecutable como `.png` no pasa.
+- Tipos admitidos: las doce de siempre (imágenes, PDF, texto, CSV, ZIP, Word,
+  Excel) **más MP4 y WebM**. El **SVG no entra**: es XML con scripts, y servirlo
+  desde el origen de la aplicación sería XSS.
+- Límites: **25 MB por archivo** (el doble que en tareas: es donde se comparten
+  vídeos), **máximo 5 por mensaje**.
+- Al enviar, el servidor comprueba que cada `attachmentId` sea **de esta
+  conversación, de quien escribe y que siga sin dueño**. Si alguno falla, el
+  mensaje entero se rechaza y los archivos se quedan en borrador — el cliente
+  recupera el estado sin enviar a medias.
+- **La descarga se sirve por el proxy de la zona** (mismo origen → la cookie va
+  sola). Imágenes y vídeo en línea; PDF en línea dentro de un
+  `Content-Security-Policy: sandbox allow-scripts allow-downloads` (sin
+  `allow-same-origin`, así un PDF con scripts no toca la sesión); el resto como
+  descarga con `nosniff`.
 
 🔴 **Solo puedes escribir a quien comparta algún proyecto contigo.** Es la única
 regla del chat privado y la aplica projects-service en el único camino por el que

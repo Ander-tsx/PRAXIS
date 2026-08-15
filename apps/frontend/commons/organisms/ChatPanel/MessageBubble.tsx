@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { textoPlano } from '../../api/chat-refs';
-import { CHAT_REACTIONS, type ChatMessage, type UserProfile, personLabel } from '../../api/domain';
+import { textoPlano, trocearMensaje } from '../../api/chat-refs';
+import {
+  CHAT_REACTIONS,
+  type ChatAttachment,
+  type ChatMessage,
+  type UserProfile,
+  formatBytes,
+  personLabel,
+} from '../../api/domain';
+import type { LinkPreview } from '../../api/link-preview';
 import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
 import { RichText } from './RichText';
@@ -16,15 +24,40 @@ export interface MessageBubbleProps {
   continued: boolean;
   canDelete: boolean;
   canReact: boolean;
+  canFijar: boolean;
   currentUserId: string;
   /** A dónde lleva pulsar el nombre. `null` si no lleva a ninguna parte. */
   hrefDePersona: string | null;
   hrefDeRef?: (kind: ChatRefKind, id: string) => string | null;
+  /** URL de los bytes de un adjunto. La da el panel, que conoce el canal. */
+  hrefDeAdjunto?: (attachmentId: string) => string;
+  /**
+   * El contenedor con scroll donde vive la conversación.
+   *
+   * La barra de acciones se voltea hacia abajo cuando el mensaje está pegado al
+   * borde superior del scroll y la barra no cabría arriba; para decidirlo hace
+   * falta comparar la posición del mensaje contra la del contenedor.
+   */
+  scrollerRef: RefObject<HTMLDivElement | null>;
   onResponder: (message: ChatMessage) => void;
   onReaccionar: (messageId: string, emoji: string, on: boolean) => void;
+  onFijar: (messageId: string, on: boolean) => void;
+  onEditar: (messageId: string, body: string) => Promise<boolean>;
   onBorrar: (messageId: string) => void;
+  /** Abre el panel lateral del hilo de este mensaje. */
+  onAbrirHilo: (message: ChatMessage) => void;
+  /**
+   * La marca «N respuestas» bajo el mensaje.
+   *
+   * Va encendida en el historial, donde es lo que anuncia que un mensaje tiene
+   * hilo, y apagada dentro del panel del hilo — ahí ya se está viendo el hilo,
+   * y la marca no haría más que repetir el número que dice la cabecera.
+   */
+  mostrarMarcaDeHilo?: boolean;
   /** Nombre de quien escribió el mensaje citado, para la cita. */
   nombreDeAutor: (userId: string) => string;
+  /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
+  previewDeLink?: (url: string) => Promise<LinkPreview | null>;
 }
 
 /**
@@ -45,15 +78,25 @@ export function MessageBubble({
   continued,
   canDelete,
   canReact,
+  canFijar,
   currentUserId,
   hrefDePersona,
   hrefDeRef,
+  hrefDeAdjunto,
+  scrollerRef,
   onResponder,
   onReaccionar,
+  onFijar,
+  onEditar,
   onBorrar,
+  onAbrirHilo,
+  mostrarMarcaDeHilo = true,
   nombreDeAutor,
+  previewDeLink,
 }: MessageBubbleProps) {
   const [eligiendoReaccion, setEligiendoReaccion] = useState(false);
+  const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
+  const editado = message.editedAt !== null && message.editedAt !== undefined;
   /**
    * Borrar pide confirmación **en la propia barra**, no en un diálogo.
    *
@@ -69,7 +112,69 @@ export function MessageBubble({
    * preguntar una cosa.
    */
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+  const [preview, setPreview] = useState<LinkPreview | null | undefined>(undefined);
   const nombre = author ? personLabel(author) : 'Alguien que ya no está';
+
+  /**
+   * Modo edición.
+   *
+   * `editando` es lo que abre el redactor en lugar de la burbuja; `borrador`
+   * guarda lo que se está escribiendo para que Esc y «Cancelar» lo suelten sin
+   * haber tocado nada. Se anula al apartar el ratón, como la confirmación de
+   * borrado: un redactor abierto sobre un mensaje que ya no estás mirando es
+   * exactamente el mismo problema que una pregunta de borrado a medio responder.
+   */
+  const [editando, setEditando] = useState(false);
+  const [borrador, setBorrador] = useState('');
+
+  async function confirmarEdicion() {
+    const guardado = await onEditar(message.id, borrador);
+    if (guardado) setEditando(false);
+  }
+
+  /** La burbuja, para saber su posición respecto al contenedor con scroll. */
+  const burbujaRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * El editor en línea. Se enfoca al entrar en modo edición (un `autoFocus`
+   * lo rechaza el linter de a11y, y este efecto lo consigue igual: el foco
+   * cae donde el usuario acaba de pedir editar).
+   */
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editando) editorRef.current?.focus();
+  }, [editando]);
+
+  /**
+   * Hacia dónde se abre la barra de acciones.
+   *
+   * Por defecto hacia arriba (`-top-4`), pero cuando el mensaje está pegado al
+   * borde superior del scroll la barra quedaría **fuera del área visible y se
+   * recortaría**. Se voltea hacia abajo para que las acciones siempre se vean.
+   */
+  const [barraAbajo, setBarraAbajo] = useState(false);
+
+  /**
+   * Cuánto ocupa la barra de acciones más una holgura.
+   *
+   * Con `p-1`, botones de `h-4` y el borde ronda los 26 px; 36 deja aire para
+   * que no roce el borde del mensaje de encima.
+   */
+  const ALTO_BARRA = 36;
+
+  function decidirDireccionBarra() {
+    const burbuja = burbujaRef.current;
+    const scroller = scrollerRef.current;
+    if (!burbuja || !scroller) return;
+    const burbujaRect = burbuja.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const cabeArriba = burbujaRect.top - ALTO_BARRA >= scrollerRect.top;
+    const cabeAbajo = burbujaRect.bottom + ALTO_BARRA <= scrollerRect.bottom;
+    /* Si no cabe arriba, abajo. Si tampoco cabe abajo (burbuja muy alta), se
+       queda arriba: mejor que no quepa del todo a estar fuera de la vista. */
+    setBarraAbajo(!cabeArriba && cabeAbajo);
+  }
 
   /** Las reacciones agrupadas por emoji, con cuántos y si estás dentro. */
   const agrupadas = new Map<string, { total: number; mia: boolean }>();
@@ -79,6 +184,26 @@ export function MessageBubble({
     if (reaccion.userId === currentUserId) actual.mia = true;
     agrupadas.set(reaccion.emoji, actual);
   }
+
+  /**
+   * El preview se pide de la primera URL del mensaje, una sola vez por burbuja.
+   * `previewDeLink` es un server action de la zona: solo se dispara cuando el
+   * panel la trae, y el `undefined` inicial distingue "todavía no preguntado"
+   * de "preguntado y sin metadatos" (`null`), para no volver a pedir.
+   */
+  const primeraUrl = previewDeLink
+    ? trocearMensaje(message.body).find((trozo) => trozo.tipo === 'url')?.url
+    : undefined;
+  useEffect(() => {
+    if (!primeraUrl || preview !== undefined) return;
+    let activo = true;
+    previewDeLink?.(primeraUrl).then((resultado) => {
+      if (activo) setPreview(resultado);
+    });
+    return () => {
+      activo = false;
+    };
+  }, [primeraUrl, preview, previewDeLink]);
 
   return (
     <article
@@ -116,6 +241,36 @@ export function MessageBubble({
               <span className="font-semibold text-text-primary">{mine ? 'Tú' : nombre}</span>
             )}
             <span className="text-[11px] text-text-disabled">{soloHora(message.createdAt)}</span>
+            {editado && (
+              <span
+                title="Mensaje editado"
+                className="font-sans text-[10px] uppercase tracking-wide text-text-disabled"
+              >
+                editado
+              </span>
+            )}
+            {fijado && (
+              <span
+                title="Mensaje fijado"
+                className="flex items-center gap-0.5 font-sans text-[10px]"
+                style={{ color: colors.primary }}
+              >
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 17v5" />
+                  <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+                </svg>
+                Fijado
+              </span>
+            )}
           </span>
         )}
 
@@ -131,15 +286,23 @@ export function MessageBubble({
          * que alguien añada más arriba volvería a capturarlo sin avisar.
          */}
         <div
+          ref={burbujaRef}
           className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
-          /* Al irse del mensaje se recoge todo: ni el selector de reacciones ni
-             la confirmación de borrado tienen sentido sobre una burbuja que ya
-             no estás mirando, y dejarlos abiertos es lo que obligaba a cerrarlos
-             a mano. Cubre además el caso de abrir el selector y apartar el ratón
-             sin llegar a entrar en él. */
+          /* Al irse del mensaje se recogen las superficies flotantes: ni el
+             selector de reacciones ni la confirmación de borrado tienen sentido
+             sobre una burbuja que ya no estás mirando, y dejarlos abiertos es lo
+             que obligaba a cerrarlos a mano. Cubre además el caso de abrir el
+             selector y apartar el ratón sin llegar a entrar en él.
+             
+             ⚠️ **El editor NO se cierra aquí.** Un redactor abierto se queda
+             hasta que se guarde, se cancele o se pulse Esc: cerrarlo al mover el
+             ratón hacía que editar fuera imposible — se abría y se cerraba solo
+             en cuanto el foco iba al textarea. */
+          onMouseEnter={decidirDireccionBarra}
           onMouseLeave={() => {
             setConfirmandoBorrado(false);
             setEligiendoReaccion(false);
+            setBarraAbajo(false);
           }}
           style={{
             background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
@@ -175,7 +338,53 @@ export function MessageBubble({
             </div>
           )}
 
-          <RichText cuerpo={message.body} hrefDeRef={hrefDeRef} currentUserId={currentUserId} />
+          {editando ? (
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                value={borrador}
+                onChange={(evento) => setBorrador(evento.target.value)}
+                onKeyDown={(evento) => {
+                  /* Enter guarda, Shift+Enter salta de línea: mismo gesto que el
+                     compositor. Esc cancela sin tocar nada. */
+                  if (evento.key === 'Enter' && !evento.shiftKey) {
+                    evento.preventDefault();
+                    void confirmarEdicion();
+                  } else if (evento.key === 'Escape') {
+                    evento.preventDefault();
+                    setEditando(false);
+                  }
+                }}
+                ref={editorRef}
+                rows={Math.min(6, Math.max(2, message.body.split('\n').length))}
+                aria-label="Editar mensaje"
+                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none focus:border-primary"
+              />
+              <span className="flex items-center gap-2 self-end">
+                <button
+                  type="button"
+                  onClick={() => setEditando(false)}
+                  className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmarEdicion()}
+                  disabled={borrador.trim().length === 0}
+                  className="cursor-pointer rounded-lg px-3 py-1 font-sans text-xs font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: colors.primary, color: colors.textInverse }}
+                >
+                  Guardar
+                </button>
+              </span>
+            </div>
+          ) : (
+            <RichText
+              cuerpo={message.body}
+              currentUserId={currentUserId}
+              {...(hrefDeRef ? { hrefDeRef } : {})}
+            />
+          )}
 
           {/**
            * La barra de acciones del mensaje.
@@ -197,27 +406,83 @@ export function MessageBubble({
            * puede pasar ninguna de las dos, porque nunca sobresale de la
            * burbuja.
            *
+           * ⚠️ **Salvo un caso: el primer mensaje del scroll.** Ahí el borde de
+           * arriba del contenedor **sí** recorta la barra que cuelga `-top-4`
+           * —se veía cortada o directamente no se veía—. Se voltea hacia abajo
+           * (`top-full`) cuando el mensaje está pegado al borde superior y la
+           * barra no cabría encima: `decidirDireccionBarra` lo mide contra el
+           * `scrollerRef` al pasar el ratón.
+           *
            * ⚠️ **Sin `focus-within`**, que es lo que la dejaba fija: al pulsar
            * un botón el foco se queda en él y la barra no se iba al apartar el
            * ratón. `focus-visible` cubre el teclado sin ese efecto.
            */}
+          {preview && <LinkPreviewCard preview={preview} mine={mine} />}
+
+          {message.attachments.length > 0 && (
+            <div className={`mt-1.5 flex flex-col gap-1.5 ${mine ? 'items-end' : ''}`}>
+              {message.attachments.map((adjunto) => {
+                const href = hrefDeAdjunto?.(adjunto.id) ?? '#';
+                return <AttachmentCard key={adjunto.id} adjunto={adjunto} href={href} />;
+              })}
+            </div>
+          )}
+
+          {/**
+           * La marca de hilo: «N respuestas».
+           *
+           * Un mensaje con respuestas es un hilo, y esta es la puerta: el número
+           * que enseña el panel lateral, sin necesidad de haberlo abierto nunca.
+           * La barra de acciones solo aparece al pasar el ratón; esta marca está
+           * siempre — es la señal de que debajo hay conversación.
+           */}
+          {mostrarMarcaDeHilo && message._count.replies > 0 && (
+            <button
+              type="button"
+              onClick={() => onAbrirHilo(message)}
+              className={`mt-1.5 flex cursor-pointer items-center gap-1 self-start rounded-full border px-2.5 py-1 font-sans text-[11px] transition-colors ${
+                mine ? 'self-end' : 'self-start'
+              }`}
+              style={{ borderColor: colors.border, color: colors.textSecondary }}
+              title="Ver las respuestas"
+            >
+              <svg
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="7" y="4" width="10" height="16" rx="2" />
+                <line x1="7" y1="8" x2="17" y2="8" />
+                <line x1="7" y1="11" x2="17" y2="11" />
+                <line x1="7" y1="14" x2="17" y2="14" />
+                <path d="M5 3.5h14" />
+                <path d="M5 20.5h14" />
+              </svg>
+              <span className="font-medium text-text-secondary">
+                {message._count.replies} {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
+              </span>
+            </button>
+          )}
+
           <div
-            /**
-             * ⚠️ **Se ancla al lado donde está el mensaje y crece hacia el
-             * centro**, que es donde siempre hay sitio.
-             *
-             * Estaba al revés: en un mensaje ajeno se anclaba a `right-2` —el
-             * borde derecho de la burbuja— y como la barra mide bastante más que
-             * un «ok» o un «o a pelo», se extendía hacia la izquierda hasta
-             * salirse por encima del avatar y del borde del hilo.
-             *
-             * Anclada al borde **exterior** del mensaje (izquierda en los
-             * ajenos, derecha en los tuyos), lo que sobra siempre cae hacia la
-             * mitad vacía de la conversación, que es ancha por definición: la
-             * burbuja nunca pasa del 78 % del panel.
-             */
-            className={`absolute -top-4 z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
-              mine ? 'right-0' : 'left-0'
+            className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
+              /* Hacia arriba normalmente; hacia abajo (`top-full`) cuando el
+                 mensaje está pegado al borde superior del scroll y arriba no
+                 cabría. Ver `decidirDireccionBarra`. */
+              barraAbajo ? 'top-full mt-1.5' : '-top-4'
+            } ${
+              /* Se ancla al lado de la burbuja que mira al centro del chat y
+                 crece hacia dentro: así, con un mensaje corto, la barra —que es
+                 más ancha que la burbuja— desborda hacia el medio de la
+                 conversación, nunca hacia el borde del contenedor. Anclarla al
+                 revés (pegada al borde exterior) era lo que la hacía salirse de
+                 la pantalla con mensajes de una línea. */
+              mine ? 'right-2' : 'left-2'
             } ${
               /* Mientras se confirma un borrado se queda: la pregunta no puede
                  irse antes de que se pueda responder. */
@@ -258,6 +523,87 @@ export function MessageBubble({
                 className="mx-0.5 h-4 w-px shrink-0"
                 style={{ background: colors.border }}
               />
+            )}
+
+            {canFijar && !confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => onFijar(message.id, !fijado)}
+                aria-label={fijado ? 'Desfijar mensaje' : 'Fijar mensaje'}
+                aria-pressed={fijado}
+                title={fijado ? 'Desfijar' : 'Fijar'}
+                className={`cursor-pointer rounded-lg p-1 transition-colors hover:bg-surface ${
+                  fijado ? 'text-primary' : 'text-text-disabled hover:text-text-primary'
+                }`}
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill={fijado ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 17v5" />
+                  <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+                </svg>
+              </button>
+            )}
+
+            {mine && !confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBorrador(message.body);
+                  setEditando(true);
+                }}
+                aria-label="Editar mensaje"
+                title="Editar"
+                className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+              </button>
+            )}
+
+            {!confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => onAbrirHilo(message)}
+                aria-label="Abrir el hilo de este mensaje"
+                title="Hilo"
+                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="7" y="4" width="10" height="16" rx="2" />
+                  <line x1="7" y1="8" x2="17" y2="8" />
+                  <line x1="7" y1="11" x2="17" y2="11" />
+                  <line x1="7" y1="14" x2="17" y2="14" />
+                  <path d="M5 3.5h14" />
+                  <path d="M5 20.5h14" />
+                </svg>
+              </button>
             )}
 
             {!confirmandoBorrado && (
@@ -381,4 +727,173 @@ export function MessageBubble({
 /** Solo la hora: el día lo dice el separador que encabeza el bloque. */
 function soloHora(iso: string): string {
   return new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Un archivo dentro del mensaje.
+ *
+ * La imagen y el vídeo se pintan en línea —`<img>` y `<video>` no ejecutan
+ * scripts—; el PDF se abre en otra pestaña (el gateway lo sirve dentro de un
+ * sandbox sin `allow-same-origin`, así que un PDF con scripts no toca la
+ * sesión); el resto sale como descarga con `nosniff`. El **SVG nunca** llega
+ * aquí: no se admite al subir.
+ *
+ * ⚠️ **Todo se sirve por el proxy de la zona** (`/…/api/gateway/…`), que es el
+ * mismo origen que la aplicación: la cookie de sesión viaja sola. Un enlace
+ * directo al gateway iría sin credenciales y devolvería 401.
+ */
+function AttachmentCard({
+  adjunto,
+  href,
+}: {
+  adjunto: ChatAttachment;
+  href: string;
+}) {
+  const esImagen = adjunto.mimeType.startsWith('image/');
+  const esVideo = adjunto.mimeType.startsWith('video/');
+  const esPdf = adjunto.mimeType === 'application/pdf';
+
+  if (esImagen || esVideo) {
+    return (
+      <div
+        className="overflow-hidden rounded-xl border border-border"
+        style={{ background: alpha(colors.border, 30) }}
+      >
+        {esImagen ? (
+          <img
+            src={href}
+            alt={adjunto.filename}
+            loading="lazy"
+            className="max-h-72 w-auto max-w-full object-contain"
+          />
+        ) : (
+          /* `controls` y no reproducción automática: un vídeo que se lanza solo
+             con el scroll es ruido y datos. `preload="metadata"` para no
+             traer el archivo entero solo para pintar la portada. */
+          <video
+            src={href}
+            controls
+            preload="metadata"
+            className="max-h-72 w-auto max-w-full bg-black"
+          >
+            <track kind="captions" />
+          </video>
+        )}
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <span className="min-w-0 flex-1 truncate font-sans text-xs text-text-secondary">
+            {adjunto.filename}
+          </span>
+          <span className="shrink-0 font-sans text-[10px] tabular-nums text-text-disabled">
+            {formatBytes(adjunto.size)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  /* PDF y el resto: un enlace. El PDF se sirve en línea por el gateway (sandbox
+     mediante); lo demás cae como descarga. El `target="_blank"` con `noopener`
+     aísla la pestaña nueva del contexto de la sesión. */
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex w-full max-w-xs items-center gap-2.5 rounded-xl border border-border px-2.5 py-2 transition-colors hover:border-primary"
+      style={{ background: alpha(colors.border, 22) }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[9px] font-semibold uppercase text-text-secondary"
+        style={{ background: alpha(colors.border, 45) }}
+      >
+        {extension(adjunto.filename)}
+      </span>
+      <span className="min-w-0 flex-1 flex-col">
+        <span className="block truncate font-sans text-xs font-medium text-text-primary">
+          {adjunto.filename}
+        </span>
+        <span className="block font-sans text-[10px] text-text-disabled">
+          {esPdf ? 'Ver en otra pestaña' : 'Descargar'} · {formatBytes(adjunto.size)}
+        </span>
+      </span>
+      <svg
+        className="h-3.5 w-3.5 shrink-0 text-text-disabled"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+        />
+      </svg>
+    </a>
+  );
+}
+
+/** `informe-final.pdf` → `PDF`. Para el icono de los que no son imagen. */
+function extension(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  if (dot === -1 || dot === filename.length - 1) return 'FILE';
+  return filename.slice(dot + 1, dot + 5);
+}
+
+/**
+ * La card de una URL con metadatos, al estilo WhatsApp.
+ *
+ * ⚠️ Nada de lo que trae se renderiza como HTML: título y descripción son
+ * texto, y la imagen se sirve en un `<img>` nativo —que no ejecuta scripts—.
+ * La URL de la imagen la validó el server action con el mismo guard SSRF que
+ * la página, y se abre en pestaña nueva con `noopener`.
+ */
+function LinkPreviewCard({ preview, mine }: { preview: LinkPreview; mine: boolean }) {
+  return (
+    <a
+      href={preview.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`mt-1.5 flex max-w-xs flex-col overflow-hidden rounded-xl border border-border transition-colors hover:border-primary ${
+        mine ? 'items-end' : ''
+      }`}
+      style={{ background: alpha(colors.border, 22) }}
+    >
+      {preview.image && (
+        <img
+          src={preview.image}
+          alt=""
+          loading="lazy"
+          className="h-36 w-full object-cover"
+          onError={(evento) => {
+            /* Una imagen rota no debe matar la card: se oculta y queda el texto. */
+            evento.currentTarget.remove();
+          }}
+        />
+      )}
+      <span className="flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
+        <span className="line-clamp-1 font-sans text-xs font-semibold text-text-primary">
+          {preview.title}
+        </span>
+        {preview.description && (
+          <span className="line-clamp-2 font-sans text-[11px] text-text-secondary">
+            {preview.description}
+          </span>
+        )}
+        <span className="line-clamp-1 font-sans text-[10px] text-text-disabled">
+          {dominioDe(preview.url)}
+        </span>
+      </span>
+    </a>
+  );
+}
+
+/** `https://github.com/a/b` → `github.com`. Para el pie de la card. */
+function dominioDe(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
 }

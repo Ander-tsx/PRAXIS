@@ -66,6 +66,18 @@ Thumbs.db
 # AI Agent context (local only)
 AGENTS.md
 DESIGN.md
+docs/ARQUITECTURA.md
+docs/BASE-DATOS.md
+docs/CI-CD.md
+docs/FUNCIONALIDADES.md
+docs/INTEGRACION-ALEXA.md
+docs/INTEGRACION-ASISTENTE.md
+docs/MONOREPO.md
+docs/PERMISOS.md
+docs/REPORTES.md
+docs/SEGURIDAD.md
+docs/STACK-TECNOLOGICO.md
+docs/TERRAFORM-GCP.md
 
 # Terraform
 #
