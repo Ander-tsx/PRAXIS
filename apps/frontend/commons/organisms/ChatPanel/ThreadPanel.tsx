@@ -3,6 +3,7 @@
 import { useRef } from 'react';
 import type { ChatAttachment, ChatMessage, UserProfile } from '../../api/domain';
 import { colors } from '../../tokens';
+import { useSidebarPlegada } from '../AppLayout/AppShell';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
 
@@ -52,10 +53,13 @@ export interface ThreadPanelProps {
  *
  * ## Qué es un hilo aquí
  *
- * Nada nuevo en la base: un hilo es un mensaje con respuestas, y una respuesta
- * es un mensaje con `replyToId`. Las respuestas fluyen por el historial como los
- * demás mensajes —que es lo que hace que la conversación se lea entera sin
- * abrir nada— y este panel las reúne bajo el mensaje que las provocó.
+ * Un subchat: lo que se escribe en su compositor (`onEnviar`, más abajo) se
+ * guarda con `enHilo: true` y **no fluye por la conversación general** — vive
+ * aquí y solo aquí. Es lo que lo distingue de «responder» desde el
+ * compositor principal, que cita igual (`replyToId`) pero sí fluye fuera.
+ * Este panel reúne bajo el mensaje que abrió el hilo tanto sus respuestas
+ * dedicadas como las citas que recibió desde fuera — las dos comparten
+ * `replyToId`, así que las dos aparecen aquí.
  *
  * ## Quién lleva el estado
  *
@@ -96,10 +100,15 @@ export function ThreadPanel({
 }: ThreadPanelProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const bubbles = [raiz, ...replies];
+  /* Mismo motivo que el ancho máximo de AppHeader: plegar la barra lateral
+     libera sitio que un panel de ancho fijo nunca reclamaba. */
+  const plegada = useSidebarPlegada();
 
   return (
     <div
-      className="flex w-full flex-col border-l border-border max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:w-80 sm:shrink-0"
+      className={`flex w-full flex-col border-l border-border max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:shrink-0 ${
+        plegada ? 'sm:w-96' : 'sm:w-80'
+      }`}
       style={{ background: colors.background }}
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">

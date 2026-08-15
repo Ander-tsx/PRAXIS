@@ -154,7 +154,54 @@ export function MessageBubble({
   const PULSACION_LARGA_MS = 450;
 
   const [arrastreX, setArrastreX] = useState(0);
-  const [hojaMovilAbierta, setHojaMovilAbierta] = useState(false);
+
+  /**
+   * La hoja de acciones móvil: montada, visible y el arrastre para cerrarla
+   * tirando hacia abajo — las tres por separado porque son tres momentos
+   * distintos de la misma animación.
+   *
+   * `hojaMontada` decide si existe en el DOM; `hojaVisible` es la clase que
+   * dispara la transición CSS. Van separados porque cerrar tiene que **verse**
+   * —deslizarse hacia abajo— antes de desaparecer: si se desmontara al mismo
+   * tiempo que se pide cerrar, no habría nada que animar. El doble
+   * `requestAnimationFrame` al abrir es lo que garantiza que el navegador
+   * pinte el estado inicial (fuera de pantalla) antes de pasar al final
+   * (visible); sin él, a veces monta ya en su sitio y la entrada no se ve.
+   */
+  const [hojaMontada, setHojaMontada] = useState(false);
+  const [hojaVisible, setHojaVisible] = useState(false);
+  const [arrastreHojaY, setArrastreHojaY] = useState(0);
+  const gestoHojaRef = useRef({ startY: 0, activo: false });
+
+  function abrirHoja() {
+    setArrastreHojaY(0);
+    setHojaMontada(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setHojaVisible(true)));
+  }
+
+  function cerrarHoja() {
+    setHojaVisible(false);
+    setConfirmandoBorrado(false);
+  }
+
+  function onHojaGestoInicio(e: React.PointerEvent<HTMLDivElement>) {
+    gestoHojaRef.current = { startY: e.clientY, activo: true };
+  }
+
+  function onHojaGestoMueve(e: React.PointerEvent<HTMLDivElement>) {
+    if (!gestoHojaRef.current.activo) return;
+    setArrastreHojaY(Math.max(0, e.clientY - gestoHojaRef.current.startY));
+  }
+
+  function onHojaGestoFin() {
+    if (!gestoHojaRef.current.activo) return;
+    gestoHojaRef.current.activo = false;
+    /* 100 px de tirón cierra; menos, se suelta y vuelve a su sitio — el mismo
+       umbral que cualquier hoja inferior de un sistema operativo móvil. */
+    if (arrastreHojaY > 100) cerrarHoja();
+    setArrastreHojaY(0);
+  }
+
   const gestoRef = useRef({
     startX: 0,
     startY: 0,
@@ -181,7 +228,7 @@ export function MessageBubble({
       if (!gestoRef.current.siguiendo) return;
       gestoRef.current.siguiendo = false;
       setArrastreX(0);
-      setHojaMovilAbierta(true);
+      abrirHoja();
       navigator.vibrate?.(10);
     }, PULSACION_LARGA_MS);
   }
@@ -467,8 +514,16 @@ export function MessageBubble({
              * otra persona y sigue teniendo sentido.
              */
             <div
-              className="mb-1.5 flex flex-col gap-0.5 rounded-lg border-l-2 py-1 pl-2.5 pr-2"
-              style={{ borderColor: colors.primary, background: alpha(colors.overlay, 18) }}
+              /* `border-l` con el primario a secas —no `alpha(colors.overlay, …)`,
+                 que es el tono casi negro de los fondos de modales—: sobre una
+                 burbuja clara salía sucio, y sobre una oscura, invisible. El
+                 tinte de fondo es el mismo primario, muy rebajado, así que
+                 escala con el tema en vez de pelearse con él. */
+              className="mb-1.5 flex flex-col gap-0.5 rounded-lg border-l-[3px] py-1 pl-2.5 pr-2"
+              style={{
+                borderColor: alpha(colors.primary, 70),
+                background: alpha(colors.primary, 10),
+              }}
             >
               <span
                 className="font-sans text-[11px] font-semibold"
@@ -872,25 +927,35 @@ export function MessageBubble({
        * responder, abrir el hilo, borrar— en una lista que se pulsa con el
        * pulgar, en vez de iconos de 16 px pensados para un cursor preciso.
        */}
-      {hojaMovilAbierta && (
+      {hojaMontada && (
         <div className="fixed inset-0 z-50">
           <button
             type="button"
             aria-label="Cerrar acciones"
-            onClick={() => {
-              setHojaMovilAbierta(false);
-              setConfirmandoBorrado(false);
-            }}
-            className="fixed inset-0 backdrop-blur-sm"
-            style={{ background: alpha(colors.overlay, 60) }}
+            onClick={cerrarHoja}
+            className="fixed inset-0 backdrop-blur-sm transition-opacity duration-200 ease-out"
+            style={{ background: alpha(colors.overlay, 60), opacity: hojaVisible ? 1 : 0 }}
           />
 
           <div
-            className="fixed inset-x-0 bottom-0 z-10 flex flex-col gap-1 rounded-t-2xl border-t p-3"
+            onTransitionEnd={(e) => {
+              /* Solo el `transform` de este mismo elemento cuenta: los hijos
+                 también disparan `transitionend` (el fondo de un botón, por
+                 ejemplo) y burbujean hasta aquí. */
+              if (e.target === e.currentTarget && !hojaVisible) setHojaMontada(false);
+            }}
+            onPointerDown={onHojaGestoInicio}
+            onPointerMove={onHojaGestoMueve}
+            onPointerUp={onHojaGestoFin}
+            onPointerCancel={onHojaGestoFin}
+            className="fixed inset-x-0 bottom-0 z-10 flex flex-col gap-1 rounded-t-2xl border-t p-3 ease-out"
             style={{
               background: colors.surfaceElevated,
               borderColor: colors.border,
               paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+              touchAction: 'none',
+              transform: hojaVisible ? `translateY(${arrastreHojaY}px)` : 'translateY(100%)',
+              transition: gestoHojaRef.current.activo ? 'none' : 'transform 220ms ease-out',
             }}
           >
             <span
@@ -913,8 +978,7 @@ export function MessageBubble({
                   <button
                     type="button"
                     onClick={() => {
-                      setConfirmandoBorrado(false);
-                      setHojaMovilAbierta(false);
+                      cerrarHoja();
                       onBorrar(message.id);
                     }}
                     className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm font-semibold"
@@ -939,7 +1003,7 @@ export function MessageBubble({
                           type="button"
                           onClick={() => {
                             onReaccionar(message.id, emoji, !puesta);
-                            setHojaMovilAbierta(false);
+                            cerrarHoja();
                           }}
                           aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
                           aria-pressed={puesta}
@@ -957,7 +1021,7 @@ export function MessageBubble({
                   etiqueta="Responder"
                   onClick={() => {
                     onResponder(message);
-                    setHojaMovilAbierta(false);
+                    cerrarHoja();
                   }}
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
@@ -968,7 +1032,7 @@ export function MessageBubble({
                   etiqueta="Ver hilo"
                   onClick={() => {
                     onAbrirHilo(message);
-                    setHojaMovilAbierta(false);
+                    cerrarHoja();
                   }}
                 >
                   <rect x="7" y="4" width="10" height="16" rx="2" />
@@ -985,7 +1049,7 @@ export function MessageBubble({
                     activa={fijado}
                     onClick={() => {
                       onFijar(message.id, !fijado);
-                      setHojaMovilAbierta(false);
+                      cerrarHoja();
                     }}
                   >
                     <path d="M12 17v5" />
@@ -999,7 +1063,7 @@ export function MessageBubble({
                     onClick={() => {
                       setBorrador(message.body);
                       setEditando(true);
-                      setHojaMovilAbierta(false);
+                      cerrarHoja();
                     }}
                   >
                     <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />

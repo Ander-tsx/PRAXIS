@@ -61,6 +61,7 @@ export class ChatController {
       body: string;
       replyToId?: string | null;
       attachmentIds?: string[];
+      enHilo?: boolean;
     },
   ) {
     const canal = await this.channels.deProyecto(dto.projectId);
@@ -155,7 +156,13 @@ export class ChatController {
 
   @MessagePattern({ cmd: 'chat_direct_send' })
   async directoEnviar(
-    @Payload() dto: Directo & { body: string; replyToId?: string | null; attachmentIds?: string[] },
+    @Payload()
+    dto: Directo & {
+      body: string;
+      replyToId?: string | null;
+      attachmentIds?: string[];
+      enHilo?: boolean;
+    },
   ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId);
     return this.chat.send({ ...dto, channelId: canal.id });

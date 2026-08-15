@@ -401,6 +401,19 @@ model ChatMessage {
   replyTo   ChatMessage?  @relation("respuestas", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   replies   ChatMessage[] @relation("respuestas")
 
+  /// Si fluye por la conversación o vive solo dentro de su hilo.
+  ///
+  /// ⚠️ **No es lo mismo que `replyToId`.** Los dos van con la cita —el hilo
+  /// también la necesita, para saber de qué mensaje es respuesta—, pero
+  /// responden preguntas distintas: `replyToId` dice a quién cita, esto dice
+  /// si el resultado se ve en la conversación general o solo al abrir el
+  /// hilo. «Responder» desde el compositor principal deja esto en `true`: es
+  /// un mensaje normal que además cita a otro. Escribir dentro del panel del
+  /// hilo lo deja en `false`: existe únicamente ahí. Confundir los dos era
+  /// el fallo — toda respuesta se convertía en hilo sin que quien escribía
+  /// lo pidiera.
+  visibleEnChat Boolean @default(true)
+
   /// Cuándo se fijó. `null` mientras no está fijado.
   ///
   /// Fijar no cambia el texto: deja el mensaje anclado a la conversación para

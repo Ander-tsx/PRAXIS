@@ -58,6 +58,7 @@ export async function sendDirectMessageAction(
   cuerpo: string,
   replyToId: string | null,
   attachmentIds: string[] = [],
+  enHilo = false,
 ): Promise<{ error: string | null }> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.' };
@@ -78,6 +79,7 @@ export async function sendDirectMessageAction(
       ...(limpio.length > 0 ? { body: limpio } : {}),
       ...(replyToId && { replyToId }),
       ...(attachmentIds.length > 0 && { attachmentIds }),
+      ...(enHilo && { enHilo }),
     });
     if (!creado?.id) return { error: 'El servidor no guardó el mensaje.' };
   } catch (error) {

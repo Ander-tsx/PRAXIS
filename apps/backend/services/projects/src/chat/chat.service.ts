@@ -102,6 +102,14 @@ export class ChatService {
     body: string;
     replyToId?: string | null;
     attachmentIds?: string[];
+    /**
+     * Si este mensaje se escribió dentro del panel del hilo.
+     *
+     * Es lo que separa «responder» de «hilo», y no `replyToId`: los dos
+     * llevan cita, pero solo el que nace en el panel del hilo se guarda
+     * fuera de la conversación general.
+     */
+    enHilo?: boolean;
   }) {
     /* Una respuesta tiene que apuntar a un mensaje **de este mismo canal**. Sin
        esta comprobación, un id conocido de otra conversación se citaría dentro
@@ -136,6 +144,7 @@ export class ChatService {
            pasa el `MinLength(1)` del DTO y sale como una burbuja vacía. */
         body: cuerpo,
         replyToId: dto.replyToId ?? null,
+        visibleEnChat: !dto.enHilo,
       },
       select: CON_MENSAJE,
     });
@@ -191,10 +200,10 @@ export class ChatService {
       const hallados = await this.prisma.chatMessage.findMany({
         where: {
           channelId: dto.channelId,
-          /* Una respuesta de un hilo no es un mensaje del chat: el término solo
-             busca mensajes raíz. Buscar dentro de un hilo se hace en el panel
-             del hilo. */
-          replyToId: null,
+          /* Un mensaje solo del hilo no se busca desde aquí: vive fuera de la
+             conversación general, y buscar dentro de un hilo se hace en su
+             propio panel. */
+          visibleEnChat: true,
           /* Insensible a mayúsculas: «Hoy» encuentra «hoy». El modo de Postgres,
              no una normalización que rompería el índice. */
           body: { contains: termino, mode: 'insensitive' },
@@ -217,7 +226,7 @@ export class ChatService {
        `limit` a propósito (el gateway ya documenta lo mismo en el DTO). */
     if (dto.pinned) {
       const fijados = await this.prisma.chatMessage.findMany({
-        where: { channelId: dto.channelId, replyToId: null, pinnedAt: { not: null } },
+        where: { channelId: dto.channelId, visibleEnChat: true, pinnedAt: { not: null } },
         orderBy: { pinnedAt: 'desc' },
         select: CON_MENSAJE,
       });
@@ -249,11 +258,12 @@ export class ChatService {
     const newest = await this.prisma.chatMessage.findMany({
       where: {
         channelId: dto.channelId,
-        /* Una respuesta fluye igual que cualquier mensaje, en su sitio
-           cronológico y con su cita — es lo que distingue «responder» de
-           «abrir el hilo». El panel del hilo (`thread()`) sigue existiendo
-           aparte, como una vista filtrada de la conversación de un mensaje,
-           no como el único sitio donde una respuesta es visible. */
+        /* «Responder» y «abrir el hilo» ya no comparten mecanismo: los dos
+           llevan cita (`replyToId`), pero solo lo que se escribe dentro del
+           panel del hilo se guarda con `visibleEnChat: false` y se queda
+           fuera de aquí. Una respuesta desde el compositor principal fluye
+           en su sitio cronológico, como cualquier mensaje. */
+        visibleEnChat: true,
         ...(cursorAt && { createdAt: { lt: cursorAt } }),
       },
       orderBy: { createdAt: 'desc' },
@@ -525,7 +535,7 @@ export class ChatService {
 
     const [ultimos, sinLeer, estados] = await Promise.all([
       this.prisma.chatMessage.findMany({
-        where: { channelId: { in: ids } },
+        where: { channelId: { in: ids }, visibleEnChat: true },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
         select: { channelId: true, body: true, authorId: true, createdAt: true },
@@ -598,7 +608,7 @@ export class ChatService {
 
     const [ultimos, sinLeer, estados] = await Promise.all([
       this.prisma.chatMessage.findMany({
-        where: { channelId: { in: ids } },
+        where: { channelId: { in: ids }, visibleEnChat: true },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
         select: { channelId: true, body: true, authorId: true, createdAt: true },

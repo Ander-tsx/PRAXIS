@@ -52,8 +52,12 @@ export function DirectConversation({
      recreadas en cada render, marcaría como leído en bucle. */
   const acciones = useMemo(
     () => ({
-      enviar: (cuerpo: string, replyToId: string | null, attachmentIds: string[]) =>
-        sendDirectMessageAction(peerId, cuerpo, replyToId, attachmentIds),
+      enviar: (
+        cuerpo: string,
+        replyToId: string | null,
+        attachmentIds: string[],
+        enHilo: boolean,
+      ) => sendDirectMessageAction(peerId, cuerpo, replyToId, attachmentIds, enHilo),
       borrar: (messageId: string) => deleteDirectMessageAction(peerId, messageId),
       reaccionar: (messageId: string, emoji: string, on: boolean) =>
         reactDirectAction(peerId, messageId, emoji, on),

@@ -35,10 +35,17 @@ const PAGINA = 50;
 const CORTE_DE_BLOQUE_MS = 5 * 60_000;
 
 export interface ChatAcciones {
+  /**
+   * `enHilo` separa «responder» de «hilo»: los dos citan con `replyToId`,
+   * pero solo un envío desde el panel del hilo (`enHilo: true`) se guarda
+   * fuera de la conversación general. El compositor principal siempre manda
+   * `false`, aunque lleve una cita puesta.
+   */
   enviar: (
     cuerpo: string,
     replyToId: string | null,
     attachmentIds: string[],
+    enHilo: boolean,
   ) => Promise<{ error: string | null }>;
   borrar: (messageId: string) => Promise<{ error: string | null }>;
   reaccionar: (messageId: string, emoji: string, on: boolean) => Promise<void>;
@@ -437,7 +444,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   async function enviar(cuerpo: string, attachmentIds: string[]) {
     setEnviando(true);
     setError(null);
-    const resultado = await acciones.enviar(cuerpo, respondiendo?.id ?? null, attachmentIds);
+    /* `enHilo: false` siempre desde aquí: es el compositor principal, y su
+       resultado tiene que fluir en la conversación general aunque lleve una
+       cita puesta. */
+    const resultado = await acciones.enviar(cuerpo, respondiendo?.id ?? null, attachmentIds, false);
     if (resultado.error) setError(resultado.error);
     else {
       setRespondiendo(null);
@@ -526,6 +536,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * repintado por mensaje parpadearía la conversación entera.
    */
   async function fijar(messageId: string, on: boolean) {
+    /* ⚠️ De `mensajes` primero, y se recuerda si estaba ahí: es la conversación
+       general, así que ahí es donde vive la barra de fijados. Un mensaje que
+       solo está en `hiloMensajes` es de un hilo — se fija en su sitio, pero
+       no tiene sentido en la barra de la conversación general porque no vive
+       ahí. */
+    const enConversacionGeneral = mensajes.some((mensaje) => mensaje.id === messageId);
     const actual =
       mensajes.find((mensaje) => mensaje.id === messageId) ??
       hiloMensajes.find((mensaje) => mensaje.id === messageId);
@@ -556,11 +572,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       /**
        * La barra se corrige con el mismo resultado, sin esperar a revalidar.
        *
-       * ⚠️ **Una respuesta de hilo no entra en la barra**, igual que en el
-       * servidor (`findAll` filtra `replyToId: null` para `pinned=true`): fijar
-       * un mensaje de un hilo lo ancla dentro de su hilo, no en la conversación.
+       * ⚠️ **Un mensaje solo del hilo no entra en la barra**, igual que en el
+       * servidor (`findAll` filtra `visibleEnChat: true` para `pinned=true`):
+       * fijarlo lo ancla dentro de su hilo, no en la conversación general.
+       * Una respuesta citada desde el compositor principal sí entra — vive en
+       * la conversación general igual que cualquier otro mensaje.
        */
-      if (actual && !actual.replyTo) {
+      if (actual && enConversacionGeneral) {
         setFijadosLista((previos) => {
           const sinEste = previos.filter((mensaje) => mensaje.id !== messageId);
           if (!resultado.pinned) return sinEste;
@@ -649,7 +667,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!hiloRaiz) return;
     setEnviando(true);
     setError(null);
-    const resultado = await acciones.enviar(cuerpo, hiloRaiz.id, attachmentIds);
+    /* `enHilo: true`: nace en el panel del hilo, así que se guarda fuera de
+       la conversación general — aparece aquí y solo aquí. */
+    const resultado = await acciones.enviar(cuerpo, hiloRaiz.id, attachmentIds, true);
     if (resultado.error) setError(resultado.error);
     else setAdjuntosPendientes([]);
     setEnviando(false);

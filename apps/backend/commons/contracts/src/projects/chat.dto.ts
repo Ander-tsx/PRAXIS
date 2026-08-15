@@ -77,6 +77,19 @@ export class SendChatMessageBodyDto {
   @ArrayMaxSize(CHAT_ATTACHMENT_MAX_PER_MESSAGE)
   @IsUUID('4', { each: true })
   attachmentIds?: string[];
+
+  /**
+   * Si este mensaje se escribe dentro del panel del hilo.
+   *
+   * Es lo que separa «responder» de «hilo» — los dos citan con `replyToId`,
+   * pero solo este deja el mensaje fuera de la conversación general, visible
+   * únicamente al abrir el hilo. Ausente o `false`: es un mensaje normal,
+   * aunque cite a otro.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  enHilo?: boolean;
 }
 
 /**

@@ -1343,6 +1343,7 @@ export async function sendChatMessageAction(
   cuerpo: string,
   replyToId: string | null,
   attachmentIds: string[] = [],
+  enHilo = false,
 ): Promise<{ error: string | null }> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.' };
@@ -1361,6 +1362,7 @@ export async function sendChatMessageAction(
       ...(body.trim() ? { body } : {}),
       ...(replyToId && { replyToId }),
       ...(attachmentIds.length > 0 && { attachmentIds }),
+      ...(enHilo && { enHilo }),
     });
     if (!created?.id) return { error: 'El servidor no guardó el mensaje.' };
   } catch (error) {
