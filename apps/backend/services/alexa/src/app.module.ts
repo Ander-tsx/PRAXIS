@@ -22,7 +22,7 @@ import { VoiceTeamModule } from './voice-team/voice-team.module';
         TCP_PORT: Joi.number().required(),
 
         // Token de voz — secreto propio, scope de solo lectura
-        VOICE_JWT_SECRET: Joi.string().optional(),
+        VOICE_JWT_SECRET: Joi.string().optional().allow(''),
         VOICE_TOKEN_EXPIRES_IN: Joi.string().default('90d'),
         ALEXA_SESSION_TTL_DAYS: Joi.number().default(90),
 

@@ -24,7 +24,7 @@ import { UsersModule } from './users/users.module';
            fallar solo en el camino de Google, con un 503 que dice qué falta.
            Es público —viaja en el JavaScript del navegador—, así que no es un
            secreto y no vive en Secret Manager. */
-        GOOGLE_CLIENT_ID: Joi.string().optional(),
+        GOOGLE_CLIENT_ID: Joi.string().optional().allow(''),
         JWT_EXPIRES_IN: Joi.string().default('15m'),
         REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
         LOG_LEVEL: Joi.string()
