@@ -17,9 +17,11 @@ import {
   alpha,
   colors,
   personLabel,
+  useAccion,
 } from '@praxis/commons';
-import { type FocusEvent, useActionState, useEffect, useRef, useState } from 'react';
+import { type FocusEvent, useEffect, useRef, useState } from 'react';
 import { SelectorDeFecha } from '../../molecules/SelectorDeFecha/SelectorDeFecha';
+import { GestorDeEtiquetas } from './GestorDeEtiquetas';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskComments } from './TaskComments';
@@ -46,6 +48,13 @@ export interface TaskDialogProps {
   canToggleChecklist: boolean;
   /** Escribir en el hilo: `canComment`, no `canEditTask`. */
   canComment: boolean;
+  /**
+   * Crear, renombrar y borrar las etiquetas del proyecto: `canManageLabels`.
+   *
+   * Es independiente de `canEdit`: quien mantiene el vocabulario del proyecto no
+   * tiene por qué poder tocar tareas, y al revés.
+   */
+  canManageLabels: boolean;
   canEdit: boolean;
   canDelete: boolean;
 }
@@ -98,14 +107,12 @@ export function TaskDialog({
   currentUserId,
   canToggleChecklist,
   canComment,
+  canManageLabels,
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const [state, formAction, pending] = useActionState(updateTaskAction, TASK_INITIAL_STATE);
-  const [deleteState, deleteAction, deleting] = useActionState(
-    deleteTaskAction,
-    TASK_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useAccion(deleteTaskAction, TASK_INITIAL_STATE);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const readOnly = !canEdit;
@@ -141,7 +148,7 @@ export function TaskDialog({
   /**
    * Hay una escritura lanzada.
    *
-   * ⚠️ Es una `ref` y no el `pending` de `useActionState` **a propósito**. Ese
+   * ⚠️ Es una `ref` y no el `pending` de `useAccion` **a propósito**. Ese
    * llega en el render siguiente, y dos cambios dentro del mismo —tocar
    * prioridad y fecha casi a la vez— lo verían todavía en `false` y lanzarían
    * los dos, que es justo lo que esto evita. La `ref` se marca en el acto.
@@ -355,25 +362,40 @@ export function TaskDialog({
           />
         </div>
 
-        <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-          <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
-          {labels.length === 0 ? (
-            <p className="font-sans text-xs text-text-secondary">
-              Este proyecto no tiene etiquetas todavía. Se crean en la pestaña «Etiquetas».
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
-              {labels.map((label) => (
-                <LabelToggle
-                  key={label.id}
-                  label={label}
-                  defaultChecked={task.labels.some((l) => l.labelId === label.id)}
-                  onToggle={save}
-                />
-              ))}
-            </div>
-          )}
-        </fieldset>
+        {/**
+         * ⚠️ **El `fieldset` cubre solo los interruptores, no la gestión.**
+         *
+         * Va con `disabled={readOnly}`, y un `fieldset` deshabilitado apaga
+         * **todo** lo que tenga dentro, botones incluidos. Con el gestor
+         * dentro, alguien con `canManageLabels` pero sin `canEditTask` —el
+         * caso de quien mantiene el vocabulario del proyecto sin tocar
+         * tareas— se lo encontraría apagado sin motivo. Los dos permisos son
+         * independientes y se respetan por separado.
+         */}
+        <div className="flex flex-col gap-2">
+          <fieldset className="flex flex-col gap-2" disabled={readOnly}>
+            <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
+            {labels.length === 0 ? (
+              <p className="font-sans text-xs text-text-secondary">
+                Este proyecto no tiene etiquetas todavía.
+                {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
+                {labels.map((label) => (
+                  <LabelToggle
+                    key={label.id}
+                    label={label}
+                    defaultChecked={task.labels.some((l) => l.labelId === label.id)}
+                    onToggle={save}
+                  />
+                ))}
+              </div>
+            )}
+          </fieldset>
+
+          {canManageLabels && <GestorDeEtiquetas projectId={projectId} labels={labels} />}
+        </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
           <legend className="font-sans text-sm font-medium text-text-primary">Encargados</legend>

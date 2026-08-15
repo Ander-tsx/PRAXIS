@@ -1,7 +1,6 @@
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { ProjectChat } from '@/components/organisms/ProjectChat';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
-import { ProjectLabels } from '@/components/organisms/ProjectLabels';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
 import { ProjectRoles } from '@/components/organisms/ProjectRoles';
 import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
@@ -48,12 +47,23 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
+/**
+ * Las pestañas, en orden de uso.
+ *
+ * ⚠️ **El chat va el último y no el segundo.** Las otras tres son configuración
+ * y contenido del proyecto —dónde está el trabajo, quién lo hace, bajo qué
+ * reglas—; el chat es una conversación, se entra a leer y no a decidir, y su
+ * insignia de no leídos ya lo reclama cuando toca. En segunda posición partía en
+ * dos el recorrido natural «espacios → equipo → roles».
+ *
+ * ⚠️ **Ya no hay pestaña «Etiquetas».** Se administran desde el diálogo de la
+ * tarea, que es donde se usan: ver §36.
+ */
 const TABS = [
   { id: 'espacios', label: 'Espacios' },
-  { id: 'chat', label: 'Chat' },
   { id: 'equipo', label: 'Equipo' },
-  { id: 'etiquetas', label: 'Etiquetas' },
   { id: 'roles', label: 'Roles' },
+  { id: 'chat', label: 'Chat' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -114,8 +124,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const [effective, members, labels, invitations, chat] = await Promise.all([
     api.get<EffectivePermissions>(`/projects/${project.id}/permissions/me`),
     api.get<ProjectMember[]>(`/projects/${project.id}/members`).catch(() => [] as ProjectMember[]),
-    /* Hacen falta en dos pestañas —para gestionarlas y para ponerlas en una
-       tarea—, así que se piden siempre; son una fila por etiqueta. */
+    /* Se piden siempre —son una fila por etiqueta— porque las necesita el
+       diálogo de la tarea, que es donde ahora se ponen **y** se administran, y
+       el inventario del borrado del proyecto, que dice cuántas se van. */
     api
       .get<Label[]>(`/projects/${project.id}/labels`)
       .catch(() => [] as Label[]),
@@ -358,14 +369,18 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    */
   const counts: Record<TabId, number> = {
     espacios: project.workspaces.length,
-    chat: chat.unread,
     equipo: members.length,
-    etiquetas: labels.length,
     roles: project.roles.length,
+    chat: chat.unread,
   };
 
   return (
-    <AppHeader title={project.name}>
+    /* El nombre del proyecto **no** va aquí: lo pinta la propia página, en
+       grande y editable (`EditableProjectFields`). Repetirlo en la cabecera
+       gastaba la única línea que dice dónde estás en decir dos veces lo mismo,
+       y con un nombre largo además se truncaba. La cabecera nombra la sección,
+       igual que el enlace de la barra lateral por el que se llega. */
+    <AppHeader title="Proyectos">
       <div className="flex flex-col gap-6">
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
@@ -467,6 +482,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             workspaces={project.workspaces}
             activeWorkspace={activeWorkspace}
             canManage={can.canCreateBoard}
+            /* Renombrar y eliminar **espacios y tableros** cuelgan de estos dos,
+               no de `canCreateBoard`: el gateway pide `canEditBoard` para los
+               dos `PATCH` y `canDeleteBoard` para los dos `DELETE`, incluidos
+               los del espacio. Antes «Eliminar espacio» se enseñaba con
+               `canCreateBoard` y un rol que pudiera crear pero no borrar veía
+               un botón que siempre respondía 403. */
+            canEditBoard={can.canEditBoard}
+            canDeleteBoard={can.canDeleteBoard}
             /* Las columnas tienen sus propios permisos, y hasta ahora todo
                colgaba de `canCreateBoard`: quien podía crear columnas pero no
                tableros no veía el botón. `canEditColumn` además estrena uso: no
@@ -488,6 +511,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             canEditTask={can.canEditTask}
             /* Comentar deja de exigir editar: el observador ya puede responder. */
             canComment={can.canComment}
+            /* Las etiquetas se administran desde el diálogo de la tarea, que es
+               donde se usan. Permiso propio: quien edita tareas no rehace por
+               ello el vocabulario del proyecto entero. */
+            canManageLabels={can.canManageLabels}
             canDeleteTask={can.canDeleteTask}
           />
         )}
@@ -529,13 +556,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             projectName={project.name}
             currentUserId={userId}
           />
-        )}
-
-        {activeTab === 'etiquetas' && (
-          /* Etiquetas con su propio permiso: hasta ahora las gestionaba
-             `canEditTask`, así que quien tocaba una tarea rehacía el vocabulario
-             del proyecto entero. */
-          <ProjectLabels projectId={project.id} labels={labels} canManage={can.canManageLabels} />
         )}
 
         {activeTab === 'roles' && (
