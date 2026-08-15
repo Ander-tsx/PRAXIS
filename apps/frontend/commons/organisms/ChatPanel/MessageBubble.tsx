@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { textoPlano, trocearMensaje } from '../../api/chat-refs';
 import {
@@ -132,6 +132,93 @@ export function MessageBubble({
     if (guardado) setEditando(false);
   }
 
+  /**
+   * Gestos táctiles: deslizar responde, mantener pulsado abre la hoja de
+   * acciones.
+   *
+   * ## Por qué no la barra de acciones también en móvil
+   *
+   * La barra aparece con `:hover`, y el táctil no tiene ese estado —una
+   * pulsación lo dispara a veces, pegado hasta el siguiente toque en otro
+   * sitio, que es peor que no tenerlo—. En vez de perseguir ese estado, se le
+   * dan dos gestos que ya conoce de cualquier app de mensajería: deslizar de
+   * lado para la respuesta rápida, mantener pulsado para el resto.
+   *
+   * Los dos se leen con Pointer Events y no con Touch Events: son el mismo
+   * gesto para ratón y dedo, así que no hace falta duplicar el manejo, y
+   * `pointerType` filtra el táctil sin tocar el comportamiento de ratón que
+   * ya tenía la barra.
+   */
+  const ARRASTRE_UMBRAL = 56;
+  const ARRASTRE_TOPE = 84;
+  const PULSACION_LARGA_MS = 450;
+
+  const [arrastreX, setArrastreX] = useState(0);
+  const [hojaMovilAbierta, setHojaMovilAbierta] = useState(false);
+  const gestoRef = useRef({
+    startX: 0,
+    startY: 0,
+    siguiendo: false,
+    /** Se decide en el primer movimiento real: horizontal (desliza) o no (deja pasar el scroll). */
+    esDeslizamiento: false,
+    temporizador: null as ReturnType<typeof setTimeout> | null,
+  });
+
+  function limpiarTemporizador() {
+    if (gestoRef.current.temporizador) {
+      clearTimeout(gestoRef.current.temporizador);
+      gestoRef.current.temporizador = null;
+    }
+  }
+
+  function onGestoInicio(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'touch' || editando || confirmandoBorrado) return;
+    gestoRef.current.startX = e.clientX;
+    gestoRef.current.startY = e.clientY;
+    gestoRef.current.siguiendo = true;
+    gestoRef.current.esDeslizamiento = false;
+    gestoRef.current.temporizador = setTimeout(() => {
+      if (!gestoRef.current.siguiendo) return;
+      gestoRef.current.siguiendo = false;
+      setArrastreX(0);
+      setHojaMovilAbierta(true);
+      navigator.vibrate?.(10);
+    }, PULSACION_LARGA_MS);
+  }
+
+  function onGestoMueve(e: React.PointerEvent<HTMLDivElement>) {
+    if (!gestoRef.current.siguiendo) return;
+    const dx = e.clientX - gestoRef.current.startX;
+    const dy = e.clientY - gestoRef.current.startY;
+
+    if (!gestoRef.current.esDeslizamiento) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      /* Más vertical que horizontal: es el scroll de la conversación, no un
+         deslizamiento. Se suelta el gesto entero y no se vuelve a mirar hasta
+         el próximo `pointerdown`. */
+      if (Math.abs(dy) > Math.abs(dx)) {
+        gestoRef.current.siguiendo = false;
+        limpiarTemporizador();
+        return;
+      }
+      gestoRef.current.esDeslizamiento = true;
+      limpiarTemporizador();
+    }
+
+    setArrastreX(Math.max(-ARRASTRE_TOPE, Math.min(ARRASTRE_TOPE, dx)));
+  }
+
+  function onGestoFin() {
+    limpiarTemporizador();
+    if (gestoRef.current.esDeslizamiento && Math.abs(arrastreX) >= ARRASTRE_UMBRAL) {
+      onResponder(message);
+      navigator.vibrate?.(8);
+    }
+    gestoRef.current.siguiendo = false;
+    gestoRef.current.esDeslizamiento = false;
+    setArrastreX(0);
+  }
+
   /** La burbuja, para saber su posición respecto al contenedor con scroll. */
   const burbujaRef = useRef<HTMLDivElement>(null);
 
@@ -226,7 +313,9 @@ export function MessageBubble({
         <Avatar label={nombre} mine={mine} size="sm" />
       )}
 
-      <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
+      <div
+        className={`relative flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}
+      >
         {!continued && (
           <span className="flex items-baseline gap-2 px-1 font-sans text-xs">
             {hrefDePersona && !mine ? (
@@ -285,6 +374,40 @@ export function MessageBubble({
          * Se nombra (`group/burbuja`) a propósito: sin nombre, cualquier `group`
          * que alguien añada más arriba volvería a capturarlo sin avisar.
          */}
+        {/**
+         * El indicador del deslizamiento: una respuesta ↩ que se hace más
+         * visible cuanto más se arrastra, hasta el umbral que la dispara.
+         *
+         * Vive fuera de `burbujaRef` — es su hermano, no su hijo— para que el
+         * `translateX` de la burbuja no se lo lleve consigo: tiene que
+         * quedarse fijo en el sitio que la burbuja está dejando al descubierto,
+         * no viajar pegado a ella.
+         */}
+        {arrastreX !== 0 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full"
+            style={{
+              [arrastreX > 0 ? 'left' : 'right']: '0.25rem',
+              opacity: Math.min(1, Math.abs(arrastreX) / ARRASTRE_UMBRAL),
+              background: alpha(colors.primary, 18),
+              color: colors.primary,
+            }}
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
+            </svg>
+          </span>
+        )}
+
         <div
           ref={burbujaRef}
           className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
@@ -293,7 +416,7 @@ export function MessageBubble({
              sobre una burbuja que ya no estás mirando, y dejarlos abiertos es lo
              que obligaba a cerrarlos a mano. Cubre además el caso de abrir el
              selector y apartar el ratón sin llegar a entrar en él.
-             
+
              ⚠️ **El editor NO se cierra aquí.** Un redactor abierto se queda
              hasta que se guarde, se cancele o se pulse Esc: cerrarlo al mover el
              ratón hacía que editar fuera imposible — se abría y se cerraba solo
@@ -304,8 +427,22 @@ export function MessageBubble({
             setEligiendoReaccion(false);
             setBarraAbajo(false);
           }}
+          /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
+             como que el sistema cancele el gesto a medias (una llamada
+             entrante, por ejemplo) — sin `onPointerCancel`, la burbuja se
+             quedaría desplazada para siempre. */
+          onPointerDown={onGestoInicio}
+          onPointerMove={onGestoMueve}
+          onPointerUp={onGestoFin}
+          onPointerCancel={onGestoFin}
           style={{
             background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
+            /* `pan-y`: el navegador sigue scrolleando la conversación en
+               vertical de forma nativa: el deslizamiento solo captura el eje
+               horizontal, a mano, con los manejadores de arriba. */
+            touchAction: 'pan-y',
+            transform: arrastreX !== 0 ? `translateX(${arrastreX}px)` : undefined,
+            transition: gestoRef.current.esDeslizamiento ? 'none' : 'transform 150ms ease-out',
             /* La esquina que apunta al avatar se queda cuadrada solo en el
                primero del bloque: es lo que agrupa los mensajes seguidos
                visualmente sin necesidad de separadores. */
@@ -727,7 +864,209 @@ export function MessageBubble({
           </div>
         )}
       </div>
+
+      {/**
+       * La hoja de acciones táctil: lo que la pulsación larga abre.
+       *
+       * Reúne lo mismo que la barra de escritorio —reaccionar, fijar, editar,
+       * responder, abrir el hilo, borrar— en una lista que se pulsa con el
+       * pulgar, en vez de iconos de 16 px pensados para un cursor preciso.
+       */}
+      {hojaMovilAbierta && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Cerrar acciones"
+            onClick={() => {
+              setHojaMovilAbierta(false);
+              setConfirmandoBorrado(false);
+            }}
+            className="fixed inset-0 backdrop-blur-sm"
+            style={{ background: alpha(colors.overlay, 60) }}
+          />
+
+          <div
+            className="fixed inset-x-0 bottom-0 z-10 flex flex-col gap-1 rounded-t-2xl border-t p-3"
+            style={{
+              background: colors.surfaceElevated,
+              borderColor: colors.border,
+              paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              className="mx-auto mb-1 h-1 w-10 rounded-full"
+              style={{ background: colors.border }}
+            />
+
+            {confirmandoBorrado ? (
+              <div className="flex items-center justify-between gap-3 px-2 py-3">
+                <span className="font-sans text-sm text-text-primary">¿Eliminar este mensaje?</span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoBorrado(false)}
+                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm text-text-secondary"
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBorrado(false);
+                      setHojaMovilAbierta(false);
+                      onBorrar(message.id);
+                    }}
+                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm font-semibold"
+                    style={{ background: colors.error, color: colors.textInverse }}
+                  >
+                    Eliminar
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <>
+                {canReact && (
+                  <div
+                    className="flex items-center justify-around border-b pb-3 pt-1"
+                    style={{ borderColor: colors.border }}
+                  >
+                    {CHAT_REACTIONS.map((emoji) => {
+                      const puesta = agrupadas.get(emoji)?.mia ?? false;
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            onReaccionar(message.id, emoji, !puesta);
+                            setHojaMovilAbierta(false);
+                          }}
+                          aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
+                          aria-pressed={puesta}
+                          className="cursor-pointer rounded-full p-1.5 text-2xl leading-none active:scale-90"
+                          style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
+                        >
+                          {emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <HojaBoton
+                  etiqueta="Responder"
+                  onClick={() => {
+                    onResponder(message);
+                    setHojaMovilAbierta(false);
+                  }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
+                </HojaBoton>
+
+                <HojaBoton
+                  etiqueta="Ver hilo"
+                  onClick={() => {
+                    onAbrirHilo(message);
+                    setHojaMovilAbierta(false);
+                  }}
+                >
+                  <rect x="7" y="4" width="10" height="16" rx="2" />
+                  <line x1="7" y1="8" x2="17" y2="8" />
+                  <line x1="7" y1="11" x2="17" y2="11" />
+                  <line x1="7" y1="14" x2="17" y2="14" />
+                  <path d="M5 3.5h14" />
+                  <path d="M5 20.5h14" />
+                </HojaBoton>
+
+                {canFijar && (
+                  <HojaBoton
+                    etiqueta={fijado ? 'Desfijar' : 'Fijar'}
+                    activa={fijado}
+                    onClick={() => {
+                      onFijar(message.id, !fijado);
+                      setHojaMovilAbierta(false);
+                    }}
+                  >
+                    <path d="M12 17v5" />
+                    <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+                  </HojaBoton>
+                )}
+
+                {mine && (
+                  <HojaBoton
+                    etiqueta="Editar"
+                    onClick={() => {
+                      setBorrador(message.body);
+                      setEditando(true);
+                      setHojaMovilAbierta(false);
+                    }}
+                  >
+                    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                  </HojaBoton>
+                )}
+
+                {canDelete && (
+                  <HojaBoton
+                    etiqueta="Eliminar"
+                    destructiva
+                    onClick={() => setConfirmandoBorrado(true)}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                    />
+                  </HojaBoton>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </article>
+  );
+}
+
+/**
+ * Una fila de la hoja de acciones móvil: icono, etiqueta, todo el ancho.
+ *
+ * `children` son los `<path>`/`<rect>`/`<line>` del icono — el mismo trazo
+ * que ya usa la barra de escritorio para la misma acción, sin duplicarlo con
+ * otro juego de iconos que habría que mantener a la par.
+ */
+function HojaBoton({
+  etiqueta,
+  onClick,
+  children,
+  activa = false,
+  destructiva = false,
+}: {
+  etiqueta: string;
+  onClick: () => void;
+  children: ReactNode;
+  activa?: boolean;
+  destructiva?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-3 text-left font-sans text-sm active:bg-overlay/10"
+      style={{ color: destructiva ? colors.error : activa ? colors.primary : colors.textPrimary }}
+    >
+      <svg
+        className="h-5 w-5 shrink-0"
+        viewBox="0 0 24 24"
+        fill={activa ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={activa ? 2 : 1.8}
+        aria-hidden="true"
+      >
+        {children}
+      </svg>
+      {etiqueta}
+    </button>
   );
 }
 

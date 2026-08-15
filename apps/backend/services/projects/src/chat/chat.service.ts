@@ -249,9 +249,11 @@ export class ChatService {
     const newest = await this.prisma.chatMessage.findMany({
       where: {
         channelId: dto.channelId,
-        /* Las respuestas de los hilos viven en el panel del hilo, no en el
-           flujo del chat: aquí solo fluyen los mensajes raíz. */
-        replyToId: null,
+        /* Una respuesta fluye igual que cualquier mensaje, en su sitio
+           cronológico y con su cita — es lo que distingue «responder» de
+           «abrir el hilo». El panel del hilo (`thread()`) sigue existiendo
+           aparte, como una vista filtrada de la conversación de un mensaje,
+           no como el único sitio donde una respuesta es visible. */
         ...(cursorAt && { createdAt: { lt: cursorAt } }),
       },
       orderBy: { createdAt: 'desc' },
