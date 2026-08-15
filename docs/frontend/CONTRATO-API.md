@@ -1335,6 +1335,7 @@ una consulta agregada nueva, hazlo también.
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
+| POST | `/me/assistant/project-draft` | `{ brief }` | ninguno propio, solo `JwtGuard` |
 
 Las dos primeras cuelgan de `/projects/:projectId` para que el guard resuelva el
 proyecto desde la ruta, igual que los reportes. La cuota es **del usuario**, no
@@ -1355,6 +1356,62 @@ que la pantalla ya no enseña. `/me/assistant/quota` **no** cambia — es la cuo
 del usuario, no de ningún proyecto, y Configuración la sigue leyendo sin
 permisos de proyecto.
 
+### `POST /me/assistant/project-draft` — la plantilla de un proyecto nuevo
+
+Cuelga de `/me` por un motivo más fuerte que el de la cuota: **se pide para crear
+un proyecto, así que el proyecto todavía no existe**. No hay `projectId` que
+poner en la ruta ni permisos de proyecto que resolver.
+
+```jsonc
+// Entrada — la primera vez
+{ "brief": "Somos un estudio de arquitectura de seis personas. Llevamos tres obras a la vez..." }
+
+// Entrada — un ajuste sobre lo que ya propuso
+{
+  "brief": "…el mismo de antes…",
+  "ajuste": "Quita el rol de becario y añade un tablero para licencias",
+  "previa": "{\"nombre\":\"Estudio — obras 2026\", …}"  // el plan anterior, en JSON
+}
+
+// Salida (envuelta en { success, data, meta } como todo)
+{
+  "plantilla": {
+    "nombre": "Estudio — obras 2026",
+    "descripcion": "…",
+    "etiquetas": [{ "nombre": "licencias", "color": "warning" }],
+    "roles": [{ "nombre": "Aparejador", "permisos": { "canCreateTask": true } }],
+    "espacios": [
+      { "nombre": "Obras", "tableros": [
+        { "nombre": "Obra Chamberí", "columnas": [
+          { "nombre": "Proyecto" }, { "nombre": "Entregado", "color": "success" }
+        ] }
+      ] }
+    ],
+    "porQue": "Un tablero por obra porque llevas tres a la vez y…"
+  },
+  "cuota": { "plan": "FREE", "usados": 3, "limite": 5 }
+}
+```
+
+- **429** cuota agotada, con la cuota en `details`.
+- **502** Gemini no respondió, o respondió algo inservible. En el primer caso
+  **no se ha consumido cuota**.
+
+⚠️ **`permisos` es un diccionario de booleanos**, no el array que el modelo
+rellena: la conversión la hace assistant-service al validar. Trampa 8.
+
+⚠️ **`color: "success"` en una columna no es un color, es un significado**:
+marca la columna de cierre. El servicio recorta a una sola por tablero.
+
+⚠️ **`previa` es una cadena JSON, no un objeto.** El `ValidationPipe` corre con
+`forbidNonWhitelisted` y un objeto anidado obligaría a seis clases DTO para algo
+que el servicio solo reenvía al modelo como texto del turno anterior. Tope en
+`PLANTILLA_PREVIA_MAX`. Con `ajuste` **y** `previa` ajusta; sin ellos genera de
+cero. **Cuesta una consulta de cuota en los dos casos.**
+
+**No crea nada.** Materializarlo son N peticiones del frontend a los endpoints de
+siempre, y esa lista está abajo.
+
 ### ⚠️ Ninguna de las dos escribe nada
 
 `chat` devuelve **propuestas**, no hechos. Si el asistente dice que ha creado,
@@ -1371,6 +1428,23 @@ existía, con su permiso de siempre:
 | `proponer_movimiento` | `POST /tasks/:id/move` | `canMoveTask` |
 | `proponer_checklist` | `POST /tasks/:id/checklists` | `canEditTask` |
 | `proponer_comentario` | `POST /tasks/:id/comments` | `canComment` |
+
+Y la plantilla de arranque, que no es una `tool` del chat sino la respuesta de
+`project-draft`, se materializa igual — un endpoint por trozo, todos existentes:
+
+| Trozo del plan | Endpoint al aceptar |
+|---|---|
+| `nombre`, `descripcion` | `POST /projects` |
+| `etiquetas[]` | `POST /projects/:id/labels` |
+| `roles[]` | `POST /projects/:id/roles` |
+| `espacios[]` | `POST /projects/:id/workspaces` |
+| `espacios[].tableros[]` | `POST /workspaces/:id/boards` |
+| `…tableros[].columnas[]` | `POST /boards/:id/columns` |
+| El color de una columna | `PATCH /boards/:id/columns/:columnId` |
+
+Sin permiso no hace falta comprobar nada: el proyecto lo acaba de crear quien
+acepta, así que nace con rol de administración y con esa persona dentro
+(trampa 7). Lo ejecuta `commons/plantilla/aplicar.ts`.
 
 **No hay ninguna vía de escritura nueva.** Sin el permiso de la fila, aceptar
 falla igual que le fallaría a esa persona pulsando el botón a mano.

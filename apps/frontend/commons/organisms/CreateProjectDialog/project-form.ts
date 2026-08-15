@@ -11,6 +11,12 @@
  * para que no digan cosas distintas.
  */
 
+import type {
+  PlantillaBorradorState,
+  PlantillaDeProyecto,
+  PlantillaResultado,
+} from '../../api/domain';
+
 export const PROJECT_NAME_MIN = 2;
 export const PROJECT_NAME_MAX = 100;
 export const PROJECT_DESCRIPTION_MAX = 500;
@@ -67,3 +73,25 @@ export type CreateProjectAction = (
   estadoPrevio: CreateProjectState,
   formData: FormData,
 ) => Promise<CreateProjectState>;
+
+/**
+ * Firmas de las dos Server Actions del modo asistido.
+ *
+ * Se inyectan como props por lo mismo que `CreateProjectAction`: cada zona
+ * revalida sus rutas y navega a lo suyo, y el organismo no puede importarlas sin
+ * quedar acoplado a una de las dos.
+ *
+ * ⚠️ **Son opcionales, y el modo asistido solo aparece si llegan las dos.** Sin
+ * una de ellas el diálogo es exactamente el de antes: nombre, descripción y
+ * crear. Así una zona nueva no hereda un botón que no sabe atender, y el modo
+ * puede apagarse desde fuera sin tocar el organismo.
+ */
+export type BorradorDePlantillaAction = (
+  brief: string,
+  /** Un retoque sobre el plan que ya se propuso. Sin esto, genera de cero. */
+  ajuste?: { texto: string; previa: PlantillaDeProyecto },
+) => Promise<PlantillaBorradorState>;
+
+export type AplicarPlantillaAction = (
+  plantilla: PlantillaDeProyecto,
+) => Promise<PlantillaResultado>;

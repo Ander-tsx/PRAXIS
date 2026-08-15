@@ -276,6 +276,36 @@ export const PROJECT_PERMISSIONS = [
 export type ProjectPermission = (typeof PROJECT_PERMISSIONS)[number];
 
 /**
+ * Etiquetas legibles de cada permiso.
+ *
+ * Sube a commons porque ahora las necesitan **dos** sitios: el formulario de
+ * roles de `projects-front`, que las tuvo siempre, y la vista previa de la
+ * plantilla del asistente, que vive en `commons/organisms` y la montan dos
+ * zonas. Enseñar «3 permisos» en vez de cuáles obligaba a crear el proyecto
+ * para descubrir qué se estaba repartiendo.
+ */
+export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
+  canViewProject: 'Ver el proyecto',
+  canCreateBoard: 'Crear tableros',
+  canEditBoard: 'Editar tableros',
+  canDeleteBoard: 'Eliminar tableros',
+  canCreateColumn: 'Crear columnas',
+  canEditColumn: 'Editar columnas',
+  canDeleteColumn: 'Eliminar columnas',
+  canCreateTask: 'Crear tareas',
+  canMoveTask: 'Mover tareas y marcar pasos del checklist',
+  canEditTask: 'Editar tareas',
+  canDeleteTask: 'Eliminar tareas',
+  canManageMembers: 'Gestionar el equipo',
+  canManageRoles: 'Gestionar los roles',
+  canComment: 'Comentar en las tareas',
+  canManageLabels: 'Gestionar las etiquetas',
+  canEditProject: 'Renombrar el proyecto y cambiar su descripción',
+  canViewReports: 'Ver los reportes y usar el asistente',
+  canDeleteProject: 'Eliminar el proyecto',
+};
+
+/**
  * Mapa de permisos de un rol.
  *
  * ⚠️ Es un **diccionario**, nunca un array. El backend lo valida desde que
@@ -794,3 +824,120 @@ export interface ChatContact {
   userId: string;
   proyectos: { id: string; name: string; slug: string; rol: string }[];
 }
+
+/* ─── La plantilla de arranque que propone el asistente ─────────────── */
+
+/**
+ * Lo que devuelve `POST /me/assistant/project-draft`.
+ *
+ * Espejo de `PlantillaDeProyecto` en `@praxis/contracts`. Está copiado por lo
+ * mismo que el resto de este archivo: aquel es un paquete de backend y arrastra
+ * `class-validator` y los decoradores de Nest, que no pintan nada en el
+ * navegador.
+ *
+ * ⚠️ **Esto no es un proyecto: es una propuesta.** No existe hasta que alguien
+ * la acepta, y aceptarla son N llamadas a los endpoints que ya usa cada
+ * formulario —`POST /projects`, `/workspaces`, `/boards`, `/columns`,
+ * `/labels`, `/roles`—, con la sesión de quien pulsa. Es la regla de §26.1: la
+ * IA propone; ejecuta el código que ya existe. Ninguno de estos objetos lleva
+ * `id` porque nada de esto existe todavía.
+ */
+export interface PlantillaEtiqueta {
+  nombre: string;
+  color: LabelColor;
+}
+
+export interface PlantillaRol {
+  nombre: string;
+  /** Diccionario de booleanos, nunca un array. Trampa 8 de CLAUDE.md. */
+  permisos: PermissionMap;
+}
+
+export interface PlantillaColumna {
+  nombre: string;
+  /**
+   * ⚠️ `success` **no es un color, es un significado**: marca la columna de
+   * cierre y una tarea que entra ahí se da por terminada. El backend ya se
+   * encarga de que solo la última lo lleve.
+   */
+  color?: ColumnColor;
+}
+
+export interface PlantillaTablero {
+  nombre: string;
+  columnas: PlantillaColumna[];
+}
+
+export interface PlantillaEspacio {
+  nombre: string;
+  tableros: PlantillaTablero[];
+}
+
+export interface PlantillaDeProyecto {
+  nombre: string;
+  descripcion: string;
+  etiquetas: PlantillaEtiqueta[];
+  roles: PlantillaRol[];
+  espacios: PlantillaEspacio[];
+  /** Por qué esta estructura y no otra. Lo pinta la pantalla junto al plan. */
+  porQue: string;
+}
+
+/** El contador que acompaña al borrador, para pintarlo como hace el chat. */
+export interface PlantillaCuota {
+  plan: string;
+  usados: number;
+  limite: number;
+}
+
+export interface PlantillaDraftResult {
+  plantilla: PlantillaDeProyecto;
+  cuota: PlantillaCuota;
+}
+
+/** Cuánto texto se le pide a quien describe su proyecto. */
+export const PLANTILLA_BRIEF_MIN = 20;
+export const PLANTILLA_BRIEF_MAX = 4000;
+
+/**
+ * Lo que devuelve pedir un borrador. Vive aquí, y no junto a la función que lo
+ * produce, porque el diálogo es un componente de cliente y aquella es código de
+ * servidor: el tipo tiene que poder cruzar esa frontera.
+ */
+export interface PlantillaBorradorState {
+  resultado: PlantillaDraftResult | null;
+  error: string | null;
+  /**
+   * La cuota se acabó.
+   *
+   * Se distingue del resto porque **no se arregla reintentando**, y la pantalla
+   * tiene que decir otra cosa: con un «vuelve a intentarlo» genérico la gente
+   * pulsa el botón otras cinco veces contra un 429.
+   */
+  sinCuota: boolean;
+}
+
+/** Lo que devuelve materializar una plantilla aceptada. */
+export interface PlantillaResultado {
+  /** El proyecto **sí** se creó, aunque algo posterior fallara. */
+  proyecto: { id: string; name: string; slug: string } | null;
+  creado: {
+    etiquetas: number;
+    roles: number;
+    espacios: number;
+    tableros: number;
+    columnas: number;
+  };
+  /**
+   * Lo que no salió, en frases que se puedan enseñar.
+   *
+   * ⚠️ **No se agrupa ni se resume.** «Hubo 3 errores» no le dice a nadie qué le
+   * falta por crear a mano.
+   */
+  fallos: string[];
+  /** Solo cuando no hay proyecto: no se pudo ni empezar. */
+  error: string | null;
+}
+
+/** Cuánto puede ocupar un retoque sobre un plan ya propuesto. */
+export const PLANTILLA_AJUSTE_MAX = 1000;

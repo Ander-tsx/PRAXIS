@@ -122,6 +122,28 @@ un 403 o un desplegable vacío. Ya se coló en cinco sitios.
 
 Lista completa de lo que falta por el lado del backend, con severidad y reproducción, en [PENDIENTES-BACKEND.md](docs/frontend/PENDIENTES-BACKEND.md).
 
+**Formularios: `useAccion`, nunca `useActionState` a pelo.** Está en
+`commons/hooks`, es un reemplazo directo con la misma tupla, y lo usan los 45
+puntos del repo. El `isPending` de React no mide tu petición: mide la transición
+del App Router, que es **una sola para toda la aplicación**, y hay un camino en
+Next 16 por el que su promesa no se resuelve nunca —una navegación encima de una
+acción en vuelo la marca `discarded` y el `resolve` de la cola se salta—. Eso
+sale como **todos los botones girando a la vez sobre un cambio que sí se
+guardó**, sin un error en ninguna consola. `useAccion` mide la espera fuera de esa
+transición. Explicación entera en ESTADO-ACTUAL §35.
+
+**Y `router.refresh()` va por `useRefrescoAgrupado`**, del mismo sitio: cada
+refresco entra en esa misma cola, y tenerla ocupada es lo que destapa el fallo de
+arriba.
+
+**El asistente propone; nunca ejecuta.** Vale para todo lo que se le añada,
+incluida la plantilla de arranque de un proyecto (`POST
+/me/assistant/project-draft`): devuelve parámetros para funciones que ya existen,
+y quien las llama es el frontend, una a una, con la sesión de quien acepta y por
+los endpoints de siempre. Si una capacidad nueva necesita una ruta de escritura
+nueva, está mal planteada. Y **no hay herramienta de borrado**, a propósito y por
+triplicado: detalle en ESTADO-ACTUAL §26.1, §30.3 y §36.2.
+
 ## Estado
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).

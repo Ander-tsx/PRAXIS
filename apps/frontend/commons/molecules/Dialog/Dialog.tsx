@@ -12,14 +12,29 @@ export interface DialogProps {
   children: ReactNode;
   /** Acciones del pie. Normalmente Cancelar + confirmar. */
   footer?: ReactNode;
-  /** `sm` para confirmaciones, `md` por defecto, `lg` para formularios largos. */
-  size?: 'sm' | 'md' | 'lg';
+  /**
+   * `sm` para confirmaciones, `md` por defecto, `lg` para formularios largos y
+   * `xl` para lo que **enseña una estructura**, no un formulario.
+   *
+   * `xl` entró con la vista previa de la plantilla del asistente: un árbol de
+   * espacios → tableros → columnas dentro de 42rem obliga a que cada nivel
+   * envuelva, y un árbol cuyos nombres envuelven deja de leerse como un árbol.
+   * En pantallas estrechas da igual —`max-w` no fuerza ancho— así que no hay
+   * nada que compensar en móvil.
+   *
+   * ⚠️ **48rem y no 56rem.** El primer intento fue `max-w-4xl` y en un monitor
+   * de escritorio el diálogo se comía la pantalla: el árbol cabía de sobra y el
+   * espacio de más solo servía para separar el nombre de un campo de su valor.
+   * Cada escalón es un paso de la escala de Tailwind, no un salto.
+   */
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-3xl',
 } as const;
 
 /**

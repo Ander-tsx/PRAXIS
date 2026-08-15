@@ -1,4 +1,8 @@
-import { createProjectAction } from '@/app/actions';
+import {
+  borradorDePlantillaAction,
+  crearProyectoDesdePlantillaAction,
+  createProjectAction,
+} from '@/app/actions';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
@@ -106,7 +110,13 @@ export default async function DashboardPage() {
     <AppHeader
       title="Panel"
       headerSlot={
-        projects.length > 0 ? <CreateProjectDialog action={createProjectAction} /> : undefined
+        projects.length > 0 ? (
+          <CreateProjectDialog
+            action={createProjectAction}
+            borradorAction={borradorDePlantillaAction}
+            aplicarAction={crearProyectoDesdePlantillaAction}
+          />
+        ) : undefined
       }
     >
       <div className="flex flex-col gap-8">
@@ -135,6 +145,8 @@ export default async function DashboardPage() {
             action={
               <CreateProjectDialog
                 action={createProjectAction}
+                borradorAction={borradorDePlantillaAction}
+                aplicarAction={crearProyectoDesdePlantillaAction}
                 triggerLabel="Crear mi primer proyecto"
                 triggerSize="lg"
               />
