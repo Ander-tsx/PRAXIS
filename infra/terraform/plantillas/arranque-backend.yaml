@@ -62,6 +62,12 @@ write_files:
       # ⚠️ La base de los enlaces de los correos. Sin ella apuntarían a
       # localhost y ninguna confirmación de cuenta funcionaría.
       PUBLIC_APP_URL=${public_app_url}
+      # Los adjuntos del chat. El bucket existe siempre; "postgres" aquí
+      # significa que projects-service lo ignora y sigue guardando en Cloud
+      # SQL, como hasta ahora. Ver activar_gcs_chat en variables.tf.
+      STORAGE_DRIVER=${storage_driver}
+      GCS_PROJECT_ID=${gcs_project_id}
+      GCS_BUCKET=${gcs_bucket}
       LOG_LEVEL=info
       ENV
 

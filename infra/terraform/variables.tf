@@ -131,6 +131,24 @@ variable "borrado_protegido_sql" {
   default     = true
 }
 
+# ────────────────────────── almacenamiento ──────────────────────────
+
+variable "activar_gcs_chat" {
+  description = <<-EOT
+    Activa el proveedor GCS para los adjuntos del chat.
+
+    El bucket se crea siempre (ver storage.tf). Con esto en false —el valor
+    por defecto—, STORAGE_DRIVER sigue en "postgres" y el bucket se queda
+    vacío: crearlo no cambia nada del comportamiento actual.
+
+    ⚠️ Activarlo no migra los adjuntos que ya existen: solo decide dónde se
+    guardan los que se suban DESPUÉS del cambio. Ver el comentario de
+    storage.tf antes de encenderlo en un entorno con datos reales.
+  EOT
+  type        = bool
+  default     = false
+}
+
 # ─────────────────────────── imágenes ───────────────────────────
 
 variable "etiqueta_imagen" {

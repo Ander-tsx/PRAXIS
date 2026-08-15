@@ -51,3 +51,10 @@ dominio = ""
 
 # Cambiar esto y aplicar es lo que despliega una versión nueva de las imágenes.
 etiqueta_imagen = "latest"
+
+# El bucket de adjuntos del chat se crea siempre. Con esto en false (por
+# defecto), projects-service sigue guardando en Cloud SQL, como hasta ahora.
+#
+# ⚠️ Activarlo no migra los adjuntos que ya existen: solo decide dónde se
+# guardan los que se suban DESPUÉS. Ver el comentario de storage.tf.
+activar_gcs_chat = false

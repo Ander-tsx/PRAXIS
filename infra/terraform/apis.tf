@@ -13,6 +13,7 @@ locals {
     "servicenetworking.googleapis.com", # el peering que da IP privada a Cloud SQL
     "secretmanager.googleapis.com",     # los secretos
     "artifactregistry.googleapis.com",  # el registro de imágenes Docker
+    "storage.googleapis.com",           # el bucket de los adjuntos del chat
     "cloudbuild.googleapis.com",        # donde se construyen las imágenes (x86-64)
     "iap.googleapis.com",               # el túnel para entrar por SSH sin IP pública
     "logging.googleapis.com",

@@ -62,6 +62,11 @@ resource "google_compute_instance_template" "backend" {
       google_client_id = var.google_client_id
       mail_from        = var.mail_from
       public_app_url   = "https://${local.dominio}"
+      /* El bucket se crea siempre (storage.tf); el driver solo cambia con la
+         variable. Ver el comentario de activar_gcs_chat en variables.tf. */
+      storage_driver = var.activar_gcs_chat ? "gcs" : "postgres"
+      gcs_project_id = var.proyecto
+      gcs_bucket     = google_storage_bucket.chat_adjuntos.name
     })
   }
 

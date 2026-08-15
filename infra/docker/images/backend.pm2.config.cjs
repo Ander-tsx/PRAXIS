@@ -44,6 +44,12 @@ const {
   /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
      desarrollo, cada confirmación apuntaría a la máquina de quien la abre. */
   PUBLIC_APP_URL = 'http://localhost:4100',
+  /* Los adjuntos del chat. Solo los usa projects-service; el resto de
+     procesos ni los recibe. "postgres" es el mismo valor por defecto que en
+     desarrollo — sin bucket configurado, el driver de GCS ni se instancia. */
+  STORAGE_DRIVER = 'postgres',
+  GCS_PROJECT_ID = '',
+  GCS_BUCKET = '',
   LOG_LEVEL = 'info',
 } = process.env;
 
@@ -141,6 +147,9 @@ module.exports = {
       TCP_PORT: 3003,
       DATABASE_URL: databaseUrl('projects'),
       REDIS_URL,
+      STORAGE_DRIVER,
+      GCS_PROJECT_ID,
+      GCS_BUCKET,
     }),
 
     proceso('tasks', '/app/apps/backend/services/tasks', {
