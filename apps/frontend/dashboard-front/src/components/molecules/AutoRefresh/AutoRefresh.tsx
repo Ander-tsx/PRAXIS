@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRefrescoAgrupado } from '@praxis/commons';
 import { useEffect } from 'react';
 
 export interface AutoRefreshProps {
@@ -9,54 +9,67 @@ export interface AutoRefreshProps {
 }
 
 /**
- * Vuelve a pedir la página cada tanto, para que los avisos aparezcan solos.
+ * Vuelve a pedir la página cada tanto, por si el tiempo real se ha caído.
  *
- * No hay tiempo real: los avisos nacen de acciones de otras personas y no hay
- * canal abierto —ni WebSocket ni SSE— por el que enterarse. Reconsultar es lo
- * que permite la arquitectura de hoy, y para una bandeja llega de sobra.
+ * ## Ya no es la vía principal, y eso cambia lo que debe hacer
  *
- * `router.refresh()` y no `location.reload()`: vuelve a renderizar el Server
- * Component **conservando el estado del cliente**, así que no se pierde lo que
- * haya escrito ni salta el scroll. La página es un Server Component; sin este
- * empujón se quedaría con los datos del primer render hasta navegar.
+ * Cuando se escribió esto no había canal abierto y reconsultar era la única
+ * forma de enterarse. Ahora `AvisosEnVivo` mantiene un flujo SSE desde el
+ * armazón —una conexión por persona, viva en todas las pantallas— y refresca la
+ * ruta con cada aviso que llega. La bandeja se pone al día **en el momento**, no
+ * al minuto.
+ *
+ * Lo que queda aquí es la red de seguridad: si Redis o el flujo se caen, el
+ * `EventSource` reconecta solo pero puede perderse lo publicado mientras estaba
+ * fuera. Un repaso de vez en cuando lo recupera.
+ *
+ * ⚠️ **Por eso el intervalo es largo y no corto.** Cada refresco entra en la
+ * misma cola global que las Server Actions, y tenerla ocupada es lo que destapa
+ * el fallo del botón que gira para siempre —explicado en
+ * `commons/hooks/useAccion`—. Un sondeo frecuente sobre algo que ya llega solo
+ * es coste puro: paga la carrera y no aporta nada.
+ *
+ * Va por [`useRefrescoAgrupado`], como todo lo demás, para que un repaso que
+ * caiga justo encima de un aviso del flujo sea **un** refresco y no dos.
  *
  * ⚠️ **Se pausa con la pestaña oculta.** Sin eso, veinte pestañas olvidadas
- * seguirían pidiendo cada minuto para nadie. Al volver refresca en el acto, que
- * además es justo cuando la persona quiere ver lo nuevo.
+ * seguirían pidiendo para nadie. Al volver refresca en el acto, que además es
+ * justo cuando la persona quiere ver lo nuevo.
  */
 export function AutoRefresh({ seconds }: AutoRefreshProps) {
-  const router = useRouter();
+  const pedirRefresco = useRefrescoAgrupado();
 
   useEffect(() => {
-    const period = seconds * 1000;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    const periodo = seconds * 1000;
+    let temporizador: ReturnType<typeof setInterval> | undefined;
 
-    function stop() {
-      if (timer) clearInterval(timer);
-      timer = undefined;
-    }
-    function start() {
-      stop();
-      timer = setInterval(() => router.refresh(), period);
+    function parar() {
+      if (temporizador) clearInterval(temporizador);
+      temporizador = undefined;
     }
 
-    function onVisibility() {
+    function arrancar() {
+      parar();
+      temporizador = setInterval(pedirRefresco, periodo);
+    }
+
+    function alCambiarVisibilidad() {
       if (document.hidden) {
-        stop();
+        parar();
         return;
       }
-      router.refresh();
-      start();
+      pedirRefresco();
+      arrancar();
     }
 
-    if (!document.hidden) start();
-    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) arrancar();
+    document.addEventListener('visibilitychange', alCambiarVisibilidad);
 
     return () => {
-      stop();
-      document.removeEventListener('visibilitychange', onVisibility);
+      parar();
+      document.removeEventListener('visibilitychange', alCambiarVisibilidad);
     };
-  }, [router, seconds]);
+  }, [pedirRefresco, seconds]);
 
   return null;
 }

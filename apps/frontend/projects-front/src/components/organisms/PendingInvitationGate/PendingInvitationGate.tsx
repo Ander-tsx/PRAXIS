@@ -2,8 +2,7 @@
 
 import { respondInvitationAction } from '@/app/(private)/[id]/invitation-actions';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
-import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
-import { useActionState } from 'react';
+import { Badge, Button, type MyInvitation, alpha, colors, useAccion } from '@praxis/commons';
 
 export interface PendingInvitationGateProps {
   invitation: MyInvitation;
@@ -22,7 +21,7 @@ export interface PendingInvitationGateProps {
  * buscar otra vez lo que ya tenía delante.
  */
 export function PendingInvitationGate({ invitation }: PendingInvitationGateProps) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAccion(
     respondInvitationAction,
     INVITATION_RESPONSE_INITIAL_STATE,
   );

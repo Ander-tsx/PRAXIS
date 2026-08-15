@@ -6,8 +6,8 @@ import {
   projectInventoryAction,
 } from '@/app/(private)/[id]/actions';
 import { DELETE_PROJECT_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState, useTransition } from 'react';
+import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useId, useState, useTransition } from 'react';
 
 export interface DeleteProjectButtonProps {
   projectId: string;
@@ -42,9 +42,13 @@ interface Line {
  *   diálogo, porque contar tareas obliga a una petición por tablero y sería
  *   trabajo tirado en las visitas donde nadie borra nada.
  * - **Hay que escribir el nombre**, como en GitHub y como ya hace
- *   `DeleteWorkspaceButton` cuando el espacio no está vacío. Aquí es **siempre**:
- *   un proyecto nunca está lo bastante vacío como para que preguntar sea
- *   ceremonia.
+ *   `PanelDeEntidad` con un espacio o un tablero que no estén vacíos. Aquí es
+ *   **siempre**: un proyecto nunca está lo bastante vacío como para que
+ *   preguntar sea ceremonia.
+ *
+ * Este sí se queda como botón visible, y no detrás de un menú como los otros
+ * dos: es la única acción de su nivel —no hay «los proyectos» dentro de un
+ * proyecto— y esconderla obligaría a inventar un menú para un solo elemento.
  * - Y si algo no se pudo contar se dice, en lugar de escribir un cero. En una
  *   confirmación de borrado, decir «0 tareas» cuando son siete es peor que
  *   admitir que no se sabe.
@@ -68,10 +72,7 @@ export function DeleteProjectButton({
   const [inventory, setInventory] = useState<ProjectInventory | null>(null);
   const [counting, startCounting] = useTransition();
 
-  const [state, formAction, pending] = useActionState(
-    deleteProjectAction,
-    DELETE_PROJECT_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(deleteProjectAction, DELETE_PROJECT_INITIAL_STATE);
 
   const confirmId = useId();
   const canDelete = confirmation.trim() === projectName;

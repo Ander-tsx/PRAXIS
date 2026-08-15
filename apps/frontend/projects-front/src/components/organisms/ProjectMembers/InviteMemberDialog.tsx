@@ -13,9 +13,10 @@ import {
   alpha,
   colors,
   personLabel,
+  useAccion,
 } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons/api';
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 export interface InviteMemberDialogProps {
   projectId: string;
@@ -48,7 +49,7 @@ const MAX_RESULTS = 6;
  */
 export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMemberDialogProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(inviteMemberAction, MEMBER_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
   /** `null` mientras no se ha buscado: distingue "sin buscar" de "sin resultados". */
@@ -71,7 +72,7 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
    * envió. La primera vez sí funciona, porque ahí pasa de `null` a `'invited'`:
    * de ahí que pareciera aleatorio.
    *
-   * `useActionState` devuelve un objeto nuevo por cada ejecución, así que su
+   * `useAccion` devuelve un objeto nuevo por cada ejecución, así que su
    * identidad sí cambia siempre. La guarda de dentro sigue siendo la que decide
    * —si la acción falló, `done` es `null` y no se cierra nada—.
    *

@@ -3,8 +3,8 @@
 import { generateSeedPhraseAction, revokeVoiceLinkAction } from '@/app/(private)/settings/actions';
 import { VOICE_LINK_INITIAL_STATE } from '@/lib/action-state';
 import { type VoiceLink, estaActiva, formatoCuentaAtras, formatoFecha } from '@/lib/voice';
-import { Badge, Button, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { Badge, Button, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface VoiceLinkingProps {
   /** Vinculaciones que ya existen. Las pinta el Server Component de la pantalla. */
@@ -40,11 +40,8 @@ export interface VoiceLinkingProps {
  * equivoca además en todo lo que tarde la respuesta en llegar.
  */
 export function VoiceLinking({ links, sinConexion = false }: VoiceLinkingProps) {
-  const [state, generar, generando] = useActionState(
-    generateSeedPhraseAction,
-    VOICE_LINK_INITIAL_STATE,
-  );
-  const [revocacion, revocar, revocando] = useActionState(
+  const [state, generar, generando] = useAccion(generateSeedPhraseAction, VOICE_LINK_INITIAL_STATE);
+  const [revocacion, revocar, revocando] = useAccion(
     revokeVoiceLinkAction,
     VOICE_LINK_INITIAL_STATE,
   );

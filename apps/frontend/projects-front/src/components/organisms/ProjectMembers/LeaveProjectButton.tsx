@@ -2,8 +2,8 @@
 
 import { leaveProjectAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, alpha, colors } from '@praxis/commons';
-import { useActionState, useState } from 'react';
+import { Button, Dialog, alpha, colors, useAccion } from '@praxis/commons';
+import { useState } from 'react';
 
 export interface LeaveProjectButtonProps {
   projectId: string;
@@ -20,7 +20,7 @@ export interface LeaveProjectButtonProps {
  */
 export function LeaveProjectButton({ projectId, projectName }: LeaveProjectButtonProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(leaveProjectAction, MEMBER_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(leaveProjectAction, MEMBER_INITIAL_STATE);
 
   return (
     <>

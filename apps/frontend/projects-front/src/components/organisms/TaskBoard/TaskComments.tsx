@@ -6,8 +6,15 @@ import {
   editCommentAction,
 } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
-import { type TaskComment, type UserProfile, alpha, colors, personLabel } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import {
+  type TaskComment,
+  type UserProfile,
+  alpha,
+  colors,
+  personLabel,
+  useAccion,
+} from '@praxis/commons';
+import { useEffect, useRef, useState } from 'react';
 import { SECTION_PANEL } from './section-panel';
 
 /**
@@ -50,7 +57,7 @@ export function TaskComments({
   canComment,
   canModerate,
 }: TaskCommentsProps) {
-  const [state, formAction, pending] = useActionState(addCommentAction, TASK_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(addCommentAction, TASK_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
   /** Se vacía al confirmar, no al enviar: si falla, lo escrito sigue ahí. */
@@ -143,11 +150,8 @@ function CommentRow({
   canDelete: boolean;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editState, editAction, saving] = useActionState(editCommentAction, TASK_INITIAL_STATE);
-  const [deleteState, deleteAction, deleting] = useActionState(
-    deleteCommentAction,
-    TASK_INITIAL_STATE,
-  );
+  const [editState, editAction, saving] = useAccion(editCommentAction, TASK_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useAccion(deleteCommentAction, TASK_INITIAL_STATE);
 
   /** Sale del modo edición cuando el servidor confirma, no al enviar. */
   useEffect(() => {

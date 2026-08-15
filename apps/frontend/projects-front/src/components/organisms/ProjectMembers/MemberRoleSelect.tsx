@@ -2,8 +2,8 @@
 
 import { changeMemberRoleAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
-import { type ProjectRole, Select } from '@praxis/commons';
-import { useActionState, useRef, useState } from 'react';
+import { type ProjectRole, Select, useAccion } from '@praxis/commons';
+import { useRef, useState } from 'react';
 
 /**
  * El rol de un miembro, editable en su propia fila.
@@ -35,7 +35,7 @@ export function MemberRoleSelect({
   /** Nombre de la persona, para el texto accesible. */
   label: string;
 }) {
-  const [state, action, pending] = useActionState(changeMemberRoleAction, MEMBER_INITIAL_STATE);
+  const [state, action, pending] = useAccion(changeMemberRoleAction, MEMBER_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
   /**

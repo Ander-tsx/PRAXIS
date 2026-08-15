@@ -9,8 +9,8 @@ import {
   alpha,
   colors,
   personLabel,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState } from 'react';
 
 export interface PendingInvitationsProps {
   projectId: string;
@@ -83,7 +83,7 @@ export function PendingInvitations({
 }
 
 function CancelButton({ projectId, invitationId }: { projectId: string; invitationId: string }) {
-  const [state, formAction, pending] = useActionState(cancelInvitationAction, MEMBER_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(cancelInvitationAction, MEMBER_INITIAL_STATE);
 
   return (
     <form action={formAction}>

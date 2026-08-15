@@ -6,8 +6,16 @@ import {
   toggleChecklistItemAction,
 } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
-import { Input, ProgressBar, type Task, alpha, checklistProgress, colors } from '@praxis/commons';
-import { useActionState, useEffect, useRef } from 'react';
+import {
+  Input,
+  ProgressBar,
+  type Task,
+  alpha,
+  checklistProgress,
+  colors,
+  useAccion,
+} from '@praxis/commons';
+import { useEffect, useRef } from 'react';
 
 export interface TaskChecklistProps {
   projectId: string;
@@ -38,7 +46,7 @@ export interface TaskChecklistProps {
  */
 export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskChecklistProps) {
   const { done, total } = checklistProgress(task);
-  const [addState, addAction, adding] = useActionState(addChecklistItemAction, TASK_INITIAL_STATE);
+  const [addState, addAction, adding] = useAccion(addChecklistItemAction, TASK_INITIAL_STATE);
   const addFormRef = useRef<HTMLFormElement>(null);
 
   /**
@@ -151,11 +159,11 @@ function ChecklistRow({
   canEdit: boolean;
   canToggle: boolean;
 }) {
-  const [toggleState, toggleAction, toggling] = useActionState(
+  const [toggleState, toggleAction, toggling] = useAccion(
     toggleChecklistItemAction,
     TASK_INITIAL_STATE,
   );
-  const [deleteState, deleteAction, deleting] = useActionState(
+  const [deleteState, deleteAction, deleting] = useAccion(
     deleteChecklistItemAction,
     TASK_INITIAL_STATE,
   );

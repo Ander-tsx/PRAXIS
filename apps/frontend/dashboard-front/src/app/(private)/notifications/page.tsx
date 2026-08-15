@@ -14,8 +14,16 @@ export const metadata: Metadata = {
   title: 'Notificaciones',
 };
 
-/** Cada cuánto se vuelve a pedir la bandeja. Ver `AutoRefresh`. */
-const REFRESH_SECONDS = 60;
+/**
+ * Cada cuánto se repasa la bandeja **por si acaso**.
+ *
+ * Eran 60 s de cuando este sondeo era la única forma de enterarse. Hoy el flujo
+ * SSE de `AvisosEnVivo` refresca la ruta en cuanto llega un aviso, así que esto
+ * solo cubre lo que se pierda si el flujo se cae: cinco minutos es de sobra para
+ * eso, y ahorra los refrescos que competían con las Server Actions. Ver
+ * `AutoRefresh`.
+ */
+const REFRESH_SECONDS = 300;
 
 /**
  * Cuántos avisos por página.

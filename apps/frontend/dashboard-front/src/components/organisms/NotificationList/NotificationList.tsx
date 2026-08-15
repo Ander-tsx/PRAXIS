@@ -12,8 +12,8 @@ import {
   alpha,
   colors,
   personLabel,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState } from 'react';
 
 export interface NotificationListProps {
   notifications: AppNotification[];
@@ -35,7 +35,7 @@ export interface NotificationListProps {
  * quince avisos, media bandeja en negrita no distingue nada.
  */
 export function NotificationList({ notifications, unread, usersById }: NotificationListProps) {
-  const [allState, markAllAction, markingAll] = useActionState(
+  const [allState, markAllAction, markingAll] = useAccion(
     markAllNotificationsReadAction,
     NOTIFICATION_INITIAL_STATE,
   );
@@ -102,7 +102,7 @@ function NotificationRow({
   notification: AppNotification;
   actor: UserProfile | undefined;
 }) {
-  const [state, markReadAction, marking] = useActionState(
+  const [state, markReadAction, marking] = useAccion(
     markNotificationReadAction,
     NOTIFICATION_INITIAL_STATE,
   );

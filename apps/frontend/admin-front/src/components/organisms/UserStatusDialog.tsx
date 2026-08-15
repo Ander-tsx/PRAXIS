@@ -3,8 +3,8 @@
 import { setUserStatusAction } from '@/app/(private)/actions';
 import { ADMIN_USER_INITIAL_STATE } from '@/lib/action-state';
 import { ESTADOS, nombreDe } from '@/lib/admin';
-import { type AdminUser, Button, Dialog, Textarea } from '@praxis/commons';
-import { useActionState, useEffect } from 'react';
+import { type AdminUser, Button, Dialog, Textarea, useAccion } from '@praxis/commons';
+import { useEffect } from 'react';
 
 export interface UserStatusDialogProps {
   usuario: AdminUser;
@@ -34,10 +34,7 @@ export interface UserStatusDialogProps {
  * de React y el formulario se queda mudo (ESTADO-ACTUAL §17.6).
  */
 export function UserStatusDialog({ usuario, open, onClose }: UserStatusDialogProps) {
-  const [state, formAction, pending] = useActionState(
-    setUserStatusAction,
-    ADMIN_USER_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(setUserStatusAction, ADMIN_USER_INITIAL_STATE);
 
   const activa = usuario.status === 'ACTIVE';
   const nuevoEstado = activa ? 'SUSPENDED' : 'ACTIVE';

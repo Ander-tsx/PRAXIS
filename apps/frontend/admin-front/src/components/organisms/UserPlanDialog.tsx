@@ -11,8 +11,9 @@ import {
   Dialog,
   Select,
   Textarea,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface UserPlanDialogProps {
   usuario: AdminUser;
@@ -40,10 +41,7 @@ const DESCRIPCION: Record<AssistantPlanName, string> = {
  * cuenta— pero el servidor la aplica igualmente.
  */
 export function UserPlanDialog({ usuario, open, onClose }: UserPlanDialogProps) {
-  const [state, formAction, pending] = useActionState(
-    setAssistantPlanAction,
-    ADMIN_USER_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(setAssistantPlanAction, ADMIN_USER_INITIAL_STATE);
 
   const [elegido, setElegido] = useState<AssistantPlanName>(usuario.assistantPlan);
 

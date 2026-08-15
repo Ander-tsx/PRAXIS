@@ -3,8 +3,8 @@
 import { updateProfileAction } from '@/app/(private)/settings/actions';
 import { UPDATE_PROFILE_INITIAL_STATE } from '@/lib/action-state';
 import { NAME_MAX, validateProfile } from '@/lib/validation';
-import { Button, Input, alpha, colors } from '@praxis/commons';
-import { useActionState, useId, useState } from 'react';
+import { Button, Input, alpha, colors, useAccion } from '@praxis/commons';
+import { useId, useState } from 'react';
 
 export interface ProfileFormProps {
   email: string;
@@ -19,10 +19,7 @@ export interface ProfileFormProps {
  * Se muestra deshabilitado para que quede claro de qué cuenta hablamos.
  */
 export function ProfileForm({ email, initialFirstName, initialLastName }: ProfileFormProps) {
-  const [state, formAction, pending] = useActionState(
-    updateProfileAction,
-    UPDATE_PROFILE_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(updateProfileAction, UPDATE_PROFILE_INITIAL_STATE);
 
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);

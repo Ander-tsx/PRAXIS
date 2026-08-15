@@ -13,8 +13,9 @@ import {
   isPreviewableImage,
   isViewablePdf,
   personLabel,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { PdfViewer } from './PdfViewer';
 import { SECTION_PANEL } from './section-panel';
 
@@ -46,7 +47,7 @@ export function TaskAttachments({
   canUpload,
   canModerate,
 }: TaskAttachmentsProps) {
-  const [state, formAction, uploading] = useActionState(uploadAttachmentAction, TASK_INITIAL_STATE);
+  const [state, formAction, uploading] = useAccion(uploadAttachmentAction, TASK_INITIAL_STATE);
   const formRef = useRef<HTMLFormElement>(null);
 
   /** Se limpia al confirmar el servidor, para poder subir otro seguido. */
@@ -136,10 +137,7 @@ function AttachmentRow({
   taskId: string;
   canDelete: boolean;
 }) {
-  const [state, deleteAction, deleting] = useActionState(
-    deleteAttachmentAction,
-    TASK_INITIAL_STATE,
-  );
+  const [state, deleteAction, deleting] = useAccion(deleteAttachmentAction, TASK_INITIAL_STATE);
 
   /** Mismo origen que la aplicación: la cookie de sesión viaja sola. */
   const href = `/projects/api/gateway/tasks/${taskId}/attachments/${file.id}/content`;

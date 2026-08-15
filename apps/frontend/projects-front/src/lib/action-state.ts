@@ -1,6 +1,6 @@
 /**
  * Estado de las Server Actions que consumen los formularios con
- * `useActionState`.
+ * `useAccion`.
  *
  * Vive fuera de los `actions.ts` porque **un archivo `'use server'` solo puede
  * exportar funciones async**: exportar de ahí una constante rompe el módulo
