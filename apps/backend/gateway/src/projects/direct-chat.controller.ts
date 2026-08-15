@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,19 +9,38 @@ import {
   Inject,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Request,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  CHAT_ATTACHMENT_ALLOWED_MIME,
+  CHAT_ATTACHMENT_MAX_BYTES,
+  EditChatMessageBodyDto,
   FindChatMessagesQueryDto,
   MuteChatBodyDto,
+  PinChatMessageBodyDto,
   ReactChatBodyDto,
   SendChatMessageBodyDto,
+  isChatAttachmentInlineMime,
+  validarFirmaChatAdjunto,
 } from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { MentionablesService } from './mentionables.service';
@@ -146,6 +166,144 @@ export class DirectChatController {
     );
   }
 
+  /**
+   * El hilo de un mensaje de una conversación privada.
+   *
+   * La autorización la hace `ChannelsService.directo()` como en el resto de la
+   * conversación: solo puedes abrir el hilo de un mensaje de alguien con quien
+   * compartes proyecto.
+   */
+  @Get(':peerId/messages/:id/thread')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'El mensaje y sus respuestas, en orden' })
+  @ApiResponse({ status: 200, description: '{ root, replies }' })
+  thread(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_thread' },
+        { messageId: id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
+  /**
+   * Sube un archivo a una conversación privada, como borrador.
+   *
+   * ⚠️ La autorización no está aquí: está en `ChannelsService.directo()`, que
+   * comprueba que compartes un proyecto con `peerId` antes de resolver el canal.
+   * El `requesterId` sale del token; `peerId`, de la ruta. Sin esa regla en el
+   * servicio, esto sería mensajería abierta a toda la plataforma.
+   */
+  @Post(':peerId/attachments')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: CHAT_ATTACHMENT_MAX_BYTES, files: 1 },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube un archivo a la conversación (queda en borrador)' })
+  @ApiResponse({ status: 201, description: 'Metadatos del adjunto' })
+  upload(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Request() req: Express.Request,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No llegó ningún archivo en el campo «file»');
+    }
+    if (!(CHAT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
+      throw new BadRequestException('Solo se admiten imágenes, vídeo, PDF, texto, ZIP y Office.');
+    }
+    if (file.size === 0) {
+      throw new BadRequestException('El archivo está vacío');
+    }
+    /* El `mimetype` lo declara quien sube: se comprueba la firma de los bytes
+       contra el tipo declarado antes de aceptarlo. */
+    if (!validarFirmaChatAdjunto(file.mimetype, file.buffer)) {
+      throw new BadRequestException('Ese archivo no es lo que parece por el nombre.');
+    }
+
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_attachment_create' },
+        {
+          peerId,
+          requesterId: req.user!.userId,
+          filename: sanitizeFilename(file.originalname),
+          mimeType: file.mimetype,
+          size: file.size,
+          content: file.buffer.toString('base64'),
+        },
+      ),
+    );
+  }
+
+  @Get(':peerId/attachments/:id/content')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Descarga el contenido de un adjunto de la conversación' })
+  @ApiResponse({ status: 200, description: 'Bytes del archivo' })
+  async download(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+    @Res() res: Response,
+  ) {
+    const file = await firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_attachment_get_content' },
+        { id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+
+    const buffer = Buffer.from(file.content, 'base64');
+    const disposition = isChatAttachmentInlineMime(file.mimeType) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    /* El PDF en línea va dentro de un sandbox sin `allow-same-origin`: ver el
+       comentario del visor en `attachments.controller.ts` de tareas. */
+    res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-downloads');
+    res.setHeader(
+      'Content-Disposition',
+      `${disposition}; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+    );
+    res.setHeader('Cache-Control', 'private, max-age=300');
+
+    res.end(buffer);
+  }
+
+  /**
+   * Borra un adjunto **propio**.
+   *
+   * En privado no hay moderación —es el mismo criterio que el borrado de
+   * mensajes—: el servicio fija `canModerate` en `false`.
+   */
+  @Delete(':peerId/attachments/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borra un adjunto propio de la conversación' })
+  @ApiResponse({ status: 200, description: 'Adjunto eliminado' })
+  deleteAttachment(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_attachment_delete' },
+        { id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
   @Post(':peerId/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deja la conversación por leída' })
@@ -195,6 +353,55 @@ export class DirectChatController {
   }
 
   /**
+   * Fija o desfija un mensaje de la conversación.
+   *
+   * Igual que reaccionar: cualquiera de los dos puede fijar, no hay nada que
+   * moderar en un chat de dos.
+   */
+  @Post(':peerId/messages/:id/pin')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Fija o desfija un mensaje de la conversación' })
+  @ApiResponse({ status: 200, description: '{ messageId, pinned, pinnedById }' })
+  pin(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+    @Body() body: PinChatMessageBodyDto,
+  ) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_pin' },
+        { ...body, messageId: id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
+  /**
+   * Edita el texto de un mensaje propio de la conversación.
+   *
+   * La autoría la comprueba projects-service —editar el de otro no encuentra
+   * fila—, así que aquí no hace falta más que sesión: quien escribe ya compartió
+   * proyecto con quien lee.
+   */
+  @Patch(':peerId/messages/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Edita el texto de un mensaje propio de la conversación' })
+  @ApiResponse({ status: 200, description: 'Mensaje editado' })
+  edit(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Param('id') id: string,
+    @Request() req: Express.Request,
+    @Body() body: EditChatMessageBodyDto,
+  ) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_edit' },
+        { ...body, id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
+  /**
    * Borra un mensaje **propio**.
    *
    * En privado no hay moderación: no existe un rol por encima de una
@@ -217,4 +424,20 @@ export class DirectChatController {
       ),
     );
   }
+}
+
+/**
+ * Deja el nombre en algo seguro de devolver en una cabecera.
+ *
+ * Quita separadores de ruta —un `../` en el nombre no debe poder salir de
+ * ningún sitio— y los caracteres de control, que romperían la cabecera.
+ */
+function sanitizeFilename(name: string): string {
+  const clean = name
+    .replace(/[/\\]/g, '_')
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: es justo lo que hay que quitar
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .trim();
+
+  return clean.slice(0, 255) || 'archivo';
 }

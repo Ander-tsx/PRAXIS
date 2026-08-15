@@ -86,6 +86,8 @@ export default function LoginPage() {
         setGlobalError('Credenciales inválidas. Verifica tu email y contraseña.');
       } else if (res.status === 400) {
         setGlobalError(data?.message ?? 'Los datos enviados no son válidos.');
+      } else if (res.status === 429) {
+        setGlobalError(data?.message ?? 'Demasiados intentos. Espera un minuto.');
       } else {
         setGlobalError('Ocurrió un error al iniciar sesión. Intenta de nuevo.');
       }

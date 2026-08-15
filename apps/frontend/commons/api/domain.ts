@@ -490,6 +490,40 @@ export interface TaskComment {
 export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
+ * Tope por archivo en el chat, espejo de `CHAT_ATTACHMENT_MAX_BYTES`.
+ *
+ * El doble que el de tareas: un vídeo en calidad de móvil ronda los 15–40 MB.
+ */
+export const CHAT_ATTACHMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Cuántos archivos puede llevar un mensaje. Espejo del backend. */
+export const CHAT_ATTACHMENT_MAX_PER_MESSAGE = 5;
+
+/**
+ * Tipos admitidos en el chat, espejo del backend.
+ *
+ * Imágenes, vídeo, PDF, texto, ZIP y Office — la lista vieja de tareas más el
+ * vídeo. El SVG **no entra**: es XML con scripts, y servirlo desde el mismo
+ * origen que la aplicación sería XSS.
+ */
+export const CHAT_ATTACHMENT_ALLOWED_MIME = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const;
+
+/**
  * Tipos admitidos: **solo PDF**. Espejo del backend, que además comprueba la
  * firma del archivo y no solo lo que declare el navegador.
  */
@@ -781,9 +815,42 @@ export interface ChatMessage {
   authorId: string;
   body: string;
   createdAt: string;
+  /** `null` mientras no se ha reescrito. Para la marca «editado». */
+  editedAt: string | null;
+  /** `null` mientras no está fijado. Para la marca y la lista de anclados. */
+  pinnedAt: string | null;
+  /** Quién lo fijó, para el «fijado por» de la marca. */
+  pinnedById: string | null;
   /** A qué mensaje responde, con lo justo para pintar la cita. */
   replyTo: { id: string; authorId: string; body: string } | null;
+  /** Cuántas respuestas tiene su hilo. Para la marca «N respuestas». */
+  _count: { replies: number };
   reactions: ChatReaction[];
+  /** Archivos que viajan con el mensaje, sin bytes: ver `ChatAttachment`. */
+  attachments: ChatAttachment[];
+}
+
+/**
+ * Un archivo compartido en el chat.
+ *
+ * Los metadatos viajan con el mensaje; los bytes se piden aparte con
+ * `chatAttachmentHref` cuando toca pintarlos.
+ *
+ * ⚠️ **Los nombres de archivo no se interpolan nunca en HTML.** Son datos del
+ * usuario en el origen de la página: se pintan con React, que los escapa.
+ */
+export interface ChatAttachment {
+  id: string;
+  channelId: string;
+  /** `null` mientras es un borrador sin mensaje; al enviarlo queda fijado. */
+  messageId: string | null;
+  filename: string;
+  mimeType: string;
+  /** En bytes. Lo usa la tarjeta para abreviar «2,4 MB». */
+  size: number;
+  /** Quién lo subió. Para el «lo borra su autor». */
+  uploadedBy: string;
+  createdAt: string;
 }
 
 /** Lo que devuelve la lista de mensajes, de proyecto o privada. */

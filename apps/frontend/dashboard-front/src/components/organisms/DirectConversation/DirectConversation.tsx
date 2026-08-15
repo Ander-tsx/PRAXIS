@@ -1,11 +1,16 @@
 'use client';
 
 import {
+  deleteDirectAttachmentAction,
   deleteDirectMessageAction,
+  editDirectAction,
   markDirectReadAction,
   muteDirectAction,
+  pinDirectAction,
+  previewDeEnlaceAction,
   reactDirectAction,
   sendDirectMessageAction,
+  uploadDirectAttachmentAction,
 } from '@/app/(private)/chat/actions';
 import { Badge, type ChatMessagePage, ChatPanel, type UserProfile } from '@praxis/commons';
 import { useMemo, useState } from 'react';
@@ -41,12 +46,17 @@ export function DirectConversation({
      recreadas en cada render, marcaría como leído en bucle. */
   const acciones = useMemo(
     () => ({
-      enviar: (cuerpo: string, replyToId: string | null) =>
-        sendDirectMessageAction(peerId, cuerpo, replyToId),
+      enviar: (cuerpo: string, replyToId: string | null, attachmentIds: string[]) =>
+        sendDirectMessageAction(peerId, cuerpo, replyToId, attachmentIds),
       borrar: (messageId: string) => deleteDirectMessageAction(peerId, messageId),
       reaccionar: (messageId: string, emoji: string, on: boolean) =>
         reactDirectAction(peerId, messageId, emoji, on),
+      fijar: (messageId: string, on: boolean) => pinDirectAction(peerId, messageId, on),
+      editar: (messageId: string, body: string) => editDirectAction(peerId, messageId, body),
       marcarLeido: () => markDirectReadAction(peerId),
+      adjuntar: (file: File) => uploadDirectAttachmentAction(peerId, file),
+      quitarAdjunto: (attachmentId: string) => deleteDirectAttachmentAction(peerId, attachmentId),
+      previewDeLink: previewDeEnlaceAction,
     }),
     [peerId],
   );

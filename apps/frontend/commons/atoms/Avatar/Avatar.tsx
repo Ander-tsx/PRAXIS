@@ -80,8 +80,8 @@ export function Avatar({
  * nombre y cae al correo— sí se usan sus dos primeras letras.
  */
 export function iniciales(label: string): string {
-  const words = label.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0].slice(0, 2);
-  return words[0][0] + words[1][0];
+  const [primera, segunda] = label.trim().split(/\s+/).filter(Boolean);
+  if (!primera) return '?';
+  if (!segunda) return primera.slice(0, 2);
+  return primera.charAt(0) + segunda.charAt(0);
 }

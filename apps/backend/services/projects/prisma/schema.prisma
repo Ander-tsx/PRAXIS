@@ -315,6 +315,7 @@ model ChatChannel {
 
   states   ChatChannelState[]
   messages ChatMessage[]
+  attachments ChatAttachment[]
 
   @@unique([directUserA, directUserB])
   /// La bandeja de conversaciones de alguien: las suyas, por los dos lados.
@@ -384,6 +385,13 @@ model ChatMessage {
   authorId String
   body     String
 
+  /// Cuándo se editó por última vez. `null` mientras no se ha tocado.
+  ///
+  /// Editar **no cambia el autor ni el momento original**: solo se marca que el
+  /// texto se reescribió después, para que la marca «editado» no mienta. Un
+  /// mensaje editado sigue respondiendo a lo que respondía y sigue donde estaba.
+  editedAt DateTime?
+
   /// A qué mensaje responde.
   ///
   /// `SetNull` y no `Cascade`: borrar un mensaje **no** puede llevarse por
@@ -393,17 +401,89 @@ model ChatMessage {
   replyTo   ChatMessage?  @relation("respuestas", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   replies   ChatMessage[] @relation("respuestas")
 
+  /// Cuándo se fijó. `null` mientras no está fijado.
+  ///
+  /// Fijar no cambia el texto: deja el mensaje anclado a la conversación para
+  /// que no se pierda en el historial. La lista de fijados es «los que no son
+  /// nulos», y el índice de abajo es justo lo que la lee.
+  pinnedAt DateTime?
+  /// Quién lo fijó, para la marca. Sin clave foránea, igual que `authorId`.
+  pinnedById String?
+
   createdAt DateTime @default(now())
 
-  reactions ChatReaction[]
+  reactions   ChatReaction[]
+  attachments ChatAttachment[]
 
   /// El único acceso que existe: los últimos mensajes de un canal, y los
   /// anteriores a uno dado al subir por el historial. Las dos consultas son
   /// este índice leído al revés.
   @@index([channelId, createdAt])
+  @@index([channelId, pinnedAt])
   @@index([replyToId])
   @@schema("projects")
   @@map("chat_messages")
+}
+
+/// Metadatos de un archivo adjunto a un mensaje de chat.
+///
+/// ## Los bytes no están aquí
+///
+/// Viven en `ChatAttachmentBlob` —en Postgres, hoy— o en el proveedor de
+/// almacenamiento de objetos que se active (GCS). Separarlos es lo que permite
+/// listar mensajes sin arrastrar megabytes: el listado consulta esta tabla y
+/// los bytes solo se leen en la ruta de descarga.
+///
+/// ## El `messageId` es nulo hasta que el mensaje se envía
+///
+/// El archivo se sube **antes** de escribir el mensaje, y queda en borrador
+/// (`messageId: null`) hasta que el mensaje lo reclama. Así el cliente puede
+/// adjuntar varios, enseñarlos como chips y enviarlos todos de una vez con el
+/// cuerpo. Un borrador abandonado se queda ahí hasta que quien lo subió lo
+/// borra (mismo permiso que subirlo).
+///
+/// ## Por qué no se mide aquí el acceso
+///
+/// Quién puede ver un adjunto es quién puede ver la conversación, y eso se
+/// decide por el canal —con el guard del proyecto o con `ChannelsService` para
+/// los privados. Este modelo solo guarda el hecho.
+model ChatAttachment {
+  id         String       @id @default(uuid())
+  channelId  String
+  channel    ChatChannel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  messageId  String?
+  message    ChatMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Nombre con el que se subió, saneado. Es lo que se ofrece al descargar.
+  filename   String
+  mimeType   String
+  /// Bytes reales del archivo, medidos en el servidor y no declarados por el cliente.
+  size       Int
+  /// Quién lo subió. Sin clave foránea, igual que `authorId` del mensaje.
+  uploadedBy String
+  createdAt  DateTime     @default(now())
+
+  blob ChatAttachmentBlob?
+
+  @@index([channelId, messageId])
+  @@index([messageId])
+  @@schema("projects")
+  @@map("chat_attachments")
+}
+
+/// Los bytes de un adjunto de chat, en su propia fila.
+///
+/// Uno a uno con `ChatAttachment`, y **solo cuando el proveedor activo es
+/// Postgres**. Si el almacenamiento de objetos (GCS) toma el relevo, esta
+/// tabla queda vacía y los bytes viven en el bucket: la API no cambia, quien
+/// la consume no se entera de dónde está el archivo.
+model ChatAttachmentBlob {
+  attachmentId String          @id
+  attachment   ChatAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  /// `bytea`. Postgres lo saca del bloque principal vía TOAST.
+  data         Bytes
+
+  @@schema("projects")
+  @@map("chat_attachment_blobs")
 }
 
 /// Una reacción a un mensaje.

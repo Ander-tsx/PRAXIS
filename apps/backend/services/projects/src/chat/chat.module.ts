@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { BlobStorageModule } from '../storage/blob-storage.module';
 import { ChannelsService } from './channels.service';
+import { ChatAttachmentsService } from './chat-attachments.service';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 
@@ -9,9 +11,14 @@ import { ChatService } from './chat.service';
  * En otro servicio, cada comprobación de acceso sería un salto de red y habría
  * que duplicar la noción de miembro — que es exactamente como se desincronizan
  * dos servicios.
+ *
+ * Los adjuntos traen su propio almacenamiento (`BlobStorageModule`), que hoy
+ * guarda en Postgres y mañana en GCS; el resto del módulo no conoce cuál está
+ * activo.
  */
 @Module({
+  imports: [BlobStorageModule],
   controllers: [ChatController],
-  providers: [ChatService, ChannelsService],
+  providers: [ChatService, ChannelsService, ChatAttachmentsService],
 })
 export class ChatModule {}

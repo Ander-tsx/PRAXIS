@@ -163,7 +163,7 @@ export function CreateProjectDialog({
               onChange={(event) => setName(event.target.value)}
               maxLength={PROJECT_NAME_MAX}
               variant={touched && clientError ? 'error' : 'default'}
-              message={touched && clientError ? clientError : undefined}
+              {...(touched && clientError ? { message: clientError } : {})}
               autoComplete="off"
               fullWidth
             />

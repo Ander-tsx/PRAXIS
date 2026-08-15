@@ -41,7 +41,8 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 
 ### Abiertos
 
-Ninguno. Los seis que quedaban se cerraron el 2026-07-30; ver la tabla de abajo.
+Ninguno de la lista vieja. El punto 18 es un hueco nuevo, de escalado, no de
+seguridad: los adjuntos guardan en Postgres y el código ya está listo para GCS.
 
 ### Resueltos
 
@@ -772,4 +773,53 @@ Reglas que seguimos para que nada se rompa cuando estos puntos se arreglen:
 5. `permissions` de un rol se envía **siempre como diccionario de booleanos**,
    nunca como array, y con claves del enum (punto 11).
 6. La interfaz decide qué enseñar con `GET /projects/:id/permissions/me`, no
-   probando y reaccionando al 403.
+    probando y reaccionando al 403.
+
+---
+
+## 🟡 18. Los adjuntos de chat guardan en Postgres; el plan es GCS
+
+Los adjuntos del chat —y los de tarea— se guardan **en Postgres**, en su propia
+tabla para que ningún listado arrastre los bytes. Funciona y sobra con los
+volúmenes actuales, pero no escala: los bytes de archivo no son datos
+relacionales y conviene sacarlos a un almacenamiento de objetos.
+
+**Lo que hicimos nosotros (frontend + projects-service):** el código ya está
+estructurado alrededor de un proveedor. `projects-service` tiene un
+`BlobStorage` con dos implementaciones —`postgres` (activa por defecto) y
+`gcs` (escrita pero inactiva)—, y se elige con `STORAGE_DRIVER=postgres|gcs` en
+el `.env` de ese servicio. El proveedor `gcs` usa `@google-cloud/storage` y
+espera `GCS_PROJECT_ID` y `GCS_BUCKET`.
+
+**Qué falta por el lado del backend** (si se quiere conectar):
+
+- Crear el bucket y decidir la política de acceso (las URLs de los objetos
+  deben seguir pasando por el gateway: la autorización es de la aplicación, no
+  del bucket).
+- Activar el driver en producción con `STORAGE_DRIVER=gcs` y las variables de
+  entorno. La firma y los límites ya se validan igual en ambos proveedores.
+- Una tarea de limpieza para los adjuntos huérfanos (borrador sin `messageId`
+  que nadie reclama) — hoy se quedan para siempre, en el proveedor que sea.
+
+Sin esto no hay nada roto: la capa de almacenamiento es transparente para el
+gateway y para el frontend, que no saben —ni deben saber— dónde viven los bytes.
+
+## 🟡 19. El preview de links del chat vive en el frontend; el ideal es un endpoint del gateway
+
+Desde el chat se envían URLs y el frontend muestra una card con título,
+descripción e imagen cuando el sitio las expone (Open Graph). Hoy lo hace un
+**server action de cada zona** (`previewDeEnlaceAction`) que lee la URL ajena
+desde el servidor de la zona con un guard SSRF propio (bloquea IPs privadas y
+de loopback, valida cada redirección, timeout y límite de bytes).
+
+**Qué falta por el lado del backend** (si se quiere centralizar):
+
+- Un `GET /api/links/preview?url=...` en el gateway que haga el unfurl con su
+  propio guard SSRF, con caché por URL y sin exponer a ningún cliente el fetch
+  de terceros. La validación SSRF viviría en una sola capa y no en cada zona.
+- Decidir si el preview debe guardarse (evitar refetch en cada visita) y si el
+  tamaño/cache son por URL o por dominio.
+
+Sin esto no hay nada roto: la card funciona y las dos zonas comparten la misma
+utilidad de `commons`. El coste es que cada zona repite la función —dos líneas—,
+y que la protección SSRF vive en el frontend, donde un fallo se vería antes.
