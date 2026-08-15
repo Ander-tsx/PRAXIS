@@ -40,6 +40,29 @@ export interface ChatPanelProps {
    * y el tope solo dejaba una franja vacía contra el borde inferior.
    */
   llenarAlto?: boolean;
+  /**
+   * En móvil, la conversación ocupa la pantalla entera.
+   *
+   * ## Por qué un modo aparte y no solo estilos responsive
+   *
+   * Un chat metido en una columna de 360 px con la lista de conversaciones
+   * encima y la cabecera de la aplicación arriba deja unas pocas líneas útiles:
+   * se escribe a ciegas y se lee de tres en tres mensajes. Toda app de
+   * mensajería resuelve lo mismo igual —la lista y la conversación son dos
+   * pantallas, no dos columnas— y es lo que se hace aquí a partir de `sm`.
+   *
+   * ⚠️ Se posiciona **fijo respecto al viewport**, así que quien lo active tiene
+   * que dar una salida visible: sin ella, en móvil no habría forma de volver.
+   * Va en `salidaMovil`, y por eso los dos van juntos.
+   */
+  pantallaCompletaEnMovil?: boolean;
+  /**
+   * El control de volver, solo visible en móvil.
+   *
+   * Lo pone la zona porque solo ella sabe a dónde se vuelve: al listado de
+   * conversaciones en el panel, a las pestañas del proyecto en projects.
+   */
+  salidaMovil?: ReactNode;
   page: ChatMessagePage;
   usersById: Map<string, UserProfile>;
   currentUserId: string;
@@ -84,6 +107,8 @@ export interface ChatPanelProps {
  */
 export function ChatPanel({
   llenarAlto = false,
+  pantallaCompletaEnMovil = false,
+  salidaMovil,
   page,
   usersById,
   currentUserId,
@@ -240,20 +265,49 @@ export function ChatPanel({
     setEnviando(false);
   }
 
+  /**
+   * Reaccionar, **con la respuesta pintada al instante**.
+   *
+   * ## El fallo que arregla
+   *
+   * Esto releía el canal con `?limit=1` y buscaba el mensaje en el resultado.
+   * `limit=1` devuelve **el último mensaje de la conversación**, así que la
+   * búsqueda solo acertaba si habías reaccionado justo al más reciente: en
+   * cualquier otro no encontraba nada, no actualizaba nada y la reacción no
+   * aparecía hasta recargar la página.
+   *
+   * ## Y por qué ahora no se pide nada
+   *
+   * La reacción es información completa en el cliente: sabemos el emoji, quién
+   * la pone y si se añade o se quita. Calcularla aquí la enseña **en el mismo
+   * fotograma del clic**, que es lo que hace que un chat se sienta vivo; ir al
+   * servidor a preguntar qué pasó añadía una espera para saber algo que ya
+   * sabíamos.
+   *
+   * Si el servidor rechaza, se deshace: es la única forma honesta de ser
+   * optimista — enseñar el resultado antes de tenerlo obliga a saber volver.
+   */
   async function reaccionar(messageId: string, emoji: string, on: boolean) {
-    await acciones.reaccionar(messageId, emoji, on);
-    /* Se relee la conversación entera no; solo este mensaje. La acción devuelve
-       las reacciones que quedaron, y son las que se pintan. */
+    const actual =
+      reaccionesLocales.get(messageId) ??
+      mensajes.find((mensaje) => mensaje.id === messageId)?.reactions ??
+      [];
+
+    const siguiente = on
+      ? [...actual, { messageId, emoji, userId: currentUserId }]
+      : actual.filter(
+          (reaccion) => !(reaccion.emoji === emoji && reaccion.userId === currentUserId),
+        );
+
+    setReaccionesLocales((previas) => new Map(previas).set(messageId, siguiente));
+
     try {
-      const api = createApiClient({ gatewayPath });
-      const pagina = await api.get<ChatMessagePage>(`${rutaCanal}/messages?limit=1`);
-      const actualizado = pagina.items.find((m) => m.id === messageId);
-      if (actualizado) {
-        setReaccionesLocales((previas) => new Map(previas).set(messageId, actualizado.reactions));
-      }
+      await acciones.reaccionar(messageId, emoji, on);
     } catch {
-      /* La reacción se guardó igual; solo no se refleja hasta el siguiente
-         refresco. */
+      /* Vuelta atrás: dejar la reacción puesta cuando el servidor la rechazó
+         sería mentir sobre lo que ven los demás. */
+      setReaccionesLocales((previas) => new Map(previas).set(messageId, actual));
+      setError('No se pudo guardar la reacción.');
     }
   }
 
@@ -263,7 +317,18 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className={`flex min-h-0 flex-1 flex-col ${
+        /* `max-sm:` y no un `hidden sm:flex` en el padre: así el mismo
+           componente sirve en las dos y no hay dos árboles que mantener.
+           `bg-background` es obligatorio — al salir del flujo, lo de debajo se
+           vería a través. */
+        pantallaCompletaEnMovil
+          ? 'max-sm:fixed max-sm:inset-0 max-sm:z-40 max-sm:bg-background max-sm:px-3 max-sm:pb-3'
+          : ''
+      }`}
+    >
+      {salidaMovil && <div className="shrink-0 pt-2 sm:hidden">{salidaMovil}</div>}
       {encabezado}
 
       {/**

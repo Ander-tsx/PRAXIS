@@ -56,6 +56,27 @@ export function DirectConversation({
       /* Pantalla dedicada: el chat es lo único que hay, así que llena el alto.
          Con el tope de 58vh quedaba una franja muerta contra el borde inferior. */
       llenarAlto
+      /* En móvil la conversación se lleva la pantalla entera, como cualquier
+         app de mensajería: con la lista encima quedaban cuatro líneas útiles. */
+      pantallaCompletaEnMovil
+      salidaMovil={
+        <a
+          href="/dashboard/chat"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Conversaciones
+        </a>
+      }
       page={page}
       usersById={usersById}
       currentUserId={currentUserId}

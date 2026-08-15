@@ -132,7 +132,15 @@ export function MessageBubble({
          */}
         <div
           className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
-          onMouseLeave={() => setConfirmandoBorrado(false)}
+          /* Al irse del mensaje se recoge todo: ni el selector de reacciones ni
+             la confirmación de borrado tienen sentido sobre una burbuja que ya
+             no estás mirando, y dejarlos abiertos es lo que obligaba a cerrarlos
+             a mano. Cubre además el caso de abrir el selector y apartar el ratón
+             sin llegar a entrar en él. */
+          onMouseLeave={() => {
+            setConfirmandoBorrado(false);
+            setEligiendoReaccion(false);
+          }}
           style={{
             background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
             /* La esquina que apunta al avatar se queda cuadrada solo en el
@@ -170,62 +178,107 @@ export function MessageBubble({
           <RichText cuerpo={message.body} hrefDeRef={hrefDeRef} currentUserId={currentUserId} />
 
           {/**
-           * Las acciones, flotando fuera de la burbuja para no robarle ancho.
+           * La barra de acciones del mensaje.
            *
-           * ⚠️ **`top-1` y no `-top-3.5`.** Estaba por encima del borde superior
-           * de la burbuja, y en el primer mensaje del hilo eso quedaba fuera del
-           * contenedor con scroll: la barra se recortaba contra el borde de
-           * arriba. Ahora cae **dentro**, alineada con la primera línea de texto.
+           * ## Las seis reacciones van dentro, no detrás de un botón
            *
-           * ⚠️ Y se ancla al lado **contrario** al avatar, hacia dentro de la
-           * conversación (`-right-1` en los ajenos, `-left-1` en los tuyos), en
-           * vez de a `right-0`/`left-0`: ahí sobresalía por el costado y en una
-           * pantalla estrecha se salía del viewport.
+           * Antes había una carita que abría un segundo desplegable. Eran dos
+           * pasos, dos superficies flotantes y un hueco entre ellas por el que
+           * el puntero se salía —lo que hacía imposible llegar al emoji— y todo
+           * para elegir entre **seis** opciones que caben de sobra en una fila.
+           * Con el conjunto cerrado que tiene el chat, el menú sobraba: ahora
+           * reaccionar es un clic y no hay nada que cruzar.
+           *
+           * ## Y por qué se solapa con la burbuja
+           *
+           * Se ancla sobre el borde superior, hacia dentro del ancho del
+           * mensaje. Fuera se salía del viewport en pantallas estrechas y se
+           * recortaba contra el borde del hilo en el primer mensaje; aquí no
+           * puede pasar ninguna de las dos, porque nunca sobresale de la
+           * burbuja.
+           *
+           * ⚠️ **Sin `focus-within`**, que es lo que la dejaba fija: al pulsar
+           * un botón el foco se queda en él y la barra no se iba al apartar el
+           * ratón. `focus-visible` cubre el teclado sin ese efecto.
            */}
           <div
-            className={`absolute top-1 ${
-              mine ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'
-            } z-10 flex items-center gap-0.5 rounded-full border border-border px-1 py-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/burbuja:opacity-100`}
-            style={{ background: colors.surface }}
+            className={`absolute -top-4 z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
+              mine ? 'left-2' : 'right-2'
+            } ${
+              /* Mientras se confirma un borrado se queda: la pregunta no puede
+                 irse antes de que se pueda responder. */
+              confirmandoBorrado ? 'opacity-100' : ''
+            }`}
+            style={{
+              background: colors.surfaceElevated,
+              borderColor: colors.border,
+              boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,
+            }}
           >
-            {canReact && (
+            {canReact &&
+              !confirmandoBorrado &&
+              CHAT_REACTIONS.map((emoji) => {
+                const puesta = agrupadas.get(emoji)?.mia ?? false;
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReaccionar(message.id, emoji, !puesta)}
+                    aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
+                    aria-pressed={puesta}
+                    title={emoji}
+                    /* `active:scale-90` además del `hover`: el emoji se hunde al
+                       pulsarlo y vuelve, que es el acuse de recibo que hace que
+                       un clic se sienta atendido aunque la red tarde. */
+                    className="cursor-pointer rounded-lg px-1 py-0.5 text-[15px] leading-none transition-transform duration-100 hover:scale-125 active:scale-90"
+                    style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+
+            {canReact && !confirmandoBorrado && (
+              <span
+                aria-hidden="true"
+                className="mx-0.5 h-4 w-px shrink-0"
+                style={{ background: colors.border }}
+              />
+            )}
+
+            {!confirmandoBorrado && (
               <button
                 type="button"
-                onClick={() => setEligiendoReaccion((abierto) => !abierto)}
-                aria-label="Reaccionar"
-                title="Reaccionar"
-                className="cursor-pointer rounded-full px-1.5 py-0.5 text-[13px] leading-none transition-colors hover:bg-surface-elevated"
+                onClick={() => onResponder(message)}
+                aria-label="Responder"
+                title="Responder"
+                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
               >
-                🙂
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
+                </svg>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => onResponder(message)}
-              aria-label="Responder"
-              title="Responder"
-              className="cursor-pointer rounded-full px-1.5 py-0.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
-            >
-              <svg
-                className="h-3.5 w-3.5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
-              </svg>
-            </button>
 
             {canDelete &&
               (confirmandoBorrado ? (
-                /* Al confirmar, el botón **cambia de forma**: deja de ser un
-                   icono del tamaño de sus vecinos y pasa a ser una palabra en
-                   rojo. Quien llegó aquí por error lo lee antes de volver a
-                   pulsar; quien venía a borrar lo tiene igual de cerca. */
-                <span className="flex items-center gap-0.5">
+                /**
+                 * Al confirmar, la barra **se convierte en la pregunta**.
+                 *
+                 * Se ocultan las reacciones y responder: dejarlas al lado de un
+                 * «Eliminar» en rojo invita a pulsar mal justo en la única
+                 * acción que no se deshace. Lo que queda es la decisión.
+                 */
+                <span className="flex items-center gap-1 px-1">
+                  <span className="font-sans text-xs text-text-secondary">¿Eliminar?</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -233,86 +286,52 @@ export function MessageBubble({
                       onBorrar(message.id);
                     }}
                     aria-label="Confirmar que se elimina el mensaje"
-                    className="cursor-pointer rounded-full px-2 py-0.5 font-sans text-[11px] font-semibold transition-colors"
-                    style={{ background: alpha(colors.error, 18), color: colors.error }}
+                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs font-semibold transition-opacity hover:opacity-80"
+                    style={{ background: colors.error, color: colors.textInverse }}
                   >
-                    Eliminar
+                    Sí
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirmandoBorrado(false)}
                     aria-label="No eliminar"
-                    title="Cancelar"
-                    className="cursor-pointer rounded-full px-1.5 py-0.5 font-sans text-[11px] text-text-secondary transition-colors hover:text-text-primary"
+                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
                   >
                     No
                   </button>
                 </span>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmandoBorrado(true)}
-                  aria-label="Eliminar mensaje"
-                  title="Eliminar"
-                  /* Separado del resto por un filete: es la única acción de la
-                     barra que no se deshace, y no debe leerse como una más. */
-                  className="ml-0.5 cursor-pointer rounded-full border-l border-border py-0.5 pl-1.5 pr-1 text-text-disabled transition-colors hover:text-error"
-                >
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                <>
+                  <span
                     aria-hidden="true"
+                    className="mx-0.5 h-4 w-px shrink-0"
+                    style={{ background: colors.border }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoBorrado(true)}
+                    aria-label="Eliminar mensaje"
+                    title="Eliminar"
+                    className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-error"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                      />
+                    </svg>
+                  </button>
+                </>
               ))}
           </div>
-
-          {eligiendoReaccion && (
-            /**
-             * **Justo debajo de la barra de opciones, y alineado con ella.**
-             *
-             * Estuvo flotando sobre la burbuja (`-top-11`) y se salía por arriba
-             * en el primer mensaje del hilo. Ahora cuelga del mismo sitio del que
-             * salió —el botón de la carita— así que el gesto es continuo: se
-             * abre donde estaba el ratón, no en la otra punta del mensaje.
-             *
-             * `top-10` es la altura de la barra (`top-1` + su alto) más un hueco;
-             * si cambia el tamaño de aquella, este número va detrás.
-             */
-            <div
-              className={`absolute top-10 ${
-                mine ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'
-              } z-20 flex items-center gap-0.5 rounded-full border border-border px-1.5 py-1`}
-              style={{
-                background: colors.surfaceElevated,
-                boxShadow: `0 10px 28px ${alpha(colors.overlay, 50)}`,
-              }}
-            >
-              {CHAT_REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => {
-                    onReaccionar(message.id, emoji, !agrupadas.get(emoji)?.mia);
-                    setEligiendoReaccion(false);
-                  }}
-                  aria-label={`Reaccionar con ${emoji}`}
-                  className="cursor-pointer rounded-full px-1.5 py-0.5 text-base leading-none transition-transform hover:scale-125"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {agrupadas.size > 0 && (

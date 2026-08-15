@@ -388,16 +388,42 @@ export function Composer({
           >
             {trozos.map((trozo, indice) =>
               trozo.etiqueta ? (
+                /**
+                 * ⚠️ **La etiqueta no puede ocupar ni un píxel de más, y ese era
+                 * el fallo del cursor.**
+                 *
+                 * Esto llevaba `px-1` y `font-medium`. Las dos cosas cambian el
+                 * ancho del texto: el relleno mete 8 px por etiqueta y el peso
+                 * cambia las métricas de cada glifo. Pero el `<textarea>` de
+                 * debajo —que es quien dibuja el cursor— tiene el texto **crudo**,
+                 * sin relleno y con el peso normal. A partir de la primera
+                 * etiqueta las dos capas dejaban de coincidir y el cursor
+                 * aparecía desplazado respecto a las letras que se veían, cada
+                 * vez más cuantas más etiquetas hubiera.
+                 *
+                 * La píldora se dibuja ahora con `box-shadow`, que **no ocupa
+                 * espacio**: extiende el fondo hacia los lados sin mover el
+                 * texto. El resultado se ve igual y mide exactamente lo mismo
+                 * que la capa de abajo.
+                 *
+                 * Si alguna vez hay que darle más aire, va por ahí — cualquier
+                 * `padding`, `border`, `letter-spacing` o cambio de peso vuelve
+                 * a desalinear el cursor.
+                 */
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: los trozos no tienen id propio y la lista se recalcula entera con el texto
                   key={indice}
-                  className="rounded px-1 py-0.5 font-medium"
                   style={{
                     background: alpha(
                       trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
                       16,
                     ),
                     color: trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
+                    borderRadius: 3,
+                    boxShadow: `0 0 0 2px ${alpha(
+                      trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
+                      16,
+                    )}`,
                   }}
                 >
                   {trozo.texto}

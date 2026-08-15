@@ -89,7 +89,12 @@ export function ChatDirectory({
   return (
     <nav
       aria-label="Conversaciones"
-      className="flex w-full shrink-0 flex-col gap-3 sm:w-80 sm:border-r sm:border-border sm:pr-5"
+      /* Con una conversación abierta, en móvil la lista **no está**: la
+         conversación se lleva la pantalla y volver es el botón de arriba. En
+         escritorio conviven, que es donde hay sitio para las dos. */
+      className={`w-full shrink-0 flex-col gap-3 sm:flex sm:w-80 sm:border-r sm:border-border sm:pr-5 ${
+        activo ? 'hidden' : 'flex'
+      }`}
     >
       {/* El conmutador. Las dos pestañas llevan su contador de no leídos, que es
           lo que hace que se vea desde la otra que hay algo esperando. */}

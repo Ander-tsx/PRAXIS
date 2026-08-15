@@ -10,6 +10,9 @@ const NOTIFICATIONS_HREF = '/dashboard/notifications';
 /** Href del panel de administración, que solo ven quienes administran. */
 const ADMIN_HREF = '/admin';
 
+/** Href de los mensajes directos, que llevan su propia insignia. */
+const CHAT_HREF = '/dashboard/chat';
+
 export interface AppNavOptions {
   /**
    * Roles globales de quien mira. Sin ellos, la entrada de administración **no**
@@ -38,6 +41,27 @@ async function loadUnreadCount(): Promise<number> {
 }
 
 /**
+ * Cuántos mensajes directos sin leer, sumando todas las conversaciones.
+ *
+ * ⚠️ **No sale de la bandeja**, y por eso hace falta una petición aparte: un
+ * mensaje de chat viaja por el flujo de avisos pero **no es un
+ * `NotificationType`** y no deja fila en `notifications` — cincuenta mensajes
+ * serían cincuenta avisos por persona. Lo que sí hay es el `unread` por canal
+ * que ya devuelve `GET /me/chats`, y sumarlo es exactamente el número que
+ * quiere ver alguien mirando la barra lateral.
+ *
+ * Degrada a cero como la otra: no saber cuántos hay no puede tumbar la página.
+ */
+async function loadDirectUnreadCount(): Promise<number> {
+  try {
+    const conversaciones = await createServerApiClient().get<{ unread?: number }[]>('/me/chats');
+    return conversaciones.reduce((suma, conversacion) => suma + (conversacion.unread ?? 0), 0);
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * La lista canónica adaptada a quien mira. Sin red: solo decide.
  *
  * Dos ajustes, y los dos tienen que pasar aquí y no en `APP_NAV_ITEMS`, que no
@@ -47,11 +71,21 @@ async function loadUnreadCount(): Promise<number> {
  * - la insignia de avisos solo aparece con algo sin leer, porque una insignia que
  *   enseña un cero es una insignia que enseña nada.
  */
-function buildNavItems({ roles, unread }: { roles: readonly string[]; unread: number }) {
+function buildNavItems({
+  roles,
+  unread,
+  mensajes,
+}: { roles: readonly string[]; unread: number; mensajes: number }) {
   const puedeAdministrar = hasAdminRole(roles);
 
-  return APP_NAV_ITEMS.filter((item) => item.href !== ADMIN_HREF || puedeAdministrar).map((item) =>
-    item.href === NOTIFICATIONS_HREF && unread > 0 ? { ...item, badge: unread } : item,
+  return APP_NAV_ITEMS.filter((item) => item.href !== ADMIN_HREF || puedeAdministrar).map(
+    (item) => {
+      if (item.href === NOTIFICATIONS_HREF && unread > 0) return { ...item, badge: unread };
+      /* Los mensajes llevan la suya, y por el mismo criterio: sin nada sin leer no
+       hay insignia, porque una que enseña un cero no informa de nada. */
+      if (item.href === CHAT_HREF && mensajes > 0) return { ...item, badge: mensajes };
+      return item;
+    },
   );
 }
 
@@ -66,7 +100,8 @@ function buildNavItems({ roles, unread }: { roles: readonly string[]; unread: nu
  * usuario de una vez y en paralelo.
  */
 export async function loadAppNavItems(options: AppNavOptions = {}): Promise<AppNavItem[]> {
-  return buildNavItems({ roles: options.roles ?? [], unread: await loadUnreadCount() });
+  const [unread, mensajes] = await Promise.all([loadUnreadCount(), loadDirectUnreadCount()]);
+  return buildNavItems({ roles: options.roles ?? [], unread, mensajes });
 }
 
 export interface PrivateChrome extends CurrentUser {
@@ -93,7 +128,13 @@ export interface PrivateChrome extends CurrentUser {
  * alternativa era arreglar lo mismo cuatro veces.
  */
 export async function loadPrivateChrome(): Promise<PrivateChrome> {
-  const [user, unread] = await Promise.all([loadCurrentUser(), loadUnreadCount()]);
+  /* Las tres en paralelo: ninguna depende de las otras, y encadenarlas pagaría
+     dos saltos de red de más en cada zona. */
+  const [user, unread, mensajes] = await Promise.all([
+    loadCurrentUser(),
+    loadUnreadCount(),
+    loadDirectUnreadCount(),
+  ]);
 
-  return { ...user, navItems: buildNavItems({ roles: user.roles, unread }) };
+  return { ...user, navItems: buildNavItems({ roles: user.roles, unread, mensajes }) };
 }

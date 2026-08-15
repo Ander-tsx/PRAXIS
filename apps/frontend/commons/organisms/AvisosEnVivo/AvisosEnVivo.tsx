@@ -166,16 +166,39 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
         return;
       }
 
+      const destino = destinoDe(aviso);
+
+      /**
+       * ⚠️ **Si ya estás mirando esa conversación, ni tarjeta ni sonido.**
+       *
+       * Avisar de un mensaje que aparece solo, delante de tus ojos, es ruido: la
+       * tarjeta tapa el propio hilo y el sonido suena por algo que ya estás
+       * leyendo. En una conversación viva eso son dos pitidos por minuto para no
+       * decir nada nuevo.
+       *
+       * Se compara contra `window.location` y no contra `usePathname()` a
+       * propósito: aquel devuelve la ruta **sin el basePath** de la zona
+       * —`/chat/<id>` dentro de dashboard-front— mientras que `destinoDe`
+       * construye la ruta pública completa. Comparar las dos daría siempre
+       * falso. Aquí, además, estamos en un manejador de evento: el navegador ya
+       * está montado y `location` es la verdad.
+       *
+       * ⚠️ **El `router.refresh()` se hace igual.** Es lo que mete el mensaje en
+       * el hilo abierto: silenciar el aviso no puede significar no enterarse.
+       */
+      const estoyViendolo = destino !== null && mismaVista(destino, window.location);
+
+      router.refresh();
+      if (estoyViendolo) return;
+
       const id = siguienteId.current++;
       setAvisos((actuales) =>
-        [
-          ...actuales,
-          { id, texto: describir(aviso), tono: tonoDe(aviso.type), destino: destinoDe(aviso) },
-        ].slice(-MAXIMO_APILADO),
+        [...actuales, { id, texto: describir(aviso), tono: tonoDe(aviso.type), destino }].slice(
+          -MAXIMO_APILADO,
+        ),
       );
 
       sonar();
-      router.refresh();
 
       window.setTimeout(() => {
         setAvisos((actuales) => actuales.filter((candidato) => candidato.id !== id));
@@ -398,3 +421,25 @@ const TONO_POR_TIPO: Record<NotificationType, string> = {
   TASK_ASSIGNED: colors.primary,
   TASK_UNASSIGNED: colors.textSecondary,
 };
+
+/**
+ * ¿La pantalla que hay abierta es el destino de este aviso?
+ *
+ * Compara la ruta y, **solo si el destino la lleva**, la pestaña. Un aviso del
+ * chat de un proyecto apunta a `?tab=chat`: estar en el proyecto pero en otra
+ * pestaña **no** cuenta como estarlo viendo, porque la conversación no está a la
+ * vista. En cambio los parámetros que trae la URL de más —`ws`, `board`— no
+ * deben romper la coincidencia: quien mira el chat con un tablero recordado
+ * sigue mirando el chat.
+ */
+export function mismaVista(destino: string, actual: { pathname: string; search: string }): boolean {
+  const [rutaDestino, consultaDestino] = destino.split('?');
+  if (rutaDestino !== actual.pathname) return false;
+  if (!consultaDestino) return true;
+
+  const abiertos = new URLSearchParams(actual.search);
+  for (const [clave, valor] of new URLSearchParams(consultaDestino)) {
+    if (abiertos.get(clave) !== valor) return false;
+  }
+  return true;
+}

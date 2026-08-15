@@ -21,6 +21,14 @@ export interface ProjectChatProps {
   canWrite: boolean;
   /** `canManageMembers`: quien lleva el equipo retira mensajes ajenos. */
   canModerate: boolean;
+  /**
+   * A dónde vuelve el botón de salir en móvil.
+   *
+   * Lo da la page porque es quien conoce el slug: la URL del proyecto lo lleva
+   * y este componente solo tiene el UUID, que daría una dirección fea y un
+   * redirección de más.
+   */
+  hrefVolver: string;
 }
 
 /**
@@ -40,6 +48,7 @@ export function ProjectChat({
   currentUserId,
   canWrite,
   canModerate,
+  hrefVolver,
 }: ProjectChatProps) {
   /* Estable entre renders: `ChatPanel` tiene `marcarLeido` en las dependencias
      de un efecto, y recreada en cada render marcaría como leído en bucle. */
@@ -57,6 +66,28 @@ export function ProjectChat({
 
   return (
     <ChatPanel
+      /* En móvil se lleva la pantalla entera: dentro de una pestaña, con la
+         cabecera del proyecto y la lista de pestañas encima, la conversación
+         quedaba en una franja donde no se puede ni leer ni escribir. */
+      pantallaCompletaEnMovil
+      salidaMovil={
+        <a
+          href={hrefVolver}
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Volver al proyecto
+        </a>
+      }
       page={page}
       usersById={usersById}
       currentUserId={currentUserId}

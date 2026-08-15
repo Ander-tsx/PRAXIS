@@ -98,7 +98,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * registro que se consulta. Las dos últimas entradas —Notificaciones y
      * Configuración— son de mirar; esta es de usar, como Proyectos y Análisis.
      */
-    label: 'Mensajes directos',
+    label: 'Mensajes',
     href: '/dashboard/chat',
     icon: (
       <svg {...iconProps} aria-hidden="true">
