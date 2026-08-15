@@ -58,7 +58,7 @@ export interface AppShellProps {
  * parte del árbol, así que la apertura del cajón viaja por contexto. Es la única
  * pieza de estado que cruza esa frontera.
  */
-const AppShellContext = createContext<{ openMenu: () => void } | null>(null);
+const AppShellContext = createContext<{ openMenu: () => void; plegada: boolean } | null>(null);
 
 /** Lo usa `AppHeader` para su botón de menú en móvil. */
 export function useAppShell() {
@@ -67,6 +67,22 @@ export function useAppShell() {
     throw new Error('useAppShell solo funciona dentro de <AppShell>');
   }
   return context;
+}
+
+/**
+ * Si la barra está plegada, para lo que se pinta **dentro** de ella.
+ *
+ * Existe para el pie —hoy «Cerrar sesión»—, que llega como slot desde el
+ * `layout.tsx` de cada zona: el armazón no puede recortarle el texto sin saber
+ * qué hay dentro, y pasarle una prop obligaría a que las cuatro zonas se
+ * enteraran de un detalle que no es suyo. Por contexto se entera solo quien lo
+ * necesita.
+ *
+ * Devuelve `false` fuera del armazón en vez de reventar: un botón usado suelto
+ * en otra pantalla se pinta entero, que es lo correcto ahí.
+ */
+export function useSidebarPlegada(): boolean {
+  return useContext(AppShellContext)?.plegada ?? false;
 }
 
 /**
@@ -114,7 +130,7 @@ export function AppShell({
   const activePath = pathname === '/' ? zonePath : `${zonePath}${pathname}`;
 
   return (
-    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true) }}>
+    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
@@ -125,12 +141,24 @@ export function AppShell({
           {/* El pliegue vive **en la cabecera, al lado de la marca**: es donde
               se busca por costumbre, y ahí no compite con «Cerrar sesión», que
               era el vecino que tenía abajo y con el que se podía confundir. */}
+          {/**
+           * Plegada, la marca **no está**: no se encoge a una inicial.
+           *
+           * Estuvo como una «P» suelta y no funcionaba — una letra sola en una
+           * columna de iconos se lee como un icono más, no como la marca, y
+           * encima competía por el sitio con el botón. Quien está dentro de la
+           * aplicación ya sabe en qué aplicación está; el logotipo es para la
+           * landing y para la pantalla de entrada.
+           *
+           * Lo que queda es el botón, centrado, que es lo único accionable de
+           * esta franja cuando está plegada.
+           */}
           <div
             className={`flex h-16 items-center border-b border-border ${
-              plegada ? 'flex-col justify-center gap-1 px-0' : 'justify-between px-6'
+              plegada ? 'justify-center px-0' : 'justify-between px-6'
             }`}
           >
-            {plegada ? <Isotipo /> : <Wordmark />}
+            {!plegada && <Wordmark />}
             <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
@@ -281,24 +309,5 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
         <path strokeLinecap="round" d={plegada ? 'M9 4v16' : 'M15 4v16'} />
       </svg>
     </button>
-  );
-}
-
-/**
- * La marca cuando no cabe entera.
- *
- * Una `P` y no un logotipo nuevo: es la misma tipografía, el mismo color y la
- * primera letra de lo que pone desplegada, así que se lee como la misma marca
- * encogida y no como otra cosa. `aria-label` con el nombre completo, que es lo
- * que de verdad representa.
- */
-function Isotipo() {
-  return (
-    <span
-      aria-label="PRAXIS"
-      className="select-none font-serif text-xl font-black tracking-tight text-primary"
-    >
-      P
-    </span>
   );
 }
