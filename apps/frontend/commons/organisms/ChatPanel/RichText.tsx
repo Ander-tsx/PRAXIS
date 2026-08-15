@@ -1,3 +1,4 @@
+import { Folder, KanbanIcon, LayoutGrid, SquareCheckIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { COLOR_POR_TIPO_DE_REF, trocearMensaje } from '../../api/chat-refs';
@@ -8,16 +9,21 @@ import { alpha } from '../../tokens';
  * `COLOR_POR_TIPO_DE_REF`, la misma fuente que usa el compositor mientras se
  * escribe — así una mención no puede salir de un color en el desplegable y de
  * otro ya enviada, que fue justo el fallo antes de compartir esto.
+ *
+ * ⚠️ Board y tarea usan el mismo componente de Lucide que ya pinta el
+ * desplegable de «/» en `Composer.tsx` — antes esto eran glifos unicode
+ * distintos de los del desplegable, y era la otra mitad del mismo fallo de
+ * consistencia que ya tuvo el color.
  */
-const ICONO_POR_TIPO: Record<ChatRefKind, string> = {
-  user: '',
+const ICONO_POR_TIPO: Record<ChatRefKind, typeof KanbanIcon | null> = {
+  user: null,
   /* `project` y `workspace` ya no se ofrecen al escribir —`/` enlaza tareas y
      tableros— pero siguen apareciendo en mensajes escritos antes del cambio,
      así que se pintan igual. Un mensaje viejo se lee como se escribió. */
-  project: '◆',
-  workspace: '▦',
-  board: '▤',
-  task: '✓',
+  project: Folder,
+  workspace: LayoutGrid,
+  board: KanbanIcon,
+  task: SquareCheckIcon,
 };
 
 /**
@@ -222,7 +228,7 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
         }
 
         const color = COLOR_POR_TIPO_DE_REF[trozo.kind];
-        const icono = ICONO_POR_TIPO[trozo.kind];
+        const Icono = ICONO_POR_TIPO[trozo.kind];
         const esYo = trozo.kind === 'user' && trozo.id === currentUserId?.toLowerCase();
         /* Tu propia mención no enlaza: escribirte a ti mismo no existe, y el
            backend lo rechaza con un 400. */
@@ -232,13 +238,15 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
 
         const contenido = (
           <>
-            {/* El separador va dentro del texto y no en un `gap`: sin caja
-                flex no hay `gap` que valga, y un margen no se colapsa al
-                partirse la línea. */}
-            {icono && (
-              <span aria-hidden="true" className="text-[0.85em] opacity-70">
-                {`${icono} `}
-              </span>
+            {/* `inline-block`, nunca `inline-flex`: ver el comentario de
+                `clases` más abajo sobre por qué la etiqueta entera tiene que
+                poder partirse. Un icono `inline-block` fluye igual que una
+                letra y no lo impide. */}
+            {Icono && (
+              <Icono
+                aria-hidden="true"
+                className="mr-1 inline-block h-3 w-3 shrink-0 align-text-bottom opacity-80"
+              />
             )}
             {trozo.sigil === '@' ? `@${trozo.label}` : trozo.label}
           </>
