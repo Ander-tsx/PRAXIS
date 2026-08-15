@@ -27,7 +27,17 @@ const CON_MENSAJE = {
   pinnedAt: true,
   pinnedById: true,
   reactions: true,
-  replyTo: { select: { id: true, authorId: true, body: true } },
+  /* `attachments` con solo el `mimeType`: es lo que necesita la cita para
+     decir «📷 Imagen» en vez de un hueco vacío cuando el mensaje citado no
+     tiene texto — un mensaje puede ser solo un archivo. */
+  replyTo: {
+    select: {
+      id: true,
+      authorId: true,
+      body: true,
+      attachments: { select: { mimeType: true }, take: 1 },
+    },
+  },
   attachments: {
     select: {
       id: true,
@@ -40,9 +50,11 @@ const CON_MENSAJE = {
       createdAt: true,
     },
   },
-  /* Cuántas respuestas tiene. Lo usa la marca de hilo en el chat: el raíz
-     enseña «N respuestas» sin tener que pedir el hilo para saber si existe. */
-  _count: { select: { replies: true } },
+  /* Cuántas respuestas tiene **su hilo**, no cuántas citas recibió: una
+     respuesta desde el compositor principal cita con el mismo `replyToId`
+     pero vive en la conversación general, y contarla aquí haría que el raíz
+     dijera «1 respuesta» con el hilo vacío al abrirlo. */
+  _count: { select: { replies: { where: { visibleEnChat: false } } } },
 } as const;
 
 /**
@@ -324,7 +336,12 @@ export class ChatService {
     }
 
     const respuestas = await this.prisma.chatMessage.findMany({
-      where: { replyToId: dto.messageId, channelId: dto.channelId },
+      /* `visibleEnChat: false`: separación estricta con la conversación
+         general. Una respuesta citada desde el compositor principal tiene el
+         mismo `replyToId`, pero vive fuera del hilo — mostrarla aquí también
+         sería tenerla en los dos sitios a la vez, que es justo lo que
+         `enHilo` existe para impedir. */
+      where: { replyToId: dto.messageId, channelId: dto.channelId, visibleEnChat: false },
       orderBy: { createdAt: 'asc' },
       select: CON_MENSAJE,
     });

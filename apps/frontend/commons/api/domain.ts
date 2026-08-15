@@ -821,8 +821,19 @@ export interface ChatMessage {
   pinnedAt: string | null;
   /** Quién lo fijó, para el «fijado por» de la marca. */
   pinnedById: string | null;
-  /** A qué mensaje responde, con lo justo para pintar la cita. */
-  replyTo: { id: string; authorId: string; body: string } | null;
+  /**
+   * A qué mensaje responde, con lo justo para pintar la cita.
+   *
+   * `attachments` solo trae el `mimeType`, del primero si hay varios: la cita
+   * no enseña el archivo, solo dice qué es cuando el mensaje citado no tiene
+   * texto — «📷 Imagen» en vez de un hueco vacío.
+   */
+  replyTo: {
+    id: string;
+    authorId: string;
+    body: string;
+    attachments: { mimeType: string }[];
+  } | null;
   /** Cuántas respuestas tiene su hilo. Para la marca «N respuestas». */
   _count: { replies: number };
   reactions: ChatReaction[];

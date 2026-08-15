@@ -1,6 +1,6 @@
 'use client';
 
-import { textoPlano } from '../../api/chat-refs';
+import { previewDeMensaje } from '../../api/chat-refs';
 import type { ChatMessage } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
 
@@ -147,23 +147,4 @@ export function PinnedBar({
       )}
     </div>
   );
-}
-
-/**
- * El texto de un fijado, o qué es si no tiene texto.
- *
- * Un mensaje puede ser solo un archivo —`body` vacío—, y `textoPlano('')` es
- * una cadena vacía: la barra se vería con el nombre de quien fijó y nada más,
- * como si el mensaje estuviera roto. Aquí se dice qué es, no el nombre del
- * archivo —ese no importa para reconocer el mensaje, y sí para el ruido visual.
- */
-function previewDeMensaje(mensaje: ChatMessage): string {
-  const texto = textoPlano(mensaje.body).trim();
-  if (texto) return texto;
-
-  const primero = mensaje.attachments[0];
-  if (!primero) return '';
-  if (primero.mimeType.startsWith('image/')) return '📷 Imagen';
-  if (primero.mimeType.startsWith('video/')) return '🎬 Vídeo';
-  return '📎 Archivo';
 }

@@ -65,6 +65,15 @@ export interface ComposerProps {
    */
   permiteMenciones: boolean;
   respuestaSlot?: ReactNode;
+  /**
+   * El id del mensaje al que se está respondiendo, si hay uno.
+   *
+   * Solo para enfocar: al pulsar «Responder» en una burbuja, el cursor debe
+   * caer solo en el campo sin que haya que ir a buscarlo con el ratón. Un
+   * booleano no bastaría —pulsar «Responder» dos veces sobre el mismo mensaje
+   * es el mismo valor y el efecto no volvería a correr—, así que es el id.
+   */
+  citaId?: string | null;
   /** Los archivos que esperan a que envíes el mensaje. */
   adjuntosPendientes: ChatAttachment[];
   /** Llamar al elegir un archivo del selector: ya subido como borrador. */
@@ -152,6 +161,7 @@ export function Composer({
   onPedirSugerencias,
   permiteMenciones,
   respuestaSlot,
+  citaId,
   adjuntosPendientes,
   onAdjuntar,
   onQuitarAdjunto,
@@ -184,7 +194,9 @@ export function Composer({
 
     const consulta = disparador.consulta.toLowerCase();
     const delTipo = sugerencias.filter((sugerencia) =>
-      disparador.sigil === '@' ? sugerencia.kind === 'user' : sugerencia.kind === 'task',
+      disparador.sigil === '@'
+        ? sugerencia.kind === 'user'
+        : sugerencia.kind === 'task' || sugerencia.kind === 'board',
     );
 
     return ordenarPorCoincidencia(
@@ -244,6 +256,23 @@ export function Composer({
     area.setSelectionRange(cursorPendiente, cursorPendiente);
     setCursorPendiente(null);
   }, [cursorPendiente]);
+
+  /**
+   * Al pulsar «Responder», el cursor cae solo en el campo.
+   *
+   * Sin esto, quien pulsó «Responder» tenía que ir a buscar el campo con el
+   * ratón o el dedo para escribir — un paso de más que la propia cita ya
+   * anuncia que toca. Al final del texto, no al principio: es donde se sigue
+   * escribiendo.
+   */
+  useEffect(() => {
+    if (!citaId) return;
+    const area = areaRef.current;
+    if (!area) return;
+    area.focus();
+    const fin = area.value.length;
+    area.setSelectionRange(fin, fin);
+  }, [citaId]);
 
   /**
    * Los trozos del texto, marcando cuáles son etiqueta.
@@ -451,6 +480,19 @@ export function Composer({
               className="flex cursor-pointer items-center gap-2 px-3 py-2"
               style={indice === marcada ? { background: alpha(colors.primary, 14) } : undefined}
             >
+              {/* El icono es lo que distingue tarea de tablero de un vistazo:
+                  los dos comparten el mismo desplegable de `/` y sin él, «Sprint
+                  1» (un tablero) y «Sprint 1 — revisar métricas» (una tarea)
+                  se leen igual hasta fijarse en el contexto de la derecha. */}
+              {sugerencia.kind !== 'user' && (
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-xs"
+                  style={{ color: sugerencia.kind === 'board' ? colors.info : colors.success }}
+                >
+                  {sugerencia.kind === 'board' ? '▤' : '✓'}
+                </span>
+              )}
               <span className="truncate font-sans text-sm text-text-primary">
                 {sugerencia.label}
               </span>

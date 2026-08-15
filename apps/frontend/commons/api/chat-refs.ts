@@ -140,6 +140,29 @@ export function textoPlano(cuerpo: string): string {
 }
 
 /**
+ * El texto de un mensaje, o qué es si no tiene texto.
+ *
+ * Un mensaje puede ser solo un archivo —`body` vacío—, y `textoPlano('')` es
+ * una cadena vacía: la cita, la barra de fijados o un resultado de búsqueda se
+ * verían con el nombre de quien escribió y nada más, como si el mensaje
+ * estuviera roto. Aquí se dice qué es, no el nombre del archivo —ese no
+ * importa para reconocer el mensaje, y sí para el ruido visual.
+ */
+export function previewDeMensaje(mensaje: {
+  body: string;
+  attachments: { mimeType: string }[];
+}): string {
+  const texto = textoPlano(mensaje.body).trim();
+  if (texto) return texto;
+
+  const primero = mensaje.attachments[0];
+  if (!primero) return '';
+  if (primero.mimeType.startsWith('image/')) return '📷 Imagen';
+  if (primero.mimeType.startsWith('video/')) return '🎬 Vídeo';
+  return '📎 Archivo';
+}
+
+/**
  * Se come los marcadores de Markdown y deja solo el contenido, para los sitios
  * de texto plano. `**negrita**` → `negrita`, `` `código` `` → `código`,
  * `[texto](https://x)` → `texto`, `- ítem` → `ítem`. Es el espejo de lo que

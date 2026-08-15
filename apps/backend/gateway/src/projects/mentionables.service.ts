@@ -2,14 +2,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
-/** Una tarea a la que se puede apuntar con `/`. */
+/** Una tarea o un tablero al que se puede apuntar con `/`. */
 export interface ChatRefOption {
-  kind: 'task';
+  kind: 'task' | 'board';
   id: string;
   label: string;
   /** De dónde cuelga: «Sprint 1 · Rediseño». Distingue dos con el mismo nombre. */
   contexto: string;
-  /** En qué columna está. Es lo que convierte el nombre en información útil. */
+  /** En qué columna está. Solo las tareas lo llevan. */
   estado?: string;
 }
 
@@ -33,12 +33,14 @@ interface Tablero {
 /**
  * El catálogo de lo que se puede nombrar en una conversación.
  *
- * ## Solo tareas, y a propósito
+ * ## Tareas y tableros, no proyectos ni espacios
  *
- * ⚠️ La primera versión ofrecía también proyectos, espacios y tableros. Era
- * ruido: en un desplegable de siete huecos, tres los ocupaban cosas que nadie
- * nombra en una frase, y empujaban fuera a las tareas — que es de lo único que
- * se habla de verdad en un chat de trabajo.
+ * ⚠️ La primera versión ofrecía también proyectos y espacios. Seguía siendo
+ * ruido: nadie los nombra en una frase de chat. Tareas y tableros sí — «mira
+ * #Sprint 1» para señalar dónde se habla, o citar la tarea concreta — así que
+ * son los dos tipos que compiten por el desplegable. El cliente los distingue
+ * por `kind` y los pinta con un icono distinto para que no se confundan al
+ * elegir.
  *
  * ## Por qué se compone aquí
  *
@@ -72,10 +74,27 @@ export class MentionablesService {
       ),
     );
 
+    const tableros = base.tableros ?? [];
+
+    /* Los tableros van primero: son la referencia más corta —el nombre a
+       secas— y quien empieza a escribir "/S" buscando "Sprint 1" no debería
+       tener que teclear más solo porque las tareas del mismo tablero llenan
+       los huecos antes. `ordenarPorCoincidencia`, en el cliente, ya reordena
+       por lo escrito; este orden es el de empate, cuando la consulta está vacía. */
     return {
       people: base.people ?? [],
-      refs: await this.tareasDe(base.tableros ?? []),
+      refs: [...this.tablerosComo(tableros), ...(await this.tareasDe(tableros))],
     };
+  }
+
+  /** Los tableros mismos, citables con `/` igual que las tareas. */
+  private tablerosComo(tableros: Tablero[]): ChatRefOption[] {
+    return tableros.map((tablero) => ({
+      kind: 'board' as const,
+      id: tablero.id,
+      label: tablero.nombre,
+      contexto: tablero.proyecto,
+    }));
   }
 
   /**

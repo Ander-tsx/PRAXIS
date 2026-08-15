@@ -18,9 +18,9 @@ import { alpha, colors } from '../../tokens';
  */
 const ESTILO_POR_TIPO: Record<ChatRefKind, { color: string; icono: string }> = {
   user: { color: colors.primary, icono: '' },
-  /* Los tres siguientes ya no se ofrecen al escribir —`/` solo enlaza tareas—
-     pero siguen apareciendo en mensajes escritos antes del cambio, así que se
-     pintan igual. Un mensaje viejo se lee como se escribió. */
+  /* `project` y `workspace` ya no se ofrecen al escribir —`/` enlaza tareas y
+     tableros— pero siguen apareciendo en mensajes escritos antes del cambio,
+     así que se pintan igual. Un mensaje viejo se lee como se escribió. */
   project: { color: colors.accent, icono: '◆' },
   workspace: { color: colors.accent, icono: '▦' },
   board: { color: colors.info, icono: '▤' },
@@ -34,9 +34,10 @@ const ESTILO_POR_TIPO: Record<ChatRefKind, { color: string; icono: string }> = {
  * proyecto y **no en una conversación privada**: allí no se sabe de qué proyecto
  * es la tarea, y la etiqueta solo lleva su id.
  *
- * Se resuelve con `/projects/tarea/<id>`, una ruta que busca la tarea, encuentra
- * su proyecto y redirige. Así la misma etiqueta funciona en los dos sitios y no
- * hubo que cambiar el formato de los mensajes ya escritos.
+ * Se resuelve con `/projects/tarea/<id>` y `/projects/tablero/<id>`, dos rutas
+ * que buscan lo suyo, encuentran el proyecto y redirigen. Así la misma
+ * etiqueta funciona en los dos sitios y no hubo que cambiar el formato de los
+ * mensajes ya escritos.
  *
  * Una mención lleva a la conversación privada con esa persona: es lo que
  * cualquiera espera al pulsar un nombre.
@@ -47,10 +48,12 @@ function destinoDe(kind: ChatRefKind, id: string): string | null {
       return `/dashboard/chat/${id}`;
     case 'task':
       return `/projects/tarea/${id}`;
+    case 'board':
+      return `/projects/tablero/${id}`;
     /* Un proyecto se abre por su id: el guard acepta id y slug, así que la URL
-       sale fea pero lleva a algún sitio — que es lo que importa. Espacios y
-       tableros necesitan el proyecto en la ruta y la etiqueta no lo trae, así
-       que se quedan sin enlace en vez de llevar a un 404. */
+       sale fea pero lleva a algún sitio — que es lo que importa. Un espacio
+       necesita el proyecto en la ruta y la etiqueta no lo trae, así que se
+       queda sin enlace en vez de llevar a un 404. */
     case 'project':
       return `/projects/${id}`;
     default:

@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { textoPlano, trocearMensaje } from '../../api/chat-refs';
+import { previewDeMensaje, trocearMensaje } from '../../api/chat-refs';
 import {
   CHAT_REACTIONS,
   type ChatAttachment,
@@ -532,7 +532,7 @@ export function MessageBubble({
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
               <span className="line-clamp-2 font-sans text-xs text-text-secondary">
-                {textoPlano(message.replyTo.body)}
+                {previewDeMensaje(message.replyTo)}
               </span>
             </div>
           )}

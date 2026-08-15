@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { textoPlano } from '../../api/chat-refs';
+import { previewDeMensaje } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
 import type { ChatAttachment, ChatMessage, ChatMessagePage, UserProfile } from '../../api/domain';
 import { personLabel } from '../../api/domain';
@@ -1097,7 +1097,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             {mensaje.pinnedAt && <span className="text-text-disabled">📌</span>}
                           </span>
                           <span className="mt-0.5 line-clamp-2 block font-sans text-sm text-text-secondary">
-                            {textoPlano(mensaje.body)}
+                            {previewDeMensaje(mensaje)}
                           </span>
                         </button>
                       </li>
@@ -1120,6 +1120,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               onAdjuntar={adjuntar}
               onQuitarAdjunto={quitarAdjunto}
               subiendo={subiendo}
+              citaId={respondiendo?.id ?? null}
               respuestaSlot={
                 respondiendo && (
                   <div
@@ -1134,7 +1135,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         Respondiendo a {nombreDeAutor(respondiendo.authorId)}
                       </span>
                       <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                        {textoPlano(respondiendo.body)}
+                        {previewDeMensaje(respondiendo)}
                       </span>
                     </span>
                     <button
