@@ -1,5 +1,6 @@
 'use client';
 
+import { KanbanIcon, SquareCheckIcon } from 'lucide-react';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -9,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { type ChatRefKind, componerReferencia } from '../../api/chat-refs';
+import { COLOR_POR_TIPO_DE_REF, type ChatRefKind, componerReferencia } from '../../api/chat-refs';
 import {
   CHAT_ATTACHMENT_ALLOWED_MIME,
   CHAT_ATTACHMENT_MAX_PER_MESSAGE,
@@ -484,15 +485,20 @@ export function Composer({
                   los dos comparten el mismo desplegable de `/` y sin él, «Sprint
                   1» (un tablero) y «Sprint 1 — revisar métricas» (una tarea)
                   se leen igual hasta fijarse en el contexto de la derecha. */}
-              {sugerencia.kind !== 'user' && (
-                <span
-                  aria-hidden="true"
-                  className="shrink-0 text-xs"
-                  style={{ color: sugerencia.kind === 'board' ? colors.info : colors.success }}
-                >
-                  {sugerencia.kind === 'board' ? '▤' : '✓'}
-                </span>
-              )}
+              {sugerencia.kind !== 'user' &&
+                (sugerencia.kind === 'board' ? (
+                  <KanbanIcon
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
+                  />
+                ) : (
+                  <SquareCheckIcon
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
+                  />
+                ))}
               <span className="truncate font-sans text-sm text-text-primary">
                 {sugerencia.label}
               </span>
@@ -553,16 +559,10 @@ export function Composer({
                   // biome-ignore lint/suspicious/noArrayIndexKey: los trozos no tienen id propio y la lista se recalcula entera con el texto
                   key={indice}
                   style={{
-                    background: alpha(
-                      trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
-                      16,
-                    ),
-                    color: trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
+                    background: alpha(COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind], 16),
+                    color: COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind],
                     borderRadius: 3,
-                    boxShadow: `0 0 0 2px ${alpha(
-                      trozo.etiqueta.kind === 'user' ? colors.primary : colors.success,
-                      16,
-                    )}`,
+                    boxShadow: `0 0 0 2px ${alpha(COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind], 16)}`,
                   }}
                 >
                   {trozo.texto}

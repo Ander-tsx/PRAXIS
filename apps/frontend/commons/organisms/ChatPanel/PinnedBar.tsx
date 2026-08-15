@@ -1,8 +1,8 @@
 'use client';
 
-import { previewDeMensaje } from '../../api/chat-refs';
 import type { ChatMessage } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
+import { AdjuntoPreview } from './AdjuntoPreview';
 
 export interface PinnedBarProps {
   /** Los fijados, del más reciente al más antiguo — el mismo orden que da el servidor. */
@@ -90,7 +90,7 @@ export function PinnedBar({
             <span className="font-medium text-text-primary">
               {nombreDeAutor(actual.authorId)}:{' '}
             </span>
-            {previewDeMensaje(actual)}
+            <AdjuntoPreview mensaje={actual} />
           </span>
         </button>
 
@@ -138,7 +138,7 @@ export function PinnedBar({
                   {nombreDeAutor(mensaje.authorId)}
                 </span>
                 <span className="line-clamp-1 block font-sans text-xs text-text-secondary">
-                  {previewDeMensaje(mensaje)}
+                  <AdjuntoPreview mensaje={mensaje} />
                 </span>
               </span>
             </button>

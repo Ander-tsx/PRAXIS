@@ -18,8 +18,27 @@
  * Espejo de `chat-refs.ts` en `@praxis/contracts`.
  */
 
+import { colors } from '../tokens';
+
 export const CHAT_REF_KINDS = ['user', 'project', 'workspace', 'board', 'task'] as const;
 export type ChatRefKind = (typeof CHAT_REF_KINDS)[number];
+
+/**
+ * El color de cada tipo de referencia — **la única fuente**, para que una
+ * mención se vea del mismo color en todas partes: mientras se escribe (el
+ * resaltado del compositor), en el desplegable de `/` y ya enviada
+ * (`RichText`). Estuvo repetido en los tres sitios y se desincronizó: un
+ * tablero salía verde en el compositor y azul en el mensaje ya enviado,
+ * porque el compositor solo distinguía «mención» de «lo demás» y `/` ya no es
+ * solo tareas.
+ */
+export const COLOR_POR_TIPO_DE_REF: Record<ChatRefKind, string> = {
+  user: colors.primary,
+  project: colors.accent,
+  workspace: colors.accent,
+  board: colors.info,
+  task: colors.success,
+};
 
 /** **Espejo exacto** de `CHAT_REF_PATTERN` en `@praxis/contracts`. */
 const PATRON_REFERENCIA =
@@ -148,18 +167,26 @@ export function textoPlano(cuerpo: string): string {
  * estuviera roto. Aquí se dice qué es, no el nombre del archivo —ese no
  * importa para reconocer el mensaje, y sí para el ruido visual.
  */
+export type TipoDeAdjunto = 'imagen' | 'video' | 'archivo';
+
+export interface PreviewDeMensaje {
+  texto: string;
+  /** `null` cuando el mensaje tiene texto propio: no hace falta decir qué es. */
+  tipoAdjunto: TipoDeAdjunto | null;
+}
+
 export function previewDeMensaje(mensaje: {
   body: string;
   attachments: { mimeType: string }[];
-}): string {
+}): PreviewDeMensaje {
   const texto = textoPlano(mensaje.body).trim();
-  if (texto) return texto;
+  if (texto) return { texto, tipoAdjunto: null };
 
   const primero = mensaje.attachments[0];
-  if (!primero) return '';
-  if (primero.mimeType.startsWith('image/')) return '📷 Imagen';
-  if (primero.mimeType.startsWith('video/')) return '🎬 Vídeo';
-  return '📎 Archivo';
+  if (!primero) return { texto: '', tipoAdjunto: null };
+  if (primero.mimeType.startsWith('image/')) return { texto: 'Imagen', tipoAdjunto: 'imagen' };
+  if (primero.mimeType.startsWith('video/')) return { texto: 'Vídeo', tipoAdjunto: 'video' };
+  return { texto: 'Archivo', tipoAdjunto: 'archivo' };
 }
 
 /**

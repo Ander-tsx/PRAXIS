@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { previewDeMensaje, trocearMensaje } from '../../api/chat-refs';
+import { trocearMensaje } from '../../api/chat-refs';
 import {
   CHAT_REACTIONS,
   type ChatAttachment,
@@ -14,6 +14,7 @@ import {
 import type { LinkPreview } from '../../api/link-preview';
 import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
+import { AdjuntoPreview } from './AdjuntoPreview';
 import { RichText } from './RichText';
 
 export interface MessageBubbleProps {
@@ -532,7 +533,7 @@ export function MessageBubble({
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
               <span className="line-clamp-2 font-sans text-xs text-text-secondary">
-                {previewDeMensaje(message.replyTo)}
+                <AdjuntoPreview mensaje={message.replyTo} />
               </span>
             </div>
           )}

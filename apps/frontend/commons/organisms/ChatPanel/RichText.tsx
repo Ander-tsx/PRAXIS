@@ -1,10 +1,27 @@
 import { Fragment, type ReactNode } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { trocearMensaje } from '../../api/chat-refs';
-import { alpha, colors } from '../../tokens';
+import { COLOR_POR_TIPO_DE_REF, trocearMensaje } from '../../api/chat-refs';
+import { alpha } from '../../tokens';
 
 /**
- * A dónde lleva cada tipo de referencia, y cómo se pinta.
+ * El icono de cada tipo de referencia. El color **no vive aquí**: sale de
+ * `COLOR_POR_TIPO_DE_REF`, la misma fuente que usa el compositor mientras se
+ * escribe — así una mención no puede salir de un color en el desplegable y de
+ * otro ya enviada, que fue justo el fallo antes de compartir esto.
+ */
+const ICONO_POR_TIPO: Record<ChatRefKind, string> = {
+  user: '',
+  /* `project` y `workspace` ya no se ofrecen al escribir —`/` enlaza tareas y
+     tableros— pero siguen apareciendo en mensajes escritos antes del cambio,
+     así que se pintan igual. Un mensaje viejo se lee como se escribió. */
+  project: '◆',
+  workspace: '▦',
+  board: '▤',
+  task: '✓',
+};
+
+/**
+ * A dónde lleva cada tipo de referencia.
  *
  * ⚠️ Las rutas llevan el prefijo de zona completo porque una etiqueta puede
  * pintarse desde cualquier sitio —una mención escrita en el chat de un proyecto
@@ -16,16 +33,6 @@ import { alpha, colors } from '../../tokens';
  * el guard acepta las dos formas y una etiqueta que lleva a algún sitio vale más
  * que una bonita que no lleva.
  */
-const ESTILO_POR_TIPO: Record<ChatRefKind, { color: string; icono: string }> = {
-  user: { color: colors.primary, icono: '' },
-  /* `project` y `workspace` ya no se ofrecen al escribir —`/` enlaza tareas y
-     tableros— pero siguen apareciendo en mensajes escritos antes del cambio,
-     así que se pintan igual. Un mensaje viejo se lee como se escribió. */
-  project: { color: colors.accent, icono: '◆' },
-  workspace: { color: colors.accent, icono: '▦' },
-  board: { color: colors.info, icono: '▤' },
-  task: { color: colors.success, icono: '✓' },
-};
 
 /**
  * A dónde lleva cada etiqueta **sin necesidad de saber en qué chat estás**.
@@ -214,7 +221,8 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
           );
         }
 
-        const estilo = ESTILO_POR_TIPO[trozo.kind];
+        const color = COLOR_POR_TIPO_DE_REF[trozo.kind];
+        const icono = ICONO_POR_TIPO[trozo.kind];
         const esYo = trozo.kind === 'user' && trozo.id === currentUserId?.toLowerCase();
         /* Tu propia mención no enlaza: escribirte a ti mismo no existe, y el
            backend lo rechaza con un 400. */
@@ -227,9 +235,9 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
             {/* El separador va dentro del texto y no en un `gap`: sin caja
                 flex no hay `gap` que valga, y un margen no se colapsa al
                 partirse la línea. */}
-            {estilo.icono && (
+            {icono && (
               <span aria-hidden="true" className="text-[0.85em] opacity-70">
-                {`${estilo.icono} `}
+                {`${icono} `}
               </span>
             )}
             {trozo.sigil === '@' ? `@${trozo.label}` : trozo.label}
@@ -247,8 +255,8 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
         const pintura = {
           /* Al mencionarte a ti, más contraste: es lo que hace que encuentres tu
              nombre recorriendo la conversación sin leerla entera. */
-          background: alpha(estilo.color, esYo ? 30 : 14),
-          color: estilo.color,
+          background: alpha(color, esYo ? 30 : 14),
+          color,
         };
 
         return destino ? (

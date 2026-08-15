@@ -5,7 +5,8 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "dependencies": {
-    "jose": "^5.9.6"
+    "jose": "^5.9.6",
+    "lucide-react": "^1.31.0"
   },
   "peerDependencies": {
     "next": ">=16",
