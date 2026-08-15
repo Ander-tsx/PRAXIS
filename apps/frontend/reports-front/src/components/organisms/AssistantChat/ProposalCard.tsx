@@ -26,6 +26,7 @@ import type {
   PropuestaTarea,
 } from '@/lib/assistant';
 import { Badge, Button, PRIORITY_LABELS, type Priority, alpha, colors } from '@praxis/commons';
+import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { TextoDelModelo } from './TextoDelModelo';
 
@@ -691,6 +692,7 @@ export function ChartProposalCard({
   estadoGuardado,
   propuesta,
 }: ProposalCardProps & { propuesta: PropuestaGrafico }) {
+  const router = useRouter();
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -711,6 +713,16 @@ export function ChartProposalCard({
        Un enlace que lleva a donde ya estás es ruido. */
     setResultado({ texto: 'Añadido al final de tu lienzo.', href: null });
     setEstado('hecho');
+
+    /**
+     * Y se repinta al momento.
+     *
+     * La acción ya revalida en el servidor, pero el lienzo es una isla de
+     * cliente con su propio estado: sin este empujón, el gráfico se guardaba y
+     * no aparecía hasta que alguien recargaba — que es exactamente lo contrario
+     * de lo que promete una tarjeta que dice «Añadido».
+     */
+    router.refresh();
   }
 
   const { grafico } = propuesta;

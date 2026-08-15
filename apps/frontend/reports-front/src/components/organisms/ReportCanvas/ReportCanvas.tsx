@@ -137,6 +137,30 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
   }, []);
 
   /**
+   * Los widgets que llegan del servidor y aquí todavía no están.
+   *
+   * ⚠️ **Sin esto, aceptar un gráfico del asistente no se veía hasta recargar.**
+   * `widgets` nace de `inicial` una sola vez, al montar: es lo correcto para las
+   * posiciones —el arrastre manda sobre lo que diga el servidor— pero convierte
+   * a este componente en sordo a los widgets que aparecen por otra vía. Y hay
+   * una: la tarjeta del asistente guarda el gráfico y llama a `revalidatePath`,
+   * así que el servidor manda el lienzo actualizado… y aquí no se miraba.
+   *
+   * Solo se **añaden los que faltan**, nunca se pisan los que ya hay: si alguien
+   * está arrastrando cuando llega el refresco, su gesto no se deshace. Y no se
+   * borran los que el servidor ya no trae, porque eso pasa de forma legítima
+   * mientras un guardado va en vuelo.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `inicial` es el disparador; `widgets` se lee dentro del actualizador para no reaccionar a los cambios propios
+  useEffect(() => {
+    setWidgets((actuales) => {
+      const conocidos = new Set(actuales.map((widget) => widget.id));
+      const nuevos = inicial.filter((widget) => !conocidos.has(widget.id));
+      return nuevos.length > 0 ? [...actuales, ...nuevos] : actuales;
+    });
+  }, [inicial]);
+
+  /**
    * La cuadrícula devuelve posiciones; aquí se vuelven a pegar a su widget.
    *
    * ⚠️ **Solo persiste en `lg`.** En los anchos pequeños la disposición que

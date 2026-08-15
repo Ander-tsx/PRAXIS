@@ -878,7 +878,16 @@ export async function aceptarGraficoAction(
      * cambia **es esta página**, y sin revalidar el gráfico aceptado no aparece
      * hasta que alguien recargue, que se lee como que aceptar no hizo nada.
      */
-    revalidatePath(`/${projectId}`);
+    /**
+     * ⚠️ **La ruta, no el valor.** Estaba como `/${projectId}`, con el UUID, y
+     * no revalidaba nada: la URL de esta pantalla lleva el **slug**
+     * (`/reports/rediseno-del-panel`), así que ese path no casaba con ninguna
+     * página renderizada y el gráfico aceptado no aparecía hasta recargar a
+     * mano. Con la forma del segmento dinámico y `'page'` se revalida la ruta
+     * sea cual sea el parámetro, que es justo lo que hace falta cuando el mismo
+     * proyecto se puede alcanzar por slug o por id.
+     */
+    revalidatePath('/[id]', 'page');
     return { anadido: true, error: null };
   } catch (error) {
     return { anadido: false, error: describe(error, 'No se pudo añadir el gráfico.') };

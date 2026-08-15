@@ -276,13 +276,62 @@ export function AssistantChat({
           {/* El contador solo en el chat: en el historial no se gasta nada, y un
               número de cuota sobre una lista de títulos solo distrae. */}
           {vista === 'chat' && cuota && <ContadorCuota cuota={cuota} />}
-          <Button
-            size="sm"
-            variant="ghost"
+          {/**
+           * Icono y no texto: la cabecera ya lleva el título, la insignia «AI» y
+           * el contador de cuota, y una palabra más la volvía una fila de cosas
+           * que leer. Lo que se pierde —saber a qué lleva sin pasar por encima—
+           * se recupera con el `title`, y el nombre accesible va completo.
+           */}
+          <button
+            type="button"
             onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
+            aria-label={vista === 'historial' ? 'Volver al chat' : 'Ver el historial'}
+            aria-pressed={vista === 'historial'}
+            title={vista === 'historial' ? 'Volver al chat' : 'Historial'}
+            /* 40×40 con borde: el contador de cuota que tiene al lado son dos
+               líneas (~32 px de alto) y un icono suelto de 16 px quedaba
+               diminuto y descolgado. Con este tamaño los dos bloques pesan lo
+               mismo y la cabecera se lee simétrica. */
+            className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              vista === 'historial'
+                ? 'bg-surface-elevated text-text-primary'
+                : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
+            }`}
+            style={{ borderColor: colors.border }}
           >
-            {vista === 'historial' ? 'Volver al chat' : 'Historial'}
-          </Button>
+            {vista === 'historial' ? (
+              /* De vuelta: una flecha, que es lo que se espera de «salir de
+                 aquí» y no se confunde con otra sección. */
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            ) : (
+              /* Un reloj con la flecha de retroceso: el icono estándar de
+                 «historial», que se reconoce sin leer nada. */
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M3.05 11a9 9 0 111.5 6M3 20v-5h5"
+                />
+              </svg>
+            )}
+          </button>
         </div>
       </header>
 
