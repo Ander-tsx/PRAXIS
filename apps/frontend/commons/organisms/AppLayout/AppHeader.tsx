@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useAppShell } from './AppShell';
+import { useAppShell, useSidebarPlegada } from './AppShell';
 
 export interface AppHeaderProps {
   /** Título de la pantalla. */
@@ -25,6 +25,11 @@ export interface AppHeaderProps {
  */
 export function AppHeader({ title, headerSlot, children }: AppHeaderProps) {
   const { openMenu } = useAppShell();
+  /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
+     libera ~184px que esta columna nunca reclama —se queda en el margen
+     lateral en vez de dárselos al contenido— y en una pantalla ancha, plegar
+     no cambia nada de lo que se ve. */
+  const plegada = useSidebarPlegada();
 
   return (
     <>
@@ -55,7 +60,11 @@ export function AppHeader({ title, headerSlot, children }: AppHeaderProps) {
       </header>
 
       <main className="relative flex-1 overflow-y-auto bg-background">
-        <div className="mx-auto w-full max-w-[1400px] p-4 sm:p-6">{children}</div>
+        <div
+          className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`}
+        >
+          {children}
+        </div>
       </main>
     </>
   );
