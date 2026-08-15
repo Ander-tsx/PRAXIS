@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 /**
  * Acciones del chat privado.
  *
- * ## Funciones normales, no `useActionState`
+ * ## Funciones normales, no `useAccion`
  *
  * El redactor **controla su propio texto** —insertar una mención obliga a
  * reescribirlo y a recolocar el cursor—, así que no hay `FormData` que mandar:
@@ -128,6 +128,20 @@ export async function markDirectReadAction(peerId: string): Promise<void> {
   if (!api) return;
 
   await api.post(`/me/chats/${peerId}/read`, {}).catch(() => undefined);
+
+  /**
+   * ⚠️ **Revalida el armazón, y sin esto la insignia mentía.**
+   *
+   * Marcar leído escribe en el servidor y no cambia nada de lo que se está
+   * viendo… salvo el contador de la barra lateral, que lo calcula
+   * `loadPrivateChrome()` en el `layout.tsx`. Sin revalidar, abrías la
+   * conversación, la leías entera, contestabas — y la burbuja de no leídos
+   * seguía ahí hasta cambiar de página o recargar.
+   *
+   * Se revalida el **layout** y no la página: el contador no vive en la
+   * pantalla del chat, vive en el armazón que la envuelve.
+   */
+  revalidatePath('/', 'layout');
 }
 
 /**

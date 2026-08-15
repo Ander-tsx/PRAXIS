@@ -123,7 +123,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   const effective = await api.get<EffectivePermissions>(`/projects/${projectId}/permissions/me`);
   if (!effective.permissions.canViewReports) {
     return (
-      <AppHeader title={`${project.name}`}>
+      <AppHeader title="Análisis">
         <NoReportsAccess projectName={project.name} />
       </AppHeader>
     );
@@ -294,7 +294,9 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   }
 
   return (
-    <AppHeader title={`${project.name}`}>
+    /* Igual que en Proyectos: el nombre del proyecto ya encabeza la página.
+       Aquí va el nombre de la sección, el mismo que en la barra lateral. */
+    <AppHeader title="Análisis">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">

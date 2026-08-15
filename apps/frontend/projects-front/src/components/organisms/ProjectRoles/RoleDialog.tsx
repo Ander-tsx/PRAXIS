@@ -12,8 +12,9 @@ import {
   type ProjectRole,
   alpha,
   colors,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { PERMISSION_GROUPS, PERMISSION_LABELS, impliedFrom, selectedFrom } from './permissions';
 
 export interface RoleDialogProps {
@@ -37,7 +38,7 @@ export function RoleDialog({
   triggerSize = 'md',
 }: RoleDialogProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(saveRoleAction, ROLE_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(saveRoleAction, ROLE_INITIAL_STATE);
 
   const [name, setName] = useState(role?.name ?? '');
   const [selected, setSelected] = useState<Set<ProjectPermission>>(

@@ -2,8 +2,8 @@
 
 import { removeMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useState } from 'react';
+import { Button, Dialog, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useState } from 'react';
 
 export interface RemoveMemberButtonProps {
   projectId: string;
@@ -14,7 +14,7 @@ export interface RemoveMemberButtonProps {
 
 export function RemoveMemberButton({ projectId, userId, label }: RemoveMemberButtonProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(removeMemberAction, MEMBER_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(removeMemberAction, MEMBER_INITIAL_STATE);
 
   useEffect(() => {
     if (state.done) setOpen(false);

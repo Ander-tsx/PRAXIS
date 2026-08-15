@@ -4,4 +4,4 @@ export * from './BoardStrip';
 export * from './BoardColumns';
 export * from './AddColumnCard';
 export * from './CreateBoardButton';
-export * from './DeleteWorkspaceButton';
+export * from './TableroMenu';

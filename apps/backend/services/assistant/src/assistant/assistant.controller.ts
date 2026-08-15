@@ -48,6 +48,26 @@ export class AssistantController {
   }
 
   /**
+   * El borrador de plantilla de un proyecto que todavía no existe.
+   *
+   * ⚠️ **No lleva `projectId`, y no es un olvido.** Se pide antes de crear
+   * nada, así que no hay proyecto contra el que el gateway pueda resolver
+   * permisos: lo único que comprueba es que haya sesión. Es seguro porque esto
+   * **no escribe nada** —devuelve nombres— y porque materializarlo son N
+   * llamadas del frontend a los endpoints de siempre, cada una con su guard.
+   */
+  @MessagePattern({ cmd: 'assistant_project_draft' })
+  async borradorDePlantilla(
+    @Payload() dto: { userId: string; brief: string; ajuste?: string; previa?: string },
+  ) {
+    try {
+      return await this.assistant.borradorDePlantilla(dto);
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  /**
    * Cambia el plan de una persona. Lo usa el panel de administración.
    *
    * ⚠️ Exigir el rol global de la plataforma es cosa del gateway, como en el

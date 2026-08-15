@@ -3,8 +3,14 @@
 import type { CreateProjectState } from '@/lib/action-state';
 import { validateProject } from '@/lib/validation';
 import { ApiError } from '@praxis/commons';
-import type { Project } from '@praxis/commons';
+import type {
+  PlantillaBorradorState,
+  PlantillaDeProyecto,
+  PlantillaResultado,
+  Project,
+} from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/plantilla';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -88,4 +94,47 @@ export async function createProjectAction(
   revalidatePath('/');
 
   return { error: null, createdName: created.name };
+}
+
+/**
+ * Le pide al asistente una plantilla para un proyecto nuevo.
+ *
+ * **No crea nada.** Es la mitad que propone; la que ejecuta es
+ * `crearProyectoDesdePlantillaAction`, y solo después de que alguien haya visto
+ * el plan. La lógica vive en `commons` porque el diálogo que la usa lo montan
+ * dos zonas; aquí solo se le pone el `'use server'` de esta.
+ */
+export async function borradorDePlantillaAction(
+  brief: string,
+  ajuste?: { texto: string; previa: PlantillaDeProyecto },
+): Promise<PlantillaBorradorState> {
+  const session = await getSession();
+  if (!session) {
+    return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false };
+  }
+  return pedirBorrador(brief, ajuste);
+}
+
+/**
+ * Crea el proyecto y todo lo que la plantilla propone.
+ *
+ * Llama a los endpoints de siempre, uno a uno, con esta sesión: no hay ninguna
+ * vía de escritura nueva. Ver `commons/plantilla/aplicar`.
+ */
+export async function crearProyectoDesdePlantillaAction(
+  plantilla: PlantillaDeProyecto,
+): Promise<PlantillaResultado> {
+  const session = await getSession();
+  if (!session) {
+    return {
+      proyecto: null,
+      creado: { etiquetas: 0, roles: 0, espacios: 0, tableros: 0, columnas: 0 },
+      fallos: [],
+      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+    };
+  }
+
+  const resultado = await aplicarPlantilla(plantilla);
+  if (resultado.proyecto) revalidatePath('/');
+  return resultado;
 }

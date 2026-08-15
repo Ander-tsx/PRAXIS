@@ -3,8 +3,7 @@
 import { respondInvitationAction } from '@/app/invitations-actions';
 import { NoticePanel } from '@/components/molecules/NoticePanel';
 import { INVITATION_RESPONSE_INITIAL_STATE } from '@/lib/action-state';
-import { Badge, Button, type MyInvitation, alpha, colors } from '@praxis/commons';
-import { useActionState } from 'react';
+import { Badge, Button, type MyInvitation, alpha, colors, useAccion } from '@praxis/commons';
 
 export interface MyInvitationsProps {
   invitations: MyInvitation[];
@@ -45,7 +44,7 @@ export function MyInvitations({ invitations }: MyInvitationsProps) {
 }
 
 function InvitationRow({ invitation }: { invitation: MyInvitation }) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAccion(
     respondInvitationAction,
     INVITATION_RESPONSE_INITIAL_STATE,
   );

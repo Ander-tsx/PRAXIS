@@ -12,8 +12,9 @@ import {
   Select,
   Textarea,
   globalRoleLevelOf,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface UserRoleDialogProps {
   usuario: AdminUser;
@@ -40,7 +41,7 @@ export interface UserRoleDialogProps {
  * otro no— es justo la que hay que entender antes de pulsar.
  */
 export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDialogProps) {
-  const [state, formAction, pending] = useActionState(setUserRoleAction, ADMIN_USER_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(setUserRoleAction, ADMIN_USER_INITIAL_STATE);
 
   /* Solo los estrictamente por debajo de mi nivel: la misma regla que aplica el
      gateway con `canGrantGlobalRole`. */

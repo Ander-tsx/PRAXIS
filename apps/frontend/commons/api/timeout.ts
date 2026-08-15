@@ -23,6 +23,16 @@ import { ApiError } from './envelope';
  * Por eso es un fallo de todos los botones a la vez y no de uno: no está en
  * ningún formulario, está en que una petición podía no terminar nunca.
  *
+ * ⚠️ **Esto arregla una de las dos causas, no las dos.** Con el plazo puesto,
+ * ninguna petición se queda colgada y el render de la revalidación termina
+ * siempre. Pero el botón podía seguir girando por un camino que no pasa por la
+ * red: la promesa que Next usa para cerrar la transición del router **no se
+ * resuelve** cuando su acción se marca `discarded`, y eso ocurre con una
+ * navegación encima de una acción en vuelo. La explicación entera y el arreglo
+ * están en `commons/hooks/useAccion`, que es lo que hoy mide la espera de los
+ * botones. Los dos fallos dan exactamente el mismo síntoma, así que si vuelve a
+ * aparecer, hay que descartar los dos.
+ *
  * ## El número
  *
  * 15 segundos. El gateway está a un salto de red —dentro de la misma VPC en el

@@ -14,6 +14,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
+import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './plantilla';
 import { systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
 import { herramientasPara } from './tools';
@@ -254,6 +255,97 @@ export class AssistantService {
       proposals: proposals as unknown as AssistantProposal[],
       cuota,
     };
+  }
+
+  /**
+   * El borrador de plantilla para un proyecto que **todavía no existe**.
+   *
+   * Es el mismo contrato de siempre —la IA propone, no ejecuta— con dos
+   * diferencias que salen de que no haya proyecto:
+   *
+   * - **No hay briefing ni permisos que consultar.** Nada que validar contra un
+   *   contexto, porque no hay contexto: el modelo solo pone nombres y los ids
+   *   los devuelve el servidor a medida que el frontend va creando cada cosa.
+   * - **No se guarda como propuesta.** Las filas de `assistant_proposals`
+   *   cuelgan de una conversación, y una conversación cuelga de un proyecto. Se
+   *   devuelve y vive en la pantalla hasta que se acepta o se cierra.
+   *
+   * Lo que **sí** es idéntico es el orden de los pasos, y por los mismos
+   * motivos que en `chat`: la cuota se comprueba antes de llamar a Gemini —para
+   * no gastar dinero en una respuesta que se va a tirar— y se consume después y
+   * solo si respondió bien.
+   */
+  async borradorDePlantilla(payload: {
+    userId: string;
+    brief: string;
+    /** Qué cambiar del plan anterior. Con `previa`, ajusta en vez de rehacer. */
+    ajuste?: string;
+    /** El plan anterior en JSON, tal cual se le devolvió al cliente. */
+    previa?: string;
+  }) {
+    const cuotaPrevia = await this.quota.estado(payload.userId);
+
+    if (cuotaPrevia.usados >= cuotaPrevia.limite) {
+      throw new RpcException({
+        statusCode: 429,
+        message:
+          `Has gastado los ${cuotaPrevia.limite} mensajes de este mes. ` +
+          'Vuelven el dia 1 del mes que viene.',
+        details: { cuota: cuotaPrevia },
+      });
+    }
+
+    /**
+     * Ajustar es un segundo turno, no una segunda llamada suelta.
+     *
+     * Se le devuelve el plan anterior **como su propio turno** y el ajuste como
+     * el siguiente mensaje. Sin eso, pedir «quítale el espacio de marketing»
+     * llegaría sin nada que quitar y el modelo rehacía el plan entero desde el
+     * brief, perdiendo por el camino todo lo demás que ya estaba bien.
+     *
+     * El plan viaja en JSON y no redactado: es lo que el modelo acaba de
+     * producir con esa misma forma, así que reconoce la estructura y la
+     * devuelve igual en vez de reinterpretarla.
+     */
+    const ajustando = Boolean(payload.ajuste?.trim() && payload.previa?.trim());
+
+    const respuesta = await this.gemini.chat({
+      system: instruccionDePlantilla(),
+      history: ajustando
+        ? [
+            { role: 'user', text: payload.brief },
+            { role: 'model', text: `Propuse esta plantilla:\n${payload.previa}` },
+          ]
+        : [],
+      message: ajustando ? (payload.ajuste as string) : payload.brief,
+      tools: [PROPONER_PLANTILLA],
+    });
+
+    /* Si Gemini falló, `chat` ya lanzó: la cuota no se toca. Ver `GeminiError`. */
+    const cuota = await this.quota.consumir(payload.userId);
+
+    /**
+     * La primera llamada válida, y solo esa.
+     *
+     * El prompt pide una, pero un modelo que se pone creativo devuelve dos
+     * variantes y quedarse con la última sería quedarse con la que le pareció
+     * peor. Si no llamó a nada, es un 502 y no una respuesta vacía: una pantalla
+     * de creación sin plantilla no tiene nada que enseñar.
+     */
+    const plantilla = respuesta.calls.map((call) => validarPlantilla(call)).find(Boolean);
+
+    if (!plantilla) {
+      this.log.warn('El modelo no devolvio ninguna plantilla utilizable');
+      throw new RpcException({
+        statusCode: 502,
+        message:
+          'El asistente no ha sabido proponer una plantilla. ' +
+          'Prueba a contarle un poco mas sobre el proyecto.',
+        details: { cuota },
+      });
+    }
+
+    return { plantilla, cuota };
   }
 
   /** Las conversaciones, delegadas. El gateway habla con este servicio. */

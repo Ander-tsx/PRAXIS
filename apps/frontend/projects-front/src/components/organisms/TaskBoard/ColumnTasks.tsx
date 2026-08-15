@@ -3,8 +3,8 @@
 import { createTaskAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import type { Column, Label, Task, UserProfile } from '@praxis/commons';
-import { DONE_COLUMN_COLOR, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { DONE_COLUMN_COLOR, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useRef, useState } from 'react';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
 
@@ -22,6 +22,8 @@ export interface ColumnTasksProps {
   canMove: boolean;
   /** Comentar: `canComment`. Un perfil de solo lectura ya puede responder. */
   canComment: boolean;
+  /** Gestionar las etiquetas del proyecto desde el diálogo de tarea: `canManageLabels`. */
+  canManageLabels: boolean;
   /** Tarea a abrir al entrar, si está en esta columna. Llega de la URL. */
   openTaskId?: string | null;
   canEdit: boolean;
@@ -60,6 +62,7 @@ export function ColumnTasks({
   canCreate,
   canMove,
   canComment,
+  canManageLabels,
   openTaskId,
   canEdit,
   canDelete,
@@ -233,6 +236,7 @@ export function ColumnTasks({
           /* Marcar pasos va con mover: las dos son ejecutar la tarea. */
           canToggleChecklist={canMove}
           canComment={canComment}
+          canManageLabels={canManageLabels}
           canEdit={canEdit}
           canDelete={canDelete}
         />
@@ -271,7 +275,7 @@ function NewTaskInline({
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [state, formAction, pending] = useActionState(createTaskAction, TASK_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(createTaskAction, TASK_INITIAL_STATE);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

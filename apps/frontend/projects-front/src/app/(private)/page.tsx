@@ -1,4 +1,8 @@
-import { createProjectAction } from '@/app/actions';
+import {
+  borradorDePlantillaAction,
+  crearProyectoDesdePlantillaAction,
+  createProjectAction,
+} from '@/app/actions';
 import { ProjectGrid } from '@/components/organisms/ProjectGrid';
 import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 import {
@@ -67,7 +71,16 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   };
 
   return (
-    <AppHeader title="Proyectos" headerSlot={<CreateProjectDialog action={createProjectAction} />}>
+    <AppHeader
+      title="Proyectos"
+      headerSlot={
+        <CreateProjectDialog
+          action={createProjectAction}
+          borradorAction={borradorDePlantillaAction}
+          aplicarAction={crearProyectoDesdePlantillaAction}
+        />
+      }
+    >
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-3xl text-text-primary">Tus proyectos</h2>
@@ -81,6 +94,8 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
             action={
               <CreateProjectDialog
                 action={createProjectAction}
+                borradorAction={borradorDePlantillaAction}
+                aplicarAction={crearProyectoDesdePlantillaAction}
                 triggerLabel="Crear mi primer proyecto"
                 triggerSize="lg"
               />

@@ -9,8 +9,9 @@ import {
   Dialog,
   type ProjectStatusName,
   Textarea,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect } from 'react';
+import { useEffect } from 'react';
 
 export interface ProjectStatusDialogProps {
   proyecto: AdminProject;
@@ -45,7 +46,7 @@ export function ProjectStatusDialog({
   open,
   onClose,
 }: ProjectStatusDialogProps) {
-  const [state, formAction, pending] = useActionState(
+  const [state, formAction, pending] = useAccion(
     setProjectStatusAction,
     ADMIN_PROJECT_INITIAL_STATE,
   );

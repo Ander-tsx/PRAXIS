@@ -1,9 +1,9 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAT_EVENT_TYPE, type NotificationType } from '../../api/domain';
 import { projectHref } from '../../api/routes';
+import { useRefrescoAgrupado } from '../../hooks';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -87,9 +87,18 @@ export interface AvisosEnVivoProps {
  * Ese refresco es la parte que más importa y la más fácil de olvidar: sin él, el
  * aviso emergente contaría algo que la página de debajo sigue sin enseñar —la
  * insignia de la barra lateral con el número viejo, el tablero sin la tarea que
- * te acaban de asignar—. `router.refresh()` vuelve a pedir los componentes de
- * servidor conservando el estado del cliente, así que la pantalla se pone al día
- * sin perder lo que estuvieras haciendo.
+ * te acaban de asignar—. Refrescar vuelve a pedir los componentes de servidor
+ * conservando el estado del cliente, así que la pantalla se pone al día sin
+ * perder lo que estuvieras haciendo.
+ *
+ * ⚠️ **El refresco va agrupado, y eso no es una optimización cosmética.** Cada
+ * `router.refresh()` entra en la misma cola global que las Server Actions, y
+ * tenerla ocupada es lo que destapa el fallo del botón que gira para siempre
+ * —explicado en `commons/hooks/useAccion`—. Por este flujo viaja también el
+ * chat, que no tiene ritmo: uno a uno, una conversación viva dejaba la cola
+ * ocupada casi todo el rato. Con [`useRefrescoAgrupado`] una ráfaga es un solo
+ * refresco, y el resultado en pantalla es idéntico porque cada refresco trae el
+ * estado completo, no un incremento.
  *
  * ⚠️ **No reemplaza a la bandeja.** Si nadie tiene la pestaña abierta, el aviso
  * ya está guardado y se ve al entrar. Esto es una capa encima; que Redis o el
@@ -97,7 +106,7 @@ export interface AvisosEnVivoProps {
  */
 export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
   const [avisos, setAvisos] = useState<AvisoEnPantalla[]>([]);
-  const router = useRouter();
+  const pedirRefresco = useRefrescoAgrupado();
   const siguienteId = useRef(0);
 
   /**
@@ -183,12 +192,12 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
        * falso. Aquí, además, estamos en un manejador de evento: el navegador ya
        * está montado y `location` es la verdad.
        *
-       * ⚠️ **El `router.refresh()` se hace igual.** Es lo que mete el mensaje en
-       * el hilo abierto: silenciar el aviso no puede significar no enterarse.
+       * ⚠️ **El refresco se pide igual.** Es lo que mete el mensaje en el hilo
+       * abierto: silenciar el aviso no puede significar no enterarse.
        */
       const estoyViendolo = destino !== null && mismaVista(destino, window.location);
 
-      router.refresh();
+      pedirRefresco();
       if (estoyViendolo) return;
 
       const id = siguienteId.current++;
@@ -215,7 +224,7 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
       fuente.removeEventListener('aviso', alLlegarAviso as EventListener);
       fuente.close();
     };
-  }, [gatewayPath, router, sonar]);
+  }, [gatewayPath, pedirRefresco, sonar]);
 
   if (avisos.length === 0) return null;
 

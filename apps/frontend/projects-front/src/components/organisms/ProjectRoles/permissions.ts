@@ -1,26 +1,11 @@
 import { PERMISSION_IMPLIES, type PermissionMap, type ProjectPermission } from '@praxis/commons';
 
-/** Etiquetas legibles. El nombre técnico no dice nada a quien reparte roles. */
-export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
-  canViewProject: 'Ver el proyecto',
-  canCreateBoard: 'Crear tableros',
-  canEditBoard: 'Editar tableros',
-  canDeleteBoard: 'Eliminar tableros',
-  canCreateColumn: 'Crear columnas',
-  canEditColumn: 'Editar columnas',
-  canDeleteColumn: 'Eliminar columnas',
-  canCreateTask: 'Crear tareas',
-  canMoveTask: 'Mover tareas y marcar pasos del checklist',
-  canEditTask: 'Editar tareas',
-  canDeleteTask: 'Eliminar tareas',
-  canManageMembers: 'Gestionar el equipo',
-  canManageRoles: 'Gestionar los roles',
-  canComment: 'Comentar en las tareas',
-  canManageLabels: 'Gestionar las etiquetas',
-  canEditProject: 'Renombrar el proyecto y cambiar su descripción',
-  canViewReports: 'Ver los reportes y usar el asistente',
-  canDeleteProject: 'Eliminar el proyecto',
-};
+/**
+ * Las etiquetas viven en commons desde que también las usa la vista previa de
+ * la plantilla del asistente. Se reexportan para no tocar los puntos de uso de
+ * esta zona, que son cuatro.
+ */
+export { PERMISSION_LABELS } from '@praxis/commons';
 
 /** Agrupados como los piensa quien reparte permisos, no como los guarda la BD. */
 export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[] }[] = [

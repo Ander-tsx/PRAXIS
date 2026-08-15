@@ -2,8 +2,8 @@
 
 import { deleteRoleAction } from '@/app/(private)/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, type ProjectRole, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useState } from 'react';
+import { Button, Dialog, type ProjectRole, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useState } from 'react';
 
 export interface DeleteRoleButtonProps {
   projectId: string;
@@ -21,7 +21,7 @@ export interface DeleteRoleButtonProps {
  */
 export function DeleteRoleButton({ projectId, role, membersUsing }: DeleteRoleButtonProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(deleteRoleAction, ROLE_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(deleteRoleAction, ROLE_INITIAL_STATE);
 
   const blocked = membersUsing > 0;
 

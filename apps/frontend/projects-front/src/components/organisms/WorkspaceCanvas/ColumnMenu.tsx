@@ -10,8 +10,9 @@ import {
   DONE_COLUMN_COLOR,
   alpha,
   colors,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MaximizarIcono } from './TableroExpandible';
 
 export interface ColumnMenuProps {
@@ -82,14 +83,8 @@ export function ColumnMenu({
   const nameRef = useRef<HTMLInputElement>(null);
   const deleteFormRef = useRef<HTMLFormElement>(null);
 
-  const [updateState, updateAction, updating] = useActionState(
-    updateColumnAction,
-    COLUMN_INITIAL_STATE,
-  );
-  const [deleteState, deleteAction, deleting] = useActionState(
-    deleteColumnAction,
-    COLUMN_INITIAL_STATE,
-  );
+  const [updateState, updateAction, updating] = useAccion(updateColumnAction, COLUMN_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useAccion(deleteColumnAction, COLUMN_INITIAL_STATE);
 
   const open = view !== null;
 

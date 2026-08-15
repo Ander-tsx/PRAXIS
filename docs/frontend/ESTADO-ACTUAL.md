@@ -3395,3 +3395,307 @@ paleta hace falta de verdad en la **dona**, que no tiene eje.
 **La separación entre personas no se puede probar por la API, y esa es la
 garantía:** no hay ninguna ruta que acepte un `userId`. Lo pone el gateway desde
 el token y la clave primaria es `(userId, projectId)`.
+
+---
+
+## 35. El botón que giraba para siempre, la otra mitad
+
+`commons/api/timeout.ts` ya contaba este síntoma y lo daba por resuelto: un
+`fetch` sin plazo durante el render de `revalidatePath` dejaba la respuesta de la
+acción sin cerrar, y con ella el `pending` del botón. Ese arreglo es correcto y
+está completo —los cuatro clientes pasan `timeoutSignal()`— pero **el síntoma
+seguía apareciendo**, sin regularidad, sobre cambios que sí se habían guardado.
+
+Eran dos fallos distintos con la misma cara.
+
+### 35.1 El estado del router **es** una promesa, y hay un camino que no la resuelve
+
+En `use-action-queue.js` de Next 16.2.9, el estado del App Router se lee así:
+
+```js
+return isThenable(stateWithDebugInfo) ? use(stateWithDebugInfo) : stateWithDebugInfo;
+```
+
+Es decir: el estado es una promesa y se consume con `use()` **en la raíz del
+árbol**. Y en `app-router-instance.js`, cada acción del router —una Server
+Action, un `router.refresh()`, una navegación— hace esto al despacharse:
+
+```js
+const deferredPromise = new Promise((resolve, reject) => { resolvers = { resolve, reject } });
+startTransition(() => { setState(deferredPromise); });
+```
+
+Si esa promesa no se resuelve, la transición no termina nunca. Y no se resuelve
+cuando la acción se marca `discarded`, porque el manejador sale antes:
+
+```js
+function handleResult(nextState) {
+  if (action.discarded) {
+    ...
+    runRemainingActions(actionQueue, setState);
+    return;                        // ← action.resolve(nextState) no se llama
+  }
+  actionQueue.state = nextState;
+  runRemainingActions(actionQueue, setState);
+  action.resolve(nextState);
+}
+```
+
+Una acción se descarta cuando llega un `ACTION_NAVIGATE` o un `ACTION_RESTORE`
+con otra en vuelo: pulsar un enlace, o el botón atrás, mientras se guarda.
+
+**El `resolve` del payload sí se llama** —es otro, y es el que devuelve el
+resultado al formulario—, así que la escritura llegó al backend y se guardó. El
+que no se llama es el de la cola. De ahí la firma exacta del fallo: el cambio
+está hecho, no hay ningún error en ninguna consola, y como la transición es una
+sola para toda la aplicación, **giran todos los botones a la vez**.
+
+### 35.2 Por qué a PRAXIS le pasaba más que a una aplicación normal
+
+Porque la cola del router estaba ocupada casi siempre, y eso ensancha la ventana
+de la carrera:
+
+| Fuente | Qué hacía |
+|---|---|
+| `AvisosEnVivo` | `router.refresh()` **por cada evento SSE**, sin agrupar, montado en el armazón de las seis zonas |
+| El chat | Viaja por ese mismo flujo. Una conversación viva son varios eventos por minuto, en toda pestaña abierta |
+| `AutoRefresh` | Un refresco por intervalo en la bandeja, de cuando no había tiempo real |
+| `revalidateProject` | Revalidaba `/<id>` **y** `/` en cada acción, y §24.4 ya midió lo que cuesta re-renderizar el detalle |
+
+Es intermitente porque `notifyOthers` excluye al autor: los avisos que provocan
+la colisión son los de **otras personas**. Solo, cuesta reproducirlo; con el
+equipo dentro, pasa a diario.
+
+### 35.3 Cómo se mide ahora la espera — `commons/hooks/useAccion`
+
+Reemplazo directo de `useActionState`, misma tupla. Mide con dos contadores:
+
+| Contador | Cuándo sube | Prioridad |
+|---|---|---|
+| `lanzadas` | Al empezar la acción | La de la transición — igual que antes |
+| `terminadas` | En el `finally`, dentro de un `setTimeout(…, 0)` | **Normal** |
+
+El `setTimeout` es la pieza. React propaga el contexto de la transición a través
+de los `await` de una acción, pero **no** al callback de un macrotask: lo que se
+programa ahí se actualiza por la vía normal, que la transición atascada no
+bloquea. Apagar el aviso deja de depender de aquello que se cuelga.
+
+Y son contadores y no un booleano para que el orden no importe: los dos son
+monótonos, así que si el «terminó» llegara a pintarse antes que el «empezó»
+—prioridades distintas—, `lanzadas > terminadas` sigue dando lo correcto en
+cuanto han llegado los dos. Con un booleano ese cruce deja el botón encendido
+para siempre, que es justo lo que se venía a arreglar.
+
+`TECHO_DE_ESPERA_MS` (25 s) cubre el último caso: que la acción no vuelva **de
+ninguna manera** y el `finally` no llegue a correr. Está por encima de
+`REQUEST_TIMEOUT_MS` a propósito — si fuera a fallar por tiempo, ya habría
+fallado con su mensaje.
+
+⚠️ **No uses `useActionState` directamente en un formulario nuevo.** Funciona el
+95 % de las veces, y el 5 % restante es este fallo.
+
+### 35.4 Y se baja la presión sobre la cola
+
+- **`commons/hooks/useRefrescoAgrupado`**: un refresco por ventana de 800 ms,
+  el primero sin retraso, nada con la pestaña oculta y el pendiente al volver.
+  Su estado vive **en el módulo, no en el hook**: lo que se raciona es una cola
+  global, así que dos componentes que pidan a la vez tienen que contar juntos.
+  Lo usan `AvisosEnVivo` y `AutoRefresh`.
+- **`AutoRefresh` pasa de 60 s a 300 s** en la bandeja. Dejó de ser la vía
+  principal cuando llegó el SSE; hoy solo cubre lo que se pierda si el flujo se
+  cae, y su documentación seguía diciendo que no había canal abierto.
+- **`revalidateProject` ya no revalida `/`.** `ProjectGrid` pinta `name`,
+  `description`, `status`, `createdAt`, `_count.members` y `_count.workspaces`,
+  y nada más: un comentario o una tarea no cambian ninguno. Se separó en
+  `revalidateProjectAndList`, que llaman **tres** acciones —`removeMember`,
+  `createWorkspace`, `deleteWorkspace`— y son las que mueven un contador.
+
+### 35.5 Alcance del cambio
+
+45 puntos de uso en 31 archivos migrados a `useAccion`. No quedaba ni un
+`useFormStatus` en el repo, así que la migración cubre **todos** los botones con
+espera. Las seis zonas compilan y construyen; Biome no añade ni un diagnóstico
+nuevo.
+
+---
+
+## 36. El asistente arranca el proyecto, y las etiquetas se van a donde se usan
+
+Tres cambios de una misma sesión. El grande es el primero.
+
+### 36.1 Por qué hacía falta un endpoint nuevo, y no otra `tool`
+
+El asistente vivía entero bajo `/projects/:projectId/assistant/*`, y sus seis
+herramientas son todas de tarea. Para proponer la estructura de un proyecto
+faltaban las dos cosas: una ruta sin `projectId` —porque el proyecto todavía no
+existe— y una herramienta que supiera hablar de espacios, tableros, columnas,
+etiquetas y roles.
+
+**Y no entra en `herramientasPara`.** Las seis se declaran en cada turno de una
+conversación; meter ahí la de plantilla habría significado que a mitad de una
+charla sobre tareas el modelo pudiera proponer rehacer el proyecto entero. Vive
+en `plantilla.ts`, con su propia instrucción de sistema, y solo se le declara a
+la llamada que la pide.
+
+| Pieza | Dónde |
+|---|---|
+| Herramienta, prompt y validación | `assistant/src/assistant/plantilla.ts` |
+| El turno | `AssistantService.borradorDePlantilla` |
+| Comando TCP | `assistant_project_draft` |
+| Ruta | `POST /me/assistant/project-draft` (solo `JwtGuard`) |
+| Tipos | `contracts/assistant/plantilla.dto.ts` y `commons/api/domain.ts` |
+
+### 36.2 La invariante de §26.1, intacta
+
+**La IA propone; ejecuta el código que ya existe.** El endpoint devuelve
+**nombres** y nada más — ni un id, porque nada existe todavía—. Quien crea el
+proyecto es `commons/plantilla/aplicar.ts`, llamando una a una a las rutas que ya
+usan los formularios de cada cosa, con la sesión de quien acepta.
+
+No hay ninguna vía de escritura nueva. Y sigue sin haber borrado: una plantilla
+solo añade, y sobre un proyecto que acaba de nacer vacío.
+
+El paso de revisión **no es cortesía**: es esa regla puesta en pantalla. Un botón
+que dijera «crear con IA» y montara veinte cosas de golpe sería la misma
+capacidad con la revisión quitada.
+
+#### Lo que se puede tocar antes de crear
+
+Nombre y descripción se escriben; todo lo demás se **incluye o se quita**, y lo
+quitado se queda tachado en vez de desaparecer — volver a meterlo sin repetir la
+consulta importa, porque cada consulta cuesta cuota. Un editor de cada columna y
+cada permiso sería rehacer aquí cuatro pantallas que ya existen para eso.
+
+⚠️ **La poda transforma antes de filtrar, y ese orden arregla un bug real.** Las
+claves de exclusión (`w1b0c2`) son posiciones del plan original. Encadenando
+`.filter().map()`, el índice que recibe el `map` es el de la lista ya recortada:
+quitar el primer espacio corría los demás una posición y la poda de sus tableros
+se aplicaba al espacio equivocado, en silencio.
+
+### 36.3 Dos decisiones del prompt que salen de trampas ya conocidas
+
+- **`permisos` se declara como `ARRAY`** porque es lo que un modelo rellena bien,
+  y se normaliza a **diccionario de booleanos** al validar. Es la trampa 8, y
+  aquí muerde seguro: un array llegaría a `POST /projects/:id/roles` como un 400
+  que nadie sabría de dónde sale.
+- **`success` en una columna no es un color, es un significado**: marca la de
+  cierre (§20.2). El prompt insiste en que solo la última lo lleve y la
+  validación **recorta a una por tablero** — pedirle un color «de acabado» y
+  darle una lista de fases invita a pintar de verde todo lo que suene a
+  terminado, y eso da un tablero donde una tarea se cierra a mitad del flujo.
+
+Se excluye `canDeleteProject` de lo repartible: una plantilla de arranque no
+tiene motivo para regalar el borrado del proyecto entero el primer día.
+
+### 36.4 Fallar a mitad, y decirlo
+
+`POST /projects` es la única excepción: si falla no hay dónde colgar nada y se
+vuelve con el error. A partir de ahí **se sigue y se apunta**. No hay transacción
+que abarque varias peticiones HTTP, así que abortar en la quinta columna dejaría
+el proyecto a medias igual, pero además sin lo que sí se podía crear. Misma
+decisión que el checklist del asistente (§30.3).
+
+El resumen enseña **los fallos uno a uno**, no un contador: quien acaba de crear
+el proyecto necesita saber *cuáles* para ponerlos a mano.
+
+Las columnas van **en secuencia**, no en paralelo: `order` es la posición, y
+lanzadas a la vez el orden lo decide quién llegue antes al servidor.
+
+### 36.5 Las etiquetas, al diálogo de la tarea
+
+Tenían pestaña propia. El argumento de entonces —son configuración del proyecto,
+se definen una vez y se usan muchas— chocaba con cuándo hacen falta de verdad:
+**siempre estás clasificando una tarea y la que necesitas no está**. Eso obligaba
+a cerrar el diálogo, cambiar de pestaña, crearla, volver al tablero, reabrir la
+tarea y buscar dónde te habías quedado.
+
+`GestorDeEtiquetas` vive dentro del diálogo, tras `canManageLabels`.
+
+⚠️ **No tiene ningún `<form>`, y era el motivo por el que no estaba aquí.** Un
+`<form>` anidado es HTML inválido y lo que se rompe no es el gestor, es el
+autoguardado de la tarea. Se resuelve por donde había que resolverlo: la tupla de
+`useAccion` devuelve un despachador que acepta un `FormData` construido a mano.
+
+⚠️ Y por eso **ningún campo del gestor lleva `name`**: si lo llevara, el
+formulario de la tarea lo recogería al autoguardar, y un campo de más es un 400.
+Los valores viven en estado de React. Los botones son todos `type="button"`.
+
+⚠️ **El `fieldset` cubre solo los interruptores.** Va con `disabled={readOnly}`, y
+un `fieldset` deshabilitado apaga todo lo que tenga dentro: con el gestor dentro,
+quien tuviera `canManageLabels` sin `canEditTask` se lo encontraría apagado. Los
+dos permisos son independientes.
+
+### 36.6 El chat, la última pestaña
+
+`espacios → equipo → roles → chat`. Las tres primeras son dónde está el trabajo,
+quién lo hace y bajo qué reglas; el chat es una conversación, se entra a leer y
+no a decidir, y su insignia de no leídos ya lo reclama cuando toca. En segunda
+posición partía en dos ese recorrido.
+
+### 36.7 Segunda pasada: un bug del hook y una pantalla que no se entendía
+
+**`useAccion` avisaba por consola al usarlo sin formulario.** «An async function
+with useActionState was called outside of a transition». El gestor de etiquetas
+llama al despachador desde un `onClick` —que es lo que permite mandar un
+`FormData` a mano sin anidar un `<form>`— y eso no abre transición, así que el
+`isPending` interno de `useActionState` no se actualizaba. Se arregla **dentro
+del hook**, envolviendo el despachador en `startTransition`: son 45 puntos de
+uso y basta con que a uno se le olvide. Anidar `startTransition` dentro de la
+que React ya abre para un formulario no tiene efecto, así que el caso normal no
+cambia.
+
+**Y la vista previa del plan no se entendía.** Cinco arreglos, todos del mismo
+problema —la pantalla donde se decide si aceptar veinte objetos que no has
+creado tiene que poder leerse—:
+
+| Antes | Ahora |
+|---|---|
+| Tres niveles con sangría y un borde | Árbol tipo EDT: guías en L, y cada nivel con su etiqueta —**Espacio**, **Tablero**— y su color |
+| Columnas como chips sueltos | Chips con la de cierre marcada **con palabra**: «· cierra tareas» |
+| «3 permisos» | Los permisos **por su nombre**, ordenados contra `PROJECT_PERMISSIONS` |
+| Descripción en 2 filas | 6 filas y contador: la que propone el modelo son dos o tres frases |
+| `max-w-lg` en los dos modos | `xl` (48rem) en **los dos**: cambiarlo al alternar de pestaña hacía saltar la ventana bajo el cursor |
+
+`PERMISSION_LABELS` sube a `commons/api/domain.ts` — lo necesitan el formulario
+de roles de `projects-front` y esta vista previa, que vive en `commons`.
+
+`Dialog` estrena `size="xl"`. Un árbol de tres niveles dentro de 42rem obliga a
+que cada nombre envuelva, y un árbol cuyos nombres envuelven deja de leerse como
+un árbol.
+
+#### Y se puede seguir hablando con el asistente
+
+`POST /me/assistant/project-draft` acepta ahora `ajuste` y `previa`: con los dos
+la llamada deja de ser «propón algo» y pasa a ser «cambia esto de lo que ya
+propusiste». El plan anterior vuelve al modelo **como su propio turno**; sin eso,
+pedir «quítale el espacio de marketing» llegaba sin nada que quitar y el modelo
+rehacía el plan desde el brief, perdiendo todo lo demás que ya estaba bien.
+
+⚠️ **`previa` viaja como cadena JSON, no como objeto anidado.** El
+`ValidationPipe` del gateway corre con `forbidNonWhitelisted`, así que un objeto
+obligaría a declarar seis clases DTO para describir algo que el servicio **no usa
+como datos** — solo lo reenvía al modelo como texto. Una cadena con tope
+(`PLANTILLA_PREVIA_MAX`) es lo que hace falta y no puede desincronizarse de la
+forma real.
+
+⚠️ **Cada ajuste reinicia las exclusiones.** Son posiciones (`w1b0c2`), no
+identidades: conservarlas sobre una estructura recién generada quitaría lo que
+hubiera caído en esa posición, que casi nunca es lo mismo. Perder dos clics es
+mucho mejor que crear un proyecto al que le falta algo que nadie quitó.
+
+Y gasta cuota, como cualquier turno. Se dice al lado del botón, con las que
+quedan, y no después de pulsarlo.
+
+### 36.8 Lo que **no** está verificado
+
+El stack estaba apagado durante esta sesión, así que **nada de esto se ha
+probado contra Gemini ni contra la base**. Compila entero —las seis zonas, el
+gateway y assistant-service— y `next build` pasa, pero eso no dice nada de la
+calidad de las plantillas que devuelve el modelo, ni de si `aplicarPlantilla`
+sobrevive a un 409 por nombre repetido en mitad del árbol. Queda pendiente:
+
+- un `pnpm e2e:regresion` completo;
+- probar el borrador con briefs de tres sectores distintos y ver si el recorte de
+  `success` aguanta;
+- forzar un fallo a mitad —una etiqueta duplicada— y comprobar que el resumen lo
+  cuenta bien.

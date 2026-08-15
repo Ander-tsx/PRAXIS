@@ -61,8 +61,36 @@ async function requireApi() {
   return createServerApiClient();
 }
 
-/** Revalida el detalle y la lista, que muestra contadores. */
+/**
+ * Revalida **solo el detalle**, que es lo que cambia casi siempre.
+ *
+ * ⚠️ Antes revalidaba también `/`, y era caro por partida doble. Un
+ * `revalidatePath` dentro de una Server Action re-renderiza en la **misma
+ * respuesta** —§24.4—, así que el botón no se apaga hasta que ese render
+ * termina; y ese render ocupa la cola global del App Router, que es donde se
+ * origina el botón que gira para siempre (`commons/hooks/useAccion`). Pagarlo
+ * dos veces por escribir un comentario es coste puro.
+ *
+ * De la lista, `ProjectGrid` pinta exactamente esto: `name`, `description`,
+ * `status`, `createdAt`, `_count.members` y `_count.workspaces`. Nada más. Un
+ * comentario, una tarea, una columna o una etiqueta **no cambian ninguno de
+ * esos campos**, así que revalidarla no producía una sola diferencia en
+ * pantalla.
+ */
 function revalidateProject(projectId: string) {
+  revalidatePath(`/${projectId}`);
+}
+
+/**
+ * El detalle **y** la lista.
+ *
+ * Solo para lo que mueve un contador de `ProjectGrid`: entrar o salir gente, y
+ * crear o borrar espacios. Si mañana la tarjeta de la lista enseña algo más
+ * —tareas abiertas, por ejemplo— hay que volver aquí y ampliar quién la llama;
+ * olvidarlo sale como una tarjeta con el número viejo hasta navegar, no como un
+ * error.
+ */
+function revalidateProjectAndList(projectId: string) {
   revalidatePath(`/${projectId}`);
   revalidatePath('/');
 }
@@ -480,7 +508,7 @@ export async function removeMemberAction(
     return { error: describe(error, 'No se pudo quitar a esa persona.'), done: null };
   }
 
-  revalidateProject(projectId);
+  revalidateProjectAndList(projectId);
   return { error: null, done: 'removed' };
 }
 
@@ -514,7 +542,7 @@ export async function createWorkspaceAction(
     };
   }
 
-  revalidateProject(projectId);
+  revalidateProjectAndList(projectId);
   // El id vuelve para que el selector entre directamente en el espacio nuevo.
   return { error: null, savedName: name, createdId: created.id };
 }
@@ -579,8 +607,99 @@ export async function deleteWorkspaceAction(
     };
   }
 
-  revalidateProject(projectId);
+  revalidateProjectAndList(projectId);
   return { error: null, savedName: 'eliminado', createdId: null };
+}
+
+/**
+ * Renombrar un espacio.
+ *
+ * Faltaba: el espacio se podía crear y borrar, pero no corregirle el nombre —
+ * así que una errata obligaba a borrarlo entero, y borrarlo **cascadea** sobre
+ * sus tableros y columnas. Un renombrado evita esa desproporción.
+ */
+export async function updateWorkspaceAction(
+  _prev: WorkspaceState,
+  formData: FormData,
+): Promise<WorkspaceState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null, createdId: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const workspaceId = String(formData.get('workspaceId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+
+  const invalid = validateWorkspace(name);
+  if (invalid) return { error: invalid, savedName: null, createdId: null };
+
+  try {
+    /* Solo el campo que declara el DTO: uno de sobra ya da 400. */
+    await api.patch(`/workspaces/${workspaceId}`, { name });
+  } catch (error) {
+    return {
+      error: describe(error, 'No se pudo renombrar el espacio.'),
+      savedName: null,
+      createdId: null,
+    };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: name, createdId: null };
+}
+
+/* ─── Tableros ──────────────────────────────────────────────────────── */
+
+/** Renombrar un tablero. El endpoint existía y no lo usaba nadie. */
+export async function updateBoardAction(
+  _prev: BoardState,
+  formData: FormData,
+): Promise<BoardState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const boardId = String(formData.get('boardId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+
+  const invalid = validateBoard(name);
+  if (invalid) return { error: invalid, savedName: null };
+
+  try {
+    await api.patch(`/boards/${boardId}`, { name });
+  } catch (error) {
+    return { error: describe(error, 'No se pudo renombrar el tablero.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: name };
+}
+
+/**
+ * Eliminar un tablero.
+ *
+ * ⚠️ **No existía en la interfaz**, aunque el endpoint sí: se podían crear
+ * tableros y no había forma de quitarlos. Cascadea sobre sus columnas igual que
+ * el espacio sobre sus tableros, así que quien lo llama pide confirmación
+ * escrita cuando hay algo dentro.
+ */
+export async function deleteBoardAction(
+  _prev: BoardState,
+  formData: FormData,
+): Promise<BoardState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', savedName: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const boardId = String(formData.get('boardId') ?? '');
+
+  try {
+    await api.delete(`/boards/${boardId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo eliminar el tablero.'), savedName: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, savedName: 'eliminado' };
 }
 
 /* ─── Columnas ──────────────────────────────────────────────────────── */
@@ -1199,7 +1318,7 @@ export async function deleteAttachmentAction(
 /* ─── Chat del proyecto ─────────────────────────────────────────────── */
 
 /**
- * ## Funciones normales, no `useActionState`
+ * ## Funciones normales, no `useAccion`
  *
  * El redactor **controla su propio texto** —insertar una mención obliga a
  * reescribirlo y a recolocar el cursor—, así que no hay `FormData` que mandar:
@@ -1296,6 +1415,20 @@ export async function markChatReadAction(projectId: string): Promise<void> {
   if (!api) return;
 
   await api.post(`/projects/${projectId}/chat/read`, {}).catch(() => undefined);
+
+  /**
+   * ⚠️ **Revalida el armazón, y sin esto la insignia mentía.**
+   *
+   * Marcar leído escribe en el servidor y no cambia nada de lo que se está
+   * viendo… salvo el contador de la barra lateral, que lo calcula
+   * `loadPrivateChrome()` en el `layout.tsx`. Sin revalidar, abrías la
+   * conversación, la leías entera, contestabas — y la burbuja de no leídos
+   * seguía ahí hasta cambiar de página o recargar.
+   *
+   * Se revalida el **layout** y no la página: el contador no vive en la
+   * pantalla del chat, vive en el armazón que la envuelve.
+   */
+  revalidatePath('/', 'layout');
 }
 
 /**

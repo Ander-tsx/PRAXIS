@@ -3,8 +3,8 @@
 import { createBoardAction } from '@/app/(private)/[id]/actions';
 import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
-import { Button, Dialog, Input, alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useId, useState } from 'react';
+import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useId, useState } from 'react';
 
 export interface CreateBoardButtonProps {
   workspaceId: string;
@@ -15,7 +15,7 @@ export interface CreateBoardButtonProps {
 /** Añade un tablero dentro del espacio abierto. */
 export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonProps) {
   const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState(createBoardAction, BOARD_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(createBoardAction, BOARD_INITIAL_STATE);
 
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);
