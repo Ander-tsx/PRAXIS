@@ -3,8 +3,8 @@
 import { createColumnAction } from '@/app/(private)/[id]/actions';
 import { COLUMN_INITIAL_STATE } from '@/lib/action-state';
 import { COLUMN_NAME_MAX } from '@/lib/validation';
-import { alpha, colors } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { alpha, colors, useAccion } from '@praxis/commons';
+import { useEffect, useRef, useState } from 'react';
 
 export interface AddColumnCardProps {
   boardId: string;
@@ -25,7 +25,7 @@ export interface AddColumnCardProps {
 export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardProps) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
-  const [state, formAction, pending] = useActionState(createColumnAction, COLUMN_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(createColumnAction, COLUMN_INITIAL_STATE);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

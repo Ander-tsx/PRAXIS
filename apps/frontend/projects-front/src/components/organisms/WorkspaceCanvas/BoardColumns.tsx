@@ -11,8 +11,9 @@ import {
   type UserProfile,
   alpha,
   colors,
+  useAccion,
 } from '@praxis/commons';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
@@ -51,6 +52,8 @@ export interface BoardColumnsProps {
   canMoveTask: boolean;
   /** Comentar en una tarea: `canComment`, no `canEditTask`. */
   canComment: boolean;
+  /** Gestionar las etiquetas del proyecto desde el diálogo de tarea: `canManageLabels`. */
+  canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -103,6 +106,7 @@ export function BoardColumns({
   canMoveTask,
   openTaskId,
   canComment,
+  canManageLabels,
   canEditTask,
   canDeleteTask,
 }: BoardColumnsProps) {
@@ -110,7 +114,7 @@ export function BoardColumns({
     [...board.columns].sort((a, b) => a.order - b.order),
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [, reorderAction] = useActionState(reorderColumnsAction, COLUMN_INITIAL_STATE);
+  const [, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
 
   /**
    * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
@@ -133,7 +137,7 @@ export function BoardColumns({
     status: string;
     order: number;
   } | null>(null);
-  const [moveState, moveAction] = useActionState(moveTaskAction, TASK_INITIAL_STATE);
+  const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
   const moveFormRef = useRef<HTMLFormElement>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
@@ -430,6 +434,7 @@ export function BoardColumns({
                   canMove={canMoveTask}
                   openTaskId={openTaskId}
                   canComment={canComment}
+                  canManageLabels={canManageLabels}
                   canEdit={canEditTask}
                   canDelete={canDeleteTask}
                   draggingTaskId={draggingTaskId}
@@ -526,6 +531,7 @@ export function BoardColumns({
               canCreate={canCreateTask}
               canMove={canMoveTask}
               canComment={canComment}
+              canManageLabels={canManageLabels}
               canEdit={canEditTask}
               canDelete={canDeleteTask}
               draggingTaskId={draggingTaskId}

@@ -9,7 +9,6 @@ import {
 import type { ReactNode } from 'react';
 import { BoardStrip } from './BoardStrip';
 import { CreateBoardButton } from './CreateBoardButton';
-import { DeleteWorkspaceButton } from './DeleteWorkspaceButton';
 import { WorkspacePicker } from './WorkspacePicker';
 
 export interface WorkspaceCanvasProps {
@@ -27,6 +26,10 @@ export interface WorkspaceCanvasProps {
   /** Espacio abierto, resuelto en la page desde `?ws=`. */
   activeWorkspace: Workspace | null;
   canManage: boolean;
+  /** Renombrar espacios y tableros: `canEditBoard`. */
+  canEditBoard: boolean;
+  /** Eliminar espacios y tableros: `canDeleteBoard`. */
+  canDeleteBoard: boolean;
   /** Crear y reordenar columnas: `canCreateColumn`. */
   canCreateColumn: boolean;
   /** Renombrar y recolorear columnas: `canEditColumn`. */
@@ -51,6 +54,8 @@ export interface WorkspaceCanvasProps {
   canMoveTask: boolean;
   /** Comentar en una tarea: `canComment`, no `canEditTask`. */
   canComment: boolean;
+  /** Gestionar las etiquetas del proyecto desde el diálogo de tarea: `canManageLabels`. */
+  canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -74,6 +79,8 @@ export function WorkspaceCanvas({
   workspaces,
   activeWorkspace,
   canManage,
+  canEditBoard,
+  canDeleteBoard,
   canCreateColumn,
   canEditColumn,
   canDeleteColumn,
@@ -86,6 +93,7 @@ export function WorkspaceCanvas({
   canMoveTask,
   openTaskId,
   canComment,
+  canManageLabels,
   canEditTask,
   canDeleteTask,
 }: WorkspaceCanvasProps) {
@@ -98,13 +106,17 @@ export function WorkspaceCanvas({
           workspaces={workspaces}
           activeId={activeWorkspace?.id ?? ''}
           canManage={canManage}
+          canEditBoard={canEditBoard}
+          canDeleteBoard={canDeleteBoard}
         />
 
+        {/* Solo queda «Nuevo tablero». Renombrar y eliminar el espacio se
+            fueron **dentro del selector**, a la fila del espacio al que
+            afectan: eran dos botones fijos para acciones que se usan una vez
+            cada muchas semanas, y «Eliminar espacio» además actuaba sobre «el
+            activo», que había que deducir mirando a otra parte. */}
         {activeWorkspace && canManage && (
-          <div className="flex items-center gap-2">
-            <CreateBoardButton workspaceId={activeWorkspace.id} projectId={projectId} />
-            <DeleteWorkspaceButton projectId={projectId} workspace={activeWorkspace} />
-          </div>
+          <CreateBoardButton workspaceId={activeWorkspace.id} projectId={projectId} />
         )}
       </div>
 
@@ -156,6 +168,8 @@ export function WorkspaceCanvas({
               board={board}
               filtroMisTareas={filtroMisTareas}
               projectId={projectId}
+              canEditBoard={canEditBoard}
+              canDeleteBoard={canDeleteBoard}
               canCreateColumn={canCreateColumn}
               canEditColumn={canEditColumn}
               canDeleteColumn={canDeleteColumn}
@@ -168,6 +182,7 @@ export function WorkspaceCanvas({
               canMoveTask={canMoveTask}
               openTaskId={openTaskId}
               canComment={canComment}
+              canManageLabels={canManageLabels}
               canEditTask={canEditTask}
               canDeleteTask={canDeleteTask}
             />

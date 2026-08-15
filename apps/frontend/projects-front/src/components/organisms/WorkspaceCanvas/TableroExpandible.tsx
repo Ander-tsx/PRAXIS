@@ -18,6 +18,16 @@ export interface TableroExpandibleProps {
    * lean como lo que son: los dos controles de vista del tablero.
    */
   accionesDeVista?: ReactNode;
+  /**
+   * Las acciones del tablero en sí —renombrarlo, eliminarlo—, a la derecha del
+   * todo.
+   *
+   * Separado de `accionesDeVista` porque no son lo mismo y el orden importa:
+   * los de vista cambian **cómo se mira** lo que hay y no tocan nada, este
+   * cambia el tablero. Van en grupos distintos para que no se pulse uno
+   * queriendo el otro, y el destructivo queda detrás de un menú.
+   */
+  menu?: ReactNode;
   /** La tira de columnas. Llega como slot: aquí no se sabe qué hay dentro. */
   children: ReactNode;
 }
@@ -49,6 +59,7 @@ export function TableroExpandible({
   nombre,
   resumen,
   accionesDeVista,
+  menu,
   children,
 }: TableroExpandibleProps) {
   const [expandido, setExpandido] = useState(false);
@@ -126,6 +137,8 @@ export function TableroExpandible({
             {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
             {expandido ? 'Salir' : 'Ampliar'}
           </button>
+
+          {menu}
         </div>
       </header>
 

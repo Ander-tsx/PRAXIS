@@ -2,6 +2,7 @@ import type { Board, Label, Task, UserProfile } from '@praxis/commons';
 import type { ReactNode } from 'react';
 import { BoardColumns } from './BoardColumns';
 import { TableroExpandible } from './TableroExpandible';
+import { TableroMenu } from './TableroMenu';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface BoardStripProps {
@@ -9,6 +10,10 @@ export interface BoardStripProps {
   filtroMisTareas?: ReactNode;
   board: Board;
   projectId: string;
+  /** Renombrar el tablero: `canEditBoard`. */
+  canEditBoard: boolean;
+  /** Eliminar el tablero: `canDeleteBoard`. */
+  canDeleteBoard: boolean;
   /** Crear y reordenar columnas: `canCreateColumn`. */
   canCreateColumn: boolean;
   /** Renombrar y recolorear columnas: `canEditColumn`. */
@@ -32,6 +37,8 @@ export interface BoardStripProps {
   canMoveTask: boolean;
   /** Comentar en una tarea: `canComment`, no `canEditTask`. */
   canComment: boolean;
+  /** Gestionar las etiquetas del proyecto desde el diálogo de tarea: `canManageLabels`. */
+  canManageLabels: boolean;
   canEditTask: boolean;
   canDeleteTask: boolean;
 }
@@ -47,6 +54,8 @@ export function BoardStrip({
   board,
   filtroMisTareas,
   projectId,
+  canEditBoard,
+  canDeleteBoard,
   canCreateColumn,
   canEditColumn,
   canDeleteColumn,
@@ -59,6 +68,7 @@ export function BoardStrip({
   canMoveTask,
   openTaskId,
   canComment,
+  canManageLabels,
   canEditTask,
   canDeleteTask,
 }: BoardStripProps) {
@@ -75,6 +85,16 @@ export function BoardStrip({
           aquí —que es un componente de servidor— no hay estado que compartir. */}
       <TableroExpandible
         accionesDeVista={filtroMisTareas}
+        /* A la derecha de «Ampliar», el último de la fila: es el sitio donde
+           se busca lo que no se usa a diario. */
+        menu={
+          <TableroMenu
+            projectId={projectId}
+            board={board}
+            canEdit={canEditBoard}
+            canDelete={canDeleteBoard}
+          />
+        }
         nombre={board.name}
         resumen={`${
           columnCount === 0
@@ -97,6 +117,7 @@ export function BoardStrip({
           canMoveTask={canMoveTask}
           openTaskId={openTaskId}
           canComment={canComment}
+          canManageLabels={canManageLabels}
           canEditTask={canEditTask}
           canDeleteTask={canDeleteTask}
         />

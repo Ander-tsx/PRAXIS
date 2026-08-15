@@ -202,8 +202,22 @@ export function MessageBubble({
            * ratón. `focus-visible` cubre el teclado sin ese efecto.
            */}
           <div
+            /**
+             * ⚠️ **Se ancla al lado donde está el mensaje y crece hacia el
+             * centro**, que es donde siempre hay sitio.
+             *
+             * Estaba al revés: en un mensaje ajeno se anclaba a `right-2` —el
+             * borde derecho de la burbuja— y como la barra mide bastante más que
+             * un «ok» o un «o a pelo», se extendía hacia la izquierda hasta
+             * salirse por encima del avatar y del borde del hilo.
+             *
+             * Anclada al borde **exterior** del mensaje (izquierda en los
+             * ajenos, derecha en los tuyos), lo que sobra siempre cae hacia la
+             * mitad vacía de la conversación, que es ancha por definición: la
+             * burbuja nunca pasa del 78 % del panel.
+             */
             className={`absolute -top-4 z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
-              mine ? 'left-2' : 'right-2'
+              mine ? 'right-0' : 'left-0'
             } ${
               /* Mientras se confirma un borrado se queda: la pregunta no puede
                  irse antes de que se pueda responder. */

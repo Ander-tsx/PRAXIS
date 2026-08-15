@@ -62,7 +62,7 @@ export default async function ReportsIndexPage() {
 
   if (todos.total > 0) {
     return (
-      <AppHeader title="Reportes">
+      <AppHeader title="Análisis">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
@@ -80,7 +80,7 @@ export default async function ReportsIndexPage() {
   }
 
   return (
-    <AppHeader title="Reportes">
+    <AppHeader title="Análisis">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
