@@ -6,12 +6,20 @@ import {
   alpha,
   colors,
 } from '@praxis/commons';
+import type { ReactNode } from 'react';
 import { BoardStrip } from './BoardStrip';
 import { CreateBoardButton } from './CreateBoardButton';
 import { DeleteWorkspaceButton } from './DeleteWorkspaceButton';
 import { WorkspacePicker } from './WorkspacePicker';
 
 export interface WorkspaceCanvasProps {
+  /**
+   * El control de «solo mis tareas». Va al lado de «Ampliar» en cada tablero.
+   *
+   * Slot y no un booleano: lo construye la page, que es quien sabe cuántas hay
+   * y a qué URL lleva. Aquí solo se coloca.
+   */
+  filtroMisTareas?: ReactNode;
   projectId: string;
   /** Solo para navegar; las acciones siguen usando `projectId`. */
   projectSlug: string;
@@ -61,6 +69,7 @@ export interface WorkspaceCanvasProps {
  */
 export function WorkspaceCanvas({
   projectId,
+  filtroMisTareas,
   projectSlug,
   workspaces,
   activeWorkspace,
@@ -145,6 +154,7 @@ export function WorkspaceCanvas({
             <BoardStrip
               key={board.id}
               board={board}
+              filtroMisTareas={filtroMisTareas}
               projectId={projectId}
               canCreateColumn={canCreateColumn}
               canEditColumn={canEditColumn}

@@ -1,9 +1,12 @@
 import type { Board, Label, Task, UserProfile } from '@praxis/commons';
+import type { ReactNode } from 'react';
 import { BoardColumns } from './BoardColumns';
 import { TableroExpandible } from './TableroExpandible';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface BoardStripProps {
+  /** El control de «solo mis tareas», que va junto a «Ampliar». */
+  filtroMisTareas?: ReactNode;
   board: Board;
   projectId: string;
   /** Crear y reordenar columnas: `canCreateColumn`. */
@@ -42,6 +45,7 @@ export interface BoardStripProps {
 
 export function BoardStrip({
   board,
+  filtroMisTareas,
   projectId,
   canCreateColumn,
   canEditColumn,
@@ -70,6 +74,7 @@ export function BoardStrip({
           dos tienen que moverse juntos a la capa de pantalla completa, y desde
           aquí —que es un componente de servidor— no hay estado que compartir. */}
       <TableroExpandible
+        accionesDeVista={filtroMisTareas}
         nombre={board.name}
         resumen={`${
           columnCount === 0

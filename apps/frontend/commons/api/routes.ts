@@ -89,6 +89,14 @@ export interface ProjectParams {
   board?: string;
   /** Tarea a abrir directamente. */
   task?: string;
+  /**
+   * Enseñar solo las tareas propias del tablero.
+   *
+   * Va en la URL y no en estado de cliente por lo mismo que `tab`: sobrevive a
+   * recargar, el botón atrás lo deshace, y un enlace compartido lleva a la
+   * misma vista que estaba mirando quien lo mandó.
+   */
+  mias?: '1';
 }
 
 function queryString(params?: ProjectParams): string {

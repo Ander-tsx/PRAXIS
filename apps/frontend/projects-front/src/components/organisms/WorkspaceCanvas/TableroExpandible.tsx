@@ -9,6 +9,15 @@ export interface TableroExpandibleProps {
   nombre: string;
   /** «4 columnas · 12 tareas». Lo compone quien nos monta. */
   resumen: string;
+  /**
+   * Controles extra de la cabecera, a la izquierda de «Ampliar».
+   *
+   * Llega como slot porque lo que va aquí depende de la pantalla que monta el
+   * tablero —hoy el filtro de «solo mis tareas»— y este componente no tiene por
+   * qué conocerlo. Se pinta con el mismo tratamiento que «Ampliar» para que se
+   * lean como lo que son: los dos controles de vista del tablero.
+   */
+  accionesDeVista?: ReactNode;
   /** La tira de columnas. Llega como slot: aquí no se sabe qué hay dentro. */
   children: ReactNode;
 }
@@ -36,7 +45,12 @@ export interface TableroExpandibleProps {
  * columnas siguen siendo hijos directos de la sección, exactamente como si esto
  * no existiera.
  */
-export function TableroExpandible({ nombre, resumen, children }: TableroExpandibleProps) {
+export function TableroExpandible({
+  nombre,
+  resumen,
+  accionesDeVista,
+  children,
+}: TableroExpandibleProps) {
   const [expandido, setExpandido] = useState(false);
 
   useEffect(() => {
@@ -91,21 +105,28 @@ export function TableroExpandible({ nombre, resumen, children }: TableroExpandib
             se leía como un borrón. */}
         <span className="font-sans text-xs text-text-secondary">{resumen}</span>
 
-        <button
-          type="button"
-          onClick={() => setExpandido((actual) => !actual)}
-          aria-expanded={expandido}
-          aria-label={
-            expandido
-              ? `Salir de pantalla completa del tablero ${nombre}`
-              : `Ver el tablero ${nombre} en pantalla completa`
-          }
-          title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
-          className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        >
-          {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
-          {expandido ? 'Salir' : 'Ampliar'}
-        </button>
+        {/* Empujado a la derecha por el `ml-auto` del grupo, no del botón: así
+            los dos controles de vista viajan juntos y no se separan cuando el
+            nombre del tablero es largo. */}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {accionesDeVista}
+
+          <button
+            type="button"
+            onClick={() => setExpandido((actual) => !actual)}
+            aria-expanded={expandido}
+            aria-label={
+              expandido
+                ? `Salir de pantalla completa del tablero ${nombre}`
+                : `Ver el tablero ${nombre} en pantalla completa`
+            }
+            title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
+            {expandido ? 'Salir' : 'Ampliar'}
+          </button>
+        </div>
       </header>
 
       {children}

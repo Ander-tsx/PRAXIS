@@ -29,7 +29,13 @@ import { notFound } from 'next/navigation';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; ws?: string; board?: string; task?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    ws?: string;
+    board?: string;
+    task?: string;
+    mias?: string;
+  }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -69,7 +75,7 @@ type TabId = (typeof TABS)[number]['id'];
  */
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tab, ws, board, task } = await searchParams;
+  const { tab, ws, board, task, mias } = await searchParams;
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
@@ -303,7 +309,40 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         .catch(() => [board.id, [] as Task[]] as const),
     ),
   );
-  const tasksByBoard = new Map(boardTasks);
+  /**
+   * «Solo mis tareas».
+   *
+   * ⚠️ **Se filtra al pintar, no al pedir.** Podría hacerse en el gateway con un
+   * parámetro, y sería menos datos por la red; se hace aquí a propósito porque
+   * el tablero necesita **saber cuántas se están escondiendo** para poder
+   * decirlo. Un filtro que deja columnas vacías sin explicar por qué se lee como
+   * un tablero roto, y esa es la forma más rápida de que alguien crea que ha
+   * perdido su trabajo.
+   *
+   * Filtra por encargado y no por quien la creó: lo que se busca al pulsarlo es
+   * «lo que me toca», no «lo que abrí yo».
+   */
+  const soloMias = mias === '1';
+  const tasksByBoard = new Map(
+    soloMias
+      ? boardTasks.map(
+          ([boardId, tareas]) =>
+            [
+              boardId,
+              tareas.filter((tarea) => tarea.assignees?.some((a) => a.userId === userId)),
+            ] as const,
+        )
+      : boardTasks,
+  );
+
+  /* Cuántas se están escondiendo, para poder decirlo en vez de dejar columnas
+     vacías sin explicación. */
+  const totalDelEspacio = boardTasks.reduce((suma, [, tareas]) => suma + tareas.length, 0);
+  const misTareasDelEspacio = boardTasks.reduce(
+    (suma, [, tareas]) =>
+      suma + tareas.filter((tarea) => tarea.assignees?.some((a) => a.userId === userId)).length,
+    0,
+  );
 
   /** Quién puede aparecer como encargado: los miembros más el dueño. */
   const memberIds = new Set([...members.map((member) => member.userId), project.ownerId]);
@@ -372,6 +411,57 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
 
         {activeTab === 'espacios' && (
           <WorkspaceCanvas
+            /**
+             * El filtro de «mis tareas», **dentro de la cabecera del tablero y
+             * junto a «Ampliar»**.
+             *
+             * Estuvo suelto encima del lienzo y ahí no se leía como lo que es.
+             * Los dos son controles de **vista del tablero** —qué se ve y de qué
+             * tamaño— así que van juntos y con el mismo tratamiento; separados,
+             * el filtro parecía una acción del proyecto entero.
+             *
+             * Es un enlace y no un interruptor: el estado vive en la URL
+             * (`?mias=1`), así que recargar lo mantiene, el botón atrás lo
+             * deshace y un enlace compartido lleva a la misma vista. Misma
+             * regla que la pestaña activa.
+             */
+            filtroMisTareas={
+              <Link
+                href={projectPath(project, {
+                  tab: 'espacios',
+                  ws: activeWorkspace?.id,
+                  ...(soloMias ? {} : { mias: '1' }),
+                })}
+                replace
+                aria-pressed={soloMias}
+                title={
+                  soloMias
+                    ? `Ver todas las tareas (${totalDelEspacio})`
+                    : `Ver solo las mías (${misTareasDelEspacio} de ${totalDelEspacio})`
+                }
+                className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  soloMias
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                }`}
+              >
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                {soloMias ? `Solo mías · ${misTareasDelEspacio}` : 'Solo mías'}
+              </Link>
+            }
             projectId={project.id}
             projectSlug={project.slug}
             workspaces={project.workspaces}
@@ -416,6 +506,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             /* Modera quien lleva el equipo, no quien borra tareas: lo que se
                modera aquí es una conversación entre personas. */
             canModerate={can.canManageMembers}
+            /* Vuelve a la primera pestaña, no a `?tab=chat`: el botón existe
+               para salir de la conversación.
+
+               Con `projectPath` y no con la plantilla a mano: el slug va en la
+               URL y el UUID en la API, los dos son `string`, y confundirlos no
+               da error de compilación — solo una URL fea o un 403. Ya se coló
+               en cinco sitios (CLAUDE.md). */
+            hrefVolver={projectPath(project, { tab: 'espacios' })}
           />
         )}
 
