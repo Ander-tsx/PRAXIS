@@ -12,8 +12,15 @@ import {
   sendChatMessageAction,
   uploadChatAttachmentAction,
 } from '@/app/(private)/[id]/actions';
-import { type ChatMessagePage, ChatPanel, type UserProfile, alpha, colors } from '@praxis/commons';
-import { useMemo, useState } from 'react';
+import {
+  type ChatMessagePage,
+  ChatPanel,
+  type ChatPanelHandle,
+  type UserProfile,
+  alpha,
+  colors,
+} from '@praxis/commons';
+import { useMemo, useRef, useState } from 'react';
 
 export interface ProjectChatProps {
   projectId: string;
@@ -75,8 +82,11 @@ export function ProjectChat({
     [projectId],
   );
 
+  const chatRef = useRef<ChatPanelHandle>(null);
+
   return (
     <ChatPanel
+      ref={chatRef}
       /* En móvil se lleva la pantalla entera: dentro de una pestaña, con la
          cabecera del proyecto y la lista de pestañas encima, la conversación
          quedaba en una franja donde no se puede ni leer ni escribir. */
@@ -130,10 +140,48 @@ export function ProjectChat({
             </p>
           </div>
 
-          <BotonSilenciar projectId={projectId} inicial={page.muted} />
+          <div className="flex shrink-0 items-center gap-2">
+            <BotonBuscar onClick={() => chatRef.current?.abrirBusqueda()} />
+            <BotonSilenciar projectId={projectId} inicial={page.muted} />
+          </div>
         </div>
       }
     />
+  );
+}
+
+/**
+ * Abre la búsqueda de `ChatPanel`, con el mismo estilo que «Silenciar avisos».
+ *
+ * Vive en la cabecera —fuera del árbol del panel— porque es donde debe estar
+ * junto a los demás controles del chat; la llamada real va por
+ * `ChatPanelHandle`, que el panel expone justo para esto.
+ */
+function BotonBuscar({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Buscar en el chat"
+      title="Buscar en el chat"
+      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 font-sans text-xs transition-colors"
+      style={{ borderColor: colors.border, color: colors.textSecondary }}
+    >
+      <svg
+        className="h-4 w-4"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
+        />
+      </svg>
+    </button>
   );
 }
 

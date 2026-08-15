@@ -311,6 +311,13 @@ export function MessageBubble({
                visualmente sin necesidad de separadores. */
             borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
             borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
+            /* El realce de un mensaje fijado: la marca «Fijado» de arriba ya lo
+               dice, pero en un bloque largo de burbujas seguidas hay que poder
+               distinguirlo sin leer cada una. Un borde entero y no solo un
+               tinte de fondo — el tinte por sí solo se confundía con el propio
+               matiz de "mine" en las burbujas del autor. */
+            outline: fijado ? `1.5px solid ${alpha(colors.primary, 55)}` : undefined,
+            outlineOffset: fijado ? '-1.5px' : undefined,
           }}
         >
           {message.replyTo && (
@@ -779,14 +786,19 @@ function AttachmentCard({
             <track kind="captions" />
           </video>
         )}
-        <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <span className="min-w-0 flex-1 truncate font-sans text-xs text-text-secondary">
-            {adjunto.filename}
-          </span>
-          <span className="shrink-0 font-sans text-[10px] tabular-nums text-text-disabled">
-            {formatBytes(adjunto.size)}
-          </span>
-        </div>
+        {/* Solo el vídeo lleva el nombre debajo: la miniatura no dice de qué
+            archivo es. Una imagen ya se enseña entera — el nombre del archivo
+            no añade nada y es ruido en la interfaz. */}
+        {esVideo && (
+          <div className="flex items-center gap-2 px-2.5 py-1.5">
+            <span className="min-w-0 flex-1 truncate font-sans text-xs text-text-secondary">
+              {adjunto.filename}
+            </span>
+            <span className="shrink-0 font-sans text-[10px] tabular-nums text-text-disabled">
+              {formatBytes(adjunto.size)}
+            </span>
+          </div>
+        )}
       </div>
     );
   }

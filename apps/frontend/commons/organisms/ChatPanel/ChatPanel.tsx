@@ -1,6 +1,15 @@
 'use client';
 
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { textoPlano } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
@@ -10,6 +19,7 @@ import type { LinkPreview } from '../../api/link-preview';
 import { alpha, colors } from '../../tokens';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
+import { PinnedBar } from './PinnedBar';
 import { ThreadPanel } from './ThreadPanel';
 
 /** Cuántos mensajes trae cada tirón del historial. */
@@ -128,6 +138,18 @@ export interface ChatPanelProps {
 }
 
 /**
+ * Lo que la zona puede pedirle al panel desde fuera.
+ *
+ * Solo `abrirBusqueda`: el botón de la lupa vive en la cabecera —al lado de
+ * «Silenciar avisos», con su mismo estilo— y la cabecera la construye la zona,
+ * fuera del árbol del panel. Es lo único que se expone así; todo lo demás sigue
+ * siendo props normales.
+ */
+export interface ChatPanelHandle {
+  abrirBusqueda: () => void;
+}
+
+/**
  * Una conversación completa: cabecera, historial y redactor.
  *
  * ## Cómo llegan los mensajes nuevos
@@ -145,25 +167,28 @@ export interface ChatPanelProps {
  * servidor, que siempre es la última página: los dos tramos no se solapan porque
  * uno termina donde empieza el otro.
  */
-export function ChatPanel({
-  llenarAlto = false,
-  pantallaCompletaEnMovil = false,
-  salidaMovil,
-  page,
-  usersById,
-  currentUserId,
-  acciones,
-  gatewayPath,
-  rutaCanal,
-  canWrite,
-  canModerate,
-  permiteMenciones,
-  vacio,
-  motivoSinEscribir,
-  encabezado,
-  hrefDePersona,
-  hrefDeRef,
-}: ChatPanelProps) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(
+  {
+    llenarAlto = false,
+    pantallaCompletaEnMovil = false,
+    salidaMovil,
+    page,
+    usersById,
+    currentUserId,
+    acciones,
+    gatewayPath,
+    rutaCanal,
+    canWrite,
+    canModerate,
+    permiteMenciones,
+    vacio,
+    motivoSinEscribir,
+    encabezado,
+    hrefDePersona,
+    hrefDeRef,
+  }: ChatPanelProps,
+  ref,
+) {
   const [older, setOlder] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(page.hasMore);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
@@ -230,6 +255,18 @@ export function ChatPanel({
   >(new Map());
 
   /**
+   * La barra de fijados, aparte del historial.
+   *
+   * ⚠️ **No sale de `mensajes`.** Un mensaje fijado hace tiempo puede no estar
+   * cargado —el historial pagina hacia atrás y solo trae lo último—, así que la
+   * barra pide su propia lista al servidor (`?pinned=true`, ya la sirve el
+   * mismo endpoint que la búsqueda) en vez de filtrar lo que ya está en pantalla.
+   */
+  const [fijadosLista, setFijadosLista] = useState<ChatMessage[]>([]);
+  const [fijadosIndice, setFijadosIndice] = useState(0);
+  const [fijadosExpandido, setFijadosExpandido] = useState(false);
+
+  /**
    * Los textos editados que este navegador ya ha aplicado, encima de lo que
    * trajo el servidor. Mismo motivo que los otros dos: editar no revalida, así
    * que sin esta corrección el cambio no se vería hasta el siguiente render.
@@ -252,6 +289,12 @@ export function ChatPanel({
     };
   });
   const ultimoId = mensajes.at(-1)?.id;
+
+  /** Los fijados con las mismas correcciones locales que el historial. */
+  const fijadosConCorrecciones = fijadosLista.map((mensaje) => {
+    const editado = editadosLocales.get(mensaje.id);
+    return editado ? { ...mensaje, body: editado.body, editedAt: editado.editedAt } : mensaje;
+  });
 
   /** Las respuestas del hilo con las mismas correcciones locales que el historial. */
   const hiloMensajes = hiloReplies.map((mensaje) => {
@@ -371,6 +414,26 @@ export function ChatPanel({
     }
   }, [gatewayPath, rutaCanal, usersById, currentUserId]);
 
+  /**
+   * La lista de fijados, entera y sin paginar — el propio backend la deja así
+   * (ver el comentario de `dto.pinned` en `ChatService.findAll`).
+   */
+  const cargarFijados = useCallback(async () => {
+    try {
+      const api = createApiClient({ gatewayPath });
+      const pagina = await api.get<ChatMessagePage>(`${rutaCanal}/messages?pinned=true`);
+      setFijadosLista(pagina.items);
+      setFijadosIndice(0);
+    } catch {
+      /* Sin lista, la barra simplemente no aparece: no es una acción que haya
+         pedido nadie, así que un fallo aquí no merece un `error` visible. */
+    }
+  }, [gatewayPath, rutaCanal]);
+
+  useEffect(() => {
+    void cargarFijados();
+  }, [cargarFijados]);
+
   async function enviar(cuerpo: string, attachmentIds: string[]) {
     setEnviando(true);
     setError(null);
@@ -463,7 +526,9 @@ export function ChatPanel({
    * repintado por mensaje parpadearía la conversación entera.
    */
   async function fijar(messageId: string, on: boolean) {
-    const actual = mensajes.find((mensaje) => mensaje.id === messageId);
+    const actual =
+      mensajes.find((mensaje) => mensaje.id === messageId) ??
+      hiloMensajes.find((mensaje) => mensaje.id === messageId);
     const previo = {
       pinnedAt: fijadosLocales.get(messageId)?.pinnedAt ?? actual?.pinnedAt ?? null,
       pinnedById: fijadosLocales.get(messageId)?.pinnedById ?? actual?.pinnedById ?? null,
@@ -487,6 +552,28 @@ export function ChatPanel({
           pinnedById: resultado.pinnedById,
         }),
       );
+
+      /**
+       * La barra se corrige con el mismo resultado, sin esperar a revalidar.
+       *
+       * ⚠️ **Una respuesta de hilo no entra en la barra**, igual que en el
+       * servidor (`findAll` filtra `replyToId: null` para `pinned=true`): fijar
+       * un mensaje de un hilo lo ancla dentro de su hilo, no en la conversación.
+       */
+      if (actual && !actual.replyTo) {
+        setFijadosLista((previos) => {
+          const sinEste = previos.filter((mensaje) => mensaje.id !== messageId);
+          if (!resultado.pinned) return sinEste;
+          return [
+            {
+              ...actual,
+              pinnedAt: new Date().toISOString(),
+              pinnedById: resultado.pinnedById,
+            },
+            ...sinEste,
+          ];
+        });
+      }
     } catch {
       setFijadosLocales((previos) => new Map(previos).set(messageId, previo));
       setError('No se pudo guardar el fijado.');
@@ -627,6 +714,8 @@ export function ChatPanel({
     setTerminoBuscado('');
   }
 
+  useImperativeHandle(ref, () => ({ abrirBusqueda }));
+
   /**
    * Saltar a un mensaje y enseñarlo en su sitio del historial.
    *
@@ -698,6 +787,20 @@ export function ChatPanel({
     }
   }
 
+  /**
+   * Saltar a un fijado desde la barra, y dejar el puntero en el siguiente.
+   *
+   * Así una pulsación tras otra recorre todos los fijados sin tener que abrir
+   * la lista — es lo que hace que la barra compacta baste para el caso normal.
+   */
+  function irAFijado(messageId: string) {
+    setFijadosExpandido(false);
+    void saltarAlMensaje(messageId);
+    if (fijadosLista.length > 1) {
+      setFijadosIndice((previo) => (previo + 1) % fijadosLista.length);
+    }
+  }
+
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col ${
@@ -712,6 +815,15 @@ export function ChatPanel({
     >
       {salidaMovil && <div className="shrink-0 pt-2 sm:hidden">{salidaMovil}</div>}
       {encabezado}
+
+      <PinnedBar
+        fijados={fijadosConCorrecciones}
+        indice={fijadosIndice}
+        expandido={fijadosExpandido}
+        onExpandirCambiar={setFijadosExpandido}
+        onIr={irAFijado}
+        nombreDeAutor={nombreDeAutor}
+      />
 
       {/**
        * El chat y el hilo, en una fila.
@@ -872,33 +984,6 @@ export function ChatPanel({
                 </svg>
               </button>
             )}
-
-            {/* La lupa siempre está: buscar no depende de estar arriba o abajo. */}
-            <button
-              type="button"
-              onClick={abrirBusqueda}
-              aria-label="Buscar en la conversación"
-              className="absolute right-4 top-3 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
-              style={{
-                background: colors.surfaceElevated,
-                boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
-              }}
-            >
-              <svg
-                className="h-4 w-4 text-text-secondary"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-                />
-              </svg>
-            </button>
 
             {/**
              * La vista de búsqueda, encima del historial.
@@ -1095,7 +1180,7 @@ export function ChatPanel({
       </div>
     </div>
   );
-}
+});
 
 /**
  * «Hoy», «Ayer» o la fecha, **solo cuando cambia el día**.

@@ -12,8 +12,14 @@ import {
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
 } from '@/app/(private)/chat/actions';
-import { Badge, type ChatMessagePage, ChatPanel, type UserProfile } from '@praxis/commons';
-import { useMemo, useState } from 'react';
+import {
+  Badge,
+  type ChatMessagePage,
+  ChatPanel,
+  type ChatPanelHandle,
+  type UserProfile,
+} from '@praxis/commons';
+import { useMemo, useRef, useState } from 'react';
 
 export interface DirectConversationProps {
   peerId: string;
@@ -61,8 +67,11 @@ export function DirectConversation({
     [peerId],
   );
 
+  const chatRef = useRef<ChatPanelHandle>(null);
+
   return (
     <ChatPanel
+      ref={chatRef}
       /* Pantalla dedicada: el chat es lo único que hay, así que llena el alto.
          Con el tope de 58vh quedaba una franja muerta contra el borde inferior. */
       llenarAlto
@@ -119,6 +128,7 @@ export function DirectConversation({
           nombre={peerNombre}
           proyectos={proyectosEnComun}
           muted={page.muted}
+          onBuscar={() => chatRef.current?.abrirBusqueda()}
         />
       }
     />
@@ -140,11 +150,13 @@ function Encabezado({
   nombre,
   proyectos,
   muted,
+  onBuscar,
 }: {
   peerId: string;
   nombre: string;
   proyectos: { id: string; name: string; slug: string; rol: string }[];
   muted: boolean;
+  onBuscar: () => void;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -166,8 +178,45 @@ function Encabezado({
         )}
       </div>
 
-      <BotonSilenciar peerId={peerId} inicial={muted} />
+      <div className="flex shrink-0 items-center gap-2">
+        <BotonBuscar onClick={onBuscar} />
+        <BotonSilenciar peerId={peerId} inicial={muted} />
+      </div>
     </div>
+  );
+}
+
+/**
+ * Abre la búsqueda de `ChatPanel`, con el mismo estilo que «Silenciar avisos».
+ *
+ * Vive en la cabecera —fuera del árbol del panel— porque es donde debe estar
+ * junto a los demás controles del canal; la llamada real va por
+ * `ChatPanelHandle`, que el panel expone justo para esto.
+ */
+function BotonBuscar({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Buscar en la conversación"
+      title="Buscar en la conversación"
+      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-hidden="true"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
+        />
+      </svg>
+    </button>
   );
 }
 
