@@ -1,3 +1,4 @@
+import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 import { Inter, Lora } from 'next/font/google';
 import './globals.css';
@@ -36,25 +37,36 @@ export const metadata: Metadata = {
 };
 
 /**
- * Sin `data-theme` de la cookie, a propósito.
+ * El shell **sí** lee la cookie de tema, igual que las otras cuatro zonas.
  *
- * El shell no sirve páginas de negocio (CLAUDE.md) — lo único que hay aquí es
- * el landing público, y sus organismos (`LandingHero`, `LandingCTA`, …) tienen
- * colores incrustados que no se tocaron en esta pasada: quedan fuera del
- * alcance del tema claro (ver `commons/molecules/FeatureCard`, que sí se
- * arregló porque además la usa este mismo landing). Si el `<html>` heredara
- * `data-theme="light"` de la cookie compartida, el texto del landing —gris
- * claro sobre fondo ahora blanco— se volvería ilegible sin que nadie lo haya
- * pedido. El landing se queda oscuro siempre, y el selector de Configuración
- * solo afecta a las cuatro zonas privadas.
+ * ## Por qué antes no lo hacía
+ *
+ * Estuvo fijado a `data-theme="dark"` y era la decisión correcta entonces: los
+ * organismos del landing llevaban **noventa y dos colores incrustados**, y la
+ * mitad eran blancos con alfa que hacían de texto, de borde y de superficie
+ * sobre fondo oscuro. Heredar `light` los dejaba invisibles sobre blanco, así
+ * que se prefirió un landing oscuro a uno roto.
+ *
+ * Ya no aplica: los seis organismos pasaron a `colors`/`alpha()` de
+ * `commons/tokens`, así que el landing responde al tema como cualquier otra
+ * pantalla. Y como es la única zona pública, trae su propio selector en
+ * `PublicNavbar` — quien entra sin cuenta no tiene una Configuración donde
+ * elegirlo.
+ *
+ * ⚠️ La cookie es **la misma** (`praxis_theme`, `path=/`): cambiar el tema en el
+ * landing lo cambia también dentro de la aplicación, y al revés. Es lo que se
+ * espera de un selector de tema, y lo que evita que entrar en sesión te cambie
+ * el aspecto sin haber tocado nada.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getTheme();
+
   return (
-    <html lang="es" data-theme="dark" className={`${inter.variable} ${lora.variable} h-full`}>
+    <html lang="es" data-theme={theme} className={`${inter.variable} ${lora.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );

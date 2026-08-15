@@ -26,11 +26,11 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 - **La lógica de negocio (fetch, estado, validación) vive solo en las pages.** Moléculas y organismos reciben slots `ReactNode` y props. Patrón de referencia: `commons/molecules/AuthForm` + `auth-front/src/app/login/page.tsx`
 
 **Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Oscuro y
-claro: el selector vive en Configuración, la elección se guarda en la cookie
-`praxis_theme` y cada zona la lee en su `layout.tsx` para estampar `data-theme`
-en el `<html>` sin parpadeo. El landing público de `web-shell` se queda
-oscuro siempre — no sirve páginas de negocio y sus organismos decorativos no
-se migraron. Detalle en ESTADO-ACTUAL §27.
+claro: la elección se guarda en la cookie `praxis_theme` y **las seis zonas** la
+leen en su `layout.tsx` para estampar `data-theme` en el `<html>` sin parpadeo.
+Hay dos selectores y comparten componente (`commons/molecules/ThemeToggle`): el
+de Configuración y el del landing, que lo lleva en `PublicNavbar` porque quien
+entra sin cuenta no tiene dónde elegirlo. Detalle en ESTADO-ACTUAL §27 y §34.
 
 Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.css` de zona lo importa y solo añade lo suyo: `@source "../**/*.tsx"` y sus `@font-face` (que llevan el basePath).
 

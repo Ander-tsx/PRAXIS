@@ -1,6 +1,22 @@
 'use client';
 
-import { FeatureCard, type FeatureCardData, SectionHeader } from '@praxis/commons';
+import { FeatureCard, type FeatureCardData, SectionHeader, alpha, colors } from '@praxis/commons';
+
+/**
+ * ⚠️ **Los `rgba()` que quedan en este archivo son acentos de marca, no
+ * descuidos.**
+ *
+ * Lavanda, índigo y ámbar con alfa baja: colores saturados que se leen igual
+ * sobre `#0d0f14` y sobre blanco, así que no necesitan token ni versión clara.
+ * Lo que sí se migró —y era el problema real del tema claro— son los
+ * `rgba(255,255,255,…)`: veintisiete blancos con alfa que hacían de texto, de
+ * superficie y de borde, y que sobre fondo claro desaparecían. Todos pasan por
+ * `colors.textPrimary`, que se invierte solo entre temas y por eso sirve para
+ * los tres papeles a la vez.
+ *
+ * Las sombras se quedan oscuras en los dos temas, igual que `--color-overlay`:
+ * oscurecer por encima de algo claro sigue leyéndose como sombra.
+ */
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -37,13 +53,13 @@ function KanbanScene(active: boolean) {
     <div
       className="rounded-lg px-2 py-1.5"
       style={{
-        background: tone ? `${tone}1c` : 'rgba(255,255,255,0.05)',
-        border: `1px solid ${tone ? `${tone}55` : 'rgba(255,255,255,0.08)'}`,
+        background: tone ? `${tone}1c` : alpha(colors.textPrimary, 5),
+        border: `1px solid ${tone ? `${tone}55` : alpha(colors.textPrimary, 8)}`,
       }}
     >
       <div
         className="truncate font-sans text-[0.58rem] leading-tight"
-        style={{ color: tone ?? 'rgba(255,255,255,0.62)' }}
+        style={{ color: tone ?? alpha(colors.textPrimary, 62) }}
       >
         {title}
       </div>
@@ -54,13 +70,13 @@ function KanbanScene(active: boolean) {
           fill="none"
           stroke="currentColor"
           strokeWidth={2.5}
-          style={{ color: 'rgba(255,255,255,0.3)' }}
+          style={{ color: alpha(colors.textPrimary, 30) }}
           aria-hidden="true"
         >
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M8 3v4M16 3v4M3 11h18" />
         </svg>
-        <span className="font-mono text-[0.5rem]" style={{ color: 'rgba(255,255,255,0.35)' }}>
+        <span className="font-mono text-[0.5rem]" style={{ color: alpha(colors.textPrimary, 35) }}>
           {due}
         </span>
       </div>
@@ -79,7 +95,7 @@ function KanbanScene(active: boolean) {
             <span
               className="truncate font-sans text-[0.58rem] font-medium"
               style={{
-                color: active ? col.color : 'rgba(255,255,255,0.4)',
+                color: active ? col.color : alpha(colors.textPrimary, 40),
                 transition: 'color 320ms ease',
               }}
             >
@@ -100,8 +116,8 @@ function KanbanScene(active: boolean) {
                    bajo "Autenticación", sin descuadrar el hueco. */
                 transform: active ? 'translateX(calc(100% + 10px))' : 'translateX(0)',
                 filter: active
-                  ? 'drop-shadow(0 10px 16px rgba(0,0,0,0.55))'
-                  : 'drop-shadow(0 0 0 rgba(0,0,0,0))',
+                  ? `drop-shadow(0 10px 16px ${alpha(colors.overlay, 55)})`
+                  : 'drop-shadow(0 0 0 transparent)',
                 transition: `transform 700ms ${EASE}, filter 500ms ease`,
                 animation: active ? 'kanban-tilt 700ms ease-in-out' : undefined,
               }}
@@ -153,9 +169,9 @@ function PermissionsScene(active: boolean) {
             key={role.name}
             className="rounded-full px-2 py-0.5 font-sans text-[0.55rem] font-medium"
             style={{
-              background: role.on ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.04)',
-              border: `1px solid ${role.on ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.07)'}`,
-              color: role.on ? '#c4b5fd' : 'rgba(255,255,255,0.3)',
+              background: role.on ? 'rgba(167,139,250,0.18)' : alpha(colors.textPrimary, 4),
+              border: `1px solid ${role.on ? 'rgba(167,139,250,0.5)' : alpha(colors.textPrimary, 7)}`,
+              color: role.on ? colors.primary : alpha(colors.textPrimary, 30),
               transition: 'all 320ms ease',
             }}
           >
@@ -164,7 +180,7 @@ function PermissionsScene(active: boolean) {
         ))}
         <span
           className="ml-auto font-mono text-[0.52rem]"
-          style={{ color: 'rgba(255,255,255,0.4)' }}
+          style={{ color: alpha(colors.textPrimary, 40) }}
         >
           {granted.size}/{total}
         </span>
@@ -176,7 +192,7 @@ function PermissionsScene(active: boolean) {
           <div key={group.resource} className="flex items-center gap-1.5">
             <span
               className="w-14 flex-shrink-0 font-sans text-[0.55rem] font-medium"
-              style={{ color: 'rgba(255,255,255,0.45)' }}
+              style={{ color: alpha(colors.textPrimary, 45) }}
             >
               {group.resource}
             </span>
@@ -189,9 +205,9 @@ function PermissionsScene(active: boolean) {
                   key={action}
                   className="flex-1 rounded-md py-[3px] text-center font-sans text-[0.5rem] font-medium"
                   style={{
-                    background: on ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.035)',
-                    border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.06)'}`,
-                    color: on ? '#ddd6fe' : 'rgba(255,255,255,0.25)',
+                    background: on ? 'rgba(167,139,250,0.22)' : alpha(colors.textPrimary, 3.5),
+                    border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : alpha(colors.textPrimary, 6)}`,
+                    color: on ? colors.primary : alpha(colors.textPrimary, 25),
                     transition: `all 280ms ${EASE} ${tileIndex * 40}ms`,
                   }}
                 >
@@ -272,8 +288,8 @@ function HierarchyScene(active: boolean) {
               width={node.w}
               height={18}
               rx={5}
-              fill={active ? `${node.color}20` : 'rgba(255,255,255,0.04)'}
-              stroke={active ? `${node.color}70` : 'rgba(255,255,255,0.08)'}
+              fill={active ? `${node.color}20` : alpha(colors.textPrimary, 4)}
+              stroke={active ? `${node.color}70` : alpha(colors.textPrimary, 8)}
               strokeWidth="1"
               style={{ transition: 'all 380ms ease' }}
             />
@@ -284,7 +300,7 @@ function HierarchyScene(active: boolean) {
               dominantBaseline="middle"
               fontSize="7.5"
               fontFamily="system-ui, sans-serif"
-              fill={active ? node.color : 'rgba(255,255,255,0.45)'}
+              fill={active ? node.color : alpha(colors.textPrimary, 45)}
               style={{ transition: 'fill 380ms ease' }}
             >
               {node.label}
@@ -308,7 +324,7 @@ function ChecklistScene(active: boolean) {
         <span
           className="font-mono text-[0.58rem]"
           style={{
-            color: active ? '#34d399' : 'rgba(255,255,255,0.35)',
+            color: active ? '#34d399' : alpha(colors.textPrimary, 35),
             transition: 'color 400ms ease 320ms',
           }}
         >
@@ -318,7 +334,7 @@ function ChecklistScene(active: boolean) {
 
       <div
         className="h-1 overflow-hidden rounded-full"
-        style={{ background: 'rgba(255,255,255,0.07)' }}
+        style={{ background: alpha(colors.textPrimary, 7) }}
       >
         <div
           className="h-full rounded-full"
@@ -336,7 +352,7 @@ function ChecklistScene(active: boolean) {
             className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-[4px] font-sans text-[0.5rem] font-bold"
             style={{
               background: active ? '#34d399' : 'transparent',
-              border: `1px solid ${active ? '#34d399' : 'rgba(255,255,255,0.18)'}`,
+              border: `1px solid ${active ? '#34d399' : alpha(colors.textPrimary, 18)}`,
               color: '#0d1117',
               transition: `background 260ms ease ${i * 140}ms, border-color 260ms ease ${i * 140}ms`,
             }}
@@ -353,7 +369,7 @@ function ChecklistScene(active: boolean) {
           <span
             className="font-sans text-[0.6rem]"
             style={{
-              color: active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.55)',
+              color: active ? alpha(colors.textPrimary, 35) : alpha(colors.textPrimary, 55),
               textDecoration: active ? 'line-through' : 'none',
               transition: `color 260ms ease ${i * 140}ms`,
             }}
@@ -382,7 +398,7 @@ function TeamScene(active: boolean) {
           key={member.initials}
           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
           style={{
-            background: active ? 'rgba(255,255,255,0.045)' : 'transparent',
+            background: active ? alpha(colors.textPrimary, 4.5) : 'transparent',
             opacity: active ? 1 : 0.5,
             transform: active ? 'translateX(0)' : 'translateX(-8px)',
             transition: `all 380ms ${EASE} ${i * 90}ms`,
@@ -433,7 +449,7 @@ function VoiceScene(active: boolean) {
               height: active ? `${height * 100}%` : '14%',
               background: active
                 ? `rgba(245,158,11,${0.45 + height * 0.5})`
-                : 'rgba(255,255,255,0.16)',
+                : alpha(colors.textPrimary, 16),
               transition: `height 420ms ${EASE} ${i * 32}ms, background 420ms ease ${i * 32}ms`,
             }}
           />
@@ -443,9 +459,9 @@ function VoiceScene(active: boolean) {
       <div
         className="rounded-full px-3 py-1.5 text-center font-sans text-[0.6rem]"
         style={{
-          background: active ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${active ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.07)'}`,
-          color: active ? '#f59e0b' : 'rgba(255,255,255,0.4)',
+          background: active ? 'rgba(245,158,11,0.1)' : alpha(colors.textPrimary, 4),
+          border: `1px solid ${active ? 'rgba(245,158,11,0.35)' : alpha(colors.textPrimary, 7)}`,
+          color: active ? '#f59e0b' : alpha(colors.textPrimary, 40),
           transition: 'all 400ms ease 200ms',
         }}
       >

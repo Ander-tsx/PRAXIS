@@ -6,6 +6,7 @@ import { PublicFooter } from '@/components/organisms/PublicFooter';
 import { PublicNavbar } from '@/components/organisms/PublicNavbar';
 import { LandingTemplate } from '@/components/templates/LandingTemplate';
 import { getSession } from '@praxis/commons/auth';
+import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -25,12 +26,15 @@ export const metadata: Metadata = {
  * prerenderizarse: es el precio de que el navbar refleje la sesión.
  */
 export default async function LandingPage() {
+  /* El mismo tema con el que el layout estampó el `<html>`: el switch tiene
+     que nacer donde está, no en el valor por defecto. */
+  const theme = await getTheme();
   const session = await getSession();
   const isAuthenticated = session !== null;
 
   return (
     <LandingTemplate
-      navbar={<PublicNavbar isAuthenticated={isAuthenticated} />}
+      navbar={<PublicNavbar isAuthenticated={isAuthenticated} initialTheme={theme} />}
       hero={<LandingHero isAuthenticated={isAuthenticated} />}
       features={<LandingFeatures />}
       howItWorks={<LandingHowItWorks />}

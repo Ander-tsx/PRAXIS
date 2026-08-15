@@ -27,6 +27,22 @@ function rndChar() {
   return CHARS[Math.floor(Math.random() * CHARS.length)];
 }
 
+/**
+ * El gris del sistema, resuelto a un color real.
+ *
+ * `getComputedStyle` sobre el `<html>` devuelve el valor que tenga
+ * `--color-text-secondary` **con el tema puesto**, así que sirve para los dos
+ * sin que este archivo sepa cuál está activo. Con reserva por si se llama antes
+ * de que el CSS esté listo.
+ */
+function colorDeTexto(): string {
+  if (typeof window === 'undefined') return '#9AA0B4';
+  const valor = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-text-secondary')
+    .trim();
+  return valor || '#9AA0B4';
+}
+
 export function AsciiBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cellsRef = useRef<Cell[]>([]);
@@ -102,7 +118,11 @@ export function AsciiBackground() {
             cell.timer = 0;
           }
           ctx.globalAlpha = BASE_OPACITY;
-          ctx.fillStyle = '#9AA0B4';
+          /* ⚠️ El canvas **no entiende variables CSS**: `fillStyle` necesita un
+             color resuelto. Se lee del documento en tiempo de ejecución para
+             que la retícula siga al tema en vez de quedarse en el gris del
+             modo oscuro, que sobre fondo claro es casi invisible. */
+          ctx.fillStyle = colorDeTexto();
         }
 
         ctx.fillText(cell.char, cx, cy);

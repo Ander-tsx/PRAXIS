@@ -7,11 +7,22 @@
  * Solo tiene sentido en el hero de la landing como elemento visual.
  */
 
+import { alpha, colors } from '@praxis/commons';
 import { ContactShadows, Environment, Float, useGLTF } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { gsap } from 'gsap';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+
+/**
+ * El color del halo que separa el modelo del fondo.
+ *
+ * `surface-elevated` con un 18 % de índigo: en oscuro da el azul marino que ya
+ * tenía, y en claro un lavanda muy suave que sigue destacando el dispositivo sin
+ * ensuciar la página. La mezcla se hace en CSS —no en JS— porque los dos
+ * ingredientes son variables que cambian con el tema.
+ */
+const AURA = `color-mix(in srgb, ${colors.primary} 18%, ${colors.surfaceElevated})`;
 
 /* Pre-load the model */
 useGLTF.preload('/alexa.glb');
@@ -104,9 +115,14 @@ function SpeechBubble({ text, visible }: { text: string; visible: boolean }) {
       ref={ref}
       className="flex items-center gap-3.5 rounded-2xl rounded-bl-sm px-5 py-4"
       style={{
-        background: 'rgba(22,27,39,0.92)',
-        border: '1px solid rgba(108,99,255,0.35)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(108,99,255,0.08)',
+        /* ⚠️ La burbuja llevaba el color de superficie **a fuego**
+           (`rgba(22,27,39,0.92)`, que es `--color-surface` del tema oscuro), así
+           que en claro seguía siendo una tarjeta negra sobre una página blanca.
+           Con el token se invierte sola y el texto —que ya usaba
+           `text-text-primary`— vuelve a tener contraste contra su propio fondo. */
+        background: alpha(colors.surface, 92),
+        border: `1px solid ${alpha(colors.primary, 35)}`,
+        boxShadow: `0 8px 32px ${alpha(colors.overlay, 50)}, 0 0 0 1px ${alpha(colors.primary, 8)}`,
         backdropFilter: 'blur(14px)',
         maxWidth: 400,
         opacity: 0,
@@ -114,7 +130,10 @@ function SpeechBubble({ text, visible }: { text: string; visible: boolean }) {
     >
       <div
         className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
-        style={{ background: 'rgba(108,99,255,0.15)', border: '1.5px solid rgba(108,99,255,0.55)' }}
+        style={{
+          background: alpha(colors.primary, 15),
+          border: `1.5px solid ${alpha(colors.primary, 55)}`,
+        }}
       >
         <div
           className="h-2.5 w-2.5 animate-pulse rounded-full"
@@ -178,8 +197,19 @@ export function EchoDot3D() {
             position: 'absolute',
             inset: 0,
             borderRadius: '50%',
-            background:
-              'radial-gradient(ellipse 80% 75% at 50% 45%, rgba(38,34,80,0.55) 0%, rgba(28,24,55,0.3) 45%, transparent 72%)',
+            /**
+             * ⚠️ **El aura ya no es oscura a fuego.**
+             *
+             * Era un elipse azul marino fijo (`rgba(38,34,80,…)`) que existía
+             * para separar el modelo del fondo. En oscuro cumplía; en claro se
+             * veía como una mancha negra alrededor del dispositivo — el fondo
+             * había cambiado y la capa que lo contrastaba, no.
+             *
+             * Ahora parte de `surface-elevated` con un toque de índigo, así que
+             * hace lo mismo en los dos temas: **oscurece sobre oscuro y aclara
+             * sobre claro**, conservando el tinte de marca que tenía.
+             */
+            background: `radial-gradient(ellipse 80% 75% at 50% 45%, ${alpha(AURA, 55)} 0%, ${alpha(AURA, 30)} 45%, transparent 72%)`,
             pointerEvents: 'none',
             zIndex: 0,
           }}

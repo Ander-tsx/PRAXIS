@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkle } from '@praxis/commons';
+import { Sparkle, alpha, colors } from '@praxis/commons';
 
 const TRUST_SIGNALS = [
   '✓ Listo para usar en minutos',
@@ -59,17 +59,17 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
                 className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
                 style={{
                   background: 'var(--color-primary)',
-                  color: '#fff',
-                  boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
+                  color: colors.primaryForeground,
+                  boxShadow: `0 4px 24px ${alpha(colors.primary, 35)}`,
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget as HTMLButtonElement;
-                  el.style.boxShadow = '0 4px 48px rgba(108,99,255,0.65)';
+                  el.style.boxShadow = `0 4px 48px ${alpha(colors.primary, 65)}`;
                   el.style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget as HTMLButtonElement;
-                  el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
+                  el.style.boxShadow = `0 4px 24px ${alpha(colors.primary, 35)}`;
                   el.style.transform = 'translateY(0)';
                 }}
               >
@@ -84,17 +84,17 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
                   className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
                   style={{
                     background: 'var(--color-primary)',
-                    color: '#fff',
-                    boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
+                    color: colors.primaryForeground,
+                    boxShadow: `0 4px 24px ${alpha(colors.primary, 35)}`,
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 48px rgba(108,99,255,0.65)';
+                    el.style.boxShadow = `0 4px 48px ${alpha(colors.primary, 65)}`;
                     el.style.transform = 'translateY(-2px)';
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
+                    el.style.boxShadow = `0 4px 24px ${alpha(colors.primary, 35)}`;
                     el.style.transform = 'translateY(0)';
                   }}
                 >
@@ -105,14 +105,18 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
                 <button
                   type="button"
                   className="font-sans text-sm font-medium px-8 py-3.5 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
-                  style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                  style={{ borderColor: alpha(colors.textPrimary, 12) }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'rgba(255,255,255,0.25)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = alpha(
+                      colors.textPrimary,
+                      25,
+                    );
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'rgba(255,255,255,0.12)';
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = alpha(
+                      colors.textPrimary,
+                      12,
+                    );
                   }}
                 >
                   Iniciar sesión

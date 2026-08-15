@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkle } from '@praxis/commons';
+import { Sparkle, alpha, colors } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import dynamic from 'next/dynamic';
@@ -15,7 +15,10 @@ const EchoDot3D = dynamic(() => import('./EchoDot3D').then((m) => ({ default: m.
     <div className="flex items-center justify-center" style={{ width: 300, height: 340 }}>
       <div
         className="w-32 h-32 rounded-full animate-pulse"
-        style={{ background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.2)' }}
+        style={{
+          background: alpha(colors.primary, 10),
+          border: `1px solid ${alpha(colors.primary, 20)}`,
+        }}
       />
     </div>
   ),
@@ -210,8 +213,7 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
         className="absolute inset-0 z-0 pointer-events-none"
         aria-hidden="true"
         style={{
-          background:
-            'radial-gradient(ellipse 70% 55% at 40% 50%, rgba(108,99,255,0.12) 0%, transparent 65%)',
+          background: `radial-gradient(ellipse 70% 55% at 40% 50%, ${alpha(colors.primary, 12)} 0%, transparent 65%)`,
         }}
       />
 
@@ -269,7 +271,7 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                   style={{
                     opacity: 0,
                     background:
-                      'linear-gradient(135deg, #fff 0%, var(--color-primary) 50%, #a78bfa 100%)',
+                      'linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-primary) 50%, #a78bfa 100%)',
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
                     backgroundClip: 'text',
@@ -287,7 +289,7 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                 style={{
                   opacity: 0,
                   background:
-                    'linear-gradient(135deg, #fff 0%, var(--color-primary) 50%, #a78bfa 100%)',
+                    'linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-primary) 50%, #a78bfa 100%)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -323,17 +325,17 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                   className="font-sans text-sm font-semibold px-7 py-3 rounded-full transition-all duration-200 cursor-pointer"
                   style={{
                     background: 'var(--color-primary)',
-                    color: '#fff',
-                    boxShadow: '0 4px 24px rgba(108,99,255,0.35)',
+                    color: colors.primaryForeground,
+                    boxShadow: `0 4px 24px ${alpha(colors.primary, 35)}`,
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 40px rgba(108,99,255,0.6)';
+                    el.style.boxShadow = `0 4px 40px ${alpha(colors.primary, 60)}`;
                     el.style.transform = 'translateY(-1px)';
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = '0 4px 24px rgba(108,99,255,0.35)';
+                    el.style.boxShadow = `0 4px 24px ${alpha(colors.primary, 35)}`;
                     el.style.transform = 'translateY(0)';
                   }}
                 >
@@ -345,15 +347,15 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
                   <button
                     type="button"
                     className="font-sans text-sm font-medium px-7 py-3 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
-                    style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                    style={{ borderColor: alpha(colors.textPrimary, 12) }}
                     onMouseEnter={(e) => {
                       const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = 'rgba(255,255,255,0.25)';
-                      el.style.background = 'rgba(255,255,255,0.04)';
+                      el.style.borderColor = alpha(colors.textPrimary, 25);
+                      el.style.background = alpha(colors.textPrimary, 4);
                     }}
                     onMouseLeave={(e) => {
                       const el = e.currentTarget as HTMLButtonElement;
-                      el.style.borderColor = 'rgba(255,255,255,0.12)';
+                      el.style.borderColor = alpha(colors.textPrimary, 12);
                       el.style.background = 'transparent';
                     }}
                   >

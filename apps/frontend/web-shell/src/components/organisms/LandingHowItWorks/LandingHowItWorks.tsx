@@ -1,6 +1,6 @@
 'use client';
 
-import { RoleBadge, Sparkle, alpha } from '@praxis/commons';
+import { RoleBadge, Sparkle, alpha, colors } from '@praxis/commons';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { type ReactNode, useEffect, useRef } from 'react';
@@ -22,7 +22,7 @@ function Panel({ title, meta, children }: { title: string; meta?: string; childr
       style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
-        boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+        boxShadow: `0 12px 40px ${alpha(colors.overlay, 35)}`,
       }}
     >
       <div className="flex items-center justify-between gap-3">
@@ -270,8 +270,7 @@ export function LandingHowItWorks() {
         className="pointer-events-none absolute inset-0"
         aria-hidden="true"
         style={{
-          background:
-            'radial-gradient(ellipse 60% 40% at 80% 50%, rgba(108,99,255,0.05) 0%, transparent 60%)',
+          background: `radial-gradient(ellipse 60% 40% at 80% 50%, ${alpha(colors.primary, 5)} 0%, transparent 60%)`,
         }}
       />
 

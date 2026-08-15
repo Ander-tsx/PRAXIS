@@ -1,0 +1,1 @@
+export { ThemeSwitchPublico } from './ThemeSwitchPublico';

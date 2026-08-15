@@ -1,6 +1,5 @@
 'use client';
 
-import { setThemeAction } from '@/app/(private)/settings/actions';
 import { useState, useTransition } from 'react';
 
 /**
@@ -15,6 +14,16 @@ type ThemeName = 'dark' | 'light';
 
 export interface ThemeToggleProps {
   initialTheme: ThemeName;
+  /**
+   * Cómo se guarda la elección. **Lo pone quien lo monta.**
+   *
+   * Es lo único que cambia entre los dos sitios donde vive este control, y por
+   * eso entra por props en vez de estar dentro: Configuración usa una Server
+   * Action que además revalida su layout, y el landing —que es público y no
+   * tiene acciones propias— escribe la cookie desde el cliente. Meter aquí
+   * cualquiera de las dos habría atado un control de `commons` a una zona.
+   */
+  onCambiar: (theme: ThemeName) => void | Promise<void>;
 }
 
 const OPTIONS: { value: ThemeName; label: string }[] = [
@@ -36,12 +45,15 @@ const PADDING = 4;
  * indica cuál está activo sin repetir el color en cada botón.
  *
  * Cambia de vista al instante —el estado local se adelanta al servidor— y
- * confirma con `setThemeAction`, que escribe la cookie y revalida el layout
- * raíz de esta zona. Las otras cuatro la recogen la próxima vez que el
- * servidor las renderice, que es siempre: no hay navegación de zona sin un
- * salto de página completo (ESTADO-ACTUAL §16).
+ * confirma con lo que le pasen en `onCambiar`, que escribe la cookie. Las demás
+ * zonas la recogen la próxima vez que el servidor las renderice, que es siempre:
+ * no hay navegación de zona sin un salto de página completo (ESTADO-ACTUAL §16).
+ *
+ * ⚠️ **Vive en `commons` porque lo usan dos zonas**: Configuración y el landing
+ * público del shell. Estuvo solo en dashboard-front, y duplicarlo para el
+ * landing habría dejado dos switches que se separan al primer retoque.
  */
-export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
+export function ThemeToggle({ initialTheme, onCambiar }: ThemeToggleProps) {
   const [theme, setTheme] = useState<ThemeName>(initialTheme);
   const [pending, startTransition] = useTransition();
 
@@ -49,7 +61,7 @@ export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
     if (value === theme || pending) return;
     setTheme(value);
     startTransition(async () => {
-      await setThemeAction(value);
+      await onCambiar(value);
     });
   }
 

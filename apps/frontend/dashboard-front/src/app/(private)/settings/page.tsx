@@ -1,11 +1,11 @@
+import { setThemeAction } from '@/app/(private)/settings/actions';
 import { SettingsSection } from '@/components/molecules/SettingsSection';
-import { ThemeToggle } from '@/components/molecules/ThemeToggle';
 import { BillingSummary } from '@/components/organisms/BillingSummary';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
 import { VoiceLinking } from '@/components/organisms/VoiceLinking';
 import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import type { VoiceLink } from '@/lib/voice';
-import { AppHeader, GlobalRoleBadges } from '@praxis/commons';
+import { AppHeader, GlobalRoleBadges, ThemeToggle } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
@@ -86,7 +86,7 @@ export default async function SettingsPage() {
           title="Apariencia"
           description="Cómo se ve la interfaz. Se aplica en todas las zonas de PRAXIS."
         >
-          <ThemeToggle initialTheme={theme} />
+          <ThemeToggle initialTheme={theme} onCambiar={setThemeAction} />
         </SettingsSection>
 
         <SettingsSection
