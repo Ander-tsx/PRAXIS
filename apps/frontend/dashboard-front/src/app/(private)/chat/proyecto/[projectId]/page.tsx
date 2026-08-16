@@ -3,6 +3,7 @@ import type {
   ChatMessagePage,
   EffectivePermissions,
   ProjectDetail,
+  ProjectMember,
   UserProfile,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
@@ -31,21 +32,40 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
-  const [page, project, permisos] = await Promise.all([
+  const [page, project, permisos, miembros] = await Promise.all([
     api.get<ChatMessagePage>(`/projects/${projectId}/chat/messages?limit=50`).catch(() => null),
     api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null),
     api.get<EffectivePermissions>(`/projects/${projectId}/permissions/me`).catch(() => null),
+    /* El equipo, para el desplegable de `@`: quien todavía no ha escrito no
+       está entre los autores y saldría como un trozo de UUID. */
+    api
+      .get<ProjectMember[]>(`/projects/${projectId}/members`)
+      .catch(() => [] as ProjectMember[]),
   ]);
 
   if (!page || !project) return notFound();
 
   /**
-   * Los perfiles de quien ha escrito.
+   * Los perfiles de quien ha escrito **y de todo el equipo**.
    *
-   * ⚠️ Se piden **por id** y no con un listado del equipo: quien escribió puede
-   * haber salido del proyecto después, y su burbuja saldría con el UUID crudo.
+   * ⚠️ Los dos conjuntos, y ninguno sobra. Quien escribió puede **haber salido
+   * del proyecto** después, así que no está entre los miembros y su burbuja
+   * saldría con el UUID crudo; y quien está en el equipo pero **todavía no ha
+   * escrito** no está entre los autores, así que el desplegable de `@` lo
+   * ofrecía como «22222222» —el trozo de UUID al que cae `pedirSugerencias`
+   * cuando no encuentra el perfil—.
+   *
+   * Se piden por id y no con `/users?limit=100`: aquello es la primera página
+   * del directorio de toda la plataforma y deja de contener a tu gente en
+   * cuanto hay más de cien cuentas (CLAUDE.md).
    */
-  const ids = [...new Set([userId, ...page.items.map((mensaje) => mensaje.authorId)])];
+  const ids = [
+    ...new Set([
+      userId,
+      ...page.items.map((mensaje) => mensaje.authorId),
+      ...miembros.map((miembro) => miembro.userId),
+    ]),
+  ];
   const perfiles = await Promise.all(
     ids.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
   );
