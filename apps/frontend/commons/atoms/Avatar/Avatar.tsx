@@ -121,7 +121,16 @@ export function Avatar({
      * Dentro tendría que pelearse con el `overflow-hidden` que recorta la foto:
      * o se recorta el punto, o se deja de recortar la foto y sale cuadrada.
      */
-    <span className={['relative inline-flex shrink-0', className].filter(Boolean).join(' ')}>
+    <span
+      /**
+       * ⚠️ **`h-fit`, o el punto se va al fondo de la fila.** Un contenedor
+       * `flex` estira a sus hijos por defecto (`align-items: stretch`), así que
+       * este envoltorio crecía hasta el alto del mensaje entero y su
+       * `bottom-0` dejaba el punto colgando muy por debajo de la cara. Con el
+       * alto ajustado al círculo, la esquina vuelve a ser la esquina.
+       */
+      className={['relative inline-flex h-fit shrink-0', className].filter(Boolean).join(' ')}
+    >
       {circulo}
       <span
         title={etiqueta}
