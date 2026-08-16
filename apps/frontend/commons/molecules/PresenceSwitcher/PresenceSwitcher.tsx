@@ -12,18 +12,21 @@ export interface PresenceSwitcherProps {
    * action; devuelve el valor confirmado o `null` si no se pudo.
    */
   onCambiar: (presencia: Presence) => Promise<string | null>;
-  /** Plegada, solo cabe el punto. */
-  plegada?: boolean;
 }
 
 /**
- * Cambiar de presencia **sin salir de donde estés**.
+ * Cambiar de presencia pulsando **la propia esfera** del avatar.
  *
- * Vive en el pie de la barra lateral, donde estaba «Cerrar sesión». El cambio
- * de estado es lo que se toca varias veces al día —entras a una reunión, sales
- * a comer— y mandarlo a una pantalla aparte era pedir dos navegaciones por
- * cada vez. Cerrar sesión, que se usa una vez, es lo que se fue a la pantalla
- * de cuenta.
+ * ## El punto es el botón
+ *
+ * Hubo una fila con el nombre del estado bajo la ficha de usuario, y sobraba:
+ * el punto de color ya está ahí, ya dice cuál es tu estado y es donde se
+ * intenta pulsar. Repetirlo debajo con su etiqueta ocupaba una línea entera de
+ * la barra para decir lo que la esfera ya decía.
+ *
+ * Se dibuja **encima del avatar**, en su esquina, en el sitio exacto donde
+ * `Avatar` pintaría el punto pasivo — por eso en la barra el avatar va sin
+ * `presence`: lo sustituye este, que además se puede pulsar.
  *
  * ## Se pinta lo que confirma el servidor
  *
@@ -31,7 +34,7 @@ export interface PresenceSwitcherProps {
  * pero se corrige con lo que devuelve el servidor: si el guardado falla, el
  * punto vuelve a decir la verdad en vez de la intención.
  */
-export function PresenceSwitcher({ valor, onCambiar, plegada = false }: PresenceSwitcherProps) {
+export function PresenceSwitcher({ valor, onCambiar }: PresenceSwitcherProps) {
   const [abierto, setAbierto] = useState(false);
   const [presencia, setPresencia] = useState(valor ?? 'AVAILABLE');
   const [guardando, setGuardando] = useState(false);
@@ -70,38 +73,19 @@ export function PresenceSwitcher({ valor, onCambiar, plegada = false }: Presence
 
   return (
     <div ref={cajaRef} className="relative">
+      {/* El mismo tamaño y el mismo sitio que el punto pasivo de `Avatar`, para
+          que al cambiar de una pantalla a otra no se mueva ni un píxel. */}
       <button
         type="button"
         onClick={() => setAbierto((previo) => !previo)}
         disabled={guardando}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        title={plegada ? `Estado: ${actual.etiqueta}` : 'Cambiar tu estado'}
-        className={`flex w-full cursor-pointer items-center gap-2 rounded-lg font-sans text-xs text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60 ${
-          plegada ? 'justify-center p-2' : 'px-2 py-2'
-        }`}
-      >
-        <span
-          aria-hidden="true"
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ background: actual.color }}
-        />
-        {!plegada && <span className="min-w-0 flex-1 truncate text-left">{actual.etiqueta}</span>}
-        {!plegada && (
-          <svg
-            className={`h-3 w-3 shrink-0 transition-transform ${abierto ? 'rotate-180' : ''}`}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        )}
-      </button>
+        aria-label={`Tu estado: ${actual.etiqueta}. Pulsa para cambiarlo`}
+        title={`${actual.etiqueta} — pulsa para cambiar tu estado`}
+        className="block h-3 w-3 cursor-pointer rounded-full ring-2 ring-surface transition-transform hover:scale-125 disabled:cursor-not-allowed disabled:opacity-60"
+        style={{ background: actual.color }}
+      />
 
       {abierto && (
         /* Hacia **arriba**: el conmutador vive en el pie de la barra, así que

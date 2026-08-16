@@ -135,9 +135,21 @@ export function Avatar({
       <span
         title={etiqueta}
         aria-label={etiqueta}
+        /**
+         * ⚠️ **El punto se mete hacia dentro, no se pega al borde.**
+         *
+         * `bottom-0 right-0` lo coloca en la esquina de la **caja**, y la caja
+         * de un círculo tiene las esquinas vacías: el punto quedaba flotando en
+         * diagonal, separado de la cara. Metiéndolo un poco (`bottom-0 right-0`
+         * con un desplazamiento) cae sobre el borde real del círculo, que es
+         * donde se espera verlo.
+         *
+         * El desplazamiento es proporcional al tamaño: en el círculo pequeño el
+         * arco es más cerrado y hay que entrar menos.
+         */
         className={[
-          'absolute bottom-0 right-0 rounded-full ring-2 ring-surface',
-          size === 'sm' ? 'h-2 w-2' : 'h-3 w-3',
+          'absolute rounded-full ring-2 ring-surface',
+          size === 'sm' ? 'bottom-[-1px] right-[-1px] h-2 w-2' : 'bottom-0 right-0 h-3 w-3',
         ].join(' ')}
         style={{ background: color }}
       />

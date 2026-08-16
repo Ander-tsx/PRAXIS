@@ -28,10 +28,9 @@ export default async function PrivateLayout({ children }: { children: React.Reac
         avatarSrc: hrefDeAvatar(profile.avatarUrl, '/reports/api/gateway'),
         presence: profile.presence ?? null,
       }}
-      /* «Cerrar sesión» se fue a la pantalla de cuenta, a la que se llega
-         pulsando la ficha de arriba. Aquí queda el cambio de estado, que es
-         lo que sí se toca varias veces al día. */
-      footerSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
+      /* El selector de estado se dibuja sobre la esquina del avatar: la
+         esfera **es** el botón. Ver `PresenceFooter`. */
+      estadoSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
     >
       {children}
     </AppShell>

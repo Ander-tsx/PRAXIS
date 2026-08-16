@@ -2,7 +2,6 @@
 
 import type { Presence } from '../../api/presence';
 import { PresenceSwitcher } from '../../molecules/PresenceSwitcher';
-import { useSidebarPlegada } from './AppShell';
 
 export interface PresenceFooterProps {
   presencia: string | null | undefined;
@@ -15,19 +14,18 @@ export interface PresenceFooterProps {
 }
 
 /**
- * El pie de la barra lateral: cambiar de estado, y nada más.
+ * El selector de estado de la barra lateral: **la propia esfera del avatar**.
  *
- * ⚠️ **Aquí estaba «Cerrar sesión».** Era el único control destructivo de toda
- * la barra, pegado a la navegación, y se usa una vez al día como mucho; se fue
- * a la pantalla de cuenta, donde vive el resto de lo tuyo. Lo que queda es lo
- * que sí se toca varias veces al día — entras a una reunión, sales a comer— y
- * que mandado a otra pantalla costaría dos navegaciones cada vez.
+ * ⚠️ Aquí hubo primero «Cerrar sesión» —que se fue a la pantalla de cuenta— y
+ * luego una fila con el nombre del estado. La fila sobraba: el punto de color
+ * del avatar ya dice cuál es tu estado y es donde se intenta pulsar, así que
+ * repetirlo debajo con su etiqueta gastaba una línea de la barra para no decir
+ * nada nuevo. Ahora el punto **es** el botón.
  *
- * Existe como componente propio para leer el pliegue por contexto: plegada la
- * barra solo cabe el punto de color, y esa decisión no puede tomarla el
- * `layout.tsx` de cada zona, que se pinta en el servidor.
+ * Se queda como componente propio porque `AppShell` lo coloca sobre el avatar
+ * y quien tiene la acción de guardar es la zona: este es el puente entre las
+ * dos, y es de cliente porque el menú tiene estado.
  */
 export function PresenceFooter({ presencia, onCambiar }: PresenceFooterProps) {
-  const plegada = useSidebarPlegada();
-  return <PresenceSwitcher valor={presencia} onCambiar={onCambiar} plegada={plegada} />;
+  return <PresenceSwitcher valor={presencia} onCambiar={onCambiar} />;
 }

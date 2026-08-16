@@ -31,15 +31,17 @@ export interface AppShellProps {
   zonePath: string;
   user: AppShellUser;
   /**
-   * Pie de la barra lateral.
+   * El selector de estado, **dibujado sobre la esquina del avatar**.
    *
-   * ⚠️ **Ya no lleva «Cerrar sesión».** Se movió a la pantalla de cuenta, a la
-   * que se llega pulsando la propia ficha de usuario: en el pie era el único
-   * control destructivo de toda la barra y estaba pegado a la navegación, un
-   * clic de más al ir a Configuración. Aquí queda el cambio rápido de
-   * presencia, que sí se usa a diario.
+   * ⚠️ Este hueco fue antes el pie de la barra: primero con «Cerrar sesión»
+   * —que se movió a la pantalla de cuenta— y luego con una fila que repetía el
+   * estado con su etiqueta. La fila sobraba, porque el punto del avatar ya lo
+   * decía; ahora ese punto **es** el botón, y esto es lo que se pinta encima.
+   *
+   * Lo pone la zona porque la escritura va por su propio proxy: ver
+   * `PresenceFooter`.
    */
-  footerSlot?: ReactNode;
+  estadoSlot?: ReactNode;
   /**
    * Si la barra sale plegada, **resuelto en el servidor**.
    *
@@ -122,7 +124,7 @@ export function AppShell({
   navItems,
   zonePath,
   user,
-  footerSlot,
+  estadoSlot,
   plegadaInicial = false,
   children,
 }: AppShellProps) {
@@ -213,18 +215,18 @@ export function AppShell({
                 }`}
                 title={`${user.name.trim() || user.email} — tu cuenta`}
               >
+                {/* Sin `presence`: el punto lo pinta `estadoSlot`, que además
+                    se puede pulsar. Ver el aviso de esa prop. */}
                 <Avatar
                   label={user.name.trim() || user.email}
                   mine
                   size="md"
                   src={user.avatarSrc ?? null}
-                  presence={user.presence ?? null}
                 />
               </a>
             ) : (
-              <UserCard user={user} activa={enCuenta} />
+              <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
             )}
-            {footerSlot}
           </div>
         </aside>
 
@@ -285,8 +287,7 @@ export function AppShell({
               </div>
 
               <div className="border-t border-border pt-4">
-                <UserCard user={user} />
-                {footerSlot}
+                <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
               </div>
             </div>
           </div>
@@ -304,10 +305,13 @@ export function AppShell({
  * donde se ha puesto lo tuyo: nombre, foto, presencia, cerrar sesión y borrar
  * la cuenta.
  */
-function UserCard({ user, activa = false }: { user: AppShellUser; activa?: boolean }) {
+function UserCard({
+  user,
+  activa = false,
+  estadoSlot,
+}: { user: AppShellUser; activa?: boolean; estadoSlot?: ReactNode }) {
   return (
-    <a
-      href={CUENTA_HREF}
+    <div
       title="Tu cuenta"
       aria-current={activa ? 'page' : undefined}
       /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
@@ -320,20 +324,32 @@ function UserCard({ user, activa = false }: { user: AppShellUser; activa?: boole
       {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
           la barra lateral la persona siempre eres tú, así que sale en rojo. Que
           coincida importa — es lo que enseña que el rojo significa «tuyo». */}
-      <Avatar
-        label={user.name.trim() || user.email}
-        mine
-        size="md"
-        src={user.avatarSrc ?? null}
-        presence={user.presence ?? null}
-      />
-      <div className="min-w-0 flex-1">
+      {/**
+       * El avatar y su punto **no van dentro del enlace**: el punto es un botón
+       * y un botón dentro de un `<a>` es HTML inválido —y en la práctica, un
+       * clic que navega en vez de abrir el menú—. Por eso la ficha es una fila
+       * con dos cosas: un enlace que ocupa el texto y el avatar, y el selector
+       * de estado encima, fuera de él.
+       */}
+      <span className="relative shrink-0">
+        <a href={CUENTA_HREF} className="block" title="Tu cuenta">
+          <Avatar
+            label={user.name.trim() || user.email}
+            mine
+            size="md"
+            src={user.avatarSrc ?? null}
+          />
+        </a>
+        {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
+      </span>
+      {/* El texto sí es el enlace a tu cuenta. */}
+      <a href={CUENTA_HREF} className="min-w-0 flex-1">
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-text-primary">{user.name}</p>
         )}
         <p className="truncate font-sans text-xs text-text-secondary">{user.email}</p>
-      </div>
-    </a>
+      </a>
+    </div>
   );
 }
 

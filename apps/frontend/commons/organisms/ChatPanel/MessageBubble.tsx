@@ -517,7 +517,11 @@ export function MessageBubble({
         className={`relative flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}
       >
         {!continued && (
-          <span className="flex items-baseline gap-2 px-1 font-sans text-xs">
+          /* ⚠️ `items-center` y no `items-baseline`: un `<svg>` no tiene línea
+             base, así que en una fila alineada por ella los checks se apoyaban
+             en el borde inferior de su caja y quedaban un par de píxeles por
+             debajo del nombre y la hora. */
+          <span className="flex items-center gap-2 px-1 font-sans text-xs">
             {hrefDePersona && !mine ? (
               <a
                 href={hrefDePersona}
@@ -1006,7 +1010,10 @@ export function MessageBubble({
              * Solo aparece si alguien lo ha visto: un botón que abre una lista
              * vacía es un botón que no había que ofrecer.
              */}
-            {!confirmandoBorrado && vistoPor.length > 0 && (
+            {/* Solo en los tuyos: en el mensaje de otra persona, saber quién
+                más lo ha visto no es asunto de quien lo lee — y ahí el dato
+                que importa ya lo da su propio autor. */}
+            {!confirmandoBorrado && mine && vistoPor.length > 0 && (
               <button
                 type="button"
                 onClick={() => setListaDeVistos((previo) => !previo)}
@@ -1101,7 +1108,7 @@ export function MessageBubble({
 
         {/* La lista de quién lo ha visto, plegada bajo el mensaje. Solo cuando
             se pide desde la barra: ver el comentario de ese botón. */}
-        {listaDeVistos && vistoPor.length > 0 && (
+        {listaDeVistos && mine && vistoPor.length > 0 && (
           <div
             className={`flex max-w-full flex-col gap-1 rounded-lg border px-2.5 py-2 ${
               mine ? 'self-end' : 'self-start'
