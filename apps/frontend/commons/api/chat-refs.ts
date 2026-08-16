@@ -127,6 +127,84 @@ export function trocearMensaje(cuerpo: string): ChatToken[] {
   return trozos;
 }
 
+/**
+ * Una etiqueta ya insertada en el texto que se está escribiendo o editando.
+ *
+ * El id vive aquí, fuera del `<textarea>`, y solo se pega al serializar: si el
+ * texto guardara la etiqueta entera —`@[María García](user:2222…)`—, quien
+ * edita un mensaje vería un UUID de 36 caracteres en mitad de su frase.
+ */
+export interface EtiquetaPlana {
+  kind: ChatRefKind;
+  id: string;
+  /** Lo que se ve en el campo: `@María García`, o el título de la tarea. */
+  visible: string;
+}
+
+/**
+ * Separa el cuerpo de un mensaje guardado en texto legible y etiquetas, para
+ * poder editarlo sin que un UUID asome en mitad de la frase.
+ *
+ * Es la inversa de `serializarEtiquetas`: `@[María García](user:2222…)` se
+ * convierte en `@María García` + una etiqueta que guarda el id. Si se guarda sin
+ * tocar nada, `serializarEtiquetas` reconstruye el cuerpo exacto.
+ */
+export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: EtiquetaPlana[] } {
+  const trozos = trocearMensaje(cuerpo);
+  const texto: string[] = [];
+  const etiquetas: EtiquetaPlana[] = [];
+
+  for (const trozo of trozos) {
+    if (trozo.tipo === 'texto') {
+      texto.push(trozo.texto);
+    } else if (trozo.tipo === 'url') {
+      texto.push(trozo.url);
+    } else {
+      /* Espejo de `elegir()` en el Composer: la `@` es del formato de las
+         personas; un tablero o una tarea se muestran sin su `/`. Así el texto
+         que vuelve al campo es exactamente el que se escribiría a mano, y
+         `serializarEtiquetas` lo reconstruye sin duplicar el sigil. */
+      const visible = trozo.kind === 'user' ? `@${trozo.label}` : trozo.label;
+      texto.push(visible);
+      etiquetas.push({ kind: trozo.kind, id: trozo.id, visible });
+    }
+  }
+
+  return { texto: texto.join(''), etiquetas };
+}
+
+/**
+ * Junta texto y etiquetas en el cuerpo que viaja al servidor.
+ *
+ * Recorre las etiquetas **en el orden en que se insertaron** y busca cada una a
+ * partir de donde acabó la anterior. Eso resuelve dos personas con el mismo
+ * nombre y, sobre todo, **una etiqueta que ya no está**: si quien edita borró
+ * ese trozo del texto, no se encuentra y se ignora — el mensaje sale con lo que
+ * de verdad quedó escrito. Espejo del `serializar()` del Composer.
+ */
+export function serializarEtiquetas(texto: string, etiquetas: EtiquetaPlana[]): string {
+  const salida: string[] = [];
+  let desde = 0;
+
+  for (const etiqueta of etiquetas) {
+    const posicion = texto.indexOf(etiqueta.visible, desde);
+    if (posicion === -1) continue;
+    if (posicion > desde) salida.push(texto.slice(desde, posicion));
+    salida.push(
+      componerReferencia(
+        etiqueta.kind,
+        etiqueta.id,
+        /* La `@` es del formato, no del nombre: se quita antes de componer. */
+        etiqueta.kind === 'user' ? etiqueta.visible.slice(1) : etiqueta.visible,
+      ),
+    );
+    desde = posicion + etiqueta.visible.length;
+  }
+
+  if (desde < texto.length) salida.push(texto.slice(desde));
+  return salida.join('');
+}
+
 /** Construye una etiqueta para insertarla en el texto que se está escribiendo. */
 export function componerReferencia(kind: ChatRefKind, id: string, label: string): string {
   const sigil = kind === 'user' ? '@' : '/';

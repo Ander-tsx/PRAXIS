@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { COLOR_POR_TIPO_DE_REF, type ChatRefKind, componerReferencia } from '../../api/chat-refs';
+import { COLOR_POR_TIPO_DE_REF, type ChatRefKind, serializarEtiquetas } from '../../api/chat-refs';
 import {
   CHAT_ATTACHMENT_ALLOWED_MIME,
   CHAT_ATTACHMENT_MAX_PER_MESSAGE,
@@ -302,18 +302,7 @@ export function Composer({
 
   /** Lo mismo, pero con los ids pegados: es lo que viaja al servidor. */
   function serializar(): string {
-    return trozos
-      .map((trozo) =>
-        trozo.etiqueta
-          ? componerReferencia(
-              trozo.etiqueta.kind,
-              trozo.etiqueta.id,
-              /* La `@` es del formato, no del nombre: se quita antes de componer. */
-              trozo.etiqueta.kind === 'user' ? trozo.texto.slice(1) : trozo.texto,
-            )
-          : trozo.texto,
-      )
-      .join('');
+    return serializarEtiquetas(texto, etiquetas);
   }
 
   function enviar() {
