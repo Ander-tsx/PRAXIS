@@ -1234,62 +1234,40 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     }
                   : {})}
                 respuestaSlot={
-                  editando ? (
-                    <div
-                      className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
-                      style={{ borderColor: colors.warning, background: alpha(colors.warning, 8) }}
-                    >
-                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span
-                          className="font-sans text-[11px] font-semibold"
-                          style={{ color: colors.warning }}
+                  /* Editando no se anuncia con una franja: el campo relleno, el
+                     texto de ayuda y los botones «Guardar»/«Cancelar» ya lo dicen,
+                     y una etiqueta más solo robaba alto al chat. */
+                  editando
+                    ? null
+                    : respondiendo && (
+                        <div
+                          className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
+                          style={{
+                            borderColor: colors.primary,
+                            background: alpha(colors.primary, 8),
+                          }}
                         >
-                          Editando tu mensaje
-                        </span>
-                        <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                          <AdjuntoPreview mensaje={editando} />
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setEditando(null)}
-                        aria-label="Dejar de editar"
-                        className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    respondiendo && (
-                      <div
-                        className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
-                        style={{
-                          borderColor: colors.primary,
-                          background: alpha(colors.primary, 8),
-                        }}
-                      >
-                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <span
-                            className="font-sans text-[11px] font-semibold"
-                            style={{ color: colors.primary }}
+                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span
+                              className="font-sans text-[11px] font-semibold"
+                              style={{ color: colors.primary }}
+                            >
+                              Respondiendo a {nombreDeAutor(respondiendo.authorId)}
+                            </span>
+                            <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+                              <AdjuntoPreview mensaje={respondiendo} />
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setRespondiendo(null)}
+                            aria-label="Dejar de responder"
+                            className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
                           >
-                            Respondiendo a {nombreDeAutor(respondiendo.authorId)}
-                          </span>
-                          <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                            <AdjuntoPreview mensaje={respondiendo} />
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setRespondiendo(null)}
-                          aria-label="Dejar de responder"
-                          className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )
-                  )
+                            ✕
+                          </button>
+                        </div>
+                      )
                 }
               />
             </div>

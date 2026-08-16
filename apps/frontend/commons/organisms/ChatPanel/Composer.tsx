@@ -617,7 +617,10 @@ export function Composer({
           <button
             type="button"
             onClick={onCancelar}
-            className="shrink-0 cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+            /* `h-9` como «Guardar»: sin alto propio, el botón se alineaba por
+               su texto y quedaba un par de píxeles más abajo que su vecino en
+               una fila que se alinea por abajo (`items-end`). */
+            className="flex h-9 shrink-0 cursor-pointer items-center rounded-lg px-3 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
           >
             Cancelar
           </button>
