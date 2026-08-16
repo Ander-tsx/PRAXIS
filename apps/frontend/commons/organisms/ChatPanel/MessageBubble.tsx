@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatRefKind, EtiquetaPlana } from '../../api/chat-refs';
 import { desdoblarEtiquetas, serializarEtiquetas, trocearMensaje } from '../../api/chat-refs';
 import {
@@ -64,11 +64,11 @@ export interface MessageBubbleProps {
 /**
  * Un mensaje.
  *
- * ## Las acciones aparecen al pasar por encima, no siempre
+ * ## Las acciones se abren con un clic, no al pasar por encima
  *
  * Tres botones fijos en cada burbuja convierten la conversación en una rejilla
  * de controles y le quitan sitio al texto, que es lo único que se viene a leer.
- * Aparecen al pasar el ratón **y al enfocar con teclado**: con solo
+ * Se abren con un clic en la burbuja **y al enfocar con teclado**: con solo
  * `group-hover`, quien navega con tabulador tendría botones que existen y no
  * puede ver.
  */
@@ -228,6 +228,9 @@ export function MessageBubble({
     /** Se decide en el primer movimiento real: horizontal (desliza) o no (deja pasar el scroll). */
     esDeslizamiento: false,
     temporizador: null as ReturnType<typeof setTimeout> | null,
+    /** El tipo de puntero del último `pointerdown`, para que el click de la
+        burbuja solo abra la barra con ratón. */
+    ultimoPointerTipo: 'mouse' as string,
   });
 
   function limpiarTemporizador() {
@@ -238,6 +241,7 @@ export function MessageBubble({
   }
 
   function onGestoInicio(e: React.PointerEvent<HTMLDivElement>) {
+    gestoRef.current.ultimoPointerTipo = e.pointerType;
     if (e.pointerType !== 'touch' || editando || confirmandoBorrado) return;
     gestoRef.current.startX = e.clientX;
     gestoRef.current.startY = e.clientY;
@@ -314,6 +318,8 @@ export function MessageBubble({
    * recortaría**. Se voltea hacia abajo para que las acciones siempre se vean.
    */
   const [barraAbajo, setBarraAbajo] = useState(false);
+  /** Si la barra de acciones está abierta. Se abre al pulsar la burbuja. */
+  const [barraVisible, setBarraVisible] = useState(false);
 
   /**
    * Cuánto ocupa la barra de acciones más una holgura.
@@ -335,6 +341,34 @@ export function MessageBubble({
        queda arriba: mejor que no quepa del todo a estar fuera de la vista. */
     setBarraAbajo(!cabeArriba && cabeAbajo);
   }
+
+  /** Abre la barra de acciones sobre el mensaje. */
+  function abrirBarra() {
+    decidirDireccionBarra();
+    setBarraVisible(true);
+  }
+
+  /** Cierra la barra y recoge lo que tenía abierto encima. */
+  const cerrarBarra = useCallback(() => {
+    setConfirmandoBorrado(false);
+    setEligiendoReaccion(false);
+    setBarraAbajo(false);
+    setBarraVisible(false);
+  }, []);
+
+  /* Un clic fuera de la burbuja cierra la barra: dejarla abierta mientras se
+     lee otro mensaje es el mismo ruido que el hover que la abría solo. */
+  useEffect(() => {
+    if (!barraVisible) return;
+    function alClicFuera(evento: MouseEvent) {
+      const burbuja = burbujaRef.current;
+      if (burbuja && evento.target instanceof Node && !burbuja.contains(evento.target)) {
+        cerrarBarra();
+      }
+    }
+    document.addEventListener('pointerdown', alClicFuera);
+    return () => document.removeEventListener('pointerdown', alClicFuera);
+  }, [barraVisible, cerrarBarra]);
 
   /** Las reacciones agrupadas por emoji, con cuántos y si estás dentro. */
   const agrupadas = new Map<string, { total: number; mia: boolean }>();
@@ -472,16 +506,11 @@ export function MessageBubble({
           </span>
         )}
 
-        {/**
-         * ⚠️ **El `group` está aquí, en la burbuja, y no en el `<article>`.**
-         *
-         * Estaba en la fila entera, que ocupa todo el ancho del panel: pasar el
-         * ratón por el hueco vacío de la derecha —o por el avatar, o por el
-         * nombre— ya sacaba los tres botones. Con varios mensajes seguidos, se
-         * encendían y apagaban solos al mover el ratón por la conversación.
-         *
-         * Se nombra (`group/burbuja`) a propósito: sin nombre, cualquier `group`
-         * que alguien añada más arriba volvería a capturarlo sin avisar.
+        {/** La burbuja es el elemento que se pulsa para abrir la barra de
+         * acciones, y el `<article>` que la envuelve ocupa todo el ancho del
+         * panel. Por eso el manejador de clic vive aquí, en la burbuja, y no en
+         * la fila entera: pulsar el hueco vacío de la derecha —o el avatar, o el
+         * nombre— no debe sacar los botones de un mensaje que no se ha tocado.
          */}
         {editando ? (
           <div className="w-full rounded-xl border border-border p-2 transition-colors focus-within:border-primary">
@@ -568,25 +597,31 @@ export function MessageBubble({
               </span>
             )}
 
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado son los <button> de la barra, siempre en el DOM (se enfocan y `has-[:focus-visible]` la saca); poner role="button" en la burbuja aplanaría su contenido para un lector de pantalla */}
             <div
               ref={burbujaRef}
-              className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
-              /* Al irse del mensaje se recogen las superficies flotantes: ni el
-                 selector de reacciones ni la confirmación de borrado tienen
-                 sentido sobre una burbuja que ya no estás mirando, y dejarlos
-                 abiertos es lo que obligaba a cerrarlos a mano. Cubre además el
-                 caso de abrir el selector y apartar el ratón sin llegar a entrar
-                 en él.
+              className="relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
+              /* Un clic en el mensaje abre o cierra la barra de acciones.
+                 Un clic en un enlace o botón del mensaje no la alterna: es la
+                 propia acción de ese elemento (navegar, abrir el hilo…) y la
+                 barra no debe salir por medio. `closest` recorre hacia arriba
+                 desde lo que se pulsó para detectarlo.
 
                  ⚠️ **El editor NO se cierra aquí.** Un redactor abierto se queda
-                 hasta que se guarde, se cancele o se pulse Esc: cerrarlo al mover
-                 el ratón hacía que editar fuera imposible — se abría y se cerraba
-                 solo en cuanto el foco iba al textarea. */
-              onMouseEnter={decidirDireccionBarra}
-              onMouseLeave={() => {
-                setConfirmandoBorrado(false);
-                setEligiendoReaccion(false);
-                setBarraAbajo(false);
+                 hasta que se guarde, se cancele o se pulse Esc. */
+              onClick={(evento) => {
+                const objetivo = evento.target as Element;
+                if (objetivo.closest('a, button')) return;
+                /* En móvil un tap no abre la barra: esa es la vía de la hoja de
+                   acciones (pulsación larga). Un clic de ratón sí la alterna. */
+                if (gestoRef.current.ultimoPointerTipo !== 'mouse') return;
+                /* Seleccionar texto del mensaje no debe abrir la barra: el
+                   gesto era copiar, y perder la selección bajo la barra es
+                   peor que no hacer nada. */
+                const seleccion = window.getSelection();
+                if (seleccion && !seleccion.isCollapsed) return;
+                if (barraVisible) cerrarBarra();
+                else abrirBarra();
               }}
               /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
                  como que el sistema cancele el gesto a medias (una llamada
@@ -638,24 +673,30 @@ export function MessageBubble({
                * Con el conjunto cerrado que tiene el chat, el menú sobraba: ahora
                * reaccionar es un clic y no hay nada que cruzar.
                *
-               * ## Y por qué se solapa con la burbuja
+               * ## Y por qué flota arriba, sin tapar el mensaje
                *
-               * Se ancla sobre el borde superior, hacia dentro del ancho del
-               * mensaje. Fuera se salía del viewport en pantallas estrechas y se
-               * recortaba contra el borde del hilo en el primer mensaje; aquí no
-               * puede pasar ninguna de las dos, porque nunca sobresale de la
-               * burbuja.
+               * Se ancla al borde superior de la burbuja pero **por fuera**,
+               * `bottom-full`, dejando aire (`mb-1.5`) entre la barra y el
+               * texto. Antes caía por dentro del mensaje (`-top-4`) y tapaba la
+               * primera línea que acababa de escribirse. Anclarla por fuera no
+               * la hace salirse del viewport en pantallas estrechas: el anclaje
+               * lateral sigue siendo hacia dentro del ancho de la burbuja.
                *
                * ⚠️ **Salvo un caso: el primer mensaje del scroll.** Ahí el borde de
-               * arriba del contenedor **sí** recorta la barra que cuelga `-top-4`
-               * —se veía cortada o directamente no se veía—. Se voltea hacia abajo
+               * arriba del contenedor **sí** recorta la barra que cuelga por fuera
+               * —se vería cortada o directamente no se vería—. Se voltea hacia abajo
                * (`top-full`) cuando el mensaje está pegado al borde superior y la
                * barra no cabría encima: `decidirDireccionBarra` lo mide contra el
-               * `scrollerRef` al pasar el ratón.
+               * `scrollerRef` al abrir la barra.
                *
-               * ⚠️ **Sin `focus-within`**, que es lo que la dejaba fija: al pulsar
-               * un botón el foco se queda en él y la barra no se iba al apartar el
-               * ratón. `focus-visible` cubre el teclado sin ese efecto.
+               * ## Y por qué se abre con un clic, no con el hover
+               *
+               * Con el `hover`, la barra saltaba en cada burbuja por la que se
+               * pasaba: al cruzar la conversación se encendía y apagaba sola y
+               * tapaba justo el mensaje que se intentaba leer. Ahora se abre con
+               * un clic en la burbuja y se cierra con otro, o al pulsar fuera
+               * (`cerrarBarra`). `focus-visible` sigue sacándola al navegar con
+               * teclado, que es la vía de quien no usa ratón.
                */}
               {preview && <LinkPreviewCard preview={preview} mine={mine} />}
 
@@ -673,8 +714,8 @@ export function MessageBubble({
                *
                * Un mensaje con respuestas es un hilo, y esta es la puerta: el número
                * que enseña el panel lateral, sin necesidad de haberlo abierto nunca.
-               * La barra de acciones solo aparece al pasar el ratón; esta marca está
-               * siempre — es la señal de que debajo hay conversación.
+               * La barra de acciones se abre con un clic en la burbuja; esta
+               * marca está siempre — es la señal de que debajo hay conversación.
                */}
               {mostrarMarcaDeHilo && message._count.replies > 0 && (
                 <button
@@ -711,11 +752,31 @@ export function MessageBubble({
               )}
 
               <div
-                className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
-                  /* Hacia arriba normalmente; hacia abajo (`top-full`) cuando el
-                 mensaje está pegado al borde superior del scroll y arriba no
-                 cabría. Ver `decidirDireccionBarra`. */
-                  barraAbajo ? 'top-full mt-1.5' : '-top-4'
+                className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg transition-all duration-150 ${
+                  /* La visibilidad la decide el estado, no el hover: la barra se
+                 abre con un clic en la burbuja y se cierra con otro o al pulsar
+                 fuera. El `has-[:focus-visible]` la saca también cuando el
+                 teclado llega a sus botones, que es la única vía de que alguien
+                 que no usa ratón la encuentre.
+
+                 ⚠️ **`pointer-events-none` cuando está cerrada.** Sin él, los
+                 botones invisibles siguen capturando clics: la barra anclada
+                 `bottom-full` queda sobre el mensaje de encima, y un clic ahí
+                 activaba una acción de un botón que no se veía. Al abrirse (o al
+                 enfocarla con teclado) vuelve a recibir el puntero. */
+                  barraVisible || confirmandoBorrado
+                    ? 'opacity-100'
+                    : 'pointer-events-none opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100'
+                } ${
+                  /* Hacia arriba, pegada al borde superior de la burbuja pero
+                 **sin solaparse con el texto**: `bottom-full` apoya el borde
+                 inferior de la barra en el borde superior del mensaje y
+                 `mb-1.5` deja aire entre ambos. Antes caía `-top-4`, por
+                 dentro de la burbuja, tapando la primera línea del mensaje.
+                 Hacia abajo (`top-full`) cuando el mensaje está pegado al
+                 borde superior del scroll y arriba no cabría. Ver
+                 `decidirDireccionBarra`. */
+                  barraAbajo ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
                 } ${
                   /* Se ancla al lado de la burbuja que mira al centro del chat y
                  crece hacia dentro: así, con un mensaje corto, la barra —que es
@@ -724,10 +785,6 @@ export function MessageBubble({
                  revés (pegada al borde exterior) era lo que la hacía salirse de
                  la pantalla con mensajes de una línea. */
                   mine ? 'right-2' : 'left-2'
-                } ${
-                  /* Mientras se confirma un borrado se queda: la pregunta no puede
-                 irse antes de que se pueda responder. */
-                  confirmandoBorrado ? 'opacity-100' : ''
                 }`}
                 style={{
                   background: colors.surfaceElevated,
