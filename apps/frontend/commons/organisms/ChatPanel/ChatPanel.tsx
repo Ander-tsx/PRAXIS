@@ -7,6 +7,7 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -15,6 +16,8 @@ import { createApiClient } from '../../api/client';
 import type { ChatAttachment, ChatMessage, ChatMessagePage, UserProfile } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
+import { hrefDeAvatar } from '../../api/presence';
+import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
 import { Composer, type Sugerencia } from './Composer';
@@ -332,6 +335,66 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     };
   });
   const ultimoId = mensajes.at(-1)?.id;
+
+  /**
+   * Hasta dónde ha leído cada persona del canal, sin contarte a ti.
+   *
+   * ## No hay acuse por mensaje, y no hace falta
+   *
+   * El servidor ya guardaba `lastReadAt` por persona y canal, así que un
+   * mensaje está visto por alguien si esa marca es **posterior** a su fecha.
+   * Una tabla de acuses por mensaje serían tantas filas como mensajes por
+   * personas para decir exactamente lo mismo.
+   *
+   * Se vuelven a pedir cuando llega un mensaje nuevo (`ultimoId`): es cuando
+   * el «visto» de los demás puede haber cambiado, y evita preguntarlo en bucle.
+   */
+  const [acuses, setAcuses] = useState<{ userId: string; lastReadAt: string }[]>([]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `ultimoId` es el disparador, no un valor que se lea — al llegar un mensaje nuevo hay que volver a preguntar quién ha leído
+  useEffect(() => {
+    let vivo = true;
+    createApiClient({ gatewayPath })
+      .get<{ userId: string; lastReadAt: string }[]>(`${rutaCanal}/receipts`)
+      .then((lista) => {
+        if (vivo) setAcuses(lista);
+      })
+      /* Sin acuses no se pinta nada. No saber quién ha leído no es motivo para
+         enseñar un error encima de la conversación. */
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [gatewayPath, rutaCanal, ultimoId]);
+
+  /**
+   * Bajo qué mensaje va la carita de cada persona: **la del último que ha
+   * leído**, no la de todos los que ha leído.
+   *
+   * Es lo que hace que la fila de caritas avance por la conversación como en
+   * cualquier app de mensajería, en vez de repetir las mismas seis caras bajo
+   * cada burbuja.
+   */
+  const vistoPorMensaje = useMemo(() => {
+    const mapa = new Map<string, string[]>();
+    if (acuses.length === 0) return mapa;
+
+    /* `mensajes` va del más viejo al más nuevo, así que el último que cumple
+       la condición es el que se busca. */
+    for (const acuse of acuses) {
+      const leidoHasta = new Date(acuse.lastReadAt).getTime();
+      let ultimoLeido: string | undefined;
+      for (const mensaje of mensajes) {
+        if (new Date(mensaje.createdAt).getTime() > leidoHasta) break;
+        ultimoLeido = mensaje.id;
+      }
+      if (!ultimoLeido) continue;
+      const yaEstan = mapa.get(ultimoLeido) ?? [];
+      yaEstan.push(acuse.userId);
+      mapa.set(ultimoLeido, yaEstan);
+    }
+    return mapa;
+  }, [acuses, mensajes]);
 
   /** Los fijados con las mismas correcciones locales que el historial. */
   const fijadosConCorrecciones = fijadosLista.map((mensaje) => {
@@ -1057,6 +1120,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                           ? { previewDeLink: acciones.previewDeLink }
                           : {})}
                       />
+
+                      {/**
+                       * Quién ha llegado a leer hasta aquí.
+                       *
+                       * Va **debajo del último mensaje que cada quien ha
+                       * leído**, así que la fila avanza por la conversación en
+                       * vez de repetirse bajo cada burbuja. Solo en el chat
+                       * general: dentro de un hilo la marca de lectura es la
+                       * del canal entero y diría lo mismo en todas las
+                       * respuestas.
+                       */}
+                      <VistoPor
+                        userIds={vistoPorMensaje.get(mensaje.id) ?? []}
+                        usersById={usersById}
+                        gatewayPath={gatewayPath}
+                        nombreDeAutor={nombreDeAutor}
+                      />
                     </div>
                   );
                 })
@@ -1354,5 +1434,57 @@ function mismoDia(a: Date, b: Date): boolean {
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
+  );
+}
+
+/**
+ * La fila de caritas de quien ya leyó hasta aquí.
+ *
+ * Un máximo de cinco y un «+N» detrás: en un equipo de veinte, veinte círculos
+ * de 24 px bajo un mensaje ocupan más que el mensaje y no se lee ninguno. Cinco
+ * caras y un número dicen lo mismo en una línea.
+ *
+ * ⚠️ **Sin nadie no se pinta nada**, ni un hueco: la fila solo aparece bajo el
+ * último mensaje que cada quien ha leído, así que la conversación entera no
+ * puede llenarse de filas vacías.
+ */
+function VistoPor({
+  userIds,
+  usersById,
+  gatewayPath,
+  nombreDeAutor,
+}: {
+  userIds: string[];
+  usersById: Map<string, UserProfile>;
+  gatewayPath: string;
+  nombreDeAutor: (userId: string) => string;
+}) {
+  if (userIds.length === 0) return null;
+
+  const CUANTAS = 5;
+  const visibles = userIds.slice(0, CUANTAS);
+  const resto = userIds.length - visibles.length;
+  const nombres = userIds.map(nombreDeAutor).join(', ');
+
+  return (
+    <div className="mt-1 flex items-center justify-end gap-1 pr-1" title={`Visto por ${nombres}`}>
+      <span className="font-sans text-[10px] text-text-disabled">Visto por</span>
+      {visibles.map((userId) => {
+        const perfil = usersById.get(userId);
+        return (
+          <Avatar
+            key={userId}
+            label={perfil ? personLabel(perfil) : userId}
+            size="sm"
+            ring
+            className="h-4 w-4 text-[8px]"
+            src={hrefDeAvatar(perfil?.avatarUrl, gatewayPath)}
+          />
+        );
+      })}
+      {resto > 0 && (
+        <span className="font-sans text-[10px] tabular-nums text-text-disabled">+{resto}</span>
+      )}
+    </div>
   );
 }
