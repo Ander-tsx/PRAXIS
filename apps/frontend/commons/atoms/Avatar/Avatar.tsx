@@ -88,15 +88,23 @@ export function Avatar({
           queda es lo de siempre y no un hueco. */}
       {iniciales(label)}
       {src && (
-        <img
-          src={src}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          /* Una foto que no carga se quita a sí misma y deja ver las
-             iniciales de debajo, en vez del icono de imagen rota. */
-          onError={(evento) => {
-            evento.currentTarget.style.display = 'none';
-          }}
+        /**
+         * ⚠️ **La foto va de `background-image` y no en un `<img>`, y no es
+         * capricho.** `Avatar` lo pintan también componentes de servidor —el
+         * equipo de un proyecto, la tabla de administración— y a un `<img>`
+         * había que darle un `onError` para esconderlo si la imagen falla:
+         * pasar un manejador desde el servidor revienta con «Event handlers
+         * cannot be passed to Client Component props» y se lleva la página
+         * entera por delante.
+         *
+         * De fondo se consigue lo mismo **sin una línea de JavaScript**: si la
+         * imagen no carga, la capa queda transparente y se ven las iniciales de
+         * debajo, que es exactamente el respaldo que se quería.
+         */
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${src})` }}
         />
       )}
     </span>
