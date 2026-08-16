@@ -969,6 +969,43 @@ export function MessageBubble({
               </button>
             )}
 
+            {/**
+             * Quién lo ha visto.
+             *
+             * En la barra y no bajo el mensaje: es un dato que se consulta
+             * cuando hace falta —«¿lo habrá leído ya?»— no algo que quieras
+             * leer en cada burbuja mientras repasas la conversación. Ahí
+             * estaba antes y ocupaba una línea por mensaje.
+             *
+             * Solo aparece si alguien lo ha visto: un botón que abre una lista
+             * vacía es un botón que no había que ofrecer.
+             */}
+            {!confirmandoBorrado && vistoPor.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setListaDeVistos((previo) => !previo)}
+                aria-label="Ver quién lo ha visto"
+                aria-expanded={listaDeVistos}
+                title={`Visto por ${vistoPor.length}`}
+                className="flex cursor-pointer items-center gap-0.5 rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <span className="font-sans text-[10px] tabular-nums">{vistoPor.length}</span>
+              </button>
+            )}
+
             {canDelete &&
               (confirmandoBorrado ? (
                 /**
@@ -1035,6 +1072,26 @@ export function MessageBubble({
               ))}
           </div>
         </div>
+
+        {/* La lista de quién lo ha visto, plegada bajo el mensaje. Solo cuando
+            se pide desde la barra: ver el comentario de ese botón. */}
+        {listaDeVistos && vistoPor.length > 0 && (
+          <div
+            className={`flex max-w-full flex-col gap-1 rounded-lg border px-2.5 py-2 ${
+              mine ? 'self-end' : 'self-start'
+            }`}
+            style={{ borderColor: colors.border, background: colors.surfaceElevated }}
+          >
+            <span className="font-sans text-[10px] uppercase tracking-wide text-text-disabled">
+              Visto por
+            </span>
+            {vistoPor.map((userId) => (
+              <span key={userId} className="font-sans text-xs text-text-primary">
+                {nombreDeAutor(userId)}
+              </span>
+            ))}
+          </div>
+        )}
 
         {agrupadas.size > 0 && (
           <div className={`flex flex-wrap gap-1 px-1 ${mine ? 'justify-end' : ''}`}>

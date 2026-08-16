@@ -32,6 +32,14 @@ export interface ProjectConversationProps {
   currentUserId: string;
   /** `canComment`: el mismo permiso que comentar en una tarea. */
   canWrite: boolean;
+  /**
+   * Cuánta gente del equipo, **sin contarte**.
+   *
+   * Decide cuándo un mensaje tuyo pasa a «visto por todos». Sale de los
+   * miembros del proyecto y no de los acuses de lectura: ahí solo aparece
+   * quien ya abrió el chat alguna vez.
+   */
+  otrosDelEquipo: number;
 }
 
 /**
@@ -61,6 +69,7 @@ export function ProjectConversation({
   usersById,
   currentUserId,
   canWrite,
+  otrosDelEquipo,
 }: ProjectConversationProps) {
   /* Estable entre renders: `ChatPanel` tiene `marcarLeido` en las dependencias
      de un efecto, y recreada en cada render marcaría como leído en bucle. */
@@ -117,6 +126,7 @@ export function ProjectConversation({
       gatewayPath="/dashboard/api/gateway"
       rutaCanal={`/projects/${projectId}/chat`}
       canWrite={canWrite}
+      participantes={otrosDelEquipo}
       motivoSinEscribir="Puedes leer la conversación del equipo, pero tu rol no incluye escribir en ella."
       vacio={
         canWrite

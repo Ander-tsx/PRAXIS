@@ -114,6 +114,8 @@ export function DirectConversation({
        * de después de darle a enviar.
        */
       canWrite={proyectosEnComun.length > 0}
+      /* Sois dos: el «visto por todos» se cumple en cuanto lo lee esa persona. */
+      participantes={1}
       motivoSinEscribir="Ya no compartís ningún proyecto, así que no puedes escribirle. Lo que os dijisteis sigue aquí."
       /**
        * ⚠️ **En privado no se menciona a nadie.** Sois dos: escribir `@Juan`

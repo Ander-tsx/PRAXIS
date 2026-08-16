@@ -88,6 +88,8 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
          Si no llega, se lee pero no se escribe: el gateway rechazaría igual y
          así el motivo se ve antes de teclear. */
       canWrite={permisos?.permissions.canComment === true}
+      /* Menos tú: el «visto por todos» no se espera a sí mismo. */
+      otrosDelEquipo={Math.max(0, miembros.length - 1)}
     />
   );
 }
