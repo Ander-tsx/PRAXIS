@@ -78,7 +78,6 @@ export function DirectConversation({
       ref={chatRef}
       /* Pantalla dedicada: el chat es lo único que hay, así que llena el alto.
          Con el tope de 58vh quedaba una franja muerta contra el borde inferior. */
-      llenarAlto
       /* En móvil la conversación se lleva la pantalla entera, como cualquier
          app de mensajería: con la lista encima quedaban cuatro líneas útiles. */
       pantallaCompletaEnMovil

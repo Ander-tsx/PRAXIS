@@ -26,13 +26,32 @@ export const ESPERA_DE_AGRUPACION_MS = 800;
 let hayPendiente = false;
 let temporizador: number | null = null;
 let ultimoRefresco = 0;
-let refrescarRuta: (() => void) | null = null;
-let cuantosEscuchan = 0;
+
+/**
+ * Los refrescos de quien está montado ahora mismo, **todos**, no el último.
+ *
+ * ⚠️ Esto era una sola función —«el último en montarse gana»— y ahí estaba el
+ * fallo por el que un mensaje llegaba al instante unas veces y otras no. Con
+ * dos componentes escuchando (los avisos en vivo, en el layout, y el repaso
+ * automático de la bandeja, en la página), la referencia se quedaba apuntando
+ * al **segundo**; al salir de esa página ese componente se desmontaba, pero
+ * como quedaba otro escuchando no se limpiaba nada, y los refrescos seguían
+ * saliendo por el router de un componente que ya no existe. React los descarta
+ * en silencio: sin error, sin aviso, y la conversación dejaba de actualizarse
+ * hasta recargar. Guardando el conjunto y refrescando por el primero que siga
+ * vivo, desmontar uno no puede dejar la zona sorda.
+ */
+const refrescos = new Set<() => void>();
 
 function ejecutarRefresco() {
   hayPendiente = false;
   ultimoRefresco = Date.now();
-  refrescarRuta?.();
+  /* Uno basta: `refresh()` de cualquier router de la zona repinta la ruta
+     actual, y llamarlos todos serían N repintados idénticos. */
+  for (const refrescar of refrescos) {
+    refrescar();
+    return;
+  }
 }
 
 /**
@@ -69,10 +88,11 @@ export function useRefrescoAgrupado(esperaMs: number = ESPERA_DE_AGRUPACION_MS):
   const router = useRouter();
 
   useEffect(() => {
-    cuantosEscuchan += 1;
     /* Cualquier router de la zona sirve: `refresh()` despacha a la misma cola.
-       El último en montarse gana, y da igual cuál sea. */
-    refrescarRuta = () => router.refresh();
+       Se guardan todos y se retira el propio al desmontar — ver el aviso de
+       `refrescos`. */
+    const refrescar = () => router.refresh();
+    refrescos.add(refrescar);
 
     function alCambiarVisibilidad() {
       if (!document.hidden && hayPendiente) ejecutarRefresco();
@@ -83,8 +103,8 @@ export function useRefrescoAgrupado(esperaMs: number = ESPERA_DE_AGRUPACION_MS):
     return () => {
       document.removeEventListener('visibilitychange', alCambiarVisibilidad);
 
-      cuantosEscuchan -= 1;
-      if (cuantosEscuchan > 0) return;
+      refrescos.delete(refrescar);
+      if (refrescos.size > 0) return;
 
       /* No queda nadie: se desarma lo que hubiera en vuelo para no refrescar
          una ruta que ya no está montada. */
@@ -93,7 +113,6 @@ export function useRefrescoAgrupado(esperaMs: number = ESPERA_DE_AGRUPACION_MS):
         temporizador = null;
       }
       hayPendiente = false;
-      refrescarRuta = null;
     };
   }, [router]);
 

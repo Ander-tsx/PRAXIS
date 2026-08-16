@@ -36,17 +36,16 @@ type Pestana = 'directos' | 'proyectos';
 /**
  * La columna del centro de mensajes.
  *
- * ## Los dos tipos de chat conviven aquí, y el de proyecto **sale de la zona**
+ * ## Los dos tipos de chat conviven aquí, y los dos se abren aquí
  *
- * Un chat de proyecto vive en la pantalla de su proyecto, con el tablero al
- * lado, que es donde tiene sentido leerlo. Pero **enterarte** de que hay algo
- * nuevo no debería obligarte a recorrer proyecto por proyecto: por eso aparecen
- * aquí, con su contador, y al pulsarlos te llevan a su sitio.
+ * El de proyecto llevaba fuera —a la pestaña «Chat» de su proyecto—, donde la
+ * conversación compartía pantalla con el título, la descripción y las pestañas
+ * y le quedaba un tercio del alto. Ahora se abre en esta misma zona, con la
+ * pantalla entera, igual que una conversación privada; en el proyecto queda una
+ * muestra con su enlace.
  *
- * Se separan en dos pestañas en vez de mezclarse en una lista: son cosas
- * distintas —una habla con una persona, la otra con un equipo— y **una lleva
- * fuera de esta pantalla y la otra no**. Mezclarlas haría que pulsar dos filas
- * seguidas diera resultados que se sienten inconsistentes.
+ * Se separan en dos pestañas en vez de mezclarse en una lista porque son cosas
+ * distintas: una habla con una persona y la otra con un equipo.
  *
  * El número de la pestaña es **lo no leído**, no cuántas hay: cuántos proyectos
  * tienes ya lo sabes.
@@ -188,6 +187,7 @@ export function ChatDirectory({
                 key={chat.project.id}
                 chat={chat}
                 autor={chat.ultimo ? nombreDe(chat.ultimo.authorId) : null}
+                activo={activo === chat.project.id}
               />
             ))
           )}
@@ -323,13 +323,24 @@ function FilaPersona({
  * El enlace usa el **slug**, que es lo que va en la URL. El id y el slug son los
  * dos `string` y confundirlos no da error de compilación (CLAUDE.md, trampa 10).
  */
-function FilaProyecto({ chat, autor }: { chat: ChatDeProyecto; autor: string | null }) {
+function FilaProyecto({
+  chat,
+  autor,
+  activo,
+}: { chat: ChatDeProyecto; autor: string | null; activo: boolean }) {
   const inicial = chat.project.name.trim()[0]?.toUpperCase() ?? '·';
 
   return (
-    <a
-      href={`/projects/${chat.project.slug}?tab=chat`}
+    /* Enlace de la propia zona: el chat de equipo ya vive aquí, al lado de los
+       privados, así que pulsarlo ya no saca de la pantalla.
+
+       ⚠️ La ruta lleva el **UUID** y no el slug: todo lo anidado bajo
+       `/projects/:id` en el gateway espera el UUID (CLAUDE.md). */
+    <Link
+      href={`/chat/proyecto/${chat.project.id}`}
+      aria-current={activo ? 'page' : undefined}
       className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated"
+      style={activo ? { background: colors.surfaceElevated } : undefined}
     >
       {/* Cuadrado y no círculo: distingue de un vistazo un equipo de una
           persona sin tener que leer nada. */}
@@ -369,7 +380,7 @@ function FilaProyecto({ chat, autor }: { chat: ChatDeProyecto; autor: string | n
       >
         <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7-7 7M21 12H4" />
       </svg>
-    </a>
+    </Link>
   );
 }
 

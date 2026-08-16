@@ -76,6 +76,28 @@ export interface ComposerProps {
   onQuitarAdjunto: (attachmentId: string) => void;
   /** Verdadero mientras el archivo elegido está subiendo. */
   subiendo: boolean;
+  /**
+   * Con qué texto nace el campo. **Solo se lee al montar.**
+   *
+   * Es lo que permite reutilizar este mismo compositor para editar un mensaje
+   * ya enviado: se le pasa el cuerpo ya disfrazado (`campoDesdeCuerpo`) y desde
+   * ahí se escribe con las mismas menciones, las mismas referencias de `/` y el
+   * mismo tamaño de campo que al escribirlo por primera vez. El editor
+   * anterior era un `<textarea>` aparte, más pequeño y sin desplegables.
+   */
+  valorInicial?: { texto: string; etiquetas: Etiqueta[] };
+  /**
+   * Si se da, el compositor está **editando**: aparece «Cancelar», Esc cancela
+   * y el campo no se vacía al enviar —si el guardado falla, lo escrito sigue
+   * ahí—.
+   */
+  onCancelar?: () => void;
+  /** Texto del botón de enviar cuando no es el avión de papel. */
+  etiquetaEnviar?: string;
+  /** Oculta el clip: editar un mensaje no cambia sus adjuntos. */
+  ocultarAdjuntos?: boolean;
+  /** Enfoca el campo nada más montarlo. */
+  autoFoco?: boolean;
 }
 
 /** Qué se está escribiendo tras un `@` o un `/`, y desde dónde. */
@@ -160,11 +182,19 @@ export function Composer({
   onAdjuntar,
   onQuitarAdjunto,
   subiendo,
+  valorInicial,
+  onCancelar,
+  etiquetaEnviar,
+  ocultarAdjuntos = false,
+  autoFoco = false,
 }: ComposerProps) {
-  const [texto, setTexto] = useState('');
-  const [cursor, setCursor] = useState(0);
+  /* `valorInicial` solo se lee al montar: quien edita monta un compositor
+     nuevo por mensaje, así que no hay que sincronizar nada después. */
+  const [texto, setTexto] = useState(valorInicial?.texto ?? '');
+  const [cursor, setCursor] = useState(valorInicial?.texto.length ?? 0);
   const [marcada, setMarcada] = useState(0);
-  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>(valorInicial?.etiquetas ?? []);
+  const editando = onCancelar !== undefined;
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const capaRef = useRef<HTMLDivElement>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
@@ -259,6 +289,16 @@ export function Composer({
    * anuncia que toca. Al final del texto, no al principio: es donde se sigue
    * escribiendo.
    */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo al montar — es lo que significa «auto»
+  useEffect(() => {
+    if (!autoFoco) return;
+    const area = areaRef.current;
+    if (!area) return;
+    area.focus();
+    const fin = area.value.length;
+    area.setSelectionRange(fin, fin);
+  }, []);
+
   useEffect(() => {
     if (!citaId) return;
     const area = areaRef.current;
@@ -280,6 +320,9 @@ export function Composer({
       serializarCampo(trozos).trim(),
       adjuntosPendientes.map((a) => a.id),
     );
+    /* Editando no se vacía: si el guardado falla, lo escrito tiene que seguir
+       ahí. Quien edita cierra el campo al confirmar, no al enviar. */
+    if (editando) return;
     setTexto('');
     setCursor(0);
     setEtiquetas([]);
@@ -317,6 +360,14 @@ export function Composer({
     if (evento.key === 'Enter' && !evento.shiftKey) {
       evento.preventDefault();
       enviar();
+      return;
+    }
+
+    /* Esc suelta la edición sin guardar. Solo aquí: con el desplegable abierto
+       lo que cierra es el desplegable, y eso ya se resolvió arriba. */
+    if (evento.key === 'Escape' && onCancelar) {
+      evento.preventDefault();
+      onCancelar();
     }
   }
 
@@ -511,48 +562,63 @@ export function Composer({
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => archivoRef.current?.click()}
-          disabled={
-            deshabilitado ||
-            subiendo ||
-            adjuntosPendientes.length >= CHAT_ATTACHMENT_MAX_PER_MESSAGE
-          }
-          aria-label="Adjuntar un archivo"
-          title="Adjuntar archivo"
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {subiendo ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-              />
-            </svg>
-          )}
-        </button>
+        {!ocultarAdjuntos && (
+          <button
+            type="button"
+            onClick={() => archivoRef.current?.click()}
+            disabled={
+              deshabilitado ||
+              subiendo ||
+              adjuntosPendientes.length >= CHAT_ATTACHMENT_MAX_PER_MESSAGE
+            }
+            aria-label="Adjuntar un archivo"
+            title="Adjuntar archivo"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {subiendo ? (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                />
+              </svg>
+            )}
+          </button>
+        )}
 
         {/* Escondido: lo abre el botón del clip. Se elige un archivo y se sube
             al instante; no se guarda en el formulario. */}
-        <input
-          ref={archivoRef}
-          type="file"
-          multiple={false}
-          accept={CHAT_ATTACHMENT_ALLOWED_MIME.join(',')}
-          onChange={alElegirArchivo}
-          className="hidden"
-        />
+        {!ocultarAdjuntos && (
+          <input
+            ref={archivoRef}
+            type="file"
+            multiple={false}
+            accept={CHAT_ATTACHMENT_ALLOWED_MIME.join(',')}
+            onChange={alElegirArchivo}
+            className="hidden"
+          />
+        )}
+
+        {/* Editando, «Cancelar» va pegado a «Guardar»: son la misma decisión. */}
+        {onCancelar && (
+          <button
+            type="button"
+            onClick={onCancelar}
+            className="shrink-0 cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+          >
+            Cancelar
+          </button>
+        )}
 
         <button
           type="button"
@@ -563,12 +629,16 @@ export function Composer({
             subiendo ||
             (adjuntosPendientes.length === 0 && texto.trim().length === 0)
           }
-          aria-label="Enviar mensaje"
-          className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label={etiquetaEnviar ?? 'Enviar mensaje'}
+          className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg font-sans text-xs font-semibold transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 ${
+            etiquetaEnviar ? 'px-3' : 'w-9'
+          }`}
           style={{ background: alpha(colors.primary, 22), color: colors.primary }}
         >
           {enviando ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : etiquetaEnviar ? (
+            etiquetaEnviar
           ) : (
             <svg
               className="h-4 w-4"

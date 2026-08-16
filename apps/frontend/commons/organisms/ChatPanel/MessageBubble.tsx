@@ -15,15 +15,9 @@ import type { LinkPreview } from '../../api/link-preview';
 import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
+import { Composer, type Sugerencia } from './Composer';
 import { RichText } from './RichText';
-import {
-  CapaEtiquetas,
-  type Etiqueta,
-  TIPOGRAFIA_CAMPO,
-  campoDesdeCuerpo,
-  serializarCampo,
-  trozosDeCampo,
-} from './etiquetado';
+import { campoDesdeCuerpo } from './etiquetado';
 
 export interface MessageBubbleProps {
   message: ChatMessage;
@@ -95,6 +89,16 @@ export interface MessageBubbleProps {
    * ella—, esa cita sigue siendo información nueva y se pinta igual.
    */
   ocultarCitaSiApuntaA?: string;
+  /**
+   * Lo que necesita el compositor cuando se edita este mensaje: si `@` ofrece
+   * personas, el catálogo de sugerencias y cómo pedirlo.
+   *
+   * Viene del panel y no de aquí porque el catálogo es **del canal**: pedirlo
+   * por burbuja serían tantas consultas como mensajes en pantalla.
+   */
+  permiteMenciones: boolean;
+  sugerencias: Sugerencia[];
+  onPedirSugerencias: () => void;
   /** Nombre de quien escribió el mensaje citado, para la cita. */
   nombreDeAutor: (userId: string) => string;
   /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
@@ -140,6 +144,9 @@ export function MessageBubble({
   permiteAbrirHilo = true,
   permiteResponder = true,
   ocultarCitaSiApuntaA,
+  permiteMenciones,
+  sugerencias,
+  onPedirSugerencias,
   nombreDeAutor,
   previewDeLink,
 }: MessageBubbleProps) {
@@ -174,32 +181,25 @@ export function MessageBubble({
    * exactamente el mismo problema que una pregunta de borrado a medio responder.
    */
   const [editando, setEditando] = useState(false);
-  const [borrador, setBorrador] = useState('');
   /**
-   * Las etiquetas del borrador, aparte del texto.
+   * El cuerpo con el que nace el editor, ya **disfrazado**.
    *
    * ⚠️ **El editor no puede cargar `message.body` a pelo.** El cuerpo guardado
    * lleva los ids dentro —`@[María García](user:2222-…)`— así que editar un
    * mensaje con una mención enseñaba el UUID entero en mitad de la frase, y
-   * tocar un solo carácter de él rompía la referencia sin ningún aviso. Se
-   * carga disfrazado con `campoDesdeCuerpo` y se vuelve a componer al guardar,
-   * exactamente igual que hace el compositor al escribir.
+   * tocar un solo carácter de él rompía la referencia sin ningún aviso.
+   * `campoDesdeCuerpo` lo convierte en texto legible más la lista de etiquetas,
+   * que es exactamente lo que el compositor sabe manejar.
    */
-  const [etiquetasBorrador, setEtiquetasBorrador] = useState<Etiqueta[]>([]);
-  const trozosBorrador = useMemo(
-    () => trozosDeCampo(borrador, etiquetasBorrador),
-    [borrador, etiquetasBorrador],
-  );
+  const valorInicial = useMemo(() => campoDesdeCuerpo(message.body), [message.body]);
 
   function abrirEdicion() {
-    const { texto, etiquetas } = campoDesdeCuerpo(message.body);
-    setBorrador(texto);
-    setEtiquetasBorrador(etiquetas);
     setEditando(true);
   }
 
-  async function confirmarEdicion() {
-    const guardado = await onEditar(message.id, serializarCampo(trozosBorrador).trim());
+  /* El compositor ya devuelve el cuerpo serializado, con los ids puestos. */
+  async function confirmarEdicion(cuerpo: string) {
+    const guardado = await onEditar(message.id, cuerpo);
     if (guardado) setEditando(false);
   }
 
@@ -347,19 +347,6 @@ export function MessageBubble({
   const burbujaRef = useRef<HTMLDivElement>(null);
 
   /**
-   * El editor en línea. Se enfoca al entrar en modo edición (un `autoFocus`
-   * lo rechaza el linter de a11y, y este efecto lo consigue igual: el foco
-   * cae donde el usuario acaba de pedir editar).
-   */
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-  /** La capa que pinta las etiquetas del editor, para sincronizar su scroll. */
-  const capaEdicionRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (editando) editorRef.current?.focus();
-  }, [editando]);
-
-  /**
    * Hacia dónde se abre la barra de acciones.
    *
    * Por defecto hacia arriba (`-top-4`), pero cuando el mensaje está pegado al
@@ -424,12 +411,15 @@ export function MessageBubble({
    * Un mensaje que **solo** es una imagen o un vídeo: sin texto, sin cita, sin
    * marca de hilo y sin preview de enlace.
    *
-   * Es lo que decide que la burbuja se quede sin relleno y el medio la llene de
-   * borde a borde. Con relleno, una foto quedaba flotando dentro de un
-   * rectángulo de color con tres milímetros de margen por todos lados —el
-   * «globo feo»—; sin él, la burbuja **es** la foto. Cualquiera de esas otras
-   * piezas obliga a devolver el relleno: si no, se pegarían al borde
-   * redondeado.
+   * Sirve para quitarle el margen superior al medio, que solo separa de un
+   * texto que aquí no hay.
+   *
+   * ⚠️ **La burbuja conserva su relleno.** Estuvo sin él, con la foto pegada a
+   * los cuatro bordes, y así **no quedaba un solo píxel de burbuja donde
+   * pulsar**: cualquier clic caía sobre la imagen —que abre el visor— en vez de
+   * sobre el mensaje, que es lo que despliega responder, reaccionar y el resto.
+   * El medio llena la tarjeta interior, y ese marco de dos milímetros es la
+   * zona por la que se agarra el mensaje.
    */
   const citaVisible = Boolean(message.replyTo && message.replyTo.id !== ocultarCitaSiApuntaA);
   const marcaHiloVisible = Boolean(mostrarMarcaDeHilo && message._count.replies > 0);
@@ -582,9 +572,18 @@ export function MessageBubble({
         <div
           ref={burbujaRef}
           className={`relative min-w-0 max-w-full rounded-2xl ${
-            /* Sin relleno cuando la burbuja es solo una foto o un vídeo: el
-               medio la llena de borde a borde. Ver `soloMedia`. */
-            soloMedia ? 'overflow-hidden' : 'px-3.5 py-2'
+            /* ⚠️ **Solo un medio: relleno igual por los cuatro lados.** El de
+               un mensaje de texto (`px-3.5 py-2`) es más ancho que alto a
+               propósito —así se lee mejor una línea— pero alrededor de una foto
+               ese desajuste se ve: dos milímetros arriba y cuatro a los lados,
+               como un marco mal cortado. */
+            soloMedia ? 'p-2' : 'px-3.5 py-2'
+          } ${
+            /* El puntero de mano dice que la burbuja hace algo al pulsarla
+               —abre sus acciones—, que es justo lo que no se adivinaba desde
+               que dejaron de salir al pasar el ratón. Mientras se edita no:
+               ahí lo que hay es un campo de texto. */
+            editando ? '' : 'cursor-pointer'
           }`}
           /* Al irse del mensaje se recogen las superficies flotantes: ni el
              selector de reacciones ni la confirmación de borrado tienen sentido
@@ -680,71 +679,34 @@ export function MessageBubble({
           )}
 
           {editando ? (
-            <div className="flex flex-col gap-1.5">
-              {/**
-               * Las dos capas del editor, igual que en el compositor: el
-               * `<textarea>` lleva la tinta transparente y lo que se lee es la
-               * capa de debajo, que pinta las etiquetas como píldoras. Sin
-               * esto, editar un mensaje con una mención enseñaba su UUID.
-               */}
-              <div
-                className="relative w-full rounded-xl border border-border bg-background focus-within:border-primary"
-                style={{ minHeight: '3.5rem' }}
-              >
-                <CapaEtiquetas
-                  trozos={trozosBorrador}
-                  capaRef={capaEdicionRef}
-                  className="max-h-40 overflow-hidden"
-                />
-                <textarea
-                  value={borrador}
-                  onChange={(evento) => setBorrador(evento.target.value)}
-                  onKeyDown={(evento) => {
-                    /* Enter guarda, Shift+Enter salta de línea: mismo gesto que el
-                       compositor. Esc cancela sin tocar nada. */
-                    if (evento.key === 'Enter' && !evento.shiftKey) {
-                      evento.preventDefault();
-                      void confirmarEdicion();
-                    } else if (evento.key === 'Escape') {
-                      evento.preventDefault();
-                      setEditando(false);
-                    }
-                  }}
-                  /* Las dos capas se desplazan juntas: si no, al pasar de
-                     cuatro líneas el resaltado se queda quieto y el texto sube. */
-                  onScroll={(evento) => {
-                    if (capaEdicionRef.current) {
-                      capaEdicionRef.current.scrollTop = evento.currentTarget.scrollTop;
-                    }
-                  }}
-                  ref={editorRef}
-                  rows={Math.min(6, Math.max(2, borrador.split('\n').length))}
-                  aria-label="Editar mensaje"
-                  /* Tinta transparente: lo que se lee es la capa de abajo. El
-                     cursor se pinta aparte con `caret-color`. */
-                  className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none ${TIPOGRAFIA_CAMPO}`}
-                  style={{ caretColor: colors.textPrimary }}
-                />
-              </div>
-              <span className="flex items-center gap-2 self-end">
-                <button
-                  type="button"
-                  onClick={() => setEditando(false)}
-                  className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void confirmarEdicion()}
-                  disabled={borrador.trim().length === 0}
-                  className="cursor-pointer rounded-lg px-3 py-1 font-sans text-xs font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ background: colors.primary, color: colors.textInverse }}
-                >
-                  Guardar
-                </button>
-              </span>
-            </div>
+            /**
+             * Editar usa **el mismo compositor con el que se escribe**.
+             *
+             * Antes era un `<textarea>` propio: más pequeño, sin `@`, sin `/` y
+             * con su propio manejo de teclas. Reutilizando el compositor, editar
+             * un mensaje se siente igual que escribirlo —mismos desplegables,
+             * mismo tamaño, mismos atajos— y no hay dos campos que mantener.
+             *
+             * `valorInicial` llega ya disfrazado: el cuerpo guardado lleva los
+             * ids dentro y aquí se ven como píldoras.
+             */
+            <Composer
+              onEnviar={(cuerpo) => void confirmarEdicion(cuerpo)}
+              enviando={false}
+              placeholder="Edita tu mensaje…"
+              permiteMenciones={permiteMenciones}
+              sugerencias={sugerencias}
+              onPedirSugerencias={onPedirSugerencias}
+              adjuntosPendientes={[]}
+              onAdjuntar={() => undefined}
+              onQuitarAdjunto={() => undefined}
+              subiendo={false}
+              valorInicial={valorInicial}
+              onCancelar={() => setEditando(false)}
+              etiquetaEnviar="Guardar"
+              ocultarAdjuntos
+              autoFoco
+            />
           ) : (
             /* Un mensaje que solo trae adjuntos no pinta cuerpo: un `<p>` vacío
                sigue ocupando su línea, y esa línea era la franja de color de más
@@ -795,14 +757,7 @@ export function MessageBubble({
             >
               {message.attachments.map((adjunto) => {
                 const href = hrefDeAdjunto?.(adjunto.id) ?? '#';
-                return (
-                  <AttachmentCard
-                    key={adjunto.id}
-                    adjunto={adjunto}
-                    href={href}
-                    aSangre={soloMedia}
-                  />
-                );
+                return <AttachmentCard key={adjunto.id} adjunto={adjunto} href={href} />;
               })}
             </div>
           )}
@@ -1353,18 +1308,9 @@ function soloHora(iso: string): string {
 function AttachmentCard({
   adjunto,
   href,
-  aSangre = false,
 }: {
   adjunto: ChatAttachment;
   href: string;
-  /**
-   * La burbuja no tiene relleno y el medio la llena de borde a borde.
-   *
-   * Cambia solo el redondeo: a sangre lo pone la burbuja, así que la tarjeta
-   * no lleva ni borde ni esquinas propias — si las llevara, se verían dos
-   * redondeos concéntricos desalineados, que es justo lo que se veía antes.
-   */
-  aSangre?: boolean;
 }) {
   const esImagen = adjunto.mimeType.startsWith('image/');
   const esVideo = adjunto.mimeType.startsWith('video/');
@@ -1388,9 +1334,7 @@ function AttachmentCard({
           type="button"
           onClick={() => setAmpliada(true)}
           aria-label={`Ver ${adjunto.filename} a tamaño completo`}
-          className={`block w-full cursor-zoom-in overflow-hidden ${
-            aSangre ? '' : 'rounded-xl border border-border'
-          }`}
+          className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-border"
         >
           <img
             src={href}
@@ -1411,7 +1355,7 @@ function AttachmentCard({
   }
 
   if (esVideo) {
-    return <ReproductorVideo href={href} aSangre={aSangre} />;
+    return <ReproductorVideo href={href} />;
   }
 
   /* PDF y el resto: un enlace. El PDF se sirve en línea por el gateway (sandbox
@@ -1557,13 +1501,42 @@ function reloj(segundos: number): string {
  * `preload="metadata"` trae solo la duración y el primer fotograma para poder
  * pintar la barra, no el archivo entero.
  */
-function ReproductorVideo({ href, aSangre }: { href: string; aSangre: boolean }) {
+function ReproductorVideo({ href }: { href: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cajaRef = useRef<HTMLDivElement>(null);
   const [reproduciendo, setReproduciendo] = useState(false);
   const [silenciado, setSilenciado] = useState(false);
   const [momento, setMomento] = useState(0);
   const [duracion, setDuracion] = useState(0);
+
+  /**
+   * Si esta caja es la que está a pantalla completa.
+   *
+   * ⚠️ **Hace falta saberlo, y esto es lo que estaba roto.** Quien va a
+   * pantalla completa es el contenedor —no el `<video>`, para que los controles
+   * propios sigan encima—, así que el vídeo se quedaba con el `max-h-96` del
+   * chat: un recuadro pequeño arriba del todo y el resto de la pantalla en
+   * negro. En pantalla completa el vídeo tiene que llenar la caja y centrarse,
+   * que es lo único que cambia.
+   *
+   * Se escucha `fullscreenchange` en vez de fiarse del clic: también se sale
+   * con Esc, con el gesto del sistema o desde otra pestaña, y en esos casos
+   * nadie llamaría a nuestro manejador.
+   */
+  const [aPantallaCompleta, setAPantallaCompleta] = useState(false);
+
+  useEffect(() => {
+    function alCambiar() {
+      setAPantallaCompleta(document.fullscreenElement === cajaRef.current);
+    }
+    document.addEventListener('fullscreenchange', alCambiar);
+    return () => document.removeEventListener('fullscreenchange', alCambiar);
+  }, []);
+
+  function alternarPantallaCompleta() {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void cajaRef.current?.requestFullscreen?.();
+  }
 
   function alternar() {
     const video = videoRef.current;
@@ -1578,7 +1551,9 @@ function ReproductorVideo({ href, aSangre }: { href: string; aSangre: boolean })
     <div
       ref={cajaRef}
       className={`group/video relative overflow-hidden bg-black ${
-        aSangre ? '' : 'rounded-xl border border-border'
+        aPantallaCompleta
+          ? 'flex h-full w-full items-center justify-center'
+          : 'rounded-xl border border-border'
       }`}
     >
       {/* biome-ignore lint/a11y/useMediaCaption: los adjuntos los sube quien escribe y no hay pista de subtítulos que ofrecer */}
@@ -1594,7 +1569,9 @@ function ReproductorVideo({ href, aSangre }: { href: string; aSangre: boolean })
         onTimeUpdate={(evento) => setMomento(evento.currentTarget.currentTime)}
         onLoadedMetadata={(evento) => setDuracion(evento.currentTarget.duration)}
         onVolumeChange={(evento) => setSilenciado(evento.currentTarget.muted)}
-        className="block max-h-96 w-full cursor-pointer object-contain"
+        className={`block cursor-pointer object-contain ${
+          aPantallaCompleta ? 'h-full max-h-none w-full' : 'max-h-96 w-full'
+        }`}
       />
 
       {/**
@@ -1712,8 +1689,8 @@ function ReproductorVideo({ href, aSangre }: { href: string; aSangre: boolean })
 
         <button
           type="button"
-          onClick={() => void cajaRef.current?.requestFullscreen?.()}
-          aria-label="Pantalla completa"
+          onClick={alternarPantallaCompleta}
+          aria-label={aPantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110"
           style={{ color: colors.textInverse }}
         >

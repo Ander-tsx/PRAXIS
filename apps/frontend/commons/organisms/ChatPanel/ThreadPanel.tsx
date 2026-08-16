@@ -8,13 +8,6 @@ import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
 
 export interface ThreadPanelProps {
-  /**
-   * Igual que en `ChatPanel`: si el chat llena la pantalla dedicada
-   * (`true`) o comparte sitio con otra cosa, como la pestaña de un proyecto
-   * (`false`, valor por defecto). Gobierna el mismo tope de altura que el
-   * chat principal — ver el comentario junto al scroller, más abajo.
-   */
-  llenarAlto?: boolean;
   /** El mensaje que abre el hilo. */
   raiz: ChatMessage;
   /** Sus respuestas, en orden, con las correcciones locales ya aplicadas. */
@@ -75,7 +68,6 @@ export interface ThreadPanelProps {
  * reaccionar en el hilo y verlo en el historial fueran dos cosas distintas.
  */
 export function ThreadPanel({
-  llenarAlto = false,
   raiz,
   replies,
   cargando,
@@ -156,19 +148,13 @@ export function ThreadPanel({
       <div
         ref={scrollerRef}
         /**
-         * ⚠️ **El tope de altura tiene que ir aquí, en el propio scroller,
-         * igual que en el chat principal (ver el comentario junto al suyo en
-         * `ChatPanel`).** `min-h-0`/`flex-1` a secas solo acotan la altura si
-         * hay un ancestro con altura **definida** de quien heredarla —cierto en
-         * la pantalla dedicada de mensajes (`llenarAlto`), falso en la pestaña
-         * de un proyecto, donde la página crece con el contenido y nada por
-         * encima le da al panel un límite real. Sin este tope explícito, el
-         * hilo crecía sin parar con cada respuesta en vez de quedarse dentro
-         * del alto del chat y dejar que el scroll interno se encargara.
+         * El hilo mide **lo mismo que el chat** porque los dos son hijos
+         * estirados de la misma fila y ninguno lleva tope propio: el alto lo
+         * fija el contenedor de la pantalla, una sola vez. Cuando cada uno
+         * tenía su `max-h`, terminaban a alturas distintas y crecían con cada
+         * mensaje — ver el comentario del scroller en `ChatPanel`.
          */
-        className={`flex flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 py-2 ${
-          llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
-        }`}
+        className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 py-2"
       >
         {bubbles.map((mensaje, indice) => {
           const anterior = bubbles[indice - 1];
@@ -199,6 +185,9 @@ export function ThreadPanel({
                 hrefDePersona={hrefDePersona ? hrefDePersona(mensaje.authorId) : null}
                 hrefDeAdjunto={(id) => `${gatewayPath}${rutaCanal}/attachments/${id}/content`}
                 scrollerRef={scrollerRef}
+                permiteMenciones={permiteMenciones}
+                sugerencias={sugerencias}
+                onPedirSugerencias={onPedirSugerencias}
                 onResponder={() => undefined}
                 onReaccionar={onReaccionar}
                 onFijar={onFijar}

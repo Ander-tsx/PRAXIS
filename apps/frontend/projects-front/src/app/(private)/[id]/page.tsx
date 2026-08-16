@@ -1,5 +1,5 @@
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
-import { ProjectChat } from '@/components/organisms/ProjectChat';
+import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
 import { ProjectMembers } from '@/components/organisms/ProjectMembers';
 import { ProjectRoles } from '@/components/organisms/ProjectRoles';
@@ -520,24 +520,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         )}
 
         {activeTab === 'chat' && (
-          <ProjectChat
+          /* Solo una muestra: la conversación entera vive en Mensajes, donde
+             tiene la pantalla para ella. Ver `ProjectChatPreview`. */
+          <ProjectChatPreview
             projectId={project.id}
             projectName={project.name}
             page={chat}
             usersById={usersById}
             currentUserId={userId}
-            /* Escribir es `canComment`, el mismo permiso que comentar en una
-               tarea. No hay un `canChat`: una clave nueva en el diccionario de
-               permisos nace en `false` para todos los roles que ya existen. */
-            canWrite={can.canComment}
-            /* Vuelve a la primera pestaña, no a `?tab=chat`: el botón existe
-               para salir de la conversación.
-
-               Con `projectPath` y no con la plantilla a mano: el slug va en la
-               URL y el UUID en la API, los dos son `string`, y confundirlos no
-               da error de compilación — solo una URL fea o un 403. Ya se coló
-               en cinco sitios (CLAUDE.md). */
-            hrefVolver={projectPath(project, { tab: 'espacios' })}
           />
         )}
 

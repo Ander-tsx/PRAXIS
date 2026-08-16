@@ -89,15 +89,6 @@ export interface ChatAcciones {
 
 export interface ChatPanelProps {
   /**
-   * Que el panel ocupe todo el alto que le dé su padre.
-   *
-   * Falso por defecto —el chat de un proyecto convive con pestañas y ahí un
-   * tope de 58vh evita que la conversación empuje el resto fuera de la vista—
-   * y verdadero en la pantalla dedicada de mensajes, donde no compite con nada
-   * y el tope solo dejaba una franja vacía contra el borde inferior.
-   */
-  llenarAlto?: boolean;
-  /**
    * En móvil, la conversación ocupa la pantalla entera.
    *
    * ## Por qué un modo aparte y no solo estilos responsive
@@ -175,7 +166,6 @@ export interface ChatPanelHandle {
  */
 export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel(
   {
-    llenarAlto = false,
     pantallaCompletaEnMovil = false,
     salidaMovil,
     page,
@@ -238,16 +228,54 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
   /**
-   * Las reacciones que este navegador ya ha aplicado, encima de lo que trajo el
-   * servidor.
+   * **Solo tus** reacciones pendientes de que el servidor las confirme:
+   * `messageId` → `emoji` → puesta o quitada.
    *
    * ⚠️ Sin esto, reaccionar no se ve hasta que la página se vuelve a renderizar:
    * la lista viene del servidor y la acción no revalida —revalidar en cada
-   * reacción repintaría la conversación entera—. Se corrige con lo que devuelve
-   * el servidor, no con lo que se pidió.
+   * reacción repintaría la conversación entera—.
+   *
+   * ⚠️ **Y guardaba la lista entera de reacciones del mensaje, que es lo que
+   * hacía que los emojis «no siempre se sumaran».** Esa lista pisaba la del
+   * servidor para siempre: en cuanto reaccionabas a un mensaje, las reacciones
+   * que pusiera **otra persona** en ese mismo mensaje ya no aparecían nunca —el
+   * servidor las traía y la corrección local las tapaba—. Ahora se guarda el
+   * delta de lo tuyo y se aplica **encima** de lo que trae el servidor, así que
+   * lo de los demás nunca se pierde y lo tuyo se ve al instante. Al llegar la
+   * confirmación del servidor el delta ya es idempotente y deja de notarse.
    */
-  const [reaccionesLocales, setReaccionesLocales] = useState<Map<string, ChatMessage['reactions']>>(
+  const [reaccionesLocales, setReaccionesLocales] = useState<Map<string, Map<string, boolean>>>(
     new Map(),
+  );
+
+  /**
+   * Aplica tu delta pendiente sobre las reacciones que trae el servidor.
+   *
+   * Idempotente a propósito: poner un emoji que el servidor ya devuelve no lo
+   * duplica, y quitar uno que ya no está no hace nada. Es lo que permite dejar
+   * el delta puesto sin tener que adivinar cuándo el servidor «ya se enteró».
+   */
+  const conMisReacciones = useCallback(
+    (mensaje: ChatMessage): ChatMessage['reactions'] => {
+      const mias = reaccionesLocales.get(mensaje.id);
+      if (!mias || mias.size === 0) return mensaje.reactions;
+
+      let salida = mensaje.reactions;
+      for (const [emoji, puesta] of mias) {
+        const yaEsta = salida.some(
+          (reaccion) => reaccion.emoji === emoji && reaccion.userId === currentUserId,
+        );
+        if (puesta && !yaEsta) {
+          salida = [...salida, { messageId: mensaje.id, emoji, userId: currentUserId }];
+        } else if (!puesta && yaEsta) {
+          salida = salida.filter(
+            (reaccion) => !(reaccion.emoji === emoji && reaccion.userId === currentUserId),
+          );
+        }
+      }
+      return salida;
+    },
+    [reaccionesLocales, currentUserId],
   );
 
   /**
@@ -281,9 +309,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   >(new Map());
 
   const mensajes = [...older, ...page.items].map((mensaje) => {
-    const reacciones = reaccionesLocales.has(mensaje.id)
-      ? (reaccionesLocales.get(mensaje.id) as ChatMessage['reactions'])
-      : mensaje.reactions;
+    const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
     return {
@@ -303,9 +329,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   /** Las respuestas del hilo con las mismas correcciones locales que el historial. */
   const hiloMensajes = hiloReplies.map((mensaje) => {
-    const reacciones = reaccionesLocales.has(mensaje.id)
-      ? (reaccionesLocales.get(mensaje.id) as ChatMessage['reactions'])
-      : mensaje.reactions;
+    const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
     return {
@@ -454,23 +478,42 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setEnviando(false);
   }
 
+  /**
+   * Sube un archivo como borrador.
+   *
+   * ⚠️ **El `try` no es de adorno, y su ausencia era un fallo mudo.** Una
+   * Server Action que **lanza** —y lanza, por ejemplo, cuando el archivo pasa
+   * del tope de cuerpo de Next— reventaba este `await`: ni se pintaba el
+   * error, ni se quitaba el «subiendo», así que el clip se quedaba girando
+   * para siempre y lo único que decía algo era la consola del navegador. El
+   * `finally` garantiza que la ruleta pare pase lo que pase.
+   */
   async function adjuntar(file: File) {
     setSubiendo(true);
     setError(null);
-    const resultado = await acciones.adjuntar(file);
-    if (resultado.error) setError(resultado.error);
-    else if (resultado.attachment) {
-      setAdjuntosPendientes((previos) => [...previos, resultado.attachment as ChatAttachment]);
+    try {
+      const resultado = await acciones.adjuntar(file);
+      if (resultado.error) setError(resultado.error);
+      else if (resultado.attachment) {
+        setAdjuntosPendientes((previos) => [...previos, resultado.attachment as ChatAttachment]);
+      }
+    } catch {
+      setError('No se pudo subir el archivo. Si es muy grande, prueba con uno más ligero.');
+    } finally {
+      setSubiendo(false);
     }
-    setSubiendo(false);
   }
 
   async function quitarAdjunto(attachmentId: string) {
     setError(null);
-    const resultado = await acciones.quitarAdjunto(attachmentId);
-    if (resultado.error) setError(resultado.error);
-    else {
-      setAdjuntosPendientes((previos) => previos.filter((a) => a.id !== attachmentId));
+    try {
+      const resultado = await acciones.quitarAdjunto(attachmentId);
+      if (resultado.error) setError(resultado.error);
+      else {
+        setAdjuntosPendientes((previos) => previos.filter((a) => a.id !== attachmentId));
+      }
+    } catch {
+      setError('No se pudo quitar el archivo.');
     }
   }
 
@@ -496,26 +539,34 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * Si el servidor rechaza, se deshace: es la única forma honesta de ser
    * optimista — enseñar el resultado antes de tenerlo obliga a saber volver.
    */
+  /**
+   * Pone o quita **tu** reacción, pintada en el mismo fotograma.
+   *
+   * Solo se anota el delta de este emoji: lo que hayan puesto los demás sigue
+   * saliendo del servidor y no se toca. Ver el aviso de `reaccionesLocales`.
+   */
   async function reaccionar(messageId: string, emoji: string, on: boolean) {
-    const actual =
-      reaccionesLocales.get(messageId) ??
-      mensajes.find((mensaje) => mensaje.id === messageId)?.reactions ??
-      [];
+    const anterior = reaccionesLocales.get(messageId)?.get(emoji);
 
-    const siguiente = on
-      ? [...actual, { messageId, emoji, userId: currentUserId }]
-      : actual.filter(
-          (reaccion) => !(reaccion.emoji === emoji && reaccion.userId === currentUserId),
-        );
-
-    setReaccionesLocales((previas) => new Map(previas).set(messageId, siguiente));
+    setReaccionesLocales((previas) => {
+      const copia = new Map(previas);
+      const delMensaje = new Map(copia.get(messageId) ?? []);
+      delMensaje.set(emoji, on);
+      return copia.set(messageId, delMensaje);
+    });
 
     try {
       await acciones.reaccionar(messageId, emoji, on);
     } catch {
       /* Vuelta atrás: dejar la reacción puesta cuando el servidor la rechazó
          sería mentir sobre lo que ven los demás. */
-      setReaccionesLocales((previas) => new Map(previas).set(messageId, actual));
+      setReaccionesLocales((previas) => {
+        const copia = new Map(previas);
+        const delMensaje = new Map(copia.get(messageId) ?? []);
+        if (anterior === undefined) delMensaje.delete(emoji);
+        else delMensaje.set(emoji, anterior);
+        return copia.set(messageId, delMensaje);
+      });
       setError('No se pudo guardar la reacción.');
     }
   }
@@ -853,26 +904,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 flex-1 flex-col">
           {/**
-           * ⚠️ **El tope de altura vive aquí, no en el scroller de dentro.**
+           * ⚠️ **El panel llena siempre el alto que le da su padre, y quien lo
+           * monta tiene que darle uno acotado.**
            *
-           * Estaba en el scroller (`max-h-[58vh]`) mientras este contenedor era
-           * `flex-1`. En cuanto el tope se aplicaba, el contenedor seguía creciendo
-           * hasta llenar lo que le daba el padre y el scroller se quedaba corto: todo
-           * ese sobrante quedaba como **hueco muerto entre el último mensaje y el
-           * compositor**.
-           *
-           * ⚠️ Y el tope **solo se pone cuando el chat comparte pantalla con otra
-           * cosa** (`llenarAlto` en falso), que es el caso de la pestaña de un
-           * proyecto: ahí 58vh evita que la conversación empuje el resto fuera de la
-           * vista. En la pantalla dedicada de mensajes no hay nada más con lo que
-           * competir, así que el tope solo dejaba una franja vacía contra el borde
-           * inferior — que es lo que se veía.
+           * Hubo un modo con tope propio (`max-h-[58vh]`) para cuando el chat
+           * compartía pantalla con las pestañas de un proyecto. Con dos modos,
+           * el chat y el hilo se calculaban el alto por caminos distintos y
+           * acababan **desiguales** —uno terminaba donde el otro seguía— además
+           * de estirarse con cada mensaje nuevo. Desde que el chat de proyecto
+           * vive en Mensajes, el único montaje es el de alto acotado, y con un
+           * solo modo los dos paneles miden lo mismo por construcción.
            */}
-          <div
-            className={`relative flex flex-col ${
-              llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
-            }`}
-          >
+          <div className="relative flex min-h-0 flex-1 flex-col">
             <div
               ref={scrollerRef}
               onScroll={alDesplazar}
@@ -961,6 +1004,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                           `${gatewayPath}${rutaCanal}/attachments/${id}/content`
                         }
                         scrollerRef={scrollerRef}
+                        permiteMenciones={permiteMenciones}
+                        sugerencias={sugerencias}
+                        onPedirSugerencias={() => void pedirSugerencias()}
                         onResponder={setRespondiendo}
                         onReaccionar={reaccionar}
                         onFijar={fijar}
@@ -1166,7 +1212,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
         {hiloRaiz && (
           <ThreadPanel
-            llenarAlto={llenarAlto}
             raiz={hiloRaiz}
             replies={hiloMensajes}
             cargando={hiloCargando}
