@@ -420,7 +420,7 @@ export class ChatService {
    * El `authorId` va en el `where` cuando no hay moderación, no en una
    * comprobación previa: así no existe el hueco entre leer y borrar, y borrar el
    * de otro **no encuentra fila** en vez de encontrarla y rechazarla.
-   */  async delete(dto: {
+   */ async delete(dto: {
     id: string;
     channelId: string;
     requesterId: string;
@@ -704,6 +704,40 @@ export class ChatService {
     `;
 
     return new Map(filas.map((fila) => [fila.channelId, Number(fila.unread)]));
+  }
+
+  /**
+   * Quién ha leído hasta dónde, para las burbujas de «visto».
+   *
+   * ## Sale de un dato que ya se guardaba
+   *
+   * No hay tabla de acuses por mensaje —serían tantas filas como mensajes por
+   * personas, y para lo mismo—: `ChatChannelState.lastReadAt` ya dice hasta
+   * cuándo ha leído cada quien, y con eso un mensaje está visto por alguien si
+   * su `lastReadAt` es posterior a la fecha del mensaje. Lo calcula el
+   * frontend, que es donde están los mensajes en pantalla.
+   *
+   * ⚠️ **Se excluye a quien pregunta.** Tu propia marca de lectura no dice nada
+   * —acabas de abrir el canal— y de dejarla, cada mensaje saldría «visto por
+   * ti», que es ruido.
+   *
+   * ⚠️ **Sin `lastReadAt` no sale en la lista.** Es «no ha abierto el canal
+   * nunca», y devolverlo con `null` obligaría a filtrar lo mismo del otro lado.
+   */
+  async receipts(dto: { channelId: string; requesterId: string }) {
+    const estados = await this.prisma.chatChannelState.findMany({
+      where: {
+        channelId: dto.channelId,
+        userId: { not: dto.requesterId },
+        lastReadAt: { not: null },
+      },
+      select: { userId: true, lastReadAt: true },
+    });
+
+    return estados.map((estado) => ({
+      userId: estado.userId,
+      lastReadAt: (estado.lastReadAt as Date).toISOString(),
+    }));
   }
 
   /**

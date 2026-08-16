@@ -104,6 +104,13 @@ export class ChatController {
     return this.chat.markRead({ ...dto, channelId: canal.id });
   }
 
+  /** Quién ha leído hasta dónde. Para las burbujas de «visto». */
+  @MessagePattern({ cmd: 'chat_project_receipts' })
+  async proyectoAcuses(@Payload() dto: DeProyecto) {
+    const canal = await this.channels.deProyecto(dto.projectId);
+    return this.chat.receipts({ channelId: canal.id, requesterId: dto.requesterId });
+  }
+
   @MessagePattern({ cmd: 'chat_project_mute' })
   async proyectoSilenciar(@Payload() dto: DeProyecto & { muted: boolean }) {
     const canal = await this.channels.deProyecto(dto.projectId);
@@ -201,6 +208,12 @@ export class ChatController {
   async directoLeido(@Payload() dto: Directo) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId);
     return this.chat.markRead({ ...dto, channelId: canal.id });
+  }
+
+  @MessagePattern({ cmd: 'chat_direct_receipts' })
+  async directoAcuses(@Payload() dto: Directo) {
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    return this.chat.receipts({ channelId: canal.id, requesterId: dto.requesterId });
   }
 
   @MessagePattern({ cmd: 'chat_direct_mute' })

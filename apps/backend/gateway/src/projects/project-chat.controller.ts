@@ -301,6 +301,31 @@ export class ProjectChatController {
   }
 
   /**
+   * Quién ha leído hasta dónde, para las burbujas de «visto».
+   *
+   * Devuelve `[{ userId, lastReadAt }]` de todo el que haya abierto el canal
+   * **menos quien pregunta**. Un mensaje está visto por alguien si su
+   * `lastReadAt` es posterior a la fecha del mensaje; ese cálculo lo hace el
+   * frontend, que es donde están los mensajes en pantalla.
+   *
+   * `CAN_VIEW_PROJECT` y no `CAN_COMMENT`: quien puede leer el chat puede
+   * saber quién más lo ha leído.
+   */
+  @Get('receipts')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_PROJECT)
+  @ApiOperation({ summary: 'Hasta dónde ha leído cada miembro del canal' })
+  @ApiResponse({ status: 200, description: 'Lista de userId con su lastReadAt' })
+  receipts(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_project_receipts' },
+        { projectId: req.projectId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
+  /**
    * Silencia el chat, o le devuelve el sonido.
    *
    * Silenciar **no deja de contar lo no leído**: la insignia sigue. Lo que se

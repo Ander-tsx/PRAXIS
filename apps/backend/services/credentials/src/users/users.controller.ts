@@ -50,6 +50,42 @@ export class UsersController {
     return this.usersService.setStatus(dto);
   }
 
+  /**
+   * La foto llega **en base64**, no como `Buffer`.
+   *
+   * ⚠️ El transporte TCP de Nest serializa el payload a JSON, y un `Buffer`
+   * cruza como `{ type: 'Buffer', data: [...] }` —un array de miles de números
+   * que ocupa cinco veces más—. En base64 viaja como una cadena y se
+   * reconstruye aquí.
+   */
+  @MessagePattern({ cmd: 'user_set_avatar' })
+  setAvatar(@Payload() dto: { userId: string; mimeType: string; base64: string }) {
+    return this.usersService.setAvatar(
+      dto.userId,
+      dto.mimeType,
+      /* `Uint8Array<ArrayBuffer>` explícito: el `Buffer` de Node declara
+         `ArrayBufferLike`, que Prisma no acepta para un campo `Bytes`. */
+      Uint8Array.from(Buffer.from(dto.base64, 'base64')) as Uint8Array<ArrayBuffer>,
+    );
+  }
+
+  @MessagePattern({ cmd: 'user_delete_avatar' })
+  deleteAvatar(@Payload() dto: { userId: string }) {
+    return this.usersService.deleteAvatar(dto.userId);
+  }
+
+  /** Devuelve los bytes en base64, por el mismo motivo que los recibe así. */
+  @MessagePattern({ cmd: 'user_get_avatar' })
+  async getAvatar(@Payload() dto: { userId: string }) {
+    const avatar = await this.usersService.getAvatar(dto.userId);
+    if (!avatar) return null;
+    return {
+      mimeType: avatar.mimeType,
+      size: avatar.size,
+      base64: Buffer.from(avatar.bytes).toString('base64'),
+    };
+  }
+
   @MessagePattern({ cmd: 'user_delete' })
   delete(@Payload() dto: DeleteUserDto) {
     return this.usersService.delete(dto.id);

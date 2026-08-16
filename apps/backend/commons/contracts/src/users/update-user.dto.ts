@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 /**
  * Cuerpo de `PATCH /users/:id`.
@@ -15,6 +15,23 @@ import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-valida
  * dos formas durante la transición —`first_name` queda **obsoleto**— para no
  * romper a nadie que ya mande la vieja.
  */
+/**
+ * Los estados de presencia. Espejo de `UserPresence` en el esquema de Prisma.
+ *
+ * Conjunto cerrado: un texto libre por persona convierte la lista del equipo en
+ * algo que no se lee de un vistazo ni se traduce.
+ */
+export const USER_PRESENCES = [
+  'AVAILABLE',
+  'BUSY',
+  'IN_MEETING',
+  'EATING',
+  'AWAY',
+  'DO_NOT_DISTURB',
+] as const;
+
+export type UserPresence = (typeof USER_PRESENCES)[number];
+
 export class UpdateUserBodyDto {
   @ApiPropertyOptional({ description: 'Nombre', example: 'Ada' })
   @IsOptional()
@@ -45,6 +62,19 @@ export class UpdateUserBodyDto {
   @MinLength(2, { message: 'El apellido debe tener al menos 2 caracteres' })
   @MaxLength(60, { message: 'El apellido no puede superar 60 caracteres' })
   last_name?: string;
+
+  /**
+   * Lo que dices que estás haciendo. Lo eliges tú y se queda hasta que lo
+   * cambies.
+   *
+   * ⚠️ **No confundir con `status`**, que es el estado administrativo de la
+   * cuenta y **no se toca desde aquí**: quien la suspende es la plataforma, y
+   * aceptarlo en este cuerpo dejaría que cualquiera se reactivase solo.
+   */
+  @ApiPropertyOptional({ enum: USER_PRESENCES, description: 'Presencia elegida' })
+  @IsOptional()
+  @IsEnum(USER_PRESENCES)
+  presence?: UserPresence;
 }
 
 /** Payload que viaja al microservicio: el cuerpo más el id de la ruta. */

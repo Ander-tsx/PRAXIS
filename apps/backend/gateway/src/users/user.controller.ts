@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,19 +7,65 @@ import {
   HttpCode,
   HttpStatus,
   Inject,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   Request,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { DeleteUserDto, FindUsersQueryDto, UpdateUserBodyDto } from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { AccountOwnerGuard } from '../common/guards/account-owner.guard';
+
+/**
+ * Tope de la foto de perfil: 2 MB.
+ *
+ * Mucho menos que un adjunto del chat (25 MB) a propósito: una foto de perfil
+ * se pinta en cada burbuja y en cada lista de equipo, y de 2 MB ya salen 512 px
+ * de sobra. Lo que se evita es que alguien suba una foto de cámara sin recortar
+ * y la pague todo el que abra la pantalla.
+ */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Tipos que se aceptan como foto.
+ *
+ * ⚠️ **Sin SVG**, por el mismo motivo que en el chat y en los adjuntos de
+ * tarea: es XML con scripts, y servirlo desde el mismo origen que la aplicación
+ * es XSS con todas las letras.
+ */
+const AVATAR_ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'] as const;
+
+/** ¿Los primeros bytes dicen lo mismo que el `Content-Type` declarado? */
+function firmaDeImagenValida(mimeType: string, contenido: Uint8Array): boolean {
+  const empiezaPor = (firma: number[], offset = 0) =>
+    contenido.length >= offset + firma.length &&
+    firma.every((byte, i) => contenido[offset + i] === byte);
+
+  if (mimeType === 'image/png') return empiezaPor([0x89, 0x50, 0x4e, 0x47]);
+  if (mimeType === 'image/jpeg') return empiezaPor([0xff, 0xd8, 0xff]);
+  if (mimeType === 'image/webp')
+    return empiezaPor([0x52, 0x49, 0x46, 0x46]) && empiezaPor([0x57, 0x45, 0x42, 0x50], 8);
+  return false;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -83,6 +130,84 @@ export class UserController {
   @ApiResponse({ status: 403, description: 'Solo puedes modificar tu propia cuenta' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateUserBodyDto) {
     return firstValueFrom(this.credentialsClient.send({ cmd: 'user_update' }, { ...body, id }));
+  }
+
+  /**
+   * Sube la foto de perfil.
+   *
+   * ⚠️ **La ruta lleva el `:id` y el guard de dueño**, aunque siempre sea la
+   * tuya: es la misma regla que `PATCH` y `DELETE` de esta clase, y hacerla
+   * `/users/me/avatar` habría sido la única de las cuatro con otra forma.
+   */
+  @Post(':id/avatar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccountOwnerGuard)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: AVATAR_MAX_BYTES, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube la foto de perfil' })
+  @ApiResponse({ status: 200, description: 'Perfil con la avatarUrl nueva' })
+  setAvatar(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No llegó ningún archivo en el campo «file»');
+    if (!(AVATAR_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
+      throw new BadRequestException('La foto tiene que ser PNG, JPEG o WebP.');
+    }
+    if (file.size === 0) throw new BadRequestException('El archivo está vacío');
+    /* El `mimetype` lo declara quien sube: se comprueba contra la firma real,
+       igual que en los adjuntos del chat. */
+    if (!firmaDeImagenValida(file.mimetype, file.buffer)) {
+      throw new BadRequestException('Ese archivo no es la imagen que dice ser.');
+    }
+
+    return firstValueFrom(
+      this.credentialsClient.send(
+        { cmd: 'user_set_avatar' },
+        { userId: id, mimeType: file.mimetype, base64: file.buffer.toString('base64') },
+      ),
+    );
+  }
+
+  @Delete(':id/avatar')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccountOwnerGuard)
+  @ApiOperation({ summary: 'Quita la foto de perfil' })
+  deleteAvatar(@Param('id', ParseUUIDPipe) id: string) {
+    return firstValueFrom(
+      this.credentialsClient.send({ cmd: 'user_delete_avatar' }, { userId: id }),
+    );
+  }
+
+  /**
+   * Sirve los bytes de la foto.
+   *
+   * **Sin `AccountOwnerGuard`**: una foto de perfil la ve cualquiera que esté
+   * dentro —sale en cada burbuja del chat y en cada lista de equipo—, así que
+   * basta con tener sesión. Lo que no se expone por aquí es nada más del perfil.
+   */
+  @Get(':id/avatar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bytes de la foto de perfil' })
+  async getAvatar(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const avatar = await firstValueFrom(
+      this.credentialsClient.send<{ mimeType: string; size: number; base64: string } | null>(
+        { cmd: 'user_get_avatar' },
+        { userId: id },
+      ),
+    );
+    if (!avatar) throw new NotFoundException('Esa cuenta no tiene foto');
+
+    const bytes = Buffer.from(avatar.base64, 'base64');
+    res.setHeader('Content-Type', avatar.mimeType);
+    res.setHeader('Content-Length', bytes.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    /* Un año de caché **inmutable**: la URL lleva `?v=<epoch>` y cambia con
+       cada foto nueva, así que la respuesta vieja nunca se pide otra vez. Sin
+       la versión en la URL, esto sería justo lo que dejaría la foto vieja
+       pegada durante un año. */
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(bytes);
   }
 
   @Delete(':id')

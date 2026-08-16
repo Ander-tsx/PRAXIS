@@ -91,6 +91,9 @@ export class UsersService {
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
         ...(dto.lastName === undefined &&
           dto.last_name !== undefined && { lastName: dto.last_name }),
+        /* La presencia la elige su dueño. `status` **no** entra por aquí: es el
+           estado administrativo de la cuenta y lo pone la plataforma. */
+        ...(dto.presence !== undefined && { presence: dto.presence }),
       },
       include: { credential: { select: { email: true } } },
     });
@@ -98,6 +101,66 @@ export class UsersService {
     await this.redis.del(`user:${dto.id}`);
 
     return updated;
+  }
+
+  /**
+   * Guarda la foto de perfil y devuelve el perfil con la `avatarUrl` nueva.
+   *
+   * ⚠️ **La URL lleva una marca de versión** (`?v=<epoch>`), y sin ella la foto
+   * nueva no se vería: la ruta que la sirve es la misma de siempre, así que el
+   * navegador seguiría enseñando la vieja desde su caché. Cambiando la URL en
+   * cada subida, la caché deja de acertar y se pide otra vez.
+   *
+   * Los bytes van a `UserAvatar`, no a `User`: son cientos de kilobytes que no
+   * hacen falta en las decenas de consultas de perfil que pinta una pantalla.
+   */
+  async setAvatar(userId: string, mimeType: string, bytes: Uint8Array<ArrayBuffer>) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new RpcException({ statusCode: 404, message: 'Usuario no encontrado' });
+    }
+
+    const version = Date.now();
+    const [, actualizado] = await this.prisma.$transaction([
+      this.prisma.userAvatar.upsert({
+        where: { userId },
+        create: { userId, mimeType, size: bytes.length, bytes },
+        update: { mimeType, size: bytes.length, bytes },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { avatarUrl: `/users/${userId}/avatar?v=${version}` },
+        include: { credential: { select: { email: true } } },
+      }),
+    ]);
+
+    await this.redis.del(`user:${userId}`);
+    return actualizado;
+  }
+
+  /** Quita la foto. Devuelve el perfil, ya sin `avatarUrl`. */
+  async deleteAvatar(userId: string) {
+    await this.prisma.userAvatar.deleteMany({ where: { userId } });
+    const actualizado = await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+      include: { credential: { select: { email: true } } },
+    });
+    await this.redis.del(`user:${userId}`);
+    return actualizado;
+  }
+
+  /**
+   * Los bytes de la foto, para la ruta que la sirve.
+   *
+   * `null` y no una excepción cuando no hay: no tener foto es lo normal, no un
+   * error, y el gateway responde 404 sin ruido.
+   */
+  async getAvatar(userId: string) {
+    return this.prisma.userAvatar.findUnique({
+      where: { userId },
+      select: { mimeType: true, size: true, bytes: true },
+    });
   }
 
   /**

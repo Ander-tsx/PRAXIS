@@ -317,6 +317,25 @@ export class DirectChatController {
     );
   }
 
+  /**
+   * Hasta dónde ha leído la otra persona. Ver el gemelo del chat de proyecto.
+   *
+   * En una conversación de dos la lista trae como mucho un elemento, y es
+   * justo el que hace falta para el «visto».
+   */
+  @Get(':peerId/receipts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Hasta dónde ha leído la otra persona' })
+  @ApiResponse({ status: 200, description: 'Lista de userId con su lastReadAt' })
+  receipts(@Param('peerId', ParseUUIDPipe) peerId: string, @Request() req: Express.Request) {
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_receipts' },
+        { peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
   @Post(':peerId/mute')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Silencia o reactiva los avisos de esta conversación' })
