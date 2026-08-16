@@ -1,3 +1,4 @@
+import { presenciaDe } from '../../api/presence';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -37,6 +38,21 @@ export interface AvatarProps {
   ring?: boolean;
   className?: string;
   title?: string;
+  /**
+   * La foto, ya con el proxy de la zona delante (`hrefDeAvatar`).
+   *
+   * Si falla al cargarse **se vuelve a las iniciales**: una foto rota deja un
+   * hueco gris con el icono del navegador, que es peor que no tenerla.
+   */
+  src?: string | null;
+  /**
+   * Presencia de esa persona: pinta el puntito de color en la esquina.
+   *
+   * Sin valor no se pinta nada. Es lo que evita que salga un punto verde en
+   * los avatares que solo ilustran —una tarjeta de tarea, una lista de
+   * miembros— donde la presencia no viene al caso.
+   */
+  presence?: string | null;
 }
 
 export function Avatar({
@@ -46,15 +62,17 @@ export function Avatar({
   ring = false,
   className = '',
   title,
+  src,
+  presence,
 }: AvatarProps) {
-  return (
+  const circulo = (
     <span
       title={title ?? label}
       className={[
-        'flex shrink-0 items-center justify-center rounded-full font-sans font-semibold uppercase',
+        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-sans font-semibold uppercase',
         SIZES[size],
         ring ? 'ring-2 ring-background' : '',
-        className,
+        presence ? '' : className,
       ]
         .filter(Boolean)
         .join(' ')}
@@ -66,7 +84,46 @@ export function Avatar({
           : { background: alpha(colors.primary, 30), color: colors.textPrimary }
       }
     >
+      {/* Las iniciales **siempre están debajo**: si la foto no carga, lo que
+          queda es lo de siempre y no un hueco. */}
       {iniciales(label)}
+      {src && (
+        <img
+          src={src}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          /* Una foto que no carga se quita a sí misma y deja ver las
+             iniciales de debajo, en vez del icono de imagen rota. */
+          onError={(evento) => {
+            evento.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
+    </span>
+  );
+
+  if (!presence) return circulo;
+
+  const { etiqueta, color } = presenciaDe(presence);
+
+  return (
+    /**
+     * El punto va **fuera del círculo**, en un envoltorio.
+     *
+     * Dentro tendría que pelearse con el `overflow-hidden` que recorta la foto:
+     * o se recorta el punto, o se deja de recortar la foto y sale cuadrada.
+     */
+    <span className={['relative inline-flex shrink-0', className].filter(Boolean).join(' ')}>
+      {circulo}
+      <span
+        title={etiqueta}
+        aria-label={etiqueta}
+        className={[
+          'absolute bottom-0 right-0 rounded-full ring-2 ring-surface',
+          size === 'sm' ? 'h-2 w-2' : 'h-3 w-3',
+        ].join(' ')}
+        style={{ background: color }}
+      />
     </span>
   );
 }

@@ -1,5 +1,13 @@
+import { setPresenceAction } from '@/app/(private)/presence-actions';
 import { AccessDenied } from '@/components/organisms/AccessDenied';
-import { AppHeader, AppShell, LogoutButton, displayName, hasAdminRole } from '@praxis/commons';
+import {
+  AppHeader,
+  AppShell,
+  PresenceFooter,
+  displayName,
+  hasAdminRole,
+  hrefDeAvatar,
+} from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import { getSidebarPlegada } from '@praxis/commons/theme';
 
@@ -36,8 +44,16 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       navItems={navItems}
       zonePath="/admin"
       plegadaInicial={plegada}
-      user={{ name: displayName(profile), email: profile.credential.email }}
-      footerSlot={<LogoutButton />}
+      user={{
+        name: displayName(profile),
+        email: profile.credential.email,
+        avatarSrc: hrefDeAvatar(profile.avatarUrl, '/admin/api/gateway'),
+        presence: profile.presence ?? null,
+      }}
+      /* «Cerrar sesión» se fue a la pantalla de cuenta, a la que se llega
+         pulsando la ficha de arriba. Aquí queda el cambio de estado, que es
+         lo que sí se toca varias veces al día. */
+      footerSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
     >
       {hasAdminRole(roles) ? (
         children

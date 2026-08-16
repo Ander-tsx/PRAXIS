@@ -12,6 +12,10 @@ export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
   name: string;
   email: string;
+  /** Foto, ya con el proxy de la zona delante (`hrefDeAvatar`). */
+  avatarSrc?: string | null;
+  /** Presencia elegida. Pinta el punto de color sobre el avatar. */
+  presence?: string | null;
 }
 
 export interface AppShellProps {
@@ -26,7 +30,15 @@ export interface AppShellProps {
    */
   zonePath: string;
   user: AppShellUser;
-  /** Pie de la barra lateral. Normalmente cerrar sesión. */
+  /**
+   * Pie de la barra lateral.
+   *
+   * ⚠️ **Ya no lleva «Cerrar sesión».** Se movió a la pantalla de cuenta, a la
+   * que se llega pulsando la propia ficha de usuario: en el pie era el único
+   * control destructivo de toda la barra y estaba pegado a la navegación, un
+   * clic de más al ir a Configuración. Aquí queda el cambio rápido de
+   * presencia, que sí se usa a diario.
+   */
   footerSlot?: ReactNode;
   /**
    * Si la barra sale plegada, **resuelto en el servidor**.
@@ -171,9 +183,19 @@ export function AppShell({
                 el correo no caben, y el avatar ya identifica de quién es la
                 sesión, que es lo que esa tarjeta viene a decir. */}
             {plegada ? (
-              <div className="mb-2 flex justify-center" title={user.name.trim() || user.email}>
-                <Avatar label={user.name.trim() || user.email} mine size="md" />
-              </div>
+              <a
+                href={CUENTA_HREF}
+                className="mb-2 flex justify-center"
+                title={`${user.name.trim() || user.email} — tu cuenta`}
+              >
+                <Avatar
+                  label={user.name.trim() || user.email}
+                  mine
+                  size="md"
+                  src={user.avatarSrc ?? null}
+                  presence={user.presence ?? null}
+                />
+              </a>
             ) : (
               <UserCard user={user} />
             )}
@@ -249,20 +271,48 @@ export function AppShell({
   );
 }
 
+/**
+ * Dónde vive la pantalla de la cuenta.
+ *
+ * Ruta **absoluta y con el prefijo de zona**: la pantalla la sirve `dashboard`
+ * y esta barra la pintan las seis zonas, así que desde `projects` o `reports`
+ * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
+ * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
+ */
+const CUENTA_HREF = '/dashboard/perfil';
+
+/**
+ * La ficha de usuario del pie: ahora es **la puerta a tu cuenta**.
+ *
+ * Antes era un rótulo y debajo iba «Cerrar sesión». Pulsar tu propia cara es
+ * el gesto que ya se intenta en cualquier otra herramienta, así que ahí es
+ * donde se ha puesto lo tuyo: nombre, foto, presencia, cerrar sesión y borrar
+ * la cuenta.
+ */
 function UserCard({ user }: { user: AppShellUser }) {
   return (
-    <div className="mb-3 flex items-center gap-3">
+    <a
+      href={CUENTA_HREF}
+      title="Tu cuenta"
+      className="mb-3 flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-surface-elevated"
+    >
       {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
           la barra lateral la persona siempre eres tú, así que sale en rojo. Que
           coincida importa — es lo que enseña que el rojo significa «tuyo». */}
-      <Avatar label={user.name.trim() || user.email} mine size="md" />
+      <Avatar
+        label={user.name.trim() || user.email}
+        mine
+        size="md"
+        src={user.avatarSrc ?? null}
+        presence={user.presence ?? null}
+      />
       <div className="min-w-0 flex-1">
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-text-primary">{user.name}</p>
         )}
         <p className="truncate font-sans text-xs text-text-secondary">{user.email}</p>
       </div>
-    </div>
+    </a>
   );
 }
 

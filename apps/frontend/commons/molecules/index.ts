@@ -8,3 +8,4 @@ export * from './RoleBadge';
 export * from './AuthForm';
 export * from './Pagination';
 export * from './ThemeToggle';
+export * from './PresenceSwitcher';

@@ -11,8 +11,19 @@ export interface UserProfile {
   /** Vacío en cuentas nuevas: `POST /auth/register` no pide nombre. */
   firstName: string | null;
   lastName: string | null;
+  /**
+   * Ruta **relativa al gateway** de la foto: `/users/<id>/avatar?v=<epoch>`.
+   * La zona le antepone su propio proxy — ver `hrefDeAvatar`.
+   */
   avatarUrl: string | null;
+  /**
+   * Estado **administrativo** de la cuenta (`ACTIVE`, `INACTIVE`,
+   * `SUSPENDED`), puesto por la plataforma. **No es la presencia**: esa es
+   * `presence`, la elige su dueño y no decide nada sobre el acceso.
+   */
   status: string;
+  /** Lo que dice que está haciendo. Ver `presence.ts`. */
+  presence?: string;
   createdAt: string;
   updatedAt: string;
   credential: { email: string };
