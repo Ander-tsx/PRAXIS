@@ -516,6 +516,13 @@ export const CHAT_ATTACHMENT_ALLOWED_MIME = [
   'application/pdf',
   'text/plain',
   'text/csv',
+  /* ⚠️ **Markdown va con sus dos tipos, y no sobra ninguno.** Chrome declara
+     un `.md` como `text/markdown`, pero Safari y algunos Linux lo mandan como
+     `text/x-markdown`, y hay sistemas donde llega vacío —ahí no hay nada que
+     hacer desde aquí—. Con solo el primero, el mismo archivo entraba en un
+     navegador y lo rechazaba otro. */
+  'text/markdown',
+  'text/x-markdown',
   'application/zip',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

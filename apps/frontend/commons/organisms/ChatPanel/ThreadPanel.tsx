@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ChatAttachment, ChatMessage, UserProfile } from '../../api/domain';
 import { colors } from '../../tokens';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
+import { campoDesdeCuerpo } from './etiquetado';
 
 export interface ThreadPanelProps {
   /** El mensaje que abre el hilo. */
@@ -98,6 +99,20 @@ export function ThreadPanel({
 }: ThreadPanelProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const bubbles = [raiz, ...replies];
+  /**
+   * El mensaje que se edita **en el compositor de este panel**.
+   *
+   * Estado propio y no del chat: editar aquí tiene que rellenar el campo de
+   * «Responder en el hilo…», no el de abajo del historial, que ni siquiera se
+   * está mirando. Es la misma idea que en `ChatPanel`, aplicada al subchat.
+   */
+  const [editando, setEditando] = useState<ChatMessage | null>(null);
+
+  async function guardarEdicion(cuerpo: string) {
+    if (!editando) return;
+    const guardado = await onEditar(editando.id, cuerpo);
+    if (guardado) setEditando(null);
+  }
   /* Mismo motivo que el ancho máximo de AppHeader: plegar la barra lateral
      libera sitio que un panel de ancho fijo nunca reclamaba. */
   const plegada = useSidebarPlegada();
@@ -191,7 +206,8 @@ export function ThreadPanel({
                 onResponder={() => undefined}
                 onReaccionar={onReaccionar}
                 onFijar={onFijar}
-                onEditar={onEditar}
+                onPedirEdicion={setEditando}
+                editandose={editando?.id === mensaje.id}
                 onBorrar={onBorrar}
                 onAbrirHilo={() => undefined}
                 permiteAbrirHilo={false}
@@ -222,16 +238,28 @@ export function ThreadPanel({
       {canWrite ? (
         <div className="shrink-0 border-t border-border p-3">
           <Composer
-            onEnviar={onEnviar}
+            /* Ver el aviso de la `key` en `ChatPanel`: es lo que rellena el
+               campo con el mensaje que se va a editar. */
+            key={editando ? `editar-${editando.id}` : 'nuevo'}
+            onEnviar={editando ? (cuerpo) => void guardarEdicion(cuerpo) : onEnviar}
             enviando={enviando}
-            placeholder="Responder en el hilo…"
+            placeholder={editando ? 'Edita tu mensaje…' : 'Responder en el hilo…'}
             permiteMenciones={permiteMenciones}
             sugerencias={sugerencias}
             onPedirSugerencias={onPedirSugerencias}
-            adjuntosPendientes={adjuntosPendientes}
+            adjuntosPendientes={editando ? [] : adjuntosPendientes}
             onAdjuntar={onAdjuntar}
             onQuitarAdjunto={onQuitarAdjunto}
             subiendo={subiendo}
+            {...(editando
+              ? {
+                  valorInicial: campoDesdeCuerpo(editando.body),
+                  onCancelar: () => setEditando(null),
+                  etiquetaEnviar: 'Guardar',
+                  ocultarAdjuntos: true,
+                  autoFoco: true,
+                }
+              : {})}
           />
         </div>
       ) : (

@@ -603,7 +603,10 @@ export function Composer({
             ref={archivoRef}
             type="file"
             multiple={false}
-            accept={CHAT_ATTACHMENT_ALLOWED_MIME.join(',')}
+            /* Las extensiones además de los tipos: el selector de archivos de
+               algunos sistemas no reconoce `text/markdown` y dejaba los `.md`
+               en gris aunque el servidor sí los acepte. */
+            accept={`${CHAT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown`}
             onChange={alElegirArchivo}
             className="hidden"
           />
@@ -655,7 +658,15 @@ export function Composer({
       </div>
 
       <div className="flex items-center justify-between gap-3 px-1">
-        <p className="font-sans text-[11px] text-text-disabled">
+        {/**
+         * ⚠️ **Una sola línea, recortada, y por eso `truncate`.** Esta ayuda
+         * cabe entera en el compositor del chat y **se partía en dos** en el
+         * del hilo, que es la mitad de ancho. Dos líneas contra una empujaban
+         * el campo del hilo unos 17 px hacia arriba, y los dos compositores
+         * terminaban a alturas distintas por mucho que midieran igual. El
+         * texto completo sigue a la vista en el compositor ancho.
+         */}
+        <p className="truncate font-sans text-[11px] text-text-disabled">
           <kbd className="font-sans">Enter</kbd> envía ·{' '}
           <kbd className="font-sans">Mayús+Enter</kbd> salta de línea
           {permiteMenciones && (

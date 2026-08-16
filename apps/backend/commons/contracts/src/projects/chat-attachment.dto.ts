@@ -50,6 +50,13 @@ export const CHAT_ATTACHMENT_ALLOWED_MIME = [
   'application/pdf',
   'text/plain',
   'text/csv',
+  /* ⚠️ **Markdown va con sus dos tipos, y no sobra ninguno.** Chrome declara
+     un `.md` como `text/markdown`, pero Safari y algunos Linux lo mandan como
+     `text/x-markdown`, y hay sistemas donde llega vacío —ahí no hay nada que
+     hacer desde aquí—. Con solo el primero, el mismo archivo entraba en un
+     navegador y lo rechazaba otro. */
+  'text/markdown',
+  'text/x-markdown',
   'application/zip',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -111,9 +118,22 @@ export function validarFirmaChatAdjunto(mimeType: string, contenido: Uint8Array)
   if (mimeType === 'application/msword' || mimeType === 'application/vnd.ms-excel') {
     return empiezaPor(contenido, [0xd0, 0xcf, 0x11, 0xe0]);
   }
-  if (mimeType === 'text/plain' || mimeType === 'text/csv') return esTexto(contenido);
+  /* Markdown es texto: mismo trato que el plano y el CSV. Sin esto caía al
+     `return false` del final y un `.md` se rechazaba con «no es lo que parece
+     por el nombre» aunque su tipo estuviera en la lista blanca. */
+  if (esTextoPlano(mimeType)) return esTexto(contenido);
 
   return false;
+}
+
+/** ¿Este tipo es texto sin firma binaria que comprobar? */
+function esTextoPlano(mimeType: string): boolean {
+  return (
+    mimeType === 'text/plain' ||
+    mimeType === 'text/csv' ||
+    mimeType === 'text/markdown' ||
+    mimeType === 'text/x-markdown'
+  );
 }
 
 /** ¿Este tipo se guarda como ZIP? */

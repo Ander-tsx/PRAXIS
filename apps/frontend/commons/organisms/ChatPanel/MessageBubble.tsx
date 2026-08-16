@@ -45,7 +45,19 @@ export interface MessageBubbleProps {
   onResponder: (message: ChatMessage) => void;
   onReaccionar: (messageId: string, emoji: string, on: boolean) => void;
   onFijar: (messageId: string, on: boolean) => void;
-  onEditar: (messageId: string, body: string) => Promise<boolean>;
+  /**
+   * Pide editar este mensaje.
+   *
+   * ⚠️ **La burbuja no edita.** El editor es **el compositor de abajo, el
+   * mismo con el que se escribe**: se rellena con el mensaje, esconde el clip
+   * y saca «Guardar» y «Cancelar». Aquí hubo un compositor propio dentro de la
+   * burbuja y no era lo mismo — dos campos que mantener, dos sitios donde
+   * mirar, y el de arriba salía más pequeño que el de abajo. Quien lleva el
+   * estado es el panel, que es de quien es el compositor.
+   */
+  onPedirEdicion: (message: ChatMessage) => void;
+  /** Si este mensaje es el que se está editando ahora mismo, abajo. */
+  editandose?: boolean;
   onBorrar: (messageId: string) => void;
   /** Abre el panel lateral del hilo de este mensaje. */
   onAbrirHilo: (message: ChatMessage) => void;
@@ -137,7 +149,8 @@ export function MessageBubble({
   onResponder,
   onReaccionar,
   onFijar,
-  onEditar,
+  onPedirEdicion,
+  editandose = false,
   onBorrar,
   onAbrirHilo,
   mostrarMarcaDeHilo = true,
@@ -170,38 +183,6 @@ export function MessageBubble({
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const [preview, setPreview] = useState<LinkPreview | null | undefined>(undefined);
   const nombre = author ? personLabel(author) : 'Alguien que ya no está';
-
-  /**
-   * Modo edición.
-   *
-   * `editando` es lo que abre el redactor en lugar de la burbuja; `borrador`
-   * guarda lo que se está escribiendo para que Esc y «Cancelar» lo suelten sin
-   * haber tocado nada. Se anula al apartar el ratón, como la confirmación de
-   * borrado: un redactor abierto sobre un mensaje que ya no estás mirando es
-   * exactamente el mismo problema que una pregunta de borrado a medio responder.
-   */
-  const [editando, setEditando] = useState(false);
-  /**
-   * El cuerpo con el que nace el editor, ya **disfrazado**.
-   *
-   * ⚠️ **El editor no puede cargar `message.body` a pelo.** El cuerpo guardado
-   * lleva los ids dentro —`@[María García](user:2222-…)`— así que editar un
-   * mensaje con una mención enseñaba el UUID entero en mitad de la frase, y
-   * tocar un solo carácter de él rompía la referencia sin ningún aviso.
-   * `campoDesdeCuerpo` lo convierte en texto legible más la lista de etiquetas,
-   * que es exactamente lo que el compositor sabe manejar.
-   */
-  const valorInicial = useMemo(() => campoDesdeCuerpo(message.body), [message.body]);
-
-  function abrirEdicion() {
-    setEditando(true);
-  }
-
-  /* El compositor ya devuelve el cuerpo serializado, con los ids puestos. */
-  async function confirmarEdicion(cuerpo: string) {
-    const guardado = await onEditar(message.id, cuerpo);
-    if (guardado) setEditando(false);
-  }
 
   /**
    * Gestos táctiles: deslizar responde, mantener pulsado abre la hoja de
@@ -292,7 +273,7 @@ export function MessageBubble({
   }
 
   function onGestoInicio(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.pointerType !== 'touch' || editando || confirmandoBorrado) return;
+    if (e.pointerType !== 'touch' || editandose || confirmandoBorrado) return;
     /* Sin respuesta posible no hay deslizamiento que valga: dentro de un hilo
        arrastrar la burbuja no llevaba a ninguna parte. La pulsación larga sí
        sigue abriendo la hoja, que ahí tiene el resto de acciones. */
@@ -424,7 +405,7 @@ export function MessageBubble({
   const citaVisible = Boolean(message.replyTo && message.replyTo.id !== ocultarCitaSiApuntaA);
   const marcaHiloVisible = Boolean(mostrarMarcaDeHilo && message._count.replies > 0);
   const soloMedia =
-    !editando &&
+    !editandose &&
     sinTexto &&
     !citaVisible &&
     !marcaHiloVisible &&
@@ -583,7 +564,7 @@ export function MessageBubble({
                —abre sus acciones—, que es justo lo que no se adivinaba desde
                que dejaron de salir al pasar el ratón. Mientras se edita no:
                ahí lo que hay es un campo de texto. */
-            editando ? '' : 'cursor-pointer'
+            editandose ? '' : 'cursor-pointer'
           }`}
           /* Al irse del mensaje se recogen las superficies flotantes: ni el
              selector de reacciones ni la confirmación de borrado tienen sentido
@@ -610,7 +591,8 @@ export function MessageBubble({
            * revela al llegar—, que es lo que justifica el silencio de la regla.
            */
           onClick={(evento) => {
-            if (editando || (evento.target as HTMLElement).closest('a,button,video,input')) return;
+            if (editandose || (evento.target as HTMLElement).closest('a,button,video,input'))
+              return;
             if (!barraAbierta) decidirDireccionBarra();
             setBarraAbierta((previa) => !previa);
             setConfirmandoBorrado(false);
@@ -678,36 +660,9 @@ export function MessageBubble({
             </div>
           )}
 
-          {editando ? (
-            /**
-             * Editar usa **el mismo compositor con el que se escribe**.
-             *
-             * Antes era un `<textarea>` propio: más pequeño, sin `@`, sin `/` y
-             * con su propio manejo de teclas. Reutilizando el compositor, editar
-             * un mensaje se siente igual que escribirlo —mismos desplegables,
-             * mismo tamaño, mismos atajos— y no hay dos campos que mantener.
-             *
-             * `valorInicial` llega ya disfrazado: el cuerpo guardado lleva los
-             * ids dentro y aquí se ven como píldoras.
-             */
-            <Composer
-              onEnviar={(cuerpo) => void confirmarEdicion(cuerpo)}
-              enviando={false}
-              placeholder="Edita tu mensaje…"
-              permiteMenciones={permiteMenciones}
-              sugerencias={sugerencias}
-              onPedirSugerencias={onPedirSugerencias}
-              adjuntosPendientes={[]}
-              onAdjuntar={() => undefined}
-              onQuitarAdjunto={() => undefined}
-              subiendo={false}
-              valorInicial={valorInicial}
-              onCancelar={() => setEditando(false)}
-              etiquetaEnviar="Guardar"
-              ocultarAdjuntos
-              autoFoco
-            />
-          ) : (
+          {/* El cuerpo. Editarlo no pasa por aquí: lo hace el compositor de
+              abajo, que es el mismo con el que se escribe. */}
+          {
             /* Un mensaje que solo trae adjuntos no pinta cuerpo: un `<p>` vacío
                sigue ocupando su línea, y esa línea era la franja de color de más
                que se veía encima de una foto. */
@@ -718,7 +673,7 @@ export function MessageBubble({
                 {...(hrefDeRef ? { hrefDeRef } : {})}
               />
             )
-          )}
+          }
 
           {/**
            * La barra de acciones del mensaje.
@@ -898,7 +853,7 @@ export function MessageBubble({
               <button
                 type="button"
                 onClick={() => {
-                  abrirEdicion();
+                  onPedirEdicion(message);
                   setBarraAbierta(false);
                 }}
                 aria-label="Editar mensaje"
@@ -1215,7 +1170,7 @@ export function MessageBubble({
                   <HojaBoton
                     etiqueta="Editar"
                     onClick={() => {
-                      abrirEdicion();
+                      onPedirEdicion(message);
                       cerrarHoja();
                     }}
                   >

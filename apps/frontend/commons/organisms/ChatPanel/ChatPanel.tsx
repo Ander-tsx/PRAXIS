@@ -21,6 +21,7 @@ import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
 import { PinnedBar } from './PinnedBar';
 import { ThreadPanel } from './ThreadPanel';
+import { campoDesdeCuerpo } from './etiquetado';
 
 /** Cuántos mensajes trae cada tirón del historial. */
 const PAGINA = 50;
@@ -190,6 +191,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [respondiendo, setRespondiendo] = useState<ChatMessage | null>(null);
+  /**
+   * El mensaje que se está editando **en el compositor de abajo**.
+   *
+   * ⚠️ **El editor es el compositor de siempre, no uno propio.** Hubo un
+   * compositor dentro de la burbuja: mismo diseño, pero otro campo, más
+   * pequeño, con su propio estado y su propio sitio en la pantalla. Al pedir
+   * editar ahora se rellena el campo de escribir con el mensaje, se esconde el
+   * clip —editar no cambia los adjuntos— y salen «Guardar» y «Cancelar» ahí
+   * mismo. Un solo campo, el que ya se estaba mirando.
+   */
+  const [editando, setEditando] = useState<ChatMessage | null>(null);
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
   const [alFinal, setAlFinal] = useState(true);
   /** Los borradores que esperan al envío del mensaje. */
@@ -675,6 +687,29 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }
 
   /**
+   * Lo que hace el botón «Guardar» del compositor cuando está editando.
+   *
+   * El compositor entrega el cuerpo ya serializado —con los ids de las
+   * menciones puestos—, así que aquí solo se guarda y se sale del modo.
+   */
+  async function guardarEdicion(cuerpo: string) {
+    if (!editando) return;
+    const guardado = await editar(editando.id, cuerpo);
+    if (guardado) setEditando(null);
+  }
+
+  /**
+   * Pedir editar un mensaje.
+   *
+   * Cancela la respuesta en curso: el compositor es uno, y no puede estar
+   * citando a alguien y editando otra cosa a la vez.
+   */
+  function pedirEdicion(mensaje: ChatMessage) {
+    setRespondiendo(null);
+    setEditando(mensaje);
+  }
+
+  /**
    * Abrir el hilo de un mensaje: guardar el raíz y pedir sus respuestas.
    *
    * Las respuestas van a la ruta `…/messages/<id>/thread`, que devuelve el raíz
@@ -1007,10 +1042,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         permiteMenciones={permiteMenciones}
                         sugerencias={sugerencias}
                         onPedirSugerencias={() => void pedirSugerencias()}
-                        onResponder={setRespondiendo}
+                        onResponder={(mensaje) => {
+                          setEditando(null);
+                          setRespondiendo(mensaje);
+                        }}
                         onReaccionar={reaccionar}
                         onFijar={fijar}
-                        onEditar={editar}
+                        onPedirEdicion={pedirEdicion}
+                        editandose={editando?.id === mensaje.id}
                         onBorrar={borrar}
                         onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
                         nombreDeAutor={nombreDeAutor}
@@ -1152,48 +1191,108 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             )}
           </div>
 
+          {/**
+           * ⚠️ **El envoltorio es idéntico al del hilo, y por eso están
+           * alineados.** El del hilo llevaba `border-t` y `p-3` y este no
+           * llevaba nada: el campo del subchat quedaba metido hacia dentro y
+           * más abajo que el del chat, y las dos cajas terminaban a alturas
+           * distintas. Si se toca el relleno de uno, hay que tocar el del otro
+           * — o vuelven a desalinearse.
+           */}
           {canWrite ? (
-            <Composer
-              onEnviar={enviar}
-              enviando={enviando}
-              placeholder="Escribe un mensaje…"
-              permiteMenciones={permiteMenciones}
-              sugerencias={sugerencias}
-              onPedirSugerencias={pedirSugerencias}
-              adjuntosPendientes={adjuntosPendientes}
-              onAdjuntar={adjuntar}
-              onQuitarAdjunto={quitarAdjunto}
-              subiendo={subiendo}
-              citaId={respondiendo?.id ?? null}
-              respuestaSlot={
-                respondiendo && (
-                  <div
-                    className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
-                    style={{ borderColor: colors.primary, background: alpha(colors.primary, 8) }}
-                  >
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span
-                        className="font-sans text-[11px] font-semibold"
-                        style={{ color: colors.primary }}
-                      >
-                        Respondiendo a {nombreDeAutor(respondiendo.authorId)}
-                      </span>
-                      <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                        <AdjuntoPreview mensaje={respondiendo} />
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setRespondiendo(null)}
-                      aria-label="Dejar de responder"
-                      className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
+            <div className="shrink-0 border-t border-border p-3">
+              <Composer
+                /**
+                 * ⚠️ **La `key` es lo que rellena el campo al editar.**
+                 * `valorInicial` solo se lee al montar, así que sin cambiar la
+                 * clave el compositor no se entera de que ahora edita otro
+                 * mensaje: seguiría con lo que hubiera escrito. Cambiándola, cada
+                 * mensaje que se edita monta un campo limpio con su contenido, y
+                 * al salir del modo vuelve el de escribir, vacío.
+                 */
+                key={editando ? `editar-${editando.id}` : 'nuevo'}
+                onEnviar={editando ? (cuerpo) => void guardarEdicion(cuerpo) : enviar}
+                enviando={enviando}
+                placeholder={editando ? 'Edita tu mensaje…' : 'Escribe un mensaje…'}
+                permiteMenciones={permiteMenciones}
+                sugerencias={sugerencias}
+                onPedirSugerencias={pedirSugerencias}
+                /* Editando no hay adjuntos que enseñar: lo que se cambia es el
+                 texto. Los del mensaje siguen donde estaban. */
+                adjuntosPendientes={editando ? [] : adjuntosPendientes}
+                onAdjuntar={adjuntar}
+                onQuitarAdjunto={quitarAdjunto}
+                subiendo={subiendo}
+                citaId={respondiendo?.id ?? null}
+                {...(editando
+                  ? {
+                      valorInicial: campoDesdeCuerpo(editando.body),
+                      onCancelar: () => setEditando(null),
+                      etiquetaEnviar: 'Guardar',
+                      ocultarAdjuntos: true,
+                      autoFoco: true,
+                    }
+                  : {})}
+                respuestaSlot={
+                  editando ? (
+                    <div
+                      className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
+                      style={{ borderColor: colors.warning, background: alpha(colors.warning, 8) }}
                     >
-                      ✕
-                    </button>
-                  </div>
-                )
-              }
-            />
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span
+                          className="font-sans text-[11px] font-semibold"
+                          style={{ color: colors.warning }}
+                        >
+                          Editando tu mensaje
+                        </span>
+                        <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+                          <AdjuntoPreview mensaje={editando} />
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEditando(null)}
+                        aria-label="Dejar de editar"
+                        className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    respondiendo && (
+                      <div
+                        className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
+                        style={{
+                          borderColor: colors.primary,
+                          background: alpha(colors.primary, 8),
+                        }}
+                      >
+                        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                          <span
+                            className="font-sans text-[11px] font-semibold"
+                            style={{ color: colors.primary }}
+                          >
+                            Respondiendo a {nombreDeAutor(respondiendo.authorId)}
+                          </span>
+                          <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+                            <AdjuntoPreview mensaje={respondiendo} />
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setRespondiendo(null)}
+                          aria-label="Dejar de responder"
+                          className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )
+                  )
+                }
+              />
+            </div>
           ) : (
             <p
               className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-text-secondary"
