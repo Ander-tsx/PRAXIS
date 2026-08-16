@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test';
  * El `matcher` de Next con lookahead negativo —
  * `'/((?!_next/static|…).*)'` — **no casa la raíz**. Hay que añadir `'/'` como
  * entrada aparte o la página principal de la zona se sirve sin guard. Pasó de
- * verdad: `/dashboard/perfil` sí redirigía y `/dashboard` a secas no, que es la
+ * verdad: `/dashboard/profile` sí redirigía y `/dashboard` a secas no, que es la
  * forma de fallo más fácil de pasar por alto porque solo se nota en una URL de
  * cada zona.
  *

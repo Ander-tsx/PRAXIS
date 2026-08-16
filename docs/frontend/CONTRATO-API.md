@@ -84,12 +84,29 @@ inalcanzable—. Si ves un `FORBIDDEN` donde el backend dice mandar otra cosa, e
 | Método | Ruta | Entrada | Notas |
 |---|---|---|---|
 | GET | `/users` | query params | `page`, `limit`, `search`… |
+| GET | `/users?ids=a,b,c` | query params | **Varios perfiles concretos, en una petición** |
 | GET | `/users/me` | — | **Tu perfil**, resuelto desde el token |
 | GET | `/users/:id` | — | Incluye `credential.email` |
 | PATCH | `/users/:id` | `{ firstName?, lastName? }` | camelCase de entrada y de salida |
 | DELETE | `/users/:id` | — | Borra usuario + credencial + sesión Redis |
 
 `data` de listado: `{ items: User[], total: number }`.
+
+✅ **`?ids=` resuelve varios perfiles de una vez**, y es lo que hay que usar
+siempre que se tenga una lista de `userId` que poner cara: la bandeja de avisos,
+el equipo de un proyecto, el chat, la rejilla de proyectos. Antes se pedía un
+`GET /users/:id` **por persona**.
+
+- Responde con **la misma forma que el listado** (`{ items, total }`): quien la
+  consume no tiene que desenvolver dos formas según el parámetro que mandó.
+- **No se pagina** y no se combina con `search`: si llegan los dos, mandan los
+  ids. Tope de 200 (`FindUsersByIdsDto`).
+- Un id que ya no exista **simplemente no sale**. No es un error, así que hay que
+  tolerar que `items.length < ids.length` — es justo el caso de quien ya no está
+  en el equipo.
+- ⚠️ **No uses `?limit=100` para «traerte el directorio y cruzar en memoria».**
+  Miente en cuanto la plataforma pasa de cien cuentas, y ya nos mordió tres
+  veces: la bandeja decía «Alguien», la pestaña Equipo enseñaba UUID crudos.
 
 ```ts
 User = { id, credentialId, firstName, lastName, avatarUrl, status, createdAt, updatedAt,
@@ -210,6 +227,24 @@ ni para su dueño. En la práctica, por estas rutas solo se ven `ACTIVE` y `SUSP
 Cacheado en Redis 5 min — un cambio puede tardar en reflejarse. **Suspender y archivar
 invalidan esa clave**, así que el estado sí es inmediato; lo que puede ir con retraso
 es un renombrado.
+
+✅ **`GET /projects` (el listado) trae además `members`**: los **cuatro primeros**
+miembros, solo su `userId`, ordenados por antigüedad.
+
+```ts
+members: [{ userId: string }]   // solo en el listado, máximo 4
+```
+
+Existe para pintar las caras del equipo en la rejilla sin pedir
+`GET /projects/:projectId/members` una vez por tarjeta. Los nombres y las fotos
+se resuelven aparte con **`GET /users?ids=`**, en una sola petición.
+
+⚠️ **No es el equipo entero: el total sigue siendo `_count.members`.** Contar
+`members.length` para saber cuánta gente hay da cuatro como mucho.
+
+⚠️ **El detalle (`GET /projects/:id`) no lo trae.** Ahí los miembros van por su
+propia ruta, con su rol y su fecha de entrada, que es lo que necesita la pestaña
+de Equipo.
 
 ---
 

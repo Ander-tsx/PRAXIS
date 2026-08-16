@@ -115,7 +115,7 @@ function GeneradorDeFrase({
         <FraseViva phrase={phrase} expiresAt={expiresAt} />
       ) : (
         <div
-          className="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-6"
+          className="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-5"
           style={{ borderColor: alpha(colors.border, 140) }}
         >
           <p className="font-sans text-sm text-text-secondary">
@@ -310,7 +310,10 @@ function Dispositivos({
           {activas.map((link) => (
             <li
               key={link.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3"
+              /* `surface-elevated` y no `surface`: la tarjeta que envuelve esto
+                 ya es `surface`, y una fila del mismo color que su fondo se
+                 queda solo con el borde. */
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-elevated px-4 py-3"
             >
               <span className="flex min-w-0 flex-col">
                 <span className="font-sans text-sm text-text-primary">Alexa</span>

@@ -54,8 +54,9 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  /** Con `refreshToken` cierra solo esa sesión; sin él, todas. Ver `logout()`. */
   @MessagePattern({ cmd: 'auth_logout' })
-  logout(@Payload() dto: { userId: string }) {
-    return this.authService.logout(dto.userId);
+  logout(@Payload() dto: { userId: string; refreshToken?: string }) {
+    return this.authService.logout(dto.userId, dto.refreshToken);
   }
 }

@@ -82,7 +82,34 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Buscar o listar usuarios' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios recuperada' })
-  findAll(@Query() query: FindUsersQueryDto) {
+  async findAll(@Query() query: FindUsersQueryDto) {
+    /**
+     * `?ids=a,b,c` resuelve varios perfiles concretos en **una** petición.
+     *
+     * El `cmd` ya existía —lo usan el panel de administración y alexa-service—
+     * y lo único que faltaba era la puerta HTTP. Sin ella, cada pantalla que
+     * tiene una lista de `userId` (la bandeja de avisos, el equipo de un
+     * proyecto, el chat, la rejilla de proyectos) pedía **un `GET /users/:id`
+     * por persona**.
+     *
+     * ⚠️ **Se responde con la misma forma que el listado** (`{ items, total }`)
+     * aunque aquí no haya paginación que valga: quien consume esta ruta no
+     * debería tener que desenvolver dos formas distintas según el parámetro que
+     * mandó. `total` es cuántos se encontraron, que con ids es lo mismo que
+     * `items.length` — y puede ser menor que los ids pedidos si alguno ya no
+     * existe, que no es un error.
+     *
+     * No se combina con `search` ni con la paginación: si llegan los dos, mandan
+     * los ids. Mezclarlos daría una consulta que nadie necesita y dos formas de
+     * significar lo mismo.
+     */
+    if (query.ids?.length) {
+      const items = await firstValueFrom(
+        this.credentialsClient.send({ cmd: 'user_find_by_ids' }, { ids: query.ids }),
+      );
+      return { items, total: Array.isArray(items) ? items.length : 0 };
+    }
+
     return firstValueFrom(
       this.credentialsClient.send({ cmd: 'user_find_all' }, query.toFindUsersDto()),
     );

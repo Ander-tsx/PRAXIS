@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
    * Multi-Zones: esta zona vive bajo `/dashboard` y el web-shell la expone con
    * un rewrite. El prefijo lo aplica Next automáticamente a `next/link`,
    * `useRouter()` y `redirect()`, así que dentro de la zona las rutas se
-   * escriben **sin** él (`/perfil`, no `/dashboard/perfil`).
+   * escriben **sin** él (`/profile`, no `/dashboard/profile`).
    *
    * Para salir de la zona hace falta navegación dura. Ver ESTADO-ACTUAL §16.
    */

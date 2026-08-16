@@ -24,6 +24,14 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    # Redis guarda las sesiones (auth:sessions:<userId>), no solo caché.
+    # Sin volumen vivian en la capa del contenedor: recrearlo -por un `down`,
+    # por tocar este archivo o por una actualizacion de Docker- echaba a todo
+    # el mundo a la vez. Con volumen sobreviven, y el `--appendonly yes` hace
+    # que sobrevivan tambien a un corte, no solo a los snapshots cada 5 min.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -33,3 +41,5 @@ services:
 volumes:
   postgres_data:
     name: praxis_postgres_data
+  redis_data:
+    name: praxis_redis_data

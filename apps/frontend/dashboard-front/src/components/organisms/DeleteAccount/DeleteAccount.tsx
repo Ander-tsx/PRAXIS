@@ -1,6 +1,6 @@
 'use client';
 
-import { deleteAccountAction } from '@/app/(private)/perfil/actions';
+import { deleteAccountAction } from '@/app/(private)/profile/actions';
 import { Button, Input, alpha, colors } from '@praxis/commons';
 import { useId, useState } from 'react';
 
@@ -24,6 +24,9 @@ export interface DeleteAccountProps {
  *
  * Es lo único destructivo de la pantalla. Va la última, detrás de todo lo que
  * se usa a diario, y **cerrada**: hay que pedirla para verla.
+ *
+ * El marco rojo lo pone `PanelCard` con `tone="danger"`, así que aquí dentro
+ * no se repite: dos recuadros rojos concéntricos no avisan el doble.
  */
 export function DeleteAccount({ email }: DeleteAccountProps) {
   const [abierto, setAbierto] = useState(false);
@@ -66,8 +69,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="w-fit cursor-pointer rounded-lg border px-3 py-2 font-sans text-sm transition-colors"
-        style={{ borderColor: alpha(colors.error, 40), color: colors.error }}
+        className="w-fit rounded-lg border px-3 py-2 font-sans text-sm transition-colors cursor-none border-red-300 text-red-600"
       >
         Eliminar mi cuenta
       </button>
@@ -75,10 +77,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
   }
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-xl border p-4"
-      style={{ borderColor: alpha(colors.error, 40), background: alpha(colors.error, 6) }}
-    >
+    <div className="flex flex-col gap-3">
       <p className="font-sans text-sm font-semibold" style={{ color: colors.error }}>
         Esto no se puede deshacer.
       </p>

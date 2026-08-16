@@ -16,6 +16,7 @@ import {
   EmailOnlyDto,
   GoogleLoginDto,
   LoginDto,
+  LogoutDto,
   RefreshTokenDto,
   RegisterDto,
   ResetPasswordDto,
@@ -147,9 +148,34 @@ export class AuthController {
     return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_google' }, body));
   }
 
+  /**
+   * 🔴 **Esta ruta NO puede llevar el apretón del login.**
+   *
+   * Lo llevaba —10 por minuto y por IP, el mismo que `login` y `register`— y era
+   * un cierre de sesión disfrazado de límite de tasa:
+   *
+   * - a esta ruta **no la llama una persona**, la llama `refresh-proxy.ts` desde
+   *   el middleware de cada zona, en cada navegación en la que el access token
+   *   está a menos de un minuto de caducar;
+   * - las **seis zonas** salen por la misma IP, y en desarrollo todo es `::1`,
+   *   así que las diez se gastan entre pestañas sin que nadie note nada;
+   * - y al pasarse, el gateway responde **429**, que no es «tu refresh no
+   *   sirve» sino «ahora no». El proxy lo trataba como un rechazo y borraba las
+   *   dos cookies: sesión cerrada, sin un error a la vista y sin relación
+   *   aparente con nada.
+   *
+   * Se arregla por los dos lados: aquí se sube el límite a algo pensado para un
+   * cliente automático, y en `refresh-proxy.ts` **solo un 401/403 cuenta como
+   * sesión muerta**.
+   *
+   * Adivinar un refresh token no es un ataque realista —es un JWT firmado— así
+   * que el apretón aquí no protege de nada que la firma no proteja ya. Lo que
+   * queda es un tope de cortesía, por encima de lo que gasta una persona
+   * navegando rápido entre zonas y por debajo de las 300 globales.
+   */
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @Throttle(LIMITE_AUTENTICACION)
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @ApiOperation({ summary: 'Refrescar token de acceso' })
   @ApiBody({ type: RefreshTokenDto })
   @ApiResponse({ status: 200, description: 'Token de acceso renovado' })
@@ -166,10 +192,23 @@ export class AuthController {
   @ApiOperation({ summary: 'Cerrar sesión' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
-  async logout(@Request() req: Express.Request) {
+  async logout(@Request() req: Express.Request, @Body() body?: LogoutDto) {
     this.logger.log('POST /auth/logout → credentials-service');
+    /**
+     * El `refreshToken` es **opcional y sirve para cerrar solo esta sesión**.
+     *
+     * Ahora que una cuenta puede tener varias abiertas, «cerrar sesión» en el
+     * portátil no debe echar del móvil. Quien manda el token dice cuál cierra;
+     * quien no lo manda —una integración antigua— sigue cerrándolas todas, que
+     * es el comportamiento seguro por defecto.
+     *
+     * El `userId` sale del token de la petición, nunca del cuerpo.
+     */
     return firstValueFrom(
-      this.credentialsClient.send({ cmd: 'auth_logout' }, { userId: req.user!.userId }),
+      this.credentialsClient.send(
+        { cmd: 'auth_logout' },
+        { userId: req.user!.userId, refreshToken: body?.refreshToken },
+      ),
     );
   }
 }

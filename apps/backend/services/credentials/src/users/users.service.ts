@@ -168,7 +168,7 @@ export class UsersService {
    *
    * ## Lo segundo es lo importante
    *
-   * Sin el borrado de `auth:session:<id>`, suspender a alguien con la sesión
+   * Sin el borrado de `auth:sessions:<id>`, suspender a alguien con la sesión
    * abierta **no le echaba nunca**. Comprobado leyendo `auth.service.refresh()`:
    * verifica la firma del refresh token, lo compara con esta clave de Redis y
    * firma un access nuevo — sin volver a mirar `status` en ningún momento. Y el
@@ -209,7 +209,7 @@ export class UsersService {
        nada que cerrar, y borrar la clave echaría de la aplicación a alguien a
        quien se le acaba de devolver el acceso. */
     if (dto.status !== UserStatus.ACTIVE) {
-      await this.redis.del(`auth:session:${dto.id}`);
+      await this.redis.del(`auth:sessions:${dto.id}`);
     }
 
     return updated;
@@ -231,7 +231,7 @@ export class UsersService {
     ]);
 
     await this.redis.del(`user:${id}`);
-    await this.redis.del(`auth:session:${id}`);
+    await this.redis.del(`auth:sessions:${id}`);
 
     return { success: true, id };
   }

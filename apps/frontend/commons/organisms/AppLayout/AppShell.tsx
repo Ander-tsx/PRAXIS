@@ -118,7 +118,7 @@ const UN_ANO = 60 * 60 * 24 * 365;
  * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
  * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
  */
-const CUENTA_HREF = '/dashboard/perfil';
+const CUENTA_HREF = '/dashboard/profile';
 
 export function AppShell({
   navItems,
@@ -157,7 +157,7 @@ export function AppShell({
    * ¿Estás en tu cuenta?
    *
    * ⚠️ **Sin esto, la barra marcaba «Panel».** `activeHrefOf` resuelve por
-   * prefijo, y `/dashboard/perfil` empieza por `/dashboard`, que es el href de
+   * prefijo, y `/dashboard/profile` empieza por `/dashboard`, que es el href de
    * Panel: la sección más específica gana, pero la cuenta **no es una sección**
    * y no tiene entrada propia con la que competir. Se resuelve dejando la lista
    * sin nada activo y marcando la ficha de usuario, que es de donde se viene.
@@ -207,23 +207,34 @@ export function AppShell({
                 el correo no caben, y el avatar ya identifica de quién es la
                 sesión, que es lo que esa tarjeta viene a decir. */}
             {plegada ? (
-              <a
-                href={CUENTA_HREF}
-                aria-current={enCuenta ? 'page' : undefined}
+              /* Plegada, el enlace y el selector siguen siendo hermanos por lo
+                 mismo que desplegada: un botón dentro de un `<a>` no vale. */
+              <div
                 className={`mb-2 flex justify-center rounded-lg p-1 transition-colors ${
                   enCuenta ? 'bg-surface-elevated' : ''
                 }`}
-                title={`${user.name.trim() || user.email} — tu cuenta`}
               >
-                {/* Sin `presence`: el punto lo pinta `estadoSlot`, que además
-                    se puede pulsar. Ver el aviso de esa prop. */}
-                <Avatar
-                  label={user.name.trim() || user.email}
-                  mine
-                  size="md"
-                  src={user.avatarSrc ?? null}
-                />
-              </a>
+                <span className="relative">
+                  <a
+                    href={CUENTA_HREF}
+                    aria-current={enCuenta ? 'page' : undefined}
+                    className="block"
+                    title={`${user.name.trim() || user.email} — tu cuenta`}
+                  >
+                    {/* Sin `presence`: el punto lo pinta `estadoSlot`, que
+                        además se puede pulsar. Ver el aviso de esa prop. */}
+                    <Avatar
+                      label={user.name.trim() || user.email}
+                      mine
+                      size="md"
+                      src={user.avatarSrc ?? null}
+                    />
+                  </a>
+                  {estadoSlot && (
+                    <span className="absolute bottom-0 right-0">{estadoSlot}</span>
+                  )}
+                </span>
+              </div>
             ) : (
               <UserCard user={user} activa={enCuenta} estadoSlot={estadoSlot} />
             )}

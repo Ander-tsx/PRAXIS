@@ -36,10 +36,21 @@ export interface DescripcionDePresencia {
 /**
  * El catálogo, en un solo sitio.
  *
- * Los colores salen de los tokens y **no son decorativos**: verde disponible,
- * ámbar ocupado y rojo no molestar es el convenio que ya traen aprendido de
- * cualquier otra herramienta, y romperlo aquí solo obligaría a leer la
- * etiqueta cada vez.
+ * ## Un color por estado, y ninguno repetido
+ *
+ * Los tres colores que **no se tocan** son los que ya trae aprendido cualquiera
+ * de otra herramienta: verde disponible, rojo no molestar y gris ausente.
+ * Romperlos obligaría a leer la etiqueta cada vez.
+ *
+ * ⚠️ Los otros tres compartían el ámbar de los tokens —«Ocupado», «En una
+ * reunión» y «Comiendo» eran el mismo punto— así que la esfera no distinguía
+ * nada y en el menú compacto, que es **solo** esferas, había tres opciones
+ * idénticas. Ahora cada uno tiene el suyo, elegidos para separarse bien del
+ * verde y del rojo vecinos y entre ellos: ámbar, violeta y naranja.
+ *
+ * Van literales y no por token a propósito: no son colores semánticos de la
+ * interfaz —no dicen «error» ni «aviso»— sino la paleta de una lista cerrada,
+ * y atarlos a `warning` fue justo lo que los hizo colisionar.
  */
 export const PRESENCIAS: Record<Presence, DescripcionDePresencia> = {
   AVAILABLE: {
@@ -49,18 +60,18 @@ export const PRESENCIAS: Record<Presence, DescripcionDePresencia> = {
   },
   BUSY: {
     etiqueta: 'Ocupado',
-    ayuda: 'Estás trabajando en algo; puede que tardes en contestar.',
-    color: colors.warning,
+    ayuda: 'Estás ocupado trabajando en algo.',
+    color: '#FBBF24',
   },
   IN_MEETING: {
     etiqueta: 'En una reunión',
     ayuda: 'Estás en una llamada o reunión.',
-    color: colors.warning,
+    color: '#A78BFA',
   },
   EATING: {
     etiqueta: 'Comiendo',
     ayuda: 'Estás en la comida y vuelves luego.',
-    color: colors.warning,
+    color: '#FB923C',
   },
   AWAY: {
     etiqueta: 'Ausente',

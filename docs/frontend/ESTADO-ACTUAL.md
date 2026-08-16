@@ -755,7 +755,7 @@ cuenta.
 
 ## 17. `dashboard-front` — el primer microfrontend de negocio (implementado)
 
-> Panel en `/dashboard` y datos del usuario en `/dashboard/perfil`. Zona propia,
+> Panel en `/dashboard` y datos del usuario en `/dashboard/profile`. Zona propia,
 > puerto 4102, `basePath: '/dashboard'`. Sin mocks: todo sale del backend real.
 
 ### 17.0 Por qué es una zona y no una carpeta del shell
@@ -842,9 +842,9 @@ Es la trampa del `basePath` (§16) aplicada, y conviene tenerla junta:
 
 | Dónde | Se escribe | Por qué |
 |---|---|---|
-| `next/link` dentro de la zona | `/perfil` | Next añade `/dashboard` solo |
-| `revalidatePath()` | `/`, `/perfil` | son rutas del App Router de la app, que no incluye el basePath |
-| `activePath` de `AppLayout` | `/dashboard/perfil` | ruta **pública**: se compara con enlaces del shell |
+| `next/link` dentro de la zona | `/profile` | Next añade `/dashboard` solo |
+| `revalidatePath()` | `/`, `/profile` | son rutas del App Router de la app, que no incluye el basePath |
+| `activePath` de `AppLayout` | `/dashboard/profile` | ruta **pública**: se compara con enlaces del shell |
 | Salir de la zona (logout, landing) | `window.location` | navegación dura |
 | Rewrite en el shell | `/dashboard` **y** `/dashboard/:path*` | sin la primera, `/dashboard` a secas no casa y cae en el 404 del shell |
 
@@ -872,7 +872,7 @@ recorrer proyectos → espacios → tableros → tareas (PENDIENTES-BACKEND §5)
 **El `matcher` con lookahead negativo NO casa la raíz.** El patrón habitual
 `'/((?!_next/static|...).*)'` deja `/` fuera. En la zona eso significaba que el
 panel (`/dashboard`, la raíz de la zona) **se servía sin guard**, mientras que
-`/dashboard/perfil` sí redirigía — fácil de pasar por alto. En el shell
+`/dashboard/profile` sí redirigía — fácil de pasar por alto. En el shell
 significaba que la landing nunca renovaba la sesión, que es justo para lo que
 existe ese proxy. Se arregla añadiendo `'/'` como entrada aparte:
 
@@ -880,7 +880,7 @@ existe ese proxy. Se arregla añadiendo `'/'` como entrada aparte:
 matcher: ['/', '/((?!_next/static|_next/image|favicon.ico|api/).*)']
 ```
 
-Se detecta en el desglose de tiempos de `next dev`: `GET /perfil` muestra
+Se detecta en el desglose de tiempos de `next dev`: `GET /profile` muestra
 `proxy.ts: 3ms` y `GET /` no muestra nada.
 
 **Un archivo `'use server'` solo puede exportar funciones async.** Exportar de
@@ -929,7 +929,7 @@ Checklist, salida de montar esta:
 | Caso | Resultado |
 |---|---|
 | `/dashboard` sin sesión | 307 → `/auth/login` |
-| `/dashboard/perfil` sin sesión | 307 → `/auth/login` |
+| `/dashboard/profile` sin sesión | 307 → `/auth/login` |
 | `/dashboard` con cookie corrupta | 307 → `/auth/login` |
 | Zona servida directa (`:4102/dashboard`) | mismo guard, sin el shell delante |
 | Login → destino | `/dashboard` (`POST_AUTH_DESTINATION`) |
@@ -1476,6 +1476,10 @@ Al darle entrada propia había dos caminos, y se eligió el primero:
 por compatibilidad con nadie de dentro —los enlaces internos ya apuntan al sitio
 nuevo— sino por los marcadores y los enlaces compartidos, que no se pueden
 corregir desde aquí.
+
+> **Superado por §37.** «Tus datos» volvió a salir de Configuración a una
+> pantalla propia, y esa pantalla vive hoy en `/dashboard/profile`. `/perfil`
+> sigue siendo una redirección, pero ahora apunta ahí, no a `/settings`.
 
 **Está montada para crecer**, que era el encargo: la page es una pila de
 `SettingsSection` con una sola sección dentro. La sección es un componente y no
@@ -2472,6 +2476,11 @@ Si `GET /me/assistant/quota` falla (assistant-service caído),
 Configuración — mismo criterio que `loadCurrentUser` con los roles (§17.1).
 
 ### 27.4 La pantalla, con el acabado que pedía crecer a tres secciones
+
+> **Superado por §38.** `SettingsSection` y la pila de franjas separadas por
+> reglas horizontales ya no existen: las tres secciones son hoy tarjetas
+> (`PanelCard`) repartidas en una rejilla. El componente se borró al quedarse
+> sin usos.
 
 `SettingsSection` (§24.2) ya estaba pensada para esto: «Tus datos» pasa a
 convivir con «Apariencia» (el selector, §27.2) y «Facturación» (§27.3). Lo que
@@ -3699,3 +3708,672 @@ sobrevive a un 409 por nombre repetido en mitad del árbol. Queda pendiente:
   `success` aguanta;
 - forzar un fallo a mitad —una etiqueta duplicada— y comprobar que el resumen lo
   cuenta bien.
+
+---
+
+## 37. «Tu cuenta»: la URL en inglés y la pantalla en tres bloques
+
+La pantalla funcionaba y estaba mal repartida: cuatro `SettingsSection` apiladas
+—«Cómo te ven», «Tus datos», «Sesión», «Eliminar la cuenta»— con dos líneas de
+contenido cada una y una regla horizontal entre ellas. A 1400 px de ancho eso
+son cuatro franjas de fondo vacío separadas por líneas: **la división pesaba más
+que lo dividido**, y lo primero que se veía al entrar en «tu cuenta» era una
+tabla de contenidos.
+
+### 37.1 La ruta pasa a `/dashboard/profile`
+
+Era la única pantalla de la zona con la URL en español; sus vecinas ya son
+`chat`, `notifications` y `settings`. El segmento de la URL es lo primero que se
+ve de una pantalla y no tiene por qué estar en un idioma distinto al del resto.
+
+| Qué cambia | Dónde |
+|---|---|
+| La carpeta | `src/app/(private)/perfil/` → `(private)/profile/` (con `git mv`, para no perder el historial) |
+| El destino de la ficha de usuario | `CUENTA_HREF` en `commons/organisms/AppLayout/AppShell.tsx` |
+| «Completar perfil» del panel | `DashboardWelcome` apuntaba a `/settings`, que es de donde el formulario **ya se había ido** cuando nació esta pantalla: un enlace que prometía el campo del nombre y llevaba a una pantalla sin él |
+| Los imports de los server actions | `AccountIdentity`, `DeleteAccount` y el `layout.tsx` de la zona |
+
+`/dashboard/perfil` **sigue existiendo**, como page de una línea con
+`redirect('/profile')`. El motivo es el mismo que en §24.2 y no ha cambiado:
+dentro ya no lo usa nadie, pero los marcadores y lo que alguien haya pegado en
+un chat no se corrigen desde aquí.
+
+⚠️ Esa page vive en `src/app/perfil/`, **fuera del grupo `(private)`**. Dentro,
+el `layout.tsx` monta el armazón, y montarlo pide el perfil y la navegación al
+gateway: dos llamadas para pintar una pantalla que nadie llega a ver. La zona la
+protege `proxy.ts` entera (§17.2), así que estar fuera del grupo no la deja sin
+guard.
+
+⚠️ **`updateProfileAction` no revalidaba esta ruta.** Vive en
+`settings/actions.ts` —la escritura es la misma y no tiene sentido duplicarla—
+y revalidaba `/` y `/settings`, que era cierto cuando el formulario estaba allí.
+Desde que lo pinta esta pantalla, guardar el nombre dejaba el encabezado grande
+con el nombre viejo hasta recargar. Ahora revalida las tres.
+
+### 37.2 Tres bloques con forma, en vez de cuatro franjas
+
+| Bloque | Qué junta | Por qué |
+|---|---|---|
+| **Portada**, ancho completo | foto, nombre, correo, rol, alta, estado de la cuenta, presencia actual | Es «quién eres» de un vistazo, y es lo único que justifica ocupar los 1400 px |
+| **Rejilla 5/7** | «Tus datos» · «Tu estado» | Los dos son cortos: uno al lado del otro llenan la fila en vez de dejar medio ancho muerto |
+| **«Sesión y cuenta»** | cerrar sesión · eliminar la cuenta | Las dos formas de terminar, en una tarjeta partida por una línea vertical |
+
+**5 y 7, no 6 y 6.** Dos tarjetas de la misma fila miden lo mismo de alto
+(`items-stretch`), así que el reparto lo decide la más alta: seis estados en dos
+columnas son tres filas, y un formulario de dos campos a mitad de ancho no llega
+—a 6/6 quedaba un palmo de tarjeta vacía bajo los campos, exactamente el hueco
+que esta pasada venía a quitar—. Con el formulario en la columna estrecha sus
+campos se apilan, gana alto, y las dos columnas acaban casi a la misma altura.
+
+`ProfilePanel` (`molecules/`) es la tarjeta: icono, título, frase y contenido.
+No reusa `SettingsSection` porque aquello es una sección **suelta** separada por
+una línea —funciona en Configuración, donde cada sección trae dentro una tarjeta
+o una tabla— y lo que hacía falta aquí es justo lo contrario: algo con marco,
+que se pueda poner **al lado de** otra cosa en una rejilla.
+
+### 37.3 La portada, y lo que dejó de ocupar una fila de formulario
+
+- **El correo sale del formulario.** Estaba como `<input>` deshabilitado con el
+  motivo debajo: una fila entera de formulario para un campo que nadie puede
+  tocar. El dato y el motivo se conservan —el motivo sigue siendo verdad: vive
+  en `Credential` y no hay endpoint que lo cambie— pero ahora es una línea de la
+  ficha, con un candado y el porqué en el `title`.
+- **La tira de datos** son los tres hechos que la cuenta sabe de sí misma y que
+  no se editan en ninguna parte: `createdAt` («Miembro desde»), `status`
+  («Activa») y la presencia. Ocupan el ancho que antes era fondo vacío y no
+  inventan ningún dato que el backend no dé. ⚠️ `status` es el estado
+  **administrativo**, no la presencia; un valor que no reconozcamos se enseña
+  tal cual y **sin** pintarlo de verde, para que un estado nuevo del backend no
+  salga como «todo bien» por defecto.
+- **Las insignias de rol se quitan de la cabecera** en esta pantalla y solo en
+  esta: ya salen junto al nombre, en la portada, y arriba serían el mismo dato
+  dos veces en la misma vista.
+- **Las fechas se formatean en el servidor** y viajan como cadena. `Intl` en el
+  navegador usa la zona horaria de quien mira: formatear en un componente de
+  cliente es un desajuste de hidratación esperando a que alguien viaje.
+
+### 37.4 La presencia: dónde se cambia y quién la pinta
+
+`PresencePicker` (organismo de la zona) enseña los seis estados **con su frase
+de ayuda**, que es lo que no cabe en el menú flotante de la barra lateral. La
+esfera de `PresenceSwitcher` (`commons/molecules/`, la del pie de la barra
+lateral) sigue estando para cambiarlo en marcha desde
+cualquier pantalla; esta es la pantalla donde se decide.
+
+⚠️ **El retrato de la portada no tiene estado propio.** Pinta la prop que le da
+el servidor. Con estado local en las dos piezas, el punto del avatar y la opción
+marcada podrían decir cosas distintas; como está, el `revalidatePath('/',
+'layout')` del action actualiza a la vez la opción, el retrato **y** la esfera de
+la barra lateral. Verificado en el navegador: elegir «Comiendo» tiñe los tres.
+
+### 37.5 Dos arreglos que salieron por el camino
+
+🔴 **`LogoutButton` se encogía por el pliegue de una barra que no es la suya.**
+Lee `useSidebarPlegada()` para quedarse en icono cuando la barra lateral está
+plegada, y ese mismo botón se pinta en esta pantalla: con la barra plegada, el
+botón de la tarjeta «Cerrar sesión» perdía la palabra y quedaba un icono suelto
+en medio de una tarjeta ancha, por un estado de otra parte de la interfaz. Ahora
+acepta `compacto`, y fuera de la barra se pasa en falso.
+
+⚠️ **`Avatar` estrena `size="lg"`** (96 px). El retrato estaba puesto con
+`scale-[1.6]` sobre el mediano, y una transformación **no ocupa sitio en el
+diseño**: el círculo se veía grande pero seguía reservando 40 px, así que lo de
+al lado se le montaba encima y había que compensarlo con márgenes a ojo. La
+tabla del punto de presencia pasa a ser un `Record` por tamaño, porque el
+ternario `sm ? … : …` daba el punto del mediano a un círculo del doble.
+
+### 37.6 Móvil
+
+- El retrato va **encima** del nombre, no a su lado: a 390 px, 96 px de círculo
+  más el margen dejaban ~230 px, y el nombre y el correo se cortaban los dos.
+- La tira de datos cae a dos columnas (no a una lista de tres filas), y la
+  tercera ocupa la fila entera para que su pie con la fecha larga quepa en una
+  línea.
+- La rejilla 5/7 cae a una columna y la tarjeta de sesión apila sus dos mitades.
+- Comprobado a 390 px: `scrollWidth === clientWidth`, sin desbordamiento
+  horizontal.
+
+### 37.7 Verificado en el navegador
+
+Con el stack levantado, en las dos temperaturas de tema y en tres anchos:
+
+| Caso | Resultado |
+|---|---|
+| `/dashboard/perfil` | 307 a `/dashboard/profile`, misma pantalla |
+| Ficha de usuario de la barra, desde `dashboard` y desde `projects` | `href="/dashboard/profile"` en las dos zonas |
+| Elegir «Comiendo» | opción marcada, punto del retrato, «Te ven como» y esfera de la barra lateral, los cuatro naranjas |
+| Volver a «Disponible» | los cuatro verdes |
+| «Guardar cambios» | «Listo, Andres. Tus datos quedaron guardados.» |
+| Tema oscuro | la franja de la portada aguanta: va con `alpha()` sobre los tokens de marca, no con hexadecimales |
+| 390 px y 820 px | sin desbordamiento; la rejilla y la tarjeta de sesión apilan |
+| Consola | limpia, sin avisos de hidratación |
+
+---
+
+## 38. Configuración, con el mismo trato que la cuenta
+
+La pila de secciones de §27.4 tenía el problema de §37 y **peor**: medido en el
+navegador a 1352 px de ancho de contenido, «Praxis Voice» ocupaba 409 px de alto
+con media pantalla en blanco a la derecha de una lista de tres pasos,
+«Facturación» 315, y **«Apariencia» 159 px de banda a lo ancho de toda la
+pantalla para un interruptor de 72 px**. Entre bloque y bloque, una regla
+horizontal. Lo primero que se veía al entrar era la separación, no lo separado.
+
+### 38.1 La misma tarjeta, y el nombre que ya no mentía
+
+`ProfilePanel` pasa a llamarse **`PanelCard`**: se escribió para la pantalla de
+la cuenta, y en cuanto la usan dos pantallas el nombre estorba. Sigue en las
+moléculas de la zona y no sube a `commons` — la regla es cruzar cuando lo usan
+**dos zonas**, y las dos pantallas son de `dashboard-front`.
+
+Dos cambios en el componente:
+
+- `children` pasa a ser **opcional**. Una tarjeta cuyo control entero cabe en el
+  encabezado no tiene cuerpo (ver «Apariencia», abajo).
+- El encabezado es `flex-wrap`, para que en móvil el `aside` caiga bajo el
+  título en vez de estrujarlo.
+
+🔴 **`SettingsSection` se borra.** Era la única consumidora que le quedaba, y
+dejar dos maneras de dibujar el mismo bloque es exactamente lo que aquel
+componente existía para evitar (§24.2). Nada más lo importaba.
+
+### 38.2 El reparto
+
+| Bloque | Sitio | Por qué |
+|---|---|---|
+| **Praxis Voice** | fila 1, `lg:col-span-7` | Es lo más alto —pasos, generador y dispositivos— y lo único de esta pantalla que **habilita** algo que no se puede hacer desde ninguna otra parte, que es el criterio con el que ya iba primera |
+| **Facturación** | fila 1, `lg:col-span-5` | Con los planes apilados mide casi lo mismo que Voice: la fila queda pareja sin que sobre tarjeta por abajo |
+| **Apariencia** | fila 2, banda de una fila | Un interruptor no da para una tarjeta alta |
+
+**La banda de Apariencia no lleva cuerpo.** El `ThemeToggle` entra por `aside`,
+así que la tarjeta es una fila: icono, título y frase a la izquierda, control a
+la derecha. Se descartó rellenarla —una vista previa del tema, un par de datos
+de más— porque habría sido **cambiar un hueco por relleno**, y porque una vista
+previa de verdad no se puede pintar: `:root[data-theme='light']` está atado a la
+raíz, así que un trozo de interfaz no puede llevar el tema contrario dentro de
+una página que ya tiene el suyo. Copiar la paleta clara a mano en un componente
+para simularla es justo el error que documenta el aviso de `@theme static`.
+
+### 38.3 Lo que había que ajustar dentro de las tarjetas
+
+- **Los dos planes, apilados.** `BillingSummary` usaba `sm:grid-cols-2`, que
+  tenía sentido a lo ancho de la pantalla. En la columna de 5/12 dejaba cada
+  plan en ~260 px y el lema partido en tres líneas. ⚠️ Ojo con esto en general:
+  `sm:` mira el **viewport**, no el contenedor, así que una rejilla interna no
+  se entera de que su columna se ha estrechado.
+- **`bg-surface` dentro de `bg-surface` no se ve.** Las tarjetas de plan y las
+  filas de dispositivo vinculado tenían el mismo color que la tarjeta que ahora
+  las envuelve, y se quedaban solo con el borde. Pasan a `surface-elevated`,
+  que es la superficie que existe para esto.
+- **El aviso de «no se pudo cargar tu plan» pierde su recuadro**: lo pone
+  `PanelCard`, y dos marcos concéntricos para una frase son marco de más.
+
+### 38.4 Verificado
+
+`tsc` limpio en las seis zonas y Biome limpio en todo lo tocado.
+
+⚠️ **Sin pasada de navegador.** La sesión del navegador caducó a mitad de la
+revisión y volver a entrar exige la contraseña de la cuenta, así que el repaso
+visual de esta pantalla —los dos temas, 390 px y 820 px— queda pendiente de la
+próxima sesión con el stack levantado. Lo que sí está comprobado en el navegador
+es la pantalla de cuenta (§37.7), que estrena las mismas piezas: `PanelCard`, la
+rejilla y el reparto de anchos.
+
+---
+
+## 39. La bandeja de avisos: de lista plana a bandeja de verdad
+
+Este caso no se parecía a §37 ni a §38: aquí no sobraba espacio, sobraba
+**indistinción**. Veinte filas iguales, una debajo de otra, cada una con un
+icono genérico del tipo, y tres cosas que no se podían hacer: filtrar, saber de
+un vistazo cuándo pasó algo, y abrir el aviso sin apuntar a un enlace de 11 px.
+
+### 39.1 Siete colores diciendo dos cosas
+
+Una fila sin leer se teñía —borde y fondo— **del color de su tipo**. Es decir,
+el mismo canal visual llevaba dos mensajes a la vez: «esto no lo has leído» y
+«esto es una invitación». Con siete tonos en la paleta de tipos, ninguno de los
+dos llegaba. Ahora la regla es fija:
+
+| Dónde | Qué dice |
+|---|---|
+| Fondo, borde y punto de la fila | **si está leído o no** — siempre el mismo violeta |
+| Insignia sobre la cara | **de qué tipo es** — ámbar invitación, violeta tarea, rojo expulsión |
+
+Y se mantiene lo que ya estaba bien: **sin leer no es negrita**. Con quince
+avisos, media bandeja en negrita no distingue nada. El peso se reserva ahora
+para los nombres propios de cada frase.
+
+### 39.2 La cara de quien lo hizo
+
+Un aviso es siempre **alguien haciendo algo**, y la cara identifica antes que la
+frase. La fila estrena el avatar del actor —el mismo que esa persona tiene en el
+chat y en el tablero— con la insignia del tipo en la esquina, en el sitio exacto
+donde `Avatar` pintaría el punto de presencia.
+
+No cuesta ni una petición más: la page ya pedía el perfil de cada actor para
+poner el nombre, y solo usaba `firstName`. Sin actor —un aviso del sistema— la
+insignia se queda sola y en grande.
+
+⚠️ **El disco de la insignia es del color de la tarjeta y el dibujo del color
+del tipo, no al revés.** Con el disco relleno del tono, el dibujo tenía que ir
+en `textInverse`, que es blanco en claro y negro en oscuro: blanco sobre el
+verde de «invitación aceptada» no se ve, y negro sobre el violeta de «tarea
+asignada» tampoco. Al revés, el contraste es el que el design system ya
+garantiza para esos tonos como color de texto.
+
+### 39.3 La frase, con los nombres destacados
+
+`describe()` devolvía una cadena con comillas angulares. Ahora es un componente:
+la frase va en texto secundario y **quién, qué proyecto y qué tarea** en primario
+y peso medio. Separa mejor que un signo de puntuación y deja la lista legible de
+un barrido, que es como se lee una bandeja.
+
+### 39.4 Tramos de tiempo
+
+Veinte filas con «hace 2 h», «hace 3 h», «hace 1 d» obligan a leer cada marca
+para situarse. La página se reparte en **Hoy / Ayer / Esta semana / Antes**
+(`lib/notifications.ts`), con la cuenta de cada tramo a la derecha de su línea.
+
+⚠️ **Los tramos se calculan con el reloj de quien renderiza, que es el
+servidor.** Un servidor en UTC y alguien mirando desde UTC−6 pueden discrepar en
+la franja de medianoche. Es el mismo trato que ya reciben todas las fechas del
+repositorio, y por eso cada fila lleva además **la fecha completa en su
+`title`**: el tramo orienta, el `title` resuelve.
+
+⚠️ **Y la marca relativa arranca en absoluta.** `Date.now()` en el cuerpo de un
+componente de cliente da un valor en el servidor y otro al hidratar: el
+desajuste clásico de las marcas de tiempo. El instante vive en un estado que
+empieza en `null` —mientras tanto se pinta la hora absoluta, que no depende de
+cuándo se lea— y se rellena al montar, con un latido de un minuto. Uno solo para
+la lista entera, en `NotificationList`, y no veinte relojes.
+
+### 39.5 La fila entera es el enlace, y abrirla la da por leída
+
+Antes el destino era un «Ver» de 11 px al lado de la fecha: estaba, pero había
+que apuntarle. Ahora la fila entera navega.
+
+⚠️ **Es un `<a>` estirado (`absolute inset-0`), no un `<a>` envolviendo la
+fila.** Dentro hay un botón —marcar como leído— y un botón dentro de un enlace
+es HTML inválido: el navegador lo saca fuera al parsear y el diseño se desmonta.
+Con la capa absoluta, los dos son hermanos y el botón se queda encima con su
+`z-10`.
+
+⚠️ **Y el envoltorio del avatar lleva `pointer-events-none`**, porque es
+`relative` —lo necesita la insignia— y un hermano posicionado que va después del
+enlace se pinta por encima: sin eso, el sitio más grande y más apetecible de la
+fila era el único punto muerto.
+
+**Abrir un aviso lo marca como leído**, que es lo que ya se esperaba de una
+bandeja: si has ido al sitio del que habla, lo has visto. Se marca y **después**
+se navega a mano, con 120 ms de respiro: el destino está en otra zona del
+multi-zone, así que el clic es una carga de página completa y dejar la petición
+en vuelo la habría cortado a mitad la mitad de las veces. Con `cmd`/`ctrl`/
+`shift` no se toca la navegación —eso abre en otra pestaña y esta página se
+queda— y basta con lanzar el marcado.
+
+El botón de marcar a mano sigue estando, ahora en el hueco de la derecha, junto
+al punto de «sin leer». Aparece al pasar por encima en escritorio y **está
+siempre visible en táctil**: `group-hover` no existe sin puntero, y un botón que
+solo aparece con el ratón es un botón que en el móvil no está.
+
+### 39.6 El filtro «Sin leer», que el backend ya sabía hacer
+
+`?filtro=sin-leer` se traduce a `unreadOnly=true`, un parámetro que
+`FindNotificationsQueryDto` aceptaba desde siempre y que **desde aquí no usaba
+nadie**. Vive en la URL: son dos `next/link`, se comparten, el botón atrás hace
+lo que se espera y la pantalla sigue siendo un Server Component.
+
+🔴 **Filtrar en el cliente habría sido mentira.** La lista está paginada de 20 en
+20: esconder las leídas de la página actual dejaría «3 sin leer» arriba y una
+sola fila abajo, con las otras dos en la página 2. Por lo mismo **no hay filtro
+por tipo**: `unreadOnly` es el único que el backend sabe aplicar, y un
+desplegable de «solo tareas» solo podría recortar lo que ya vino en esta página.
+
+⚠️ **«Todas» no lleva número, y no es un olvido.** `total` viene contado con el
+**mismo `where` que la consulta**, así que con `unreadOnly=true` vale lo mismo
+que `unread`: pintarlo diría «Todas 3» cuando hay treinta, y solo mientras el
+otro filtro está puesto. El de «Sin leer» sí es fiable siempre —`unread` cuenta
+la bandeja entera pase lo que pase con el filtro, que es justo para lo que
+existe—.
+
+Y **el paginador conserva el filtro**: perder el parámetro al cambiar de página
+es el fallo clásico de esto, y aquí saltaría a la vista.
+
+### 39.7 Verificado
+
+`tsc` limpio y Biome limpio, incluidos dos avisos de accesibilidad que este
+archivo ya arrastraba: el enlace estirado lleva su nombre dentro (`sr-only`) en
+vez de un `aria-label` sobre un enlace vacío, y los iconos decorativos llevan
+`aria-hidden` literal —el analizador no ve los atributos que llegan por
+propagación—.
+
+⚠️ **Sin pasada de navegador, como §38.4.** La sesión sigue caducada y volver a
+entrar exige la contraseña de la cuenta. Queda pendiente mirar en pantalla: los
+dos temas, el filtro con y sin resultados, una fila sin destino, el móvil a
+390 px y —lo que más me interesa— que abrir una fila la deje marcada al volver.
+
+---
+
+## 40. La rejilla de proyectos: una cara por proyecto
+
+La pantalla funcionaba y era **plana**: doce tarjetas iguales, distinguibles solo
+leyendo el título de cada una, que es justo lo que no se hace al buscar algo con
+la vista. Y antes de la primera tarjeta, tres líneas de rótulo.
+
+### 40.1 Dos títulos y una cursiva, fuera
+
+La cabecera decía «Proyectos», y debajo había un `h2` de 3xl con «Tus
+proyectos» y una frase en cursiva explicando qué lista era. Todo eso en una
+pantalla a la que se llega **pulsando «Proyectos» en la barra lateral**. El
+título de la cabecera se queda —lo pone `AppHeader`— y lo que decía la frase
+—de quién son estos proyectos— se dobló en la línea del contador: «2 proyectos
+· tuyos y donde te han añadido». Misma información, un bloque menos.
+
+### 40.2 El monograma, y por qué el color sale del `id`
+
+Cada tarjeta abre con un cuadrado de 44 px con las iniciales del proyecto, en
+uno de los seis `serieColors`. Es lo que le da a cada proyecto una cara fija: el
+mismo color y las mismas iniciales siempre, y la posición en la rejilla se
+aprende sola.
+
+`serieColors` existe **exactamente para esto** —«categorías que no tienen color
+propio», medidas para separarse bajo daltonismo y con los mismos hexadecimales
+en los dos temas— así que no se inventa una paleta nueva ni se reutilizan los
+colores de estado: teñir un proyecto de rojo por azar diría que pasa algo.
+
+⚠️ **El tono sale del `id`, no del nombre.** El `id` es inmutable; el nombre no,
+y con el nombre el proyecto cambiaría de color al renombrarlo, que es justo
+cuando más falta hace reconocerlo. Las iniciales sí salen del nombre —son texto
+y deben decir lo que se ve—, y las calcula `iniciales()` de `Avatar`, que ya
+resolvía el caso de una sola palabra.
+
+### 40.3 Lo que la tarjeta dice ahora y antes no
+
+- **De quién es**, en una línea bajo el nombre («Tuyo» / «Te añadieron») en vez
+  de gastar una insignia. La insignia se reserva para `SUSPENDIDO`, que es lo
+  único que cambia lo que se puede hacer al entrar.
+- **Por qué está suspendido.** `suspendedReason` **venía en esta misma
+  respuesta** —el `omit` del servicio solo esconde `suspendedBy`— y no se usaba:
+  había que abrir el proyecto para leer por qué no responde nada. Y el monograma
+  se apaga a gris, porque la tarjeta entera tiene que leerse como «esto está
+  parado».
+- **Iconos en los contadores** de miembros y espacios, que antes eran dos
+  cifras sueltas con su palabra.
+
+⚠️ **La fecha sigue siendo `createdAt`, y no es pereza.** Es por lo que el
+backend ordena la lista (`orderBy: { createdAt: 'desc' }`, fijo en
+`findAllProjects`), así que la tarjeta y el orden dicen lo mismo. **`updatedAt`
+no vale como «última actividad»**: es la marca de la fila del proyecto, se mueve
+al renombrarlo o suspenderlo y **no** cuando alguien crea una tarea o comenta —
+enseñaría «hace 3 meses» en el proyecto donde más se trabaja.
+
+### 40.4 Buscar dejó de ser un callejón sin salida
+
+🔴 Buscar algo que no existía dejaba un párrafo suelto —«Ningún proyecto coincide
+con X»— y **ninguna forma de volver**: había que borrar el campo a mano y pulsar
+Enter en un formulario vacío. Ahora:
+
+- el vacío es un estado con su icono, su explicación y un botón «Ver todos los
+  proyectos»;
+- el contador de arriba cambia a «N resultados para «X» · Ver todos»;
+- el campo estrena lupa y una equis para limpiar **que sí navega**.
+
+⚠️ El campo pasa de `type="search"` a `type="text"` a propósito: la equis nativa
+del navegador **no dispara el submit**, así que vaciaba el campo y dejaba la
+lista filtrada como estaba. La nuestra limpia y navega.
+
+Se mantiene que **se busca al pulsar Enter**, no al teclear: con el filtrado en
+el servidor y la lista paginada, cada pulsación sería una consulta al gateway y
+una navegación del App Router; un rebote lo bastante largo para no castigar se
+siente roto —escribes, no pasa nada, y cuando ya has dejado de mirar la lista
+salta—.
+
+### 40.5 🔴 El icono que se pintaba debajo del campo
+
+Merece su propio apartado porque contradice lo que dice el orden de pintado y
+costó encontrarlo. La lupa va en un `<span>` absoluto dentro del formulario, y
+el `<input>` **no** está posicionado: por CSS, el positioned debería quedar
+encima. No quedaba. El fondo sólido del campo lo tapaba entero.
+
+Se vio midiendo en el navegador: el icono estaba en el DOM, con su color
+(`rgb(86,92,114)`), en sus 16×16 px exactos y sobre el campo… e invisible en la
+captura. Con `z-index: 10` aparece. Lo mismo vale para el botón de limpiar.
+
+De paso, el icono estaba en `text-disabled`, que en tema claro es #a4a9ba sobre
+un campo #eceef5: **1,7:1**. Un adorno puede permitirse ser tenue; algo que dice
+para qué sirve el campo, no. Pasa a `text-secondary`.
+
+### 40.6 El botón de crear, en dos formas
+
+`CreateProjectDialog` estrena el «+» en su disparador —el mismo botón lo montan
+la cabecera de Proyectos y los dos estados vacíos, así que el icono se escribe
+una vez— y una forma nueva: **`triggerVariant="tarjeta"`**.
+
+No es un color de botón, es otra forma: una tarjeta de borde discontinuo, del
+alto de sus vecinas, que ocupa la última celda de la rejilla. Con dos proyectos
+y tres columnas ese hueco existía igual y no decía nada; ahora el gesto de crear
+está donde se está mirando y la fila queda cerrada.
+
+Entra en `ProjectGrid` como **slot** (`crearSlot`) y no como props: el diálogo
+necesita las tres Server Actions de la zona, y quien las tiene es la page. Un
+render-prop no habría servido —`ProjectGrid` es un Server Component y una
+función no cruza esa frontera—, y por eso la variante es un valor y no un
+`renderTrigger`.
+
+### 40.7 Lo que **no** se hizo, y por qué
+
+**No hay ordenación.** `FindProjectsQueryDto` acepta `sortBy` y `sortOrder`, el
+gateway los reenvía… y `findAllProjects` tiene el `orderBy` **escrito a mano**
+(`{ createdAt: 'desc' }`) y no los mira. Un selector de «ordenar por nombre»
+habría cambiado la URL, recargado la lista y devuelto exactamente el mismo
+orden: la peor clase de control, el que parece funcionar. Anotado en
+PENDIENTES-BACKEND §23.
+
+**No hay filtro «solo los míos».** Se resolvería con `ownerId`, que el DTO del
+microservicio tiene pero el gateway **no** expone a propósito: aceptar un
+`ownerId` de la query sería un interruptor para mirar los proyectos de otro. Con
+la lista paginada, filtrarlo en el cliente sería el mismo engaño que ya se
+descartó en la bandeja de avisos (§39.6). La línea «Tuyo / Te añadieron» de cada
+tarjeta cubre el 90 % de la necesidad sin mentir.
+
+### 40.8 Las caras del equipo en cada tarjeta
+
+«4 miembros» dice cuántos son; las caras dicen **quiénes**, que es lo que se
+quiere saber para reconocer un proyecto de un vistazo. Es el mismo gesto que ya
+hace la tarjeta de tarea con los encargados —mismo tamaño, mismo solape, tope de
+cuatro y «+N»— así que no hay un idioma nuevo que aprenderse. Tú vas la primera
+y con el círculo rojo de `Avatar`, que significa «eres tú» en todo el producto.
+
+🔴 **Y cuesta N+1 peticiones. Es una decisión, no un descuido.**
+
+`GET /projects` devuelve `_count.members` y **ninguna persona**, así que poner
+caras obliga a pedir `GET /projects/:id/members` por proyecto —doce en una
+página— y después el perfil de cada id, que es donde vive la foto. No hay ruta
+que lo traiga junto (PENDIENTES-BACKEND §24, abierto con lo que haría falta).
+
+Se acota como se puede, y se dice:
+
+| Medida | Efecto |
+|---|---|
+| Las doce, **en paralelo** | Dos saltos de red de profundidad, no doce |
+| Ids **deduplicados entre todos los proyectos** antes de pedir perfiles | La segunda tanda es del tamaño del equipo, no de la suma de miembros: en un equipo real las mismas personas están en casi todos |
+| Cada petición con su `catch` | Si el equipo de un proyecto no se puede leer, esa tarjeta **vuelve al número de miembros** — exactamente lo que enseñaba antes |
+
+⚠️ **El «+N» sale de `_count.members`, no de las caras resueltas.** Si un perfil
+no se pudo leer, su cara se cae de la lista pero sigue contando: enseñar «+1»
+cuando faltan dos sería mentir sobre el tamaño del equipo por un fallo de red.
+
+Sin punto de presencia, igual que en las tareas: cuatro círculos de 24 px
+solapados y el punto de cada uno taparía la cara del siguiente.
+
+### 40.9 El diálogo de crear: sigue siendo diálogo, y por qué
+
+Se planteó sacarlo del modal —incrustarlo en la propia pantalla— y se descartó
+con cuatro motivos que están escritos en el propio componente: lo montan **dos
+zonas**, el modo asistido pinta un árbol que empujaría la rejilla ~600 px, crear
+es una tarea modal de verdad (se termina o se cancela) y el `<dialog>` nativo ya
+da atrapado de foco, Escape y fondo inerte. Una ruta propia (`/projects/new`)
+habría obligado al panel a navegar duro a otra zona.
+
+Lo que sí se rehízo es **lo de dentro**, que tenía el mismo mal que las demás
+pantallas de esta tanda: el diálogo es `xl` porque lo pide el árbol del asistente,
+y el formulario en blanco eran **dos campos sueltos en 48 rem**.
+
+- **Las dos formas de empezar, con lo que hace cada una escrito.** Eran dos
+  pestañas de dos palabras y elegir bien exigía haberlas probado; ahora cada una
+  es una tarjeta con su icono y una línea. ⚠️ El icono del modo manual es una
+  **hoja**, no un «+»: `Sparkle` es una estrella de cuatro puntas y a 16 px se
+  lee casi igual que un más, así que las dos opciones parecían el mismo icono.
+- **Vista previa en vivo**, ocupando la columna que sobraba: el cuadrado con las
+  iniciales, el nombre y la descripción recortada, como se verá en la rejilla.
+  ⚠️ **El cuadrado va en gris.** En la rejilla el tono sale del `id`, y el `id`
+  no existe hasta crear el proyecto: enseñar un violeta y que salga verde sería
+  prometer algo que no depende de nadie. Se pinta neutro y una línea explica que
+  el color se asigna al crearlo —que además es cómo se entera uno de que los
+  proyectos tienen color—. Las iniciales salen de `iniciales()`, **la misma
+  función** que usa la tarjeta.
+
+### 40.10 Verificado
+
+En el navegador, con el stack levantado y en los dos temas:
+
+| Caso | Resultado |
+|---|---|
+| Rejilla con dos proyectos | Monogramas de tonos distintos, caras del equipo con foto, tarjeta de crear cerrando la fila |
+| Caras | 2 y 4 miembros, con las fotos reales y las iniciales de quien no tiene |
+| Diálogo desde la cabecera **y** desde la tarjeta fantasma | Abre igual por los dos caminos |
+| Vista previa | Escribir «Rediseño del panel» da «RD», «Tuyo» y «Sin descripción» al instante |
+| Cambiar a «Con el asistente» | La otra tarjeta se marca y sale el compositor del brief, sin que el diálogo cambie de ancho |
+| Tema oscuro | Monogramas, caras y lupa correctos |
+| 390 px (en iframe) | Una columna, sin desbordamiento, la lupa y las caras se ven |
+| Lupa con el `z-10` | Visible; era lo que quedaba pendiente de §40.5 |
+
+Y de paso, con la misma sesión, se saldó lo que quedaba a deber de las dos
+pantallas anteriores: **Configuración** (§38) con sus dos tarjetas parejas y la
+banda de Apariencia, y **la bandeja de avisos** (§39) con sus tramos, sus caras,
+sus insignias de tipo y el filtro — comprobando además que la marca de tiempo
+**arranca absoluta y pasa a relativa al hidratar**, que es justo lo que §39.4
+decía que tenía que pasar.
+
+---
+
+## 41. Las sesiones se cerraban solas, y eran tres cosas
+
+Se reportó como «se me cierra la sesión a cada rato sin hacer nada», y era
+literalmente eso: nada de lo que hacía quien lo sufría tenía que ver. Tres
+causas distintas, apiladas, ninguna con un error a la vista.
+
+Es la primera vez que esta tanda toca `apps/backend/`, **con autorización
+expresa**, y queda registrado también en PENDIENTES-BACKEND.
+
+### 41.1 🔴 El limitador del login, cerrando sesiones
+
+`/auth/refresh` llevaba el mismo apretón que `login` y `register`: **10 por
+minuto y por IP**. Pero a esa ruta **no la llama una persona**: la llama
+`refresh-proxy.ts` desde el middleware de cada zona, en cada navegación en la
+que al access token le queda menos de un minuto. Las seis zonas salen por la
+misma IP —en desarrollo todo es `::1`— así que las diez se gastan entre pestañas
+sin que nadie note nada.
+
+Y al pasarse, el gateway responde **429**. El proxy tenía esto:
+
+```ts
+if (!response.ok) return { estado: 'rechazado' };   // ← 429 entraba aquí
+```
+
+…y un rechazo **borra las dos cookies**, porque significa «tu refresh ya no
+vale». Un límite de cortesía convertido en cierre de sesión.
+
+Arreglado por los dos lados, y el del frontend es el que importa:
+
+- **Solo un 401 o un 403 cuentan como sesión muerta.** Un 429, un 500 o un
+  gateway a medio arrancar caen en `inalcanzable`, que no toca las cookies y
+  reintenta en la siguiente navegación. El propio archivo ya documentaba que
+  «no pude preguntar» y «no vales» son distintos; faltaba aplicarlo al status.
+- El límite de la ruta sube a **120/min**. Adivinar un refresh token no es un
+  ataque realista —es un JWT firmado—, así que ese apretón no protegía de nada
+  que la firma no protegiera ya.
+
+### 41.2 🔴 Una sola sesión por cuenta
+
+La sesión vivía en `auth:session:<userId>` con **un solo** refresh token dentro,
+y cada entrada lo sobrescribía. El recorrido completo del síntoma:
+
+> Entras en el portátil. Al rato entras en el móvil, o en otro navegador, o
+> vuelves a entrar en incógnito. El refresh guardado pasa a ser el de la última
+> entrada. El portátil no se entera **hasta que su access token cumple 15
+> minutos**: entonces renueva, recibe «refresh token no válido», y el proxy
+> —haciendo lo correcto— borra las cookies. Te ha echado otra entrada tuya, con
+> un cuarto de hora de retraso para que no se pueda relacionar una cosa con la
+> otra.
+
+Ahora la clave es un **hash con un campo por sesión**: `auth:sessions:<userId>`
+→ `{ <jti>: <refreshToken> }`. El `jti` viaja dentro del propio refresh token,
+así que quien lo presenta dice **cuál** de las sesiones es.
+
+| Gesto | Antes | Ahora |
+|---|---|---|
+| Entrar desde otro sitio | Echaba al anterior | Conviven |
+| Cerrar sesión | Cerraba en todos lados | Cierra solo ese dispositivo (`HDEL`) |
+| Suspender o borrar la cuenta | `DEL` | `DEL` — sigue cerrando todas de un golpe |
+| Cambiar la contraseña | `DEL` | `DEL` — sigue cerrándolas todas, a propósito |
+| Comprobar que hay sesión | `GET` | `EXISTS` |
+
+⚠️ **El nombre de la clave cambia** (`auth:session:` → `auth:sessions:`) a
+propósito: la vieja guardaba una cadena y `HSET` sobre una clave de tipo cadena
+responde `WRONGTYPE`. Con un nombre nuevo no hay migración que escribir y las
+viejas caducan solas. **El precio es una entrada más para todo el mundo, una
+sola vez.** Los tres sitios que borraban la clave vieja —suspender, borrar
+cuenta, restablecer contraseña— están actualizados; si se olvida uno, suspender
+a alguien deja de echarlo.
+
+### 41.3 ⚠️ El plazo no era deslizante, y Redis no guardaba nada
+
+- El TTL de la sesión se ponía **al entrar y no se tocaba más**: caducaba a los 7
+  días exactos de la entrada aunque hubieras estado dentro cinco minutos antes.
+  Ahora cada renovación lo estira, que es lo que cualquiera espera de
+  «recuérdame».
+- ⚠️ **El tope duro sigue siendo el `exp` del refresh token**, que no se rota:
+  7 días desde que se emitió. Estirar la clave de Redis no alarga un JWT ya
+  firmado. **Rotar en cada renovación se descartó**: el proxy de cada zona
+  renueva en cada navegación y dos pestañas pueden pedirlo a la vez con el mismo
+  token — con rotación estricta, la segunda se queda fuera. Cambiar un cierre
+  aleatorio por otro no es arreglarlo.
+- 🔴 **Redis no tenía volumen.** Guarda las sesiones, no solo caché, y vivían en
+  la capa del contenedor: recrearlo —un `down`, tocar el compose, una
+  actualización de Docker— echaba a todo el mundo a la vez. Ahora tiene
+  `redis_data` y `--appendonly yes`, para que sobrevivan también a un corte y no
+  solo a los snapshots cada cinco minutos.
+
+### 41.4 De 1 + 12 + K peticiones a 2
+
+Lo que §40.8 dejó anotado como deuda, cerrado por donde tocaba:
+
+| | Antes | Ahora |
+|---|---|---|
+| Lista | `GET /projects` | igual, y ya trae `members` con los 4 primeros ids |
+| Equipos | `GET /projects/:id/members` ×12 | — |
+| Perfiles | `GET /users/:id` ×K | `GET /users?ids=a,b,c` ×1 |
+
+`user_find_by_ids` **ya existía** en credentials-service —lo usaban el panel de
+administración y alexa-service— y lo único que faltaba era la puerta HTTP en el
+gateway. Responde `{ items, total }`, la misma forma que el listado, para que
+quien la consume no tenga que desenvolver dos formas según el parámetro que
+mandó.
+
+Sigue degradando: si el directorio no se puede pedir, cada tarjeta vuelve al
+número de miembros, que es lo que enseñaba antes de que hubiera caras.
+
+### 41.5 Pendiente de probar en vivo
+
+Compila entero —gateway, credentials, projects y las seis zonas— pero **esto no
+se ha ejercitado contra el stack**: hay que reiniciar el backend (los servicios
+leen `@praxis/contracts` desde `dist/`) y comprobar en el navegador
+
+1. entrar en dos navegadores a la vez y que ninguno eche al otro;
+2. que cerrar sesión en uno **no** cierra el otro;
+3. que suspender una cuenta sigue echándola de todas partes;
+4. que la rejilla de proyectos hace dos peticiones y las caras salen igual.
+
+Y recordar que al desplegarlo **hay que volver a entrar una vez** (§41.2).

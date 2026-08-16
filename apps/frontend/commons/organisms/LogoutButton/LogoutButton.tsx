@@ -14,7 +14,20 @@ import { useSidebarPlegada } from '../AppLayout/AppShell';
  * queremos que el shell se recargue de cero, sin nada del usuario anterior en
  * memoria.
  */
-export function LogoutButton() {
+export interface LogoutButtonProps {
+  /**
+   * Fuerza la forma del botón en vez de deducirla del pliegue de la barra.
+   *
+   * ⚠️ **Fuera de la barra lateral hay que pasarlo.** El botón se pinta también
+   * en la pantalla de tu cuenta, y ahí el pliegue de la barra no significa
+   * nada: con la barra plegada, el botón de aquella tarjeta se quedaba en un
+   * icono suelto sin la palabra «Cerrar sesión», por un estado de otra parte de
+   * la pantalla.
+   */
+  compacto?: boolean;
+}
+
+export function LogoutButton({ compacto }: LogoutButtonProps = {}) {
   const [pending, setPending] = useState(false);
   /**
    * Plegada, solo el icono.
@@ -27,7 +40,8 @@ export function LogoutButton() {
    * El nombre accesible se conserva entero en `aria-label`: para un lector de
    * pantalla no cambia nada, solo deja de estar escrito.
    */
-  const plegada = useSidebarPlegada();
+  const plegadaLaBarra = useSidebarPlegada();
+  const plegada = compacto ?? plegadaLaBarra;
 
   async function handleLogout() {
     setPending(true);
@@ -51,24 +65,8 @@ export function LogoutButton() {
          `w-full` lo estiraba— el botón se encogía al ancho de su texto y el
          icono quedaba pegado a la letra. Con el relleno se ve igual en los dos
          sitios. */
-      className={`flex h-9 w-full cursor-pointer items-center justify-center rounded-lg border border-border px-4 font-sans text-xs font-semibold text-error transition-colors hover:bg-error-muted disabled:cursor-not-allowed disabled:opacity-50 ${
-        plegada ? '' : 'gap-2'
-      }`}
+      className="w-fit cursor-pointer rounded-lg border px-3 py-2 font-sans text-sm transition-colors border border-red-300 text-red-600 hover:bg-red-50"
     >
-      <svg
-        className="h-4 w-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-        />
-      </svg>
       {!plegada && (pending ? 'Saliendo...' : 'Cerrar sesión')}
     </button>
   );

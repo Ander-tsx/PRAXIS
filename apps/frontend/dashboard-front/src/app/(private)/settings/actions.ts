@@ -73,8 +73,14 @@ export async function updateProfileAction(
   // Sin el basePath: son rutas del App Router de esta app, donde el panel es
   // `/` y esta pantalla `/settings`. El nombre se ve en las dos, y también
   // en la barra lateral, que vive en el layout y lo recibe del mismo perfil.
+  //
+  // ⚠️ **`/profile` también**, que es de donde se llama hoy: el formulario se
+  // quedó aquí porque la escritura es la misma, pero quien lo pinta es la
+  // pantalla de la cuenta, y sin esta línea el nombre grande del encabezado
+  // seguía siendo el viejo hasta recargar.
   revalidatePath('/');
   revalidatePath('/settings');
+  revalidatePath('/profile');
 
   return { error: null, savedName: firstName };
 }

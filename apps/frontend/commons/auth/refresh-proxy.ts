@@ -71,8 +71,24 @@ async function requestNewAccessToken(
       signal: timeoutSignal(),
     });
 
-    /* Que el gateway conteste «no» es una respuesta: el refresh no sirve. */
-    if (!response.ok) return { estado: 'rechazado' };
+    /**
+     * 🔴 **Solo un 401 o un 403 significan «tu refresh no sirve».**
+     *
+     * Cualquier respuesta que no fuera `ok` contaba como rechazo, y eso incluía
+     * el **429** del limitador de tasa. La ruta `/auth/refresh` llevaba el mismo
+     * apretón que el login —10 por minuto y por IP— y a esta la llama este
+     * proxy, no una persona: seis zonas navegando desde la misma IP se las
+     * gastan solas. El resultado era una **sesión cerrada de verdad** —borrando
+     * las dos cookies— por un límite que solo decía «ahora no».
+     *
+     * Con esto, un 429, un 500 o un gateway a medio arrancar caen en
+     * «inalcanzable», que no toca las cookies y reintenta en la siguiente
+     * navegación. El límite de la ruta también se subió, pero **este lado es el
+     * que importa**: cualquier fallo transitorio que no sea una negativa de
+     * identidad no puede acabar en un cierre de sesión.
+     */
+    if (response.status === 401 || response.status === 403) return { estado: 'rechazado' };
+    if (!response.ok) return { estado: 'inalcanzable' };
 
     const payload = (await response.json()) as { data?: { accessToken?: unknown } };
     const accessToken = payload?.data?.accessToken;

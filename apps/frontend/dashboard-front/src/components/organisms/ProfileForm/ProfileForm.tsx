@@ -7,18 +7,23 @@ import { Button, Input, alpha, colors, useAccion } from '@praxis/commons';
 import { useId, useState } from 'react';
 
 export interface ProfileFormProps {
-  email: string;
   initialFirstName: string;
   initialLastName: string;
 }
 
 /**
- * Formulario de datos del usuario.
+ * Formulario de datos del usuario: nombre y apellido, que es todo lo que
+ * `PATCH /users/:id` acepta.
  *
- * El email no se edita: vive en la credencial y `PATCH /users/:id` no lo toca.
- * Se muestra deshabilitado para que quede claro de qué cuenta hablamos.
+ * ⚠️ **El correo ya no está aquí.** No se edita —vive en la credencial y no hay
+ * endpoint que lo cambie— y estaba puesto como un `<input>` deshabilitado, que
+ * es una fila de formulario entera para algo que nadie puede tocar. El dato y
+ * su motivo se conservan, en la ficha de la portada (`AccountIdentity`).
+ *
+ * La tarjeta tampoco es suya: la pone `PanelCard`, que es lo que permite
+ * ponerla al lado de otra en la rejilla de la pantalla.
  */
-export function ProfileForm({ email, initialFirstName, initialLastName }: ProfileFormProps) {
+export function ProfileForm({ initialFirstName, initialLastName }: ProfileFormProps) {
   const [state, formAction, pending] = useAccion(updateProfileAction, UPDATE_PROFILE_INITIAL_STATE);
 
   const [firstName, setFirstName] = useState(initialFirstName);
@@ -27,7 +32,6 @@ export function ProfileForm({ email, initialFirstName, initialLastName }: Profil
 
   const firstNameId = useId();
   const lastNameId = useId();
-  const emailId = useId();
 
   const clientError = validateProfile({ firstName, lastName });
 
@@ -40,21 +44,21 @@ export function ProfileForm({ email, initialFirstName, initialLastName }: Profil
         setTouched(true);
         if (clientError) event.preventDefault();
       }}
-      className="flex max-w-2xl flex-col gap-5 rounded-2xl border border-border bg-surface p-6"
+      /* `flex-1` y el botón al final: dentro de la rejilla, esta tarjeta y la
+         de al lado miden lo mismo, así que el formulario estira y la acción se
+         queda anclada abajo en vez de dejar un hueco debajo. */
+      className="flex flex-1 flex-col gap-5"
     >
-      <Input
-        id={emailId}
-        label="Correo"
-        value={email}
-        disabled
-        readOnly
-        message="El correo pertenece a tus credenciales y no se edita desde aquí."
-        fullWidth
-      />
-
-      {/* Nombre y apellido en fila: son dos campos cortos, y apilados dejaban
-          la card angosta pegada a la izquierda por más max-w que se le diera. */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {/**
+       * Apilados, y no en fila.
+       *
+       * Estuvieron uno al lado del otro porque la tarjeta ocupaba el ancho
+       * entero y dos campos cortos a la izquierda dejaban medio renglón vacío.
+       * Ahora la tarjeta es la columna estrecha de la rejilla: en fila, cada
+       * campo se quedaría en ~250 px, y el alto que ganan apilados es
+       * justamente lo que iguala esta tarjeta con la de al lado.
+       */}
+      <div className="grid grid-cols-1 gap-5">
         <Input
           id={firstNameId}
           name="firstName"
@@ -103,7 +107,7 @@ export function ProfileForm({ email, initialFirstName, initialLastName }: Profil
         </output>
       )}
 
-      <div className="flex justify-end">
+      <div className="mt-auto flex justify-end">
         <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>
           Guardar cambios
         </Button>

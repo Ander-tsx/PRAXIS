@@ -239,6 +239,21 @@ export interface Project {
     members: number;
     workspaces: number;
   };
+  /**
+   * Los **primeros cuatro** miembros, solo sus ids, y solo en `GET /projects`.
+   *
+   * Es lo que permite pintar las caras del equipo en la rejilla sin pedir
+   * `GET /projects/:id/members` una vez por tarjeta. Los nombres y las fotos se
+   * resuelven aparte, contra `GET /users?ids=`.
+   *
+   * ⚠️ **No es el equipo entero, y el total sigue siendo `_count.members`.** Son
+   * cuatro porque son las que caben antes del «+N»: contarlos para saber cuánta
+   * gente hay daría siempre cuatro como mucho.
+   *
+   * Opcional porque `GET /projects/:id` —el detalle— no lo trae: ahí los
+   * miembros van por su propia ruta, con su rol y su fecha de entrada.
+   */
+  members?: { userId: string }[];
 }
 
 /**

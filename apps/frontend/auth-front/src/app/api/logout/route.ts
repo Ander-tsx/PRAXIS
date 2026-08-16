@@ -1,4 +1,4 @@
-import { SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
+import { REFRESH_COOKIE, SESSION_COOKIE, clearSessionCookies } from '@/lib/session-cookie';
 import { type NextRequest, NextResponse } from 'next/server';
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
@@ -16,12 +16,22 @@ const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
  */
 export async function POST(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
 
   if (token) {
     try {
       await fetch(`${GATEWAY_URL}/api/auth/logout`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        /**
+         * El refresh token dice **cuál** de las sesiones se cierra.
+         *
+         * Una cuenta puede tener varias abiertas a la vez, así que salir en el
+         * portátil no debe echar del móvil. Sin este cuerpo, el backend las
+         * cerraría todas —que es lo que hacía antes, y lo que sigue haciendo si
+         * la cookie no está—.
+         */
+        body: JSON.stringify(refreshToken ? { refreshToken } : {}),
         cache: 'no-store',
       });
     } catch (error) {

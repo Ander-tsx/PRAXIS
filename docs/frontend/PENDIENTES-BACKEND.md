@@ -866,3 +866,111 @@ El frontend ya no ofrece fijar dentro del hilo (`canFijar={false}` en
 `ThreadPanel`). Queda anotado por si algún día la barra de fijados debe incluir
 mensajes de hilo — entonces habría que decidir a qué lleva pulsarlos, porque hoy
 saltar a un fijado busca el mensaje en el historial y uno de hilo no está ahí.
+
+---
+
+## 🟢 22. La bandeja de avisos no se puede filtrar por tipo
+
+`FindNotificationsQueryDto` acepta `page`, `limit` y `unreadOnly`. No hay nada
+para acotar por `type`, y la bandeja los mezcla todos: invitaciones, cambios de
+equipo y asignaciones de tarea.
+
+Con la lista paginada de 20 en 20, **el frontend no puede suplirlo**. Filtrar en
+el cliente solo recortaría lo que ya vino en la página actual, así que «solo
+tareas» enseñaría las que hubiera entre esas veinte y escondería el resto sin
+decirlo — el mismo engaño que ya se descartó al montar el filtro de «sin leer»,
+que sí se resolvió mandando `unreadOnly=true` (ESTADO-ACTUAL §39.6).
+
+Lo que haría falta es un `type?: NotificationType[]` en ese DTO, aplicado en el
+`where` junto a `unreadOnly`, y `total` contado con el mismo `where` —como ya
+hace hoy—.
+
+**No corre prisa.** Con veinte por página y una bandeja que se vacía sola al
+abrir cada aviso, la mezcla se lee bien; empezará a molestar cuando una cuenta
+acumule cientos y quiera buscar «aquella invitación de hace un mes».
+
+---
+
+## 🟢 23. `GET /projects` acepta `sortBy` y `sortOrder`, y los ignora
+
+`FindProjectsQueryDto` los declara, el gateway los reenvía dentro de
+`query` … y `findAllProjects` (projects-service) tiene el orden **escrito a
+mano**:
+
+```ts
+orderBy: { createdAt: 'desc' },   // projects.service.ts, findAllProjects
+```
+
+`dto.query.sortBy` no se lee en ninguna parte de ese método. Es decir: la
+petición se acepta con 200, no falla, y devuelve exactamente el mismo orden de
+siempre.
+
+**Por eso la rejilla de proyectos no ofrece ordenar** (ESTADO-ACTUAL §40.7): un
+selector que cambia la URL, recarga la lista y no cambia nada es la peor clase
+de control. Es el mismo patrón que el 200 sin guardar de la trampa #3 de
+`CLAUDE.md`, en versión lectura.
+
+Lo que haría falta: aplicar `dto.query.sortBy`/`sortOrder` en el `orderBy`, con
+una **lista blanca de columnas** (`name`, `createdAt`, `updatedAt`) — un
+`sortBy` libre va directo a Prisma y una columna inexistente revienta la
+consulta.
+
+O, si no se va a implementar, quitarlos del DTO: un parámetro documentado en
+Swagger que no hace nada es peor que no tenerlo.
+
+---
+
+## ✅ 24. ~~`GET /projects` no trae ni una persona: las caras del equipo cuestan N+1~~
+
+La rejilla de proyectos enseña las caras del equipo en cada tarjeta
+(ESTADO-ACTUAL §40.8). Para eso hacen falta **dos tandas de peticiones por
+página**, porque la lista no trae a nadie:
+
+```
+GET /projects?page=1&limit=12        → 12 proyectos, cada uno con _count.members
+GET /projects/:id/members   ×12      → filas con userId, sin nombre ni foto
+GET /users/:id              ×K       → K = personas únicas entre los 12 equipos
+```
+
+El frontend lo acota como puede —las doce en paralelo, los ids deduplicados
+entre todos los proyectos antes de pedir perfiles, y cada fallo degrada esa
+tarjeta al número de miembros— pero sigue siendo **1 + 12 + K** peticiones para
+pintar una lista que hoy se resolvía con una.
+
+Lo que lo cerraría, por orden de preferencia:
+
+1. **Incluir unos pocos miembros en la propia lista.** En `findAllProjects`,
+   junto al `_count` que ya está:
+
+   ```ts
+   include: {
+     _count: { select: { members: true, workspaces: true } },
+     members: { take: 4, select: { userId: true } },   // ← esto
+   }
+   ```
+
+   Con cuatro basta: es el tope que enseña la tarjeta, y el resto ya sale del
+   `_count`. Quita las doce peticiones de golpe y deja solo la tanda de perfiles.
+
+2. **Un `GET /users?ids=a,b,c`** que resuelva varios perfiles de una vez.
+   Serviría también a la bandeja de avisos, a la pantalla del proyecto y al
+   chat, que hacen exactamente lo mismo (una petición por id) por la misma
+   ausencia. Hoy la alternativa es `?limit=100`, que **miente en cuanto la
+   plataforma pasa de cien cuentas** — ya nos mordió y está documentado.
+
+Con las dos, la pantalla vuelve a ser dos peticiones.
+
+---
+
+**Cerrado con autorización, con las dos.** La rejilla de proyectos pasó de
+**1 + 12 + K** peticiones a **2**:
+
+- `findAllProjects` incluye `members: { take: 4, orderBy: { joinedAt: 'asc' },
+  select: { userId: true } }` junto al `_count` que ya estaba.
+- `GET /users?ids=a,b,c` en el gateway. El `cmd user_find_by_ids` **ya existía**
+  —lo usaban el panel de administración y alexa-service— y lo único que faltaba
+  era la puerta HTTP. Responde `{ items, total }`, la misma forma que el listado.
+
+Sirve igual a la bandeja de avisos, al chat y al detalle de proyecto, que siguen
+pidiendo un `GET /users/:id` por persona: cambiarlos es una línea en cada uno y
+está pendiente.

@@ -1,4 +1,4 @@
-import { setPresenceAction } from '@/app/(private)/perfil/actions';
+import { setPresenceAction } from '@/app/(private)/profile/actions';
 import { AppShell, PresenceFooter, displayName, hrefDeAvatar } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import { getSidebarPlegada } from '@praxis/commons/theme';

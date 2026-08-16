@@ -12,6 +12,15 @@ export interface PresenceSwitcherProps {
    * action; devuelve el valor confirmado o `null` si no se pudo.
    */
   onCambiar: (presencia: Presence) => Promise<string | null>;
+  /**
+   * El menú, en una columna de esferas y sin texto.
+   *
+   * Para la barra lateral plegada, que mide 72 px: ahí un menú de 224 px con
+   * el nombre y la explicación de cada estado se sale de la pantalla o tapa
+   * media aplicación. Los seis colores caben en una tira, y el nombre sigue
+   * estando en el `title` y en el `aria-label` de cada uno.
+   */
+  compacto?: boolean;
 }
 
 /**
@@ -34,7 +43,7 @@ export interface PresenceSwitcherProps {
  * pero se corrige con lo que devuelve el servidor: si el guardado falla, el
  * punto vuelve a decir la verdad en vez de la intención.
  */
-export function PresenceSwitcher({ valor, onCambiar }: PresenceSwitcherProps) {
+export function PresenceSwitcher({ valor, onCambiar, compacto = false }: PresenceSwitcherProps) {
   const [abierto, setAbierto] = useState(false);
   const [presencia, setPresencia] = useState(valor ?? 'AVAILABLE');
   const [guardando, setGuardando] = useState(false);
@@ -92,12 +101,42 @@ export function PresenceSwitcher({ valor, onCambiar }: PresenceSwitcherProps) {
            un desplegable hacia abajo se saldría de la pantalla. */
         <div
           role="menu"
-          className="absolute bottom-full left-0 z-30 mb-2 w-56 overflow-hidden rounded-xl border shadow-lg"
+          className={`absolute bottom-full z-30 mb-2 overflow-hidden rounded-xl border shadow-lg ${
+            compacto ? 'left-1/2 flex -translate-x-1/2 flex-col gap-1 p-1.5' : 'left-0 w-56'
+          }`}
           style={{ background: colors.surfaceElevated, borderColor: colors.border }}
         >
           {PRESENCES.map((clave) => {
             const descripcion = presenciaDe(clave);
             const puesta = clave === presencia;
+
+            if (compacto) {
+              return (
+                <button
+                  key={clave}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void elegir(clave)}
+                  aria-label={descripcion.etiqueta}
+                  title={descripcion.etiqueta}
+                  className="flex cursor-pointer items-center justify-center rounded-full p-1 transition-transform hover:scale-110"
+                  /* La elegida lleva un anillo: sin texto, es lo único que
+                     distingue cuál está puesta. */
+                  style={
+                    puesta
+                      ? { boxShadow: `0 0 0 2px ${colors.primary}`, background: colors.surface }
+                      : undefined
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-3 w-3 rounded-full"
+                    style={{ background: descripcion.color }}
+                  />
+                </button>
+              );
+            }
+
             return (
               <button
                 key={clave}

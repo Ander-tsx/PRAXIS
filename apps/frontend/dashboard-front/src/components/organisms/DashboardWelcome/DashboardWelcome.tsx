@@ -50,7 +50,7 @@ export function DashboardWelcome({ name, email, roles }: DashboardWelcomeProps) 
           {/* Misma zona → `next/link`, y sin el basePath: Next le antepone
               `/dashboard` solo. Ver ESTADO-ACTUAL §16. */}
           <Link
-            href="/settings"
+            href="/profile"
             className="shrink-0 rounded-lg bg-primary px-4 py-2 text-center font-sans text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover"
           >
             Completar perfil

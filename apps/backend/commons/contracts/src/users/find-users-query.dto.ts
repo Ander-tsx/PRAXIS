@@ -1,6 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { SortOrder } from '../pagination.dto';
 import { FindUsersDto } from './find-users.dto';
 
@@ -45,6 +56,39 @@ export class FindUsersQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  /**
+   * Resuelve **varios perfiles concretos de una vez**: `?ids=uuid,uuid,uuid`.
+   *
+   * Existe porque media aplicación hacía lo mismo a mano —una petición por id—
+   * para poner cara y nombre a los `userId` que devuelven projects-service y
+   * las notificaciones: la bandeja de avisos, la pantalla del proyecto, el chat
+   * y la rejilla de proyectos. Doce tarjetas con cuatro miembros eran hasta
+   * cuarenta y ocho peticiones para pintar una lista.
+   *
+   * ⚠️ **No es lo mismo que `search`, y por eso no se mezclan.** Con `ids` la
+   * respuesta no se pagina: se piden unos cuantos perfiles por su
+   * identificador y vienen todos, hasta el tope del DTO del microservicio
+   * (`FindUsersByIdsDto`: 200). Si llegan los dos, mandan los `ids`.
+   *
+   * Viaja como cadena separada por comas porque es una query string; el
+   * `@Transform` la parte y el microservicio valida que cada trozo sea un UUID.
+   * Un id que no exista simplemente no sale en la respuesta — no es un error.
+   */
+  @ApiPropertyOptional({ description: 'Perfiles concretos por id, separados por comas' })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean)
+      : value,
+  )
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsUUID('4', { each: true })
+  ids?: string[];
 
   @ApiPropertyOptional({ type: String, format: 'date-time' })
   @IsOptional()

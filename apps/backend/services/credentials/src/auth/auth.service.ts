@@ -23,6 +23,45 @@ const TOKEN_CACHE_TTL = 300; // 5 min
 const SESSION_TTL = 60 * 60 * 24 * 7; // 7 días
 
 /**
+ * 🔴 **Una persona puede tener varias sesiones abiertas a la vez.**
+ *
+ * Antes no: la sesión vivía en `auth:session:<userId>` con **un solo** refresh
+ * token dentro, y cada entrada lo sobrescribía. Consecuencia, y era el
+ * síntoma que se reportaba como «se me cierra la sesión sola»:
+ *
+ * > Entras en el portátil. Al rato entras en el móvil, o en otro navegador, o
+ * > vuelves a entrar en una ventana de incógnito. El refresh guardado pasa a
+ * > ser el de la última entrada. El portátil no se entera de nada hasta que su
+ * > access token cumple 15 minutos: entonces intenta renovar, el gateway
+ * > responde «refresh token no válido», y `refresh-proxy.ts` —que hace lo
+ * > correcto: un rechazo significa sesión muerta— borra las cookies. Te ha
+ * > echado **la otra entrada tuya**, con quince minutos de retraso para que no
+ * > se pueda relacionar una cosa con la otra.
+ *
+ * Ahora la clave es un **hash con un campo por sesión**: `auth:sessions:<userId>`
+ * → `{ <jti>: <refreshToken> }`. Cada entrada añade su campo en vez de pisar el
+ * de las demás, y el `jti` que las distingue viaja dentro del propio refresh
+ * token, así que quien lo presenta dice **cuál** de las sesiones es.
+ *
+ * Se gana además lo que se pierde con una clave por usuario:
+ *
+ * | Gesto | Antes | Ahora |
+ * |---|---|---|
+ * | Cerrar sesión en un sitio | Cerraba en todos | Cierra solo ese (`HDEL`) |
+ * | Suspender o borrar la cuenta | `DEL` | `DEL` — sigue cerrando todas de un golpe |
+ * | Saber si la sesión existe | `GET` | `EXISTS` |
+ *
+ * ⚠️ **El nombre de la clave cambia** (`auth:session:` → `auth:sessions:`) a
+ * propósito: la vieja guardaba una cadena JSON y `HSET` sobre una clave de tipo
+ * cadena responde `WRONGTYPE`. Con un nombre nuevo no hay migración que
+ * escribir; las viejas caducan solas en 7 días. El precio es que **al desplegar
+ * esto, todo el mundo entra una vez más**.
+ */
+function claveDeSesiones(userId: string): string {
+  return `auth:sessions:${userId}`;
+}
+
+/**
  * Valores del claim `typ`. El gateway compara contra el primero; `refresh()`,
  * contra el segundo. Si cambian aquí, hay que cambiarlos en `jwt.guard.ts`.
  */
@@ -67,9 +106,34 @@ export class AuthService {
     return this.jwt.signAsync({ sub: userId, typ: TOKEN_ACCESO });
   }
 
-  private async signRefresh(userId: string): Promise<string> {
+  /**
+   * Firma un refresh token **con su propio identificador de sesión** (`jti`).
+   *
+   * Es lo que permite que convivan varias: el `jti` es el campo del hash donde
+   * se guarda esta sesión y solo esta, así que entrar desde otro sitio ya no
+   * pisa la de aquí. Sin él, todos los refresh de una persona eran
+   * indistinguibles entre sí salvo por el valor completo del token.
+   */
+  private async signRefresh(userId: string): Promise<{ token: string; jti: string }> {
     const expiresIn = this.config.get<any>('REFRESH_TOKEN_EXPIRES_IN', '7d');
-    return this.jwt.signAsync({ sub: userId, typ: TOKEN_REFRESCO }, { expiresIn });
+    const jti = crypto.randomUUID();
+    const token = await this.jwt.signAsync({ sub: userId, typ: TOKEN_REFRESCO, jti }, { expiresIn });
+    return { token, jti };
+  }
+
+  /**
+   * Abre una sesión: guarda su refresh token en el campo que le toca y estira
+   * el plazo de la clave entera.
+   *
+   * El `EXPIRE` va sobre el hash completo, así que **la clave dura lo que dure
+   * la sesión más reciente**. Un campo suelto no puede caducar por su cuenta en
+   * Redis, pero tampoco hace falta: el token que hay dentro lleva su propio
+   * `exp` y `refresh()` lo verifica antes de mirar aquí.
+   */
+  private async guardarSesion(userId: string, jti: string, refreshToken: string): Promise<void> {
+    const clave = claveDeSesiones(userId);
+    await this.redis.hset(clave, jti, refreshToken);
+    await this.redis.expire(clave, SESSION_TTL);
   }
 
   async register(dto: RegisterDto) {
@@ -216,7 +280,10 @@ export class AuthService {
     });
 
     if (credential.user) {
-      await this.redis.del(`auth:session:${credential.user.id}`);
+      /* Cambiar la contraseña cierra **todas** las sesiones, no solo la de
+         aquí: quien la cambia suele estar echando a alguien. Un `DEL` sobre el
+         hash se las lleva todas de una vez, igual que antes. */
+      await this.redis.del(claveDeSesiones(credential.user.id));
     }
 
     return { restablecida: true };
@@ -276,9 +343,11 @@ export class AuthService {
 
     const userId = credential.user.id;
     const accessToken = await this.signAccess(userId);
-    const refreshToken = await this.signRefresh(userId);
+    const { token: refreshToken, jti } = await this.signRefresh(userId);
 
-    await this.redis.set(`auth:session:${userId}`, { refreshToken }, SESSION_TTL);
+    /* Añade esta sesión; **no pisa** las que ya hubiera abiertas en otros
+       dispositivos. Ver el comentario de `claveDeSesiones`. */
+    await this.guardarSesion(userId, jti, refreshToken);
 
     return { userId, accessToken, refreshToken };
   }
@@ -297,8 +366,11 @@ export class AuthService {
       throw new RpcException({ statusCode: 401, message: 'Token inválido o expirado' });
     }
 
-    const session = await this.redis.get(`auth:session:${payload.sub}`);
-    if (!session) {
+    /* Basta con que le quede **alguna** sesión abierta: este access token se
+       emitió dentro de una de ellas y dura 15 minutos. Cerrar la sesión de un
+       dispositivo no tiene por qué invalidar el access token que ya estaba en
+       vuelo en otro. */
+    if (!(await this.redis.exists(claveDeSesiones(payload.sub)))) {
       throw new RpcException({ statusCode: 401, message: 'Sesión cerrada' });
     }
 
@@ -324,10 +396,22 @@ export class AuthService {
       throw new RpcException({ statusCode: 401, message: 'Refresh token inválido o expirado' });
     }
 
-    const sessionKey = `auth:session:${payload.sub}`;
-    const session = await this.redis.get<{ refreshToken: string }>(sessionKey);
+    /**
+     * ⚠️ **Se busca la sesión concreta por su `jti`, no «la» sesión.**
+     *
+     * Un refresh token firmado antes de este cambio no lo lleva: se rechaza, y
+     * está bien —hay que volver a entrar una vez, y solo una—.
+     */
+    const sessionKey = claveDeSesiones(payload.sub);
+    const jti = payload.jti;
 
-    if (!session || session.refreshToken !== refreshToken) {
+    if (!jti) {
+      throw new RpcException({ statusCode: 401, message: 'Refresh token no válido' });
+    }
+
+    const guardado = await this.redis.hget(sessionKey, jti);
+
+    if (guardado !== refreshToken) {
       throw new RpcException({ statusCode: 401, message: 'Refresh token no válido' });
     }
 
@@ -352,18 +436,74 @@ export class AuthService {
     });
 
     if (credential?.user && credential.user.status !== 'ACTIVE') {
-      /* Se retira la sesión: si no, cada navegación volvería a preguntar y a
-         recibir el mismo 401. */
+      /* Se retiran **todas** sus sesiones: si no, cada navegación de cada
+         dispositivo volvería a preguntar y a recibir el mismo 401. */
       await this.redis.del(sessionKey);
       throw new RpcException({ statusCode: 401, message: 'Cuenta suspendida o inactiva' });
     }
+
+    /**
+     * El plazo se estira en cada renovación: **mientras uses la aplicación, la
+     * sesión no se va sola.**
+     *
+     * Antes el plazo se ponía al entrar y no se tocaba nunca más, así que
+     * caducaba a los 7 días exactos de la entrada aunque hubieras estado dentro
+     * cinco minutos antes. Ahora es deslizante, que es lo que cualquiera espera
+     * de «recuérdame».
+     *
+     * ⚠️ **El tope duro sigue siendo el `exp` del propio refresh token**, que no
+     * se rota: 7 días desde que se emitió, se use o no. Estirar la clave de
+     * Redis no alarga un JWT ya firmado. Rotarlo en cada renovación daría una
+     * sesión perpetua, pero abre una carrera real aquí: el `proxy.ts` de cada
+     * zona renueva en cada navegación y dos pestañas pueden pedirlo a la vez
+     * con el mismo token — con rotación estricta, la segunda se queda fuera. Se
+     * prefiere un tope predecible a un cierre de sesión aleatorio, que es
+     * justamente lo que este cambio viene a quitar.
+     */
+    await this.redis.expire(sessionKey, SESSION_TTL);
 
     const accessToken = await this.signAccess(payload.sub);
     return { accessToken };
   }
 
-  async logout(userId: string) {
-    await this.redis.del(`auth:session:${userId}`);
+  /**
+   * Cierra sesión.
+   *
+   * Con `refreshToken`, **solo la de ese dispositivo**: es lo que se espera al
+   * pulsar «cerrar sesión» en un portátil prestado, y antes cerraba también la
+   * del móvil sin avisar. Sin él —una llamada antigua, o un cierre desde una
+   * pantalla que no tiene la cookie a mano— se cierran todas, que era el
+   * comportamiento de siempre y sigue siendo el seguro por defecto.
+   *
+   * Cuando se va la última, la clave se borra entera: un hash vacío en Redis
+   * deja de existir solo, pero así no dependemos de ese detalle y `verifyToken`
+   * ve «sesión cerrada» de inmediato.
+   */
+  async logout(userId: string, refreshToken?: string) {
+    const clave = claveDeSesiones(userId);
+
+    if (!refreshToken) {
+      await this.redis.del(clave);
+      return { success: true };
+    }
+
+    let jti: string | undefined;
+    try {
+      const payload = await this.jwt.verifyAsync<JwtPayloadDto>(refreshToken);
+      jti = payload.jti;
+    } catch {
+      /* Un refresh ilegible no identifica ninguna sesión. Se cierran todas en
+         vez de no cerrar ninguna: quien pide salir, sale. */
+    }
+
+    if (!jti) {
+      await this.redis.del(clave);
+      return { success: true };
+    }
+
+    const quedan = await this.redis.hdel(clave, jti);
+    if (quedan === 0) await this.redis.del(clave);
+
     return { success: true };
   }
 
@@ -533,9 +673,9 @@ export class AuthService {
     }
 
     const accessToken = await this.signAccess(userId);
-    const refreshToken = await this.signRefresh(userId);
+    const { token: refreshToken, jti } = await this.signRefresh(userId);
 
-    await this.redis.set(`auth:session:${userId}`, { refreshToken }, SESSION_TTL);
+    await this.guardarSesion(userId, jti, refreshToken);
 
     return { userId, accessToken, refreshToken };
   }

@@ -2,6 +2,7 @@
 
 import type { Presence } from '../../api/presence';
 import { PresenceSwitcher } from '../../molecules/PresenceSwitcher';
+import { useSidebarPlegada } from './AppShell';
 
 export interface PresenceFooterProps {
   presencia: string | null | undefined;
@@ -27,5 +28,8 @@ export interface PresenceFooterProps {
  * dos, y es de cliente porque el menú tiene estado.
  */
 export function PresenceFooter({ presencia, onCambiar }: PresenceFooterProps) {
-  return <PresenceSwitcher valor={presencia} onCambiar={onCambiar} />;
+  /* Plegada la barra, el menú sale en su forma compacta: ver `PresenceSwitcher`.
+     El pliegue se lee por contexto porque lo decide el armazón, no la zona. */
+  const plegada = useSidebarPlegada();
+  return <PresenceSwitcher valor={presencia} onCambiar={onCambiar} compacto={plegada} />;
 }

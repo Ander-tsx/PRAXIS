@@ -395,12 +395,26 @@ export function MessageBubble({
    * acto. Se ignora lo que caiga dentro de la propia burbuja, que es quien
    * gobierna su barra.
    */
+  /**
+   * La lista de «visto por» es **un modo de la barra**, no una superficie
+   * aparte: en cuanto la barra se recoge —por un clic fuera, por elegir una
+   * acción o por lo que sea— la lista deja de tener sitio donde vivir.
+   *
+   * Va en un efecto y no en cada manejador porque hay seis caminos que cierran
+   * la barra, y bastaba olvidarse de uno para que al volver a abrirla saliera
+   * la lista en vez de las acciones.
+   */
+  useEffect(() => {
+    if (!barraAbierta) setListaDeVistos(false);
+  }, [barraAbierta]);
+
   useEffect(() => {
     if (!barraAbierta) return;
     function alPulsarFuera(evento: MouseEvent) {
       if (burbujaRef.current?.contains(evento.target as Node)) return;
       setBarraAbierta(false);
       setConfirmandoBorrado(false);
+      setListaDeVistos(false);
     }
     document.addEventListener('click', alPulsarFuera, true);
     return () => document.removeEventListener('click', alPulsarFuera, true);
@@ -651,6 +665,8 @@ export function MessageBubble({
             if (!barraAbierta) decidirDireccionBarra();
             setBarraAbierta((previa) => !previa);
             setConfirmandoBorrado(false);
+            /* La lista es un modo de la barra: al recogerla, se recoge. */
+            setListaDeVistos(false);
           }}
           /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
              como que el sistema cancele el gesto a medias (una llamada
@@ -853,238 +869,159 @@ export function MessageBubble({
               )}`,
             }}
           >
-            {canReact &&
-              !confirmandoBorrado &&
-              CHAT_REACTIONS.map((emoji) => {
-                const puesta = agrupadas.get(emoji)?.mia ?? false;
-                return (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => {
-                      onReaccionar(message.id, emoji, !puesta);
-                      setBarraAbierta(false);
-                    }}
-                    aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
-                    aria-pressed={puesta}
-                    title={emoji}
-                    /* `active:scale-90` además del `hover`: el emoji se hunde al
+            {/**
+             * Pedir «quién lo ha visto» **convierte la barra en la lista**, el
+             * mismo trato que la pregunta de borrado unas líneas más abajo.
+             *
+             * ⚠️ Estuvo como un panel aparte, bajo el mensaje, con su propio
+             * estado: se quedaba abierto indefinidamente después de cerrar la
+             * barra y había que volver a pulsar el ojo para quitarlo. Viviendo
+             * dentro, se va con ella y no hay un segundo sitio que cerrar.
+             */}
+            {listaDeVistos ? (
+              <span className="flex max-w-56 flex-col gap-0.5 px-1.5 py-0.5">
+                <span className="font-sans text-[10px] uppercase tracking-wide text-text-disabled">
+                  Visto por
+                </span>
+                {vistoPor.map((userId) => (
+                  <span key={userId} className="truncate font-sans text-xs text-text-primary">
+                    {nombreDeAutor(userId)}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <>
+                {canReact &&
+                  !confirmandoBorrado &&
+                  CHAT_REACTIONS.map((emoji) => {
+                    const puesta = agrupadas.get(emoji)?.mia ?? false;
+                    return (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => {
+                          onReaccionar(message.id, emoji, !puesta);
+                          setBarraAbierta(false);
+                        }}
+                        aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
+                        aria-pressed={puesta}
+                        title={emoji}
+                        /* `active:scale-90` además del `hover`: el emoji se hunde al
                        pulsarlo y vuelve, que es el acuse de recibo que hace que
                        un clic se sienta atendido aunque la red tarde. */
-                    className="cursor-pointer rounded-lg px-1 py-0.5 text-[15px] leading-none transition-transform duration-100 hover:scale-125 active:scale-90"
-                    style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
-                  >
-                    {emoji}
-                  </button>
-                );
-              })}
+                        className="cursor-pointer rounded-lg px-1 py-0.5 text-[15px] leading-none transition-transform duration-100 hover:scale-125 active:scale-90"
+                        style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
+                      >
+                        {emoji}
+                      </button>
+                    );
+                  })}
 
-            {canReact && !confirmandoBorrado && (
-              <span
-                aria-hidden="true"
-                className="mx-0.5 h-4 w-px shrink-0"
-                style={{ background: colors.border }}
-              />
-            )}
-
-            {canFijar && !confirmandoBorrado && (
-              <button
-                type="button"
-                onClick={() => {
-                  onFijar(message.id, !fijado);
-                  setBarraAbierta(false);
-                }}
-                aria-label={fijado ? 'Desfijar mensaje' : 'Fijar mensaje'}
-                aria-pressed={fijado}
-                title={fijado ? 'Desfijar' : 'Fijar'}
-                className={`cursor-pointer rounded-lg p-1 transition-colors hover:bg-surface ${
-                  fijado ? 'text-primary' : 'text-text-disabled hover:text-text-primary'
-                }`}
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill={fijado ? 'currentColor' : 'none'}
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 17v5" />
-                  <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
-                </svg>
-              </button>
-            )}
-
-            {mine && !confirmandoBorrado && (
-              <button
-                type="button"
-                onClick={() => {
-                  onPedirEdicion(message);
-                  setBarraAbierta(false);
-                }}
-                aria-label="Editar mensaje"
-                title="Editar"
-                className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                </svg>
-              </button>
-            )}
-
-            {!confirmandoBorrado && permiteAbrirHilo && (
-              <button
-                type="button"
-                onClick={() => {
-                  onAbrirHilo(message);
-                  setBarraAbierta(false);
-                }}
-                aria-label="Abrir el hilo de este mensaje"
-                title="Hilo"
-                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="7" y="4" width="10" height="16" rx="2" />
-                  <line x1="7" y1="8" x2="17" y2="8" />
-                  <line x1="7" y1="11" x2="17" y2="11" />
-                  <line x1="7" y1="14" x2="17" y2="14" />
-                  <path d="M5 3.5h14" />
-                  <path d="M5 20.5h14" />
-                </svg>
-              </button>
-            )}
-
-            {!confirmandoBorrado && permiteResponder && (
-              <button
-                type="button"
-                onClick={() => {
-                  onResponder(message);
-                  setBarraAbierta(false);
-                }}
-                aria-label="Responder"
-                title="Responder"
-                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
-                </svg>
-              </button>
-            )}
-
-            {/**
-             * Quién lo ha visto.
-             *
-             * En la barra y no bajo el mensaje: es un dato que se consulta
-             * cuando hace falta —«¿lo habrá leído ya?»— no algo que quieras
-             * leer en cada burbuja mientras repasas la conversación. Ahí
-             * estaba antes y ocupaba una línea por mensaje.
-             *
-             * Solo aparece si alguien lo ha visto: un botón que abre una lista
-             * vacía es un botón que no había que ofrecer.
-             */}
-            {/* Solo en los tuyos: en el mensaje de otra persona, saber quién
-                más lo ha visto no es asunto de quien lo lee — y ahí el dato
-                que importa ya lo da su propio autor. */}
-            {!confirmandoBorrado && mine && vistoPor.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setListaDeVistos((previo) => !previo)}
-                aria-label="Ver quién lo ha visto"
-                aria-expanded={listaDeVistos}
-                title={`Visto por ${vistoPor.length}`}
-                className="flex cursor-pointer items-center gap-0.5 rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-              >
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                <span className="font-sans text-[10px] tabular-nums">{vistoPor.length}</span>
-              </button>
-            )}
-
-            {canDelete &&
-              (confirmandoBorrado ? (
-                /**
-                 * Al confirmar, la barra **se convierte en la pregunta**.
-                 *
-                 * Se ocultan las reacciones y responder: dejarlas al lado de un
-                 * «Eliminar» en rojo invita a pulsar mal justo en la única
-                 * acción que no se deshace. Lo que queda es la decisión.
-                 */
-                <span className="flex items-center gap-1 px-1">
-                  <span className="font-sans text-xs text-text-secondary">¿Eliminar?</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmandoBorrado(false);
-                      setBarraAbierta(false);
-                      onBorrar(message.id);
-                    }}
-                    aria-label="Confirmar que se elimina el mensaje"
-                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs font-semibold transition-opacity hover:opacity-80"
-                    style={{ background: colors.error, color: colors.textInverse }}
-                  >
-                    Sí
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmandoBorrado(false)}
-                    aria-label="No eliminar"
-                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-                  >
-                    No
-                  </button>
-                </span>
-              ) : (
-                <>
+                {canReact && !confirmandoBorrado && (
                   <span
                     aria-hidden="true"
                     className="mx-0.5 h-4 w-px shrink-0"
                     style={{ background: colors.border }}
                   />
+                )}
+
+                {canFijar && !confirmandoBorrado && (
                   <button
                     type="button"
-                    onClick={() => setConfirmandoBorrado(true)}
-                    aria-label="Eliminar mensaje"
-                    title="Eliminar"
-                    className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-error"
+                    onClick={() => {
+                      onFijar(message.id, !fijado);
+                      setBarraAbierta(false);
+                    }}
+                    aria-label={fijado ? 'Desfijar mensaje' : 'Fijar mensaje'}
+                    aria-pressed={fijado}
+                    title={fijado ? 'Desfijar' : 'Fijar'}
+                    className={`cursor-pointer rounded-lg p-1 transition-colors hover:bg-surface ${
+                      fijado ? 'text-primary' : 'text-text-disabled hover:text-text-primary'
+                    }`}
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill={fijado ? 'currentColor' : 'none'}
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 17v5" />
+                      <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+                    </svg>
+                  </button>
+                )}
+
+                {mine && !confirmandoBorrado && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onPedirEdicion(message);
+                      setBarraAbierta(false);
+                    }}
+                    aria-label="Editar mensaje"
+                    title="Editar"
+                    className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                    </svg>
+                  </button>
+                )}
+
+                {!confirmandoBorrado && permiteAbrirHilo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAbrirHilo(message);
+                      setBarraAbierta(false);
+                    }}
+                    aria-label="Abrir el hilo de este mensaje"
+                    title="Hilo"
+                    className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="7" y="4" width="10" height="16" rx="2" />
+                      <line x1="7" y1="8" x2="17" y2="8" />
+                      <line x1="7" y1="11" x2="17" y2="11" />
+                      <line x1="7" y1="14" x2="17" y2="14" />
+                      <path d="M5 3.5h14" />
+                      <path d="M5 20.5h14" />
+                    </svg>
+                  </button>
+                )}
+
+                {!confirmandoBorrado && permiteResponder && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onResponder(message);
+                      setBarraAbierta(false);
+                    }}
+                    aria-label="Responder"
+                    title="Responder"
+                    className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
                   >
                     <svg
                       className="h-4 w-4"
@@ -1094,37 +1031,124 @@ export function MessageBubble({
                       strokeWidth={2}
                       aria-hidden="true"
                     >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                        d="M20 4v7a4 4 0 01-4 4H4"
                       />
                     </svg>
                   </button>
-                </>
-              ))}
+                )}
+
+                {/**
+                 * Quién lo ha visto.
+                 *
+                 * En la barra y no bajo el mensaje: es un dato que se consulta
+                 * cuando hace falta —«¿lo habrá leído ya?»— no algo que quieras
+                 * leer en cada burbuja mientras repasas la conversación. Ahí
+                 * estaba antes y ocupaba una línea por mensaje.
+                 *
+                 * Solo aparece si alguien lo ha visto: un botón que abre una lista
+                 * vacía es un botón que no había que ofrecer.
+                 */}
+                {/* Solo en los tuyos: en el mensaje de otra persona, saber quién
+                más lo ha visto no es asunto de quien lo lee — y ahí el dato
+                que importa ya lo da su propio autor. */}
+                {!confirmandoBorrado && mine && vistoPor.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setListaDeVistos((previo) => !previo)}
+                    aria-label="Ver quién lo ha visto"
+                    aria-expanded={listaDeVistos}
+                    title={`Visto por ${vistoPor.length}`}
+                    className="flex cursor-pointer items-center gap-0.5 rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <span className="font-sans text-[10px] tabular-nums">{vistoPor.length}</span>
+                  </button>
+                )}
+
+                {canDelete &&
+                  (confirmandoBorrado ? (
+                    /**
+                     * Al confirmar, la barra **se convierte en la pregunta**.
+                     *
+                     * Se ocultan las reacciones y responder: dejarlas al lado de un
+                     * «Eliminar» en rojo invita a pulsar mal justo en la única
+                     * acción que no se deshace. Lo que queda es la decisión.
+                     */
+                    <span className="flex items-center gap-1 px-1">
+                      <span className="font-sans text-xs text-text-secondary">¿Eliminar?</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmandoBorrado(false);
+                          setBarraAbierta(false);
+                          onBorrar(message.id);
+                        }}
+                        aria-label="Confirmar que se elimina el mensaje"
+                        className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs font-semibold transition-opacity hover:opacity-80"
+                        style={{ background: colors.error, color: colors.textInverse }}
+                      >
+                        Sí
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoBorrado(false)}
+                        aria-label="No eliminar"
+                        className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="mx-0.5 h-4 w-px shrink-0"
+                        style={{ background: colors.border }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoBorrado(true)}
+                        aria-label="Eliminar mensaje"
+                        title="Eliminar"
+                        className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-error"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                          />
+                        </svg>
+                      </button>
+                    </>
+                  ))}
+              </>
+            )}
           </div>
         </div>
-
-        {/* La lista de quién lo ha visto, plegada bajo el mensaje. Solo cuando
-            se pide desde la barra: ver el comentario de ese botón. */}
-        {listaDeVistos && mine && vistoPor.length > 0 && (
-          <div
-            className={`flex max-w-full flex-col gap-1 rounded-lg border px-2.5 py-2 ${
-              mine ? 'self-end' : 'self-start'
-            }`}
-            style={{ borderColor: colors.border, background: colors.surfaceElevated }}
-          >
-            <span className="font-sans text-[10px] uppercase tracking-wide text-text-disabled">
-              Visto por
-            </span>
-            {vistoPor.map((userId) => (
-              <span key={userId} className="font-sans text-xs text-text-primary">
-                {nombreDeAutor(userId)}
-              </span>
-            ))}
-          </div>
-        )}
 
         {agrupadas.size > 0 && (
           <div className={`flex flex-wrap gap-1 px-1 ${mine ? 'justify-end' : ''}`}>

@@ -202,7 +202,36 @@ export class ProjectsService {
            salen —son lo que explica el aviso—, el autor no. El panel lo lee por su
            propia ruta, `findAllForAdmin`, que no omite nada. */
         omit: { suspendedBy: true },
-        include: { _count: { select: { members: true, workspaces: true } } },
+        include: {
+          _count: { select: { members: true, workspaces: true } },
+          /**
+           * Los primeros miembros, **solo sus ids**.
+           *
+           * La rejilla de proyectos enseña las caras del equipo en cada
+           * tarjeta. Con solo `_count` había que pedir
+           * `GET /projects/:id/members` una vez por proyecto —doce por página—
+           * antes siquiera de empezar a resolver los perfiles.
+           *
+           * `take` es 4 porque es lo que caben en la tarjeta antes del «+N», y
+           * ese resto sale de `_count.members`, que sigue siendo **el total de
+           * verdad**. Traer todos los miembros de todos los proyectos para
+           * enseñar cuatro sería cambiar doce peticiones por una consulta
+           * gorda.
+           *
+           * `joinedAt asc` para que el orden sea estable entre cargas y empiece
+           * por quien lleva más tiempo —el dueño entra como miembro al crear el
+           * proyecto, así que sale el primero—.
+           *
+           * ⚠️ Es una lista de `userId`: projects-service no conoce a las
+           * personas. Los nombres y las fotos los resuelve quien pinta, contra
+           * `GET /users?ids=`.
+           */
+          members: {
+            take: 4,
+            orderBy: { joinedAt: 'asc' },
+            select: { userId: true },
+          },
+        },
       }),
       this.prisma.project.count({ where }),
     ]);

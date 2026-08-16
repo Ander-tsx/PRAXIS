@@ -48,12 +48,12 @@ const PLAN_COPY = {
  */
 export function BillingSummary({ quota, billing }: BillingSummaryProps) {
   if (!quota) {
+    /* Sin tarjeta propia: la pone `PanelCard`, y un recuadro dentro de otro
+       recuadro para una sola frase es marco de más. */
     return (
-      <div className="rounded-2xl border border-border bg-surface p-6">
-        <p className="font-sans text-sm text-text-secondary">
-          No se pudo cargar tu plan del asistente en este momento. Vuelve a intentarlo más tarde.
-        </p>
-      </div>
+      <p className="font-sans text-sm text-text-secondary">
+        No se pudo cargar tu plan del asistente en este momento. Vuelve a intentarlo más tarde.
+      </p>
     );
   }
 
@@ -61,8 +61,17 @@ export function BillingSummary({ quota, billing }: BillingSummaryProps) {
   const usado = Math.min(100, Math.round((quota.usados / Math.max(1, quota.limite)) * 100));
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6">
+    /**
+     * Los dos planes **uno debajo del otro**, no en dos columnas.
+     *
+     * Estuvieron en `sm:grid-cols-2` cuando esto ocupaba el ancho entero de la
+     * pantalla. Hoy vive en la columna estrecha de la rejilla de Configuración,
+     * donde dos columnas dejan cada plan en ~260 px y el lema de cada uno se
+     * parte en tres líneas. Apilados se leen como lo que son: el tuyo, y el
+     * otro.
+     */
+    <div className="grid gap-4">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-elevated p-5">
         <div className="flex items-center gap-2">
           <h3 className="font-sans text-base font-semibold text-text-primary">
             {PLAN_COPY[quota.plan].label}
@@ -102,7 +111,7 @@ export function BillingSummary({ quota, billing }: BillingSummaryProps) {
       </div>
 
       <div
-        className="flex flex-col gap-4 rounded-2xl border border-dashed p-6"
+        className="flex flex-col gap-3 rounded-2xl border border-dashed p-5"
         style={{ borderColor: colors.border }}
       >
         <h3 className="font-sans text-base font-semibold text-text-primary">
