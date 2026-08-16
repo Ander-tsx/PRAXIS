@@ -111,6 +111,24 @@ export interface MessageBubbleProps {
   permiteMenciones: boolean;
   sugerencias: Sugerencia[];
   onPedirSugerencias: () => void;
+  /**
+   * Quién ha leído **este** mensaje. Vacío si nadie o si no se sabe.
+   *
+   * ⚠️ **Antes esto se pintaba como una fila de caritas bajo el mensaje**, y
+   * salía también en los tuyos: ahí lo que se quiere saber no es una lista de
+   * caras, es si ya llegó. Ahora alimenta dos cosas distintas — los checks de
+   * tus propios mensajes y la lista que abre «Quién lo ha visto»— y no ocupa
+   * una línea por conversación.
+   */
+  vistoPor?: string[];
+  /**
+   * Cuánta gente además de ti puede leer el canal.
+   *
+   * Con esto y `vistoPor` se decide el segundo check: **visto por todos** solo
+   * cuando no falta nadie. Sin el total, «todos» sería «todos los que alguna
+   * vez abrieron el canal», que es otra cosa y más optimista.
+   */
+  cuantosPuedenVer?: number;
   /** Nombre de quien escribió el mensaje citado, para la cita. */
   nombreDeAutor: (userId: string) => string;
   /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
@@ -160,12 +178,29 @@ export function MessageBubble({
   permiteMenciones,
   sugerencias,
   onPedirSugerencias,
+  vistoPor = [],
+  cuantosPuedenVer = 0,
   nombreDeAutor,
   previewDeLink,
 }: MessageBubbleProps) {
   const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
   const editado = message.editedAt !== null && message.editedAt !== undefined;
   const sinTexto = message.body.trim().length === 0;
+
+  /**
+   * El acuse de tu propio mensaje: **entregado** o **visto por todos**.
+   *
+   * Un check gris significa que está guardado en el servidor —si se está
+   * viendo, lo está—; dos en azul, que no falta nadie por leerlo. El estado
+   * intermedio («lo han visto tres de cinco») no tiene marca propia a
+   * propósito: son tres estados para una esquina de 14 px, y el detalle está a
+   * un clic en «Quién lo ha visto».
+   *
+   * Solo en los tuyos: en el mensaje de otra persona, decirte que tú lo has
+   * visto no informa de nada.
+   */
+  const vistoPorTodos = cuantosPuedenVer > 0 && vistoPor.length >= cuantosPuedenVer;
+  const [listaDeVistos, setListaDeVistos] = useState(false);
   /**
    * Borrar pide confirmación **en la propia barra**, no en un diálogo.
    *
@@ -482,6 +517,9 @@ export function MessageBubble({
               <span className="font-semibold text-text-primary">{mine ? 'Tú' : nombre}</span>
             )}
             <span className="text-[11px] text-text-disabled">{soloHora(message.createdAt)}</span>
+            {mine && (
+              <ChecksDeEnvio vistoPorTodos={vistoPorTodos} cuantosLoVieron={vistoPor.length} />
+            )}
             {editado && (
               <span
                 title="Mensaje editado"
@@ -1771,4 +1809,51 @@ function dominioDe(url: string): string {
   } catch {
     return url;
   }
+}
+
+/**
+ * Los dos checks de un mensaje propio.
+ *
+ * Uno gris: llegó al servidor. Dos azules: no queda nadie por leerlo. Es el
+ * lenguaje que ya trae aprendido cualquiera de otra app de mensajería, y por
+ * eso no lleva texto — el `title` lo dice para quien pase por encima y para un
+ * lector de pantalla.
+ */
+function ChecksDeEnvio({
+  vistoPorTodos,
+  cuantosLoVieron,
+}: {
+  vistoPorTodos: boolean;
+  cuantosLoVieron: number;
+}) {
+  const titulo = vistoPorTodos
+    ? 'Visto por todos'
+    : cuantosLoVieron > 0
+      ? `Visto por ${cuantosLoVieron}`
+      : 'Enviado';
+
+  return (
+    <span
+      title={titulo}
+      aria-label={titulo}
+      className="inline-flex items-center"
+      style={{ color: vistoPorTodos ? colors.info : colors.textDisabled }}
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M1 13l4 4L15 7" />
+        {/* El segundo palito solo cuando lo han visto todos: dos checks grises
+            y dos azules se distinguen mal de un vistazo, un check y dos no. */}
+        {vistoPorTodos && <path d="M8 13l4 4L23 6" />}
+      </svg>
+    </span>
+  );
 }

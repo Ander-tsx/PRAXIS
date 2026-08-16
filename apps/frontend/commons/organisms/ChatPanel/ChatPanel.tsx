@@ -126,6 +126,17 @@ export interface ChatPanelProps {
   rutaCanal: string;
 
   canWrite: boolean;
+  /**
+   * Cuánta gente **además de ti** puede leer este canal.
+   *
+   * Es lo que decide si un mensaje tuyo está «visto por todos» —los dos checks
+   * en azul— o solo por algunos. Lo pone la zona porque es quien conoce el
+   * canal: uno en una conversación privada, el equipo menos tú en la de un
+   * proyecto. No sale de los acuses: ahí solo aparece quien ya ha abierto el
+   * canal alguna vez, así que contarlos daría «todos» en cuanto lo abriera el
+   * primero.
+   */
+  participantes?: number;
   /** Si `@` ofrece personas. Apagado en las conversaciones privadas. */
   permiteMenciones: boolean;
   /** Qué se enseña cuando no hay ni un mensaje. */
@@ -179,6 +190,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     gatewayPath,
     rutaCanal,
     canWrite,
+    participantes = 0,
     permiteMenciones,
     vacio,
     motivoSinEscribir,
@@ -368,30 +380,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [gatewayPath, rutaCanal, ultimoId]);
 
   /**
-   * Bajo qué mensaje va la carita de cada persona: **la del último que ha
-   * leído**, no la de todos los que ha leído.
+   * Quién ha leído **hasta cada mensaje**.
    *
-   * Es lo que hace que la fila de caritas avance por la conversación como en
-   * cualquier app de mensajería, en vez de repetir las mismas seis caras bajo
-   * cada burbuja.
+   * ⚠️ **Antes esto guardaba «el último mensaje que leyó cada quien» y se
+   * pintaba una fila de caritas debajo.** Salía también bajo tus propios
+   * mensajes —donde lo que interesa no es quién más lo ha visto en una fila de
+   * caras, sino si ya llegó— y ocupaba una línea por conversación. Ahora el
+   * dato es el mismo pero la pregunta es otra: para un mensaje dado, quién lo
+   * ha visto. De ahí salen los dos checks y la lista de «Visto por».
    */
-  const vistoPorMensaje = useMemo(() => {
+  const lectoresPorMensaje = useMemo(() => {
     const mapa = new Map<string, string[]>();
     if (acuses.length === 0) return mapa;
 
-    /* `mensajes` va del más viejo al más nuevo, así que el último que cumple
-       la condición es el que se busca. */
-    for (const acuse of acuses) {
-      const leidoHasta = new Date(acuse.lastReadAt).getTime();
-      let ultimoLeido: string | undefined;
-      for (const mensaje of mensajes) {
-        if (new Date(mensaje.createdAt).getTime() > leidoHasta) break;
-        ultimoLeido = mensaje.id;
-      }
-      if (!ultimoLeido) continue;
-      const yaEstan = mapa.get(ultimoLeido) ?? [];
-      yaEstan.push(acuse.userId);
-      mapa.set(ultimoLeido, yaEstan);
+    for (const mensaje of mensajes) {
+      const escrito = new Date(mensaje.createdAt).getTime();
+      const lectores = acuses
+        .filter((acuse) => new Date(acuse.lastReadAt).getTime() >= escrito)
+        .map((acuse) => acuse.userId);
+      if (lectores.length > 0) mapa.set(mensaje.id, lectores);
     }
     return mapa;
   }, [acuses, mensajes]);
@@ -1105,6 +1112,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         permiteMenciones={permiteMenciones}
                         sugerencias={sugerencias}
                         onPedirSugerencias={() => void pedirSugerencias()}
+                        vistoPor={lectoresPorMensaje.get(mensaje.id) ?? []}
+                        cuantosPuedenVer={participantes}
                         onResponder={(mensaje) => {
                           setEditando(null);
                           setRespondiendo(mensaje);
@@ -1119,23 +1128,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         {...(acciones.previewDeLink
                           ? { previewDeLink: acciones.previewDeLink }
                           : {})}
-                      />
-
-                      {/**
-                       * Quién ha llegado a leer hasta aquí.
-                       *
-                       * Va **debajo del último mensaje que cada quien ha
-                       * leído**, así que la fila avanza por la conversación en
-                       * vez de repetirse bajo cada burbuja. Solo en el chat
-                       * general: dentro de un hilo la marca de lectura es la
-                       * del canal entero y diría lo mismo en todas las
-                       * respuestas.
-                       */}
-                      <VistoPor
-                        userIds={vistoPorMensaje.get(mensaje.id) ?? []}
-                        usersById={usersById}
-                        gatewayPath={gatewayPath}
-                        nombreDeAutor={nombreDeAutor}
                       />
                     </div>
                   );
@@ -1434,57 +1426,5 @@ function mismoDia(a: Date, b: Date): boolean {
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
-  );
-}
-
-/**
- * La fila de caritas de quien ya leyó hasta aquí.
- *
- * Un máximo de cinco y un «+N» detrás: en un equipo de veinte, veinte círculos
- * de 24 px bajo un mensaje ocupan más que el mensaje y no se lee ninguno. Cinco
- * caras y un número dicen lo mismo en una línea.
- *
- * ⚠️ **Sin nadie no se pinta nada**, ni un hueco: la fila solo aparece bajo el
- * último mensaje que cada quien ha leído, así que la conversación entera no
- * puede llenarse de filas vacías.
- */
-function VistoPor({
-  userIds,
-  usersById,
-  gatewayPath,
-  nombreDeAutor,
-}: {
-  userIds: string[];
-  usersById: Map<string, UserProfile>;
-  gatewayPath: string;
-  nombreDeAutor: (userId: string) => string;
-}) {
-  if (userIds.length === 0) return null;
-
-  const CUANTAS = 5;
-  const visibles = userIds.slice(0, CUANTAS);
-  const resto = userIds.length - visibles.length;
-  const nombres = userIds.map(nombreDeAutor).join(', ');
-
-  return (
-    <div className="mt-1 flex items-center justify-end gap-1 pr-1" title={`Visto por ${nombres}`}>
-      <span className="font-sans text-[10px] text-text-disabled">Visto por</span>
-      {visibles.map((userId) => {
-        const perfil = usersById.get(userId);
-        return (
-          <Avatar
-            key={userId}
-            label={perfil ? personLabel(perfil) : userId}
-            size="sm"
-            ring
-            className="h-4 w-4 text-[8px]"
-            src={hrefDeAvatar(perfil?.avatarUrl, gatewayPath)}
-          />
-        );
-      })}
-      {resto > 0 && (
-        <span className="font-sans text-[10px] tabular-nums text-text-disabled">+{resto}</span>
-      )}
-    </div>
   );
 }
