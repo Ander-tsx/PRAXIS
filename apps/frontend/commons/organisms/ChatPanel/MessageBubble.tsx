@@ -99,6 +99,19 @@ export function MessageBubble({
   const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
   const editado = message.editedAt !== null && message.editedAt !== undefined;
   /**
+   * Si el mensaje lleva una imagen o un vídeo.
+   *
+   * Con un adjunto visual la burbuja se ciñe al ancho de ese adjunto (`w-fit`) y
+   * el texto fluye dentro de ese ancho, en vez de al revés: cuando mandas una
+   * foto con una frase, que el ancho lo decida el texto dejaba la imagen
+   * aplastada a la anchura de la frase —o flotando en una burbuja mucho más
+   * ancha—. El ancho del adjunto va acotado por `max-w-[320px]` para que una
+   * panorámica enorme no convierta el mensaje en la mitad del panel.
+   */
+  const conAdjuntoVisual = message.attachments.some(
+    (adjunto) => adjunto.mimeType.startsWith('image/') || adjunto.mimeType.startsWith('video/'),
+  );
+  /**
    * Borrar pide confirmación **en la propia barra**, no en un diálogo.
    *
    * El aspa estaba pegada a «Responder», del mismo tamaño y sin ninguna
@@ -600,7 +613,15 @@ export function MessageBubble({
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado son los <button> de la barra, siempre en el DOM (se enfocan y `has-[:focus-visible]` la saca); poner role="button" en la burbuja aplanaría su contenido para un lector de pantalla */}
             <div
               ref={burbujaRef}
-              className="relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
+              className={`relative min-w-0 rounded-2xl px-3.5 py-2 ${
+                /* Con adjunto visual la burbuja se adapta al ancho de la imagen
+                   (o el vídeo) y no al del texto: `w-fit` hace que el ancho lo
+                   decida el contenido más ancho —el adjunto— y el texto fluye
+                   dentro de ese ancho. El `max-w-[320px]` acota el adjunto para
+                   que no domine el panel. Sin el adjunto, `max-w-full` deja que
+                   el texto crezca hasta el tope de siempre. */
+                conAdjuntoVisual ? 'w-fit max-w-[320px]' : 'max-w-full'
+              }`}
               /* Un clic en el mensaje abre o cierra la barra de acciones.
                  Un clic en un enlace o botón del mensaje no la alterna: es la
                  propia acción de ese elemento (navegar, abrir el hilo…) y la
