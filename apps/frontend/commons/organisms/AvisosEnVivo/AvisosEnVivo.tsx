@@ -103,6 +103,14 @@ export interface AvisosEnVivoProps {
  * ⚠️ **No reemplaza a la bandeja.** Si nadie tiene la pestaña abierta, el aviso
  * ya está guardado y se ve al entrar. Esto es una capa encima; que Redis o el
  * flujo fallen degrada el tiempo real y nada más.
+ *
+ * ⚠️ **El flujo se recupera solo de los cortes.** `EventSource` reconecta
+ * automáticamente cuando la conexión cae, pero lo publicado mientras estaba
+ * caída se pierde: por eso el `onopen` de una reconexión refresca la ruta (es el
+ * momento en que lo perdido se puede recuperar) y un vigilante de latidos
+ * detecta las conexiones que mueren sin avisar —un socket que un intermediario
+ * congela— y las fuerza a reconectar. Sin esto, un mensaje caído en un hueco de
+ * red no aparecía hasta una recarga manual.
  */
 export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
   const [avisos, setAvisos] = useState<AvisoEnPantalla[]>([]);
@@ -165,9 +173,22 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
      * `/<zona>/*` hacia ella, así que esta ruta relativa resuelve bien tanto en
      * local como detrás del balanceador.
      */
-    const fuente = new EventSource(`${gatewayPath}/me/notifications/stream`);
+    let fuente: EventSource | null = null;
+    /* La primera apertura es la inicial; las siguientes son RECONEXIONES.
+       `EventSource` reintenta solo, pero al volver hay que refrescar: todo lo
+       publicado mientras el flujo estuvo caído —un mensaje, una asignación— se
+       perdió, y un `EventSource` no reenvía lo que no vio. Sin este refresco,
+       eso no aparecía hasta una recarga manual o el siguiente aviso. */
+    let primeraConexion = true;
+    /* Cuándo llegó la última señal (aviso o latido), para el vigilante. */
+    let ultimoLatido = Date.now();
+
+    function marcarVivo() {
+      ultimoLatido = Date.now();
+    }
 
     function alLlegarAviso(evento: MessageEvent<string>) {
+      marcarVivo();
       let aviso: AvisoRecibido;
       try {
         aviso = JSON.parse(evento.data) as AvisoRecibido;
@@ -214,15 +235,46 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
       }, DURACION_MS);
     }
 
-    fuente.addEventListener('aviso', alLlegarAviso as EventListener);
+    /* Un `latido` marca la conexión viva: es la señal de que el flujo sigue
+       abierto aunque no haya avisos que mostrar. El vigilante de abajo lo
+       necesita para distinguir «sin novedades» de «conexión muerta». */
+    function abrirFlujo() {
+      const nueva = new EventSource(`${gatewayPath}/me/notifications/stream`);
+      fuente = nueva;
 
-    /* Los `latido` se ignoran: existen solo para que ningún intermediario cierre
-       la conexión por inactividad. Y `onerror` no cierra nada — `EventSource`
-       reconecta solo, y cerrarlo aquí desactivaría esa reconexión. */
+      nueva.addEventListener('aviso', alLlegarAviso as EventListener);
+      nueva.addEventListener('latido', marcarVivo as EventListener);
+
+      /* El `onerror` no cierra nada — `EventSource` reconecta solo, y cerrarlo
+         aquí desactivaría esa reconexión. Lo que sí hacemos es refrescar al
+         volver: es el momento en que lo perdido se puede recuperar. */
+      nueva.onopen = () => {
+        if (!primeraConexion) pedirRefresco();
+        primeraConexion = false;
+        marcarVivo();
+      };
+    }
+
+    abrirFlujo();
+
+    /* Vigilante de la conexión. `EventSource` no detecta que un flujo se quedó
+       en silencio: si el gateway muere sin cerrar el socket —o un proxy
+       intermedio lo congela— la conexión sigue «abierta» para el navegador pero
+       no llega nada. Los latidos vienen cada 25 s, así que tras más de dos sin
+       señal la conexión está muerta: se fuerza el cierre y la reconexión, y el
+       `onopen` de arriba refresca lo perdido. */
+    const vigilante = window.setInterval(() => {
+      if (Date.now() - ultimoLatido > 2 * 25_000 + 10_000) {
+        fuente?.close();
+        abrirFlujo();
+      }
+    }, 15_000);
 
     return () => {
-      fuente.removeEventListener('aviso', alLlegarAviso as EventListener);
-      fuente.close();
+      window.clearInterval(vigilante);
+      fuente?.removeEventListener('aviso', alLlegarAviso as EventListener);
+      fuente?.removeEventListener('latido', marcarVivo as EventListener);
+      fuente?.close();
     };
   }, [gatewayPath, pedirRefresco, sonar]);
 
