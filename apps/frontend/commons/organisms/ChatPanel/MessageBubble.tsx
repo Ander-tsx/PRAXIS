@@ -1,8 +1,8 @@
 'use client';
 
-import { type ReactNode, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatRefKind, EtiquetaPlana } from '../../api/chat-refs';
-import { desdoblarEtiquetas, serializarEtiquetas, trocearMensaje } from '../../api/chat-refs';
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
+import type { ChatRefKind } from '../../api/chat-refs';
+import { trocearMensaje } from '../../api/chat-refs';
 import {
   CHAT_REACTIONS,
   type ChatAttachment,
@@ -55,6 +55,25 @@ export interface MessageBubbleProps {
    * y la marca no haría más que repetir el número que dice la cabecera.
    */
   mostrarMarcaDeHilo?: boolean;
+  /**
+   * Si puede abrirse un hilo desde este mensaje.
+   *
+   * Apagado dentro del propio panel del hilo: un hilo no tiene hilo, y sin
+   * esto el botón «Hilo» seguía apareciendo ahí aunque `onAbrirHilo` fuera un
+   * no-op — se veía, no hacía nada, y eso es peor que no estar.
+   */
+  permiteAbrirHilo?: boolean;
+  /**
+   * El id de mensaje cuya cita **no** se pinta, aunque `message.replyTo`
+   * apunte a él.
+   *
+   * Dentro de un hilo, cada respuesta cita a la raíz por construcción —es lo
+   * que las hace parte del hilo—, así que esa cita en concreto no informa de
+   * nada que la cabecera del panel no diga ya. Si `replyTo` apunta a otro
+   * mensaje —la raíz citaba a un tercero antes de que alguien abriera hilo en
+   * ella—, esa cita sigue siendo información nueva y se pinta igual.
+   */
+  ocultarCitaSiApuntaA?: string;
   /** Nombre de quien escribió el mensaje citado, para la cita. */
   nombreDeAutor: (userId: string) => string;
   /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
@@ -64,11 +83,11 @@ export interface MessageBubbleProps {
 /**
  * Un mensaje.
  *
- * ## Las acciones se abren con un clic, no al pasar por encima
+ * ## Las acciones aparecen al pasar por encima, no siempre
  *
  * Tres botones fijos en cada burbuja convierten la conversación en una rejilla
  * de controles y le quitan sitio al texto, que es lo único que se viene a leer.
- * Se abren con un clic en la burbuja **y al enfocar con teclado**: con solo
+ * Aparecen al pasar el ratón **y al enfocar con teclado**: con solo
  * `group-hover`, quien navega con tabulador tendría botones que existen y no
  * puede ver.
  */
@@ -92,25 +111,14 @@ export function MessageBubble({
   onBorrar,
   onAbrirHilo,
   mostrarMarcaDeHilo = true,
+  permiteAbrirHilo = true,
+  ocultarCitaSiApuntaA,
   nombreDeAutor,
   previewDeLink,
 }: MessageBubbleProps) {
   const [eligiendoReaccion, setEligiendoReaccion] = useState(false);
   const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
   const editado = message.editedAt !== null && message.editedAt !== undefined;
-  /**
-   * Si el mensaje lleva una imagen o un vídeo.
-   *
-   * Con un adjunto visual la burbuja se ciñe al ancho de ese adjunto (`w-fit`) y
-   * el texto fluye dentro de ese ancho, en vez de al revés: cuando mandas una
-   * foto con una frase, que el ancho lo decida el texto dejaba la imagen
-   * aplastada a la anchura de la frase —o flotando en una burbuja mucho más
-   * ancha—. El ancho del adjunto va acotado por `max-w-[320px]` para que una
-   * panorámica enorme no convierta el mensaje en la mitad del panel.
-   */
-  const conAdjuntoVisual = message.attachments.some(
-    (adjunto) => adjunto.mimeType.startsWith('image/') || adjunto.mimeType.startsWith('video/'),
-  );
   /**
    * Borrar pide confirmación **en la propia barra**, no en un diálogo.
    *
@@ -140,27 +148,9 @@ export function MessageBubble({
    */
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState('');
-  /**
-   * Las menciones del mensaje mientras se edita, fuera del `<textarea>`.
-   *
-   * El cuerpo guardado trae las etiquetas enteras —`@[María García](user:…)`—
-   * y si se volcara tal cual al campo, el UUID de cada mención aparecería en
-   * mitad de la frase. Se abren en texto legible (`@María García`) y este
-   * estado guarda el id de cada una; al confirmar se vuelven a pegar. Es el
-   * mismo desdoblamiento que el Composer hace al escribir.
-   */
-  const [etiquetasBorrador, setEtiquetasBorrador] = useState<EtiquetaPlana[]>([]);
-
-  /** Abre el redactor sobre el mensaje, con las menciones legibles. */
-  function abrirEdicion() {
-    const { texto, etiquetas } = desdoblarEtiquetas(message.body);
-    setBorrador(texto);
-    setEtiquetasBorrador(etiquetas);
-    setEditando(true);
-  }
 
   async function confirmarEdicion() {
-    const guardado = await onEditar(message.id, serializarEtiquetas(borrador, etiquetasBorrador));
+    const guardado = await onEditar(message.id, borrador);
     if (guardado) setEditando(false);
   }
 
@@ -241,9 +231,6 @@ export function MessageBubble({
     /** Se decide en el primer movimiento real: horizontal (desliza) o no (deja pasar el scroll). */
     esDeslizamiento: false,
     temporizador: null as ReturnType<typeof setTimeout> | null,
-    /** El tipo de puntero del último `pointerdown`, para que el click de la
-        burbuja solo abra la barra con ratón. */
-    ultimoPointerTipo: 'mouse' as string,
   });
 
   function limpiarTemporizador() {
@@ -254,7 +241,6 @@ export function MessageBubble({
   }
 
   function onGestoInicio(e: React.PointerEvent<HTMLDivElement>) {
-    gestoRef.current.ultimoPointerTipo = e.pointerType;
     if (e.pointerType !== 'touch' || editando || confirmandoBorrado) return;
     gestoRef.current.startX = e.clientX;
     gestoRef.current.startY = e.clientY;
@@ -313,14 +299,7 @@ export function MessageBubble({
   const editorRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (editando) {
-      const area = editorRef.current;
-      if (!area) return;
-      area.focus();
-      /* `rows={1}`: la altura inicial la pone este cálculo, no el atributo. */
-      area.style.height = 'auto';
-      area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
-    }
+    if (editando) editorRef.current?.focus();
   }, [editando]);
 
   /**
@@ -331,8 +310,6 @@ export function MessageBubble({
    * recortaría**. Se voltea hacia abajo para que las acciones siempre se vean.
    */
   const [barraAbajo, setBarraAbajo] = useState(false);
-  /** Si la barra de acciones está abierta. Se abre al pulsar la burbuja. */
-  const [barraVisible, setBarraVisible] = useState(false);
 
   /**
    * Cuánto ocupa la barra de acciones más una holgura.
@@ -354,34 +331,6 @@ export function MessageBubble({
        queda arriba: mejor que no quepa del todo a estar fuera de la vista. */
     setBarraAbajo(!cabeArriba && cabeAbajo);
   }
-
-  /** Abre la barra de acciones sobre el mensaje. */
-  function abrirBarra() {
-    decidirDireccionBarra();
-    setBarraVisible(true);
-  }
-
-  /** Cierra la barra y recoge lo que tenía abierto encima. */
-  const cerrarBarra = useCallback(() => {
-    setConfirmandoBorrado(false);
-    setEligiendoReaccion(false);
-    setBarraAbajo(false);
-    setBarraVisible(false);
-  }, []);
-
-  /* Un clic fuera de la burbuja cierra la barra: dejarla abierta mientras se
-     lee otro mensaje es el mismo ruido que el hover que la abría solo. */
-  useEffect(() => {
-    if (!barraVisible) return;
-    function alClicFuera(evento: MouseEvent) {
-      const burbuja = burbujaRef.current;
-      if (burbuja && evento.target instanceof Node && !burbuja.contains(evento.target)) {
-        cerrarBarra();
-      }
-    }
-    document.addEventListener('pointerdown', alClicFuera);
-    return () => document.removeEventListener('pointerdown', alClicFuera);
-  }, [barraVisible, cerrarBarra]);
 
   /** Las reacciones agrupadas por emoji, con cuántos y si estás dentro. */
   const agrupadas = new Map<string, { total: number; mia: boolean }>();
@@ -412,36 +361,6 @@ export function MessageBubble({
     };
   }, [primeraUrl, preview, previewDeLink]);
 
-  /**
-   * La cita del mensaje al que se responde.
-   *
-   * ⚠️ Si el original se borró, `replyTo` llega `null` desde el servidor —la
-   * clave foránea es `SET NULL`— y aquí simplemente no se pinta nada. La
-   * respuesta se queda sin cita, no desaparece: es de otra persona y sigue
-   * teniendo sentido.
-   */
-  const cita = message.replyTo ? (
-    <div
-      /* `border-l` con el primario a secas —no `alpha(colors.overlay, …)`,
-         que es el tono casi negro de los fondos de modales—: sobre una
-         burbuja clara salía sucio, y sobre una oscura, invisible. El
-         tinte de fondo es el mismo primario, muy rebajado, así que
-         escala con el tema en vez de pelearse con él. */
-      className="mb-1.5 flex flex-col gap-0.5 rounded-lg border-l-[3px] py-1 pl-2.5 pr-2"
-      style={{
-        borderColor: alpha(colors.primary, 70),
-        background: alpha(colors.primary, 10),
-      }}
-    >
-      <span className="font-sans text-[11px] font-semibold" style={{ color: colors.primary }}>
-        {nombreDeAutor(message.replyTo.authorId)}
-      </span>
-      <span className="line-clamp-2 font-sans text-xs text-text-secondary">
-        <AdjuntoPreview mensaje={message.replyTo} />
-      </span>
-    </div>
-  ) : null;
-
   return (
     <article
       className={`relative flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
@@ -464,13 +383,7 @@ export function MessageBubble({
       )}
 
       <div
-        className={`relative flex min-w-0 flex-col gap-1 ${mine ? 'items-end' : ''} ${
-          /* Al editar la burbuja se abre a todo el ancho del panel: el editor
-             confinado al `max-w-[78%]` de los mensajes hacía imposible trabajar
-             con un texto medianamente largo. Al salir del modo edición vuelve
-             el ancho de siempre. */
-          editando ? 'w-full' : 'max-w-[78%]'
-        }`}
+        className={`relative flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}
       >
         {!continued && (
           <span className="flex items-baseline gap-2 px-1 font-sans text-xs">
@@ -519,85 +432,411 @@ export function MessageBubble({
           </span>
         )}
 
-        {/** La burbuja es el elemento que se pulsa para abrir la barra de
-         * acciones, y el `<article>` que la envuelve ocupa todo el ancho del
-         * panel. Por eso el manejador de clic vive aquí, en la burbuja, y no en
-         * la fila entera: pulsar el hueco vacío de la derecha —o el avatar, o el
-         * nombre— no debe sacar los botones de un mensaje que no se ha tocado.
+        {/**
+         * ⚠️ **El `group` está aquí, en la burbuja, y no en el `<article>`.**
+         *
+         * Estaba en la fila entera, que ocupa todo el ancho del panel: pasar el
+         * ratón por el hueco vacío de la derecha —o por el avatar, o por el
+         * nombre— ya sacaba los tres botones. Con varios mensajes seguidos, se
+         * encendían y apagaban solos al mover el ratón por la conversación.
+         *
+         * Se nombra (`group/burbuja`) a propósito: sin nombre, cualquier `group`
+         * que alguien añada más arriba volvería a capturarlo sin avisar.
          */}
-        {editando ? (
-          <div className="w-full rounded-xl border border-border p-2 transition-colors focus-within:border-primary">
-            {cita}
-            <textarea
-              value={borrador}
-              onChange={(evento) => setBorrador(evento.target.value)}
-              onKeyDown={(evento) => {
-                /* Enter guarda, Shift+Enter salta de línea: mismo gesto que el
-                   compositor. Esc cancela sin tocar nada. */
-                if (evento.key === 'Enter' && !evento.shiftKey) {
-                  evento.preventDefault();
-                  void confirmarEdicion();
-                } else if (evento.key === 'Escape') {
-                  evento.preventDefault();
-                  setEditando(false);
-                }
-              }}
-              ref={editorRef}
-              rows={1}
-              aria-label="Editar mensaje"
-              /* Auto-crecimiento como el compositor: `rows` fijas se quedaban
-                 cortas al editar un mensaje largo, y un máximo de seis líneas no
-                 enseñaba lo que ya se había escrito. */
-              onInput={(evento) => {
-                const area = evento.currentTarget;
-                area.style.height = 'auto';
-                area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
-              }}
-              className="max-h-40 w-full resize-none overflow-y-auto bg-transparent px-2 py-1.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled"
-            />
-            <span className="flex items-center gap-2 self-end pt-1.5">
-              <button
-                type="button"
-                onClick={() => setEditando(false)}
-                className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmarEdicion()}
-                disabled={borrador.trim().length === 0}
-                className="cursor-pointer rounded-lg px-3 py-1 font-sans text-xs font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: colors.primary, color: colors.textInverse }}
-              >
-                Guardar
-              </button>
-            </span>
-          </div>
-        ) : (
-          <>
-            {/**
-             * El indicador del deslizamiento: una respuesta ↩ que se hace más
-             * visible cuanto más se arrastra, hasta el umbral que la dispara.
+        {/**
+         * El indicador del deslizamiento: una respuesta ↩ que se hace más
+         * visible cuanto más se arrastra, hasta el umbral que la dispara.
+         *
+         * Vive fuera de `burbujaRef` — es su hermano, no su hijo— para que el
+         * `translateX` de la burbuja no se lo lleve consigo: tiene que
+         * quedarse fijo en el sitio que la burbuja está dejando al descubierto,
+         * no viajar pegado a ella.
+         */}
+        {arrastreX !== 0 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full"
+            style={{
+              [arrastreX > 0 ? 'left' : 'right']: '0.25rem',
+              opacity: Math.min(1, Math.abs(arrastreX) / ARRASTRE_UMBRAL),
+              background: alpha(colors.primary, 18),
+              color: colors.primary,
+            }}
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
+            </svg>
+          </span>
+        )}
+
+        <div
+          ref={burbujaRef}
+          className="group/burbuja relative min-w-0 max-w-full rounded-2xl px-3.5 py-2"
+          /* Al irse del mensaje se recogen las superficies flotantes: ni el
+             selector de reacciones ni la confirmación de borrado tienen sentido
+             sobre una burbuja que ya no estás mirando, y dejarlos abiertos es lo
+             que obligaba a cerrarlos a mano. Cubre además el caso de abrir el
+             selector y apartar el ratón sin llegar a entrar en él.
+
+             ⚠️ **El editor NO se cierra aquí.** Un redactor abierto se queda
+             hasta que se guarde, se cancele o se pulse Esc: cerrarlo al mover el
+             ratón hacía que editar fuera imposible — se abría y se cerraba solo
+             en cuanto el foco iba al textarea. */
+          onMouseEnter={decidirDireccionBarra}
+          onMouseLeave={() => {
+            setConfirmandoBorrado(false);
+            setEligiendoReaccion(false);
+            setBarraAbajo(false);
+          }}
+          /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
+             como que el sistema cancele el gesto a medias (una llamada
+             entrante, por ejemplo) — sin `onPointerCancel`, la burbuja se
+             quedaría desplazada para siempre. */
+          onPointerDown={onGestoInicio}
+          onPointerMove={onGestoMueve}
+          onPointerUp={onGestoFin}
+          onPointerCancel={onGestoFin}
+          style={{
+            background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
+            /* `pan-y`: el navegador sigue scrolleando la conversación en
+               vertical de forma nativa: el deslizamiento solo captura el eje
+               horizontal, a mano, con los manejadores de arriba. */
+            touchAction: 'pan-y',
+            transform: arrastreX !== 0 ? `translateX(${arrastreX}px)` : undefined,
+            transition: gestoRef.current.esDeslizamiento ? 'none' : 'transform 150ms ease-out',
+            /* La esquina que apunta al avatar se queda cuadrada solo en el
+               primero del bloque: es lo que agrupa los mensajes seguidos
+               visualmente sin necesidad de separadores. */
+            borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
+            borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
+            /* El realce de un mensaje fijado: la marca «Fijado» de arriba ya lo
+               dice, pero en un bloque largo de burbujas seguidas hay que poder
+               distinguirlo sin leer cada una. Un borde entero y no solo un
+               tinte de fondo — el tinte por sí solo se confundía con el propio
+               matiz de "mine" en las burbujas del autor. */
+            outline: fijado ? `1.5px solid ${alpha(colors.primary, 55)}` : undefined,
+            outlineOffset: fijado ? '-1.5px' : undefined,
+          }}
+        >
+          {message.replyTo && message.replyTo.id !== ocultarCitaSiApuntaA && (
+            /**
+             * La cita.
              *
-             * Vive fuera de `burbujaRef` — es su hermano, no su hijo— para que el
-             * `translateX` de la burbuja no se lo lleve consigo: tiene que
-             * quedarse fijo en el sitio que la burbuja está dejando al
-             * descubierto, no viajar pegado a ella.
-             */}
-            {arrastreX !== 0 && (
+             * ⚠️ Si el original se borró, `replyTo` llega `null` desde el
+             * servidor —la clave foránea es `SET NULL`— y aquí simplemente no se
+             * pinta nada. La respuesta se queda sin cita, no desaparece: es de
+             * otra persona y sigue teniendo sentido.
+             */
+            <div
+              /* `border-l` con el primario a secas —no `alpha(colors.overlay, …)`,
+                 que es el tono casi negro de los fondos de modales—: sobre una
+                 burbuja clara salía sucio, y sobre una oscura, invisible. El
+                 tinte de fondo es el mismo primario, muy rebajado, así que
+                 escala con el tema en vez de pelearse con él. */
+              className="mb-1.5 flex flex-col gap-0.5 rounded-lg border-l-[3px] py-1 pl-2.5 pr-2"
+              style={{
+                borderColor: alpha(colors.primary, 70),
+                background: alpha(colors.primary, 10),
+              }}
+            >
+              <span
+                className="font-sans text-[11px] font-semibold"
+                style={{ color: colors.primary }}
+              >
+                {nombreDeAutor(message.replyTo.authorId)}
+              </span>
+              <span className="line-clamp-2 font-sans text-xs text-text-secondary">
+                <AdjuntoPreview mensaje={message.replyTo} />
+              </span>
+            </div>
+          )}
+
+          {editando ? (
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                value={borrador}
+                onChange={(evento) => setBorrador(evento.target.value)}
+                onKeyDown={(evento) => {
+                  /* Enter guarda, Shift+Enter salta de línea: mismo gesto que el
+                     compositor. Esc cancela sin tocar nada. */
+                  if (evento.key === 'Enter' && !evento.shiftKey) {
+                    evento.preventDefault();
+                    void confirmarEdicion();
+                  } else if (evento.key === 'Escape') {
+                    evento.preventDefault();
+                    setEditando(false);
+                  }
+                }}
+                ref={editorRef}
+                rows={Math.min(6, Math.max(2, message.body.split('\n').length))}
+                aria-label="Editar mensaje"
+                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none focus:border-primary"
+              />
+              <span className="flex items-center gap-2 self-end">
+                <button
+                  type="button"
+                  onClick={() => setEditando(false)}
+                  className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmarEdicion()}
+                  disabled={borrador.trim().length === 0}
+                  className="cursor-pointer rounded-lg px-3 py-1 font-sans text-xs font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ background: colors.primary, color: colors.textInverse }}
+                >
+                  Guardar
+                </button>
+              </span>
+            </div>
+          ) : (
+            <RichText
+              cuerpo={message.body}
+              currentUserId={currentUserId}
+              {...(hrefDeRef ? { hrefDeRef } : {})}
+            />
+          )}
+
+          {/**
+           * La barra de acciones del mensaje.
+           *
+           * ## Las seis reacciones van dentro, no detrás de un botón
+           *
+           * Antes había una carita que abría un segundo desplegable. Eran dos
+           * pasos, dos superficies flotantes y un hueco entre ellas por el que
+           * el puntero se salía —lo que hacía imposible llegar al emoji— y todo
+           * para elegir entre **seis** opciones que caben de sobra en una fila.
+           * Con el conjunto cerrado que tiene el chat, el menú sobraba: ahora
+           * reaccionar es un clic y no hay nada que cruzar.
+           *
+           * ## Y por qué se solapa con la burbuja
+           *
+           * Se ancla sobre el borde superior, hacia dentro del ancho del
+           * mensaje. Fuera se salía del viewport en pantallas estrechas y se
+           * recortaba contra el borde del hilo en el primer mensaje; aquí no
+           * puede pasar ninguna de las dos, porque nunca sobresale de la
+           * burbuja.
+           *
+           * ⚠️ **Salvo un caso: el primer mensaje del scroll.** Ahí el borde de
+           * arriba del contenedor **sí** recorta la barra que cuelga `-top-4`
+           * —se veía cortada o directamente no se veía—. Se voltea hacia abajo
+           * (`top-full`) cuando el mensaje está pegado al borde superior y la
+           * barra no cabría encima: `decidirDireccionBarra` lo mide contra el
+           * `scrollerRef` al pasar el ratón.
+           *
+           * ⚠️ **Sin `focus-within`**, que es lo que la dejaba fija: al pulsar
+           * un botón el foco se queda en él y la barra no se iba al apartar el
+           * ratón. `focus-visible` cubre el teclado sin ese efecto.
+           */}
+          {preview && <LinkPreviewCard preview={preview} mine={mine} />}
+
+          {message.attachments.length > 0 && (
+            <div className={`mt-1.5 flex flex-col gap-1.5 ${mine ? 'items-end' : ''}`}>
+              {message.attachments.map((adjunto) => {
+                const href = hrefDeAdjunto?.(adjunto.id) ?? '#';
+                return <AttachmentCard key={adjunto.id} adjunto={adjunto} href={href} />;
+              })}
+            </div>
+          )}
+
+          {/**
+           * La marca de hilo: «N respuestas».
+           *
+           * Un mensaje con respuestas es un hilo, y esta es la puerta: el número
+           * que enseña el panel lateral, sin necesidad de haberlo abierto nunca.
+           * La barra de acciones solo aparece al pasar el ratón; esta marca está
+           * siempre — es la señal de que debajo hay conversación.
+           */}
+          {mostrarMarcaDeHilo && message._count.replies > 0 && (
+            <button
+              type="button"
+              onClick={() => onAbrirHilo(message)}
+              className={`mt-1.5 flex cursor-pointer items-center gap-1 self-start rounded-full border px-2.5 py-1 font-sans text-[11px] transition-colors ${
+                mine ? 'self-end' : 'self-start'
+              }`}
+              style={{ borderColor: colors.border, color: colors.textSecondary }}
+              title="Ver las respuestas"
+            >
+              <svg
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="7" y="4" width="10" height="16" rx="2" />
+                <line x1="7" y1="8" x2="17" y2="8" />
+                <line x1="7" y1="11" x2="17" y2="11" />
+                <line x1="7" y1="14" x2="17" y2="14" />
+                <path d="M5 3.5h14" />
+                <path d="M5 20.5h14" />
+              </svg>
+              <span className="font-medium text-text-secondary">
+                {message._count.replies} {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
+              </span>
+            </button>
+          )}
+
+          <div
+            className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 opacity-0 shadow-lg transition-all duration-150 group-hover/burbuja:opacity-100 has-[:focus-visible]:opacity-100 ${
+              /* Hacia arriba normalmente; hacia abajo (`top-full`) cuando el
+                 mensaje está pegado al borde superior del scroll y arriba no
+                 cabría. Ver `decidirDireccionBarra`. */
+              barraAbajo ? 'top-full mt-1.5' : '-top-4'
+            } ${
+              /* Se ancla al lado de la burbuja que mira al centro del chat y
+                 crece hacia dentro: así, con un mensaje corto, la barra —que es
+                 más ancha que la burbuja— desborda hacia el medio de la
+                 conversación, nunca hacia el borde del contenedor. Anclarla al
+                 revés (pegada al borde exterior) era lo que la hacía salirse de
+                 la pantalla con mensajes de una línea. */
+              mine ? 'right-2' : 'left-2'
+            } ${
+              /* Mientras se confirma un borrado se queda: la pregunta no puede
+                 irse antes de que se pueda responder. */
+              confirmandoBorrado ? 'opacity-100' : ''
+            }`}
+            style={{
+              background: colors.surfaceElevated,
+              borderColor: colors.border,
+              boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,
+            }}
+          >
+            {canReact &&
+              !confirmandoBorrado &&
+              CHAT_REACTIONS.map((emoji) => {
+                const puesta = agrupadas.get(emoji)?.mia ?? false;
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => onReaccionar(message.id, emoji, !puesta)}
+                    aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
+                    aria-pressed={puesta}
+                    title={emoji}
+                    /* `active:scale-90` además del `hover`: el emoji se hunde al
+                       pulsarlo y vuelve, que es el acuse de recibo que hace que
+                       un clic se sienta atendido aunque la red tarde. */
+                    className="cursor-pointer rounded-lg px-1 py-0.5 text-[15px] leading-none transition-transform duration-100 hover:scale-125 active:scale-90"
+                    style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+
+            {canReact && !confirmandoBorrado && (
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full"
-                style={{
-                  [arrastreX > 0 ? 'left' : 'right']: '0.25rem',
-                  opacity: Math.min(1, Math.abs(arrastreX) / ARRASTRE_UMBRAL),
-                  background: alpha(colors.primary, 18),
-                  color: colors.primary,
-                }}
+                className="mx-0.5 h-4 w-px shrink-0"
+                style={{ background: colors.border }}
+              />
+            )}
+
+            {canFijar && !confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => onFijar(message.id, !fijado)}
+                aria-label={fijado ? 'Desfijar mensaje' : 'Fijar mensaje'}
+                aria-pressed={fijado}
+                title={fijado ? 'Desfijar' : 'Fijar'}
+                className={`cursor-pointer rounded-lg p-1 transition-colors hover:bg-surface ${
+                  fijado ? 'text-primary' : 'text-text-disabled hover:text-text-primary'
+                }`}
               >
                 <svg
-                  className="h-3.5 w-3.5"
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill={fijado ? 'currentColor' : 'none'}
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 17v5" />
+                  <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+                </svg>
+              </button>
+            )}
+
+            {mine && !confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => {
+                  setBorrador(message.body);
+                  setEditando(true);
+                }}
+                aria-label="Editar mensaje"
+                title="Editar"
+                className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+              </button>
+            )}
+
+            {!confirmandoBorrado && permiteAbrirHilo && (
+              <button
+                type="button"
+                onClick={() => onAbrirHilo(message)}
+                aria-label="Abrir el hilo de este mensaje"
+                title="Hilo"
+                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="7" y="4" width="10" height="16" rx="2" />
+                  <line x1="7" y1="8" x2="17" y2="8" />
+                  <line x1="7" y1="11" x2="17" y2="11" />
+                  <line x1="7" y1="14" x2="17" y2="14" />
+                  <path d="M5 3.5h14" />
+                  <path d="M5 20.5h14" />
+                </svg>
+              </button>
+            )}
+
+            {!confirmandoBorrado && (
+              <button
+                type="button"
+                onClick={() => onResponder(message)}
+                aria-label="Responder"
+                title="Responder"
+                className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+              >
+                <svg
+                  className="h-4 w-4"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -607,331 +846,54 @@ export function MessageBubble({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
                 </svg>
-              </span>
+              </button>
             )}
 
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado son los <button> de la barra, siempre en el DOM (se enfocan y `has-[:focus-visible]` la saca); poner role="button" en la burbuja aplanaría su contenido para un lector de pantalla */}
-            <div
-              ref={burbujaRef}
-              className={`relative min-w-0 rounded-2xl px-3.5 py-2 ${
-                /* Con adjunto visual la burbuja se adapta al ancho de la imagen
-                   (o el vídeo) y no al del texto: `w-fit` hace que el ancho lo
-                   decida el contenido más ancho —el adjunto— y el texto fluye
-                   dentro de ese ancho. El `max-w-[320px]` acota el adjunto para
-                   que no domine el panel. Sin el adjunto, `max-w-full` deja que
-                   el texto crezca hasta el tope de siempre. */
-                conAdjuntoVisual ? 'w-fit max-w-[320px]' : 'max-w-full'
-              }`}
-              /* Un clic en el mensaje abre o cierra la barra de acciones.
-                 Un clic en un enlace o botón del mensaje no la alterna: es la
-                 propia acción de ese elemento (navegar, abrir el hilo…) y la
-                 barra no debe salir por medio. `closest` recorre hacia arriba
-                 desde lo que se pulsó para detectarlo.
-
-                 ⚠️ **El editor NO se cierra aquí.** Un redactor abierto se queda
-                 hasta que se guarde, se cancele o se pulse Esc. */
-              onClick={(evento) => {
-                const objetivo = evento.target as Element;
-                if (objetivo.closest('a, button')) return;
-                /* En móvil un tap no abre la barra: esa es la vía de la hoja de
-                   acciones (pulsación larga). Un clic de ratón sí la alterna. */
-                if (gestoRef.current.ultimoPointerTipo !== 'mouse') return;
-                /* Seleccionar texto del mensaje no debe abrir la barra: el
-                   gesto era copiar, y perder la selección bajo la barra es
-                   peor que no hacer nada. */
-                const seleccion = window.getSelection();
-                if (seleccion && !seleccion.isCollapsed) return;
-                if (barraVisible) cerrarBarra();
-                else abrirBarra();
-              }}
-              /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
-                 como que el sistema cancele el gesto a medias (una llamada
-                 entrante, por ejemplo) — sin `onPointerCancel`, la burbuja se
-                 quedaría desplazada para siempre. */
-              onPointerDown={onGestoInicio}
-              onPointerMove={onGestoMueve}
-              onPointerUp={onGestoFin}
-              onPointerCancel={onGestoFin}
-              style={{
-                background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
-                /* `pan-y`: el navegador sigue scrolleando la conversación en
-                   vertical de forma nativa: el deslizamiento solo captura el eje
-                   horizontal, a mano, con los manejadores de arriba. */
-                touchAction: 'pan-y',
-                transform: arrastreX !== 0 ? `translateX(${arrastreX}px)` : undefined,
-                transition: gestoRef.current.esDeslizamiento ? 'none' : 'transform 150ms ease-out',
-                /* La esquina que apunta al avatar se queda cuadrada solo en el
-                   primero del bloque: es lo que agrupa los mensajes seguidos
-                   visualmente sin necesidad de separadores. */
-                borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
-                borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
-                /* El realce de un mensaje fijado: la marca «Fijado» de arriba ya
-                   lo dice, pero en un bloque largo de burbujas seguidas hay que
-                   poder distinguirlo sin leer cada una. Un borde entero y no solo
-                   un tinte de fondo — el tinte por sí solo se confundía con el
-                   propio matiz de "mine" en las burbujas del autor. */
-                outline: fijado ? `1.5px solid ${alpha(colors.primary, 55)}` : undefined,
-                outlineOffset: fijado ? '-1.5px' : undefined,
-              }}
-            >
-              {cita}
-
-              <RichText
-                cuerpo={message.body}
-                currentUserId={currentUserId}
-                {...(hrefDeRef ? { hrefDeRef } : {})}
-              />
-
-              {/**
-               * La barra de acciones del mensaje.
-               *
-               * ## Las seis reacciones van dentro, no detrás de un botón
-               *
-               * Antes había una carita que abría un segundo desplegable. Eran dos
-               * pasos, dos superficies flotantes y un hueco entre ellas por el que
-               * el puntero se salía —lo que hacía imposible llegar al emoji— y todo
-               * para elegir entre **seis** opciones que caben de sobra en una fila.
-               * Con el conjunto cerrado que tiene el chat, el menú sobraba: ahora
-               * reaccionar es un clic y no hay nada que cruzar.
-               *
-               * ## Y por qué flota arriba, sin tapar el mensaje
-               *
-               * Se ancla al borde superior de la burbuja pero **por fuera**,
-               * `bottom-full`, dejando aire (`mb-1.5`) entre la barra y el
-               * texto. Antes caía por dentro del mensaje (`-top-4`) y tapaba la
-               * primera línea que acababa de escribirse. Anclarla por fuera no
-               * la hace salirse del viewport en pantallas estrechas: el anclaje
-               * lateral sigue siendo hacia dentro del ancho de la burbuja.
-               *
-               * ⚠️ **Salvo un caso: el primer mensaje del scroll.** Ahí el borde de
-               * arriba del contenedor **sí** recorta la barra que cuelga por fuera
-               * —se vería cortada o directamente no se vería—. Se voltea hacia abajo
-               * (`top-full`) cuando el mensaje está pegado al borde superior y la
-               * barra no cabría encima: `decidirDireccionBarra` lo mide contra el
-               * `scrollerRef` al abrir la barra.
-               *
-               * ## Y por qué se abre con un clic, no con el hover
-               *
-               * Con el `hover`, la barra saltaba en cada burbuja por la que se
-               * pasaba: al cruzar la conversación se encendía y apagaba sola y
-               * tapaba justo el mensaje que se intentaba leer. Ahora se abre con
-               * un clic en la burbuja y se cierra con otro, o al pulsar fuera
-               * (`cerrarBarra`). `focus-visible` sigue sacándola al navegar con
-               * teclado, que es la vía de quien no usa ratón.
-               */}
-              {preview && <LinkPreviewCard preview={preview} mine={mine} />}
-
-              {message.attachments.length > 0 && (
-                <div className={`mt-1.5 flex flex-col gap-1.5 ${mine ? 'items-end' : ''}`}>
-                  {message.attachments.map((adjunto) => {
-                    const href = hrefDeAdjunto?.(adjunto.id) ?? '#';
-                    return <AttachmentCard key={adjunto.id} adjunto={adjunto} href={href} />;
-                  })}
-                </div>
-              )}
-
-              {/**
-               * La marca de hilo: «N respuestas».
-               *
-               * Un mensaje con respuestas es un hilo, y esta es la puerta: el número
-               * que enseña el panel lateral, sin necesidad de haberlo abierto nunca.
-               * La barra de acciones se abre con un clic en la burbuja; esta
-               * marca está siempre — es la señal de que debajo hay conversación.
-               */}
-              {mostrarMarcaDeHilo && message._count.replies > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onAbrirHilo(message)}
-                  className={`mt-1.5 flex cursor-pointer items-center gap-1 self-start rounded-full border px-2.5 py-1 font-sans text-[11px] transition-colors ${
-                    mine ? 'self-end' : 'self-start'
-                  }`}
-                  style={{ borderColor: colors.border, color: colors.textSecondary }}
-                  title="Ver las respuestas"
-                >
-                  <svg
-                    className="h-3 w-3"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+            {canDelete &&
+              (confirmandoBorrado ? (
+                /**
+                 * Al confirmar, la barra **se convierte en la pregunta**.
+                 *
+                 * Se ocultan las reacciones y responder: dejarlas al lado de un
+                 * «Eliminar» en rojo invita a pulsar mal justo en la única
+                 * acción que no se deshace. Lo que queda es la decisión.
+                 */
+                <span className="flex items-center gap-1 px-1">
+                  <span className="font-sans text-xs text-text-secondary">¿Eliminar?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBorrado(false);
+                      onBorrar(message.id);
+                    }}
+                    aria-label="Confirmar que se elimina el mensaje"
+                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs font-semibold transition-opacity hover:opacity-80"
+                    style={{ background: colors.error, color: colors.textInverse }}
                   >
-                    <rect x="7" y="4" width="10" height="16" rx="2" />
-                    <line x1="7" y1="8" x2="17" y2="8" />
-                    <line x1="7" y1="11" x2="17" y2="11" />
-                    <line x1="7" y1="14" x2="17" y2="14" />
-                    <path d="M5 3.5h14" />
-                    <path d="M5 20.5h14" />
-                  </svg>
-                  <span className="font-medium text-text-secondary">
-                    {message._count.replies}{' '}
-                    {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
-                  </span>
-                </button>
-              )}
-
-              <div
-                className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg transition-all duration-150 ${
-                  /* La visibilidad la decide el estado, no el hover: la barra se
-                 abre con un clic en la burbuja y se cierra con otro o al pulsar
-                 fuera. El `has-[:focus-visible]` la saca también cuando el
-                 teclado llega a sus botones, que es la única vía de que alguien
-                 que no usa ratón la encuentre.
-
-                 ⚠️ **`pointer-events-none` cuando está cerrada.** Sin él, los
-                 botones invisibles siguen capturando clics: la barra anclada
-                 `bottom-full` queda sobre el mensaje de encima, y un clic ahí
-                 activaba una acción de un botón que no se veía. Al abrirse (o al
-                 enfocarla con teclado) vuelve a recibir el puntero. */
-                  barraVisible || confirmandoBorrado
-                    ? 'opacity-100'
-                    : 'pointer-events-none opacity-0 has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100'
-                } ${
-                  /* Hacia arriba, pegada al borde superior de la burbuja pero
-                 **sin solaparse con el texto**: `bottom-full` apoya el borde
-                 inferior de la barra en el borde superior del mensaje y
-                 `mb-1.5` deja aire entre ambos. Antes caía `-top-4`, por
-                 dentro de la burbuja, tapando la primera línea del mensaje.
-                 Hacia abajo (`top-full`) cuando el mensaje está pegado al
-                 borde superior del scroll y arriba no cabría. Ver
-                 `decidirDireccionBarra`. */
-                  barraAbajo ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
-                } ${
-                  /* Se ancla al lado de la burbuja que mira al centro del chat y
-                 crece hacia dentro: así, con un mensaje corto, la barra —que es
-                 más ancha que la burbuja— desborda hacia el medio de la
-                 conversación, nunca hacia el borde del contenedor. Anclarla al
-                 revés (pegada al borde exterior) era lo que la hacía salirse de
-                 la pantalla con mensajes de una línea. */
-                  mine ? 'right-2' : 'left-2'
-                }`}
-                style={{
-                  background: colors.surfaceElevated,
-                  borderColor: colors.border,
-                  boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,
-                }}
-              >
-                {canReact &&
-                  !confirmandoBorrado &&
-                  CHAT_REACTIONS.map((emoji) => {
-                    const puesta = agrupadas.get(emoji)?.mia ?? false;
-
-                    return (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => onReaccionar(message.id, emoji, !puesta)}
-                        aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
-                        aria-pressed={puesta}
-                        title={emoji}
-                        /* `active:scale-90` además del `hover`: el emoji se hunde al
-                       pulsarlo y vuelve, que es el acuse de recibo que hace que
-                       un clic se sienta atendido aunque la red tarde. */
-                        className="cursor-pointer rounded-lg px-1 py-0.5 text-[15px] leading-none transition-transform duration-100 hover:scale-125 active:scale-90"
-                        style={puesta ? { background: alpha(colors.primary, 20) } : undefined}
-                      >
-                        {emoji}
-                      </button>
-                    );
-                  })}
-
-                {canReact && !confirmandoBorrado && (
+                    Sí
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoBorrado(false)}
+                    aria-label="No eliminar"
+                    className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    No
+                  </button>
+                </span>
+              ) : (
+                <>
                   <span
                     aria-hidden="true"
                     className="mx-0.5 h-4 w-px shrink-0"
                     style={{ background: colors.border }}
                   />
-                )}
-
-                {canFijar && !confirmandoBorrado && (
                   <button
                     type="button"
-                    onClick={() => onFijar(message.id, !fijado)}
-                    aria-label={fijado ? 'Desfijar mensaje' : 'Fijar mensaje'}
-                    aria-pressed={fijado}
-                    title={fijado ? 'Desfijar' : 'Fijar'}
-                    className={`cursor-pointer rounded-lg p-1 transition-colors hover:bg-surface ${
-                      fijado ? 'text-primary' : 'text-text-disabled hover:text-text-primary'
-                    }`}
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill={fijado ? 'currentColor' : 'none'}
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 17v5" />
-                      <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
-                    </svg>
-                  </button>
-                )}
-
-                {mine && !confirmandoBorrado && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      abrirEdicion();
-                    }}
-                    aria-label="Editar mensaje"
-                    title="Editar"
-                    className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-                    </svg>
-                  </button>
-                )}
-
-                {!confirmandoBorrado && (
-                  <button
-                    type="button"
-                    onClick={() => onAbrirHilo(message)}
-                    aria-label="Abrir el hilo de este mensaje"
-                    title="Hilo"
-                    className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="7" y="4" width="10" height="16" rx="2" />
-                      <line x1="7" y1="8" x2="17" y2="8" />
-                      <line x1="7" y1="11" x2="17" y2="11" />
-                      <line x1="7" y1="14" x2="17" y2="14" />
-                      <path d="M5 3.5h14" />
-                      <path d="M5 20.5h14" />
-                    </svg>
-                  </button>
-                )}
-
-                {!confirmandoBorrado && (
-                  <button
-                    type="button"
-                    onClick={() => onResponder(message)}
-                    aria-label="Responder"
-                    title="Responder"
-                    className="cursor-pointer rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+                    onClick={() => setConfirmandoBorrado(true)}
+                    aria-label="Eliminar mensaje"
+                    title="Eliminar"
+                    className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-error"
                   >
                     <svg
                       className="h-4 w-4"
@@ -941,83 +903,17 @@ export function MessageBubble({
                       strokeWidth={2}
                       aria-hidden="true"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 10L4 15l5 5" />
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        d="M20 4v7a4 4 0 01-4 4H4"
+                        d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
                       />
                     </svg>
                   </button>
-                )}
-
-                {canDelete &&
-                  (confirmandoBorrado ? (
-                    /**
-                     * Al confirmar, la barra **se convierte en la pregunta**.
-                     *
-                     * Se ocultan las reacciones y responder: dejarlas al lado de un
-                     * «Eliminar» en rojo invita a pulsar mal justo en la única
-                     * acción que no se deshace. Lo que queda es la decisión.
-                     */
-                    <span className="flex items-center gap-1 px-1">
-                      <span className="font-sans text-xs text-text-secondary">¿Eliminar?</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfirmandoBorrado(false);
-                          onBorrar(message.id);
-                        }}
-                        aria-label="Confirmar que se elimina el mensaje"
-                        className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs font-semibold transition-opacity hover:opacity-80"
-                        style={{ background: colors.error, color: colors.textInverse }}
-                      >
-                        Sí
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmandoBorrado(false)}
-                        aria-label="No eliminar"
-                        className="cursor-pointer rounded-lg px-2 py-0.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-                      >
-                        No
-                      </button>
-                    </span>
-                  ) : (
-                    <>
-                      <span
-                        aria-hidden="true"
-                        className="mx-0.5 h-4 w-px shrink-0"
-                        style={{ background: colors.border }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setConfirmandoBorrado(true)}
-                        aria-label="Eliminar mensaje"
-                        title="Eliminar"
-                        className="cursor-pointer rounded-lg p-1 text-text-disabled transition-colors hover:bg-surface hover:text-error"
-                      >
-                        <svg
-                          className="h-4 w-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
-                          />
-                        </svg>
-                      </button>
-                    </>
-                  ))}
-              </div>
-            </div>
-          </>
-        )}
+                </>
+              ))}
+          </div>
+        </div>
 
         {agrupadas.size > 0 && (
           <div className={`flex flex-wrap gap-1 px-1 ${mine ? 'justify-end' : ''}`}>
@@ -1154,20 +1050,22 @@ export function MessageBubble({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 4v7a4 4 0 01-4 4H4" />
                 </HojaBoton>
 
-                <HojaBoton
-                  etiqueta="Ver hilo"
-                  onClick={() => {
-                    onAbrirHilo(message);
-                    cerrarHoja();
-                  }}
-                >
-                  <rect x="7" y="4" width="10" height="16" rx="2" />
-                  <line x1="7" y1="8" x2="17" y2="8" />
-                  <line x1="7" y1="11" x2="17" y2="11" />
-                  <line x1="7" y1="14" x2="17" y2="14" />
-                  <path d="M5 3.5h14" />
-                  <path d="M5 20.5h14" />
-                </HojaBoton>
+                {permiteAbrirHilo && (
+                  <HojaBoton
+                    etiqueta="Ver hilo"
+                    onClick={() => {
+                      onAbrirHilo(message);
+                      cerrarHoja();
+                    }}
+                  >
+                    <rect x="7" y="4" width="10" height="16" rx="2" />
+                    <line x1="7" y1="8" x2="17" y2="8" />
+                    <line x1="7" y1="11" x2="17" y2="11" />
+                    <line x1="7" y1="14" x2="17" y2="14" />
+                    <path d="M5 3.5h14" />
+                    <path d="M5 20.5h14" />
+                  </HojaBoton>
+                )}
 
                 {canFijar && (
                   <HojaBoton
@@ -1187,7 +1085,8 @@ export function MessageBubble({
                   <HojaBoton
                     etiqueta="Editar"
                     onClick={() => {
-                      abrirEdicion();
+                      setBorrador(message.body);
+                      setEditando(true);
                       cerrarHoja();
                     }}
                   >

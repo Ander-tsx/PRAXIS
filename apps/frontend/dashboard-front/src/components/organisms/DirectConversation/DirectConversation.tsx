@@ -116,8 +116,6 @@ export function DirectConversation({
        */
       canWrite={proyectosEnComun.length > 0}
       motivoSinEscribir="Ya no compartís ningún proyecto, así que no puedes escribirle. Lo que os dijisteis sigue aquí."
-      /* No hay moderación: no existe un rol por encima de una conversación de dos. */
-      canModerate={false}
       /**
        * ⚠️ **En privado no se menciona a nadie.** Sois dos: escribir `@Juan`
        * cuando le estás escribiendo a Juan no aporta nada, y el desplegable

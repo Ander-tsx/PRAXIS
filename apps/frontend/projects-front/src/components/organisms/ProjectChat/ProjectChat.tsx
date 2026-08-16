@@ -31,8 +31,6 @@ export interface ProjectChatProps {
   currentUserId: string;
   /** `canComment`: el mismo permiso que comentar en una tarea. */
   canWrite: boolean;
-  /** `canManageMembers`: quien lleva el equipo retira mensajes ajenos. */
-  canModerate: boolean;
   /**
    * A dónde vuelve el botón de salir en móvil.
    *
@@ -59,7 +57,6 @@ export function ProjectChat({
   usersById,
   currentUserId,
   canWrite,
-  canModerate,
   hrefVolver,
 }: ProjectChatProps) {
   /* Estable entre renders: `ChatPanel` tiene `marcarLeido` en las dependencias
@@ -120,7 +117,6 @@ export function ProjectChat({
       gatewayPath="/projects/api/gateway"
       rutaCanal={`/projects/${projectId}/chat`}
       canWrite={canWrite}
-      canModerate={canModerate}
       motivoSinEscribir="Puedes leer la conversación del equipo, pero tu rol no incluye escribir en ella."
       vacio={
         canWrite

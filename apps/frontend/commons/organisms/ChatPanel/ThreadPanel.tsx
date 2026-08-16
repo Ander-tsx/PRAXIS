@@ -8,6 +8,13 @@ import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
 
 export interface ThreadPanelProps {
+  /**
+   * Igual que en `ChatPanel`: si el chat llena la pantalla dedicada
+   * (`true`) o comparte sitio con otra cosa, como la pestaña de un proyecto
+   * (`false`, valor por defecto). Gobierna el mismo tope de altura que el
+   * chat principal — ver el comentario junto al scroller, más abajo.
+   */
+  llenarAlto?: boolean;
   /** El mensaje que abre el hilo. */
   raiz: ChatMessage;
   /** Sus respuestas, en orden, con las correcciones locales ya aplicadas. */
@@ -21,7 +28,6 @@ export interface ThreadPanelProps {
   usersById: Map<string, UserProfile>;
   currentUserId: string;
   canWrite: boolean;
-  canModerate: boolean;
   /** Si `@` ofrece personas en las respuestas del hilo. */
   permiteMenciones: boolean;
   /** Por qué no puedes escribir, si es que no puedes. */
@@ -69,6 +75,7 @@ export interface ThreadPanelProps {
  * reaccionar en el hilo y verlo en el historial fueran dos cosas distintas.
  */
 export function ThreadPanel({
+  llenarAlto = false,
   raiz,
   replies,
   cargando,
@@ -77,7 +84,6 @@ export function ThreadPanel({
   usersById,
   currentUserId,
   canWrite,
-  canModerate,
   permiteMenciones,
   motivoSinEscribir,
   gatewayPath,
@@ -106,7 +112,12 @@ export function ThreadPanel({
 
   return (
     <div
-      className={`flex w-full flex-col border-l border-border max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:shrink-0 ${
+      /* `min-h-0`: sin él, este panel es un hijo `flex` cuya altura mínima por
+         defecto es la de su contenido —no la fila que lo contiene—, así que
+         crece con cada respuesta en vez de quedarse dentro del alto del chat y
+         dejar que el scroller de abajo se encargue. Mismo motivo que el `min-h-0`
+         del contenedor del chat principal, ver el comentario en `ChatPanel`. */
+      className={`flex min-h-0 w-full flex-col border-l border-border max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:shrink-0 ${
         plegada ? 'sm:w-96' : 'sm:w-80'
       }`}
       style={{ background: colors.background }}
@@ -144,7 +155,20 @@ export function ThreadPanel({
 
       <div
         ref={scrollerRef}
-        className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 py-2"
+        /**
+         * ⚠️ **El tope de altura tiene que ir aquí, en el propio scroller,
+         * igual que en el chat principal (ver el comentario junto al suyo en
+         * `ChatPanel`).** `min-h-0`/`flex-1` a secas solo acotan la altura si
+         * hay un ancestro con altura **definida** de quien heredarla —cierto en
+         * la pantalla dedicada de mensajes (`llenarAlto`), falso en la pestaña
+         * de un proyecto, donde la página crece con el contenido y nada por
+         * encima le da al panel un límite real. Sin este tope explícito, el
+         * hilo crecía sin parar con cada respuesta en vez de quedarse dentro
+         * del alto del chat y dejar que el scroll interno se encargara.
+         */
+        className={`flex flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 py-2 ${
+          llenarAlto ? 'min-h-0 flex-1' : 'max-h-[58vh] min-h-72 flex-1'
+        }`}
       >
         {bubbles.map((mensaje, indice) => {
           const anterior = bubbles[indice - 1];
@@ -160,7 +184,7 @@ export function ThreadPanel({
                 author={usersById.get(mensaje.authorId)}
                 mine={mensaje.authorId === currentUserId}
                 continued={continued}
-                canDelete={mensaje.authorId === currentUserId || canModerate}
+                canDelete={mensaje.authorId === currentUserId}
                 canReact={canWrite}
                 canFijar={canWrite}
                 currentUserId={currentUserId}
@@ -173,7 +197,14 @@ export function ThreadPanel({
                 onEditar={onEditar}
                 onBorrar={onBorrar}
                 onAbrirHilo={() => undefined}
+                permiteAbrirHilo={false}
                 mostrarMarcaDeHilo={false}
+                /* Todo mensaje de aquí responde a `raiz` — es lo que significa
+                   estar en su hilo—, así que su cita repetiría, mensaje tras
+                   mensaje, algo que la cabecera del panel ya dice una vez. Si
+                   `raiz` a su vez cita a un tercero, esa cita sí es información
+                   nueva y se mantiene. */
+                ocultarCitaSiApuntaA={raiz.id}
                 nombreDeAutor={nombreDeAutor}
                 {...(previewDeLink ? { previewDeLink } : {})}
               />{' '}

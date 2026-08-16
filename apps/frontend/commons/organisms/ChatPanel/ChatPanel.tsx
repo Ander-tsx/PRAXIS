@@ -131,7 +131,6 @@ export interface ChatPanelProps {
   rutaCanal: string;
 
   canWrite: boolean;
-  canModerate: boolean;
   /** Si `@` ofrece personas. Apagado en las conversaciones privadas. */
   permiteMenciones: boolean;
   /** Qué se enseña cuando no hay ni un mensaje. */
@@ -186,7 +185,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     gatewayPath,
     rutaCanal,
     canWrite,
-    canModerate,
     permiteMenciones,
     vacio,
     motivoSinEscribir,
@@ -951,7 +949,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             new Date(anterior.createdAt).getTime() <
                             CORTE_DE_BLOQUE_MS
                         }
-                        canDelete={mensaje.authorId === currentUserId || canModerate}
+                        canDelete={mensaje.authorId === currentUserId}
                         canReact={canWrite}
                         canFijar={canWrite}
                         currentUserId={currentUserId}
@@ -1168,6 +1166,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
         {hiloRaiz && (
           <ThreadPanel
+            llenarAlto={llenarAlto}
             raiz={hiloRaiz}
             replies={hiloMensajes}
             cargando={hiloCargando}
@@ -1176,7 +1175,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             usersById={usersById}
             currentUserId={currentUserId}
             canWrite={canWrite}
-            canModerate={canModerate}
             permiteMenciones={permiteMenciones}
             motivoSinEscribir={motivoSinEscribir ?? null}
             gatewayPath={gatewayPath}

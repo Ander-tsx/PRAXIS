@@ -530,9 +530,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                tarea. No hay un `canChat`: una clave nueva en el diccionario de
                permisos nace en `false` para todos los roles que ya existen. */
             canWrite={can.canComment}
-            /* Modera quien lleva el equipo, no quien borra tareas: lo que se
-               modera aquí es una conversación entre personas. */
-            canModerate={can.canManageMembers}
             /* Vuelve a la primera pestaña, no a `?tab=chat`: el botón existe
                para salir de la conversación.
 
