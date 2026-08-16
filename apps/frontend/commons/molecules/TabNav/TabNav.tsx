@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 export interface TabItem {
   /** Valor en la URL (`?tab=`). */
@@ -63,7 +63,20 @@ export function TabNav({ tabs, activeId, renderLink }: TabNavProps) {
           </span>
         );
 
-        return renderLink(tab, isActive, content);
+        /**
+         * ⚠️ **La `key` la pone `TabNav`, no quien pinta el enlace.**
+         *
+         * `renderLink` es un render-prop: el elemento lo **crea quien llama**
+         * —cada zona monta su `<Link>`— así que ninguna de esas llamadas ponía
+         * clave y React avisaba en cada carga: «Each child in a list should
+         * have a unique key». Culpaba al armazón y al layout de la zona, que es
+         * donde se crea el elemento, no a este `.map()`, que es donde está la
+         * lista; por eso costaba encontrarlo.
+         *
+         * Envolviendo aquí, la clave deja de depender de que nadie se olvide:
+         * la lista es de este componente y las claves también.
+         */
+        return <Fragment key={tab.id}>{renderLink(tab, isActive, content)}</Fragment>;
       })}
     </nav>
   );
