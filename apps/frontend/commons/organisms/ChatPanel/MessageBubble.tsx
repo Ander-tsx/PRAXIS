@@ -1456,6 +1456,20 @@ function reloj(segundos: number): string {
  * `preload="metadata"` trae solo la duración y el primer fotograma para poder
  * pintar la barra, no el archivo entero.
  */
+/**
+ * Blanco fijo para todo lo que va **encima del vídeo**.
+ *
+ * ⚠️ **Aquí no valen los tokens de texto.** `textInverse` se invierte con el
+ * tema —negro en claro, blanco en oscuro— y estos controles no están sobre el
+ * fondo de la aplicación: están sobre el vídeo, que es negro siempre. Con el
+ * token, en uno de los dos temas los iconos quedaban negros sobre negro y no
+ * se distinguían.
+ */
+const TINTA_SOBRE_VIDEO = '#ffffff';
+
+/** El velo de los botones flotantes del reproductor. Negro, no `overlay`. */
+const VELO_SOBRE_VIDEO = 'rgba(0, 0, 0, 0.55)';
+
 function ReproductorVideo({ href }: { href: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const cajaRef = useRef<HTMLDivElement>(null);
@@ -1543,7 +1557,7 @@ function ReproductorVideo({ href }: { href: string }) {
         >
           <span
             className="flex h-14 w-14 items-center justify-center rounded-full backdrop-blur transition-transform hover:scale-105"
-            style={{ background: alpha(colors.overlay, 55), color: colors.textInverse }}
+            style={{ background: VELO_SOBRE_VIDEO, color: TINTA_SOBRE_VIDEO }}
           >
             <svg
               className="ml-0.5 h-6 w-6"
@@ -1567,7 +1581,8 @@ function ReproductorVideo({ href }: { href: string }) {
           reproduciendo ? 'opacity-0 group-hover/video:opacity-100' : 'opacity-100'
         }`}
         style={{
-          background: `linear-gradient(to top, ${alpha(colors.overlay, 75)}, transparent)`,
+          /* Negro fijo, no `overlay`: el degradado va sobre el vídeo. */
+          background: 'linear-gradient(to top, rgba(0,0,0,0.75), transparent)',
         }}
       >
         <button
@@ -1575,7 +1590,7 @@ function ReproductorVideo({ href }: { href: string }) {
           onClick={alternar}
           aria-label={reproduciendo ? 'Pausar' : 'Reproducir'}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110"
-          style={{ color: colors.textInverse }}
+          style={{ color: TINTA_SOBRE_VIDEO }}
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             {reproduciendo ? <path d="M7 5h3v14H7zM14 5h3v14h-3z" /> : <path d="M8 5v14l11-7z" />}
@@ -1597,18 +1612,17 @@ function ReproductorVideo({ href }: { href: string }) {
             video.currentTime = Number(evento.target.value);
             setMomento(Number(evento.target.value));
           }}
-          className="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-full outline-none"
+          className="barra-de-video min-w-0 flex-1 cursor-pointer outline-none"
           style={{
-            background: `linear-gradient(to right, ${colors.primary} ${progreso}%, ${alpha(
-              colors.textInverse,
-              35,
-            )} ${progreso}%)`,
+            /* Lo ya reproducido en el color de marca; lo que queda, un blanco
+               rebajado —fijo, por lo mismo que la tinta—. */
+            background: `linear-gradient(to right, ${colors.primary} ${progreso}%, rgba(255,255,255,0.35) ${progreso}%)`,
           }}
         />
 
         <span
           className="shrink-0 font-sans text-[10px] tabular-nums"
-          style={{ color: colors.textInverse }}
+          style={{ color: TINTA_SOBRE_VIDEO }}
         >
           {reloj(momento)} / {reloj(duracion)}
         </span>
@@ -1621,7 +1635,7 @@ function ReproductorVideo({ href }: { href: string }) {
           }}
           aria-label={silenciado ? 'Activar el sonido' : 'Silenciar'}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110"
-          style={{ color: colors.textInverse }}
+          style={{ color: TINTA_SOBRE_VIDEO }}
         >
           <svg
             className="h-4 w-4"
@@ -1647,7 +1661,7 @@ function ReproductorVideo({ href }: { href: string }) {
           onClick={alternarPantallaCompleta}
           aria-label={aPantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-110"
-          style={{ color: colors.textInverse }}
+          style={{ color: TINTA_SOBRE_VIDEO }}
         >
           <svg
             className="h-4 w-4"

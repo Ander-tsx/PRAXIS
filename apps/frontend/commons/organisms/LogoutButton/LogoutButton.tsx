@@ -47,7 +47,11 @@ export function LogoutButton() {
       disabled={pending}
       aria-label={pending ? 'Saliendo' : 'Cerrar sesión'}
       title={plegada ? 'Cerrar sesión' : undefined}
-      className={`flex h-9 w-full cursor-pointer items-center justify-center rounded-lg border border-border font-sans text-xs font-semibold text-error transition-colors hover:bg-error-muted disabled:cursor-not-allowed disabled:opacity-50 ${
+      /* `px-4`: sin relleno horizontal, fuera de la barra lateral —donde el
+         `w-full` lo estiraba— el botón se encogía al ancho de su texto y el
+         icono quedaba pegado a la letra. Con el relleno se ve igual en los dos
+         sitios. */
+      className={`flex h-9 w-full cursor-pointer items-center justify-center rounded-lg border border-border px-4 font-sans text-xs font-semibold text-error transition-colors hover:bg-error-muted disabled:cursor-not-allowed disabled:opacity-50 ${
         plegada ? '' : 'gap-2'
       }`}
     >

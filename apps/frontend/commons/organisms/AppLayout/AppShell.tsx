@@ -108,6 +108,16 @@ export function useSidebarPlegada(): boolean {
 const SIDEBAR_COOKIE = 'praxis_sidebar';
 const UN_ANO = 60 * 60 * 24 * 365;
 
+/**
+ * Dónde vive la pantalla de la cuenta.
+ *
+ * Ruta **absoluta y con el prefijo de zona**: la pantalla la sirve `dashboard`
+ * y esta barra la pintan las seis zonas, así que desde `projects` o `reports`
+ * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
+ * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
+ */
+const CUENTA_HREF = '/dashboard/perfil';
+
 export function AppShell({
   navItems,
   zonePath,
@@ -140,6 +150,18 @@ export function AppShell({
 
   /* `/` es la raíz de la zona: su ruta pública es el prefijo a secas. */
   const activePath = pathname === '/' ? zonePath : `${zonePath}${pathname}`;
+
+  /**
+   * ¿Estás en tu cuenta?
+   *
+   * ⚠️ **Sin esto, la barra marcaba «Panel».** `activeHrefOf` resuelve por
+   * prefijo, y `/dashboard/perfil` empieza por `/dashboard`, que es el href de
+   * Panel: la sección más específica gana, pero la cuenta **no es una sección**
+   * y no tiene entrada propia con la que competir. Se resuelve dejando la lista
+   * sin nada activo y marcando la ficha de usuario, que es de donde se viene.
+   */
+  const enCuenta = activePath === CUENTA_HREF || activePath.startsWith(`${CUENTA_HREF}/`);
+  const activePathDeSecciones = enCuenta ? '' : activePath;
 
   return (
     <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
@@ -175,7 +197,7 @@ export function AppShell({
           </div>
 
           <div className={`flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}>
-            <NavList navItems={navItems} activePath={activePath} plegada={plegada} />
+            <NavList navItems={navItems} activePath={activePathDeSecciones} plegada={plegada} />
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -185,7 +207,10 @@ export function AppShell({
             {plegada ? (
               <a
                 href={CUENTA_HREF}
-                className="mb-2 flex justify-center"
+                aria-current={enCuenta ? 'page' : undefined}
+                className={`mb-2 flex justify-center rounded-lg p-1 transition-colors ${
+                  enCuenta ? 'bg-surface-elevated' : ''
+                }`}
                 title={`${user.name.trim() || user.email} — tu cuenta`}
               >
                 <Avatar
@@ -197,7 +222,7 @@ export function AppShell({
                 />
               </a>
             ) : (
-              <UserCard user={user} />
+              <UserCard user={user} activa={enCuenta} />
             )}
             {footerSlot}
           </div>
@@ -254,7 +279,7 @@ export function AppShell({
 
                 <NavList
                   navItems={navItems}
-                  activePath={activePath}
+                  activePath={activePathDeSecciones}
                   onNavigate={() => setMobileMenuOpen(false)}
                 />
               </div>
@@ -272,16 +297,6 @@ export function AppShell({
 }
 
 /**
- * Dónde vive la pantalla de la cuenta.
- *
- * Ruta **absoluta y con el prefijo de zona**: la pantalla la sirve `dashboard`
- * y esta barra la pintan las seis zonas, así que desde `projects` o `reports`
- * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
- * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
- */
-const CUENTA_HREF = '/dashboard/perfil';
-
-/**
  * La ficha de usuario del pie: ahora es **la puerta a tu cuenta**.
  *
  * Antes era un rótulo y debajo iba «Cerrar sesión». Pulsar tu propia cara es
@@ -289,12 +304,18 @@ const CUENTA_HREF = '/dashboard/perfil';
  * donde se ha puesto lo tuyo: nombre, foto, presencia, cerrar sesión y borrar
  * la cuenta.
  */
-function UserCard({ user }: { user: AppShellUser }) {
+function UserCard({ user, activa = false }: { user: AppShellUser; activa?: boolean }) {
   return (
     <a
       href={CUENTA_HREF}
       title="Tu cuenta"
-      className="mb-3 flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-surface-elevated"
+      aria-current={activa ? 'page' : undefined}
+      /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
+         vive en la lista de secciones, así que si no se marcara aquí, estando
+         en tu cuenta no habría nada marcado en ninguna parte. */
+      className={`mb-3 flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-surface-elevated ${
+        activa ? 'bg-surface-elevated' : ''
+      }`}
     >
       {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
           la barra lateral la persona siempre eres tú, así que sale en rojo. Que

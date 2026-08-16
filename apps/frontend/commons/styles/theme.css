@@ -384,3 +384,44 @@ button:disabled,
 .scrollbar-slim:hover::-webkit-scrollbar-thumb {
   background: var(--color-text-disabled);
 }
+
+/* La barra de progreso del reproductor de vídeo del chat.
+
+   Un `input[type=range]` nativo dibuja un pulgar de 16 px que sobre una barra
+   de 3 px se ve como una pelota pegada a un hilo. Aquí se reduce a un punto de
+   9 px y se le quita el carril propio: el relleno lo pinta el `background` en
+   línea del elemento, que es lo que ya conoce el progreso.
+
+   ⚠️ **Los colores van fijos y no por token**: esta barra vive **siempre**
+   sobre el vídeo, que es negro en los dos temas. Un token de texto se
+   invertiría con el tema y desaparecería en uno de los dos — que es justo lo
+   que pasaba. */
+.barra-de-video {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: var(--radius-full);
+}
+.barra-de-video::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  /* Sin borde no se ve sobre un fotograma claro. */
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+}
+.barra-de-video::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+}
+.barra-de-video::-moz-range-track {
+  background: transparent;
+}
