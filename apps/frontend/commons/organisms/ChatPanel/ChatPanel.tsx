@@ -1108,6 +1108,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         hrefDeAdjunto={(id) =>
                           `${gatewayPath}${rutaCanal}/attachments/${id}/content`
                         }
+                        gatewayPath={gatewayPath}
                         scrollerRef={scrollerRef}
                         permiteMenciones={permiteMenciones}
                         sugerencias={sugerencias}

@@ -7,6 +7,7 @@ import {
   type UserProfile,
   alpha,
   colors,
+  hrefDeAvatar,
   personLabel,
   textoPlano,
 } from '@praxis/commons';
@@ -134,6 +135,7 @@ export function ChatDirectory({
                   key={conversacion.channelId}
                   peerId={conversacion.peerId}
                   nombre={nombreDe(conversacion.peerId)}
+                  perfil={usersById.get(conversacion.peerId)}
                   activo={activo === conversacion.peerId}
                   unread={conversacion.unread}
                   muted={conversacion.muted}
@@ -155,6 +157,7 @@ export function ChatDirectory({
                   key={contacto.userId}
                   peerId={contacto.userId}
                   nombre={nombreDe(contacto.userId)}
+                  perfil={usersById.get(contacto.userId)}
                   activo={activo === contacto.userId}
                   unread={0}
                   muted={false}
@@ -267,6 +270,7 @@ function describirProyectos(contacto: ChatContact): string {
 function FilaPersona({
   peerId,
   nombre,
+  perfil,
   activo,
   unread,
   muted,
@@ -275,6 +279,8 @@ function FilaPersona({
 }: {
   peerId: string;
   nombre: string;
+  /** Para la foto y el punto de estado. Puede faltar: la fila sale igual. */
+  perfil: UserProfile | undefined;
   activo: boolean;
   unread: number;
   muted: boolean;
@@ -290,7 +296,12 @@ function FilaPersona({
         className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated"
         style={activo ? { background: alpha(colors.primary, 12) } : undefined}
       >
-        <Avatar label={nombre} size="sm" />
+        <Avatar
+          label={nombre}
+          size="sm"
+          src={hrefDeAvatar(perfil?.avatarUrl, '/dashboard/api/gateway')}
+          presence={perfil?.presence ?? null}
+        />
 
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">

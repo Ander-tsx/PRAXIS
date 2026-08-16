@@ -12,6 +12,7 @@ import {
   personLabel,
 } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
+import { hrefDeAvatar } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
@@ -34,6 +35,8 @@ export interface MessageBubbleProps {
   hrefDeRef?: (kind: ChatRefKind, id: string) => string | null;
   /** URL de los bytes de un adjunto. La da el panel, que conoce el canal. */
   hrefDeAdjunto?: (attachmentId: string) => string;
+  /** Proxy de la zona, para componer la URL de la foto de quien escribe. */
+  gatewayPath: string;
   /**
    * El contenedor con scroll donde vive la conversación.
    *
@@ -163,6 +166,7 @@ export function MessageBubble({
   hrefDePersona,
   hrefDeRef,
   hrefDeAdjunto,
+  gatewayPath,
   scrollerRef,
   onResponder,
   onReaccionar,
@@ -497,7 +501,16 @@ export function MessageBubble({
       {continued ? (
         <span className="w-6 shrink-0" aria-hidden="true" />
       ) : (
-        <Avatar label={nombre} mine={mine} size="sm" />
+        <Avatar
+          label={nombre}
+          mine={mine}
+          size="sm"
+          src={hrefDeAvatar(author?.avatarUrl, gatewayPath)}
+          /* El punto de estado también en el chat: saber que alguien está en
+             una reunión explica por qué no contesta, y ese es justo el momento
+             en que se mira. */
+          presence={author?.presence ?? null}
+        />
       )}
 
       <div
@@ -817,10 +830,23 @@ export function MessageBubble({
                  la pantalla con mensajes de una línea. */
               mine ? 'right-2' : 'left-2'
             }`}
+            /**
+             * ⚠️ **En oscuro, la sombra no separa nada.**
+             *
+             * Una sombra funciona proyectando oscuridad sobre lo de debajo: en
+             * tema claro despega la barra del fondo, pero sobre un fondo ya
+             * oscuro no hay contraste que añadir y la barra se fundía con los
+             * mensajes. Lo que sí separa en los dos temas es un **borde
+             * marcado** y un fondo un punto más claro, así que el contraste se
+             * confía al borde y la sombra se queda solo como profundidad.
+             */
             style={{
               background: colors.surfaceElevated,
-              borderColor: colors.border,
-              boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,
+              borderColor: colors.borderStrong,
+              boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}, 0 0 0 1px ${alpha(
+                colors.borderStrong,
+                60,
+              )}`,
             }}
           >
             {canReact &&

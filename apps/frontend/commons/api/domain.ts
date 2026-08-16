@@ -84,6 +84,10 @@ export interface AdminUser {
   id: string;
   firstName: string | null;
   lastName: string | null;
+  /** Ruta de la foto relativa al gateway, como en `UserProfile`. */
+  avatarUrl?: string | null;
+  /** Presencia elegida. Opcional: el listado de admin puede no traerla. */
+  presence?: string;
   status: UserStatusName;
   createdAt: string;
   credential: { email: string };

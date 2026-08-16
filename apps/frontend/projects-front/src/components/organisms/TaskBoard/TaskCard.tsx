@@ -10,6 +10,7 @@ import {
   checklistProgress,
   colors,
   dueState,
+  hrefDeAvatar,
   personLabel,
 } from '@praxis/commons';
 import { useRef } from 'react';
@@ -287,6 +288,11 @@ export function TaskCard({
                      después tapa al anterior. Ir primero en el DOM no basta
                      para verse entero: hace falta subirlo de capa. */
                   className={mine ? 'relative z-10' : ''}
+                  src={hrefDeAvatar(user?.avatarUrl, '/projects/api/gateway')}
+                  /* Sin punto de estado: en una tarjeta de tarea se solapan
+                     cuatro círculos de 24 px y el punto de cada uno taparía la
+                     cara del siguiente. Aquí lo que importa es quién la lleva,
+                     no si está comiendo. */
                 />
               );
             })}

@@ -1,7 +1,14 @@
 'use client';
 
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
-import { type AdminUser, Avatar, Badge, Button, globalRoleLevelOf } from '@praxis/commons';
+import {
+  type AdminUser,
+  Avatar,
+  Badge,
+  Button,
+  globalRoleLevelOf,
+  hrefDeAvatar,
+} from '@praxis/commons';
 import { useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
@@ -76,7 +83,13 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                 className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_0.8fr_1fr_auto] md:items-center md:gap-4"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar label={nombreDe(usuario)} mine={esMiCuenta} size="md" />
+                  <Avatar
+                    label={nombreDe(usuario)}
+                    mine={esMiCuenta}
+                    size="md"
+                    src={hrefDeAvatar(usuario.avatarUrl, '/admin/api/gateway')}
+                    presence={usuario.presence ?? null}
+                  />
                   <div className="min-w-0">
                     <p className="truncate font-sans text-sm font-semibold text-text-primary">
                       {nombreDe(usuario)}

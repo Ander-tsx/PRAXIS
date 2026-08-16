@@ -5,6 +5,7 @@ import {
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
+  hrefDeAvatar,
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
@@ -126,7 +127,15 @@ export function ProjectMembers({
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   {/* El mismo círculo que el tablero y la barra lateral: el rojo
                       dice «eres tú» en todo el producto. */}
-                  <Avatar label={label} mine={member.userId === currentUserId} size="md" />
+                  <Avatar
+                    label={label}
+                    mine={member.userId === currentUserId}
+                    size="md"
+                    src={hrefDeAvatar(user?.avatarUrl, '/projects/api/gateway')}
+                    /* El estado también aquí: la pestaña de equipo es donde se
+                       mira quién hay y si está disponible. */
+                    presence={user?.presence ?? null}
+                  />
 
                   <div className="flex min-w-0 flex-1 flex-col">
                     {/**

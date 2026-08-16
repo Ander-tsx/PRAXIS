@@ -199,6 +199,7 @@ export function ThreadPanel({
                 currentUserId={currentUserId}
                 hrefDePersona={hrefDePersona ? hrefDePersona(mensaje.authorId) : null}
                 hrefDeAdjunto={(id) => `${gatewayPath}${rutaCanal}/attachments/${id}/content`}
+                gatewayPath={gatewayPath}
                 scrollerRef={scrollerRef}
                 permiteMenciones={permiteMenciones}
                 sugerencias={sugerencias}
