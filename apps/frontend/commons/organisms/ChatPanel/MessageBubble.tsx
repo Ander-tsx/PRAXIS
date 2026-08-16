@@ -1494,6 +1494,15 @@ function ReproductorVideo({ href }: { href: string }) {
    */
   const [aPantallaCompleta, setAPantallaCompleta] = useState(false);
 
+  /* El vídeo que ya venía cargado de la caché: su `loadedmetadata` ocurrió
+     antes de montar esto, así que se lee directamente. */
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && Number.isFinite(video.duration) && video.duration > 0) {
+      setDuracion(video.duration);
+    }
+  }, []);
+
   useEffect(() => {
     function alCambiar() {
       setAPantallaCompleta(document.fullscreenElement === cajaRef.current);
@@ -1536,7 +1545,24 @@ function ReproductorVideo({ href }: { href: string }) {
         onPlay={() => setReproduciendo(true)}
         onPause={() => setReproduciendo(false)}
         onTimeUpdate={(evento) => setMomento(evento.currentTarget.currentTime)}
+        /**
+         * ⚠️ **`loadedmetadata` no basta, y esa era la causa de que la barra no
+         * se pudiera mover.**
+         *
+         * Ese evento se dispara **una sola vez y muy pronto**: si el vídeo ya
+         * está en la caché del navegador —el caso al recargar, o al volver a un
+         * chat— ya ha ocurrido antes de que React enganche el manejador, así
+         * que nunca llega y `duracion` se queda en 0. Con `max={0}` el
+         * deslizador no admite ningún valor y el contador dice «0:00 / 0:00»:
+         * exactamente el fallo intermitente que se veía —unos vídeos sí y otros
+         * no, y ninguno tras refrescar—.
+         *
+         * Se cierra por tres lados: este evento, `durationchange` (que sí llega
+         * en más casos) y una lectura al montar, más abajo, para el vídeo que
+         * ya venía listo.
+         */
         onLoadedMetadata={(evento) => setDuracion(evento.currentTarget.duration)}
+        onDurationChange={(evento) => setDuracion(evento.currentTarget.duration)}
         onVolumeChange={(evento) => setSilenciado(evento.currentTarget.muted)}
         className={`block cursor-pointer object-contain ${
           aPantallaCompleta ? 'h-full max-h-none w-full' : 'max-h-96 w-full'
@@ -1602,7 +1628,10 @@ function ReproductorVideo({ href }: { href: string }) {
         <input
           type="range"
           min={0}
-          max={duracion || 0}
+          /* Sin duración conocida el deslizador se desactiva en vez de quedarse
+             mudo con `max=0`: así se ve que aún no se puede mover. */
+          max={duracion || 1}
+          disabled={duracion <= 0}
           step={0.1}
           value={momento}
           aria-label="Buscar en el vídeo"
