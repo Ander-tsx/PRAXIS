@@ -186,7 +186,15 @@ export function ThreadPanel({
                 continued={continued}
                 canDelete={mensaje.authorId === currentUserId}
                 canReact={canWrite}
-                canFijar={canWrite}
+                /**
+                 * ⚠️ **Sin fijar dentro del hilo.** La barra de fijados solo
+                 * recorre los mensajes de la conversación general, así que
+                 * fijar una respuesta de hilo guardaba la marca y no la
+                 * enseñaba en ninguna parte: el botón se encendía y no pasaba
+                 * nada más. Lo que se fija es el mensaje que abre el hilo, y
+                 * ese sí tiene su botón en el historial.
+                 */
+                canFijar={false}
                 currentUserId={currentUserId}
                 hrefDePersona={hrefDePersona ? hrefDePersona(mensaje.authorId) : null}
                 hrefDeAdjunto={(id) => `${gatewayPath}${rutaCanal}/attachments/${id}/content`}
@@ -198,6 +206,10 @@ export function ThreadPanel({
                 onBorrar={onBorrar}
                 onAbrirHilo={() => undefined}
                 permiteAbrirHilo={false}
+                /* Ver el aviso de `permiteResponder` en `MessageBubble`: una
+                   respuesta a otra respuesta se quedaba sin sitio donde
+                   aparecer. Necesita `threadRootId` en el backend. */
+                permiteResponder={false}
                 mostrarMarcaDeHilo={false}
                 /* Todo mensaje de aquí responde a `raiz` — es lo que significa
                    estar en su hilo—, así que su cita repetiría, mensaje tras

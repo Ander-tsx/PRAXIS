@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { COLOR_POR_TIPO_DE_REF, type ChatRefKind, serializarEtiquetas } from '../../api/chat-refs';
+import { COLOR_POR_TIPO_DE_REF, type ChatRefKind } from '../../api/chat-refs';
 import {
   CHAT_ATTACHMENT_ALLOWED_MIME,
   CHAT_ATTACHMENT_MAX_PER_MESSAGE,
@@ -18,6 +18,14 @@ import {
   formatBytes,
 } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
+import {
+  CapaEtiquetas,
+  type Etiqueta,
+  TIPOGRAFIA_CAMPO,
+  serializarCampo,
+  trozosDeCampo,
+  visibleDe,
+} from './etiquetado';
 
 /** Tope de un mensaje. Espejo de `CHAT_MESSAGE_MAX` en `@praxis/contracts`. */
 export const CHAT_MESSAGE_MAX = 4000;
@@ -33,21 +41,6 @@ export interface Sugerencia {
   contexto: string;
   /** Solo en tareas: en qué columna está. */
   estado?: string;
-}
-
-/**
- * Una etiqueta ya insertada.
- *
- * ⚠️ **El campo guarda el texto que se lee, no el que se envía.** El id vive
- * aquí, fuera del `<textarea>`, y solo se pega al serializar. Antes el campo
- * contenía la etiqueta entera —`@[María García](user:2222…)`— y quien escribía
- * veía un UUID de 36 caracteres en mitad de su frase.
- */
-interface Etiqueta {
-  kind: ChatRefKind;
-  id: string;
-  /** Lo que se ve en el campo: `@María García`, o el título de la tarea. */
-  visible: string;
 }
 
 export interface ComposerProps {
@@ -214,7 +207,7 @@ export function Composer({
   function elegir(sugerencia: Sugerencia) {
     if (!disparador) return;
 
-    const visible = sugerencia.kind === 'user' ? `@${sugerencia.label}` : sugerencia.label;
+    const visible = visibleDe(sugerencia.kind, sugerencia.label);
 
     /* Un espacio detrás: sin él, seguir escribiendo pega la palabra a la
        etiqueta y el desplegable se vuelve a abrir sobre ella. */
@@ -275,35 +268,8 @@ export function Composer({
     area.setSelectionRange(fin, fin);
   }, [citaId]);
 
-  /**
-   * Los trozos del texto, marcando cuáles son etiqueta.
-   *
-   * Recorre las etiquetas **en el orden en que se insertaron** y busca cada una a
-   * partir de donde acabó la anterior. Eso resuelve dos personas con el mismo
-   * nombre y, sobre todo, **una etiqueta que ya no está**: si alguien borró ese
-   * trozo del texto, no se encuentra y se ignora — el mensaje sale con lo que de
-   * verdad quedó escrito.
-   */
-  const trozos = useMemo(() => {
-    const salida: { texto: string; etiqueta?: Etiqueta }[] = [];
-    let desde = 0;
-
-    for (const etiqueta of etiquetas) {
-      const posicion = texto.indexOf(etiqueta.visible, desde);
-      if (posicion === -1) continue;
-      if (posicion > desde) salida.push({ texto: texto.slice(desde, posicion) });
-      salida.push({ texto: etiqueta.visible, etiqueta });
-      desde = posicion + etiqueta.visible.length;
-    }
-
-    if (desde < texto.length) salida.push({ texto: texto.slice(desde) });
-    return salida;
-  }, [texto, etiquetas]);
-
-  /** Lo mismo, pero con los ids pegados: es lo que viaja al servidor. */
-  function serializar(): string {
-    return serializarEtiquetas(texto, etiquetas);
-  }
+  /** Los trozos del texto, marcando cuáles son etiqueta. Ver `etiquetado.tsx`. */
+  const trozos = useMemo(() => trozosDeCampo(texto, etiquetas), [texto, etiquetas]);
 
   function enviar() {
     /* Un mensaje puede ir solo con archivos: si no hay texto ni adjuntos, no
@@ -311,7 +277,7 @@ export function Composer({
     const puedeEnviar = adjuntosPendientes.length > 0 || texto.trim().length > 0;
     if (!puedeEnviar || enviando || subiendo) return;
     onEnviar(
-      serializar().trim(),
+      serializarCampo(trozos).trim(),
       adjuntosPendientes.map((a) => a.id),
     );
     setTexto('');
@@ -389,11 +355,6 @@ export function Composer({
     evento.preventDefault();
     if (adjuntosPendientes.length < CHAT_ATTACHMENT_MAX_PER_MESSAGE) onAdjuntar(archivo);
   }
-
-  /* Las dos capas tienen que medir igual carácter a carácter, así que comparten
-     estas clases exactas. Cualquier diferencia de fuente o relleno desplaza el
-     resaltado respecto al cursor. */
-  const tipografia = 'px-2 py-1.5 font-sans text-sm leading-relaxed';
 
   return (
     <div className="relative flex flex-col gap-2">
@@ -515,53 +476,7 @@ export function Composer({
       >
         <div className="relative min-w-0 flex-1">
           {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
-          <div
-            ref={capaRef}
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-0 max-h-40 overflow-hidden whitespace-pre-wrap break-words text-text-primary ${tipografia}`}
-          >
-            {trozos.map((trozo, indice) =>
-              trozo.etiqueta ? (
-                /**
-                 * ⚠️ **La etiqueta no puede ocupar ni un píxel de más, y ese era
-                 * el fallo del cursor.**
-                 *
-                 * Esto llevaba `px-1` y `font-medium`. Las dos cosas cambian el
-                 * ancho del texto: el relleno mete 8 px por etiqueta y el peso
-                 * cambia las métricas de cada glifo. Pero el `<textarea>` de
-                 * debajo —que es quien dibuja el cursor— tiene el texto **crudo**,
-                 * sin relleno y con el peso normal. A partir de la primera
-                 * etiqueta las dos capas dejaban de coincidir y el cursor
-                 * aparecía desplazado respecto a las letras que se veían, cada
-                 * vez más cuantas más etiquetas hubiera.
-                 *
-                 * La píldora se dibuja ahora con `box-shadow`, que **no ocupa
-                 * espacio**: extiende el fondo hacia los lados sin mover el
-                 * texto. El resultado se ve igual y mide exactamente lo mismo
-                 * que la capa de abajo.
-                 *
-                 * Si alguna vez hay que darle más aire, va por ahí — cualquier
-                 * `padding`, `border`, `letter-spacing` o cambio de peso vuelve
-                 * a desalinear el cursor.
-                 */
-                <span
-                  // biome-ignore lint/suspicious/noArrayIndexKey: los trozos no tienen id propio y la lista se recalcula entera con el texto
-                  key={indice}
-                  style={{
-                    background: alpha(COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind], 16),
-                    color: COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind],
-                    borderRadius: 3,
-                    boxShadow: `0 0 0 2px ${alpha(COLOR_POR_TIPO_DE_REF[trozo.etiqueta.kind], 16)}`,
-                  }}
-                >
-                  {trozo.texto}
-                </span>
-              ) : (
-                // biome-ignore lint/suspicious/noArrayIndexKey: ídem
-                <span key={indice}>{trozo.texto}</span>
-              ),
-            )}
-          </div>
+          <CapaEtiquetas trozos={trozos} capaRef={capaRef} className="max-h-40 overflow-hidden" />
 
           <textarea
             ref={areaRef}
@@ -591,7 +506,7 @@ export function Composer({
             }}
             /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
                se pinta aparte con `caret-color`, o el campo parecería muerto. */
-            className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${tipografia}`}
+            className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${TIPOGRAFIA_CAMPO}`}
             style={{ caretColor: colors.textPrimary }}
           />
         </div>

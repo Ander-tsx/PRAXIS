@@ -823,3 +823,46 @@ de loopback, valida cada redirección, timeout y límite de bytes).
 Sin esto no hay nada roto: la card funciona y las dos zonas comparten la misma
 utilidad de `commons`. El coste es que cada zona repite la función —dos líneas—,
 y que la protección SSRF vive en el frontend, donde un fallo se vería antes.
+
+## 🟡 20. Un hilo no puede tener respuestas anidadas: falta `threadRootId`
+
+Dentro del panel de hilo no se puede responder a un mensaje concreto, y no es
+una omisión de la interfaz: **con el modelo actual ese mensaje no tendría dónde
+aparecer**.
+
+La pertenencia a un hilo se deduce de `replyToId`. `chat.thread()` pide
+`{ replyToId: <raíz>, visibleEnChat: false }`, y el flujo general pide
+`{ visibleEnChat: true }`. Una respuesta a otra respuesta nacería con
+`replyToId = <la otra respuesta>` y `visibleEnChat: false`, así que:
+
+- **no sale en el hilo**, porque su `replyToId` ya no es el de la raíz; y
+- **no sale en el chat general**, porque `visibleEnChat` es `false`.
+
+Se envía, se guarda, y no se ve en ninguna parte. Por eso el botón «Responder»
+está apagado dentro del panel del hilo (`permiteResponder` en `MessageBubble`),
+igual que el de fijar — ver el punto siguiente.
+
+**Qué falta por el lado del backend:**
+
+- Un `threadRootId` en `ChatMessage`: quién es la raíz del hilo, guardado, en
+  vez de deducirlo de `replyToId`. Con él, `thread()` filtra por
+  `threadRootId = <raíz>` y `replyToId` vuelve a significar solo «a quién cito»,
+  que son dos cosas distintas que hoy comparten campo.
+- La migración puede rellenarlo con lo que ya hay: para cada mensaje con
+  `visibleEnChat: false`, su `threadRootId` es su `replyToId` actual.
+
+Mientras tanto no hay nada roto: se responde desde el compositor del hilo, que
+manda la respuesta al hilo entero, que es el 90 % de los casos.
+
+## 🟢 21. Fijar dentro de un hilo no lleva a ninguna parte
+
+`POST /chat/messages/:id/pin` acepta cualquier mensaje, también uno que solo
+existe dentro de un hilo (`visibleEnChat: false`). Pero la barra de fijados solo
+recorre la conversación general, así que fijar una respuesta de hilo guardaba la
+marca y no la enseñaba en ningún sitio: el botón se encendía y no pasaba nada
+más.
+
+El frontend ya no ofrece fijar dentro del hilo (`canFijar={false}` en
+`ThreadPanel`). Queda anotado por si algún día la barra de fijados debe incluir
+mensajes de hilo — entonces habría que decidir a qué lleva pulsarlos, porque hoy
+saltar a un fijado busca el mensaje en el historial y uno de hilo no está ahí.
