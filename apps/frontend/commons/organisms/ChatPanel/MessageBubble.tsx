@@ -1,8 +1,8 @@
 'use client';
 
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from 'react';
-import type { ChatRefKind } from '../../api/chat-refs';
-import { trocearMensaje } from '../../api/chat-refs';
+import type { ChatRefKind, EtiquetaPlana } from '../../api/chat-refs';
+import { desdoblarEtiquetas, serializarEtiquetas, trocearMensaje } from '../../api/chat-refs';
 import {
   CHAT_REACTIONS,
   type ChatAttachment,
@@ -127,9 +127,27 @@ export function MessageBubble({
    */
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState('');
+  /**
+   * Las menciones del mensaje mientras se edita, fuera del `<textarea>`.
+   *
+   * El cuerpo guardado trae las etiquetas enteras —`@[María García](user:…)`—
+   * y si se volcara tal cual al campo, el UUID de cada mención aparecería en
+   * mitad de la frase. Se abren en texto legible (`@María García`) y este
+   * estado guarda el id de cada una; al confirmar se vuelven a pegar. Es el
+   * mismo desdoblamiento que el Composer hace al escribir.
+   */
+  const [etiquetasBorrador, setEtiquetasBorrador] = useState<EtiquetaPlana[]>([]);
+
+  /** Abre el redactor sobre el mensaje, con las menciones legibles. */
+  function abrirEdicion() {
+    const { texto, etiquetas } = desdoblarEtiquetas(message.body);
+    setBorrador(texto);
+    setEtiquetasBorrador(etiquetas);
+    setEditando(true);
+  }
 
   async function confirmarEdicion() {
-    const guardado = await onEditar(message.id, borrador);
+    const guardado = await onEditar(message.id, serializarEtiquetas(borrador, etiquetasBorrador));
     if (guardado) setEditando(false);
   }
 
@@ -780,8 +798,7 @@ export function MessageBubble({
                   <button
                     type="button"
                     onClick={() => {
-                      setBorrador(message.body);
-                      setEditando(true);
+                      abrirEdicion();
                     }}
                     aria-label="Editar mensaje"
                     title="Editar"
@@ -1092,8 +1109,7 @@ export function MessageBubble({
                   <HojaBoton
                     etiqueta="Editar"
                     onClick={() => {
-                      setBorrador(message.body);
-                      setEditando(true);
+                      abrirEdicion();
                       cerrarHoja();
                     }}
                   >
