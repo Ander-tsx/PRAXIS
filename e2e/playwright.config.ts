@@ -37,8 +37,47 @@ import { defineConfig, devices } from '@playwright/test';
  * de seguridad del endurecimiento, que es el motivo de tener etiquetas.
  */
 
-const GATEWAY_URL = process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000';
-const SHELL_URL = process.env.E2E_SHELL_URL ?? 'http://localhost:4100';
+/**
+ * Corta la ejecución si `E2E_GATEWAY_URL` o `E2E_SHELL_URL` apuntan a
+ * producción.
+ *
+ * La suite registra más de 80 cuentas reales por corrida y —desde que
+ * `MailService` sí manda cuando hay `MAIL_API_KEY`— cada alta intenta un
+ * correo de verdad contra Resend. Las cuentas usan `@praxis.test`, que no
+ * resuelve: cada correo rebota, y con el cupo diario compartido con
+ * producción (100 en el plan gratuito) una sola corrida contra el sitio real
+ * se lo come entero y deja a cualquier persona registrándose de verdad sin
+ * poder confirmar su correo. Ya pasó: se quemaron 234 de los 3.000 mensuales
+ * y el cupo diario en bounces de `@praxis.test`, justo cuando alguien
+ * intentaba registrarse de verdad.
+ *
+ * `E2E_PERMITIR_PRODUCCION=1` es la única forma de saltárselo, y tiene que
+ * ser explícito: un `.env` con la URL de producción copiada por error no
+ * debe bastar para arrancar la corrida.
+ */
+function asegurarNoEsProduccion(url: string, variable: string): string {
+  if (process.env.E2E_PERMITIR_PRODUCCION === '1') return url;
+
+  const host = new URL(url).hostname;
+  const esLocal = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+
+  if (!esLocal) {
+    throw new Error(
+      `${variable}=${url} no es local. La suite registra cuentas reales y quema el cupo de correo de producción — ver el comentario junto a esta función. Si de verdad quieres correrla contra ese destino, pon E2E_PERMITIR_PRODUCCION=1.`,
+    );
+  }
+
+  return url;
+}
+
+const GATEWAY_URL = asegurarNoEsProduccion(
+  process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
+  'E2E_GATEWAY_URL',
+);
+const SHELL_URL = asegurarNoEsProduccion(
+  process.env.E2E_SHELL_URL ?? 'http://localhost:4100',
+  'E2E_SHELL_URL',
+);
 
 export default defineConfig({
   testDir: './tests',
