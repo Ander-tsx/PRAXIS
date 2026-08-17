@@ -257,6 +257,47 @@ export class ChannelsService {
    * Se resuelve con dos consultas y un cruce en memoria, no con una por persona:
    * el coste va con el tamaño de tus proyectos, no con el de la plataforma.
    */
+  /**
+   * Solo los **ids** de quienes comparten proyecto con esta persona.
+   *
+   * ## Por qué no vale `contactos()`
+   *
+   * `contactos()` trae, por cada persona, todos los proyectos en común con su
+   * nombre, su slug y su rol. Eso es lo que necesita la lista de contactos del
+   * chat, y ahí está bien pagado.
+   *
+   * Pero el otro consumidor es el anuncio de presencia, que con toda esa
+   * información hace **una sola cosa**: recorrer los `userId` para publicar en
+   * el canal de cada uno. Estaba pagando un `join` con `Project` y otro con
+   * `ProjectRole`, más una fila por cada par (persona, proyecto compartido) y un
+   * cruce en memoria, para tirarlo todo salvo una columna.
+   *
+   * Con `distinct` la base devuelve una fila por persona en vez de una por
+   * coincidencia, así que en un equipo que comparte cinco proyectos esto es una
+   * quinta parte de las filas — y ninguno de los dos `join`.
+   *
+   * ⚠️ **Se descartan los proyectos `DELETED`**, igual que en `contactos()`: si
+   * no, alguien de un proyecto borrado seguiría recibiendo tus cambios de
+   * estado. La regla de a quién se le anuncia tiene que ser la misma que la de
+   * con quién puedes hablar, o la presencia filtra más de lo que filtra el chat.
+   */
+  async idsDeContactos(userId: string): Promise<string[]> {
+    const mios = await this.prisma.projectMember.findMany({
+      where: { userId, project: { status: { not: 'DELETED' } } },
+      select: { projectId: true },
+    });
+    const projectIds = mios.map((fila) => fila.projectId);
+    if (projectIds.length === 0) return [];
+
+    const companeros = await this.prisma.projectMember.findMany({
+      where: { projectId: { in: projectIds }, userId: { not: userId } },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+
+    return companeros.map((fila) => fila.userId);
+  }
+
   async contactos(userId: string) {
     const mios = await this.prisma.projectMember.findMany({
       where: { userId, project: { status: { not: 'DELETED' } } },

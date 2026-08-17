@@ -50,7 +50,13 @@ export class ChatController {
 
   @MessagePattern({ cmd: 'chat_project_find_all' })
   async proyectoMensajes(
-    @Payload() dto: DeProyecto & { limit?: number; before?: string; pinned?: boolean; q?: string },
+    @Payload() dto: DeProyecto & {
+      limit?: number;
+      before?: string;
+      after?: string;
+      pinned?: boolean;
+      q?: string;
+    },
   ) {
     const canal = await this.channels.deProyecto(dto.projectId);
     return this.chat.findAll({ ...dto, channelId: canal.id });
@@ -156,7 +162,13 @@ export class ChatController {
    */
   @MessagePattern({ cmd: 'chat_direct_find_all' })
   async directoMensajes(
-    @Payload() dto: Directo & { limit?: number; before?: string; pinned?: boolean; q?: string },
+    @Payload() dto: Directo & {
+      limit?: number;
+      before?: string;
+      after?: string;
+      pinned?: boolean;
+      q?: string;
+    },
   ) {
     const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.findAll({ ...dto, channelId: canal.id });
@@ -297,5 +309,16 @@ export class ChatController {
   @MessagePattern({ cmd: 'chat_contacts' })
   contactos(@Payload() dto: { userId: string }) {
     return this.channels.contactos(dto.userId);
+  }
+
+  /**
+   * Los mismos, pero solo los ids.
+   *
+   * Para el anuncio de presencia del gateway, que con la respuesta completa de
+   * `chat_contacts` solo usaba la columna `userId`. Ver `idsDeContactos`.
+   */
+  @MessagePattern({ cmd: 'chat_peer_ids' })
+  idsDeContactos(@Payload() dto: { userId: string }) {
+    return this.channels.idsDeContactos(dto.userId);
   }
 }
