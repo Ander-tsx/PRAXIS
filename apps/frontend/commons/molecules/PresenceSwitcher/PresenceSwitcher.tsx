@@ -45,13 +45,13 @@ export interface PresenceSwitcherProps {
  */
 export function PresenceSwitcher({ valor, onCambiar, compacto = false }: PresenceSwitcherProps) {
   const [abierto, setAbierto] = useState(false);
-  const [presencia, setPresencia] = useState(valor ?? 'AVAILABLE');
+  const [presencia, setPresencia] = useState(valor ?? 'AWAY');
   const [guardando, setGuardando] = useState(false);
   const cajaRef = useRef<HTMLDivElement>(null);
 
   /* La verdad vive en el servidor: si la página se repinta con otra presencia
      —otra pestaña la cambió— esta se pone al día. */
-  useEffect(() => setPresencia(valor ?? 'AVAILABLE'), [valor]);
+  useEffect(() => setPresencia(valor ?? 'AWAY'), [valor]);
 
   /* Cerrar al pulsar fuera. En captura, para que el mismo clic que abre no
      llegue después al documento y lo cierre en el acto. */
@@ -70,15 +70,17 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
    * Si no hay actividad en 5 mins (o 60 mins si eligió estado manual), pasa a AWAY.
    * Si hay actividad y estaba en AWAY, pasa a AVAILABLE. 
    */
+  const estadoRef = useRef({ presencia, guardando });
+  useEffect(() => {
+    estadoRef.current = { presencia, guardando };
+  }, [presencia, guardando]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const INACTIVITY_MS_NORMAL = 5 * 60 * 1000;
     const INACTIVITY_MS_MANUAL = 60 * 60 * 1000;
     let checkInterval: number;
-
-    const isManualStatus = presencia !== 'AVAILABLE' && presencia !== 'AWAY';
-    const threshold = isManualStatus ? INACTIVITY_MS_MANUAL : INACTIVITY_MS_NORMAL;
 
     const handleActivity = () => {
       const now = Date.now();
@@ -88,8 +90,9 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
         localStorage.setItem('praxis_last_activity', now.toString());
       }
 
+      const current = estadoRef.current;
       // Si está ausente y se detecta actividad, vuelve a disponible de inmediato.
-      if (presencia === 'AWAY' && !guardando) {
+      if (current.presencia === 'AWAY' && !current.guardando) {
         setGuardando(true);
         onCambiar('AVAILABLE').then((confirmada) => {
           setPresencia(confirmada ?? 'AVAILABLE');
@@ -103,9 +106,13 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
       if (lastActivity === 0) return;
 
       const idleTime = Date.now() - lastActivity;
+      const current = estadoRef.current;
+      
+      const isManualStatus = current.presencia !== 'AVAILABLE' && current.presencia !== 'AWAY';
+      const threshold = isManualStatus ? INACTIVITY_MS_MANUAL : INACTIVITY_MS_NORMAL;
       
       // Si superó el tiempo y no estaba ya ausente, pasarlo a ausente
-      if (idleTime > threshold && presencia !== 'AWAY' && !guardando) {
+      if (idleTime > threshold && current.presencia !== 'AWAY' && !current.guardando) {
         setGuardando(true);
         onCambiar('AWAY').then((confirmada) => {
           setPresencia(confirmada ?? 'AWAY');
@@ -120,14 +127,27 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
     evtTypes.forEach(evt => window.addEventListener(evt, handleActivity, evtOptions));
     checkInterval = window.setInterval(checkInactivity, 60000); // Check cada minuto
 
+    // Al cerrar la pestaña o cambiar de app, forzar Ausente como "mejor esfuerzo"
+    const handleVisibility = () => {
+      const current = estadoRef.current;
+      if (document.visibilityState === 'hidden' && current.presencia !== 'AWAY' && !current.guardando) {
+        // Ignoramos la promesa porque la página se está cerrando/ocultando
+        void onCambiar('AWAY');
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', handleVisibility);
+
     // Registrar actividad inicial al montar
     handleActivity();
 
     return () => {
       evtTypes.forEach(evt => window.removeEventListener(evt, handleActivity, evtOptions as any));
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', handleVisibility);
       window.clearInterval(checkInterval);
     };
-  }, [presencia, guardando, onCambiar]);
+  }, [onCambiar]);
 
   const actual = presenciaDe(presencia);
 

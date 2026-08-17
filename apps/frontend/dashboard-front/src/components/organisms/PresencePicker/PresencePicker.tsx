@@ -56,7 +56,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
     >
       <legend className="sr-only">Tu estado</legend>
 
-      {PRESENCES.map((clave) => {
+      {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
         const descripcion = presenciaDe(clave);
         const puesta = clave === presencia;
 
