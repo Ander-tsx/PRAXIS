@@ -16,7 +16,7 @@ import {
   EmailOnlyDto,
   GoogleLoginDto,
   LoginDto,
-  LogoutDto,
+  LogoutBodyDto,
   RefreshTokenDto,
   RegisterDto,
   ResetPasswordDto,
@@ -192,7 +192,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Cerrar sesión' })
   @ApiResponse({ status: 200, description: 'Sesión cerrada exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
-  async logout(@Request() req: Express.Request, @Body() body?: LogoutDto) {
+  async logout(@Request() req: Express.Request, @Body() body?: LogoutBodyDto) {
     this.logger.log('POST /auth/logout → credentials-service');
     /**
      * El `refreshToken` es **opcional y sirve para cerrar solo esta sesión**.
