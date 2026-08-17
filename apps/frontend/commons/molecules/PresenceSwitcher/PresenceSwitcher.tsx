@@ -131,8 +131,24 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
     const handleVisibility = () => {
       const current = estadoRef.current;
       if (document.visibilityState === 'hidden' && current.presencia !== 'AWAY' && !current.guardando) {
-        // Ignoramos la promesa porque la página se está cerrando/ocultando
-        void onCambiar('AWAY');
+        
+        // Next.js Server Actions usan el fetch global, pero el navegador lo cancela al cerrar.
+        // Inyectamos keepalive temporalmente para que la petición sobreviva al cierre de la pestaña.
+        const originalFetch = window.fetch;
+        window.fetch = function (input, init) {
+          return originalFetch(input, { ...init, keepalive: true });
+        };
+
+        onCambiar('AWAY')
+          .catch(() => {})
+          .finally(() => {
+            if (window.fetch !== originalFetch) window.fetch = originalFetch;
+          });
+
+        // Por si la promesa del Server Action se encola y no ejecuta fetch de inmediato
+        setTimeout(() => {
+          if (window.fetch !== originalFetch) window.fetch = originalFetch;
+        }, 10);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
