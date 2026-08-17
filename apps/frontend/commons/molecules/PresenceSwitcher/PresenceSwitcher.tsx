@@ -65,6 +65,70 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
     return () => document.removeEventListener('click', alPulsarFuera, true);
   }, [abierto]);
 
+  /* 
+   * Transición por inactividad.
+   * Si no hay actividad en 5 mins (o 60 mins si eligió estado manual), pasa a AWAY.
+   * Si hay actividad y estaba en AWAY, pasa a AVAILABLE. 
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const INACTIVITY_MS_NORMAL = 5 * 60 * 1000;
+    const INACTIVITY_MS_MANUAL = 60 * 60 * 1000;
+    let checkInterval: number;
+
+    const isManualStatus = presencia !== 'AVAILABLE' && presencia !== 'AWAY';
+    const threshold = isManualStatus ? INACTIVITY_MS_MANUAL : INACTIVITY_MS_NORMAL;
+
+    const handleActivity = () => {
+      const now = Date.now();
+      const lastActivity = parseInt(localStorage.getItem('praxis_last_activity') || '0', 10);
+      
+      if (now - lastActivity > 5000) {
+        localStorage.setItem('praxis_last_activity', now.toString());
+      }
+
+      // Si está ausente y se detecta actividad, vuelve a disponible de inmediato.
+      if (presencia === 'AWAY' && !guardando) {
+        setGuardando(true);
+        onCambiar('AVAILABLE').then((confirmada) => {
+          setPresencia(confirmada ?? 'AVAILABLE');
+          setGuardando(false);
+        });
+      }
+    };
+
+    const checkInactivity = () => {
+      const lastActivity = parseInt(localStorage.getItem('praxis_last_activity') || '0', 10);
+      if (lastActivity === 0) return;
+
+      const idleTime = Date.now() - lastActivity;
+      
+      // Si superó el tiempo y no estaba ya ausente, pasarlo a ausente
+      if (idleTime > threshold && presencia !== 'AWAY' && !guardando) {
+        setGuardando(true);
+        onCambiar('AWAY').then((confirmada) => {
+          setPresencia(confirmada ?? 'AWAY');
+          setGuardando(false);
+        });
+      }
+    };
+
+    const evtOptions = { passive: true };
+    const evtTypes = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+    
+    evtTypes.forEach(evt => window.addEventListener(evt, handleActivity, evtOptions));
+    checkInterval = window.setInterval(checkInactivity, 60000); // Check cada minuto
+
+    // Registrar actividad inicial al montar
+    handleActivity();
+
+    return () => {
+      evtTypes.forEach(evt => window.removeEventListener(evt, handleActivity, evtOptions as any));
+      window.clearInterval(checkInterval);
+    };
+  }, [presencia, guardando, onCambiar]);
+
   const actual = presenciaDe(presencia);
 
   async function elegir(siguiente: Presence) {
@@ -106,7 +170,7 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
           }`}
           style={{ background: colors.surfaceElevated, borderColor: colors.border }}
         >
-          {PRESENCES.map((clave) => {
+          {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
             const descripcion = presenciaDe(clave);
             const puesta = clave === presencia;
 

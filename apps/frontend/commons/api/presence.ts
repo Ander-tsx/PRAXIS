@@ -89,11 +89,11 @@ export const PRESENCIAS: Record<Presence, DescripcionDePresencia> = {
  * Descripción de una presencia, tolerando lo que no se reconoce.
  *
  * Una cuenta creada antes de que esto existiera, o un valor que el backend
- * estrene mañana, cae a «Disponible» en vez de dejar el punto sin color: un
+ * estrene mañana, cae a «Ausente» en vez de dejar el punto sin color: un
  * estado que no se sabe pintar no debe romper la lista del equipo.
  */
 export function presenciaDe(valor: string | null | undefined): DescripcionDePresencia {
-  return PRESENCIAS[(valor ?? '') as Presence] ?? PRESENCIAS.AVAILABLE;
+  return PRESENCIAS[(valor ?? '') as Presence] ?? PRESENCIAS.AWAY;
 }
 
 /**
