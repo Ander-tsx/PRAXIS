@@ -1,4 +1,30 @@
 import { Injectable } from '@nestjs/common';
+
+/** La fila tal cual sale de la consulta de `canal()`. */
+interface CanalCrudo {
+  id: string;
+  kind: 'PROJECT' | 'DIRECT';
+  directUserA: string | null;
+  directUserB: string | null;
+  projectId: string | null;
+  projectName: string | null;
+  projectSlug: string | null;
+  miembros: string[];
+  callados: string[];
+}
+
+/** Lo mismo, ya en la forma que usa el reparto. */
+interface CanalParaRepartir {
+  id: string;
+  kind: 'PROJECT' | 'DIRECT';
+  directUserA: string | null;
+  directUserB: string | null;
+  project: { id: string; name: string | null; slug: string | null } | null;
+  /** El equipo del proyecto. Vacío en un canal privado. */
+  miembros: string[];
+  /** Quiénes lo tienen silenciado, ya como conjunto. */
+  callados: Set<string>;
+}
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { type ContextoDeCanal, type EventoEnVivo, canalDeEventos } from './eventos';
@@ -28,23 +54,84 @@ export class PublicadorDeEventos {
   ) {}
 
   /**
-   * Los datos del canal que hacen falta para repartir y para pintar la tarjeta.
+   * Todo lo que hace falta para repartir un evento, en **una** sentencia.
    *
-   * Se pide una vez por evento. Es una fila por `id` con dos relaciones
-   * escalares: barato, y evita que cada emisor tenga que saber cómo se
-   * distingue un canal de proyecto de uno privado.
+   * ## Qué había antes
+   *
+   * Cuatro viajes a la base por cada evento —el canal, su proyecto, los miembros
+   * del proyecto y quién lo tiene silenciado—, o sea cuatro por **cada mensaje**
+   * del chat de un equipo. Y por cada edición, cada borrado, cada reacción y
+   * cada marca de lectura.
+   *
+   * ## Por qué SQL crudo y no relaciones anidadas
+   *
+   * ⚠️ **Porque `select` anidado de Prisma no genera un `JOIN`.** Emite **una
+   * consulta por relación** y las cose en memoria, así que escribir esto como un
+   * `findUnique` con `project: { select: { members } }` y `states` daba
+   * exactamente las mismas cuatro sentencias, solo que con mejor pinta.
+   * Comprobado con `log_statement='all'` en Postgres, no supuesto — un intento
+   * anterior dio por hecho el `JOIN` y estaba equivocado.
+   *
+   * Prisma 6 sí sabe hacerlo con `relationLoadStrategy: 'join'`, pero eso exige
+   * el preview `relationJoins` en el generador y **regenerar el cliente**, que
+   * en este repositorio es la operación delicada de siempre (ver CLAUDE.md: con
+   * los vigilantes en marcha deja `dist` a medias). Para una consulta se paga
+   * más de lo que vale.
+   *
+   * Los `LATERAL` agregan cada lista a un array en la propia base, así que no
+   * hay multiplicación de filas: sale **una fila** con todo dentro.
+   *
+   * ## Por qué no una caché, que era lo que proponía el plan
+   *
+   * El plan decía cachear el canal y sus miembros con 30 s de vida, y esa
+   * segunda mitad es un agujero: durante esa ventana, alguien a quien acaban de
+   * **sacar** de un proyecto seguiría recibiendo los mensajes del equipo. La
+   * lista de destinatarios es lo único que separa una conversación de otra, así
+   * que no puede ir con retraso. Y cachear solo el canal no compensaba: es un
+   * acceso por clave primaria, y a cambio traía caducidad, invalidación al
+   * renombrar un proyecto —el `slug` viaja en el evento y se regenera— y un modo
+   * de fallo nuevo. Esto quita los cuatro viajes **sin** nada de eso.
    */
-  private async canal(channelId: string) {
-    return this.prisma.chatChannel.findUnique({
-      where: { id: channelId },
-      select: {
-        id: true,
-        kind: true,
-        directUserA: true,
-        directUserB: true,
-        project: { select: { id: true, name: true, slug: true } },
-      },
-    });
+  private async canal(channelId: string): Promise<CanalParaRepartir | null> {
+    const [fila] = await this.prisma.$queryRaw<CanalCrudo[]>`
+      SELECT
+        c."id",
+        c."kind"::text AS kind,
+        c."directUserA",
+        c."directUserB",
+        p."id"   AS "projectId",
+        p."name" AS "projectName",
+        p."slug" AS "projectSlug",
+        COALESCE(m.miembros, ARRAY[]::text[]) AS miembros,
+        COALESCE(s.callados, ARRAY[]::text[]) AS callados
+      FROM "projects"."chat_channels" c
+      LEFT JOIN "projects"."projects" p ON p."id" = c."projectId"
+      LEFT JOIN LATERAL (
+        SELECT array_agg(pm."userId") AS miembros
+        FROM "projects"."project_members" pm
+        WHERE pm."projectId" = c."projectId"
+      ) m ON true
+      LEFT JOIN LATERAL (
+        SELECT array_agg(st."userId") AS callados
+        FROM "projects"."chat_channel_states" st
+        WHERE st."channelId" = c."id" AND st."mutedAt" IS NOT NULL
+      ) s ON true
+      WHERE c."id" = ${channelId}
+    `;
+
+    if (!fila) return null;
+
+    return {
+      id: fila.id,
+      kind: fila.kind,
+      directUserA: fila.directUserA,
+      directUserB: fila.directUserB,
+      project: fila.projectId
+        ? { id: fila.projectId, name: fila.projectName, slug: fila.projectSlug }
+        : null,
+      miembros: fila.miembros,
+      callados: new Set(fila.callados),
+    };
   }
 
   /**
@@ -59,23 +146,14 @@ export class PublicadorDeEventos {
    * comparando `actorId` con quien es — es un asunto de presentación, no de
    * reparto.
    */
-  private participantes(canal: {
-    kind: string;
-    directUserA: string | null;
-    directUserB: string | null;
-    project: { id: string } | null;
-  }): Promise<string[]> {
+  private participantes(canal: CanalParaRepartir): string[] {
     if (canal.kind === 'DIRECT') {
-      return Promise.resolve(
-        [canal.directUserA, canal.directUserB].filter((id): id is string => Boolean(id)),
-      );
+      return [canal.directUserA, canal.directUserB].filter((id): id is string => Boolean(id));
     }
 
-    if (!canal.project) return Promise.resolve([]);
-
-    return this.prisma.projectMember
-      .findMany({ where: { projectId: canal.project.id }, select: { userId: true } })
-      .then((miembros) => miembros.map((miembro) => miembro.userId));
+    /* Ya vienen con el canal: ver la nota de `canal()`. Esto dejó de ser una
+       consulta y pasó a ser leer un campo. */
+    return canal.project ? canal.miembros : [];
   }
 
   /**
@@ -102,26 +180,16 @@ export class PublicadorDeEventos {
       const canal = await this.canal(channelId);
       if (!canal) return;
 
-      const destinatarios = await this.participantes(canal);
+      const destinatarios = this.participantes(canal);
       if (destinatarios.length === 0) return;
 
-      /* Quién lo tiene silenciado, en **una** consulta para todos los
-         destinatarios. Una por persona serían veinte viajes a la base por
-         mensaje en el chat de un equipo. */
-      const callados = new Set(
-        (
-          await this.prisma.chatChannelState.findMany({
-            where: { channelId, userId: { in: destinatarios }, mutedAt: { not: null } },
-            select: { userId: true },
-          })
-        ).map((estado) => estado.userId),
-      );
-
+      /* Quién lo tiene silenciado llega con el canal, ya filtrado y agregado por
+         la base: ver la nota de `canal()`. Era una consulta aparte. */
       for (const destinatario of destinatarios) {
         const evento = construir({
           destinatario,
-          silenciado: callados.has(destinatario),
-          channelKind: canal.kind as 'PROJECT' | 'DIRECT',
+          silenciado: canal.callados.has(destinatario),
+          channelKind: canal.kind,
           projectId: canal.project?.id ?? null,
           projectName: canal.project?.name ?? null,
           projectSlug: canal.project?.slug ?? null,

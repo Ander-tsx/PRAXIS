@@ -21,8 +21,9 @@ import { PublicadorDeEventos } from './publicador.service';
  *
  * `PublicadorDeEventos` recibe los dos por constructor y no usa nada más, así
  * que se le pasan dobles. Eso permite además comprobar algo que con una base de
- * verdad no se ve: **cuántas consultas hace**, que es el motivo de que los
- * silenciados se pidan de una vez.
+ * verdad no se ve: **cuántas consultas hace**. Repartir un evento cuesta una, y
+ * eso está fijado aquí abajo — eran tres, una por cada mensaje del chat de un
+ * equipo.
  */
 describe('PublicadorDeEventos', () => {
   const CANAL_DIRECTO = 'canal-directo';
@@ -53,6 +54,7 @@ describe('PublicadorDeEventos', () => {
       directUserB?: string | null;
       project?: { id: string; name: string; slug: string } | null;
     } | null;
+    /** Los del proyecto. En un canal privado no se miran. */
     miembros?: string[];
     silenciados?: string[];
     redisFalla?: boolean;
@@ -61,19 +63,28 @@ describe('PublicadorDeEventos', () => {
     const llamadas = { canal: 0, miembros: 0, silenciados: 0 };
 
     const prisma = {
-      chatChannel: {
-        findUnique: async () => {
-          llamadas.canal += 1;
-          if (!opciones.canal) return null;
-          return {
+      /* Espejo de la fila que devuelve la consulta cruda de `canal()`: el canal,
+         su proyecto, el equipo y los silenciados, todo en una. */
+      $queryRaw: async () => {
+        llamadas.canal += 1;
+        if (!opciones.canal) return [];
+        return [
+          {
             id: opciones.canal.kind === 'DIRECT' ? CANAL_DIRECTO : CANAL_PROYECTO,
             kind: opciones.canal.kind,
             directUserA: opciones.canal.directUserA ?? null,
             directUserB: opciones.canal.directUserB ?? null,
-            project: opciones.canal.project ?? null,
-          };
-        },
+            projectId: opciones.canal.project?.id ?? null,
+            projectName: opciones.canal.project?.name ?? null,
+            projectSlug: opciones.canal.project?.slug ?? null,
+            miembros: opciones.miembros ?? [],
+            callados: opciones.silenciados ?? [],
+          },
+        ];
       },
+      /* ⚠️ Estos dos siguen aquí **a propósito, y tienen que quedarse sin
+         llamar**: si alguien vuelve a partir esto en varias consultas, los
+         contadores lo delatan en vez de pasar desapercibido. */
       projectMember: {
         findMany: async () => {
           llamadas.miembros += 1;
@@ -145,7 +156,8 @@ describe('PublicadorDeEventos', () => {
       await publicador.repartir(CANAL_PROYECTO, mensajeNuevo(ANA));
 
       expect(publicado).toHaveLength(3);
-      expect(llamadas.miembros).toBe(1);
+      /* Los miembros llegan con el canal: no hay consulta aparte. */
+      expect(llamadas.miembros).toBe(0);
     });
 
     it('la lista sale de la base y nunca de quien llama', async () => {
@@ -262,18 +274,32 @@ describe('PublicadorDeEventos', () => {
       expect(publicado.find((p) => p.canal === canalDeEventos(ANA))?.evento.silenciado).toBe(false);
     });
 
-    it('los silenciados se piden en una sola consulta', async () => {
-      /* Una por persona serían veinte viajes a la base por cada mensaje del chat
-         de un equipo. Esto es lo único que lo fija: el código con una consulta
-         por destinatario funcionaría igual y solo se notaría bajo carga. */
+    it('repartir un evento cuesta **una** sentencia, no cuatro', async () => {
+      /* El canal, su proyecto, el equipo y los silenciados salen de una sola
+         consulta con dos `LATERAL`. Eran cuatro viajes a la base **por mensaje**
+         del chat de un equipo — y por cada edición, borrado, reacción y marca de
+         lectura.
+
+         ⚠️ Esta prueba cuenta llamadas al doble, así que **no** habría cazado el
+         intento anterior: escribirlo como `select` anidado de Prisma parecía una
+         consulta y en el SQL real eran cuatro, porque Prisma emite una por
+         relación. Eso solo se ve con `log_statement='all'`, y así se comprobó.
+         Lo que esto fija es que nadie vuelva a partirlo a mano.
+
+         Y no se cachea a propósito: la lista de destinatarios no puede ir con
+         retraso, o alguien recién sacado del proyecto seguiría recibiendo. Ver
+         la nota de `canal()`. */
       const { publicador, llamadas } = montar({
         canal: { kind: 'PROJECT', project: { id: 'p1', name: 'Sprint 1', slug: 'sprint-1' } },
         miembros: [ANA, BEA, CARLA],
+        silenciados: [BEA],
       });
 
       await publicador.repartir(CANAL_PROYECTO, mensajeNuevo(ANA));
 
-      expect(llamadas.silenciados).toBe(1);
+      expect(llamadas.canal).toBe(1);
+      expect(llamadas.miembros).toBe(0);
+      expect(llamadas.silenciados).toBe(0);
     });
   });
 
@@ -316,10 +342,8 @@ describe('PublicadorDeEventos', () => {
 
     it('si la consulta del canal falla, no lanza', async () => {
       const prisma = {
-        chatChannel: {
-          findUnique: async () => {
-            throw new Error('base caída');
-          },
+        $queryRaw: async () => {
+          throw new Error('base caída');
         },
       } as unknown as PrismaService;
       const redis = { publish: async () => undefined } as unknown as RedisService;
