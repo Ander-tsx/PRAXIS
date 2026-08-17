@@ -23,6 +23,7 @@ export type AdminTabId = (typeof TABS)[number]['id'];
 export function AdminTabs({ activo }: { activo: AdminTabId }) {
   return (
     <TabNav
+      ariaLabel="Secciones de administración"
       tabs={TABS.map(({ id, label }) => ({ id, label }))}
       activeId={activo}
       renderLink={(tab, isActive, content) => (

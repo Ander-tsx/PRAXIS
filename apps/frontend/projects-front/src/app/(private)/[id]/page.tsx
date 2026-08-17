@@ -17,8 +17,8 @@ import {
   type ProjectMember,
   TabNav,
   type Task,
-  type UserProfile,
   projectPath,
+  resolverPerfiles,
   tabLinkClasses,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
@@ -163,7 +163,20 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
       .get<ChatMessagePage>(
         `/projects/${project.id}/chat/messages?limit=${activeTab === 'chat' ? 50 : 1}`,
       )
-      .catch(() => ({ items: [], hasMore: false, unread: 0, muted: false }) as ChatMessagePage),
+      /* `channelId` vacío: si la carga falló no sabemos de qué canal es, y ese
+         id es lo que el panel usa para filtrar los eventos del flujo en vivo.
+         Una cadena vacía no coincide con ninguno — mejor sin tiempo real que
+         aceptando eventos de un canal desconocido. */
+      .catch(
+        () =>
+          ({
+            channelId: '',
+            items: [],
+            hasMore: false,
+            unread: 0,
+            muted: false,
+          }) as ChatMessagePage,
+      ),
   ]);
 
   const can = effective.permissions;
@@ -224,13 +237,14 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         ]
       : [];
 
-  const personas = await Promise.all(
-    idsDePersonas.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
-  );
-
+  /* ⚠️ En **una** petición, no una por persona. Un equipo de veinte eran veinte
+     peticiones por carga, todas con la IP del servidor de Next: agotaban el
+     limitador del gateway y las que caían se leían como cuentas borradas. Ver
+     `commons/api/directorio.ts`. */
+  const directorio = await resolverPerfiles(api, idsDePersonas);
   const directory = {
-    items: personas.filter((u): u is UserProfile => u !== null),
-    total: idsDePersonas.length,
+    items: [...directorio.perfiles.values()],
+    total: directorio.perfiles.size,
   };
 
   const boardCount = project.workspaces.reduce(
@@ -404,6 +418,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         />
 
         <TabNav
+          ariaLabel="Secciones del proyecto"
           tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
           activeId={activeTab}
           renderLink={(t, isActive, content) => (
@@ -526,7 +541,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             projectId={project.id}
             projectName={project.name}
             page={chat}
-            usersById={usersById}
+            directorio={directorio}
             currentUserId={userId}
           />
         )}

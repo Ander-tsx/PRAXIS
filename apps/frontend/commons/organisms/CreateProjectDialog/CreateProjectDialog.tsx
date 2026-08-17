@@ -148,7 +148,30 @@ export function CreateProjectDialog({
           </span>
         </button>
       ) : (
-        <a></a>
+        /**
+         * 🔴 **Aquí no había nada: un `<a></a>` vacío.**
+         *
+         * `e213e64` añadió la variante de tarjeta para la rejilla y, al montar
+         * el ternario, **borró el `<Button>` original en vez de dejarlo como
+         * rama `else`**. Como `triggerVariant` vale `'primary'` por defecto y
+         * solo la rejilla pasa `'tarjeta'`, todo lo demás caía en un ancla
+         * vacía.
+         *
+         * Lo que eso significaba en pantalla: **una cuenta recién creada no
+         * podía crear su primer proyecto**. El estado vacío de `/projects`
+         * pinta su título, su frase y, donde va la llamada a la acción, nada.
+         * Los `triggerLabel="Crear mi primer proyecto"` y `triggerSize="lg"`
+         * que le pasa la página se ignoraban en silencio.
+         *
+         * No lo vio nadie porque un ancla vacía **no es un error**: no rompe el
+         * render, no avisa en consola y en el árbol de accesibilidad
+         * sencillamente no existe. Lo cazó la primera corrida de la suite de
+         * interfaz — que hasta hoy no se había podido ejecutar aquí por falta
+         * de navegador.
+         */
+        <Button variant={triggerVariant} size={triggerSize} onClick={() => setOpen(true)}>
+          {triggerLabel}
+        </Button>
       )}
 
       <Dialog

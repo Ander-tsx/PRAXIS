@@ -19,7 +19,26 @@ import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui
 test.describe('Equipo del proyecto', () => {
   test('la pestaña Equipo se pinta con el avatar de quien lo creó', async ({ page }) => {
     await crearCuentaYEntrar(page);
-    await crearProyectoEnLaInterfaz(page, `Equipo ${Date.now().toString(36)}`);
+
+    /* El nombre no empieza por «Equipo» a propósito: la tarjeta del proyecto es
+       un enlace cuyo texto arranca con su nombre, y llamarlo así lo volvía
+       ambiguo con el enlace de la pestaña Equipo. */
+    const nombre = `Rediseño ${Date.now().toString(36)}`;
+    await crearProyectoEnLaInterfaz(page, nombre);
+
+    /* ⚠️ **Crear un proyecto no lleva a su ficha**: el diálogo se cierra y la
+       rejilla se refresca, así que hay que entrar a mano. Es lo mismo que hace
+       `03-sesion` para comprobar el slug de la URL. */
+    /* Por rol y no por texto: la tarjeta es un enlace, y `getByText` casaba
+       antes con el propio campo del diálogo que se está cerrando —el clic caía
+       en la nada y la página se quedaba en `/projects`—. Buscar el enlace hace
+       que Playwright espere a que la rejilla se haya refrescado. */
+    await page
+      .getByRole('link')
+      .filter({ hasText: nombre })
+      .first()
+      .click();
+    await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
 
     /* Un error de frontera servidor/cliente sale como una excepción sin
        capturar en la consola, y la región queda vacía en vez de fallar con un
@@ -28,8 +47,16 @@ test.describe('Equipo del proyecto', () => {
     page.on('pageerror', (error) => errores.push(error.message));
 
     /* La pestaña activa vive en la URL (`?tab=`), no en estado de cliente, y el
-       enlace es un `<Link>` normal dentro de la barra de secciones. */
-    await page.getByRole('navigation', { name: 'Secciones' }).getByRole('link', { name: 'Equipo' }).click();
+       enlace es un `<Link>` normal dentro de la barra de secciones del proyecto.
+
+       ⚠️ El nombre tiene que ser el del proyecto: la barra lateral es **otra**
+       navegación y hasta hoy las dos se llamaban «Secciones», así que este
+       localizador casaba con la de la izquierda y buscaba «Equipo» donde no
+       está. Arreglado en `TabNav`. */
+    await page
+      .getByRole('navigation', { name: 'Secciones del proyecto' })
+      .getByRole('link', { name: 'Equipo' })
+      .click();
 
     const equipo = page.getByRole('region', { name: 'Equipo del proyecto' });
     await expect(equipo).toBeVisible();

@@ -114,7 +114,26 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
 export async function crearProyectoEnLaInterfaz(page: Page, nombre: string): Promise<void> {
   await page.goto('/projects');
 
-  await page.getByRole('button', { name: 'Nuevo proyecto' }).click();
+  /**
+   * ⚠️ **El disparador tiene dos nombres, según haya proyectos o no.**
+   *
+   * Con la cuenta vacía, `/projects` pinta su estado vacío y el botón dice
+   * «Crear mi primer proyecto»; en cuanto hay alguno, la rejilla lo enseña como
+   * una tarjeta que dice «Nuevo proyecto». Esta función servía a las dos y solo
+   * conocía el segundo, así que en una cuenta recién creada —que es como
+   * empiezan todas estas pruebas— esperaba un botón que no existe.
+   *
+   * Se aceptan los dos en vez de elegir uno: cuál toca depende del estado de la
+   * cuenta, y quien llama a esta función no debería tener que saberlo.
+   *
+   * ⚠️ Y `.first()`, porque con la cuenta vacía hay **dos** disparadores en
+   * pantalla —el de la cabecera y el del estado vacío— y sin esto Playwright
+   * aborta por ambigüedad. Sirve cualquiera: abren el mismo diálogo.
+   */
+  await page
+    .getByRole('button', { name: /Nuevo proyecto|Crear mi primer proyecto/ })
+    .first()
+    .click();
   await page.getByRole('textbox', { name: 'Nombre', exact: true }).fill(nombre);
   await page.getByRole('button', { name: 'Crear proyecto' }).click();
 }
