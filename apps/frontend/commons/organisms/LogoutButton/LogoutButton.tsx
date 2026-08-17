@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
+import { Button } from '../../atoms';
 
 /**
  * Cerrar sesión.
@@ -55,19 +56,16 @@ export function LogoutButton({ compacto }: LogoutButtonProps = {}) {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="danger"
+      size="sm"
       onClick={handleLogout}
       disabled={pending}
       aria-label={pending ? 'Saliendo' : 'Cerrar sesión'}
       title={plegada ? 'Cerrar sesión' : undefined}
-      /* `px-4`: sin relleno horizontal, fuera de la barra lateral —donde el
-         `w-full` lo estiraba— el botón se encogía al ancho de su texto y el
-         icono quedaba pegado a la letra. Con el relleno se ve igual en los dos
-         sitios. */
-      className="w-fit cursor-pointer rounded-lg border px-3 py-2 font-sans text-sm transition-colors border border-red-300 text-red-600 hover:bg-red-50"
+      className="w-fit"
     >
       {!plegada && (pending ? 'Saliendo...' : 'Cerrar sesión')}
-    </button>
+    </Button>
   );
 }

@@ -66,13 +66,14 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
 
   if (!abierto) {
     return (
-      <button
+      <Button
         type="button"
+        variant="danger"
+        size="sm"
         onClick={() => setAbierto(true)}
-        className="w-fit rounded-lg border px-3 py-2 font-sans text-sm transition-colors cursor-none border-red-300 text-red-600"
       >
         Eliminar mi cuenta
-      </button>
+      </Button>
     );
   }
 

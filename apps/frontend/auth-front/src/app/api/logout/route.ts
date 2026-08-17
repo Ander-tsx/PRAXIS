@@ -20,6 +20,18 @@ export async function POST(request: NextRequest) {
 
   if (token) {
     try {
+      // Forzar estado a ausente antes de destruir la sesión
+      await fetch(`${GATEWAY_URL}/api/me/presence`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presence: 'AWAY' }),
+        cache: 'no-store',
+      });
+    } catch (error) {
+      console.warn('[logout] no se pudo cambiar la presencia a ausente', error);
+    }
+
+    try {
       await fetch(`${GATEWAY_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
