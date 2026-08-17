@@ -20,9 +20,10 @@
  * caía a `pnpm --filter <pkg>`, que funciona desde la raíz sin tocar `dir`.
  * Todo parecía ir bien mientras la mitad de los pasos no hacía nada.
  *
- * Por eso `assertCatalogoSano()` se ejecuta al arrancar y revienta con la lista
- * de rutas que no existen. Si alguien vuelve a mover una carpeta, el CLI lo
- * dice en la primera línea en vez de fingir.
+ * Por eso `revisarCatalogo()` se ejecuta al arrancar (`index.mjs`) y devuelve la
+ * lista de rutas que no existen o cuyo `package.json` se llama de otra forma. Si
+ * alguien vuelve a mover una carpeta, el CLI lo dice en la primera línea en vez
+ * de fingir.
  */
 
 import fs from 'node:fs';
@@ -134,7 +135,7 @@ export const BACKEND_SERVICES = [
 ];
 
 /**
- * Las seis zonas del frontend.
+ * Las siete zonas del frontend.
  *
  * ⚠️ Su archivo de entorno es **`.env.local`**, no `.env`. Next solo carga el
  * primero, así que rellenar `.env` aquí es escribir un archivo que nadie lee —
@@ -196,12 +197,21 @@ export const FRONTEND_APPS = [
     color: 96,
     descripcion: 'Administración de la plataforma',
   },
+  {
+    key: 'chat-front',
+    pkg: '@praxis/chat-front',
+    dir: 'apps/frontend/chat-front',
+    port: 4106,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'Mensajes directos y de proyecto',
+  },
 ];
 
 /**
  * El frontend se arranca **de una pieza, con turbo**, no zona a zona.
  *
- * Seis `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
+ * Siete `next dev` lanzados por separado funcionan, pero turbo ya sabe el orden
  * y comparte la caché; y sobre todo, la lista de zonas vive en un único filtro
  * en vez de repetida aquí. Las entradas de `FRONTEND_APPS` siguen haciendo
  * falta para los `.env.local` y para saber qué puertos vigilar.
@@ -213,7 +223,7 @@ export const FRONTEND_TURBO_SERVICE = {
   prisma: false,
   seedOrder: null,
   color: 96,
-  descripcion: 'Las 6 zonas juntas',
+  descripcion: 'Las 7 zonas juntas',
   /**
    * ⚠️ Va por `pnpm run`, **no invocando `turbo` directamente**.
    *
@@ -243,7 +253,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 8 servicios y las 6 zonas',
+    nombre: 'Todo — los 8 servicios y las 7 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -261,7 +271,7 @@ export const PRESETS = [
   },
   {
     key: 'frontend',
-    nombre: 'Solo frontend — las 6 zonas (el backend ya está arriba)',
+    nombre: 'Solo frontend — las 7 zonas (el backend ya está arriba)',
     backend: [],
     frontend: true,
   },

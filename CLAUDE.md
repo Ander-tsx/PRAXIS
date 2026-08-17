@@ -27,7 +27,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 - **La lógica de negocio (fetch, estado, validación) vive solo en las pages.** Moléculas y organismos reciben slots `ReactNode` y props. Patrón de referencia: `commons/molecules/AuthForm` + `auth-front/src/app/login/page.tsx`
 
 **Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Oscuro y
-claro: la elección se guarda en la cookie `praxis_theme` y **las seis zonas** la
+claro: la elección se guarda en la cookie `praxis_theme` y **las siete zonas** la
 leen en su `layout.tsx` para estampar `data-theme` en el `<html>` sin parpadeo.
 Hay dos selectores y comparten componente (`commons/molecules/ThemeToggle`): el
 de Configuración y el del landing, que lo lleva en `PublicNavbar` porque quien
@@ -149,7 +149,7 @@ triplicado: detalle en ESTADO-ACTUAL §26.1, §30.3 y §36.2.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · 4106+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · 4107+ para zonas nuevas.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
@@ -181,7 +181,7 @@ pnpm prisma:generate      # los 6 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
 pnpm prisma:seed          # 4 seeds, en su orden de dependencia
 pnpm dev:backend          # gateway + los 7 microservicios
-pnpm dev:frontend         # las 6 zonas
+pnpm dev:frontend         # las 7 zonas
 ```
 
 ⚠️ **`prisma:reset` borra las tablas.** Es `migrate reset --force`: recrea el

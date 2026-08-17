@@ -27,6 +27,7 @@ const nextConfig: NextConfig = {
     const projectsFrontUrl = process.env.PROJECTS_FRONT_URL ?? 'http://localhost:4103';
     const reportsFrontUrl = process.env.REPORTS_FRONT_URL ?? 'http://localhost:4104';
     const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
+    const chatFrontUrl = process.env.CHAT_FRONT_URL ?? 'http://localhost:4106';
 
     return [
       {
@@ -70,6 +71,21 @@ const nextConfig: NextConfig = {
       {
         source: '/admin/:path*',
         destination: `${adminFrontUrl}/admin/:path*`,
+      },
+
+      /**
+       * El chat, que hasta E3 vivía dentro de `/dashboard/chat`. Las **dos**
+       * entradas, como todas: sin la primera, `/chat` a secas —que es la
+       * pantalla a la que lleva el menú— cae en el 404 del shell.
+       *
+       * Las direcciones viejas (`/dashboard/chat/*`) siguen funcionando: las
+       * redirige dashboard-front, no el shell, porque el `basePath` de esa zona
+       * hace que sea ella quien las recibe. Ver E3.5 del plan de pulido.
+       */
+      { source: '/chat', destination: `${chatFrontUrl}/chat` },
+      {
+        source: '/chat/:path*',
+        destination: `${chatFrontUrl}/chat/:path*`,
       },
 
       /**

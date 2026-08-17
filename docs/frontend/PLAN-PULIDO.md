@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | **Etapa actual** | E1 ✅ · E2 ✅ · **E3 en curso** |
-| **Última tarea terminada** | E3.1 — `chat-front` arranca sola en el 4106 y su guard aguanta |
-| **Siguiente** | E3.2 — registrar la zona (shell, dev-cli, infra) |
+| **Última tarea terminada** | E3.2 — la zona está registrada y el shell la sirve |
+| **Siguiente** | E3.3 — mover las pantallas del chat |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -346,9 +346,40 @@ de ESTADO-ACTUAL §17.7.
       E3.3. Existe porque una zona sin ninguna ruta no arranca, y sin arrancar no
       se puede comprobar nada de lo de arriba.
 
-- [ ] **E3.2 — Registrar la zona.** `rewrites()` del web-shell,
-      `scripts/dev-cli/config/services.mjs`, `.env.local` con el mismo
-      `JWT_SECRET`, y el despliegue (`infra/`).
+- [x] **E3.2 — Registrar la zona.** Los cuatro sitios:
+      - **`rewrites()` del web-shell**, las **dos** entradas (`/chat` y
+        `/chat/:path*`), con `CHAT_FRONT_URL` y su `?? localhost:4106`.
+      - **`scripts/dev-cli/config/services.mjs`**: entrada en `FRONTEND_APPS`,
+        que es de donde salen los `.env.local` y los puertos que el CLI vigila.
+        Comprobado con `revisarCatalogo()` — devuelve `[]`, o sea que la carpeta
+        existe y el `package.json` se llama como dice el catálogo.
+      - **`.env.local`** de la zona, con el `JWT_SECRET` **idéntico** al del
+        gateway (verificado con un `diff`, no a ojo: si no coincide, la sesión se
+        ve inválida y todo redirige al login sin decir por qué).
+      - **El despliegue**: `frontend.pm2.config.cjs` (proceso `chat-front` en el
+        4106 y `CHAT_FRONT_URL` en el bloque `zonas`) y el rango del comentario
+        de `arranque-frontend.yaml`.
+
+      **Verificado por el shell**, que es lo que faltaba de E3.1:
+
+      | Comprobación | Resultado |
+      |---|---|
+      | `:4100/chat` sin sesión | 307 → `/auth/login` **en el 4100** |
+      | `:4100/chat` con sesión | sirve la zona (`<title>Mensajes | Praxis</title>`) |
+      | `:4100/chat/algo` | 404 **de chat-front**, no del shell |
+      | CSS de la zona por el shell | 200 `text/css` |
+      | Fuente por el shell | 200 `font/woff2` |
+
+      El 404 se comprueba por su texto («Ir a mensajes»), no por el código: el
+      shell también responde 404 a lo que no casa con ningún rewrite, así que el
+      número solo no distingue «llegó a la zona y no hay ruta» de «el rewrite no
+      existe». Es la forma de fallo que se lleva por delante una zona entera
+      pareciendo un enlace roto.
+
+      De paso, dos cosas que estaban desactualizadas y se corrigen: el recuento
+      de zonas (seis → siete) en el CLI, en `CLAUDE.md` y en el pm2, y un
+      comentario del catálogo que anunciaba una función `assertCatalogoSano()`
+      que **no existe** — se llama `revisarCatalogo()`.
 
 - [ ] **E3.3 — Mover las pantallas.** De `dashboard-front/src/app/(private)/chat/`
       a `chat-front/src/app/(private)/`: `layout`, `page`, `[peerId]`,

@@ -145,7 +145,7 @@ async function preguntarQueLevantar() {
     {
       type: 'confirm',
       name: 'frontend',
-      message: 'Levantar también las 6 zonas del frontend',
+      message: 'Levantar también las 7 zonas del frontend',
       default: true,
     },
   ]);
@@ -550,7 +550,7 @@ function iniciarRepl(servicios, buffers) {
  *    —justo cuando más ganas dan de cancelar— mataba el CLI con el manejador
  *    por defecto. Y como los hijos van `detached` (grupo propio, ver
  *    `proc.mjs`), el Ctrl-C de la terminal **no les llega**: sobrevivían todos.
- *    Es lo que dejaba las seis zonas de Next escuchando sin nadie que las
+ *    Es lo que dejaba las siete zonas de Next escuchando sin nadie que las
  *    hubiera pedido.
  */
 let apagando = false;
