@@ -14,6 +14,7 @@ import {
 import type { LinkPreview } from '../../api/link-preview';
 import { hrefDeAvatar } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
+import { usePresencia } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
 import { Composer, type Sugerencia } from './Composer';
@@ -132,6 +133,23 @@ export interface MessageBubbleProps {
    * vez abrieron el canal», que es otra cosa y más optimista.
    */
   cuantosPuedenVer?: number;
+  /**
+   * Si se pinta la marca de «visto» bajo tus propios mensajes.
+   *
+   * ⚠️ **El panel del hilo la apaga**, y no es una preferencia estética: dentro
+   * de un hilo esa marca **no significa nada**. Los acuses de lectura se guardan
+   * por canal (`ChatChannelState.lastReadAt`), no por mensaje, así que lo único
+   * que se sabe es hasta qué momento ha leído cada persona la conversación —no
+   * si ha abierto un hilo concreto ni hasta dónde ha llegado dentro de él.
+   *
+   * Con la marca puesta, un check gris bajo una respuesta de hilo se lee como
+   * «llegó pero nadie lo ha visto», que es una afirmación que el sistema no
+   * puede hacer. Vale más no decir nada que decir algo que no se sabe.
+   *
+   * Contestarlo de verdad exigiría acuses **por mensaje** —una fila por mensaje
+   * y por persona— y es una decisión de modelo, no un arreglo de interfaz.
+   */
+  mostrarVisto?: boolean;
   /** Nombre de quien escribió el mensaje citado, para la cita. */
   nombreDeAutor: (userId: string) => string;
   /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
@@ -186,6 +204,7 @@ export function MessageBubble({
   onPedirSugerencias,
   vistoPor = [],
   cuantosPuedenVer = 0,
+  mostrarVisto = true,
   nombreDeAutor,
   previewDeLink,
   isProjectChat = false,
@@ -224,7 +243,17 @@ export function MessageBubble({
    */
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const [preview, setPreview] = useState<LinkPreview | null | undefined>(undefined);
-  const nombre = author ? personLabel(author) : 'Alguien que ya no está';
+  /**
+   * Cómo se lee quien escribió.
+   *
+   * ⚠️ El respaldo **no** es la cadena «Alguien que ya no está» a pelo: eso
+   * afirmaba que la cuenta se había ido cada vez que el perfil no estaba en el
+   * mapa, y no estar en el mapa también pasa cuando el directorio no se pudo
+   * consultar. Se delega en `nombreDeAutor`, que sí conoce esa diferencia.
+   */
+  const nombre = author ? personLabel(author) : nombreDeAutor(message.authorId);
+  /* Lo del perfil es del último render de la página; el flujo en vivo lo pisa. */
+  const presencia = usePresencia(message.authorId, author?.presence);
 
   /**
    * Gestos táctiles: deslizar responde, mantener pulsado abre la hoja de
@@ -500,6 +529,72 @@ export function MessageBubble({
     };
   }, [primeraUrl, preview, previewDeLink]);
 
+  /**
+   * Un mensaje borrado: la lápida, y nada más.
+   *
+   * ## Por qué se corta aquí arriba y no se apagan las acciones una a una
+   *
+   * Un mensaje borrado no tiene texto, ni adjuntos, ni reacciones, ni cita que
+   * pintar, y **ninguna** acción tiene sentido sobre él: responderlo dejaría una
+   * cita vacía, reaccionar sería reaccionar a nada, fijarlo lo anclaría para
+   * siempre a un hueco y editarlo lo resucitaría con texto nuevo. Apagarlas de
+   * una en una serían siete condiciones repartidas por cuatrocientas líneas, y
+   * bastaría con olvidar una para reabrir el agujero. Saliendo por aquí no hay
+   * barra que apagar, ni gestos táctiles, ni menú: no existen.
+   *
+   * El servidor rechaza las cuatro por su cuenta (`ChatService`), así que esto
+   * es lo que se ve, no lo que lo impide.
+   *
+   * Se conserva el sitio, el autor y la hora, que es justo lo que hace que la
+   * conversación siga leyéndose: sin la fila, quien está mirando solo ve que
+   * algo se ha movido.
+   */
+  if (message.deletedAt) {
+    return (
+      <article
+        className={`relative flex min-w-0 gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
+          continued ? 'mt-0.5' : 'mt-3'
+        }`}
+      >
+        {/* El hueco del avatar, para que la lápida quede en la misma columna que
+            el resto de burbujas y no se desalinee el bloque. */}
+        <span className="w-6 shrink-0" aria-hidden="true" />
+
+        <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
+          {!continued && (
+            <span className="flex items-center gap-2 px-1 font-sans text-xs">
+              <span className="font-semibold text-text-disabled">{mine ? 'Tú' : nombre}</span>
+            </span>
+          )}
+
+          <div
+            /* Borde discontinuo y fondo transparente: se lee como un hueco
+               marcado y no como un mensaje más. Una burbuja sólida con texto en
+               cursiva se confundía con alguien que hubiera escrito eso. */
+            className="flex items-center gap-2 rounded-2xl border border-dashed px-3.5 py-2"
+            style={{ borderColor: colors.border }}
+          >
+            <svg
+              className="h-3.5 w-3.5 shrink-0 text-text-disabled"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path strokeLinecap="round" d="M5.6 5.6l12.8 12.8" />
+            </svg>
+            <span className="font-sans text-xs italic text-text-disabled">Mensaje eliminado</span>
+            <span className="font-sans text-[11px] text-text-disabled">
+              {soloHora(message.createdAt)}
+            </span>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article
       className={`relative flex min-w-0 gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
@@ -525,8 +620,9 @@ export function MessageBubble({
           src={hrefDeAvatar(author?.avatarUrl, gatewayPath)}
           /* El punto de estado también en el chat: saber que alguien está en
              una reunión explica por qué no contesta, y ese es justo el momento
-             en que se mira. */
-          presence={author?.presence ?? null}
+             en que se mira. Va por `usePresencia` para que cambie solo sin
+             recargar la conversación. */
+          presence={presencia}
         />
       )}
 
@@ -534,10 +630,24 @@ export function MessageBubble({
         className={`relative flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}
       >
         {!continued && (
-          /* ⚠️ `items-center` y no `items-baseline`: un `<svg>` no tiene línea
-             base, así que en una fila alineada por ella los checks se apoyaban
-             en el borde inferior de su caja y quedaban un par de píxeles por
-             debajo del nombre y la hora. */
+          /**
+           * La cabecera: **quién**, y nada más.
+           *
+           * ⚠️ La hora, los checks y la marca «editado» **estaban aquí**, y esa
+           * era la razón de que no se pudiera saber hasta dónde te habían leído:
+           * la cabecera solo se pinta cuando el mensaje **no** continúa un
+           * bloque, así que en una ráfaga de cinco mensajes seguidos solo el
+           * primero llevaba hora y checks. Los otros cuatro no decían nada, y
+           * los del primero se leían como si valieran para todo el bloque.
+           *
+           * Ahora esos tres bajan **dentro de la burbuja**, uno por mensaje —el
+           * modelo de WhatsApp y Telegram—, así que cada mensaje dice su propia
+           * hora y su propio estado de lectura. Ver `PieDeBurbuja`.
+           *
+           * `items-center` y no `items-baseline`: un `<svg>` no tiene línea
+           * base, y en una fila alineada por ella los iconos se apoyan en el
+           * borde inferior de su caja.
+           */
           <span className="flex items-center gap-2 px-1 font-sans text-xs">
             {hrefDePersona && !mine ? (
               <a
@@ -549,18 +659,6 @@ export function MessageBubble({
               </a>
             ) : (
               <span className="font-semibold text-text-primary">{mine ? 'Tú' : nombre}</span>
-            )}
-            <span className="text-[11px] text-text-disabled">{soloHora(message.createdAt)}</span>
-            {mine && (
-              <ChecksDeEnvio vistoPorTodos={vistoPorTodos} cuantosLoVieron={vistoPor.length} />
-            )}
-            {editado && (
-              <span
-                title="Mensaje editado"
-                className="font-sans text-[10px] uppercase tracking-wide text-text-disabled"
-              >
-                editado
-              </span>
             )}
             {fijado && (
               <span
@@ -711,16 +809,14 @@ export function MessageBubble({
              * otra persona y sigue teniendo sentido.
              */
             <div
-              /* `border-l` con el primario a secas —no `alpha(colors.overlay, …)`,
-                 que es el tono casi negro de los fondos de modales—: sobre una
-                 burbuja clara salía sucio, y sobre una oscura, invisible. El
-                 tinte de fondo es el mismo primario, muy rebajado, así que
+              /* Solo el tinte de fondo, sin barra lateral. Llevaba un
+                 `border-l-[3px]` del color primario y sobraba: el bloque ya se
+                 distingue por el fondo teñido y el nombre en color, y la barra
+                 metía un tercer acento vertical en una burbuja que ya tiene su
+                 propio borde. El tinte usa el primario muy rebajado, así que
                  escala con el tema en vez de pelearse con él. */
-              className="mb-1.5 flex flex-col gap-0.5 rounded-lg border-l-[3px] py-1 pl-2.5 pr-2"
-              style={{
-                borderColor: alpha(colors.primary, 70),
-                background: alpha(colors.primary, 10),
-              }}
+              className="mb-1.5 flex flex-col gap-0.5 rounded-lg px-2.5 py-1"
+              style={{ background: alpha(colors.primary, 10) }}
             >
               <span
                 className="font-sans text-[11px] font-semibold"
@@ -831,6 +927,47 @@ export function MessageBubble({
               </span>
             </button>
           )}
+
+          {/**
+           * El pie de la burbuja: hora, «editado» y los checks de lectura.
+           *
+           * ## Por qué está aquí abajo y no en la cabecera
+           *
+           * ⚠️ **Estaba en la cabecera, y la cabecera solo se pinta una vez por
+           * bloque.** Cinco mensajes seguidos tuyos compartían la hora y los
+           * checks del primero: no había forma de saber hasta cuál te habían
+           * leído, que es justo lo que el «visto» tiene que contestar. Con el
+           * pie dentro de cada burbuja, cada mensaje lleva su marca y el corte
+           * de lectura se ve de un vistazo — es el modelo de WhatsApp y
+           * Telegram, y funciona por eso.
+           *
+           * ## Que no se solape con el texto
+           *
+           * Va en su propia fila (`flex justify-end`) y no flotando sobre la
+           * última línea. Flotar ahorra un renglón y a cambio obliga a reservar
+           * un hueco a la derecha del texto que depende del ancho exacto de la
+           * hora, del idioma y de si hay checks: con un mensaje de una sola
+           * palabra el hueco es más ancho que el mensaje. Una fila propia no
+           * puede solaparse nunca.
+           *
+           * `-mb-0.5` recupera parte del alto que añade: el relleno inferior de
+           * la burbuja ya separa lo suficiente.
+           */}
+          <span
+            className={`-mb-0.5 mt-1 flex items-center gap-1.5 font-sans text-[10px] leading-none text-text-disabled ${
+              mine ? 'justify-end' : 'justify-start'
+            }`}
+          >
+            {editado && (
+              <span title="Mensaje editado" className="uppercase tracking-wide">
+                editado
+              </span>
+            )}
+            <span>{soloHora(message.createdAt)}</span>
+            {mine && mostrarVisto && (
+              <ChecksDeEnvio vistoPorTodos={vistoPorTodos} cuantosLoVieron={vistoPor.length} />
+            )}
+          </span>
 
           <div
             className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg transition-all duration-150 max-md:hidden has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 ${
@@ -1058,31 +1195,35 @@ export function MessageBubble({
                 {/* Solo en los tuyos: en el mensaje de otra persona, saber quién
                 más lo ha visto no es asunto de quien lo lee — y ahí el dato
                 que importa ya lo da su propio autor. */}
-                {!confirmandoBorrado && mine && vistoPor.length > 0 && isProjectChat && (
-                  <button
-                    type="button"
-                    onClick={() => setListaDeVistos((previo) => !previo)}
-                    aria-label="Ver quién lo ha visto"
-                    aria-expanded={listaDeVistos}
-                    title={`Visto por ${vistoPor.length}`}
-                    className="flex cursor-pointer items-center gap-0.5 rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
+                {!confirmandoBorrado &&
+                  mine &&
+                  mostrarVisto &&
+                  vistoPor.length > 0 &&
+                  isProjectChat && (
+                    <button
+                      type="button"
+                      onClick={() => setListaDeVistos((previo) => !previo)}
+                      aria-label="Ver quién lo ha visto"
+                      aria-expanded={listaDeVistos}
+                      title={`Visto por ${vistoPor.length}`}
+                      className="flex cursor-pointer items-center gap-0.5 rounded-lg p-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
                     >
-                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    <span className="font-sans text-[10px] tabular-nums">{vistoPor.length}</span>
-                  </button>
-                )}
+                      <svg
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <span className="font-sans text-[10px] tabular-nums">{vistoPor.length}</span>
+                    </button>
+                  )}
 
                 {canDelete &&
                   (confirmandoBorrado ? (

@@ -974,3 +974,34 @@ Con las dos, la pantalla vuelve a ser dos peticiones.
 Sirve igual a la bandeja de avisos, al chat y al detalle de proyecto, que siguen
 pidiendo un `GET /users/:id` por persona: cambiarlos es una línea en cada uno y
 está pendiente.
+
+---
+
+## 🟢 25. Los acuses de lectura son por canal, así que dentro de un hilo no hay «visto»
+
+`ChatChannelState` guarda **un** `lastReadAt` por (canal, persona). Con eso se
+responde «¿hasta dónde ha leído fulano esta conversación?», que es justo lo que
+necesita el contador de no leídos y la marca de la conversación general.
+
+Lo que **no** se puede responder es «¿ha leído alguien *esta* respuesta?», y esa
+es la pregunta de un hilo: sus mensajes van con `visibleEnChat: false`, no
+entran en el historial general y no tienen por qué haberse visto solo porque la
+marca del canal esté más adelante. Que la marca vaya por delante de un mensaje
+de hilo no dice nada sobre si alguien abrió el hilo.
+
+Enseñar el «visto» del canal ahí sería peor que no enseñar nada: diría «leído»
+sobre una respuesta que puede no haber visto nadie, con toda la apariencia de un
+dato exacto. Así que el frontend lo **oculta** (`mostrarVisto={false}` en
+`ThreadPanel`, con el motivo escrito al lado).
+
+**Decisión (17-08): se cierra como límite del producto, no se implementa.**
+Contestarlo de verdad exige una tabla de acuses **por mensaje** —fila por (mensaje,
+persona) o un rango por hilo—, su migración, y una escritura por cada mensaje
+visto: el gesto más frecuente del sistema pasa de tocar una fila por canal a
+tocar una por mensaje en pantalla. Es un coste de escritura permanente a cambio
+de una marca en una superficie secundaria.
+
+Si algún día se retoma, lo barato es acotarlo al hilo —un `lastReadAt` por
+(hilo, persona), que es la misma forma que ya existe pero con `threadRootId` en
+vez de `channelId`— y no un acuse por mensaje suelto. Depende del punto 20, que
+es donde vive `threadRootId`.

@@ -1,5 +1,5 @@
 import * as crypto from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RpcException } from '@nestjs/microservices';
@@ -70,6 +70,8 @@ export const TOKEN_REFRESCO = 'refresh';
 
 @Injectable()
 export class AuthService {
+  private readonly log = new Logger(AuthService.name);
+
   /**
    * El cliente de Google se crea una sola vez y se reutiliza: mantiene en
    * memoria las claves públicas con las que verifica las firmas. Crearlo por
@@ -181,7 +183,27 @@ export class AuthService {
      * el proveedor de correo esté rápido, y `enviar` no lanza nunca. Si falla,
      * el token queda emitido y «reenviar» lo repite.
      */
-    void this.tokens.enviarVerificacion(credential.id, credential.email);
+    /**
+     * ⚠️ **El `.catch()` no sobra, aunque `MailService.enviar` sí trague.**
+     *
+     * `enviarVerificacion` hace dos cosas, y solo una es el correo: antes llama
+     * a `emitir()`, que **escribe en la base**. Esa sí puede rechazar —un hipo
+     * de Postgres, el pool agotado— y como esto no se espera, el rechazo cae
+     * fuera de cualquier `try` de este método y llega a `unhandledRejection`,
+     * que en Node **mata el proceso**.
+     *
+     * O sea: una base con un tropiezo durante un alta se llevaba por delante
+     * credentials-service entero, y con él la autenticación de toda la
+     * plataforma. El alta ya está guardada cuando se llega aquí; lo único que se
+     * pierde es el correo, y para eso está «reenviar».
+     */
+    this.tokens
+      .enviarVerificacion(credential.id, credential.email)
+      .catch((error: unknown) =>
+        this.log.error(
+          `No se pudo emitir la verificación de ${credential.id}: ${(error as Error).message}`,
+        ),
+      );
 
     return { userId, email: credential.email, verificacionPendiente: true };
   }

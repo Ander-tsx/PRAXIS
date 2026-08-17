@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PRESENCES, type Presence, presenciaDe } from '../../api/presence';
+import { useEventoEnVivo } from '../../realtime';
 import { colors } from '../../tokens';
 
 export interface PresenceSwitcherProps {
@@ -53,6 +54,22 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
      —otra pestaña la cambió— esta se pone al día. */
   useEffect(() => setPresencia(valor ?? 'AWAY'), [valor]);
 
+  /**
+   * Y sin esperar a que la página se repinte.
+   *
+   * ⚠️ Depender solo del render del servidor dejaba tu propia esfera **muerta**:
+   * cambiabas de estado en otra pestaña y aquí seguía el color viejo hasta
+   * recargar. El servidor ya anuncia el cambio a quien le incumbe; esto es
+   * escucharlo.
+   *
+   * `mio` lo resuelve el servidor porque este componente **no conoce tu id**:
+   * recibe el valor de tu presencia, no quién eres. Ver `EventoPresencia`.
+   */
+  useEventoEnVivo('presencia', (evento) => {
+    if (!evento.mio) return;
+    setPresencia(evento.presencia);
+  });
+
   /* Cerrar al pulsar fuera. En captura, para que el mismo clic que abre no
      llegue después al documento y lo cierre en el acto. */
   useEffect(() => {
@@ -65,103 +82,28 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
     return () => document.removeEventListener('click', alPulsarFuera, true);
   }, [abierto]);
 
-  /* 
-   * Transición por inactividad.
-   * Si no hay actividad en 5 mins (o 60 mins si eligió estado manual), pasa a AWAY.
-   * Si hay actividad y estaba en AWAY, pasa a AVAILABLE. 
+  /**
+   * ⚠️ **Aquí vivía la mitad del sistema de presencia, y estaba mal por
+   * construcción.**
+   *
+   * Había temporizadores de inactividad —cinco minutos sin ratón y te ponía
+   * «Ausente»—, un manejador de `pagehide` para avisar al cerrar la pestaña y,
+   * para que ese último aviso sobreviviera al cierre, **se reemplazaba
+   * `window.fetch` por una versión con `keepalive` y se restauraba con un
+   * `setTimeout`**. Un global del navegador, parcheado y devuelto a los 10 ms,
+   * mientras cualquier otra parte de la aplicación podía estar usándolo.
+   *
+   * Y ni así funcionaba. El problema de fondo es que **el cliente no puede
+   * informar de su propia desaparición**: si se corta la red, se agota la
+   * batería o el navegador se cae, `pagehide` no se dispara nunca y la cuenta se
+   * queda «Disponible» para siempre. Usuarios fantasma.
+   *
+   * Ahora lo gobierna el servidor. Tener el flujo de eventos abierto **es** estar
+   * conectado, y una caída se detecta porque el gateway no consigue escribir el
+   * siguiente latido —en menos de treinta segundos, sin que el navegador
+   * coopere—. Este componente se ha quedado con lo único que de verdad le tocaba:
+   * **elegir** un estado. Detalle en `gateway/src/presence/presence.service.ts`.
    */
-  const estadoRef = useRef({ presencia, guardando });
-  useEffect(() => {
-    estadoRef.current = { presencia, guardando };
-  }, [presencia, guardando]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const INACTIVITY_MS_NORMAL = 5 * 60 * 1000;
-    const INACTIVITY_MS_MANUAL = 60 * 60 * 1000;
-    let checkInterval: number;
-
-    const handleActivity = () => {
-      const now = Date.now();
-      const lastActivity = parseInt(localStorage.getItem('praxis_last_activity') || '0', 10);
-      
-      if (now - lastActivity > 5000) {
-        localStorage.setItem('praxis_last_activity', now.toString());
-      }
-
-      const current = estadoRef.current;
-      // Si está ausente y se detecta actividad, vuelve a disponible de inmediato.
-      if (current.presencia === 'AWAY' && !current.guardando) {
-        setGuardando(true);
-        onCambiar('AVAILABLE').then((confirmada) => {
-          setPresencia(confirmada ?? 'AVAILABLE');
-          setGuardando(false);
-        });
-      }
-    };
-
-    const checkInactivity = () => {
-      const lastActivity = parseInt(localStorage.getItem('praxis_last_activity') || '0', 10);
-      if (lastActivity === 0) return;
-
-      const idleTime = Date.now() - lastActivity;
-      const current = estadoRef.current;
-      
-      const isManualStatus = current.presencia !== 'AVAILABLE' && current.presencia !== 'AWAY';
-      const threshold = isManualStatus ? INACTIVITY_MS_MANUAL : INACTIVITY_MS_NORMAL;
-      
-      // Si superó el tiempo y no estaba ya ausente, pasarlo a ausente
-      if (idleTime > threshold && current.presencia !== 'AWAY' && !current.guardando) {
-        setGuardando(true);
-        onCambiar('AWAY').then((confirmada) => {
-          setPresencia(confirmada ?? 'AWAY');
-          setGuardando(false);
-        });
-      }
-    };
-
-    const evtOptions = { passive: true };
-    const evtTypes = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
-    
-    evtTypes.forEach(evt => window.addEventListener(evt, handleActivity, evtOptions));
-    checkInterval = window.setInterval(checkInactivity, 60000); // Check cada minuto
-
-    // Al cerrar la pestaña o cambiar de app, forzar Ausente como "mejor esfuerzo"
-    const handleVisibility = () => {
-      const current = estadoRef.current;
-      if (current.presencia !== 'AWAY' && !current.guardando) {
-        
-        // Next.js Server Actions usan el fetch global, pero el navegador lo cancela al cerrar.
-        // Inyectamos keepalive temporalmente para que la petición sobreviva al cierre de la pestaña.
-        const originalFetch = window.fetch;
-        window.fetch = function (input, init) {
-          return originalFetch(input, { ...init, keepalive: true });
-        };
-
-        onCambiar('AWAY')
-          .catch(() => {})
-          .finally(() => {
-            if (window.fetch !== originalFetch) window.fetch = originalFetch;
-          });
-
-        // Por si la promesa del Server Action se encola y no ejecuta fetch de inmediato
-        setTimeout(() => {
-          if (window.fetch !== originalFetch) window.fetch = originalFetch;
-        }, 10);
-      }
-    };
-    window.addEventListener('pagehide', handleVisibility);
-
-    // Registrar actividad inicial al montar
-    handleActivity();
-
-    return () => {
-      evtTypes.forEach(evt => window.removeEventListener(evt, handleActivity, evtOptions as any));
-      window.removeEventListener('pagehide', handleVisibility);
-      window.clearInterval(checkInterval);
-    };
-  }, [onCambiar]);
 
   const actual = presenciaDe(presencia);
 
@@ -204,6 +146,10 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
           }`}
           style={{ background: colors.surfaceElevated, borderColor: colors.border }}
         >
+          {/* `AWAY` no se ofrece: **no es un estado que se elija**, es lo que el
+              servidor enseña cuando no tienes ninguna conexión abierta. Ponerlo
+              en la lista invitaría a marcarse ausente estando delante, que es
+              justo la confusión que el modelo viejo tenía. */}
           {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
             const descripcion = presenciaDe(clave);
             const puesta = clave === presencia;

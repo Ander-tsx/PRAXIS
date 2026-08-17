@@ -36,7 +36,14 @@ async function requireApi() {
   return createServerApiClient();
 }
 
-/** Revalida la conversación y la bandeja, que enseña el último mensaje. */
+/**
+ * Revalida la conversación y la lista, que enseña el último mensaje.
+ *
+ * ⚠️ **Queda para lo que no viaja por el flujo en vivo**: silenciar y ocultar
+ * una conversación. Enviar y borrar ya no lo usan —ver la nota de
+ * `sendDirectMessageAction`—, y esa era la mitad del atasco de la cola de
+ * transición del App Router.
+ */
 function revalidarChat(peerId: string) {
   revalidatePath(`/chat/${peerId}`);
   revalidatePath('/chat');
@@ -53,24 +60,43 @@ function describe(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * Escribe en una conversación privada y **devuelve el mensaje creado**.
+ *
+ * ⚠️ **Ya no revalida la ruta, y esa es la corrección.** Terminaba en
+ * `revalidarChat(peerId)`, o sea, volver a renderizar la conversación entera en
+ * el servidor para que apareciera una línea. Esa revalidación entra en la misma
+ * cola de transición del App Router que los refrescos del flujo en vivo, y en
+ * Next 16 una navegación encima de otra descarta la anterior: cuando perdía la
+ * carrera, el mensaje quedaba guardado, le llegaba al otro extremo —que sí se
+ * refrescaba— y en tu pantalla no aparecía. El «a veces sí, a veces no».
+ *
+ * Devolviendo el mensaje, `ChatPanel` lo inserta él mismo en el mismo fotograma
+ * y no depende de ninguna revalidación. La lista de conversaciones se pone al
+ * día por el flujo en vivo, no por este camino.
+ */
 export async function sendDirectMessageAction(
   peerId: string,
   cuerpo: string,
   replyToId: string | null,
   attachmentIds: string[] = [],
   enHilo = false,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; mensaje: ChatMessage | null }> {
   const api = await requireApi();
-  if (!api) return { error: 'Tu sesión ha caducado.' };
+  if (!api) return { error: 'Tu sesión ha caducado.', mensaje: null };
 
   /* Se valida igualmente en el cliente aunque el DTO lo haga: el mensaje llega
      antes y sin gastar un viaje de red. El texto es opcional si hay adjuntos. */
   const limpio = cuerpo.replace(/\r\n/g, '\n').trim();
   if (limpio.length === 0 && attachmentIds.length === 0) {
-    return { error: 'Escribe algo antes de enviar.' };
+    return { error: 'Escribe algo antes de enviar.', mensaje: null };
   }
-  if (limpio.length > MAX) return { error: `El mensaje no puede superar ${MAX} caracteres.` };
-  if (attachmentIds.length > 5) return { error: 'Un mensaje no puede llevar más de 5 archivos.' };
+  if (limpio.length > MAX) {
+    return { error: `El mensaje no puede superar ${MAX} caracteres.`, mensaje: null };
+  }
+  if (attachmentIds.length > 5) {
+    return { error: 'Un mensaje no puede llevar más de 5 archivos.', mensaje: null };
+  }
 
   try {
     /* Se confirma contra el `data` de la respuesta y no contra el status: un 200
@@ -81,13 +107,11 @@ export async function sendDirectMessageAction(
       ...(attachmentIds.length > 0 && { attachmentIds }),
       ...(enHilo && { enHilo }),
     });
-    if (!creado?.id) return { error: 'El servidor no guardó el mensaje.' };
+    if (!creado?.id) return { error: 'El servidor no guardó el mensaje.', mensaje: null };
+    return { error: null, mensaje: creado };
   } catch (error) {
-    return { error: describe(error, 'No se pudo enviar el mensaje.') };
+    return { error: describe(error, 'No se pudo enviar el mensaje.'), mensaje: null };
   }
-
-  revalidarChat(peerId);
-  return { error: null };
 }
 
 export async function deleteDirectChatAction(peerId: string): Promise<{ error: string | null }> {
@@ -171,7 +195,8 @@ export async function deleteDirectMessageAction(
     return { error: describe(error, 'No se pudo eliminar el mensaje.') };
   }
 
-  revalidarChat(peerId);
+  /* ⚠️ Sin revalidar, por lo mismo que enviar: el panel pinta la lápida al
+     instante y a los demás les llega por el flujo (`chat.borrado`). */
   return { error: null };
 }
 
@@ -268,18 +293,20 @@ export async function markDirectReadAction(peerId: string): Promise<void> {
   await api.post(`/me/chats/${peerId}/read`, {}).catch(() => undefined);
 
   /**
-   * ⚠️ **Revalida el armazón, y sin esto la insignia mentía.**
+   * ⚠️ **Ya no revalida el armazón.**
    *
-   * Marcar leído escribe en el servidor y no cambia nada de lo que se está
-   * viendo… salvo el contador de la barra lateral, que lo calcula
-   * `loadPrivateChrome()` en el `layout.tsx`. Sin revalidar, abrías la
-   * conversación, la leías entera, contestabas — y la burbuja de no leídos
-   * seguía ahí hasta cambiar de página o recargar.
+   * Lo hacía porque el contador de no leídos lo calcula `loadPrivateChrome()` en
+   * el `layout.tsx`, y sin revalidar la burbuja se quedaba encendida después de
+   * leer la conversación. Pero esta acción la llama el propio panel **cada vez
+   * que llega un mensaje con el chat abierto**: en una conversación viva eso era
+   * un renderizado completo del armazón por mensaje, compitiendo en la misma
+   * cola de transición que el envío. Justo el atasco que esta fase viene a
+   * quitar.
    *
-   * Se revalida el **layout** y no la página: el contador no vive en la
-   * pantalla del chat, vive en el armazón que la envuelve.
+   * Ahora el contador lo bajan las propias listas al recibir `chat.leido` por el
+   * flujo —que llega también a tus otras pestañas, así que leer en el móvil
+   * apaga la insignia en el portátil, cosa que la revalidación no hacía—.
    */
-  revalidatePath('/', 'layout');
 }
 
 /**

@@ -41,24 +41,32 @@ async function loadUnreadCount(): Promise<number> {
 }
 
 /**
- * Cuántos mensajes directos sin leer, sumando todas las conversaciones.
+ * Cuántos mensajes sin leer hay en total: **privados y de equipo**.
  *
- * ⚠️ **No sale de la bandeja**, y por eso hace falta una petición aparte: un
- * mensaje de chat viaja por el flujo de avisos pero **no es un
+ * ⚠️ **No sale de la bandeja**, y por eso hacen falta peticiones aparte: un
+ * mensaje de chat viaja por el flujo de eventos pero **no es un
  * `NotificationType`** y no deja fila en `notifications` — cincuenta mensajes
  * serían cincuenta avisos por persona. Lo que sí hay es el `unread` por canal
- * que ya devuelve `GET /me/chats`, y sumarlo es exactamente el número que
- * quiere ver alguien mirando la barra lateral.
+ * que devuelven `GET /me/chats` y `GET /me/chats/projects`.
  *
- * Degrada a cero como la otra: no saber cuántos hay no puede tumbar la página.
+ * ⚠️ **Contaba solo los privados, y esa era la discrepancia.** La entrada de la
+ * barra lateral se llama «Mensajes» y lleva a una pantalla con las dos pestañas
+ * —Directos y Proyectos—, así que dejar fuera los de equipo hacía que un mensaje
+ * en el chat de un proyecto sonara, apareciera en la lista y **no moviera la
+ * insignia**: el número decía menos de lo que la propia pantalla enseñaba.
+ *
+ * Las dos en paralelo, y cada una degrada a cero por su cuenta: no saber cuántos
+ * hay no puede tumbar la página, y que falle una no debe llevarse a la otra.
  */
-async function loadDirectUnreadCount(): Promise<number> {
-  try {
-    const conversaciones = await createServerApiClient().get<{ unread?: number }[]>('/me/chats');
-    return conversaciones.reduce((suma, conversacion) => suma + (conversacion.unread ?? 0), 0);
-  } catch {
-    return 0;
-  }
+async function loadChatUnreadCount(): Promise<number> {
+  const api = createServerApiClient();
+
+  const [directos, proyectos] = await Promise.all([
+    api.get<{ unread?: number }[]>('/me/chats').catch(() => []),
+    api.get<{ unread?: number }[]>('/me/chats/projects').catch(() => []),
+  ]);
+
+  return [...directos, ...proyectos].reduce((suma, canal) => suma + (canal.unread ?? 0), 0);
 }
 
 /**
@@ -100,7 +108,7 @@ function buildNavItems({
  * usuario de una vez y en paralelo.
  */
 export async function loadAppNavItems(options: AppNavOptions = {}): Promise<AppNavItem[]> {
-  const [unread, mensajes] = await Promise.all([loadUnreadCount(), loadDirectUnreadCount()]);
+  const [unread, mensajes] = await Promise.all([loadUnreadCount(), loadChatUnreadCount()]);
   return buildNavItems({ roles: options.roles ?? [], unread, mensajes });
 }
 
@@ -133,7 +141,7 @@ export async function loadPrivateChrome(): Promise<PrivateChrome> {
   const [user, unread, mensajes] = await Promise.all([
     loadCurrentUser(),
     loadUnreadCount(),
-    loadDirectUnreadCount(),
+    loadChatUnreadCount(),
   ]);
 
   return { ...user, navItems: buildNavItems({ roles: user.roles, unread, mensajes }) };

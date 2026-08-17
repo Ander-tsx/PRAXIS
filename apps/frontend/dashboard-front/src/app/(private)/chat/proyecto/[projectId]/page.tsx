@@ -4,8 +4,8 @@ import type {
   EffectivePermissions,
   ProjectDetail,
   ProjectMember,
-  UserProfile,
 } from '@praxis/commons';
+import { resolverPerfiles } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { notFound } from 'next/navigation';
 
@@ -58,20 +58,17 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
    * Se piden por id y no con `/users?limit=100`: aquello es la primera página
    * del directorio de toda la plataforma y deja de contener a tu gente en
    * cuanto hay más de cien cuentas (CLAUDE.md).
+   *
+   * ⚠️ Y **de una vez**, no uno a uno. Un equipo de veinte eran veinte
+   * peticiones por carga, todas con la IP del servidor de Next: agotaban el
+   * limitador del gateway y el `catch` convertía los 429 en «Alguien que ya no
+   * está» sin fotos. Ver `commons/api/directorio.ts`.
    */
-  const ids = [
-    ...new Set([
-      userId,
-      ...page.items.map((mensaje) => mensaje.authorId),
-      ...miembros.map((miembro) => miembro.userId),
-    ]),
-  ];
-  const perfiles = await Promise.all(
-    ids.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
-  );
-  const usersById = new Map(
-    perfiles.filter((perfil): perfil is UserProfile => perfil !== null).map((p) => [p.id, p]),
-  );
+  const directorio = await resolverPerfiles(api, [
+    userId,
+    ...page.items.map((mensaje) => mensaje.authorId),
+    ...miembros.map((miembro) => miembro.userId),
+  ]);
 
   return (
     <ProjectConversation
@@ -79,7 +76,7 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
       projectName={project.name}
       projectSlug={project.slug}
       page={page}
-      usersById={usersById}
+      directorio={directorio}
       currentUserId={userId}
       /* Escribir es `canComment`, el mismo permiso que comentar en una tarea.
          ⚠️ El mapa va **anidado** en `permissions`: `permissions/me` devuelve

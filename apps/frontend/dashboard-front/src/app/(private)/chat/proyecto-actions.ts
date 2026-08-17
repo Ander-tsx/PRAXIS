@@ -63,22 +63,36 @@ function normalizar(texto: string): string {
     .trim();
 }
 
+/**
+ * Escribe en el chat de un equipo y **devuelve el mensaje creado**.
+ *
+ * ⚠️ **Ya no revalida la ruta.** Mismo motivo, palabra por palabra, que en
+ * `sendDirectMessageAction`: la revalidación competía en la cola de transición
+ * del App Router con los refrescos del flujo en vivo, y perder esa carrera era
+ * el fallo de «se envía y no se pinta». El panel inserta el mensaje que devuelve
+ * esto, y a los demás les llega por `chat.mensaje`.
+ */
 export async function sendProjectMessageAction(
   projectId: string,
   cuerpo: string,
   replyToId: string | null,
   attachmentIds: string[] = [],
   enHilo = false,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; mensaje: ChatMessage | null }> {
   const api = await requireApi();
-  if (!api) return { error: 'Tu sesión ha caducado.' };
+  if (!api) return { error: 'Tu sesión ha caducado.', mensaje: null };
 
   const body = normalizar(cuerpo);
   /* Un mensaje puede ir sin texto si lleva archivos: el tope solo se
      comprueba cuando hay algo escrito. */
-  if (body.length > MAX) return { error: `El mensaje no puede superar ${MAX} caracteres.` };
-  if (!body && attachmentIds.length === 0) return { error: 'El mensaje está vacío.' };
-  if (attachmentIds.length > 5) return { error: 'Un mensaje no puede llevar más de 5 archivos.' };
+  if (body.length > MAX) {
+    return { error: `El mensaje no puede superar ${MAX} caracteres.`, mensaje: null };
+  }
+  if (!body && attachmentIds.length === 0)
+    return { error: 'El mensaje está vacío.', mensaje: null };
+  if (attachmentIds.length > 5) {
+    return { error: 'Un mensaje no puede llevar más de 5 archivos.', mensaje: null };
+  }
 
   try {
     /* Se confirma contra el `data` de la respuesta y no contra el status: un
@@ -89,13 +103,11 @@ export async function sendProjectMessageAction(
       ...(attachmentIds.length > 0 && { attachmentIds }),
       ...(enHilo && { enHilo }),
     });
-    if (!created?.id) return { error: 'El servidor no guardó el mensaje.' };
+    if (!created?.id) return { error: 'El servidor no guardó el mensaje.', mensaje: null };
+    return { error: null, mensaje: created };
   } catch (error) {
-    return { error: describe(error, 'No se pudo enviar el mensaje.') };
+    return { error: describe(error, 'No se pudo enviar el mensaje.'), mensaje: null };
   }
-
-  revalidarChat(projectId);
-  return { error: null };
 }
 
 /** Lo borra su autor, o quien gestione el equipo. El gateway lo resuelve. */
@@ -112,7 +124,8 @@ export async function deleteProjectMessageAction(
     return { error: describe(error, 'No se pudo eliminar el mensaje.') };
   }
 
-  revalidarChat(projectId);
+  /* ⚠️ Sin revalidar, por lo mismo que enviar: el panel pinta la lápida al
+     instante y a los demás les llega por el flujo (`chat.borrado`). */
   return { error: null };
 }
 
@@ -189,16 +202,19 @@ export async function editProjectAction(
 /**
  * Deja el chat por leído.
  *
- * Revalida el **layout** —no la página— porque lo único que cambia es el
- * contador de la barra lateral y de la bandeja; revalidar la página la
- * repintaría entera y volvería a llamar aquí, en bucle.
+ * ⚠️ **Ya no revalida el layout.** Lo hacía por el contador de la barra lateral,
+ * pero el panel llama a esto **cada vez que llega un mensaje con el chat
+ * abierto**: en una conversación viva era un renderizado completo del armazón
+ * por mensaje, compitiendo en la misma cola de transición que el envío. El
+ * contador lo bajan ahora las listas al recibir `chat.leido` por el flujo, que
+ * además llega a tus otras pestañas — leer en el móvil apaga la insignia en el
+ * portátil, cosa que la revalidación no hacía.
  */
 export async function markProjectReadAction(projectId: string): Promise<void> {
   const api = await requireApi();
   if (!api) return;
 
   await api.post(`/projects/${projectId}/chat/read`, {}).catch(() => undefined);
-  revalidatePath('/', 'layout');
 }
 
 /** Sube un archivo y lo deja en borrador hasta que un mensaje lo reclame. */

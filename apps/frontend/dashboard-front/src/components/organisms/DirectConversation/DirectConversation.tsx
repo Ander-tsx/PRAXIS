@@ -2,6 +2,7 @@
 
 import {
   deleteDirectAttachmentAction,
+  deleteDirectChatAction,
   deleteDirectMessageAction,
   editDirectAction,
   markDirectReadAction,
@@ -11,13 +12,13 @@ import {
   reactDirectAction,
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
-  deleteDirectChatAction,
 } from '@/app/(private)/chat/actions';
 import {
   Badge,
   type ChatMessagePage,
   ChatPanel,
   type ChatPanelHandle,
+  type Directorio,
   type UserProfile,
   colors,
 } from '@praxis/commons';
@@ -30,7 +31,8 @@ export interface DirectConversationProps {
   /** Dónde coincidís y qué es esa persona allí. */
   proyectosEnComun: { id: string; name: string; slug: string; rol: string }[];
   page: ChatMessagePage;
-  usersById: Map<string, UserProfile>;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
+  directorio: Directorio;
   currentUserId: string;
   isAdmin?: boolean;
 }
@@ -49,7 +51,7 @@ export function DirectConversation({
   peerNombre,
   proyectosEnComun,
   page,
-  usersById,
+  directorio,
   currentUserId,
   isAdmin = false,
 }: DirectConversationProps) {
@@ -109,7 +111,7 @@ export function DirectConversation({
         </a>
       }
       page={page}
-      usersById={usersById}
+      directorio={directorio}
       currentUserId={currentUserId}
       acciones={acciones}
       gatewayPath="/dashboard/api/gateway"
@@ -131,7 +133,7 @@ export function DirectConversation({
       vacio={`Todavía no habéis hablado. Escríbele a ${peerNombre}.`}
       encabezado={
         <Encabezado
-          perfil={usersById.get(peerId)}
+          perfil={directorio.perfiles.get(peerId)}
           peerId={peerId}
           nombre={peerNombre}
           proyectos={proyectosEnComun}
@@ -233,7 +235,8 @@ function Encabezado({
                 <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
                 {proyectos.length > 0 && (
                   <p className="font-sans text-sm text-white/70 drop-shadow-md">
-                    Coincidís en {proyectos.length} {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
+                    Coincidís en {proyectos.length}{' '}
+                    {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
                   </p>
                 )}
               </div>
@@ -246,9 +249,9 @@ function Encabezado({
 
           {proyectos.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
-              {isAdmin 
+              {isAdmin
                 ? 'No compartís ningún proyecto, pero como administrador puedes chatear.'
-                : hasMessages 
+                : hasMessages
                   ? 'No compartís proyecto, pero podéis continuar esta conversación.'
                   : 'Ya no compartís ningún proyecto. Puedes leer lo que os dijisteis, pero no escribir.'}
             </p>
@@ -402,8 +405,16 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
               ) : (
                 <>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.54 8.46a5 5 0 010 7.07" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.93a10 10 0 010 14.14" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.54 8.46a5 5 0 010 7.07"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.07 4.93a10 10 0 010 14.14"
+                  />
                 </>
               )}
             </svg>
@@ -430,13 +441,19 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
                 aria-hidden="true"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"
+                />
               </svg>
               Eliminar chat
             </button>
           ) : (
             <div className="flex flex-col gap-2 rounded-lg bg-error/10 p-2">
-              <span className="font-sans text-[11px] font-medium text-error">¿Eliminar chat para mí?</span>
+              <span className="font-sans text-[11px] font-medium text-error">
+                ¿Eliminar chat para mí?
+              </span>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"

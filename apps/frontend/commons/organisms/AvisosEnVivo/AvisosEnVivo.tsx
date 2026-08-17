@@ -1,121 +1,57 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { CHAT_EVENT_TYPE, type NotificationType } from '../../api/domain';
+import { useCallback, useRef } from 'react';
+import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
-import { useRefrescoAgrupado } from '../../hooks';
-import { alpha, colors } from '../../tokens';
+import { useRefrescoAgrupado, useTemaActual } from '../../hooks';
+import { useEventoEnVivo, useReconexion } from '../../realtime';
+import type { EventoAviso, EventoMensaje } from '../../realtime';
+import {
+  PRESENTACION_DE_MENSAJE,
+  type Presentacion,
+  RELLENO_POR_TEMA,
+  presentacionDe,
+} from './estilos';
 
 /**
- * Lo que publica el gateway por el flujo. Espejo de `AvisoEnVivo` allí.
+ * Las tarjetas que aparecen solas mientras la pantalla está abierta.
  *
- * ⚠️ `type` es **texto libre**, no `NotificationType`. Por este flujo viaja
- * todo lo que hay que anunciar en el momento, y no todo deja fila en la
- * bandeja: los mensajes de chat llegan como `CHAT_MESSAGE` y no existen en el
- * enum de `notifications`. Tiparlo como el enum haría creer al resto del
- * archivo que la lista está cerrada, que es justo lo que no está.
- */
-interface AvisoRecibido {
-  type: NotificationType | typeof CHAT_EVENT_TYPE | (string & {});
-  /** Quién lo provocó. En un mensaje privado es con quien hay que hablar. */
-  actorId?: string | null;
-  /** El nombre de quien lo provocó. Lo resuelve el gateway al relevar el
-      evento; `null` o ausente cuando no se pudo, y entonces se lee impersonal. */
-  actorName?: string | null;
-  /**
-   * Solo en los avisos de chat: de qué tipo de conversación viene.
-   *
-   * Es lo que decide a dónde lleva la tarjeta — al chat del proyecto o a la
-   * conversación privada—, y no se puede deducir del resto: un mensaje privado
-   * llega sin proyecto, así que sin esto sería indistinguible de un aviso al
-   * que simplemente le falta el dato.
-   */
-  channelKind?: 'PROJECT' | 'DIRECT' | null;
-  projectId: string | null;
-  projectName: string | null;
-  /**
-   * Solo lo llevan los avisos de chat.
-   *
-   * Los demás se construyen desde una fila de `notifications`, que guarda el
-   * nombre del proyecto como copia del momento pero no su slug. Cuando falta se
-   * cae al `projectId`: el guard acepta las dos formas, así que el enlace
-   * funciona igual — solo sale una URL más fea.
-   */
-  projectSlug?: string | null;
-  taskId: string | null;
-  taskTitle: string | null;
-  createdAt: string;
-}
-
-interface AvisoEnPantalla {
-  id: number;
-  texto: string;
-  tono: string;
-  /** A dónde lleva al pulsarla. `null` si el aviso no tiene destino. */
-  destino: string | null;
-}
-
-/** Cuánto se queda un aviso en pantalla antes de irse solo. */
-const DURACION_MS = 6000;
-
-/**
- * Tope de avisos apilados a la vez.
+ * ## Lo que este componente ya **no** hace
  *
- * Sin tope, alguien que asigne quince tareas de golpe llena la pantalla de
- * tarjetas y tapa la aplicación que vienen a anunciar.
- */
-const MAXIMO_APILADO = 3;
-
-export interface AvisosEnVivoProps {
-  /**
-   * Proxy de la zona, sin barra final: `/projects/api/gateway`.
-   *
-   * Tiene que ser el de la zona en la que estamos. El token vive en una cookie
-   * httpOnly y `EventSource` no puede mandar cabeceras, así que la petición
-   * **debe** cruzar el proxy para que le añada el `Authorization`.
-   */
-  gatewayPath: string;
-}
-
-/**
- * Avisos que llegan solos, mientras la pantalla está abierta.
+ * Abría la conexión SSE y llamaba a `router.refresh()` con cada evento. Las dos
+ * cosas se han ido, y las dos por el mismo motivo.
  *
- * Escucha el flujo SSE del gateway —una sola vía: el servidor empuja y aquí no
- * se escribe nunca— y por cada aviso hace tres cosas: lo enseña unos segundos en
- * una tarjeta que entra por la derecha, suena, y **refresca la ruta**.
+ * La conexión ahora la abre [`FuenteEnVivo`] —una sola por pestaña, en el
+ * armazón— porque el chat, la lista de conversaciones y los hilos quieren
+ * enterarse de lo mismo, y cuatro `EventSource` por pestaña era pagar cuatro
+ * veces por los mismos bytes.
  *
- * Ese refresco es la parte que más importa y la más fácil de olvidar: sin él, el
- * aviso emergente contaría algo que la página de debajo sigue sin enseñar —la
- * insignia de la barra lateral con el número viejo, el tablero sin la tarea que
- * te acaban de asignar—. Refrescar vuelve a pedir los componentes de servidor
- * conservando el estado del cliente, así que la pantalla se pone al día sin
- * perder lo que estuvieras haciendo.
+ * El refresco por cada mensaje era peor. Era lo único que metía un mensaje nuevo
+ * en la conversación abierta, y entraba en la **misma cola de transición del App
+ * Router que las Server Actions**: perder esa carrera contra un envío propio es
+ * exactamente el fallo de «mi mensaje se envía, le llega al otro y en mi pantalla
+ * no aparece». Ahora cada superficie se suscribe a lo suyo; aquí solo queda
+ * **anunciar**, que es lo que este componente decía ser.
  *
- * ⚠️ **El refresco va agrupado, y eso no es una optimización cosmética.** Cada
- * `router.refresh()` entra en la misma cola global que las Server Actions, y
- * tenerla ocupada es lo que destapa el fallo del botón que gira para siempre
- * —explicado en `commons/hooks/useAccion`—. Por este flujo viaja también el
- * chat, que no tiene ritmo: uno a uno, una conversación viva dejaba la cola
- * ocupada casi todo el rato. Con [`useRefrescoAgrupado`] una ráfaga es un solo
- * refresco, y el resultado en pantalla es idéntico porque cada refresco trae el
- * estado completo, no un incremento.
+ * ⚠️ **Queda un refresco, y solo para los avisos de bandeja.** Una invitación o
+ * una tarea asignada sí cambian lo que renderiza el servidor —la bandeja, el
+ * tablero— y esas pantallas no se suscriben a nada. Son unos pocos al día, no el
+ * chorro constante del chat.
+ *
+ * ## Las tarjetas las pinta `sileo`
+ *
+ * Había un apilado propio de `<article>` con su temporizador y su tope de tres.
+ * `sileo` hace eso mismo con una píldora que **se despliega** para enseñar el
+ * texto, y ese despliegue es lo que permite darle un ritmo distinto a cada clase
+ * de aviso: ver `estilos.ts`.
  *
  * ⚠️ **No reemplaza a la bandeja.** Si nadie tiene la pestaña abierta, el aviso
  * ya está guardado y se ve al entrar. Esto es una capa encima; que Redis o el
  * flujo fallen degrada el tiempo real y nada más.
- *
- * ⚠️ **El flujo se recupera solo de los cortes.** `EventSource` reconecta
- * automáticamente cuando la conexión cae, pero lo publicado mientras estaba
- * caída se pierde: por eso el `onopen` de una reconexión refresca la ruta (es el
- * momento en que lo perdido se puede recuperar) y un vigilante de latidos
- * detecta las conexiones que mueren sin avisar —un socket que un intermediario
- * congela— y las fuerza a reconectar. Sin esto, un mensaje caído en un hueco de
- * red no aparecía hasta una recarga manual.
  */
-export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
-  const [avisos, setAvisos] = useState<AvisoEnPantalla[]>([]);
+export function AvisosEnVivo() {
   const pedirRefresco = useRefrescoAgrupado();
-  const siguienteId = useRef(0);
+  const tema = useTemaActual();
 
   /**
    * El contexto de audio se crea una vez y a la primera necesidad.
@@ -166,178 +102,180 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
     }
   }, []);
 
-  useEffect(() => {
-    /**
-     * `withCredentials` no hace falta —es el mismo origen, la cookie va sola—
-     * pero el flujo sí tiene que ser de la propia zona: el shell reescribe
-     * `/<zona>/*` hacia ella, así que esta ruta relativa resuelve bien tanto en
-     * local como detrás del balanceador.
-     */
-    let fuente: EventSource | null = null;
-    /* La primera apertura es la inicial; las siguientes son RECONEXIONES.
-       `EventSource` reintenta solo, pero al volver hay que refrescar: todo lo
-       publicado mientras el flujo estuvo caído —un mensaje, una asignación— se
-       perdió, y un `EventSource` no reenvía lo que no vio. Sin este refresco,
-       eso no aparecía hasta una recarga manual o el siguiente aviso. */
-    let primeraConexion = true;
-    /* Cuándo llegó la última señal (aviso o latido), para el vigilante. */
-    let ultimoLatido = Date.now();
-
-    function marcarVivo() {
-      ultimoLatido = Date.now();
-    }
-
-    function alLlegarAviso(evento: MessageEvent<string>) {
-      marcarVivo();
-      let aviso: AvisoRecibido;
-      try {
-        aviso = JSON.parse(evento.data) as AvisoRecibido;
-      } catch {
-        return;
-      }
-
-      const destino = destinoDe(aviso);
-
-      /**
-       * ⚠️ **Si ya estás mirando esa conversación, ni tarjeta ni sonido.**
-       *
-       * Avisar de un mensaje que aparece solo, delante de tus ojos, es ruido: la
-       * tarjeta tapa el propio hilo y el sonido suena por algo que ya estás
-       * leyendo. En una conversación viva eso son dos pitidos por minuto para no
-       * decir nada nuevo.
-       *
-       * Se compara contra `window.location` y no contra `usePathname()` a
-       * propósito: aquel devuelve la ruta **sin el basePath** de la zona
-       * —`/chat/<id>` dentro de dashboard-front— mientras que `destinoDe`
-       * construye la ruta pública completa. Comparar las dos daría siempre
-       * falso. Aquí, además, estamos en un manejador de evento: el navegador ya
-       * está montado y `location` es la verdad.
-       *
-       * ⚠️ **El refresco se pide igual.** Es lo que mete el mensaje en el hilo
-       * abierto: silenciar el aviso no puede significar no enterarse.
-       */
-      const estoyViendolo = destino !== null && mismaVista(destino, window.location);
-
-      pedirRefresco();
-      if (estoyViendolo) return;
-
-      const id = siguienteId.current++;
-      setAvisos((actuales) =>
-        [...actuales, { id, texto: describir(aviso), tono: tonoDe(aviso.type), destino }].slice(
-          -MAXIMO_APILADO,
-        ),
-      );
-
+  /**
+   * Lanza la tarjeta y suena.
+   *
+   * ⚠️ El destino se navega con `window.location` y no con `next/link`: el aviso
+   * aparece en cualquier zona y su destino puede vivir en otra —te llega estando
+   * en el panel y lleva a `projects`—, así que la navegación tiene que ser dura.
+   * Misma regla que la barra lateral (ESTADO-ACTUAL §16).
+   */
+  const anunciar = useCallback(
+    (presentacion: Presentacion, descripcion: string, destino: string | null) => {
+      sileo.show({
+        type: presentacion.tipo,
+        title: presentacion.titulo,
+        description: descripcion,
+        duration: presentacion.duracion,
+        autopilot: presentacion.autopilot,
+        /* El tono de la píldora sale de la paleta de PRAXIS, no del blanco y
+           negro casi puros que trae `sileo`. Ver `RELLENO_POR_TEMA`. */
+        fill: RELLENO_POR_TEMA[tema],
+        ...(destino && presentacion.accion
+          ? {
+              button: {
+                title: presentacion.accion,
+                onClick: () => {
+                  window.location.href = destino;
+                },
+              },
+            }
+          : {}),
+      });
       sonar();
-
-      window.setTimeout(() => {
-        setAvisos((actuales) => actuales.filter((candidato) => candidato.id !== id));
-      }, DURACION_MS);
-    }
-
-    /* Un `latido` marca la conexión viva: es la señal de que el flujo sigue
-       abierto aunque no haya avisos que mostrar. El vigilante de abajo lo
-       necesita para distinguir «sin novedades» de «conexión muerta». */
-    function abrirFlujo() {
-      const nueva = new EventSource(`${gatewayPath}/me/notifications/stream`);
-      fuente = nueva;
-
-      nueva.addEventListener('aviso', alLlegarAviso as EventListener);
-      nueva.addEventListener('latido', marcarVivo as EventListener);
-
-      /* El `onerror` no cierra nada — `EventSource` reconecta solo, y cerrarlo
-         aquí desactivaría esa reconexión. Lo que sí hacemos es refrescar al
-         volver: es el momento en que lo perdido se puede recuperar. */
-      nueva.onopen = () => {
-        if (!primeraConexion) pedirRefresco();
-        primeraConexion = false;
-        marcarVivo();
-      };
-    }
-
-    abrirFlujo();
-
-    /* Vigilante de la conexión. `EventSource` no detecta que un flujo se quedó
-       en silencio: si el gateway muere sin cerrar el socket —o un proxy
-       intermedio lo congela— la conexión sigue «abierta» para el navegador pero
-       no llega nada. Los latidos vienen cada 25 s, así que tras más de dos sin
-       señal la conexión está muerta: se fuerza el cierre y la reconexión, y el
-       `onopen` de arriba refresca lo perdido. */
-    const vigilante = window.setInterval(() => {
-      if (Date.now() - ultimoLatido > 2 * 25_000 + 10_000) {
-        fuente?.close();
-        abrirFlujo();
-      }
-    }, 15_000);
-
-    return () => {
-      window.clearInterval(vigilante);
-      fuente?.removeEventListener('aviso', alLlegarAviso as EventListener);
-      fuente?.removeEventListener('latido', marcarVivo as EventListener);
-      fuente?.close();
-    };
-  }, [gatewayPath, pedirRefresco, sonar]);
-
-  if (avisos.length === 0) return null;
-
-  return (
-    <div
-      /* `aria-live="polite"`: se anuncia cuando quien escucha termina lo que
-         esté leyendo, en vez de interrumpirle. Un aviso de cortesía no puede
-         cortar la lectura de un formulario. */
-      aria-live="polite"
-      aria-label="Avisos recientes"
-      className="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"
-    >
-      {avisos.map((aviso) => (
-        <Tarjeta key={aviso.id} aviso={aviso} />
-      ))}
-    </div>
+    },
+    [sonar, tema],
   );
+
+  /**
+   * Un mensaje de chat: tarjeta y sonido.
+   *
+   * ⚠️ **Sin refrescar nada.** El mensaje ya lo ha insertado el panel de la
+   * conversación por su cuenta, escuchando este mismo evento. Aquí solo se
+   * decide si además hay que llamar la atención.
+   */
+  useEventoEnVivo('chat.mensaje', (evento) => {
+    /* Lo tuyo no se te anuncia: lo acabas de escribir. El evento te llega igual
+       —lo necesitan tus otras pestañas y el panel para reconciliar— pero sin
+       ruido. `mio` lo resuelve el servidor, que sabe a quién manda cada copia. */
+    if (evento.mio) return;
+
+    /* Silenciado es «sin tarjeta ni sonido», no «sin enterarse». */
+    if (evento.silenciado) return;
+
+    /**
+     * ⚠️ **Si ya estás mirando esa conversación, ni tarjeta ni sonido.**
+     *
+     * Avisar de un mensaje que aparece solo, delante de tus ojos, es ruido: la
+     * tarjeta tapa el propio hilo y el sonido suena por algo que ya estás
+     * leyendo. En una conversación viva eso son dos pitidos por minuto para no
+     * decir nada nuevo.
+     *
+     * Se compara contra `window.location` y no contra `usePathname()` a
+     * propósito: aquel devuelve la ruta **sin el basePath** de la zona
+     * —`/chat/<id>` dentro de dashboard-front— mientras que `destinoDeMensaje`
+     * construye la ruta pública completa. Comparar las dos daría siempre falso.
+     * Aquí, además, estamos en un manejador de evento: el navegador ya está
+     * montado y `location` es la verdad.
+     */
+    const destino = destinoDeMensaje(evento);
+    if (destino && mismaVista(destino, window.location)) return;
+
+    anunciar(PRESENTACION_DE_MENSAJE, textoDeMensaje(evento), destino);
+  });
+
+  /** Los avisos de la bandeja: invitaciones, asignaciones, altas y bajas. */
+  useEventoEnVivo('aviso', (evento) => {
+    /* Estos sí cambian lo que renderiza el servidor —la bandeja, el tablero— y
+       esas pantallas no escuchan nada. */
+    pedirRefresco();
+
+    const destino = destinoDeAviso(evento);
+    if (destino && mismaVista(destino, window.location)) return;
+
+    anunciar(presentacionDe(evento.type), describir(evento), destino);
+  });
+
+  /**
+   * Al recuperarse de un corte, se repasa lo que no se suscribe a nada.
+   *
+   * El chat se resincroniza solo —cada panel pide lo suyo con `?after=`, que es
+   * una petición pequeña y exacta— pero la bandeja y el tablero se pintan en el
+   * servidor y hay que volver a pedir la ruta.
+   */
+  useReconexion(pedirRefresco);
+
+  /**
+   * ⚠️ **El `theme` va explícito, y no se puede omitir.**
+   *
+   * `sileo` pinta una píldora **de color contrario al tema** (`{light:
+   * '#1a1a1a', dark: '#f2f2f2'}`), que es lo que le da protagonismo sin invadir:
+   * sobre la aplicación oscura sale clara y al revés. Para acertar necesita
+   * saber el tema, y si no se le pasa lo deduce de `prefers-color-scheme` — que
+   * aquí **es la respuesta equivocada**: el tema de PRAXIS se elige a mano y
+   * vive en la cookie `praxis_theme`, así que quien tenga el sistema en oscuro y
+   * la aplicación en claro vería una tarjeta oscura sobre fondo claro.
+   *
+   * Sin `theme` tampoco se estampa `data-theme` en el contenedor, y sin ese
+   * atributo la descripción se queda sin regla de color.
+   *
+   * `bottom-right` para no tapar la cabecera ni el buscador, que es donde estaba
+   * el apilado anterior.
+   */
+  return <Toaster position="bottom-right" theme={tema} offset={16} />;
 }
 
 /**
- * El texto del aviso emergente.
+ * El texto de un mensaje de chat.
  *
- * ## Con nombre desde que el gateway lo resuelve
+ * ⚠️ **Sin el texto del mensaje, a propósito.** El evento **sí** lo trae —quien
+ * lo recibe es participante del canal y ya tiene permiso para leerlo— pero
+ * reproducirlo en una tarjeta que aparece sobre cualquier pantalla lo enseñaría
+ * en la de quien tenga el portátil abierto en una reunión. Para leerlo está el
+ * chat.
  *
- * Antes iba todo en impersonal —«Te han asignado…»— porque por el flujo solo
- * viajaba `actorId` y resolverlo desde aquí habría costado una petición por
- * aviso. Ahora lo resuelve el gateway al relevar el evento, con caché, así que
- * el nombre llega puesto y **quién lo hizo es la mitad del aviso**: en un chat de
- * equipo, «mensaje nuevo» sin remitente obliga a abrirlo para saber si te
- * incumbe.
- *
- * Sigue degradando a impersonal cuando `actorName` no viene —credentials caído,
- * una cuenta borrada, un emisor que no lo manda— y esa es la forma que tenía
- * antes: se pierde un dato, no el aviso.
- *
- * ## Y el proyecto solo cuando distingue algo
- *
- * En un mensaje privado no hay proyecto que nombrar, y decir «un proyecto» ahí
- * sería inventarse un contexto que no existe.
+ * Y el proyecto solo se nombra cuando distingue algo: en un mensaje privado no
+ * hay proyecto, y decir «un proyecto» ahí sería inventarse un contexto.
  */
-function describir(aviso: AvisoRecibido): string {
-  const proyecto = aviso.projectName ?? null;
-  const tarea = aviso.taskTitle ?? 'una tarea';
-  const quien = aviso.actorName?.trim() || null;
-  /* «en «Proyecto»» o nada. Se compone una vez y se reutiliza abajo para que
-     ninguna rama se olvide de contemplar el caso sin proyecto. */
+function textoDeMensaje(evento: EventoMensaje): string {
+  const quien = evento.actorName?.trim() || null;
+  const proyecto = evento.projectName ?? null;
+
+  if (quien && proyecto) return `${quien} ha escrito en «${proyecto}».`;
+  if (quien) return `${quien} te ha escrito.`;
+  if (proyecto) return `Mensaje nuevo en el chat de «${proyecto}».`;
+  return 'Tienes un mensaje nuevo.';
+}
+
+/**
+ * A dónde lleva la tarjeta de un mensaje.
+ *
+ * ⚠️ **El chat de un equipo vive en Mensajes**, no en la pantalla del proyecto.
+ * Esto apuntaba a `/projects/<slug>?tab=chat`, donde ya solo queda una muestra
+ * de cuatro líneas — y como `mismaVista()` compara este destino con la URL
+ * abierta para decidir si callar, con un destino que no coincidía con ninguna
+ * pantalla real **la comparación daba falso siempre**: sonaba y salía tarjeta
+ * aunque tuvieras la conversación delante, y también con un hilo abierto encima.
+ *
+ * ⚠️ Va con el **UUID** y no con el slug: esa ruta lo pasa tal cual a
+ * `/projects/:id/chat/messages`, y todo lo anidado bajo `/projects/:id` espera
+ * el UUID (CLAUDE.md, trampa 10).
+ */
+function destinoDeMensaje(evento: EventoMensaje): string | null {
+  if (evento.channelKind === 'DIRECT') {
+    return evento.peerId ? `/dashboard/chat/${evento.peerId}` : null;
+  }
+  return evento.projectId ? `/dashboard/chat/proyecto/${evento.projectId}` : null;
+}
+
+/**
+ * El texto de un aviso de bandeja.
+ *
+ * Con nombre desde que el gateway lo resuelve al relevar el evento: en un equipo,
+ * «te han asignado algo» sin decir quién obliga a abrirlo para saber si te
+ * incumbe. Degrada a impersonal cuando `actorName` no viene —credentials caído,
+ * una cuenta borrada—, que es la forma que tenía antes: se pierde un dato, no el
+ * aviso.
+ */
+function describir(evento: EventoAviso): string {
+  const proyecto = evento.projectName ?? null;
+  const tarea = evento.taskTitle ?? 'una tarea';
+  const quien = evento.actorName?.trim() || null;
+  /* «en «Proyecto»» o nada. Se compone una vez para que ninguna rama se olvide
+     de contemplar el caso sin proyecto. */
   const donde = proyecto ? ` en «${proyecto}»` : '';
 
-  /**
-   * ⚠️ **Sin el texto del mensaje, a propósito.** El aviso no lo trae y no debe:
-   * reproducir lo escrito lo enseñaría en la pantalla de quien tenga el portátil
-   * abierto en una reunión. Para leerlo está el chat, que comprueba permisos.
-   */
-  if (aviso.type === CHAT_EVENT_TYPE) {
-    if (quien && proyecto) return `${quien} ha escrito en «${proyecto}».`;
-    if (quien) return `${quien} te ha escrito.`;
-    if (proyecto) return `Mensaje nuevo en el chat de «${proyecto}».`;
-    return 'Tienes un mensaje nuevo.';
-  }
-
-  switch (aviso.type) {
+  switch (evento.type) {
     case 'INVITATION_RECEIVED':
       return quien
         ? `${quien} te ha invitado a «${proyecto ?? 'un proyecto'}».`
@@ -370,128 +308,48 @@ function describir(aviso: AvisoRecibido): string {
 }
 
 /**
- * Una tarjeta.
- *
- * Con destino es un **enlace de verdad**, no un `onClick` sobre un `div`: así se
- * puede abrir en otra pestaña, se ve a dónde va en la barra de estado y el
- * teclado lo alcanza sin añadirle `role` ni `tabIndex` a mano.
- *
- * ⚠️ Y es `<a>` y no `next/link`: la tarjeta aparece en cualquier zona y el
- * destino vive en otra —el aviso te llega estando en el panel y lleva a
- * `projects`—, así que la navegación tiene que ser dura. Misma regla que la
- * barra lateral (ESTADO-ACTUAL §16).
- */
-function Tarjeta({ aviso }: { aviso: AvisoEnPantalla }) {
-  const caja =
-    'animate-entrar-desde-la-derecha pointer-events-auto flex items-start gap-3 rounded-xl border border-border p-3';
-  const estilo = {
-    background: colors.surfaceElevated,
-    boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}`,
-  };
-
-  const contenido = (
-    <>
-      <span
-        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-        style={{ background: aviso.tono }}
-        aria-hidden="true"
-      />
-      <p className="font-sans text-sm leading-snug text-text-primary">{aviso.texto}</p>
-    </>
-  );
-
-  if (!aviso.destino) {
-    return (
-      <article className={caja} style={estilo}>
-        {contenido}
-      </article>
-    );
-  }
-
-  return (
-    <a
-      href={aviso.destino}
-      className={`${caja} cursor-pointer transition-colors hover:border-border-strong`}
-      style={estilo}
-    >
-      {contenido}
-    </a>
-  );
-}
-
-/**
- * A dónde lleva la tarjeta al pulsarla, o `null` si no lleva a ninguna parte.
+ * A dónde lleva la tarjeta de un aviso de bandeja.
  *
  * ⚠️ **Se usa `projectHref` y no una plantilla a mano.** El slug va en la URL y
  * el UUID en la API, los dos son `string`, y confundirlos no da error de
  * compilación: sale una URL fea, un 403 o un desplegable vacío. Ya se coló en
  * cinco sitios (CLAUDE.md, trampa 10).
  *
- * Sin `projectSlug` se cae al `projectId`, que el guard también resuelve. Es
+ * Sin `projectSlug` se cae al `projectId`, que el guard también resuelve: es
  * mejor una URL fea que una tarjeta que no lleva a ningún sitio.
  */
-function destinoDe(aviso: AvisoRecibido): string | null {
-  /* Un mensaje privado no tiene proyecto: lleva a la conversación con quien
-     escribió. Se resuelve antes que nada porque `projectId` viene vacío y la
-     comprobación de abajo lo descartaría. */
-  if (aviso.type === CHAT_EVENT_TYPE && aviso.channelKind === 'DIRECT') {
-    return aviso.actorId ? `/dashboard/chat/${aviso.actorId}` : null;
-  }
-
-  const identificador = aviso.projectSlug || aviso.projectId;
+function destinoDeAviso(evento: EventoAviso): string | null {
+  const identificador = evento.projectSlug || evento.projectId;
   if (!identificador) return null;
-
-  if (aviso.type === CHAT_EVENT_TYPE) {
-    return projectHref({ slug: identificador }, { tab: 'chat' });
-  }
 
   /* Los avisos de tarea abren la tarea directamente. La página resuelve el
      tablero desde `?task=`, así que no hace falta saberlo aquí. */
-  if (aviso.taskId) {
-    return projectHref({ slug: identificador }, { task: aviso.taskId });
+  if (evento.taskId) {
+    return projectHref({ slug: identificador }, { task: evento.taskId });
   }
 
-  /* Los de equipo —invitaciones, altas y bajas— llevan al proyecto sin más.
-     `MEMBER_REMOVED` es la excepción: te acaban de sacar, así que el enlace
-     daría 403 y sería peor que no ofrecerlo. */
-  if (aviso.type === 'MEMBER_REMOVED') return null;
+  /* Los de equipo llevan al proyecto sin más. `MEMBER_REMOVED` es la excepción:
+     te acaban de sacar, así que el enlace daría 403 y sería peor que nada. */
+  if (evento.type === 'MEMBER_REMOVED') return null;
 
   return projectHref({ slug: identificador });
 }
 
-/**
- * El color del punto del aviso.
- *
- * Va por función y no por índice directo al mapa porque `type` ya no es una
- * lista cerrada: un `CHAT_MESSAGE` —o cualquier tipo que el gateway estrene
- * antes que el navegador— no está en `TONO_POR_TIPO` y leerlo daría `undefined`
- * sin que nada avise.
+/*
+ * ⚠️ Aquí vivían `Tarjeta`, `tonoDe` y `TONO_POR_TIPO`: el apilado propio de
+ * tarjetas, con su temporizador, su tope de tres y un color por tipo de aviso.
+ * Lo pinta `sileo`, y el color por tipo se expresa ahora con sus estados
+ * (`success`, `warning`, `error`, `info`, `action`) en `estilos.ts`, que además
+ * decide el ritmo de despliegue de cada uno. Los colores de esos estados se
+ * atan a la paleta de PRAXIS en `commons/styles/theme.css`.
  */
-function tonoDe(tipo: AvisoRecibido['type']): string {
-  if (tipo === CHAT_EVENT_TYPE) return colors.info;
-  return TONO_POR_TIPO[tipo as NotificationType] ?? colors.primary;
-}
-
-/** Mismos colores que la bandeja: equipo en ámbar, tareas en violeta, salidas en rojo. */
-const TONO_POR_TIPO: Record<NotificationType, string> = {
-  INVITATION_RECEIVED: colors.accent,
-  INVITATION_ACCEPTED: colors.success,
-  INVITATION_REJECTED: colors.textSecondary,
-  MEMBER_LEFT: colors.warning,
-  MEMBER_REMOVED: colors.error,
-  TASK_ASSIGNED: colors.primary,
-  TASK_UNASSIGNED: colors.textSecondary,
-};
 
 /**
  * ¿La pantalla que hay abierta es el destino de este aviso?
  *
- * Compara la ruta y, **solo si el destino la lleva**, la pestaña. Un aviso del
- * chat de un proyecto apunta a `?tab=chat`: estar en el proyecto pero en otra
- * pestaña **no** cuenta como estarlo viendo, porque la conversación no está a la
- * vista. En cambio los parámetros que trae la URL de más —`ws`, `board`— no
- * deben romper la coincidencia: quien mira el chat con un tablero recordado
- * sigue mirando el chat.
+ * Compara la ruta y, **solo si el destino la lleva**, la pestaña. Los parámetros
+ * que trae la URL de más —`ws`, `board`— no deben romper la coincidencia: quien
+ * mira el chat con un tablero recordado sigue mirando el chat.
  */
 export function mismaVista(destino: string, actual: { pathname: string; search: string }): boolean {
   const [rutaDestino, consultaDestino] = destino.split('?');

@@ -110,6 +110,36 @@ resource "google_sql_database_instance" "postgres" {
       update_track = "stable"
     }
 
+    /**
+     * ⚠️ **El techo de conexiones, y por qué 150 y no el que viene.**
+     *
+     * `db-f1-micro` nace con `max_connections = 25`. Al otro lado hay seis
+     * servicios con Prisma, y `PrismaPg` envuelve un `pg.Pool` cuyo `max` por
+     * defecto es 10: sesenta conexiones por instancia del backend, y el grupo
+     * escala hasta tres, o sea hasta ciento ochenta contra un límite de
+     * veinticinco.
+     *
+     * Pasado ese punto Postgres rechaza con «remaining connection slots are
+     * reserved» y el pool encola las consultas hasta agotar su espera. En la
+     * pantalla eso no se lee como un error de base de datos: se lee como que la
+     * aplicación va lenta, se traba y pierde la conexión.
+     *
+     * ⚠️ **Esta línea sola no arregla nada.** La otra mitad es acotar los pools
+     * (`DATABASE_POOL_MAX`, cinco por servicio → treinta por instancia, noventa
+     * con el grupo al máximo). Subir el límite sin acotar los pools solo mueve
+     * el problema más arriba; acotarlos sin subirlo deja el sistema sin margen
+     * para escalar.
+     *
+     * 150 sale de 90 más holgura para migraciones, `psql` y los reinicios
+     * solapados durante un despliegue. En una instancia de 0,6 GB cada conexión
+     * ociosa cuesta unos pocos megabytes, así que 150 es el techo razonable —no
+     * un número al que se deba llegar.
+     */
+    database_flags {
+      name  = "max_connections"
+      value = "150"
+    }
+
     /* Deja rastro de las consultas lentas. Sale gratis y es lo primero que se
        mira cuando una pantalla tarda y nadie sabe por qué. */
     insights_config {

@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ObservabilityModule } from '@praxis/observability';
 import { envValidationSchema } from './common/config/env.validation';
+import { IdentityThrottlerGuard } from './common/guards/identity-throttler.guard';
 
 import { AdminModule } from './admin/admin.module';
 import { AlexaModule } from './alexa/alexa.module';
@@ -14,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { PresenceModule } from './presence/presence.module';
 import { ProjectsModule } from './projects/projects.module';
 import { ReportsModule } from './reports/reports.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -44,8 +46,17 @@ import { UserModule } from './users/user.module';
      * salen casi a la vez. Con 100 se estrangulaba a un usuario navegando
      * rápido.
      *
+     * ⚠️ **Y son 300 por cuenta, no por dirección IP.** Lo eran por IP, y como
+     * el navegador nunca habla directo con el gateway —todo cruza el proxy de la
+     * zona o nace en el renderizado de servidor de Next— esa IP era **la misma
+     * para toda la plataforma**: los 300 se repartían entre todos los usuarios a
+     * la vez. Se agotaban en segundos y el gateway empezaba a responder 429 a
+     * peticiones legítimas, que las pantallas se tragan en silencio. Detalle
+     * entero en `IdentityThrottlerGuard`.
+     *
      * El apretón para `login` y `refresh` —donde adivinar sale a cuenta— se
-     * pone con `@Throttle` en `auth.controller.ts`.
+     * pone con `@Throttle` en `auth.controller.ts`. Esos siguen contando por IP
+     * porque quien los llama todavía no tiene sesión con la que identificarse.
      *
      * El registro **no** lleva límite estricto: es el mismo camino que recorre
      * la suite al crear cuentas, y ahogarlo cambiaría el riesgo de fuerza bruta
@@ -57,6 +68,7 @@ import { UserModule } from './users/user.module';
     // Módulos de negocio
     AuthModule,
     UserModule,
+    PresenceModule,
     PermissionsModule,
     ProjectsModule,
     TasksModule,
@@ -74,8 +86,12 @@ import { UserModule } from './users/user.module';
   providers: [
     AppService,
     /* Lo que hace que `ThrottlerModule` sirva de algo. Sin esta línea la
-       política existe y nadie la aplica. */
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+       política existe y nadie la aplica.
+
+       ⚠️ Es `IdentityThrottlerGuard` y no el `ThrottlerGuard` de la librería:
+       cuenta por cuenta y no por IP. Puede inyectar `JwtService` porque
+       `AuthModule` —importado arriba— exporta `JwtModule`. */
+    { provide: APP_GUARD, useClass: IdentityThrottlerGuard },
   ],
 })
 export class AppModule {}

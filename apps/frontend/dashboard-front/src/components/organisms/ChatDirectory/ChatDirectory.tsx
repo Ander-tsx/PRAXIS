@@ -4,21 +4,32 @@ import {
   Avatar,
   type ChatContact,
   type DirectConversation,
+  type Directorio,
   type UserProfile,
   alpha,
   colors,
   hrefDeAvatar,
-  personLabel,
+  nombreDePersona,
   textoPlano,
+  usePresencia,
 } from '@praxis/commons';
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useConversacionesEnVivo } from './useConversacionesEnVivo';
 
 /** Un chat de proyecto en la bandeja. */
 export interface ChatDeProyecto {
   channelId: string | null;
   project: { id: string; name: string; slug: string };
-  ultimo: { body: string; authorId: string; createdAt: string } | null;
+  /** `deletedAt` para poder decir «Mensaje eliminado» en vez de dejar la fila
+      sin resumen: al borrar, `body` se vacía. */
+  ultimo: {
+    body: string;
+    authorId: string;
+    createdAt: string;
+    deletedAt?: string | null;
+  } | null;
   unread: number;
   muted: boolean;
 }
@@ -27,12 +38,35 @@ export interface ChatDirectoryProps {
   conversaciones: DirectConversation[];
   contactos: ChatContact[];
   proyectos: ChatDeProyecto[];
-  usersById: Map<string, UserProfile>;
-  /** Con quién se está hablando ahora, si es que hay alguien. */
-  activo: string | null;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
+  directorio: Directorio;
 }
 
 type Pestana = 'directos' | 'proyectos';
+
+/**
+ * Qué conversación está abierta, leída de la ruta.
+ *
+ * ⚠️ **Esto llegaba por props desde el layout, y llegaba siempre `null`.** Salía
+ * de `params.peerId` de `chat/layout.tsx`, y un layout solo recibe los
+ * parámetros de los segmentos que tiene **por encima**: `/chat` no tiene ninguno
+ * dinámico, así que ese objeto está vacío por construcción. El resultado era que
+ * ninguna fila se marcaba nunca como seleccionada —el `aria-current` y el fondo
+ * no se ponían jamás— y en móvil la columna no se apartaba al abrir un chat,
+ * porque eso también dependía de `activo`.
+ *
+ * `usePathname()` en dashboard-front devuelve la ruta **sin el basePath**
+ * (`/chat/<id>`), que es justo la forma que hay que reconocer aquí.
+ */
+function activoDeLaRuta(pathname: string): { tipo: Pestana; id: string } | null {
+  const proyecto = /^\/chat\/proyecto\/([^/]+)/.exec(pathname);
+  if (proyecto?.[1]) return { tipo: 'proyectos', id: proyecto[1] };
+
+  const persona = /^\/chat\/([^/]+)/.exec(pathname);
+  if (persona?.[1]) return { tipo: 'directos', id: persona[1] };
+
+  return null;
+}
 
 /**
  * La columna del centro de mensajes.
@@ -52,19 +86,64 @@ type Pestana = 'directos' | 'proyectos';
  * tienes ya lo sabes.
  */
 export function ChatDirectory({
-  conversaciones,
+  conversaciones: conversacionesDelServidor,
   contactos,
-  proyectos,
-  usersById,
-  activo,
+  proyectos: proyectosDelServidor,
+  directorio,
 }: ChatDirectoryProps) {
-  const [pestana, setPestana] = useState<Pestana>('directos');
+  /**
+   * ⚠️ **Las dos listas se mantienen vivas, no se pintan tal cual llegan.**
+   *
+   * Venían del `layout.tsx` y solo cambiaban al revalidar esa ruta, cosa que no
+   * hacía nadie: te llegaba un mensaje privado estando en el chat de un
+   * proyecto, salía la tarjeta emergente y **el contador de «Directos» no se
+   * movía** hasta cambiar de página. Ahora lo del servidor es el punto de
+   * partida y a partir de ahí manda el flujo en vivo. Ver
+   * `useConversacionesEnVivo`.
+   */
+  const { directos: conversaciones, proyectos } = useConversacionesEnVivo(
+    conversacionesDelServidor,
+    proyectosDelServidor,
+  );
+
+  const abierta = activoDeLaRuta(usePathname());
+  const activo = abierta?.id ?? null;
+
+  /**
+   * La pestaña arranca en la del chat abierto.
+   *
+   * Sin esto, entrar en el chat de un equipo dejaba la columna en «Directos» y
+   * la conversación abierta no se veía por ninguna parte: había que acordarse de
+   * cambiar de pestaña para encontrar dónde estabas.
+   *
+   * Es estado y no un valor derivado a secas porque también se puede cambiar a
+   * mano: quien mira los proyectos con una conversación privada abierta sigue
+   * mirando los proyectos.
+   */
+  const [pestana, setPestana] = useState<Pestana>(abierta?.tipo ?? 'directos');
   const [busqueda, setBusqueda] = useState('');
 
-  const nombreDe = (userId: string) => {
-    const perfil = usersById.get(userId);
-    return perfil ? personLabel(perfil) : 'Alguien que ya no está';
-  };
+  /**
+   * Navegar a una conversación trae su pestaña consigo.
+   *
+   * Esta columna vive en el layout, así que **no se vuelve a montar** al cambiar
+   * de conversación y el valor inicial de arriba solo sirve para la primera
+   * carga. Sin esto, llegar a un chat de equipo desde un aviso emergente dejaba
+   * la columna en «Directos» y la conversación abierta no aparecía en la lista.
+   *
+   * No pisa la elección manual: solo depende de la ruta, así que únicamente se
+   * dispara cuando alguien navega de verdad.
+   */
+  const tipoAbierto = abierta?.tipo;
+  const idAbierto = abierta?.id;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `idAbierto` es un disparador, no un valor que se lea. Sin él, ir de una conversación a otra **del mismo tipo** —desde una tarjeta de aviso, con la pestaña cambiada a mano— no reajustaría la pestaña, y la conversación recién abierta no saldría en la lista.
+  useEffect(() => {
+    if (tipoAbierto) setPestana(tipoAbierto);
+  }, [tipoAbierto, idAbierto]);
+
+  /* Delega en `nombreDePersona`: es quien distingue «esta cuenta ya no existe»
+     de «no se pudo consultar el directorio», que antes se leían igual. */
+  const nombreDe = (userId: string) => nombreDePersona(directorio, userId);
 
   const conHilo = new Set(conversaciones.map((conversacion) => conversacion.peerId));
   const filtro = busqueda.trim().toLowerCase();
@@ -131,13 +210,13 @@ export function ChatDirectory({
                   key={conversacion.channelId}
                   peerId={conversacion.peerId}
                   nombre={nombreDe(conversacion.peerId)}
-                  perfil={usersById.get(conversacion.peerId)}
+                  perfil={directorio.perfiles.get(conversacion.peerId)}
                   activo={activo === conversacion.peerId}
                   unread={conversacion.unread}
                   muted={conversacion.muted}
                   detalle={
                     conversacion.ultimo
-                      ? `${conversacion.ultimo.authorId === conversacion.peerId ? '' : 'Tú: '}${textoPlano(conversacion.ultimo.body)}`
+                      ? `${conversacion.ultimo.authorId === conversacion.peerId ? '' : 'Tú: '}${resumenDe(conversacion.ultimo)}`
                       : null
                   }
                   cuando={conversacion.ultimo?.createdAt ?? null}
@@ -230,7 +309,30 @@ function Vacio({ texto }: { texto: string }) {
   return <p className="px-1 py-4 font-sans text-xs text-text-secondary">{texto}</p>;
 }
 
+/**
+ * Cómo se ve la fila que está abierta.
+ *
+ * ## Fondo y peso de letra, sin barra lateral
+ *
+ * Estaba en un `background` teñido al 12 % en las personas y —peor— en
+ * `surfaceElevated` en los proyectos, que es **exactamente el color del
+ * `hover`**: la fila activa era indistinguible de la que tenías bajo el ratón.
+ * Y como `activo` llegaba siempre `null` (ver `activoDeLaRuta`), ni siquiera se
+ * llegaba a pintar.
+ *
+ * Ahora el fondo va teñido lo bastante para separarse del `hover` y el nombre en
+ * negrita. Dos señales y no una porque el color por sí solo no llega a quien no
+ * lo distingue, y el grosor de la letra se lee sin color ninguno.
+ *
+ * El `aria-current="page"` lo pone cada fila aparte — es lo que lo anuncia a un
+ * lector de pantalla, y ninguna de estas dos señales le dice nada.
+ */
+const FILA_ACTIVA = 'font-semibold';
 
+function estiloDeFila(activo: boolean): React.CSSProperties | undefined {
+  if (!activo) return undefined;
+  return { background: alpha(colors.primary, 16) };
+}
 
 function FilaPersona({
   peerId,
@@ -252,20 +354,26 @@ function FilaPersona({
   detalle: string | null;
   cuando: string | null;
 }) {
+  const presencia = usePresencia(peerId, perfil?.presence);
+
   return (
     <li>
       <Link
         /* Sin el basePath: dentro de dashboard-front, Next lo añade solo. */
         href={`/chat/${peerId}`}
         aria-current={activo ? 'page' : undefined}
-        className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated"
-        style={activo ? { background: alpha(colors.primary, 12) } : undefined}
+        className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
+          activo ? FILA_ACTIVA : ''
+        }`}
+        style={estiloDeFila(activo)}
       >
         <Avatar
           label={nombre}
           size="sm"
           src={hrefDeAvatar(perfil?.avatarUrl, '/dashboard/api/gateway')}
-          presence={perfil?.presence ?? null}
+          /* La del perfil es la del último render; `usePresencia` la pisa si ha
+             cambiado desde entonces. Ver `commons/realtime/presencia.tsx`. */
+          presence={presencia}
         />
 
         <span className="flex min-w-0 flex-1 flex-col">
@@ -315,8 +423,10 @@ function FilaProyecto({
     <Link
       href={`/chat/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className="group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated"
-      style={activo ? { background: colors.surfaceElevated } : undefined}
+      className={`group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
+        activo ? FILA_ACTIVA : ''
+      }`}
+      style={estiloDeFila(activo)}
     >
       {/* Cuadrado y no círculo: distingue de un vistazo un equipo de una
           persona sin tener que leer nada. */}
@@ -339,7 +449,7 @@ function FilaProyecto({
         </span>
         <span className="truncate font-sans text-xs text-text-secondary">
           {chat.ultimo
-            ? `${autor ?? 'Alguien'}: ${textoPlano(chat.ultimo.body)}`
+            ? `${autor ?? 'Alguien'}: ${resumenDe(chat.ultimo)}`
             : 'Sin mensajes todavía'}
         </span>
       </span>
@@ -391,6 +501,18 @@ function Marcas({ unread, muted }: { unread: number; muted: boolean }) {
       )}
     </span>
   );
+}
+
+/**
+ * El resumen de un mensaje para la fila de la lista.
+ *
+ * Un mensaje borrado llega con el `body` vacío —el borrado es suave y vacía el
+ * texto—, así que `textoPlano` daba una cadena vacía y la fila se quedaba sin
+ * resumen: se leía como una conversación sin mensajes cuando en realidad el
+ * último se había borrado.
+ */
+function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
+  return mensaje.deletedAt ? 'Mensaje eliminado' : textoPlano(mensaje.body);
 }
 
 /** «14:32» si es de hoy, «mar» esta semana, «12 ago» más atrás. */

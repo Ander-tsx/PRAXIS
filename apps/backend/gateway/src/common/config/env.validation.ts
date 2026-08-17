@@ -7,6 +7,23 @@ export const envValidationSchema = Joi.object({
 
   JWT_SECRET: Joi.string().required(),
 
+  /**
+   * Cuántos intermediarios nuestros hay delante del gateway.
+   *
+   * Solo lo usa el limitador de peticiones, y **solo para lo que no lleva
+   * sesión** —el login y el registro—: todo lo demás se cuenta por cuenta (ver
+   * `IdentityThrottlerGuard`).
+   *
+   * ⚠️ Por defecto **cero, que significa «no te creas `x-forwarded-for`»**. Esa
+   * cabecera la escribe quien quiera, así que darla por buena sin saber cuántos
+   * saltos son de fiar convierte el límite por IP en decorativo: basta con
+   * cambiarla en cada intento para tener intentos infinitos contra bcrypt.
+   *
+   * En despliegue se pone el número real de saltos (con un balanceador delante,
+   * `1`). En local no hay ninguno y el valor correcto es el de por defecto.
+   */
+  TRUSTED_PROXY_HOPS: Joi.number().min(0).default(0),
+
   // credentials-service (auth + users) — TCP 3001
   CREDENTIALS_SERVICE_HOST: Joi.string().default('localhost'),
   CREDENTIALS_SERVICE_PORT: Joi.number().default(3001),

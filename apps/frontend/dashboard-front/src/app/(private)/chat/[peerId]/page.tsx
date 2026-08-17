@@ -2,8 +2,8 @@ import { DirectConversation } from '@/components/organisms/DirectConversation';
 import {
   type ChatContact,
   type ChatMessagePage,
-  type UserProfile,
-  personLabel,
+  nombreDePersona,
+  resolverPerfiles,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { notFound } from 'next/navigation';
@@ -39,24 +39,41 @@ export default async function ConversacionPage({ params }: PageProps) {
      hasta que el componente intente cargar (aunque el backend también debe ser parcheado). */
   if (!page && !isAdmin) return notFound();
 
-  const safePage = page || { items: [], nextCursor: null, prevCursor: null, receipts: [], muted: false, hasMore: false, unread: 0 };
+  /**
+   * La página vacía de reserva.
+   *
+   * ⚠️ `channelId` va en blanco **a propósito**: si la carga falló, no sabemos
+   * de qué canal es esta conversación, y ese id es justo lo que el panel usa
+   * para decidir si un evento del flujo le incumbe. Una cadena vacía no coincide
+   * con ningún canal, así que el panel se queda sin tiempo real —que es lo
+   * honesto cuando ni siquiera se pudo leer la conversación— en vez de aceptar
+   * eventos de un canal que no sabe cuál es.
+   */
+  const safePage: ChatMessagePage = page || {
+    channelId: '',
+    items: [],
+    muted: false,
+    hasMore: false,
+    unread: 0,
+  };
 
   /**
-   * Los perfiles de quien ha escrito, más el de la otra persona.
+   * Los perfiles de quien ha escrito, más el de la otra persona, en **una**
+   * petición.
    *
    * ⚠️ Quien escribió puede **ya no compartir proyecto** contigo —salió del
    * equipo después de hablar—, así que su id no está en contactos y hay que
    * pedirlo igualmente o su burbuja saldría con el UUID crudo.
+   *
+   * ⚠️ Era una petición por autor. Ver la nota del layout y
+   * `commons/api/directorio.ts`: con el renderizado en el servidor eso agotaba
+   * el limitador del gateway, que contaba a toda la plataforma en el mismo cubo.
    */
-  const ids = [...new Set([peerId, userId, ...safePage.items.map((m) => m.authorId)])];
-  const perfiles = await Promise.all(
-    ids.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
-  );
-  const usersById = new Map(
-    perfiles.filter((p): p is UserProfile => p !== null).map((p) => [p.id, p]),
-  );
-
-  const peer = usersById.get(peerId);
+  const directorio = await resolverPerfiles(api, [
+    peerId,
+    userId,
+    ...safePage.items.map((m) => m.authorId),
+  ]);
 
   /* Dónde coincidís, para poner la jerarquía bajo el nombre. Si falla, la
      conversación se abre igual: es contexto, no contenido. */
@@ -69,10 +86,13 @@ export default async function ConversacionPage({ params }: PageProps) {
   return (
     <DirectConversation
       peerId={peerId}
-      peerNombre={peer ? personLabel(peer) : 'Alguien que ya no está'}
+      /* `nombreDePersona` y no `personLabel` con un respaldo a mano: es quien
+         distingue «esta cuenta ya no existe» de «no se pudo consultar», que
+         antes se leían las dos como lo primero. */
+      peerNombre={nombreDePersona(directorio, peerId)}
       proyectosEnComun={comun}
       page={safePage}
-      usersById={usersById}
+      directorio={directorio}
       currentUserId={userId}
       isAdmin={isAdmin}
     />

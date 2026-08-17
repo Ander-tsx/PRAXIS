@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicadorDeEventos } from '../realtime/publicador.service';
@@ -122,6 +122,8 @@ export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
  */
 @Injectable()
 export class ChatService {
+  private readonly log = new Logger(ChatService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -205,7 +207,26 @@ export class ChatService {
      * Sin esto, tu propio mensaje te contaría como no leído en cuanto alguien
      * respondiera —el corte seguiría estando antes de lo que tú escribiste—.
      */
-    void this.touchRead(dto.channelId, dto.requesterId, message.createdAt);
+    /**
+     * ⚠️ **El `.catch()` no sobra: esto es una escritura de Prisma.**
+     *
+     * No se espera a propósito —tu mensaje no tiene por qué tardar más porque
+     * haya que mover tu marca de lectura—, y una promesa que se rechaza sin que
+     * nadie la escuche es un `unhandledRejection`, que en Node **mata el
+     * proceso** desde la v15. El `try` de este método no lo cubre: para cuando
+     * el rechazo ocurre, la función ya salió de él.
+     *
+     * O sea que cualquier tropiezo de la base al mandar un mensaje —el pool
+     * agotado, un `deadlock` con otra pestaña haciendo lo mismo— tumbaba
+     * projects-service entero. Lo único que se pierde tragándolo es que tu
+     * propio mensaje te cuente como no leído hasta que vuelvas a escribir o a
+     * marcar leído; el mensaje ya está guardado.
+     */
+    this.touchRead(dto.channelId, dto.requesterId, message.createdAt).catch((error: unknown) =>
+      this.log.warn(
+        `No se pudo adelantar la marca de lectura de ${dto.requesterId} en ${dto.channelId}: ${(error as Error).message}`,
+      ),
+    );
 
     /* Se releen los adjuntos después de reclamarlos: los borradores recién
        atados al mensaje no estaban en la creación. */

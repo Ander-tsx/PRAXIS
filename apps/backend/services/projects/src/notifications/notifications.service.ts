@@ -8,28 +8,24 @@ import {
   MarkNotificationReadDto,
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
+import { PublicadorDeEventos } from '../realtime/publicador.service';
 
 /** Tope de la bandeja. Por encima de esto nadie baja a mirar. */
 const DEFAULT_LIMIT = 30;
 
-/**
- * Canal de Redis por persona.
- *
- * Uno por usuario y no uno global con el destinatario dentro: el gateway se
- * suscribe con un patrón y reparte, pero teniendo el `userId` en el **nombre**
- * del canal, un aviso nunca puede acabar en la conexión equivocada por un fallo
- * al filtrar. La separación la hace Redis, no nuestro código.
+/*
+ * ⚠️ `canalDeAvisos` vivía aquí y se ha movido a `realtime/eventos.ts` como
+ * `canalDeEventos`. Por ese canal ya no viajan solo avisos de bandeja: viajan
+ * también los mensajes, ediciones, borrados y marcas de lectura del chat, así
+ * que tenerlo colgando del módulo de notificaciones obligaba al chat a importar
+ * de notificaciones para hablar de algo que no son notificaciones.
  */
-export function canalDeAvisos(userId: string): string {
-  return `avisos:${userId}`;
-}
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    private readonly eventos: PublicadorDeEventos,
   ) {}
 
   /**
@@ -73,15 +69,25 @@ export class NotificationsService {
      * `createMany` no las devuelve. Es suficiente: lleva lo justo para pintar
      * el aviso emergente, y la bandeja auténtica se pide aparte.
      */
+    const at = new Date().toISOString();
     for (const notification of worth) {
-      void this.redis.publish(canalDeAvisos(notification.userId), {
+      /* El sobre lleva `tipo: 'aviso'` en la raíz, que es lo que el cliente
+         mira para despachar. El `type` de dentro sigue siendo el enum de la
+         tabla `notifications` — son dos cosas distintas y por eso no comparten
+         nombre. Ver `realtime/eventos.ts`. */
+      void this.eventos.aUnaPersona(notification.userId, {
+        tipo: 'aviso',
         type: notification.type,
         actorId: notification.actorId ?? null,
         projectId: notification.projectId ?? null,
         projectName: notification.projectName ?? null,
+        /* El slug no lo trae el DTO de la notificación —la tabla guarda el
+           nombre del proyecto como copia del momento, no su slug— así que va
+           nulo y el cliente cae al `projectId`, que el guard también resuelve. */
+        projectSlug: null,
         taskId: notification.taskId ?? null,
         taskTitle: notification.taskTitle ?? null,
-        createdAt: new Date().toISOString(),
+        at,
       });
     }
 

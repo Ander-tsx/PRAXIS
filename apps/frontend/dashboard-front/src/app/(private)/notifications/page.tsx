@@ -1,7 +1,7 @@
 import { AutoRefresh } from '@/components/molecules/AutoRefresh';
 import { NotificationList } from '@/components/organisms/NotificationList';
 import { agruparPorDia } from '@/lib/notifications';
-import { AppHeader, type NotificationPage, Pagination, type UserProfile } from '@praxis/commons';
+import { AppHeader, type NotificationPage, Pagination, resolverPerfiles } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -122,13 +122,11 @@ export default async function NotificationsPage({ searchParams }: PageProps) {
     ...new Set(inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id)),
   ];
 
-  const actores = await Promise.all(
-    idsDeActores.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
-  );
-
-  const usersById = new Map(
-    actores.filter((u): u is UserProfile => u !== null).map((user) => [user.id, user]),
-  );
+  /* ⚠️ En **una** petición, no una por actor. Con el renderizado en el servidor,
+     una petición por fila salía con la IP del servidor de Next y agotaba el
+     limitador del gateway, que hasta ahora contaba a toda la plataforma en el
+     mismo cubo. Ver `commons/api/directorio.ts`. */
+  const usersById = (await resolverPerfiles(api, idsDeActores)).perfiles;
 
   /* Agrupar es del servidor: es donde ya se resuelve todo lo demás de la fila y
      donde no hay riesgo de que el reloj del navegador pinte otra cosa que la

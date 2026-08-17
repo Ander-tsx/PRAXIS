@@ -6,3 +6,4 @@ export * from './timeout';
 export * from './routes';
 export * from './chat-refs';
 export * from './presence';
+export * from './directorio';

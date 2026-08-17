@@ -1,12 +1,13 @@
-import type { ChatMessagePage, UserProfile } from '@praxis/commons';
-import { personLabel, textoPlano } from '@praxis/commons';
+import type { ChatMessagePage, Directorio } from '@praxis/commons';
+import { nombreDePersona, textoPlano } from '@praxis/commons';
 
 export interface ProjectChatPreviewProps {
   projectId: string;
   projectName: string;
   /** La última página del chat, ya pedida en el servidor. */
   page: ChatMessagePage;
-  usersById: Map<string, UserProfile>;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
+  directorio: Directorio;
   currentUserId: string;
 }
 
@@ -34,17 +35,15 @@ export function ProjectChatPreview({
   projectId,
   projectName,
   page,
-  usersById,
+  directorio,
   currentUserId,
 }: ProjectChatPreviewProps) {
   /* Los últimos, del más antiguo al más nuevo: el mismo orden que en el chat. */
   const ultimos = page.items.slice(-CUANTOS);
 
-  const nombreDe = (userId: string) => {
-    if (userId === currentUserId) return 'Tú';
-    const perfil = usersById.get(userId);
-    return perfil ? personLabel(perfil) : 'Alguien que ya no está';
-  };
+  /* Delega en `nombreDePersona`: distingue «esta cuenta ya no existe» de «no se
+     pudo consultar el directorio», que antes se leían las dos como lo primero. */
+  const nombreDe = (userId: string) => nombreDePersona(directorio, userId, currentUserId);
 
   /* Cruza de zona —el centro de mensajes vive en `dashboard`— así que la ruta
      lleva el prefijo completo y se navega con un `<a>` duro.

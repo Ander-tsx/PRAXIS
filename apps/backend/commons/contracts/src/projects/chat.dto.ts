@@ -132,6 +132,24 @@ export class FindChatMessagesQueryDto {
   before?: string;
 
   /**
+   * Devuelve los **posteriores** a este mensaje. Para rellenar un hueco.
+   *
+   * `before` sube por el historial; esto baja por lo que se perdió. Existe para
+   * el flujo en vivo: `EventSource` reconecta solo, pero **no reenvía lo
+   * publicado mientras la conexión estuvo caída**. Al volver, el cliente pide
+   * «lo que hay después del último mensaje que tengo» y rellena el hueco con una
+   * sola petición, en lugar de recargar la conversación entera —que era lo que
+   * hacía antes, y por eso cada hipo de red repintaba la pantalla.
+   *
+   * ⚠️ Es excluyente con `before`: pedir «lo anterior a X y lo posterior a Y» a
+   * la vez no significa nada aquí. Si llegan los dos, manda `after`.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  after?: string;
+
+  /**
    * `true`: solo los fijados, del más reciente al más antiguo. Para la lista de
    * anclados.
    *

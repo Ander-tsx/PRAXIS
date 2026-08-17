@@ -8,9 +8,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ cerrada · E2 en curso |
-| **Última tarea terminada** | E1.6 — suite entera en verde |
-| **Siguiente** | E2.2 |
+| **Etapa actual** | E1 ✅ · E2 ✅ salvo el `apply` de E2.1 · E3 es lo siguiente |
+| **Última tarea terminada** | E6.7 — las tres promesas sueltas que quedaban |
+| **Siguiente** | E3.1 — andamiaje de `chat-front` |
+| **Pendiente de una mano humana** | El `terraform apply` de E2.1 (ver ahí) |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -125,12 +126,30 @@ tocado.
 
 | Proyecto | Resultado |
 |---|---|
-| `api` (regresión) | 184 ✅ |
+| `api` (regresión) | 157 ✅ |
 | `ui` (regresión) | 33 ✅ |
 | `@security` | 14 ✅ |
 | unitarias (projects + gateway) | 12 + 39 ✅ |
 
 Es la primera vez que la suite pasa entera en esta máquina.
+
+⚠️ **Corregido (17-08): esta tabla decía `api 184` y era un error de
+transcripción que se sostuvo hasta que los números dejaron de cuadrar.** 184 no
+era el total de `api`: era el **total de aprobadas de una corrida intermedia**,
+la de los 6 rojos de E1.7 —190 pruebas menos 6—. Al pasarlo a la tabla se anotó
+en la fila de `api` y se le sumó `ui 33` al lado, que ya estaba dentro de esas
+184. O sea que la tabla presumía de 217 pruebas donde había 190, mezclando dos
+corridas distintas.
+
+Verificado con `playwright test --list`, que cuenta sin ejecutar: `api` tiene
+**158** hoy (157 en el commit del marcador, más la que añadió `32592f3`) y `ui`
+tiene **33**. Y `git diff 8d2d030..HEAD -- e2e/tests/` confirma que **no se ha
+borrado ninguna prueba**: el único cambio es una añadida. La suite no ha
+encogido; lo que estaba mal era la cuenta.
+
+**La lección, que es la misma que E1.1b y E1.8:** un número apuntado a mano en
+un documento no es una medición. Los marcadores se sacan de `--list` y del
+resumen de la corrida, y se anota **de qué corrida salen**.
 
 - [!] **E1.7 — El limitador de login *no* era el problema. Diagnóstico erróneo,
       se deja escrito para que no se repita.**
@@ -154,32 +173,71 @@ Es la primera vez que la suite pasa entera en esta máquina.
       NAT se bloquea entre sí) y **no** frena a quien reparte los intentos entre
       muchas IPs contra una sola cuenta, que es el ataque real.
 
+- [!] **E1.8 — Un servicio que no compila no se anuncia: se nota tres capas más
+      allá.** Al retomar (17-08) el árbol tenía una edición a medias de E6.7 —un
+      `this.logger` en `AuthService` que no existía—. Lo que se veía era **«No se
+      pudo crear la cuenta»** en el navegador y un 500 del gateway; el gateway
+      decía `ECONNREFUSED` porque credentials-service nunca llegó a arrancar.
+
+      ⚠️ **`pnpm dev:backend` sigue en pie con un servicio caído.** `turbo` lanza
+      los ocho en paralelo y el que falla imprime su `Found 1 error` una vez, al
+      principio, entre el arranque de los otros siete; a partir de ahí no vuelve
+      a quejarse y el resto del log parece normal. Antes de diagnosticar nada del
+      backend: `grep 'Found [0-9]* error' <log>` y comprobar que **los ocho**
+      dicen cero.
+
+      Es el mismo patrón que E1.1b: el fallo real está lejos del síntoma, y
+      leerlo cuesta treinta segundos si se sabe dónde mirar.
+
 ---
 
 ## E2 — Deuda conocida de las fases 1-4
 
 Lista cerrada, ya diagnosticada. Ninguna necesita investigación.
 
-- [ ] **E2.1 — `terraform apply` del pool.** `max_connections = 150` en
-      `sql.tf`. ⚠️ **Reinicia la instancia de Cloud SQL**; hay que elegir
-      ventana. Es la mitad del arreglo de la lentitud: la otra (`DATABASE_POOL_MAX
-      = 5`) ya está en el código y viaja con el despliegue.
+- [~] **E2.1 — `terraform apply` del pool.** `max_connections = 150` en
+      `sql.tf`. Es la mitad del arreglo de la lentitud: la otra
+      (`DATABASE_POOL_MAX = 5`) ya está en el código y viaja con el despliegue.
 
-- [ ] **E2.2 — Cachear el canal en `PublicadorDeEventos`.**
-      Hoy son 2-3 consultas **por evento** (canal, miembros, silenciados). En el
-      chat de un equipo grande, por mensaje.
+      ✅ **`terraform plan` verificado (17-08)**, acotado con
+      `-target=google_sql_database_instance.postgres`:
 
-      ⚠️ **Corrección del alcance (17-08): se cachea el canal y NO los
-      miembros.** El plan decía «el canal y sus miembros, TTL 30 s», y eso es un
-      agujero: durante esos 30 segundos, alguien a quien acaban de **sacar** de
-      un proyecto sigue recibiendo los mensajes del equipo. Es una fuga con
-      ventana, no una latencia — y la lista de destinatarios es justamente lo
-      único que separa una conversación de otra.
+      > `Plan: 0 to add, 1 to change, 0 to destroy` — un único `update in-place`
+      > que añade el bloque `database_flags { max_connections = 150 }`. Nada más
+      > se toca.
 
-      La fila del canal, en cambio, es inmutable una vez creada (`kind`,
-      `projectId`, `directUserA`/`B` no cambian nunca), así que se puede cachear
-      con TTL largo y sin riesgo. Quita una de las tres consultas; las otras dos
-      se quedan vivas a propósito.
+      ⏸️ **Falta ejecutar el `apply`.** El usuario lo autorizó, pero el comando
+      lo bloquea la política de la herramienta por ser una escritura contra
+      producción. Hay que lanzarlo a mano desde `infra/terraform/`:
+
+      ```
+      terraform apply -target=google_sql_database_instance.postgres
+      ```
+
+      ⚠️ **Reinicia la instancia de Cloud SQL** — `max_connections` es un flag
+      estático—, así que va en ventana. No afecta al desarrollo local, que corre
+      sobre el Postgres de Docker.
+
+- [x] **E2.2 — Una consulta por evento, y sin caché.** (`e7c7c95`)
+      Eran **cuatro** viajes por evento —canal, proyecto, miembros, silenciados—,
+      o sea cuatro por cada mensaje, edición, borrado, reacción y marca de
+      lectura del chat de un equipo. Ahora es **una** sentencia con dos `LATERAL`
+      que agregan cada lista en la propia base.
+
+      ⚠️ **No se cachea, que era lo que proponía el plan**, y la razón es la
+      misma por la que ya se había recortado el alcance a «el canal y no los
+      miembros»: cachear la lista de destinatarios abre una ventana en la que
+      alguien recién sacado de un proyecto sigue recibiendo los mensajes del
+      equipo. Resuelto el coste con SQL, la caché no aporta nada que compense esa
+      ventana. La fila del canal sí es inmutable y sería segura de cachear, pero
+      ya no hace falta: iba en la misma sentencia.
+
+      ⚠️ **Y un `select` anidado de Prisma no vale.** Emite una consulta por
+      relación y las cose en memoria: daba las mismas cuatro sentencias con mejor
+      pinta. Se descartó mirando el SQL real con `log_statement='all'`, y queda
+      anotado en el código. `relationLoadStrategy: 'join'` sí lo haría, pero
+      exige el preview `relationJoins` y regenerar el cliente, que en este repo
+      es la operación delicada de siempre.
 
 - [x] **E2.3 — Adelgazar el fan-out de presencia.** (`4c9c9fc`)
       `anunciar` pedía `chat_contacts`, que devuelve por cada contacto todos los
@@ -189,25 +247,46 @@ Lista cerrada, ya diagnosticada. Ninguna necesita investigación.
       Verificado contra Redis con un `psubscribe`: el cambio llega a la propia
       cuenta con `mio: true` y a los compañeros con `mio: false`.
 
-- [~] **E2.4 — `usePresencia` en `ProjectMembers`** (projects-front). Era la
-      única superficie con esferas de estado que no escuchaba el flujo.
+- [x] **E2.4 — `usePresencia` en `ProjectMembers`** (projects-front). (`9476983`)
+      Era la única superficie con esferas de estado que no escuchaba el flujo.
       `ProjectMembers` es de servidor, así que el avatar baja a un componente de
       cliente mínimo (`MemberAvatar`) en vez de convertir la pestaña entera.
-      Falta pasar `ui/05-equipo.spec.ts`, que existe justo porque `tsc` no ve un
-      error de frontera servidor/cliente: da verde y la pantalla revienta al
+
+      ✅ **`ui/05-equipo.spec.ts` pasa** (17-08). Existe justo porque `tsc` no ve
+      un error de frontera servidor/cliente: da verde y la pantalla revienta al
       pedirla.
 
-- [ ] **E2.5 — Huecos largos de reconexión.**
-      `?after=` trae 50 y **no avisa de que falta más**: una desconexión larga
-      pierde mensajes en silencio. Mínimo: devolver `hayMas` y que el panel
-      recargue la conversación entera cuando venga `true`. Ideal: Redis Streams
-      con `Last-Event-ID` para replay exacto — decisión aparte, más cara.
+- [x] **E2.5 — Huecos largos de reconexión.** (`32592f3`)
+      `?after=` recortaba el hueco al tope y **no lo decía**. Tras un corte largo
+      el panel pegaba el trozo recibido al final de lo que ya tenía y lo de en
+      medio desaparecía para siempre: un agujero mudo, sin error y sin nada que
+      lo delatara.
 
-- [ ] **E2.6 — Acuses por mensaje (o cerrar el tema).**
-      El «visto» dentro de un hilo se ha **ocultado** (`mostrarVisto={false}`)
-      porque los acuses se guardan por canal. Contestarlo de verdad exige una
-      tabla de acuses por mensaje. Decidir: se implementa o se documenta como
-      límite del producto.
+      Se pide `limit + 1`, se devuelven `limit` y **`hasMoreAfter`** dice si
+      desbordó; con `true` el panel no pega nada, recarga la conversación entera.
+      Campo propio y no `hasMore` porque significan cosas opuestas: aquel es
+      «queda más hacia arriba», este «falta hacia abajo».
+
+      Se hizo el mínimo del plan, no el ideal: **Redis Streams con
+      `Last-Event-ID`** para replay exacto sigue sin hacerse y sigue siendo una
+      decisión aparte, más cara. Con esto no se pierde nada en silencio, que era
+      lo urgente; lo que queda es evitar la recarga completa.
+
+- [x] **E2.6 — Acuses por mensaje: se cierra como límite del producto.**
+      *Decisión del usuario (17-08).* El «visto» dentro de un hilo sigue
+      **oculto** (`mostrarVisto={false}` en `ThreadPanel`), y ahora está escrito
+      por qué: `ChatChannelState` guarda un `lastReadAt` por (canal, persona), y
+      que esa marca vaya por delante de un mensaje de hilo **no dice nada** sobre
+      si alguien abrió el hilo. Enseñarlo igualmente sería peor que no enseñar
+      nada — diría «leído» con apariencia de dato exacto.
+
+      Implementarlo cuesta una tabla de acuses por mensaje, su migración y una
+      escritura por cada mensaje visto: el gesto más frecuente del sistema pasa
+      de tocar una fila por canal a una por mensaje en pantalla. Coste de
+      escritura permanente por una marca en una superficie secundaria.
+
+      Documentado como **punto 25 de PENDIENTES-BACKEND.md**, con la vía barata
+      si algún día se retoma (un `lastReadAt` por hilo, que depende del punto 20).
 
 ---
 
@@ -249,6 +328,26 @@ de ESTADO-ACTUAL §17.7.
       - `hrefDeAvatar(..., '/dashboard/api/gateway')` en ChatDirectory y
         DirectConversation
       - `revalidatePath` de las acciones (las rutas ya no llevan `/chat` delante)
+
+      ⚠️ **Cuatro sitios más que esta lista no tenía** (barrido real de
+      `rg 'dashboard/chat'`, 17-08). Los cuatro son enlaces «escribir a esta
+      persona» repartidos por zonas que no son el chat, que es justo la clase de
+      sitio donde un enlace roto no se ve hasta que alguien lo pulsa:
+      - `commons/organisms/AppLayout/navigation.tsx:102` — la entrada del menú
+        lateral. Está **además** de `HREF_DE_MENSAJES` de `AppShell`, o sea que
+        la ruta del chat vive hoy en **tres** constantes distintas (con
+        `CHAT_HREF` de `nav.ts`). Al mudar conviene dejar una sola.
+      - `commons/organisms/ChatPanel/RichText.tsx:61` — el destino de una
+        **mención** dentro de un mensaje.
+      - `admin-front/.../UsersTable.tsx:99` — escribir a una cuenta desde el
+        panel de administración. Es la única referencia al chat desde
+        `admin-front`.
+      - `projects-front/.../ProjectMembers.tsx:161` — escribir a un miembro
+        desde la pestaña Equipo.
+
+      Con estos, el recuento actual es de **13 referencias en 5 zonas**
+      (`commons` incluido). Ninguna da error de compilación al quedarse vieja:
+      salen como un 404 al pulsar.
 
 - [ ] **E3.5 — Redirecciones de cortesía.** `/dashboard/chat/*` → `/chat/*`
       permanente, para que no se rompa ningún enlace ya compartido ni las
@@ -349,7 +448,7 @@ de ESTADO-ACTUAL §17.7.
       no existe». Buscar los que quedan y decidir en cada uno si degradar es
       correcto o si está ocultando algo.
 
-- [~] **E6.7 — Promesas sueltas que pueden tumbar un servicio.**
+- [x] **E6.7 — Promesas sueltas que pueden tumbar un servicio.**
       Un `void promesa()` que se rechaza es un `unhandledRejection`, y en Node
       **eso mata el proceso**. No lo cubre el `try/catch` que lo rodea: para
       cuando el rechazo ocurre, la función ya salió de él. Lo descubrió la prueba
@@ -360,19 +459,31 @@ de ESTADO-ACTUAL §17.7.
 
       - [x] `PublicadorDeEventos.repartir` → el `publish` del bucle (`3821373`).
       - [x] `PresenceService.anunciar` → el `publish` del bucle (`4c9c9fc`).
-      - [ ] `ChatService.send` → `void this.touchRead(...)`. Es una escritura de
-            Prisma: cualquier tropiezo de la base al mandar un mensaje tumba
-            projects-service.
-      - [ ] `AuthService.register` → `void this.tokens.enviarVerificacion(...)`.
+      - [x] `ChatService.send` → `void this.touchRead(...)`. Es una escritura de
+            Prisma: cualquier tropiezo de la base al mandar un mensaje tumbaba
+            projects-service. Tragado con un `warn`; lo único que se pierde es
+            que tu propio mensaje te cuente como no leído hasta el siguiente.
+      - [x] `AuthService.register` → `void this.tokens.enviarVerificacion(...)`.
             `MailService.enviar` sí traga lo suyo, pero `emitir()` es otra
-            escritura de Prisma. Una base con hipo durante un alta se lleva por
-            delante credentials-service, o sea la autenticación entera.
-      - [ ] `NotificationsStreamService` → `void this.conNombre(e).then(...)`.
-            `conNombre` no lanza (está documentado), pero el `.then` reparte a
-            los oyentes; barato de blindar.
+            escritura de Prisma. Una base con hipo durante un alta se llevaba por
+            delante credentials-service, o sea la autenticación entera. El alta
+            ya está guardada al llegar ahí; lo que se pierde es el correo, y para
+            eso está «reenviar».
+      - [x] `NotificationsStreamService` → `void this.conNombre(e).then(...)`.
+            Lo que puede rechazar no es `conNombre` —que no lanza, y está
+            documentado— sino el `.then`: repartir llama a `next()` sobre cada
+            `Subject`, y un suscriptor que lanza propaga hacia fuera. Un oyente
+            con un fallo tumbaba el gateway, y con él el flujo de todo el mundo.
       - [x] El resto —`marcarVivo`, `marcarIdo`, `anunciar`, `elegidaDe`,
             `repartir`, `aUnaPersona`— ya tienen su `try/catch` o su `.catch()`
             **dentro**. Revisados, no hace falta tocarlos.
+
+      ⚠️ **Los tres sitios comparten una forma, y conviene saber reconocerla**:
+      un `void promesa()` cuyo `try/catch` envolvente *parece* cubrirlo. No lo
+      cubre —para cuando el rechazo ocurre la función ya salió del `try`— y el
+      síntoma no es un error en un log: es el servicio entero desapareciendo por
+      un parpadeo de Postgres o de Redis. Ninguno de los tres daba ningún aviso
+      hasta que se caía.
 - [ ] **E6.5 — Revisar el tamaño de los bundles.** `sileo` arrastra `motion`;
       comprobar cuánto pesa en cada zona y si compensa cargarlo diferido.
 - [~] **E6.6 — Revisión de dependencias.** `pnpm audit`: 38 avisos —1 crítico,
@@ -418,3 +529,7 @@ de ESTADO-ACTUAL §17.7.
 | Fecha | Etapa | Nota |
 |---|---|---|
 | 2026-08-17 | — | Plan creado. Fases 1-4 (tiempo real, presencia, toasts) cerradas y sin cobertura de pruebas. |
+| 2026-08-17 | E1 | Cerrada. Primera vez que la suite entera pasa en esta máquina. |
+| 2026-08-17 | E2 | Cerrada salvo el `apply` de E2.1, que es de infraestructura y va en ventana. E2.6 se cierra por decisión: se documenta como límite (punto 25 de PENDIENTES-BACKEND). |
+| 2026-08-17 | E6.7 | Cerrada. Las tres promesas sueltas que quedaban, blindadas. Al retomar, una de ellas estaba a medias en el árbol y **no compilaba**: credentials-service llevaba toda la sesión sin arrancar (ver E1.8). |
+| 2026-08-17 | E2 | Regresión completa tras cerrar E6.7: **191 ✅ / 0 ❌** en 23,2 min (158 `api` + 33 `ui`), stack en caliente. Y de paso se corrigió el marcador de E1, que estaba inflado. |

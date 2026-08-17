@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectRolesModule } from './project-roles/project-roles.module';
 import { ProjectsModule } from './projects/projects.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
 import { ReportLayoutsModule } from './report-layouts/report-layouts.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
@@ -39,6 +40,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     }),
     PrismaModule,
     RedisModule,
+    RealtimeModule,
     ProjectsModule,
     WorkspacesModule,
     BoardsModule,

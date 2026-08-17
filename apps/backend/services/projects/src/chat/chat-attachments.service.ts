@@ -141,6 +141,24 @@ export class ChatAttachmentsService {
   }
 
   /**
+   * Borra los bytes de varios adjuntos del proveedor de almacenamiento.
+   *
+   * Existe para el borrado de un mensaje: la fila del adjunto se va con la
+   * transacción de `ChatService.delete` —y con ella el blob de Postgres, por la
+   * cascada de `ChatAttachmentBlob`— pero **el objeto de GCS no**, porque vive
+   * fuera de la base y ninguna transacción lo alcanza.
+   *
+   * ⚠️ **No lanza, y esa es la decisión.** Un fallo al limpiar el objeto no
+   * puede deshacer un borrado que ya está confirmado en la base: el mensaje ya
+   * no existe para nadie y volver atrás sería resucitarlo. Lo que queda es un
+   * objeto huérfano al que ya nadie tiene ruta —el metadato con su id se fue—,
+   * que es basura de almacenamiento y no una fuga de contenido.
+   */
+  async borrarBytes(ids: string[]): Promise<void> {
+    await Promise.all(ids.map((id) => this.storage.delete(id).catch(() => undefined)));
+  }
+
+  /**
    * Reclama los borradores y los ata al mensaje recién creado.
    *
    * La llama `ChatService.send` después de crear el mensaje. Comprueba **aquí**

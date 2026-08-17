@@ -3,7 +3,7 @@ import {
   AppHeader,
   type ChatContact,
   type DirectConversation,
-  type UserProfile,
+  resolverPerfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -31,15 +31,7 @@ export const metadata: Metadata = {
  * se pinta. Si se pintara desde el directorio de la plataforma, saldría gente a
  * la que el backend rechazaría al escribir.
  */
-export default async function ChatLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  /* El layout no recibe los params del hijo, así que quién está activo se
-     resuelve abajo — ver la nota de `activoDesde`. */
-  params?: Promise<Record<string, string>>;
-}) {
+export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const api = createServerApiClient();
 
   /* Cada `catch` deja su bloque vacío en vez de tumbar la pantalla: que falle
@@ -56,33 +48,30 @@ export default async function ChatLayout({
   ]);
 
   /**
-   * Los perfiles de todo el que salga en la columna.
+   * Los perfiles de todo el que salga en la columna, en **una** petición.
    *
-   * ⚠️ Se piden **por id**, no con `/users?limit=100`. Aquello es la primera
-   * página del directorio de toda la plataforma y deja de contener a tu gente en
-   * cuanto hay más de cien cuentas — el mismo fallo que ya se arregló en la
-   * pestaña Equipo, que enseñaba el UUID crudo y «Correo no disponible».
+   * ⚠️ Se piden por id y no con `/users?limit=100`: aquello es la primera página
+   * del directorio de toda la plataforma y deja de contener a tu gente en cuanto
+   * hay más de cien cuentas — el mismo fallo que ya se arregló en la pestaña
+   * Equipo, que enseñaba el UUID crudo y «Correo no disponible».
+   *
+   * ⚠️ Y se piden **de una vez**, no uno a uno. Esto era un `ids.map(id =>
+   * api.get('/users/'+id))`, es decir una petición por persona de la columna. Al
+   * renderizarse en el servidor, todas salían con la IP del servidor de Next, y
+   * el limitador del gateway las contaba en el mismo cubo que las de todos los
+   * demás usuarios: se agotaba, llegaban 429, el `catch` se los tragaba y la
+   * columna se llenaba de «Alguien que ya no está» sin fotos hasta que la
+   * ventana del limitador se reiniciaba. Explicación entera en
+   * `commons/api/directorio.ts`.
    */
-  const ids = [
-    ...new Set([
-      ...conversaciones.map((conversacion) => conversacion.peerId),
-      ...contactos.map((contacto) => contacto.userId),
-      /* Quien escribió el último mensaje de un chat de proyecto puede no estar
-         en tus contactos —salió del equipo después—, y su nombre hace falta para
-         el resumen de la fila. */
-      ...proyectos.map((chat) => chat.ultimo?.authorId).filter((id): id is string => Boolean(id)),
-    ]),
-  ];
-
-  const perfiles = await Promise.all(
-    ids.map((id) => api.get<UserProfile>(`/users/${id}`).catch(() => null)),
-  );
-
-  const usersById = new Map(
-    perfiles.filter((perfil): perfil is UserProfile => perfil !== null).map((p) => [p.id, p]),
-  );
-
-  const activo = (await params)?.peerId ?? null;
+  const directorio = await resolverPerfiles(api, [
+    ...conversaciones.map((conversacion) => conversacion.peerId),
+    ...contactos.map((contacto) => contacto.userId),
+    /* Quien escribió el último mensaje de un chat de proyecto puede no estar en
+       tus contactos —salió del equipo después—, y su nombre hace falta para el
+       resumen de la fila. */
+    ...proyectos.map((chat) => chat.ultimo?.authorId),
+  ]);
 
   return (
     <AppHeader title="Mensajes directos">
@@ -96,12 +85,23 @@ export default async function ChatLayout({
        * arriba y abajo en escritorio) el chat llega justo hasta abajo.
        */}
       <div className="flex h-[calc(100vh-7rem)] flex-col gap-5 sm:flex-row">
+        {/**
+         * ⚠️ **Qué conversación está abierta lo resuelve el propio directorio,
+         * leyendo la ruta.**
+         *
+         * Salía de `params.peerId` de este layout, y ese objeto está **siempre
+         * vacío**: un layout solo recibe los parámetros de los segmentos que
+         * tiene por encima, y `/chat` no tiene ninguno dinámico. O sea que
+         * `activo` era `null` en todos los casos: ninguna fila se marcaba nunca
+         * como seleccionada y en móvil la lista no se apartaba al abrir un chat.
+         * `ChatDirectory` ya es un componente de cliente, así que lo lee de
+         * `usePathname()`, que sí lo sabe.
+         */}
         <ChatDirectory
           conversaciones={conversaciones}
           contactos={contactos}
           proyectos={proyectos}
-          usersById={usersById}
-          activo={activo}
+          directorio={directorio}
         />
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>

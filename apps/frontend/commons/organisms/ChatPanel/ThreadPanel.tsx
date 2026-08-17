@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { ChatAttachment, ChatMessage, UserProfile } from '../../api/domain';
+import type { Directorio } from '../../api/directorio';
+import type { ChatAttachment, ChatMessage } from '../../api/domain';
 import { colors } from '../../tokens';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
 import { Composer, type Sugerencia } from './Composer';
@@ -19,7 +20,8 @@ export interface ThreadPanelProps {
   error: string | null;
   /** Cierra el panel lateral. */
   onCerrar: () => void;
-  usersById: Map<string, UserProfile>;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
+  directorio: Directorio;
   currentUserId: string;
   canWrite: boolean;
   /** Si `@` ofrece personas en las respuestas del hilo. */
@@ -75,7 +77,7 @@ export function ThreadPanel({
   cargando,
   error,
   onCerrar,
-  usersById,
+  directorio,
   currentUserId,
   canWrite,
   permiteMenciones,
@@ -184,7 +186,11 @@ export function ThreadPanel({
             <div key={mensaje.id}>
               <MessageBubble
                 message={mensaje}
-                author={usersById.get(mensaje.authorId)}
+                author={directorio.perfiles.get(mensaje.authorId)}
+                /* Sin marca de «visto» dentro del hilo: los acuses se guardan
+                   por canal y no por mensaje, así que aquí no hay forma de saber
+                   si alguien ha leído **esta respuesta**. Ver `mostrarVisto`. */
+                mostrarVisto={false}
                 mine={mensaje.authorId === currentUserId}
                 continued={continued}
                 canDelete={mensaje.authorId === currentUserId}

@@ -425,3 +425,95 @@ button:disabled,
 .barra-de-video::-moz-range-track {
   background: transparent;
 }
+
+/* ─────────────────────────── Avisos emergentes ───────────────────────────
+ *
+ * `sileo` trae su propia paleta de estados en `oklch` y la declara en `:root` al
+ * importarse. Aquí se reata a la de PRAXIS para que el punto de un aviso de
+ * error sea **el mismo rojo** que el de un formulario, y no un rojo parecido: dos
+ * rojos casi iguales en la misma pantalla se leen como un descuido.
+ *
+ * ⚠️ Van fuera de `@theme` a propósito, igual que el bloque de tema claro: estas
+ * no son variables de Tailwind —nadie escribe `text-sileo-state-error`— sino
+ * variables CSS que consume una librería. Metidas en `@theme`, Tailwind las
+ * recortaría por no encontrar ninguna clase que las use (la trampa del `@theme
+ * static` que explica el aviso de arriba).
+ *
+ * ⚠️ Y se apuntan a `var(--color-…)`, no a un literal. Esas variables ya cambian
+ * solas con `data-theme`, así que los avisos siguen al tema sin necesidad de un
+ * segundo bloque aquí abajo. Copiar los valores obligaría a mantener dos
+ * paletas y a acordarse de las dos.
+ *
+ * `loading` no se usa —ese estado de sileo deja la tarjeta sin poder
+ * descartarse— pero se ata igual: si alguien lo estrena, que ya salga del tema.
+ *
+ * ⚠️ **El selector es `:root:root`, y la repetición no es un error.** `sileo`
+ * declara las suyas en `:root` y **las inyecta en tiempo de ejecución**: crea un
+ * `<style>` y lo cuelga del `<head>` al importarse el módulo, o sea **después**
+ * de esta hoja. Con la misma especificidad gana la última, así que un `:root` a
+ * secas aquí perdería siempre y estas líneas no harían absolutamente nada —sin
+ * error, sin aviso, con los colores de serie—. Repetir el selector sube la
+ * especificidad y el orden deja de importar.
+ */
+:root:root {
+  --sileo-state-success: var(--color-success);
+  --sileo-state-error: var(--color-error);
+  --sileo-state-warning: var(--color-warning);
+  --sileo-state-info: var(--color-info);
+  --sileo-state-action: var(--color-primary);
+  --sileo-state-loading: var(--color-text-secondary);
+
+  /* Algo más ancha que los 350 px de serie: los avisos llevan nombres de
+     persona y de proyecto entre comillas, y a 350 px la frase se parte en tres
+     líneas. */
+  --sileo-width: 380px;
+}
+
+/* ── Avisos: desbordes de `sileo` ──────────────────────────────────────────
+ *
+ * Tres correcciones sobre su hoja, y las tres son desbordes reales.
+ *
+ * ⚠️ **Los selectores repiten un atributo a propósito.** `sileo` inyecta su CSS
+ * en tiempo de ejecución —crea un `<style>` y lo cuelga del `<head>` al
+ * importarse—, o sea **después** de esta hoja. A igual especificidad gana la
+ * última, así que copiar su selector tal cual aquí no haría nada. Añadiendo
+ * `[data-position]` —que el contenedor siempre lleva— se sube un escalón y el
+ * orden deja de importar.
+ */
+
+/* 1. El botón se comía el ancho de la tarjeta.
+ *
+ * `[data-sileo-button]` es `display: flex` y vive como hijo de bloque dentro de
+ * la descripción, así que se estiraba al 100 %: una píldora de borde a borde que
+ * parecía salirse de la tarjeta. Con `max-content` mide lo que mide su texto. */
+[data-sileo-viewport][data-position] [data-sileo-button] {
+  width: max-content;
+  max-width: 100%;
+}
+
+/* 2. El texto largo se salía de la píldora.
+ *
+ * La descripción lleva `padding: 1rem` y `width: 100%` sin `border-box`, así que
+ * el relleno se sumaba al ancho y las dos últimas letras de cada línea quedaban
+ * fuera. Y sin `overflow-wrap`, una palabra sin espacios —una URL pegada, un
+ * nombre de archivo largo— no se parte y desborda entera. */
+[data-sileo-viewport][data-position] [data-sileo-description] {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+/* 3. La descripción, legible sobre la píldora de PRAXIS.
+ *
+ * `sileo` la pinta al 50 % de opacidad sobre su blanco y negro casi puros. Sobre
+ * los tonos de la paleta —ver `RELLENO_POR_TEMA`— ese 50 % se queda corto, así
+ * que se sube y se ata a los colores del tema contrario, que es el de la
+ * píldora.
+ *
+ * ⚠️ El `data-theme` aquí es **el de la aplicación**, no el de la tarjeta: con la
+ * aplicación en oscuro la píldora es clara, y por eso el texto va oscuro. */
+[data-sileo-viewport][data-position][data-theme="dark"] [data-sileo-description] {
+  color: rgb(13 15 20 / 0.78);
+}
+[data-sileo-viewport][data-position][data-theme="light"] [data-sileo-description] {
+  color: rgb(232 234 240 / 0.82);
+}
