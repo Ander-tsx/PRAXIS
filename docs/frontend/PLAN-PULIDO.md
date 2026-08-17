@@ -8,9 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 — en curso |
-| **Última tarea terminada** | E1.5 |
-| **Siguiente** | E1.6 |
+| **Etapa actual** | E1 ✅ cerrada · E2 en curso |
+| **Última tarea terminada** | E1.6 — suite entera en verde |
+| **Siguiente** | E2.2 |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -99,7 +99,60 @@ tocado.
       sea que projects-service dependía de una invariante de otro archivo para
       no caerse cuando Redis parpadea.
 
-- [ ] **E1.6 — `pnpm e2e:seguridad`**: comprobar que el marcador no ha empeorado.
+- [!] **E1.1b — La mitad de interfaz de la suite nunca se había ejecutado.**
+      Descubierto al mirar por qué fallaban **31 de 31** pruebas `ui`, incluida
+      «la landing responde sin sesión», que es la más simple que hay. No eran
+      regresiones: era
+      `browserType.launch: Executable doesn't exist … chrome-headless-shell`.
+      Chromium no estaba instalado en esta máquina, así que el proyecto `ui`
+      llevaba desde siempre sin dar un solo dato.
+
+      Resuelto con `pnpm e2e:instalar`. ⚠️ **Y conviene que quede escrito**: un
+      fallo de arranque del navegador sale como 31 pruebas rojas con mensajes de
+      aserción distintos, que es indistinguible de una regresión gorda hasta que
+      abres un `error-context.md`. Ante un rojo masivo y uniforme, mirar primero
+      si el navegador arrancó.
+
+- [x] **E1.6 — `pnpm e2e:seguridad`**: **14 de 14 en verde** (2,1 min).
+
+      ⚠️ **Y eso desmiente lo que dice el README de `e2e/`.** Las `@security`
+      viven aparte porque «describen lo que queremos, no lo que hay» y para que
+      un rojo esperado no tape uno nuevo. Ya no hay ningún rojo esperado: pasan
+      las catorce. Conviene actualizar esa nota o la separación se convierte en
+      folclore.
+
+**Marcador final de E1 (17-08), stack en frío y sin tocar nada durante la corrida:**
+
+| Proyecto | Resultado |
+|---|---|
+| `api` (regresión) | 184 ✅ |
+| `ui` (regresión) | 33 ✅ |
+| `@security` | 14 ✅ |
+| unitarias (projects + gateway) | 12 + 39 ✅ |
+
+Es la primera vez que la suite pasa entera en esta máquina.
+
+- [!] **E1.7 — El limitador de login *no* era el problema. Diagnóstico erróneo,
+      se deja escrito para que no se repita.**
+
+      Durante la corrida sostuve que los 6 rojos de interfaz eran el límite de
+      10 logins/minuto: fallaban consecutivos y agotaban **exactamente** el tope
+      de 120 s, que es la firma clásica del reloj. Era falso. Al abrir el
+      `error-context.md` la sesión estaba abierta y la página pintada: lo que
+      faltaba era **un botón que no existía** (ver el arreglo en `bd94296`).
+
+      ⚠️ **La lección es de método, no de código.** El patrón «consecutivos y en
+      el tope exacto» es sugerente pero no concluyente, y la captura del fallo
+      —que Playwright ya escribe— resuelve la duda en treinta segundos. Teorizar
+      antes de abrirla costó tres vueltas.
+
+      El límite sigue siendo real y sigue apretando —hay pruebas que tardan 1,3
+      min por la espera—, pero **no impide que la suite pase**. Lo de contar por
+      cuenta en vez de por IP se queda como mejora en E6, no como bloqueante:
+
+      contar por IP castiga a quien comparte salida (una oficina detrás de un
+      NAT se bloquea entre sí) y **no** frena a quien reparte los intentos entre
+      muchas IPs contra una sola cuenta, que es el ataque real.
 
 ---
 
@@ -114,9 +167,19 @@ Lista cerrada, ya diagnosticada. Ninguna necesita investigación.
 
 - [ ] **E2.2 — Cachear el canal en `PublicadorDeEventos`.**
       Hoy son 2-3 consultas **por evento** (canal, miembros, silenciados). En el
-      chat de un equipo grande, por mensaje. Caché en Redis con TTL corto (30 s)
-      del canal y sus miembros; los silenciados se leen aparte porque cambian con
-      un gesto del usuario.
+      chat de un equipo grande, por mensaje.
+
+      ⚠️ **Corrección del alcance (17-08): se cachea el canal y NO los
+      miembros.** El plan decía «el canal y sus miembros, TTL 30 s», y eso es un
+      agujero: durante esos 30 segundos, alguien a quien acaban de **sacar** de
+      un proyecto sigue recibiendo los mensajes del equipo. Es una fuga con
+      ventana, no una latencia — y la lista de destinatarios es justamente lo
+      único que separa una conversación de otra.
+
+      La fila del canal, en cambio, es inmutable una vez creada (`kind`,
+      `projectId`, `directUserA`/`B` no cambian nunca), así que se puede cachear
+      con TTL largo y sin riesgo. Quita una de las tres consultas; las otras dos
+      se quedan vivas a propósito.
 
 - [x] **E2.3 — Adelgazar el fan-out de presencia.** (`4c9c9fc`)
       `anunciar` pedía `chat_contacts`, que devuelve por cada contacto todos los
@@ -226,6 +289,16 @@ de ESTADO-ACTUAL §17.7.
 > mano y nunca mezclado con otro cambio en el mismo commit. Un renombrado que
 > viaja junto a una corrección hace imposible revisar ninguna de las dos.
 
+> **Medido (17-08), para que la decisión no sea a ojo.** De **1.233
+> identificadores exportados** en `apps/`, unos **160 tienen raíz española** —el
+> 13%—. No están repartidos: se concentran en lo más nuevo (`realtime/`, el
+> asistente con sus `Propuesta*`, el chat) y el resto del repo ya exporta en
+> inglés. O sea que el nivel 1 —solo identificadores— es un lote acotado y no
+> «tocar todo», que es lo que este documento temía.
+>
+> Lo que sí toca todo es el nivel 3: los comentarios, que son la mitad del valor
+> de este repositorio y están escritos en español con cuidado.
+
 - [ ] **E5.0 — Decidir el alcance.** Tres niveles, de menor a mayor coste:
       1. **Identificadores** (variables, funciones, tipos, props). Es lo que de
          verdad se lee como «código en dos idiomas».
@@ -296,7 +369,30 @@ de ESTADO-ACTUAL §17.7.
             **dentro**. Revisados, no hace falta tocarlos.
 - [ ] **E6.5 — Revisar el tamaño de los bundles.** `sileo` arrastra `motion`;
       comprobar cuánto pesa en cada zona y si compensa cargarlo diferido.
-- [ ] **E6.6 — `pnpm security` / revisión de dependencias.**
+- [~] **E6.6 — Revisión de dependencias.** `pnpm audit`: 38 avisos —1 crítico,
+      25 altos, 12 moderados—. Casi todo es transitivo (`tar` vía
+      `@mapbox/node-pre-gyp`, `sharp`, `postcss` vía el propio Next), pero hay uno
+      que es nuestro y urgente:
+
+      🔴 **Next 16.2.9 acumula nueve avisos, todos corregidos en 16.2.11.** Es un
+      salto de parche y lo declaran las **siete** zonas (`commons` incluido). Dos
+      de los nueve pegan justo donde vive esta arquitectura:
+      - *Middleware / Proxy bypass en App Router* — el guard de sesión de PRAXIS
+        **es** `proxy.ts`, en cada zona. Un bypass ahí es entrar sin sesión.
+      - *SSRF en `rewrites()` por hostname de destino controlado* — el
+        multi-zone entero se sirve con `rewrites()` desde el shell.
+
+      Los otros siete: DoS en Server Actions, SSRF en Server Actions sobre
+      servidor propio, dos confusiones de caché de cuerpos de respuesta, payload
+      sin límite en Edge, DoS del optimizador de imágenes con SVG, y exposición
+      sin autenticar de los endpoints internos de Server Functions.
+
+      ✅ Subido a `16.2.11` en las siete (`08cafc0`). Queda confirmar con la
+      regresión entera, que es lo que está corriendo.
+
+      Lo que **no** se toca: `tar`, `sharp` y `postcss` son transitivos y no hay
+      versión nuestra que los suba. `postcss` entra por el propio Next, así que
+      se resolverá solo cuando Next lo suba.
 
 ---
 
