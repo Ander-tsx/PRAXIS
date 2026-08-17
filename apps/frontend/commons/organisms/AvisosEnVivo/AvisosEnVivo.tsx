@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CHAT_EVENT_TYPE, type NotificationType } from '../../api/domain';
+import { CHAT_DELETED_EVENT_TYPE, CHAT_EVENT_TYPE, type NotificationType } from '../../api/domain';
 import { projectHref } from '../../api/routes';
 import { useRefrescoAgrupado } from '../../hooks';
 import { alpha, colors } from '../../tokens';
@@ -219,6 +219,17 @@ export function AvisosEnVivo({ gatewayPath }: AvisosEnVivoProps) {
       const estoyViendolo = destino !== null && mismaVista(destino, window.location);
 
       pedirRefresco();
+
+      /**
+       * Un borrado **solo refresca**: sin tarjeta y sin sonido.
+       *
+       * El marcador «mensaje eliminado» ya se ve en su sitio cuando el refresco
+       * vuelve a pedir la conversación —una tarjeta por cada borrado de una
+       * conversación viva sería ruido, y el borrado no necesita anunciarse por
+       * separado de lo que hace delante de los ojos.
+       */
+      if (aviso.type === CHAT_DELETED_EVENT_TYPE) return;
+
       if (estoyViendolo) return;
 
       const id = siguienteId.current++;

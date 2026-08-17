@@ -24,6 +24,7 @@ const CON_MENSAJE = {
   body: true,
   createdAt: true,
   editedAt: true,
+  deletedAt: true,
   pinnedAt: true,
   pinnedById: true,
   reactions: true,
@@ -35,6 +36,10 @@ const CON_MENSAJE = {
       id: true,
       authorId: true,
       body: true,
+      /* Para que la cita pueda decir «Mensaje eliminado» cuando el citado se
+         borró: sin el campo, el frente pintaría un adjunto que ya no se debe
+         enseñar. */
+      deletedAt: true,
       attachments: { select: { mimeType: true }, take: 1 },
     },
   },
@@ -79,6 +84,17 @@ export const REACCIONES = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as 
  * donde estés— **sin dejar ninguna fila detrás**.
  */
 export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
+
+/**
+ * El `type` con el que viaja un borrado por el flujo de avisos.
+ *
+ * Mismo canal que `CHAT_EVENT_TYPE` —el navegador lo escucha para **refrescar**
+ * la conversación abierta y que el mensaje se vuelva «eliminado» delante de
+ * quien lo estaba leyendo— pero **no pinta tarjeta ni suena**: el borrado ya se
+ * ve en su sitio, y una tarjeta por cada borrado de una conversación viva sería
+ * ruido. Es espejo de `CHAT_DELETED_EVENT_TYPE` en `commons/api/domain.ts`.
+ */
+export const CHAT_DELETED_EVENT_TYPE = 'CHAT_DELETED';
 
 /**
  * Lo que se ha dicho en un canal.
@@ -205,7 +221,7 @@ export class ChatService {
       where: { channelId_userId: { channelId: dto.channelId, userId: dto.requesterId } },
       select: { mutedAt: true, hiddenAt: true },
     });
-    
+
     /* La búsqueda se pide como una página aparte, no como un modo del
        historial: el término filtra el texto y el resultado se ordena del más
        reciente al más antiguo, como los fijados, sin cursor — un cursor sobre
@@ -221,6 +237,9 @@ export class ChatService {
              conversación general, y buscar dentro de un hilo se hace en su
              propio panel. */
           visibleEnChat: true,
+          /* Un mensaje borrado no se busca: el texto ya se vació al borrarlo,
+             y además no debe reaparecer por un término que escribió. */
+          deletedAt: null,
           /* Insensible a mayúsculas: «Hoy» encuentra «hoy». El modo de Postgres,
              no una normalización que rompería el índice. */
           body: { contains: termino, mode: 'insensitive' },
@@ -244,10 +263,14 @@ export class ChatService {
        `limit` a propósito (el gateway ya documenta lo mismo en el DTO). */
     if (dto.pinned) {
       const fijados = await this.prisma.chatMessage.findMany({
-        where: { 
-          channelId: dto.channelId, 
-          visibleEnChat: true, 
+        where: {
+          channelId: dto.channelId,
+          visibleEnChat: true,
           pinnedAt: { not: null },
+          /* En realidad un borrado limpia su `pinnedAt` al borrarse, pero un
+             fijado pedido por un cliente viejo entre medias no debe colarse: el
+             filtro es la red de seguridad. */
+          deletedAt: null,
           ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
         },
         orderBy: { pinnedAt: 'desc' },
@@ -300,9 +323,7 @@ export class ChatService {
     const hasMore = newest.length > limit;
     const page = hasMore ? newest.slice(0, limit) : newest;
 
-    const [unread] = await Promise.all([
-      this.countUnread(dto.channelId, dto.requesterId),
-    ]);
+    const [unread] = await Promise.all([this.countUnread(dto.channelId, dto.requesterId)]);
 
     return {
       items: page.reverse(),
@@ -408,7 +429,14 @@ export class ChatService {
     }
 
     const { count } = await this.prisma.chatMessage.updateMany({
-      where: { id: dto.id, channelId: dto.channelId, authorId: dto.requesterId },
+      where: {
+        id: dto.id,
+        channelId: dto.channelId,
+        authorId: dto.requesterId,
+        /* Un mensaje borrado no se edita: su cuerpo ya se vació a propósito y
+           rellenarlo lo haría reaparecer. */
+        deletedAt: null,
+      },
       data: { body: cuerpo, editedAt: new Date() },
     });
 
@@ -423,28 +451,53 @@ export class ChatService {
   }
 
   /**
-   * Borra un mensaje.
+   * Borra un mensaje **para todos**.
    *
    * El `authorId` va en el `where` cuando no hay moderación, no en una
    * comprobación previa: así no existe el hueco entre leer y borrar, y borrar el
    * de otro **no encuentra fila** en vez de encontrarla y rechazarla.
-   */ async delete(dto: {
+   *
+   * ⚠️ **Es un borrado suave, no físico.** La fila se queda con `deletedAt`
+   * puesto, el `body` vacío y sin fijado — es lo que hace que los demás vean
+   * «mensaje eliminado» en su sitio en vez de un hueco. Se vacía el cuerpo para
+   * que ni la búsqueda ni el último mensaje de la bandeja sigan enseñando el
+   * texto de algo que ya no se puede leer: el borrado tiene que ser para todos
+   * de verdad, no solo para quien ya tenía la página abierta.
+   *
+   * Se avisa por el flujo de avisos igual que al escribir —sin esperarlo—:
+   * es lo que le dice al resto de participantes que refresquen y conviertan la
+   * burbuja en el marcador, aunque nadie esté mirando en ese momento.
+   */
+  async delete(dto: {
     id: string;
     channelId: string;
     requesterId: string;
     canModerate: boolean;
   }) {
-    const { count } = await this.prisma.chatMessage.deleteMany({
+    const { count } = await this.prisma.chatMessage.updateMany({
       where: {
         id: dto.id,
         channelId: dto.channelId,
         ...(dto.canModerate ? {} : { authorId: dto.requesterId }),
+        /* Un mensaje ya borrado no se vuelve a borrar: sin esto, un `delete`
+           repetido —un clic doble, una retransmisión— encontraría la fila y
+           avisaría otra vez de un borrado que el resto ya vio. */
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+        body: '',
+        editedAt: null,
+        pinnedAt: null,
+        pinnedById: null,
       },
     });
 
     if (count === 0) {
       throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
     }
+
+    void this.notifyOthers(dto.channelId, dto.requesterId, new Date(), CHAT_DELETED_EVENT_TYPE);
 
     return { id: dto.id, deleted: true };
   }
@@ -560,7 +613,7 @@ export class ChatService {
 
     const [ultimos, sinLeer, estados] = await Promise.all([
       this.prisma.chatMessage.findMany({
-        where: { channelId: { in: ids }, visibleEnChat: true },
+        where: { channelId: { in: ids }, visibleEnChat: true, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
         select: { channelId: true, body: true, authorId: true, createdAt: true },
@@ -580,7 +633,7 @@ export class ChatService {
         .map((canal) => {
           const ultimo = ultimoPorCanal.get(canal.id) ?? null;
           const estado = estadoPorCanal.get(canal.id);
-          
+
           return {
             channelId: canal.id,
             /* Con quién hablas: el que no eres tú. */
@@ -647,7 +700,7 @@ export class ChatService {
 
     const [ultimos, sinLeer, estados] = await Promise.all([
       this.prisma.chatMessage.findMany({
-        where: { channelId: { in: ids }, visibleEnChat: true },
+        where: { channelId: { in: ids }, visibleEnChat: true, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
         select: { channelId: true, body: true, authorId: true, createdAt: true },
@@ -698,6 +751,9 @@ export class ChatService {
       where: {
         channelId,
         authorId: { not: userId },
+        /* Un borrado no suma sin leer: quien no lo llegó a abrir no tiene que
+           ver la insignia por algo que ya no existe. */
+        deletedAt: null,
         ...(estado?.lastReadAt && { createdAt: { gt: estado.lastReadAt } }),
       },
     });
@@ -721,6 +777,7 @@ export class ChatService {
         ON s."channelId" = m."channelId" AND s."userId" = ${userId}
       WHERE m."channelId" = ANY(${channelIds})
         AND m."authorId" <> ${userId}
+        AND m."deletedAt" IS NULL
         AND (s."lastReadAt" IS NULL OR m."createdAt" > s."lastReadAt")
       GROUP BY m."channelId"
     `;
@@ -799,7 +856,12 @@ export class ChatService {
    * lo enseñaría en la pantalla de quien tenga el portátil abierto en una sala de
    * reuniones, y para leerlo ya está el chat, que comprueba permisos al entrar.
    */
-  private async notifyOthers(channelId: string, authorId: string, at: Date) {
+  private async notifyOthers(
+    channelId: string,
+    authorId: string,
+    at: Date,
+    type: string = CHAT_EVENT_TYPE,
+  ) {
     const canal = await this.prisma.chatChannel.findUnique({
       where: { id: channelId },
       select: {
@@ -838,7 +900,7 @@ export class ChatService {
       if (callados.has(destinatario)) continue;
 
       void this.redis.publish(canalDeAvisos(destinatario), {
-        type: CHAT_EVENT_TYPE,
+        type,
         actorId: authorId,
         /* Distingue a dónde lleva la tarjeta: al chat del proyecto o a la
            conversación privada con quien escribió. */

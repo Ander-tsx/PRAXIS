@@ -821,6 +821,19 @@ export interface NotificationPage {
 export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
 
 /**
+ * El `type` con el que viaja un borrado de mensaje por el flujo de avisos.
+ *
+ * ⚠️ **No es un `NotificationType` ni debe dejar tarjeta ni sonido.** El
+ * borrado se ve en su sitio —la burbuja se convierte en «mensaje eliminado» al
+ * refrescar— y avisar de cada borrado de una conversación viva sería ruido. Su
+ * único trabajo es que `AvisosEnVivo` pida el refresco y el marcador aparezca
+ * delante de quien esté leyendo.
+ *
+ * Espejo de `CHAT_DELETED_EVENT_TYPE` en `projects-service/src/chat/chat.service.ts`.
+ */
+export const CHAT_DELETED_EVENT_TYPE = 'CHAT_DELETED';
+
+/**
  * Las reacciones que acepta el backend.
  *
  * Lista **cerrada** y espejo de `CHAT_REACTIONS` en `@praxis/contracts`: el
@@ -854,6 +867,15 @@ export interface ChatMessage {
   createdAt: string;
   /** `null` mientras no se ha reescrito. Para la marca «editado». */
   editedAt: string | null;
+  /**
+   * `null` mientras no se ha borrado para todos.
+   *
+   * ⚠️ **Borrar es un borrado suave por el lado del servidor**: la fila se
+   * queda, el `body` se vacía y `deletedAt` deja de ser nulo. Quien lo ve no
+   * debe pintar el contenido —que ya no está— sino el marcador «mensaje
+   * eliminado» en su sitio, igual que cualquier chat.
+   */
+  deletedAt: string | null;
   /** `null` mientras no está fijado. Para la marca y la lista de anclados. */
   pinnedAt: string | null;
   /** Quién lo fijó, para el «fijado por» de la marca. */
@@ -869,6 +891,8 @@ export interface ChatMessage {
     id: string;
     authorId: string;
     body: string;
+    /** `null` mientras el citado no se ha borrado: la cita dice «Mensaje eliminado». */
+    deletedAt: string | null;
     attachments: { mimeType: string }[];
   } | null;
   /** Cuántas respuestas tiene su hilo. Para la marca «N respuestas». */

@@ -396,6 +396,15 @@ model ChatMessage {
   /// mensaje editado sigue respondiendo a lo que respondía y sigue donde estaba.
   editedAt DateTime?
 
+  /// Cuándo se borró **para todos**. `null` mientras no se ha borrado.
+  ///
+  /// ⚠️ **El borrado es suave, no físico.** La fila se queda, el `body` se
+  /// vacía y las marcas se limpian, para que quien tenía el mensaje delante
+  /// vea «mensaje eliminado» en su sitio en vez de un hueco que no se explica.
+  /// Por eso el borrado viaja también por el flujo de avisos (`CHAT_DELETED`):
+  /// sin esa notificación el otro lado no se entera hasta recargar.
+  deletedAt DateTime?
+
   /// A qué mensaje responde.
   ///
   /// `SetNull` y no `Cascade`: borrar un mensaje **no** puede llevarse por

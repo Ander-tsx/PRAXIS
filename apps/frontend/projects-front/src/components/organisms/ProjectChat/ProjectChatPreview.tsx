@@ -97,10 +97,13 @@ export function ProjectChatPreview({
               </span>
               {/* Una línea por mensaje: es una muestra, no la conversación.
                   `textoPlano` quita el formato de las referencias, que aquí
-                  solo serían ruido. */}
+                  solo serían ruido. Un borrado se enseña como marcador, igual
+                  que en el chat: el texto ya no existe. */}
               <span className="truncate font-sans text-xs text-text-secondary">
-                {textoPlano(mensaje.body) ||
-                  (mensaje.attachments.length > 0 ? 'Ha enviado un archivo' : '')}
+                {mensaje.deletedAt
+                  ? 'Mensaje eliminado'
+                  : textoPlano(mensaje.body) ||
+                    (mensaje.attachments.length > 0 ? 'Ha enviado un archivo' : '')}
               </span>
             </span>
           ))}

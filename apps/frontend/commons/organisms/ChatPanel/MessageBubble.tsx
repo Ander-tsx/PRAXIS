@@ -193,6 +193,7 @@ export function MessageBubble({
   const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
   const editado = message.editedAt !== null && message.editedAt !== undefined;
   const sinTexto = message.body.trim().length === 0;
+  const eliminado = message.deletedAt !== null && message.deletedAt !== undefined;
 
   /**
    * El acuse de tu propio mensaje: **entregado** o **visto por todos**.
@@ -500,6 +501,82 @@ export function MessageBubble({
     };
   }, [primeraUrl, preview, previewDeLink]);
 
+  /**
+   * Un mensaje borrado **para todos** se ve como marcador, no como hueco.
+   *
+   * Igual que en cualquier chat: la burbuja se queda en su sitio —con su autor
+   * y su hora— pero sin texto, sin adjuntos, sin reacciones y sin acciones.
+   * Nada de lo que borró quien lo borró puede volver a leerse desde aquí, así
+   * que no hay nada que pulsar: ni barra, ni hoja, ni hilo, ni fijado.
+   *
+   * Es un `return` temprano y no un modo del render de abajo a propósito:
+   * todo lo interactivo —gestos, barra, hoja, acuses— no tiene sentido en un
+   * mensaje que ya no es de nadie, y guardarlo detrás de un `if` dentro del
+   * JSX dejaría la mitad de las piezas montadas sin sitio donde actuar.
+   */
+  if (eliminado) {
+    return (
+      <article
+        className={`relative flex min-w-0 gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
+          continued ? 'mt-0.5' : 'mt-3'
+        }`}
+      >
+        {continued ? (
+          <span className="w-6 shrink-0" aria-hidden="true" />
+        ) : (
+          <Avatar
+            label={nombre}
+            mine={mine}
+            size="sm"
+            src={hrefDeAvatar(author?.avatarUrl, gatewayPath)}
+            presence={author?.presence ?? null}
+          />
+        )}
+
+        <div
+          className={`relative flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}
+        >
+          {!continued && (
+            <span className="flex items-center gap-2 px-1 font-sans text-xs">
+              <span className="font-semibold text-text-primary">{mine ? 'Tú' : nombre}</span>
+              <span className="text-[11px] text-text-disabled">{soloHora(message.createdAt)}</span>
+            </span>
+          )}
+
+          <div
+            className="relative max-w-full rounded-2xl px-3.5 py-2"
+            style={{
+              background: mine ? alpha(colors.primary, 16) : colors.surfaceElevated,
+              borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
+              borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
+            }}
+          >
+            <span
+              aria-label="Mensaje eliminado"
+              className="flex items-center gap-1.5 font-sans text-xs italic text-text-disabled"
+            >
+              <svg
+                className="h-3.5 w-3.5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 7h12M10 7V5h4v2M9 7v10M15 7v10M7 7l1 12h8l1-12"
+                />
+              </svg>
+              {mine ? 'Tú eliminaste este mensaje' : 'Este mensaje fue eliminado'}
+            </span>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article
       className={`relative flex min-w-0 gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
@@ -705,10 +782,11 @@ export function MessageBubble({
             /**
              * La cita.
              *
-             * ⚠️ Si el original se borró, `replyTo` llega `null` desde el
-             * servidor —la clave foránea es `SET NULL`— y aquí simplemente no se
-             * pinta nada. La respuesta se queda sin cita, no desaparece: es de
-             * otra persona y sigue teniendo sentido.
+             * ⚠️ Si el original se borró, el servidor lo manda **borrado** —la
+             * fila se queda con `deletedAt` y el `body` vacío—, y aquí la cita
+             * dice «Mensaje eliminado» en vez de enseñar lo que ya no se puede
+             * leer. La respuesta se queda con su cita reconocible, no con un
+             * hueco que no se explica.
              */
             <div
               /* `border-l` con el primario a secas —no `alpha(colors.overlay, …)`,
@@ -729,7 +807,11 @@ export function MessageBubble({
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
               <span className="line-clamp-2 font-sans text-xs text-text-secondary">
-                <AdjuntoPreview mensaje={message.replyTo} />
+                {message.replyTo.deletedAt ? (
+                  <span className="italic text-text-disabled">Mensaje eliminado</span>
+                ) : (
+                  <AdjuntoPreview mensaje={message.replyTo} />
+                )}
               </span>
             </div>
           )}

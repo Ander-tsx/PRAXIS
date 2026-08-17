@@ -335,15 +335,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     Map<string, { body: string; editedAt: string }>
   >(new Map());
 
+  /**
+   * Los borrados **propios** ya confirmados de este navegador: `messageId` →
+   * cuándo. Mismo motivo que los otros mapas: el borrado **sí** revalida, pero
+   * el marcador «mensaje eliminado» se pinta en el instante del clic y la
+   * revalidación confirma lo que ya se ve. Si el servidor lo rechaza —no era
+   * tuyo— se deshace y la burbuja vuelve.
+   */
+  const [borradosLocales, setBorradosLocales] = useState<Map<string, string>>(new Map());
+
   const mensajes = [...older, ...page.items].map((mensaje) => {
     const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
+    const borrado = borradosLocales.get(mensaje.id);
     return {
       ...mensaje,
       reactions: reacciones,
       ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
       ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+      ...(borrado ? { deletedAt: borrado, body: '' } : {}),
     };
   });
   const ultimoId = mensajes.at(-1)?.id;
@@ -404,21 +415,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [acuses, mensajes]);
 
   /** Los fijados con las mismas correcciones locales que el historial. */
-  const fijadosConCorrecciones = fijadosLista.map((mensaje) => {
-    const editado = editadosLocales.get(mensaje.id);
-    return editado ? { ...mensaje, body: editado.body, editedAt: editado.editedAt } : mensaje;
-  });
+  const fijadosConCorrecciones = fijadosLista
+    .filter((mensaje) => !borradosLocales.has(mensaje.id))
+    .map((mensaje) => {
+      const editado = editadosLocales.get(mensaje.id);
+      return editado ? { ...mensaje, body: editado.body, editedAt: editado.editedAt } : mensaje;
+    });
 
   /** Las respuestas del hilo con las mismas correcciones locales que el historial. */
   const hiloMensajes = hiloReplies.map((mensaje) => {
     const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
+    const borrado = borradosLocales.get(mensaje.id);
     return {
       ...mensaje,
       reactions: reacciones,
       ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
       ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+      ...(borrado ? { deletedAt: borrado, body: '' } : {}),
     };
   });
 
@@ -654,8 +669,19 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }
 
   async function borrar(messageId: string) {
+    /* El marcador «mensaje eliminado» se pinta en el mismo fotograma del clic y
+       la revalidación de la acción lo confirma; si el servidor lo rechaza —el
+       mensaje no era tuyo ni de moderación— se deshace y la burbuja vuelve. */
+    setBorradosLocales((previos) => new Map(previos).set(messageId, new Date().toISOString()));
     const resultado = await acciones.borrar(messageId);
-    if (resultado.error) setError(resultado.error);
+    if (resultado.error) {
+      setError(resultado.error);
+      setBorradosLocales((previos) => {
+        const copia = new Map(previos);
+        copia.delete(messageId);
+        return copia;
+      });
+    }
   }
 
   /**
@@ -833,14 +859,24 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   /**
    * Borrar una respuesta del hilo, o cerrarlo si el borrado es el raíz.
    *
-   * El servidor no devuelve el mensaje, así que la respuesta se quita de la
-   * lista local — si se borrara el raíz, no queda hilo que mostrar.
+   * El borrado es suave: la respuesta borrada no se quita de la lista local,
+   * se convierte en su marcador —igual que en el historial— gracias a
+   * `borradosLocales`. Si el raíz se borra, no queda hilo que mostrar y se
+   * cierra el panel; el marcador se verá en el historial al revalidar.
    */
   async function borrarEnHilo(messageId: string) {
+    setBorradosLocales((previos) => new Map(previos).set(messageId, new Date().toISOString()));
     const resultado = await acciones.borrar(messageId);
-    if (resultado.error) setError(resultado.error);
-    else if (messageId === hiloRaiz?.id) cerrarHilo();
-    else setHiloReplies((actuales) => actuales.filter((mensaje) => mensaje.id !== messageId));
+    if (resultado.error) {
+      setError(resultado.error);
+      setBorradosLocales((previos) => {
+        const copia = new Map(previos);
+        copia.delete(messageId);
+        return copia;
+      });
+    } else if (messageId === hiloRaiz?.id) {
+      cerrarHilo();
+    }
   }
 
   /**
