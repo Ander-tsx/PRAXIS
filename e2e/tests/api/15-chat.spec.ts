@@ -56,7 +56,10 @@ interface Mensaje {
 interface Pagina {
   channelId: string;
   items: Mensaje[];
+  /** Queda historial hacia **arriba**. */
   hasMore: boolean;
+  /** Solo en `?after=`: el hueco venía recortado y falta algo hacia **abajo**. */
+  hasMoreAfter?: boolean;
   unread: number;
   muted: boolean;
 }
@@ -247,6 +250,38 @@ test.describe('Chat — paginación', () => {
     const hueco = await leer(request, duenno, otra, { after: primero.id });
 
     expect(hueco.items.map((m) => m.body)).toEqual(['durante el corte 1', 'durante el corte 2']);
+  });
+
+  test('un hueco que no cabe lo dice con `hasMoreAfter`', async ({ request }) => {
+    /* 🔴 El caso que se perdía en silencio. El servidor recorta el hueco al
+       tope, y antes no lo decía: el cliente pegaba el trozo recibido al final de
+       lo que ya tenía y **lo de en medio desaparecía para siempre**, sin error
+       ninguno. Solo pasa tras un corte largo —un portátil cerrado media hora en
+       un chat activo—, que es justo cuando nadie sospecha de la aplicación. */
+    const otra = await nuevoInterlocutor(request);
+
+    const ancla = await escribir(request, duenno, otra, 'antes del corte');
+    for (let i = 1; i <= 4; i += 1) {
+      await escribir(request, otra, duenno, `durante ${i}`);
+    }
+
+    /* Con tope 2 y cuatro mensajes por delante, el hueco desborda. */
+    const recortado = await leer(request, duenno, otra, { after: ancla.id, limit: 2 });
+    expect(recortado.items.map((m) => m.body)).toEqual(['durante 1', 'durante 2']);
+    expect(recortado.hasMoreAfter, 'El hueco no cabía y tiene que decirlo').toBe(true);
+
+    /* Y cuando sí cabe, no alarma: `false`, no ausente. Un cliente que compare
+       contra `undefined` se comportaría igual, pero el contrato tiene que ser
+       explícito. */
+    const completo = await leer(request, duenno, otra, { after: ancla.id, limit: 50 });
+    expect(completo.items).toHaveLength(4);
+    expect(completo.hasMoreAfter).toBe(false);
+
+    /* ⚠️ `hasMore` se queda en `false` en las dos: significa «queda más hacia
+       **arriba**», que es lo contrario de lo que pasa aquí. Son campos
+       distintos a propósito. */
+    expect(recortado.hasMore).toBe(false);
+    expect(completo.hasMore).toBe(false);
   });
 
   test('un cursor de otra conversación no filtra nada', async ({ request }) => {

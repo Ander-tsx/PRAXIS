@@ -13,11 +13,15 @@ import {
 } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
-import type { ChatAttachment, ChatMessage, ChatMessagePage, UserProfile } from '../../api/domain';
+import type { Directorio } from '../../api/directorio';
+import { nombreDePersona } from '../../api/directorio';
+import type { ChatAttachment, ChatMessage, ChatMessagePage } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
 import { hrefDeAvatar } from '../../api/presence';
+import { useRefrescoAgrupado } from '../../hooks';
 import { Avatar } from '../../atoms/Avatar';
+import { useEventoEnVivo, useReconexion } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
 import { Composer, type Sugerencia } from './Composer';
@@ -45,12 +49,22 @@ export interface ChatAcciones {
    * fuera de la conversación general. El compositor principal siempre manda
    * `false`, aunque lleve una cita puesta.
    */
+  /**
+   * Devuelve **el mensaje creado**, no solo si hubo error.
+   *
+   * ⚠️ Devolvía `{ error }` a secas, y lo que metía el mensaje en la pantalla era
+   * el `revalidatePath` de la propia acción. Esa revalidación compite en la cola
+   * de transición del App Router con los refrescos del flujo en vivo, y perder
+   * esa carrera era el fallo de «se envía, le llega al otro y en mi pantalla no
+   * sale». Con el mensaje en la respuesta, el panel lo inserta él mismo y no
+   * depende de ninguna revalidación.
+   */
   enviar: (
     cuerpo: string,
     replyToId: string | null,
     attachmentIds: string[],
     enHilo: boolean,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: string | null; mensaje: ChatMessage | null }>;
   borrar: (messageId: string) => Promise<{ error: string | null }>;
   reaccionar: (messageId: string, emoji: string, on: boolean) => Promise<void>;
   /**
@@ -116,7 +130,16 @@ export interface ChatPanelProps {
    */
   salidaMovil?: ReactNode;
   page: ChatMessagePage;
-  usersById: Map<string, UserProfile>;
+  /**
+   * Quién es quién, **y si se pudo preguntar**.
+   *
+   * ⚠️ Era un `Map` a secas, y esa era la mitad del fallo de «Alguien que ya no
+   * está»: un id ausente del mapa se leía como «esa cuenta se fue» tanto si el
+   * directorio había respondido que no existe como si la consulta había fallado.
+   * Un 429 del limitador se convertía así en una afirmación falsa sobre gente
+   * que estaba perfectamente. Ver `commons/api/directorio.ts`.
+   */
+  directorio: Directorio;
   currentUserId: string;
   acciones: ChatAcciones;
 
@@ -184,7 +207,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     pantallaCompletaEnMovil = false,
     salidaMovil,
     page,
-    usersById,
+    directorio,
     currentUserId,
     acciones,
     gatewayPath,
@@ -201,6 +224,37 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   ref,
 ) {
   const [older, setOlder] = useState<ChatMessage[]>([]);
+  /**
+   * Los mensajes que han llegado **después** de lo que sirvió el servidor.
+   *
+   * ## Es la pieza que arregla «mi mensaje no se pinta»
+   *
+   * La conversación se pintaba entera en el servidor y se actualizaba llamando a
+   * `router.refresh()` con cada evento. Eso metía cada mensaje en la **misma
+   * cola de transición del App Router** que el `revalidatePath` de la acción de
+   * enviar, y en Next 16 una navegación encima de otra descarta la anterior:
+   * cuando perdía la tuya, el mensaje estaba guardado, le llegaba al otro
+   * extremo y en tu pantalla no aparecía. Aleatorio en apariencia, una carrera
+   * en realidad.
+   *
+   * Ahora lo nuevo se acumula aquí, en estado de cliente, y llega por dos
+   * caminos que **se solapan a propósito**:
+   *
+   * 1. La respuesta del envío, que devuelve el mensaje creado. Es el camino
+   *    rápido: aparece en el mismo fotograma, sin esperar a la red del evento.
+   * 2. El evento `chat.mensaje` del flujo, que es el que trae lo de los demás
+   *    —y también lo tuyo desde otra pestaña—.
+   *
+   * Que se solapen no es un problema porque `insertarMensaje` deduplica por id.
+   * Es justo lo que hace que ninguno de los dos caminos sea imprescindible: si
+   * el flujo está caído, tu mensaje sale igual; si la respuesta tarda, el evento
+   * llega antes y también sale.
+   */
+  const [nuevos, setNuevos] = useState<ChatMessage[]>([]);
+
+  /* Para el único caso en que el panel no puede reconstruirse solo: un hueco de
+     reconexión que no cupo. Ver `useReconexion` más abajo. */
+  const refrescar = useRefrescoAgrupado();
   const [hasMore, setHasMore] = useState(page.hasMore);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,8 +274,28 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
   const [alFinal, setAlFinal] = useState(true);
   /** Los borradores que esperan al envío del mensaje. */
-  const [adjuntosPendientes, setAdjuntosPendientes] = useState<ChatAttachment[]>([]);
-  const [subiendo, setSubiendo] = useState(false);
+  /**
+   * Los borradores que esperan al envío, **uno por compositor**.
+   *
+   * ⚠️ **Era un solo estado para los dos, y por eso adjuntar un archivo en el
+   * chat lo pegaba también en el hilo.** El panel monta dos `Composer` —el de la
+   * conversación y el del hilo— y los dos leían `adjuntosPendientes` y
+   * `subiendo`: el chip del archivo salía en los dos campos a la vez y las dos
+   * ruletas de carga giraban juntas, aunque solo se hubiera pulsado un clip.
+   * Peor todavía, enviar por cualquiera de los dos reclamaba el mismo id, así
+   * que el archivo acababa donde no era.
+   *
+   * Son dos redactores distintos con dos borradores distintos. Se separan por
+   * `destino`, que es lo que cada operación de adjuntar dice de sí misma.
+   */
+  const [adjuntosPendientes, setAdjuntosPendientes] = useState<{
+    chat: ChatAttachment[];
+    hilo: ChatAttachment[];
+  }>({ chat: [], hilo: [] });
+  const [subiendo, setSubiendo] = useState<{ chat: boolean; hilo: boolean }>({
+    chat: false,
+    hilo: false,
+  });
 
   /**
    * El hilo abierto en el panel lateral, si hay uno.
@@ -276,6 +350,33 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   );
 
   /**
+   * Las reacciones que han puesto **otros** desde que se cargó la página.
+   *
+   * `messageId` → `"<userId>|<emoji>"` → puesta o quitada.
+   *
+   * ⚠️ **Van a un mapa distinto del de las tuyas, y no es duplicación.** El
+   * tuyo (`reaccionesLocales`) es optimista: se escribe antes de que el servidor
+   * conteste y se deshace si rechaza. Este es confirmado: llega del flujo, ya
+   * ocurrió. Mezclarlos haría que el eco de tu propia reacción pisara un cambio
+   * de opinión rápido —poner y quitar antes de que llegue el evento— dejándola
+   * al revés de como la dejaste.
+   *
+   * La clave lleva el `userId` dentro porque varias personas pueden poner el
+   * mismo emoji al mismo mensaje, y son reacciones distintas.
+   */
+  const [reaccionesAjenas, setReaccionesAjenas] = useState<Map<string, Map<string, boolean>>>(
+    new Map(),
+  );
+
+  /**
+   * Cuántas respuestas de hilo han llegado en vivo por cada mensaje raíz.
+   *
+   * Se suma a `_count.replies`, que es una foto del momento en que el servidor
+   * sirvió la página. Sin esto, la marca «N respuestas» se quedaba congelada:
+   * alguien contestaba en un hilo y el mensaje raíz seguía diciendo el número
+   * viejo —o no diciendo nada, si era la primera respuesta— hasta recargar.
+   */
+  /**
    * Aplica tu delta pendiente sobre las reacciones que trae el servidor.
    *
    * Idempotente a propósito: poner un emoji que el servidor ya devuelve no lo
@@ -285,10 +386,30 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const conMisReacciones = useCallback(
     (mensaje: ChatMessage): ChatMessage['reactions'] => {
       const mias = reaccionesLocales.get(mensaje.id);
-      if (!mias || mias.size === 0) return mensaje.reactions;
+      const ajenas = reaccionesAjenas.get(mensaje.id);
+      if (!mias?.size && !ajenas?.size) return mensaje.reactions;
 
       let salida = mensaje.reactions;
-      for (const [emoji, puesta] of mias) {
+
+      /* Primero las de los demás, que llegan confirmadas por el flujo. */
+      for (const [clave, puesta] of ajenas ?? []) {
+        const [userId, emoji] = clave.split('|');
+        if (!userId || !emoji) continue;
+        const yaEsta = salida.some(
+          (reaccion) => reaccion.emoji === emoji && reaccion.userId === userId,
+        );
+        if (puesta && !yaEsta) {
+          salida = [...salida, { messageId: mensaje.id, emoji, userId }];
+        } else if (!puesta && yaEsta) {
+          salida = salida.filter(
+            (reaccion) => !(reaccion.emoji === emoji && reaccion.userId === userId),
+          );
+        }
+      }
+
+      /* Y encima la tuya, que es optimista y manda: si acabas de pulsar, lo que
+         se ve tiene que ser lo que pulsaste. */
+      for (const [emoji, puesta] of mias ?? []) {
         const yaEsta = salida.some(
           (reaccion) => reaccion.emoji === emoji && reaccion.userId === currentUserId,
         );
@@ -300,9 +421,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           );
         }
       }
+
       return salida;
     },
-    [reaccionesLocales, currentUserId],
+    [reaccionesLocales, reaccionesAjenas, currentUserId],
   );
 
   /**
@@ -335,18 +457,97 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     Map<string, { body: string; editedAt: string }>
   >(new Map());
 
-  const mensajes = [...older, ...page.items].map((mensaje) => {
+  /**
+   * Los que este navegador ya ha borrado, con la fecha en que lo hizo.
+   *
+   * Mismo patrón que los tres de arriba: borrar sí revalida, pero la lápida
+   * tiene que aparecer **en el mismo fotograma del clic** o el mensaje se queda
+   * ahí, entero, hasta que el servidor conteste. En una conexión lenta eso son
+   * segundos mirando algo que creías haber borrado.
+   *
+   * Se aplica encima de lo que trae el servidor y es idempotente: cuando llegue
+   * la revalidación el mensaje ya vendrá con su `deletedAt` y esto dejará de
+   * notarse.
+   */
+  const [borradosLocales, setBorradosLocales] = useState<Map<string, string>>(new Map());
+
+  const [respuestasExtra, setRespuestasExtra] = useState<Map<string, number>>(new Map());
+
+  /**
+   * El historial completo: lo viejo, lo que sirvió el servidor y lo que ha
+   * llegado después, **sin repetidos y en orden**.
+   *
+   * ⚠️ La deduplicación por id es lo que permite que el mensaje propio llegue
+   * por dos caminos a la vez —la respuesta del envío y el evento del flujo— sin
+   * salir dos veces. Gana el más reciente de los dos: `Map` conserva el orden de
+   * inserción y sobrescribe el valor al repetir clave, así que un mensaje del
+   * flujo (que puede traer adjuntos ya reclamados) pisa al de la respuesta sin
+   * moverlo de sitio.
+   *
+   * ⚠️ Y se filtra `visibleEnChat`: una respuesta escrita **dentro del panel del
+   * hilo** no fluye por la conversación general. Sin este filtro, un mensaje de
+   * hilo que llegara por el flujo aparecía en medio del chat, que es lo que el
+   * modelo lleva evitando desde que se separaron «responder» y «hilo».
+   */
+  const historial = useMemo(() => {
+    const porId = new Map<string, ChatMessage>();
+    for (const mensaje of [...older, ...page.items, ...nuevos]) {
+      if (mensaje.visibleEnChat === false) continue;
+      porId.set(mensaje.id, mensaje);
+    }
+    return [...porId.values()].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
+  }, [older, page.items, nuevos]);
+
+  const mensajes = historial.map((mensaje) => {
     const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
+    const borrado = borradosLocales.get(mensaje.id);
+    const respuestasNuevas = respuestasExtra.get(mensaje.id) ?? 0;
     return {
       ...mensaje,
       reactions: reacciones,
+      ...(respuestasNuevas > 0
+        ? { _count: { replies: mensaje._count.replies + respuestasNuevas } }
+        : {}),
       ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
       ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+      /* La lápida va la última: si un mensaje está borrado, ninguna de las
+         correcciones de arriba tiene ya sentido sobre él. Se vacía el cuerpo y
+         se quitan adjuntos y reacciones aquí también, para que la burbuja nunca
+         llegue a ver contenido de un mensaje que ya no existe. */
+      ...(borrado
+        ? {
+            deletedAt: borrado,
+            body: '',
+            reactions: [],
+            attachments: [],
+            pinnedAt: null,
+            pinnedById: null,
+          }
+        : {}),
     };
   });
   const ultimoId = mensajes.at(-1)?.id;
+
+  /**
+   * Lo último que ha llegado al canal, **contando también los hilos**.
+   *
+   * ⚠️ **`ultimoId` no vale para marcar leído, y ahí estaba el fallo de que las
+   * respuestas de un hilo se quedaran siempre sin ver.** `mensajes` filtra
+   * `visibleEnChat`, así que una respuesta escrita dentro de un hilo no lo
+   * cambia nunca. El servidor, en cambio, **sí** las cuenta como no leídas:
+   * `countUnread` mira todos los mensajes del canal, sin mirar si viven en un
+   * hilo. Resultado: llegaba una respuesta de hilo, subía el contador, nada
+   * disparaba `marcarLeido` y la insignia se quedaba encendida para siempre.
+   *
+   * Este disparador toma el más reciente de los dos lados, así que abrir el
+   * panel o recibir una respuesta lo mueve igual que un mensaje normal.
+   */
+  const ultimoDelHilo = hiloReplies.at(-1)?.id;
+  const disparadorDeLectura = `${ultimoId ?? ''}|${ultimoDelHilo ?? ''}`;
 
   /**
    * Hasta dónde ha leído cada persona del canal, sin contarte a ti.
@@ -403,38 +604,59 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     return mapa;
   }, [acuses, mensajes]);
 
-  /** Los fijados con las mismas correcciones locales que el historial. */
-  const fijadosConCorrecciones = fijadosLista.map((mensaje) => {
-    const editado = editadosLocales.get(mensaje.id);
-    return editado ? { ...mensaje, body: editado.body, editedAt: editado.editedAt } : mensaje;
-  });
+  /**
+   * Los fijados con las mismas correcciones locales que el historial.
+   *
+   * Los borrados se **quitan** en vez de corregirse: una lápida no se ancla
+   * —el servidor la desfija al borrar— así que en la barra no pinta nada.
+   */
+  const fijadosConCorrecciones = fijadosLista
+    .filter((mensaje) => !borradosLocales.has(mensaje.id))
+    .map((mensaje) => {
+      const editado = editadosLocales.get(mensaje.id);
+      return editado ? { ...mensaje, body: editado.body, editedAt: editado.editedAt } : mensaje;
+    });
 
   /** Las respuestas del hilo con las mismas correcciones locales que el historial. */
   const hiloMensajes = hiloReplies.map((mensaje) => {
     const reacciones = conMisReacciones(mensaje);
     const fijado = fijadosLocales.get(mensaje.id);
     const editado = editadosLocales.get(mensaje.id);
+    const borrado = borradosLocales.get(mensaje.id);
     return {
       ...mensaje,
       reactions: reacciones,
       ...(fijado ? { pinnedAt: fijado.pinnedAt, pinnedById: fijado.pinnedById } : {}),
       ...(editado ? { body: editado.body, editedAt: editado.editedAt } : {}),
+      /* La lápida, la última y arrasando con el resto: ver la nota de `mensajes`. */
+      ...(borrado
+        ? {
+            deletedAt: borrado,
+            body: '',
+            reactions: [],
+            attachments: [],
+            pinnedAt: null,
+            pinnedById: null,
+          }
+        : {}),
     };
   });
 
+  /**
+   * Cómo se lee un autor.
+   *
+   * Delega en `nombreDePersona`, que es quien sabe distinguir «esta cuenta ya no
+   * existe» de «no se pudo preguntar». Antes decía lo primero en los dos casos.
+   */
   const nombreDeAutor = useCallback(
-    (userId: string) => {
-      const perfil = usersById.get(userId);
-      if (userId === currentUserId) return 'Tú';
-      return perfil ? personLabel(perfil) : 'Alguien que ya no está';
-    },
-    [usersById, currentUserId],
+    (userId: string) => nombreDePersona(directorio, userId, currentUserId),
+    [directorio, currentUserId],
   );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `ultimoId` es el disparador — al llegar un mensaje con el chat abierto hay que volver a marcarlo leído o el contador reaparecería
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `disparadorDeLectura` es el disparador, no un valor que se lea — al llegar un mensaje con el chat abierto hay que volver a marcarlo leído o el contador reaparecería
   useEffect(() => {
     void acciones.marcarLeido();
-  }, [acciones.marcarLeido, ultimoId]);
+  }, [acciones.marcarLeido, disparadorDeLectura]);
 
   /**
    * La conversación empieza abajo, en lo último.
@@ -473,6 +695,198 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
   }
 
+  /**
+   * El error se retira solo a los ocho segundos.
+   *
+   * ⚠️ **No lo hacía, y se quedaba clavado indefinidamente.** Solo desaparecía
+   * si la siguiente acción llamaba a `setError(null)`, y varias no lo hacen
+   * —fijar, reaccionar, borrar—: un «Solo se pueden fijar 5 mensajes» se
+   * quedaba bajo el compositor el resto de la sesión, afirmando algo que ya no
+   * era cierto.
+   *
+   * Ocho segundos: lo bastante para leer una frase larga sin prisa, y lo
+   * bastante poco para que no acompañe a la siguiente cosa que hagas. El aspa
+   * de al lado permite quitarlo antes.
+   */
+  useEffect(() => {
+    if (!error) return;
+    const temporizador = window.setTimeout(() => setError(null), 8000);
+    return () => window.clearTimeout(temporizador);
+  }, [error]);
+
+  /* ─── Tiempo real ───────────────────────────────────────────────────────
+   *
+   * Todo lo que sigue sustituye a un `router.refresh()` por evento. Cada
+   * manejador aplica **solo** lo que cambia, así que un mensaje nuevo no vuelve
+   * a renderizar la página en el servidor ni pisa lo que estuvieras escribiendo.
+   * Ver `commons/realtime/` y la nota de `nuevos`, arriba.
+   *
+   * ⚠️ **Todos comprueban `channelId` primero.** La conexión es una por pestaña
+   * y por ella pasan los eventos de **todas** tus conversaciones: sin ese filtro,
+   * un mensaje de otro chat se insertaría en el que tienes abierto.
+   */
+
+  /** Un mensaje: al historial, o al panel del hilo si nació dentro de uno. */
+  useEventoEnVivo('chat.mensaje', (evento) => {
+    if (evento.channelId !== page.channelId) return;
+
+    const mensaje = evento.mensaje;
+
+    /**
+     * Una respuesta de hilo va **al hilo**, no a la conversación.
+     *
+     * ⚠️ Esto es la mitad del arreglo de «con el hilo abierto, los mensajes
+     * nuevos no salían hasta refrescar a mano»: las respuestas solo se cargaban
+     * al abrirlo y nada volvía a pedirlas.
+     *
+     * Se inserta solo si el hilo abierto es **el suyo**: una respuesta a otro
+     * mensaje no pinta nada en este panel. Y aunque no haya hilo abierto, el
+     * mensaje raíz tiene que enterarse para subir su contador de «N respuestas»,
+     * que es lo de abajo.
+     */
+    if (mensaje.visibleEnChat === false) {
+      const raizId = mensaje.replyTo?.id;
+      if (!raizId) return;
+
+      /* Solo si el hilo abierto es **el suyo**: una respuesta a otro mensaje no
+         pinta nada en este panel. */
+      if (raizId === hiloRaiz?.id) {
+        setHiloReplies((actuales) =>
+          actuales.some((candidato) => candidato.id === mensaje.id)
+            ? actuales
+            : [...actuales, mensaje],
+        );
+      }
+
+      /**
+       * Y el contador «N respuestas» del raíz sube aunque el hilo esté cerrado:
+       * es la única señal de que ahí abajo hay conversación nueva.
+       *
+       * ⚠️ **Se cuenta aquí y en ningún otro sitio, incluidas las tuyas.** El
+       * evento llega también cuando la respuesta es tuya —el servidor manda el
+       * eco al autor— así que sumar además al enviar contaría dos veces cada
+       * respuesta propia. Un contador necesita una sola fuente; la inserción del
+       * mensaje puede tener dos porque deduplica por id, pero sumar no
+       * deduplica.
+       */
+      setRespuestasExtra((previas) => new Map(previas).set(raizId, (previas.get(raizId) ?? 0) + 1));
+      return;
+    }
+
+    setNuevos((actuales) =>
+      actuales.some((candidato) => candidato.id === mensaje.id) ? actuales : [...actuales, mensaje],
+    );
+  });
+
+  /** Una edición: se aplica encima, como si la hubieras hecho tú. */
+  useEventoEnVivo('chat.editado', (evento) => {
+    if (evento.channelId !== page.channelId) return;
+    setEditadosLocales((previos) =>
+      new Map(previos).set(evento.messageId, { body: evento.body, editedAt: evento.editedAt }),
+    );
+  });
+
+  /** Un borrado: lápida en su sitio, y fuera de la barra de fijados. */
+  useEventoEnVivo('chat.borrado', (evento) => {
+    if (evento.channelId !== page.channelId) return;
+    setBorradosLocales((previos) => new Map(previos).set(evento.messageId, evento.at));
+    setFijadosLista((previos) => previos.filter((mensaje) => mensaje.id !== evento.messageId));
+  });
+
+  /**
+   * Una reacción ajena.
+   *
+   * ⚠️ **Solo las ajenas.** Las tuyas ya las tienes aplicadas de forma optimista
+   * en `reaccionesLocales`, y volver a aplicarlas desde el evento no cambiaría
+   * nada —el delta es idempotente— pero sí pisaría una que hubieras puesto y
+   * quitado muy rápido, dejándola al revés. Las de los demás van a su propio
+   * mapa, que se aplica encima de lo que trajo el servidor.
+   */
+  useEventoEnVivo('chat.reaccion', (evento) => {
+    if (evento.channelId !== page.channelId || evento.mio) return;
+    setReaccionesAjenas((previas) => {
+      const copia = new Map(previas);
+      const delMensaje = new Map(copia.get(evento.messageId) ?? []);
+      delMensaje.set(`${evento.actorId}|${evento.emoji}`, evento.on);
+      return copia.set(evento.messageId, delMensaje);
+    });
+  });
+
+  /** Un fijado o desfijado de otra persona: se refresca la barra. */
+  useEventoEnVivo('chat.fijado', (evento) => {
+    if (evento.channelId !== page.channelId || evento.mio) return;
+    setFijadosLocales((previos) =>
+      new Map(previos).set(evento.messageId, {
+        pinnedAt: evento.pinned ? evento.at : null,
+        pinnedById: evento.pinnedById,
+      }),
+    );
+    /* La barra sí se vuelve a pedir: no basta con la marca del mensaje, porque
+       un fijado puede ser de un mensaje que este navegador **no tiene cargado**
+       —el historial pagina hacia atrás—. Es una petición pequeña y ocurre solo
+       cuando alguien fija algo, que no es un gesto frecuente. */
+    void cargarFijados();
+  });
+
+  /** Alguien ha leído: mueve los checks de «visto» sin volver a pedir los acuses. */
+  useEventoEnVivo('chat.leido', (evento) => {
+    if (evento.channelId !== page.channelId || evento.mio) return;
+    setAcuses((previos) => {
+      const sinEl = previos.filter((acuse) => acuse.userId !== evento.actorId);
+      return [...sinEl, { userId: evento.actorId, lastReadAt: evento.hasta }];
+    });
+  });
+
+  /**
+   * Al volver de un corte, se pide **solo el hueco**.
+   *
+   * `EventSource` reconecta solo pero no reenvía lo publicado mientras estuvo
+   * caído. Antes esto era un `router.refresh()`: volver a renderizar la página
+   * entera en el servidor por un hipo de red. Ahora es un `?after=<último>`, que
+   * trae exactamente lo que falta y nada más.
+   *
+   * Si no hay ni un mensaje todavía no hay cursor desde el que pedir, y tampoco
+   * hay nada que reconstruir: el siguiente mensaje llegará por el flujo.
+   */
+  useReconexion(() => {
+    if (!ultimoId) return;
+
+    createApiClient({ gatewayPath })
+      .get<ChatMessagePage>(`${rutaCanal}/messages?limit=${PAGINA}&after=${ultimoId}`)
+      .then((pagina) => {
+        /**
+         * 🔴 **Si el hueco no cabía, no se pega nada: se recarga.**
+         *
+         * El servidor recorta a `PAGINA` mensajes. Antes eso pasaba en silencio
+         * y aquí se pegaba el trozo recibido al final de lo que ya había, con lo
+         * de en medio perdido para siempre: la conversación se quedaba con un
+         * agujero mudo, sin error y sin nada que lo delatara. Solo se nota tras
+         * un corte largo —un portátil cerrado media hora en un chat activo—, que
+         * es justo cuando nadie sospecha de la aplicación.
+         *
+         * `router.refresh()` vuelve a pedir la página en el servidor, que es lo
+         * único correcto cuando no se sabe qué falta. Va por `useRefrescoAgrupado`
+         * porque el refresco entra en la cola de transiciones del App Router y
+         * dispararlo suelto es lo que destapa el fallo de los botones girando
+         * (ESTADO-ACTUAL §35).
+         */
+        if (pagina.hasMoreAfter) {
+          refrescar();
+          return;
+        }
+
+        if (pagina.items.length === 0) return;
+        /* Entran todos, de hilo y de conversación: `historial` filtra los de
+           hilo y el panel lateral recoge los suyos al volver a abrirse. */
+        setNuevos((actuales) => [...actuales, ...pagina.items]);
+      })
+      .catch(() => {
+        /* Un hueco que no se pudo rellenar no merece un error en pantalla: el
+           siguiente mensaje que llegue lo pondrá al día, y recargar siempre
+           funciona. */
+      });
+  });
+
   async function cargarHistorial() {
     const primero = mensajes[0];
     if (!primero || cargandoHistorial) return;
@@ -508,7 +922,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       const personas: Sugerencia[] = catalogo.people
         .filter((id) => id !== currentUserId)
         .map((id) => {
-          const perfil = usersById.get(id);
+          const perfil = directorio.perfiles.get(id);
           return {
             kind: 'user' as const,
             id,
@@ -523,7 +937,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
          se puede escribir una etiqueta a mano, así que no hay nada que hacer al
          respecto y un error aquí solo estorbaría. */
     }
-  }, [gatewayPath, rutaCanal, usersById, currentUserId]);
+  }, [gatewayPath, rutaCanal, directorio, currentUserId]);
 
   /**
    * La lista de fijados, entera y sin paginar — el propio backend la deja así
@@ -545,6 +959,28 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     void cargarFijados();
   }, [cargarFijados]);
 
+  /**
+   * Enviar, y **pintar el mensaje con lo que devuelve el servidor**.
+   *
+   * ## El fallo que cierra
+   *
+   * Esto solo miraba `resultado.error`. Lo que metía el mensaje en la pantalla
+   * era el `revalidatePath` de la Server Action, es decir, volver a renderizar
+   * la página en el servidor — y eso entra en la misma cola de transición del
+   * App Router que el `router.refresh()` que disparaba cada evento del flujo.
+   * Con una conversación viva esa cola estaba ocupada casi siempre, y cuando tu
+   * revalidación perdía la carrera **Next la descartaba**: el mensaje quedaba
+   * guardado, le llegaba al otro extremo y en tu pantalla no aparecía. Ese era
+   * el «a veces sí y a veces no».
+   *
+   * Ahora se usa el mensaje que devuelve la acción y se inserta aquí mismo. No
+   * hay revalidación, no hay cola y no hay carrera que perder.
+   *
+   * ⚠️ **No es optimismo: es el mensaje real del servidor**, con su id, su hora y
+   * sus adjuntos ya reclamados. No hace falta reconciliar nada después, y si el
+   * envío falla no hay nada que deshacer porque no se pintó nada. El eco que
+   * llega luego por el flujo trae el mismo id y `historial` lo deduplica.
+   */
   async function enviar(cuerpo: string, attachmentIds: string[]) {
     setEnviando(true);
     setError(null);
@@ -554,8 +990,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const resultado = await acciones.enviar(cuerpo, respondiendo?.id ?? null, attachmentIds, false);
     if (resultado.error) setError(resultado.error);
     else {
+      if (resultado.mensaje)
+        setNuevos((actuales) => [...actuales, resultado.mensaje as ChatMessage]);
       setRespondiendo(null);
-      setAdjuntosPendientes([]);
+      setAdjuntosPendientes((previos) => ({ ...previos, chat: [] }));
     }
     setEnviando(false);
   }
@@ -570,29 +1008,49 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * para siempre y lo único que decía algo era la consola del navegador. El
    * `finally` garantiza que la ruleta pare pase lo que pase.
    */
-  async function adjuntar(file: File) {
-    setSubiendo(true);
+  /**
+   * Sube un archivo como borrador, **al compositor que lo pidió**.
+   *
+   * ⚠️ `destino` no es un adorno: el panel monta dos redactores y sin él el chip
+   * y la ruleta salían en los dos a la vez. Ver la nota de `adjuntosPendientes`.
+   *
+   * ⚠️ **El `try` tampoco es de adorno, y su ausencia era un fallo mudo.** Una
+   * Server Action que **lanza** —y lanza, por ejemplo, cuando el archivo pasa
+   * del tope de cuerpo de Next— reventaba este `await`: ni se pintaba el
+   * error, ni se quitaba el «subiendo», así que el clip se quedaba girando
+   * para siempre y lo único que decía algo era la consola del navegador. El
+   * `finally` garantiza que la ruleta pare pase lo que pase.
+   */
+  async function adjuntar(destino: 'chat' | 'hilo', file: File) {
+    setSubiendo((previo) => ({ ...previo, [destino]: true }));
     setError(null);
     try {
       const resultado = await acciones.adjuntar(file);
       if (resultado.error) setError(resultado.error);
       else if (resultado.attachment) {
-        setAdjuntosPendientes((previos) => [...previos, resultado.attachment as ChatAttachment]);
+        const adjunto = resultado.attachment;
+        setAdjuntosPendientes((previos) => ({
+          ...previos,
+          [destino]: [...previos[destino], adjunto],
+        }));
       }
     } catch {
       setError('No se pudo subir el archivo. Si es muy grande, prueba con uno más ligero.');
     } finally {
-      setSubiendo(false);
+      setSubiendo((previo) => ({ ...previo, [destino]: false }));
     }
   }
 
-  async function quitarAdjunto(attachmentId: string) {
+  async function quitarAdjunto(destino: 'chat' | 'hilo', attachmentId: string) {
     setError(null);
     try {
       const resultado = await acciones.quitarAdjunto(attachmentId);
       if (resultado.error) setError(resultado.error);
       else {
-        setAdjuntosPendientes((previos) => previos.filter((a) => a.id !== attachmentId));
+        setAdjuntosPendientes((previos) => ({
+          ...previos,
+          [destino]: previos[destino].filter((a) => a.id !== attachmentId),
+        }));
       }
     } catch {
       setError('No se pudo quitar el archivo.');
@@ -653,9 +1111,31 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
   }
 
+  /**
+   * Borrar, con la lápida pintada al instante.
+   *
+   * Si el servidor rechaza, se deshace: dejar la lápida puesta cuando el borrado
+   * falló sería mentir sobre lo que ven los demás — que es la misma regla que
+   * siguen reaccionar y fijar.
+   */
   async function borrar(messageId: string) {
+    setBorradosLocales((previos) => new Map(previos).set(messageId, new Date().toISOString()));
+
+    /* Un mensaje borrado se desfija en el servidor, así que también sale aquí
+       de la barra: si no, la barra seguiría anclando una lápida hasta la
+       siguiente revalidación. */
+    setFijadosLista((previos) => previos.filter((mensaje) => mensaje.id !== messageId));
+
     const resultado = await acciones.borrar(messageId);
-    if (resultado.error) setError(resultado.error);
+    if (resultado.error) {
+      setBorradosLocales((previos) => {
+        const copia = new Map(previos);
+        copia.delete(messageId);
+        return copia;
+      });
+      setError(resultado.error);
+      void cargarFijados();
+    }
   }
 
   /**
@@ -723,9 +1203,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           ];
         });
       }
-    } catch {
+    } catch (fallo) {
       setFijadosLocales((previos) => new Map(previos).set(messageId, previo));
-      setError('No se pudo guardar el fijado.');
+      /**
+       * ⚠️ **El mensaje del servidor, no uno genérico.**
+       *
+       * Esto decía siempre «No se pudo guardar el fijado», y con el tope de
+       * cinco fijados por conversación esa frase es inservible: quien lo intenta
+       * no tiene forma de saber que hay un límite ni que la solución es desfijar
+       * otro. El servidor ya devuelve exactamente eso —«Solo se pueden fijar 5
+       * mensajes por conversación. Desfija alguno antes.»— y lo único que había
+       * que hacer era dejarlo pasar.
+       *
+       * El respaldo se queda para lo que no trae mensaje: un corte de red.
+       */
+      const motivo = fallo instanceof Error ? fallo.message.trim() : '';
+      setError(motivo || 'No se pudo guardar el fijado.');
     }
   }
 
@@ -817,6 +1310,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * se añade al panel lateral al instante (además de fluir por el historial al
    * siguiente refresco).
    */
+  /**
+   * Enviar una respuesta del hilo.
+   *
+   * ⚠️ **Ya no recarga el hilo entero.** Terminaba con `await abrirHilo(hiloRaiz)`,
+   * o sea: por cada respuesta, otra petición que traía el raíz y **todas** sus
+   * respuestas otra vez, y que además reiniciaba el estado de carga —el panel
+   * parpadeaba con su propio mensaje—. Se inserta lo que devuelve el servidor,
+   * igual que en la conversación general.
+   */
   async function enviarEnHilo(cuerpo: string, attachmentIds: string[]) {
     if (!hiloRaiz) return;
     setEnviando(true);
@@ -825,9 +1327,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
        la conversación general — aparece aquí y solo aquí. */
     const resultado = await acciones.enviar(cuerpo, hiloRaiz.id, attachmentIds, true);
     if (resultado.error) setError(resultado.error);
-    else setAdjuntosPendientes([]);
+    else {
+      if (resultado.mensaje) {
+        const respuesta = resultado.mensaje;
+        setHiloReplies((actuales) =>
+          actuales.some((candidato) => candidato.id === respuesta.id)
+            ? actuales
+            : [...actuales, respuesta],
+        );
+        /* La marca «N respuestas» **no** se toca aquí: la sube el manejador de
+           `chat.mensaje`, que recibe también el eco de lo tuyo. Sumarla en los
+           dos sitios contaría cada respuesta propia dos veces. */
+      }
+      setAdjuntosPendientes((previos) => ({ ...previos, hilo: [] }));
+    }
     setEnviando(false);
-    await abrirHilo(hiloRaiz);
   }
 
   /**
@@ -836,11 +1350,32 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * El servidor no devuelve el mensaje, así que la respuesta se quita de la
    * lista local — si se borrara el raíz, no queda hilo que mostrar.
    */
+  /**
+   * Borrar dentro del hilo.
+   *
+   * ⚠️ **La respuesta ya no se quita de la lista: se convierte en lápida**, igual
+   * que en la conversación general. Quitarla dejaba el mismo hueco mudo que
+   * arreglamos arriba, y en un hilo se nota más porque son cuatro mensajes
+   * contados.
+   *
+   * El raíz sigue cerrando el panel: sin él no queda hilo del que hablar, y una
+   * lápida como cabecera de un subchat no dice nada útil.
+   */
   async function borrarEnHilo(messageId: string) {
+    setBorradosLocales((previos) => new Map(previos).set(messageId, new Date().toISOString()));
+
     const resultado = await acciones.borrar(messageId);
-    if (resultado.error) setError(resultado.error);
-    else if (messageId === hiloRaiz?.id) cerrarHilo();
-    else setHiloReplies((actuales) => actuales.filter((mensaje) => mensaje.id !== messageId));
+    if (resultado.error) {
+      setBorradosLocales((previos) => {
+        const copia = new Map(previos);
+        copia.delete(messageId);
+        return copia;
+      });
+      setError(resultado.error);
+      return;
+    }
+
+    if (messageId === hiloRaiz?.id) cerrarHilo();
   }
 
   /**
@@ -1088,7 +1623,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
                       <MessageBubble
                         message={mensaje}
-                        author={usersById.get(mensaje.authorId)}
+                        author={directorio.perfiles.get(mensaje.authorId)}
                         mine={mensaje.authorId === currentUserId}
                         continued={
                           !separador &&
@@ -1293,10 +1828,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 onPedirSugerencias={pedirSugerencias}
                 /* Editando no hay adjuntos que enseñar: lo que se cambia es el
                  texto. Los del mensaje siguen donde estaban. */
-                adjuntosPendientes={editando ? [] : adjuntosPendientes}
-                onAdjuntar={adjuntar}
-                onQuitarAdjunto={quitarAdjunto}
-                subiendo={subiendo}
+                adjuntosPendientes={editando ? [] : adjuntosPendientes.chat}
+                onAdjuntar={(file) => adjuntar('chat', file)}
+                onQuitarAdjunto={(id) => quitarAdjunto('chat', id)}
+                subiendo={subiendo.chat}
                 citaId={respondiendo?.id ?? null}
                 {...(editando
                   ? {
@@ -1315,11 +1850,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     ? null
                     : respondiendo && (
                         <div
-                          className="flex items-start gap-2 rounded-lg border-l-2 py-1.5 pl-2.5 pr-2"
-                          style={{
-                            borderColor: colors.primary,
-                            background: alpha(colors.primary, 8),
-                          }}
+                          /* Sin barra lateral, igual que la cita dentro de la
+                             burbuja: el tinte de fondo y el «Respondiendo a» en
+                             color ya dicen lo que es. */
+                          className="flex items-start gap-2 rounded-lg px-2.5 py-1.5"
+                          style={{ background: alpha(colors.primary, 8) }}
                         >
                           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span
@@ -1354,9 +1889,35 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </p>
           )}
 
+          {/**
+           * El error de la última acción, **con salida**.
+           *
+           * ⚠️ **Se quedaba puesto para siempre.** Nada lo borraba salvo la
+           * siguiente acción que llamara a `setError(null)`, y hay varias que no
+           * lo hacen: fijar, reaccionar, borrar. Así que un «Solo se pueden
+           * fijar 5 mensajes» se quedaba clavado bajo el compositor el resto de
+           * la sesión, contando algo que ya no era cierto y sin forma de
+           * quitarlo.
+           *
+           * Ahora se va solo (ver el efecto de `error`) y además se puede cerrar
+           * a mano: un mensaje que se desvanece sin que hayas terminado de
+           * leerlo es tan malo como uno que no se va.
+           */}
           {error && (
-            <p role="alert" className="mt-2 font-sans text-xs" style={{ color: colors.error }}>
-              {error}
+            <p
+              role="alert"
+              className="mt-2 flex items-start gap-2 font-sans text-xs"
+              style={{ color: colors.error }}
+            >
+              <span className="min-w-0 flex-1">{error}</span>
+              <button
+                type="button"
+                onClick={() => setError(null)}
+                aria-label="Descartar el error"
+                className="shrink-0 cursor-pointer rounded px-1 leading-none opacity-70 hover:opacity-100"
+              >
+                ✕
+              </button>
             </p>
           )}
         </div>
@@ -1368,7 +1929,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             cargando={hiloCargando}
             error={hiloError}
             onCerrar={cerrarHilo}
-            usersById={usersById}
+            directorio={directorio}
             currentUserId={currentUserId}
             canWrite={canWrite}
             permiteMenciones={permiteMenciones}
@@ -1381,10 +1942,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             onFijar={fijar}
             onEditar={editar}
             onBorrar={borrarEnHilo}
-            adjuntosPendientes={adjuntosPendientes}
-            onAdjuntar={adjuntar}
-            onQuitarAdjunto={quitarAdjunto}
-            subiendo={subiendo}
+            adjuntosPendientes={adjuntosPendientes.hilo}
+            onAdjuntar={(file) => adjuntar('hilo', file)}
+            onQuitarAdjunto={(id) => quitarAdjunto('hilo', id)}
+            subiendo={subiendo.hilo}
             sugerencias={sugerencias}
             onPedirSugerencias={() => void pedirSugerencias()}
             {...(hrefDePersona ? { hrefDePersona } : {})}

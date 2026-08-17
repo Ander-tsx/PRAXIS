@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { canalDeAvisos } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { PublicadorDeEventos } from '../realtime/publicador.service';
 import { RedisService } from '../redis/redis.service';
 import { ChannelsService } from './channels.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
@@ -26,15 +26,29 @@ const CON_MENSAJE = {
   editedAt: true,
   pinnedAt: true,
   pinnedById: true,
+  /* Si el mensaje fluye por la conversación o vive solo dentro de su hilo.
+     El cliente **lo necesita** desde que los mensajes llegan por el flujo en
+     vivo: es lo que decide si una respuesta nueva se inserta en el historial o
+     en el panel del hilo. Sin esto, una respuesta de hilo aparecía en medio de
+     la conversación general. */
+  visibleEnChat: true,
+  /* La lápida de un mensaje borrado. Va aquí porque el cliente **tiene** que
+     poder distinguirla de un mensaje vacío: es lo que decide si se pinta la
+     burbuja o el «Mensaje eliminado», y si el mensaje admite acciones. */
+  deletedAt: true,
   reactions: true,
   /* `attachments` con solo el `mimeType`: es lo que necesita la cita para
      decir «📷 Imagen» en vez de un hueco vacío cuando el mensaje citado no
-     tiene texto — un mensaje puede ser solo un archivo. */
+     tiene texto — un mensaje puede ser solo un archivo.
+
+     `deletedAt` también: si el mensaje citado se borró, la cita tiene que decir
+     «Mensaje eliminado» y no quedarse en blanco. */
   replyTo: {
     select: {
       id: true,
       authorId: true,
       body: true,
+      deletedAt: true,
       attachments: { select: { mimeType: true }, take: 1 },
     },
   },
@@ -65,6 +79,20 @@ const CON_MENSAJE = {
  * cubren lo que la gente usa de verdad y caben en una fila sin desplegable.
  */
 export const REACCIONES = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+
+/**
+ * Cuántos mensajes se pueden tener fijados a la vez en un canal.
+ *
+ * Fijar es «esto no se puede perder», y esa frase deja de significar nada
+ * cuando lo dice de treinta mensajes: la barra se convierte en un segundo
+ * historial que hay que recorrer, y quien entra no sabe por dónde empezar.
+ *
+ * Cinco es lo que cabe en la lista desplegable sin desplazamiento y lo bastante
+ * poco para obligar a elegir. El tope se aplica **aquí y no en el navegador**:
+ * dos pestañas fijando a la vez, o cualquiera llamando a la ruta a mano, se
+ * saltarían un límite que solo viviera en la interfaz.
+ */
+export const MAXIMO_DE_FIJADOS = 5;
 
 /**
  * El `type` del aviso en vivo de un mensaje nuevo.
@@ -99,6 +127,7 @@ export class ChatService {
     private readonly redis: RedisService,
     private readonly channels: ChannelsService,
     private readonly attachments: ChatAttachmentsService,
+    private readonly eventos: PublicadorDeEventos,
   ) {}
 
   /**
@@ -129,9 +158,11 @@ export class ChatService {
     if (dto.replyToId) {
       const citado = await this.prisma.chatMessage.findUnique({
         where: { id: dto.replyToId },
-        select: { channelId: true },
+        select: { channelId: true, deletedAt: true },
       });
-      if (!citado || citado.channelId !== dto.channelId) {
+      /* Tampoco se cita una lápida: la cita saldría vacía y quien responde
+         creería estar contestando a algo que ya no existe. */
+      if (!citado || citado.channelId !== dto.channelId || citado.deletedAt) {
         throw new RpcException({
           statusCode: 400,
           message: 'Ese mensaje no es de esta conversación.',
@@ -175,7 +206,6 @@ export class ChatService {
      * respondiera —el corte seguiría estando antes de lo que tú escribiste—.
      */
     void this.touchRead(dto.channelId, dto.requesterId, message.createdAt);
-    void this.notifyOthers(dto.channelId, dto.requesterId, message.createdAt);
 
     /* Se releen los adjuntos después de reclamarlos: los borradores recién
        atados al mensaje no estaban en la creación. */
@@ -183,7 +213,16 @@ export class ChatService {
       where: { id: message.id },
       select: CON_MENSAJE,
     });
-    return conAdjuntos ?? message;
+    const completo = conAdjuntos ?? message;
+
+    /* ⚠️ **Se anuncia el mensaje ya completo, no el de la creación.** Con el de
+       arriba, un mensaje enviado con archivos llegaba al otro extremo **sin
+       ellos** —los adjuntos se reclaman después del `create`—, y no reaparecían
+       hasta recargar. Es la clase de fallo que solo se ve con adjuntos y por eso
+       es fácil que sobreviva a las pruebas manuales. */
+    void this.anunciarMensaje(dto.channelId, completo, message.createdAt);
+
+    return completo;
   }
 
   /**
@@ -198,6 +237,16 @@ export class ChatService {
     requesterId: string;
     limit?: number;
     before?: string;
+    /**
+     * Los mensajes **posteriores** a este, para resincronizar tras un corte.
+     *
+     * `before` sube por el historial; esto baja por lo que se perdió. Un
+     * `EventSource` reconecta solo, pero lo publicado mientras la conexión
+     * estaba caída no se reenvía: al volver, el cliente pide «lo que hay
+     * después del último que tengo» y rellena el hueco con una sola petición,
+     * en vez de recargar la conversación entera.
+     */
+    after?: string;
     pinned?: boolean;
     q?: string;
   }) {
@@ -205,7 +254,7 @@ export class ChatService {
       where: { channelId_userId: { channelId: dto.channelId, userId: dto.requesterId } },
       select: { mutedAt: true, hiddenAt: true },
     });
-    
+
     /* La búsqueda se pide como una página aparte, no como un modo del
        historial: el término filtra el texto y el resultado se ordena del más
        reciente al más antiguo, como los fijados, sin cursor — un cursor sobre
@@ -221,6 +270,10 @@ export class ChatService {
              conversación general, y buscar dentro de un hilo se hace en su
              propio panel. */
           visibleEnChat: true,
+          /* Una lápida no se busca: su `body` está vacío, así que nunca casaría
+             un término, pero se excluye explícitamente para que la intención
+             quede escrita y no dependa de que el vaciado siga haciéndose. */
+          deletedAt: null,
           /* Insensible a mayúsculas: «Hoy» encuentra «hoy». El modo de Postgres,
              no una normalización que rompería el índice. */
           body: { contains: termino, mode: 'insensitive' },
@@ -232,6 +285,7 @@ export class ChatService {
       });
 
       return {
+        channelId: dto.channelId,
         items: hallados,
         hasMore: false,
         unread: 0,
@@ -244,10 +298,16 @@ export class ChatService {
        `limit` a propósito (el gateway ya documenta lo mismo en el DTO). */
     if (dto.pinned) {
       const fijados = await this.prisma.chatMessage.findMany({
-        where: { 
-          channelId: dto.channelId, 
-          visibleEnChat: true, 
+        where: {
+          channelId: dto.channelId,
+          visibleEnChat: true,
           pinnedAt: { not: null },
+          /* `delete` ya desfija al borrar, así que esto no debería descartar
+             nada. Se deja porque la barra de fijados es lo único que ancla un
+             mensaje **fuera** del historial: si alguna vez se colara una lápida
+             ahí, se quedaría anclada para siempre y gastando una de las cinco
+             plazas. */
+          deletedAt: null,
           ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
         },
         orderBy: { pinnedAt: 'desc' },
@@ -255,6 +315,7 @@ export class ChatService {
       });
 
       return {
+        channelId: dto.channelId,
         items: fijados,
         hasMore: false,
         unread: 0,
@@ -263,6 +324,87 @@ export class ChatService {
     }
 
     const limit = dto.limit ?? DEFAULT_LIMIT;
+
+    /**
+     * Lo que llegó **después** de un mensaje dado: el hueco de una desconexión.
+     *
+     * Se resuelve antes que el historial normal porque responde otra pregunta y
+     * no admite `before` — pedir «lo anterior a X y posterior a Y» a la vez no
+     * significa nada aquí.
+     *
+     * ⚠️ Sale en orden ascendente y **`hasMore` va siempre a `false`**: en el
+     * historial normal significa «queda más hacia arriba», y aquí lo que puede
+     * faltar está hacia abajo. Reutilizarlo diría lo contrario de lo que pasa.
+     *
+     * 🔴 **Para eso está `hasMoreAfter`, y antes no existía.** El hueco se
+     * servía recortado a `limit` **sin decirlo**: una desconexión de más de
+     * cincuenta mensajes dejaba al cliente pegando el trozo que le llegó al
+     * final de lo que ya tenía, con el resto perdido para siempre y sin un solo
+     * error. La conversación se quedaba con un agujero mudo en medio hasta que
+     * alguien recargara —y nadie recarga, porque nada parece roto—.
+     *
+     * Ahora se piden `limit + 1` para saber si el hueco desbordó, se devuelven
+     * `limit` y el campo lo dice. Quien recibe `true` no debe pegar nada: tiene
+     * que recargar la conversación entera, que es lo único correcto cuando no
+     * cabe lo que falta.
+     */
+    if (dto.after) {
+      const desde = await this.prisma.chatMessage.findUnique({
+        where: { id: dto.after },
+        select: { createdAt: true, channelId: true },
+      });
+      /* Un cursor de otra conversación se ignora, igual que en `before`: sería
+         una forma de leer un chat ajeno con un id que se conozca. */
+      if (!desde || desde.channelId !== dto.channelId) {
+        return {
+          channelId: dto.channelId,
+          items: [],
+          hasMore: false,
+          hasMoreAfter: false,
+          unread: await this.countUnread(dto.channelId, dto.requesterId),
+          muted: estado?.mutedAt !== null && estado?.mutedAt !== undefined,
+        };
+      }
+
+      /**
+       * ⚠️ **Los dos cortes se combinan, no se sobrescriben.**
+       *
+       * Escribir `createdAt: {gt: X}` y a continuación esparcir
+       * `...(hiddenAt && { createdAt: {gt: hiddenAt} })` **pisa** la primera
+       * clave: en JavaScript la última gana, y el filtro del cursor
+       * desaparecía. Se toma el más tardío de los dos, que es lo que los dos
+       * quieren decir juntos.
+       *
+       * ⚠️ Y **no se filtra `visibleEnChat`**: por aquí también tienen que
+       * volver las respuestas de hilo que se perdieron. El cliente las reparte
+       * —al historial o al panel del hilo— mirando ese mismo campo, que viaja
+       * en cada mensaje.
+       */
+      const corte =
+        estado?.hiddenAt && estado.hiddenAt > desde.createdAt ? estado.hiddenAt : desde.createdAt;
+
+      /* Uno de más, igual que en el historial: es lo que permite saber si el
+         hueco desbordó sin contar la tabla. No se devuelve. */
+      const posteriores = await this.prisma.chatMessage.findMany({
+        where: { channelId: dto.channelId, createdAt: { gt: corte } },
+        orderBy: { createdAt: 'asc' },
+        take: limit + 1,
+        select: CON_MENSAJE,
+      });
+
+      const desbordado = posteriores.length > limit;
+
+      return {
+        channelId: dto.channelId,
+        items: desbordado ? posteriores.slice(0, limit) : posteriores,
+        hasMore: false,
+        /* El hueco no cabía entero. Quien lo reciba **no puede pegar** estos
+           mensajes al final de lo que tiene: falta lo de en medio. */
+        hasMoreAfter: desbordado,
+        unread: await this.countUnread(dto.channelId, dto.requesterId),
+        muted: estado?.mutedAt !== null && estado?.mutedAt !== undefined,
+      };
+    }
 
     /* El cursor es un mensaje, no una página: en un chat el número de página de
        un mensaje cambia cada vez que alguien escribe. Se traduce a su instante,
@@ -300,11 +442,14 @@ export class ChatService {
     const hasMore = newest.length > limit;
     const page = hasMore ? newest.slice(0, limit) : newest;
 
-    const [unread] = await Promise.all([
-      this.countUnread(dto.channelId, dto.requesterId),
-    ]);
+    const [unread] = await Promise.all([this.countUnread(dto.channelId, dto.requesterId)]);
 
     return {
+      /* ⚠️ El canal viaja en la respuesta desde que el chat se actualiza por
+         eventos: es con lo que el panel decide si un evento que llega es de la
+         conversación que tiene abierta. Deducirlo de `items[0].channelId` no
+         vale — una conversación recién empezada no tiene ni un mensaje. */
+      channelId: dto.channelId,
       items: page.reverse(),
       hasMore,
       unread,
@@ -312,9 +457,29 @@ export class ChatService {
     };
   }
 
-  /** Deja el canal por leído hasta ahora. */
+  /**
+   * Deja el canal por leído hasta ahora.
+   *
+   * Anuncia el corte de lectura, y eso sirve para **dos** cosas distintas:
+   *
+   * 1. A los demás, para mover los checks de «visto» de sus mensajes sin tener
+   *    que volver a pedir los acuses.
+   * 2. **A ti mismo, en tus otras sesiones.** Leer una conversación en el móvil
+   *    tiene que apagar su contador en el portátil; sin este evento, la insignia
+   *    se quedaba encendida en la otra pestaña hasta recargar.
+   */
   async markRead(dto: { channelId: string; requesterId: string }) {
-    await this.touchRead(dto.channelId, dto.requesterId, new Date());
+    const at = new Date();
+    await this.touchRead(dto.channelId, dto.requesterId, at);
+
+    void this.eventos.repartir(dto.channelId, () => ({
+      tipo: 'chat.leido',
+      channelId: dto.channelId,
+      actorId: dto.requesterId,
+      at: at.toISOString(),
+      hasta: at.toISOString(),
+    }));
+
     return { ok: true };
   }
 
@@ -407,8 +572,16 @@ export class ChatService {
       throw new RpcException({ statusCode: 400, message: 'Escribe algo antes de guardar.' });
     }
 
+    /* `deletedAt: null`: editar una lápida la resucitaría con texto nuevo, que
+       es exactamente lo que un borrado tiene que impedir. Sin fila que casar, la
+       respuesta es el mismo 404 que un mensaje ajeno. */
     const { count } = await this.prisma.chatMessage.updateMany({
-      where: { id: dto.id, channelId: dto.channelId, authorId: dto.requesterId },
+      where: {
+        id: dto.id,
+        channelId: dto.channelId,
+        authorId: dto.requesterId,
+        deletedAt: null,
+      },
       data: { body: cuerpo, editedAt: new Date() },
     });
 
@@ -416,35 +589,112 @@ export class ChatService {
       throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
     }
 
-    return this.prisma.chatMessage.findUnique({
+    const editado = await this.prisma.chatMessage.findUnique({
       where: { id: dto.id },
       select: CON_MENSAJE,
     });
+
+    /* ⚠️ Una edición **no se anunciaba a nadie**: el texto nuevo se guardaba y
+       en el otro extremo seguía el viejo hasta recargar la página. Ahora viaja
+       el texto ya editado, así que quien lo recibe no tiene que releer nada. */
+    if (editado?.editedAt) {
+      void this.eventos.repartir(dto.channelId, () => ({
+        tipo: 'chat.editado',
+        channelId: dto.channelId,
+        actorId: dto.requesterId,
+        at: editado.editedAt!.toISOString(),
+        messageId: dto.id,
+        body: editado.body,
+        editedAt: editado.editedAt!.toISOString(),
+      }));
+    }
+
+    return editado;
   }
 
   /**
-   * Borra un mensaje.
+   * Borra un mensaje, **dejando la lápida**.
    *
    * El `authorId` va en el `where` cuando no hay moderación, no en una
    * comprobación previa: así no existe el hueco entre leer y borrar, y borrar el
    * de otro **no encuentra fila** en vez de encontrarla y rechazarla.
-   */ async delete(dto: {
+   *
+   * ## Qué se va y qué se queda
+   *
+   * Se va **todo el contenido**: el texto, las reacciones y los adjuntos con sus
+   * bytes. Se queda la fila, con `deletedAt`, su autor y su hora.
+   *
+   * ⚠️ Esto era un `deleteMany` y la fila desaparecía. En una conversación eso
+   * es un hueco mudo: quien la está leyendo ve que algo se ha movido y no sabe
+   * si alguien borró un mensaje, si falló la carga o si nunca hubo nada. Y con
+   * `replyTo` en `SetNull`, las respuestas que lo citaban se quedaban colgando
+   * de una cita vacía. La lápida contesta esas dos preguntas sin conservar nada
+   * de lo que se pidió borrar.
+   *
+   * ⚠️ **Y se desfija.** Un mensaje fijado que se borra tiene que salir de la
+   * barra de fijados: si no, el canal se queda con un anclaje permanente a un
+   * hueco, y encima gastando una de las cinco plazas.
+   *
+   * Todo en una transacción: un borrado a medias —texto fuera, adjuntos dentro—
+   * sería peor que no haber borrado, porque parecería completo.
+   */
+  async delete(dto: {
     id: string;
     channelId: string;
     requesterId: string;
     canModerate: boolean;
   }) {
-    const { count } = await this.prisma.chatMessage.deleteMany({
+    /* Los adjuntos se resuelven antes de la transacción: sus bytes pueden estar
+       fuera de la base (GCS), y eso no se puede deshacer con un rollback. */
+    const objetivo = await this.prisma.chatMessage.findFirst({
       where: {
         id: dto.id,
         channelId: dto.channelId,
+        deletedAt: null,
         ...(dto.canModerate ? {} : { authorId: dto.requesterId }),
       },
+      select: { id: true, attachments: { select: { id: true } } },
     });
 
-    if (count === 0) {
+    if (!objetivo) {
+      /* O no existe, o no es tuyo, o ya estaba borrado. Las tres se responden
+         igual: no se confirma la existencia de un mensaje que no puedes tocar. */
       throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
     }
+
+    await this.prisma.$transaction([
+      this.prisma.chatReaction.deleteMany({ where: { messageId: dto.id } }),
+      this.prisma.chatAttachment.deleteMany({ where: { messageId: dto.id } }),
+      this.prisma.chatMessage.update({
+        where: { id: dto.id },
+        data: {
+          body: '',
+          deletedAt: new Date(),
+          /* Se desfija en el mismo gesto, y también se limpia quién lo fijó:
+             ese dato solo tiene sentido mientras el mensaje está anclado. */
+          pinnedAt: null,
+          pinnedById: null,
+        },
+      }),
+    ]);
+
+    /* Los bytes del proveedor externo, **después** de confirmar en la base. Van
+       fuera de la transacción porque GCS no participa en ella, y no lanzan:
+       ver `borrarBytes`. */
+    if (objetivo.attachments.length > 0) {
+      await this.attachments.borrarBytes(objetivo.attachments.map((adjunto) => adjunto.id));
+    }
+
+    /* ⚠️ Un borrado tampoco se anunciaba. En el otro extremo el mensaje seguía
+       entero —con su texto y sus archivos— hasta que a esa persona le diera por
+       recargar, que es exactamente lo contrario de lo que un borrado promete. */
+    void this.eventos.repartir(dto.channelId, () => ({
+      tipo: 'chat.borrado',
+      channelId: dto.channelId,
+      actorId: dto.requesterId,
+      at: new Date().toISOString(),
+      messageId: dto.id,
+    }));
 
     return { id: dto.id, deleted: true };
   }
@@ -470,9 +720,12 @@ export class ChatService {
 
     const mensaje = await this.prisma.chatMessage.findUnique({
       where: { id: dto.messageId },
-      select: { channelId: true },
+      select: { channelId: true, deletedAt: true },
     });
-    if (!mensaje || mensaje.channelId !== dto.channelId) {
+    /* Una lápida no acepta reacciones: no hay nada a lo que reaccionar, y la
+       interfaz ya no ofrece el botón. Se responde 404 igual que a un mensaje de
+       otra conversación — el cliente no tiene por qué distinguirlos. */
+    if (!mensaje || mensaje.channelId !== dto.channelId || mensaje.deletedAt) {
       throw new RpcException({ statusCode: 404, message: 'Mensaje no encontrado' });
     }
 
@@ -494,6 +747,22 @@ export class ChatService {
       where: { messageId: dto.messageId },
     });
 
+    /* ⚠️ Se anuncia **el delta y no la lista entera**, a propósito. Cada cliente
+       ya aplica su propio delta local encima de lo que trajo el servidor (ver
+       `reaccionesLocales` en `ChatPanel`), y mandar la lista completa pisaría esa
+       corrección optimista con una foto que puede llegar desordenada respecto a
+       otra reacción simultánea. Un delta —«fulano puso 👍»— es idempotente y se
+       puede aplicar en cualquier orden. */
+    void this.eventos.repartir(dto.channelId, () => ({
+      tipo: 'chat.reaccion',
+      channelId: dto.channelId,
+      actorId: dto.requesterId,
+      at: new Date().toISOString(),
+      messageId: dto.messageId,
+      emoji: dto.emoji,
+      on: dto.on,
+    }));
+
     return { messageId: dto.messageId, reactions };
   }
 
@@ -511,13 +780,48 @@ export class ChatService {
     requesterId: string;
     on: boolean;
   }) {
+    /**
+     * El tope de fijados, comprobado **antes** de escribir y solo al fijar.
+     *
+     * ⚠️ El `where` excluye el propio mensaje: sin eso, volver a fijar uno que
+     * ya lo está contaría como el sexto y devolvería un error por una operación
+     * que no cambia nada. Fijar es idempotente y tiene que seguir siéndolo.
+     *
+     * ⚠️ **Esto es una comprobación previa, así que hay una carrera**: dos
+     * pestañas fijando a la vez con cuatro puestos pueden colar el sexto. Se
+     * acepta a conciencia — la alternativa es un bloqueo de tabla o un índice
+     * único artificial para defender un límite **de presentación**, no de
+     * integridad. El peor caso es una barra con seis fijados hasta que alguien
+     * quite uno, y ninguna consulta ni permiso depende de ese número.
+     */
+    if (dto.on) {
+      const yaFijados = await this.prisma.chatMessage.count({
+        where: {
+          channelId: dto.channelId,
+          pinnedAt: { not: null },
+          deletedAt: null,
+          id: { not: dto.messageId },
+        },
+      });
+
+      if (yaFijados >= MAXIMO_DE_FIJADOS) {
+        throw new RpcException({
+          statusCode: 400,
+          message: `Solo se pueden fijar ${MAXIMO_DE_FIJADOS} mensajes por conversación. Desfija alguno antes.`,
+        });
+      }
+    }
+
     /* Se escribe con `updateMany` y el `channelId` en el `where` —no con un
        `findUnique` y luego un `update`— para que no exista el hueco entre
        comprobar y escribir: un id de otra conversación no encuentra fila y no
        hay nada que decidir. El `authorId` no limita: cualquiera que pueda
-       entrar al chat puede fijar, igual que puede reaccionar. */
+       entrar al chat puede fijar, igual que puede reaccionar.
+
+       `deletedAt: null` para no poder anclar una lápida: quedaría en la barra
+       para siempre, apuntando a un hueco y gastando una de las cinco plazas. */
     const resultado = await this.prisma.chatMessage.updateMany({
-      where: { id: dto.messageId, channelId: dto.channelId },
+      where: { id: dto.messageId, channelId: dto.channelId, deletedAt: null },
       data: {
         pinnedAt: dto.on ? new Date() : null,
         pinnedById: dto.on ? dto.requesterId : null,
@@ -532,6 +836,16 @@ export class ChatService {
       where: { id: dto.messageId },
       select: { id: true, pinnedAt: true, pinnedById: true },
     });
+
+    void this.eventos.repartir(dto.channelId, () => ({
+      tipo: 'chat.fijado',
+      channelId: dto.channelId,
+      actorId: dto.requesterId,
+      at: new Date().toISOString(),
+      messageId: dto.messageId,
+      pinned: Boolean(fijado?.pinnedAt),
+      pinnedById: fijado?.pinnedById ?? null,
+    }));
 
     return {
       messageId: dto.messageId,
@@ -563,7 +877,9 @@ export class ChatService {
         where: { channelId: { in: ids }, visibleEnChat: true },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
-        select: { channelId: true, body: true, authorId: true, createdAt: true },
+        /* `deletedAt` para que el resumen de la fila diga «Mensaje eliminado»
+           en vez de quedarse en blanco: al borrar, `body` se vacía. */
+        select: { channelId: true, body: true, authorId: true, createdAt: true, deletedAt: true },
       }),
       this.contarSinLeerDeVarios(ids, userId),
       this.prisma.chatChannelState.findMany({
@@ -580,7 +896,7 @@ export class ChatService {
         .map((canal) => {
           const ultimo = ultimoPorCanal.get(canal.id) ?? null;
           const estado = estadoPorCanal.get(canal.id);
-          
+
           return {
             channelId: canal.id,
             /* Con quién hablas: el que no eres tú. */
@@ -650,7 +966,9 @@ export class ChatService {
         where: { channelId: { in: ids }, visibleEnChat: true },
         orderBy: { createdAt: 'desc' },
         distinct: ['channelId'],
-        select: { channelId: true, body: true, authorId: true, createdAt: true },
+        /* `deletedAt` para que el resumen de la fila diga «Mensaje eliminado»
+           en vez de quedarse en blanco: al borrar, `body` se vacía. */
+        select: { channelId: true, body: true, authorId: true, createdAt: true, deletedAt: true },
       }),
       this.contarSinLeerDeVarios(ids, userId),
       this.prisma.chatChannelState.findMany({
@@ -785,72 +1103,48 @@ export class ChatService {
   }
 
   /**
-   * Publica el aviso en vivo para todos los del canal menos quien escribió.
+   * Anuncia un mensaje nuevo **con el mensaje dentro**.
    *
-   * ⚠️ Los destinatarios salen de la base, **no de la petición**: el canal de
-   * Redis lleva el `userId` en su nombre y es lo único que separa la conexión de
-   * una persona de la de otra, así que quién entra en esa lista es una decisión
-   * de seguridad.
+   * ## Qué cambia respecto a lo que había
    *
-   * ⚠️ **Quien lo tenga silenciado no recibe nada.** Se filtra aquí y no en el
-   * navegador: un aviso que llega y se descarta al pintarlo ya ha sonado.
+   * Esto era `notifyOthers` y publicaba un aviso sin contenido: solo «ha pasado
+   * algo en un chat». El navegador no podía hacer nada con eso salvo
+   * `router.refresh()`, y de ahí venían los dos fallos que parecían inconexos
+   * —tu mensaje que a veces no se pintaba, y los hilos y contadores que no se
+   * enteraban—. Explicación entera en `realtime/eventos.ts`.
    *
-   * No lleva el texto del mensaje. Un aviso emergente que reprodujera lo escrito
-   * lo enseñaría en la pantalla de quien tenga el portátil abierto en una sala de
-   * reuniones, y para leerlo ya está el chat, que comprueba permisos al entrar.
+   * Tres diferencias concretas:
+   *
+   * 1. **Va el mensaje completo**, así que el cliente lo inserta sin pedir nada.
+   * 2. **También se le manda al autor.** La misma persona puede tener el chat
+   *    abierto en dos pestañas y en el móvil; sin el eco, esas sesiones no verían
+   *    su propio mensaje hasta recargar. Que no suene lo decide el cliente
+   *    comparando `actorId` consigo mismo — es presentación, no reparto.
+   * 3. **A quien lo tenga silenciado también se le manda**, con `silenciado:
+   *    true`. Antes no se le mandaba nada, lo cual valía cuando el evento solo
+   *    servía para pitar; ahora lleva el mensaje, y no mandarlo significaría que
+   *    una conversación silenciada deja de actualizarse sola.
+   *
+   * ⚠️ **El texto del mensaje viaja, pero la tarjeta emergente no lo enseña.**
+   * Quien recibe el evento ya tiene permiso para leer el canal —es participante,
+   * y la lista sale de la base—, así que no es una fuga; lo que no debe hacerse
+   * es reproducirlo en una tarjeta que aparece sobre cualquier pantalla, y eso
+   * lo decide `AvisosEnVivo`.
    */
-  private async notifyOthers(channelId: string, authorId: string, at: Date) {
-    const canal = await this.prisma.chatChannel.findUnique({
-      where: { id: channelId },
-      select: {
-        kind: true,
-        directUserA: true,
-        directUserB: true,
-        project: { select: { id: true, name: true, slug: true } },
-      },
-    });
-    if (!canal) return;
-
-    const destinatarios =
-      canal.kind === 'DIRECT'
-        ? [canal.directUserA === authorId ? canal.directUserB : canal.directUserA].filter(
-            (id): id is string => Boolean(id),
-          )
-        : (
-            await this.prisma.projectMember.findMany({
-              where: { projectId: canal.project?.id, userId: { not: authorId } },
-              select: { userId: true },
-            })
-          ).map((miembro) => miembro.userId);
-
-    if (destinatarios.length === 0) return;
-
-    const callados = new Set(
-      (
-        await this.prisma.chatChannelState.findMany({
-          where: { channelId, userId: { in: destinatarios }, mutedAt: { not: null } },
-          select: { userId: true },
-        })
-      ).map((estado) => estado.userId),
-    );
-
-    for (const destinatario of destinatarios) {
-      if (callados.has(destinatario)) continue;
-
-      void this.redis.publish(canalDeAvisos(destinatario), {
-        type: CHAT_EVENT_TYPE,
-        actorId: authorId,
-        /* Distingue a dónde lleva la tarjeta: al chat del proyecto o a la
-           conversación privada con quien escribió. */
-        channelKind: canal.kind,
-        projectId: canal.project?.id ?? null,
-        projectName: canal.project?.name ?? null,
-        projectSlug: canal.project?.slug ?? null,
-        taskId: null,
-        taskTitle: null,
-        createdAt: at.toISOString(),
-      });
-    }
+  private anunciarMensaje(channelId: string, mensaje: { id: string; authorId: string }, at: Date) {
+    return this.eventos.repartir(channelId, (contexto) => ({
+      tipo: 'chat.mensaje',
+      channelId,
+      actorId: mensaje.authorId,
+      at: at.toISOString(),
+      mensaje,
+      silenciado: contexto.silenciado,
+      channelKind: contexto.channelKind,
+      projectId: contexto.projectId,
+      projectName: contexto.projectName,
+      projectSlug: contexto.projectSlug,
+      peerId: contexto.peerId,
+    }));
   }
   /**
    * Oculta un canal para un usuario, actualizando hiddenAt en ChatChannelState.

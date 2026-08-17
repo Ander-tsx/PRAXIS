@@ -807,18 +807,13 @@ export interface NotificationPage {
   unread: number;
 }
 
-/**
- * El `type` con el que viaja un mensaje de chat por el flujo de avisos.
- *
- * ⚠️ **No está en `NOTIFICATION_TYPES` y no debe estarlo.** Esa lista es espejo
- * del enum de la tabla `notifications`, y un mensaje de chat **no crea fila**:
- * una conversación de cincuenta mensajes serían cincuenta avisos por persona y
- * taparían el que importa. Comparte el flujo SSE —que es lo que hace que suene
- * y salga en pantalla estés donde estés— pero no la bandeja.
- *
- * Espejo de `CHAT_EVENT_TYPE` en `projects-service/src/chat/chat.service.ts`.
+/*
+ * ⚠️ Aquí estaba `CHAT_EVENT_TYPE = 'CHAT_MESSAGE'`, el `type` de texto libre con
+ * el que un mensaje de chat se colaba por el canal de avisos disfrazado de
+ * notificación. Ese sobre ya no existe: los eventos en vivo llevan `tipo` en la
+ * raíz y una unión cerrada, en `commons/realtime/tipos.ts`. La constante se ha
+ * ido con él para que nadie la reintroduzca creyendo que sigue significando algo.
  */
-export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
 
 /**
  * Las reacciones que acepta el backend.
@@ -859,16 +854,54 @@ export interface ChatMessage {
   /** Quién lo fijó, para el «fijado por» de la marca. */
   pinnedById: string | null;
   /**
+   * Si fluye por la conversación general o vive solo dentro de su hilo.
+   *
+   * ⚠️ **No es lo mismo que `replyTo`.** Los dos van con la cita, pero responden
+   * preguntas distintas: `replyTo` dice a quién cita, esto dice **dónde se ve**.
+   * «Responder» desde el compositor principal deja esto en `true` —es un mensaje
+   * normal que además cita a otro—; escribir dentro del panel del hilo lo deja
+   * en `false`.
+   *
+   * El cliente lo necesita desde que los mensajes llegan por el flujo en vivo:
+   * es lo que decide si un mensaje nuevo se inserta en el historial o en el
+   * panel del hilo. Sin esto, una respuesta de hilo aparecía en medio de la
+   * conversación general.
+   */
+  visibleEnChat: boolean;
+  /**
+   * Cuándo se borró, o `null` si el mensaje está vivo.
+   *
+   * ## Un mensaje borrado sigue estando en la lista
+   *
+   * El borrado es **suave**: la fila se queda, con `body` vacío, sin adjuntos y
+   * sin reacciones, y la conversación pinta una lápida —«Mensaje eliminado»— en
+   * su sitio. Antes la fila desaparecía, y eso deja un hueco mudo: quien está
+   * leyendo ve que algo se ha movido y no sabe si alguien borró un mensaje o si
+   * falló la carga.
+   *
+   * ⚠️ **Una lápida no admite ninguna acción**: ni responder, ni reaccionar, ni
+   * fijar, ni editar, ni abrir hilo. `MessageBubble` corta por aquí antes de
+   * pintar la barra, y el backend rechaza las cuatro por su cuenta — la
+   * interfaz no es lo que las impide.
+   */
+  deletedAt: string | null;
+  /**
    * A qué mensaje responde, con lo justo para pintar la cita.
    *
    * `attachments` solo trae el `mimeType`, del primero si hay varios: la cita
    * no enseña el archivo, solo dice qué es cuando el mensaje citado no tiene
    * texto — «📷 Imagen» en vez de un hueco vacío.
+   *
+   * `deletedAt` porque el mensaje citado puede haberse borrado **después** de
+   * que alguien lo respondiera: entonces la cita dice «Mensaje eliminado» en vez
+   * de quedarse en blanco. La respuesta sigue ahí — es de otra persona y sigue
+   * teniendo sentido.
    */
   replyTo: {
     id: string;
     authorId: string;
     body: string;
+    deletedAt: string | null;
     attachments: { mimeType: string }[];
   } | null;
   /** Cuántas respuestas tiene su hilo. Para la marca «N respuestas». */
@@ -903,10 +936,32 @@ export interface ChatAttachment {
 
 /** Lo que devuelve la lista de mensajes, de proyecto o privada. */
 export interface ChatMessagePage {
+  /**
+   * El canal de esta conversación.
+   *
+   * ⚠️ Es con lo que el panel decide si un evento del flujo en vivo le incumbe,
+   * y **no se puede deducir de `items[0].channelId`**: una conversación recién
+   * empezada no tiene ni un mensaje, y sería justo la que se quedaría muda.
+   */
+  channelId: string;
   /** Del más antiguo al más nuevo, que es como se pinta una conversación. */
   items: ChatMessage[];
   /** Queda historial por encima. Lo usa el botón de «ver mensajes anteriores». */
   hasMore: boolean;
+  /**
+   * Solo en `?after=`: el hueco **no cabía entero** y viene recortado.
+   *
+   * ⚠️ Con `true` los `items` **no se pegan** a lo que ya hay: falta lo de en
+   * medio, y pegarlos deja la conversación con un agujero mudo. Hay que recargar
+   * la conversación entera.
+   *
+   * Va aparte de `hasMore` porque significan cosas opuestas: aquel dice que
+   * queda más **hacia arriba** (historial antiguo), este que falta **hacia
+   * abajo** (lo que llegó durante el corte).
+   *
+   * Opcional porque el resto de respuestas no lo traen.
+   */
+  hasMoreAfter?: boolean;
   /** Sin leer de esta persona en este canal. Es lo que pinta la insignia. */
   unread: number;
   /**
@@ -923,7 +978,19 @@ export interface DirectConversation {
   channelId: string;
   /** Con quién hablas. El perfil se resuelve contra el directorio. */
   peerId: string;
-  ultimo: { body: string; authorId: string; createdAt: string } | null;
+  /**
+   * El último mensaje, para el resumen de la fila.
+   *
+   * `deletedAt` viaja porque un mensaje borrado deja `body` vacío: sin él, la
+   * fila de una conversación cuyo último mensaje se borró se queda **sin
+   * resumen**, que se lee como si la conversación estuviera vacía.
+   */
+  ultimo: {
+    body: string;
+    authorId: string;
+    createdAt: string;
+    deletedAt?: string | null;
+  } | null;
   unread: number;
   muted: boolean;
 }

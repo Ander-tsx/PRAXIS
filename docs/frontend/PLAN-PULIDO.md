@@ -299,6 +299,12 @@ de ESTADO-ACTUAL §17.7.
 > Lo que sí toca todo es el nivel 3: los comentarios, que son la mitad del valor
 > de este repositorio y están escritos en español con cuidado.
 
+> **Un ejemplo real, señalado por el usuario (17-08):** `contarSinLeerDeVarios`.
+> Hace falta leer el cuerpo para saber qué cuenta, de qué y para quién. En
+> inglés sería `countUnreadForChannels`, que se entiende sin abrirlo. Es la
+> clase de nombre que justifica esta etapa: no es incomodidad estética, es que
+> el nombre no dice lo que hace.
+
 - [ ] **E5.0 — Decidir el alcance.** Tres niveles, de menor a mayor coste:
       1. **Identificadores** (variables, funciones, tipos, props). Es lo que de
          verdad se lee como «código en dos idiomas».
