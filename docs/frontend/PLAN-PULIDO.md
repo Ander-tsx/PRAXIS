@@ -8,9 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · **E2 ✅ cerrada entera** · E3 es lo siguiente |
-| **Última tarea terminada** | E2.1 — pool aplicado en producción y reinicio verificado |
-| **Siguiente** | E3.1 — andamiaje de `chat-front` |
+| **Etapa actual** | E1 ✅ · E2 ✅ · **E3 en curso** |
+| **Última tarea terminada** | E3.1 — `chat-front` arranca sola en el 4106 y su guard aguanta |
+| **Siguiente** | E3.2 — registrar la zona (shell, dev-cli, infra) |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -309,12 +309,42 @@ de ESTADO-ACTUAL §17.7.
 > ⚠️ **Después de E1.** Esta etapa mueve todas las rutas del chat; sin pruebas
 > detrás, un enlace mal migrado se descubre en producción.
 
-- [ ] **E3.1 — Andamiaje de la zona.** `package.json` (puerto 4106),
-      `next.config` con `basePath: '/chat'`, `proxy.ts` con su guard **y `'/'`
-      como entrada aparte del matcher** (§17.6: el lookahead negativo no casa la
-      raíz), `app/api/gateway/[...path]/route.ts`, `globals.css` importando
+- [x] **E3.1 — Andamiaje de la zona.** Checklist de §17.7 completo:
+      `package.json` (puerto 4106), `next.config` con `basePath: '/chat'`,
+      `tsconfig` con los `paths` a commons, `postcss.config.mjs`, `proxy.ts` con
+      su guard **y `'/'` como entrada aparte del matcher**,
+      `app/api/gateway/[...path]/route.ts`, `globals.css` importando
       `commons/styles/theme.css` con su `@source` y sus `@font-face` con el
-      basePath, `layout.tsx` estampando `data-theme` desde la cookie.
+      basePath, `layout.tsx` estampando `data-theme` desde la cookie, más
+      `error.tsx`, `not-found.tsx`, el icono y las fuentes en `public/fonts/`.
+
+      **Verificado sirviendo la zona sola en el 4106**, que es justo lo que tiene
+      que poder hacerse. Las cinco cosas que el andamiaje debe acertar y que
+      fallan en silencio:
+
+      | Comprobación | Resultado |
+      |---|---|
+      | `/chat` **sin sesión** (la raíz) | 307 → `/auth/login` |
+      | `/chat/<peerId>` sin sesión | 307 → `/auth/login` |
+      | Con `x-forwarded-host` (el shell delante) | 307 → **`:4100`**, no al puerto interno |
+      | `/chat/api/gateway/*` sin sesión | **401 JSON**, no un redirect HTML |
+      | `/chat/fonts/*.woff2` sin sesión | 200 `font/woff2` |
+
+      Y con sesión, la página se pinta **con estilos**: la hoja generada trae las
+      variables del tema (`--color-background`, `--color-primary`… dos
+      definiciones cada una, clara y oscura) y las cuatro utilidades que usa.
+      Incluye `--color-info` y `--color-error-muted`, que la página **no** usa
+      como clase — o sea que el `@theme static` de `theme.css` está haciendo su
+      trabajo y el import resolvió de verdad. Ver el aviso de Tailwind en
+      CLAUDE.md: si ese import falla, no hay error, hay una pantalla sin estilos.
+
+      El `data-theme` sale de la cookie, comprobado en los dos sentidos:
+      `praxis_theme=light` → `light`, `=dark` → `dark`, sin cookie → `dark`
+      (`DEFAULT_THEME`).
+
+      ⚠️ **Hay una página provisional** en `(private)/page.tsx` y la sustituye
+      E3.3. Existe porque una zona sin ninguna ruta no arranca, y sin arrancar no
+      se puede comprobar nada de lo de arriba.
 
 - [ ] **E3.2 — Registrar la zona.** `rewrites()` del web-shell,
       `scripts/dev-cli/config/services.mjs`, `.env.local` con el mismo
