@@ -272,9 +272,20 @@ export class ChannelsService {
    * `ProjectRole`, más una fila por cada par (persona, proyecto compartido) y un
    * cruce en memoria, para tirarlo todo salvo una columna.
    *
-   * Con `distinct` la base devuelve una fila por persona en vez de una por
-   * coincidencia, así que en un equipo que comparte cinco proyectos esto es una
-   * quinta parte de las filas — y ninguno de los dos `join`.
+   * ## Por qué SQL crudo y no `distinct` de Prisma
+   *
+   * ⚠️ **`distinct` de Prisma no llega a la base.** Se comprobó registrando la
+   * consulta real: con `distinct: ['userId']`, el SQL que sale es un `SELECT`
+   * normal —sin `DISTINCT`, y encima añadiendo la columna `id`— y la
+   * deduplicación la hace el cliente en memoria. O sea que Postgres seguía
+   * devolviendo una fila por **cada par (persona, proyecto compartido)**: en un
+   * equipo que comparte cinco proyectos, cinco veces las filas necesarias, todas
+   * viajando por el cable para tirar cuatro quintas partes al llegar.
+   *
+   * Con `SELECT DISTINCT` sale una fila por persona **de la base**, que es lo
+   * que se quería. Es la misma decisión que en `contarSinLeerDeVarios`, y por el
+   * mismo motivo: cuando lo que importa es lo que hace el motor, se escribe lo
+   * que hace el motor.
    *
    * ⚠️ **Se descartan los proyectos `DELETED`**, igual que en `contactos()`: si
    * no, alguien de un proyecto borrado seguiría recibiendo tus cambios de
@@ -282,20 +293,19 @@ export class ChannelsService {
    * con quién puedes hablar, o la presencia filtra más de lo que filtra el chat.
    */
   async idsDeContactos(userId: string): Promise<string[]> {
-    const mios = await this.prisma.projectMember.findMany({
-      where: { userId, project: { status: { not: 'DELETED' } } },
-      select: { projectId: true },
-    });
-    const projectIds = mios.map((fila) => fila.projectId);
-    if (projectIds.length === 0) return [];
+    const filas = await this.prisma.$queryRaw<{ userId: string }[]>`
+      SELECT DISTINCT companero."userId"
+      FROM "projects"."project_members" companero
+      JOIN "projects"."project_members" mio
+        ON mio."projectId" = companero."projectId"
+      JOIN "projects"."projects" p
+        ON p."id" = companero."projectId"
+      WHERE mio."userId" = ${userId}
+        AND companero."userId" <> ${userId}
+        AND p."status" <> 'DELETED'
+    `;
 
-    const companeros = await this.prisma.projectMember.findMany({
-      where: { projectId: { in: projectIds }, userId: { not: userId } },
-      select: { userId: true },
-      distinct: ['userId'],
-    });
-
-    return companeros.map((fila) => fila.userId);
+    return filas.map((fila) => fila.userId);
   }
 
   async contactos(userId: string) {

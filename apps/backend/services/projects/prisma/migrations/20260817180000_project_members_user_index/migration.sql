@@ -1,0 +1,16 @@
+-- «¿En qué proyectos estoy?» era un Seq Scan.
+--
+-- `project_members` ya tenía un índice único `(projectId, userId)`, pero un
+-- índice compuesto solo se aprovecha por su prefijo: una consulta que filtra
+-- solo por `userId` no puede usarlo. Y esa consulta es la primera de
+-- `GET /projects`, de la lista de contactos del chat y del reparto de
+-- presencia, así que las tres recorrían la tabla entera.
+--
+-- Confirmado con EXPLAIN ANALYZE antes de escribir esto:
+--   Seq Scan on project_members ... Rows Removed by Filter: 176
+--
+-- No se usa CREATE INDEX CONCURRENTLY: Prisma ejecuta cada migración dentro de
+-- una transacción y Postgres no lo permite ahí. La tabla es pequeña y el bloqueo
+-- de escritura dura lo que tarde el índice; si algún día deja de serlo, este
+-- índice habrá que crearlo a mano y fuera de la migración.
+CREATE INDEX "project_members_userId_idx" ON "projects"."project_members"("userId");

@@ -1,0 +1,19 @@
+-- Borrado suave de mensajes de chat.
+--
+-- El borrado era un `DELETE` de la fila, y eso dejaba un hueco mudo en la
+-- conversación: quien leía no distinguía «alguien borró un mensaje» de «esto no
+-- ha cargado». Con `deletedAt` la fila se queda como lápida y las respuestas que
+-- la citaban conservan su cita.
+--
+-- El contenido sí se va: `body` se vacía y las reacciones y los adjuntos se
+-- borran en la misma transacción del servicio. Aquí solo se abre la columna.
+--
+-- Sin índice propio a propósito. Los borrados son una fracción mínima de las
+-- filas, así que un índice sobre `deletedAt` no separaría nada; las dos
+-- consultas que los filtran —el historial y la lista de fijados— siguen
+-- entrando por `chat_messages_channelId_createdAt_idx` y
+-- `chat_messages_channelId_pinnedAt_idx`, que ya existen, y descartan las
+-- lápidas al leer. Un índice parcial habría sido más ajustado, pero Prisma no
+-- sabe declararlos: quedaría fuera del esquema y cada `migrate dev` siguiente
+-- lo detectaría como desviación e intentaría deshacerlo.
+ALTER TABLE "projects"."chat_messages" ADD COLUMN "deletedAt" TIMESTAMP(3);
