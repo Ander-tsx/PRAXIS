@@ -6,7 +6,8 @@
   "types": "./index.ts",
   "dependencies": {
     "jose": "^5.9.6",
-    "lucide-react": "^1.31.0"
+    "lucide-react": "^1.31.0",
+    "sileo": "^0.1.5"
   },
   "peerDependencies": {
     "next": ">=16",
@@ -16,7 +17,7 @@
   "devDependencies": {
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "next": "16.2.9",
+    "next": "16.2.11",
     "typescript": "^5"
   }
 }
