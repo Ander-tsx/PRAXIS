@@ -118,13 +118,21 @@ Lista cerrada, ya diagnosticada. Ninguna necesita investigación.
       del canal y sus miembros; los silenciados se leen aparte porque cambian con
       un gesto del usuario.
 
-- [ ] **E2.3 — Adelgazar el fan-out de presencia.**
-      `anunciar` pide `chat_contacts`, que devuelve los proyectos de cada
-      contacto cuando solo hacen falta los ids. Añadir `cmd: 'project_peer_ids'`
-      en projects-service.
+- [x] **E2.3 — Adelgazar el fan-out de presencia.** (`4c9c9fc`)
+      `anunciar` pedía `chat_contacts`, que devuelve por cada contacto todos los
+      proyectos en común con nombre, slug y rol —dos `join` y una fila por cada
+      par (persona, proyecto)— para usar **una columna**. Ahora hay
+      `cmd: 'chat_peer_ids'`, que lo resuelve con `distinct` y sin `join`.
+      Verificado contra Redis con un `psubscribe`: el cambio llega a la propia
+      cuenta con `mio: true` y a los compañeros con `mio: false`.
 
-- [ ] **E2.4 — `usePresencia` en `ProjectMembers`** (projects-front). Es la única
-      superficie con esferas de estado que no escucha el flujo.
+- [~] **E2.4 — `usePresencia` en `ProjectMembers`** (projects-front). Era la
+      única superficie con esferas de estado que no escuchaba el flujo.
+      `ProjectMembers` es de servidor, así que el avatar baja a un componente de
+      cliente mínimo (`MemberAvatar`) en vez de convertir la pestaña entera.
+      Falta pasar `ui/05-equipo.spec.ts`, que existe justo porque `tsc` no ve un
+      error de frontera servidor/cliente: da verde y la pantalla revienta al
+      pedirla.
 
 - [ ] **E2.5 — Huecos largos de reconexión.**
       `?after=` trae 50 y **no avisa de que falta más**: una desconexión larga
@@ -261,6 +269,31 @@ de ESTADO-ACTUAL §17.7.
       `.catch(() => null)` fue la causa de que un 429 se leyera como «esta cuenta
       no existe». Buscar los que quedan y decidir en cada uno si degradar es
       correcto o si está ocultando algo.
+
+- [~] **E6.7 — Promesas sueltas que pueden tumbar un servicio.**
+      Un `void promesa()` que se rechaza es un `unhandledRejection`, y en Node
+      **eso mata el proceso**. No lo cubre el `try/catch` que lo rodea: para
+      cuando el rechazo ocurre, la función ya salió de él. Lo descubrió la prueba
+      de `PublicadorDeEventos`, que tiró el proceso de Jest en seco.
+
+      Barrido de `rg '^\s*void [a-zA-Z_$][a-zA-Z0-9_$.]*\('` sobre `apps/backend`
+      — 18 sitios, clasificados:
+
+      - [x] `PublicadorDeEventos.repartir` → el `publish` del bucle (`3821373`).
+      - [x] `PresenceService.anunciar` → el `publish` del bucle (`4c9c9fc`).
+      - [ ] `ChatService.send` → `void this.touchRead(...)`. Es una escritura de
+            Prisma: cualquier tropiezo de la base al mandar un mensaje tumba
+            projects-service.
+      - [ ] `AuthService.register` → `void this.tokens.enviarVerificacion(...)`.
+            `MailService.enviar` sí traga lo suyo, pero `emitir()` es otra
+            escritura de Prisma. Una base con hipo durante un alta se lleva por
+            delante credentials-service, o sea la autenticación entera.
+      - [ ] `NotificationsStreamService` → `void this.conNombre(e).then(...)`.
+            `conNombre` no lanza (está documentado), pero el `.then` reparte a
+            los oyentes; barato de blindar.
+      - [x] El resto —`marcarVivo`, `marcarIdo`, `anunciar`, `elegidaDe`,
+            `repartir`, `aUnaPersona`— ya tienen su `try/catch` o su `.catch()`
+            **dentro**. Revisados, no hace falta tocarlos.
 - [ ] **E6.5 — Revisar el tamaño de los bundles.** `sileo` arrastra `motion`;
       comprobar cuánto pesa en cada zona y si compensa cargarlo diferido.
 - [ ] **E6.6 — `pnpm security` / revisión de dependencias.**

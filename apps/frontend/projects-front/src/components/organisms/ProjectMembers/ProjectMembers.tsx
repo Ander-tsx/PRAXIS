@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Badge,
   type ProjectInvitation,
   type ProjectMember,
@@ -9,6 +8,7 @@ import {
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
+import { MemberAvatar } from './MemberAvatar';
 import { LeaveProjectButton } from './LeaveProjectButton';
 import { MemberRoleSelect } from './MemberRoleSelect';
 import { PendingInvitations } from './PendingInvitations';
@@ -126,14 +126,16 @@ export function ProjectMembers({
                     el nombre no se separen al apilar. */}
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   {/* El mismo círculo que el tablero y la barra lateral: el rojo
-                      dice «eres tú» en todo el producto. */}
-                  <Avatar
+                      dice «eres tú» en todo el producto, y el punto de estado
+                      importa aquí más que en ninguna parte —la pestaña de equipo
+                      es donde se mira quién hay—. Va **en vivo**: era la única
+                      superficie con esferas que no escuchaba el flujo, así que
+                      se quedaba congelada hasta recargar. Ver `MemberAvatar`. */}
+                  <MemberAvatar
+                    userId={member.userId}
                     label={label}
                     mine={member.userId === currentUserId}
-                    size="md"
                     src={hrefDeAvatar(user?.avatarUrl, '/projects/api/gateway')}
-                    /* El estado también aquí: la pestaña de equipo es donde se
-                       mira quién hay y si está disponible. */
                     presence={user?.presence ?? null}
                   />
 
