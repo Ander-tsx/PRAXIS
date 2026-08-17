@@ -8,10 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ salvo el `apply` de E2.1 · E3 es lo siguiente |
-| **Última tarea terminada** | E6.7 — las tres promesas sueltas que quedaban |
+| **Etapa actual** | E1 ✅ · **E2 ✅ cerrada entera** · E3 es lo siguiente |
+| **Última tarea terminada** | E2.1 — pool aplicado en producción y reinicio verificado |
 | **Siguiente** | E3.1 — andamiaje de `chat-front` |
-| **Pendiente de una mano humana** | El `terraform apply` de E2.1 (ver ahí) |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -195,28 +194,40 @@ resumen de la corrida, y se anota **de qué corrida salen**.
 
 Lista cerrada, ya diagnosticada. Ninguna necesita investigación.
 
-- [~] **E2.1 — `terraform apply` del pool.** `max_connections = 150` en
+- [x] **E2.1 — `terraform apply` del pool.** `max_connections = 150` en
       `sql.tf`. Es la mitad del arreglo de la lentitud: la otra
       (`DATABASE_POOL_MAX = 5`) ya está en el código y viaja con el despliegue.
 
-      ✅ **`terraform plan` verificado (17-08)**, acotado con
-      `-target=google_sql_database_instance.postgres`:
+      **Aplicado en producción el 17-08 a las 22:45 UTC** (lo ejecutó el usuario;
+      la herramienta bloquea las escrituras contra producción). `Apply complete!
+      Resources: 0 added, 1 changed, 0 destroyed`, acotado con
+      `-target=google_sql_database_instance.postgres`.
 
-      > `Plan: 0 to add, 1 to change, 0 to destroy` — un único `update in-place`
-      > que añade el bloque `database_flags { max_connections = 150 }`. Nada más
-      > se toca.
-
-      ⏸️ **Falta ejecutar el `apply`.** El usuario lo autorizó, pero el comando
-      lo bloquea la política de la herramienta por ser una escritura contra
-      producción. Hay que lanzarlo a mano desde `infra/terraform/`:
+      ✅ **Verificado que el valor está vivo, no solo configurado.** Son dos cosas
+      distintas y conviene no confundirlas: `gcloud sql instances describe`
+      devuelve lo que está *pedido*, y `max_connections` es un parámetro estático
+      que solo entra en vigor **al arrancar**. La instancia solo tiene IP privada,
+      así que no hay `SHOW max_connections` posible desde fuera de la VPC — pero
+      los logs de Cloud SQL registran el reinicio, que es la prueba que hacía
+      falta:
 
       ```
-      terraform apply -target=google_sql_database_instance.postgres
+      22:45:34.551  received fast shutdown request
+      22:45:34.905  database system is shut down
+      22:45:41.816  starting PostgreSQL 16.14
+      22:45:41.988  database system is ready to accept connections
       ```
 
-      ⚠️ **Reinicia la instancia de Cloud SQL** — `max_connections` es un flag
-      estático—, así que va en ventana. No afecta al desarrollo local, que corre
-      sobre el Postgres de Docker.
+      **~7,4 s de corte.** El `UPDATE` de la API duró 21 s en total (22:45:23 →
+      22:45:44) y el reinicio va dentro: Cloud SQL lo hace solo, no aparece como
+      operación `RESTART` aparte. Que no salga una línea de reinicio en la salida
+      de `terraform` **no significa que no lo haya habido** — es justo lo que
+      había que comprobar y por poco se da por bueno sin mirar.
+
+      ⚠️ Para futuros flags estáticos, el patrón de comprobación es este:
+      `gcloud logging read` sobre `resource.type="cloudsql_database"` filtrando
+      por `database system is ready to accept connections`. Sirve sin credenciales
+      de base de datos y sin entrar en la VPC.
 
 - [x] **E2.2 — Una consulta por evento, y sin caché.** (`e7c7c95`)
       Eran **cuatro** viajes por evento —canal, proyecto, miembros, silenciados—,
@@ -533,3 +544,4 @@ de ESTADO-ACTUAL §17.7.
 | 2026-08-17 | E2 | Cerrada salvo el `apply` de E2.1, que es de infraestructura y va en ventana. E2.6 se cierra por decisión: se documenta como límite (punto 25 de PENDIENTES-BACKEND). |
 | 2026-08-17 | E6.7 | Cerrada. Las tres promesas sueltas que quedaban, blindadas. Al retomar, una de ellas estaba a medias en el árbol y **no compilaba**: credentials-service llevaba toda la sesión sin arrancar (ver E1.8). |
 | 2026-08-17 | E2 | Regresión completa tras cerrar E6.7: **191 ✅ / 0 ❌** en 23,2 min (158 `api` + 33 `ui`), stack en caliente. Y de paso se corrigió el marcador de E1, que estaba inflado. |
+| 2026-08-17 | E2 | **Cerrada entera.** El `apply` de E2.1 fue a producción a las 22:45 UTC con ~7,4 s de corte de Cloud SQL. Con esto las dos mitades del arreglo de la lentitud están puestas: el techo de conexiones arriba y los pools acotados abajo. |
