@@ -20,9 +20,12 @@ import { ProjectsController } from './projects.controller';
 import { TaskPurgeService } from './task-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
+import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
+
 @Module({
   imports: [
     AuthModule,
+    GlobalRolesModule,
     ClientsModule.registerAsync([
       {
         name: 'PROJECTS_SERVICE',

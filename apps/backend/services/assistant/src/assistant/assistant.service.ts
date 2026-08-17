@@ -78,6 +78,7 @@ interface Briefing {
   tareas?: {
     id: string;
     titulo: string;
+    descripcion?: string;
     cerrada: boolean;
     columnId: string;
     columna: string;

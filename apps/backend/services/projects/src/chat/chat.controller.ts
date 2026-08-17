@@ -20,6 +20,7 @@ interface Directo {
   /** Con quién hablas. */
   peerId: string;
   requesterId: string;
+  isAdmin?: boolean;
 }
 
 /**
@@ -157,7 +158,7 @@ export class ChatController {
   async directoMensajes(
     @Payload() dto: Directo & { limit?: number; before?: string; pinned?: boolean; q?: string },
   ) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.findAll({ ...dto, channelId: canal.id });
   }
 
@@ -171,14 +172,14 @@ export class ChatController {
       enHilo?: boolean;
     },
   ) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.send({ ...dto, channelId: canal.id });
   }
 
   /** El hilo de un mensaje de una conversación privada. */
   @MessagePattern({ cmd: 'chat_direct_thread' })
   async directoHilo(@Payload() dto: Directo & { messageId: string }) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.thread({ ...dto, channelId: canal.id });
   }
 
@@ -206,19 +207,19 @@ export class ChatController {
 
   @MessagePattern({ cmd: 'chat_direct_mark_read' })
   async directoLeido(@Payload() dto: Directo) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.markRead({ ...dto, channelId: canal.id });
   }
 
   @MessagePattern({ cmd: 'chat_direct_receipts' })
   async directoAcuses(@Payload() dto: Directo) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.receipts({ channelId: canal.id, requesterId: dto.requesterId });
   }
 
   @MessagePattern({ cmd: 'chat_direct_mute' })
   async directoSilenciar(@Payload() dto: Directo & { muted: boolean }) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.setMuted({ ...dto, channelId: canal.id });
   }
 
@@ -231,7 +232,7 @@ export class ChatController {
    */
   @MessagePattern({ cmd: 'chat_direct_delete' })
   async directoBorrar(@Payload() dto: Directo & { id: string }) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.delete({ ...dto, channelId: canal.id, canModerate: false });
   }
 
@@ -239,25 +240,31 @@ export class ChatController {
   async directoReaccionar(
     @Payload() dto: Directo & { messageId: string; emoji: string; on: boolean },
   ) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.react({ ...dto, channelId: canal.id });
   }
 
   /** Fija o desfija un mensaje de una conversación privada. */
   @MessagePattern({ cmd: 'chat_direct_pin' })
   async directoFijar(@Payload() dto: Directo & { messageId: string; on: boolean }) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.pin({ ...dto, channelId: canal.id });
   }
 
   /** Edita el texto de un mensaje propio de una conversación privada. */
   @MessagePattern({ cmd: 'chat_direct_edit' })
   async directoEditar(@Payload() dto: Directo & { id: string; body: string }) {
-    const canal = await this.channels.directo(dto.requesterId, dto.peerId);
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
     return this.chat.edit({ ...dto, channelId: canal.id });
   }
 
   /* ─── Bandeja del chat privado ────────────────────────────────────── */
+
+  @MessagePattern({ cmd: 'chat_direct_hide_conversation' })
+  async directoOcultar(@Payload() dto: Directo) {
+    const canal = await this.channels.directo(dto.requesterId, dto.peerId, dto.isAdmin);
+    return this.chat.hideConversation(canal.id, dto.requesterId);
+  }
 
   @MessagePattern({ cmd: 'chat_my_conversations' })
   misConversaciones(@Payload() dto: { userId: string }) {

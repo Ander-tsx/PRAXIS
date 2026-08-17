@@ -201,6 +201,11 @@ export class ChatService {
     pinned?: boolean;
     q?: string;
   }) {
+    const estado = await this.prisma.chatChannelState.findUnique({
+      where: { channelId_userId: { channelId: dto.channelId, userId: dto.requesterId } },
+      select: { mutedAt: true, hiddenAt: true },
+    });
+    
     /* La búsqueda se pide como una página aparte, no como un modo del
        historial: el término filtra el texto y el resultado se ordena del más
        reciente al más antiguo, como los fijados, sin cursor — un cursor sobre
@@ -219,6 +224,7 @@ export class ChatService {
           /* Insensible a mayúsculas: «Hoy» encuentra «hoy». El modo de Postgres,
              no una normalización que rompería el índice. */
           body: { contains: termino, mode: 'insensitive' },
+          ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
         },
         orderBy: { createdAt: 'desc' },
         take: limit,
@@ -229,7 +235,7 @@ export class ChatService {
         items: hallados,
         hasMore: false,
         unread: 0,
-        muted: false,
+        muted: estado?.mutedAt !== null && estado?.mutedAt !== undefined,
       };
     }
 
@@ -238,7 +244,12 @@ export class ChatService {
        `limit` a propósito (el gateway ya documenta lo mismo en el DTO). */
     if (dto.pinned) {
       const fijados = await this.prisma.chatMessage.findMany({
-        where: { channelId: dto.channelId, visibleEnChat: true, pinnedAt: { not: null } },
+        where: { 
+          channelId: dto.channelId, 
+          visibleEnChat: true, 
+          pinnedAt: { not: null },
+          ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
+        },
         orderBy: { pinnedAt: 'desc' },
         select: CON_MENSAJE,
       });
@@ -247,7 +258,7 @@ export class ChatService {
         items: fijados,
         hasMore: false,
         unread: 0,
-        muted: false,
+        muted: estado?.mutedAt !== null && estado?.mutedAt !== undefined,
       };
     }
 
@@ -277,6 +288,7 @@ export class ChatService {
            en su sitio cronológico, como cualquier mensaje. */
         visibleEnChat: true,
         ...(cursorAt && { createdAt: { lt: cursorAt } }),
+        ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
       },
       orderBy: { createdAt: 'desc' },
       /* Uno de más: sirve para saber si queda historial por encima sin tener que
@@ -288,12 +300,8 @@ export class ChatService {
     const hasMore = newest.length > limit;
     const page = hasMore ? newest.slice(0, limit) : newest;
 
-    const [unread, estado] = await Promise.all([
+    const [unread] = await Promise.all([
       this.countUnread(dto.channelId, dto.requesterId),
-      this.prisma.chatChannelState.findUnique({
-        where: { channelId_userId: { channelId: dto.channelId, userId: dto.requesterId } },
-        select: { mutedAt: true },
-      }),
     ]);
 
     return {
@@ -560,28 +568,42 @@ export class ChatService {
       this.contarSinLeerDeVarios(ids, userId),
       this.prisma.chatChannelState.findMany({
         where: { channelId: { in: ids }, userId },
-        select: { channelId: true, mutedAt: true },
+        select: { channelId: true, mutedAt: true, hiddenAt: true },
       }),
     ]);
 
     const ultimoPorCanal = new Map(ultimos.map((m) => [m.channelId, m]));
-    const silenciados = new Map(estados.map((e) => [e.channelId, e.mutedAt !== null]));
+    const estadoPorCanal = new Map(estados.map((e) => [e.channelId, e]));
 
     return (
       canales
-        .map((canal) => ({
-          channelId: canal.id,
-          /* Con quién hablas: el que no eres tú. */
-          peerId: canal.directUserA === userId ? canal.directUserB : canal.directUserA,
-          ultimo: ultimoPorCanal.get(canal.id) ?? null,
-          unread: sinLeer.get(canal.id) ?? 0,
-          muted: silenciados.get(canal.id) ?? false,
-        }))
+        .map((canal) => {
+          const ultimo = ultimoPorCanal.get(canal.id) ?? null;
+          const estado = estadoPorCanal.get(canal.id);
+          
+          return {
+            channelId: canal.id,
+            /* Con quién hablas: el que no eres tú. */
+            peerId: canal.directUserA === userId ? canal.directUserB : canal.directUserA,
+            ultimo,
+            unread: sinLeer.get(canal.id) ?? 0,
+            muted: estado?.mutedAt !== null && estado?.mutedAt !== undefined,
+            hiddenAt: estado?.hiddenAt,
+          };
+        })
+        /* Filtra los canales que fueron borrados/ocultados. Un canal se oculta si no tiene 
+           mensajes nuevos desde que se marcó hiddenAt. */
+        .filter((canal) => {
+          if (!canal.hiddenAt) return true;
+          if (!canal.ultimo) return false; // Borrado y sin mensajes nuevos
+          return canal.ultimo.createdAt > canal.hiddenAt;
+        })
         /* Las conversaciones vivas arriba. Una sin mensajes —abierta y nunca
          usada— cae al final en vez de encabezar la lista por ser reciente. */
         .sort(
           (a, b) => (b.ultimo?.createdAt?.getTime() ?? 0) - (a.ultimo?.createdAt?.getTime() ?? 0),
         )
+        .map(({ hiddenAt, ...rest }) => rest) // Quitar hiddenAt de la respuesta
     );
   }
 
@@ -829,5 +851,16 @@ export class ChatService {
         createdAt: at.toISOString(),
       });
     }
+  }
+  /**
+   * Oculta un canal para un usuario, actualizando hiddenAt en ChatChannelState.
+   * Si llegan nuevos mensajes después de hiddenAt, el chat reaparecerá.
+   */
+  async hideConversation(channelId: string, userId: string) {
+    return this.prisma.chatChannelState.upsert({
+      where: { channelId_userId: { channelId, userId } },
+      create: { channelId, userId, hiddenAt: new Date() },
+      update: { hiddenAt: new Date() },
+    });
   }
 }

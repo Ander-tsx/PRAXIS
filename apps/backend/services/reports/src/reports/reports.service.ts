@@ -488,6 +488,7 @@ export class ReportsService {
         {
           id: string;
           titulo: string;
+          descripcion: string | null;
           columna: string;
           columnId: string;
           prioridad: string;
@@ -590,6 +591,7 @@ export class ReportsService {
        */
       tareas: tareas.map((tarea) => ({
         ...tarea,
+        descripcion: tarea.descripcion ?? '',
         tablero: nombreDeTablero.get(tarea.boardId) ?? null,
       })),
       /**

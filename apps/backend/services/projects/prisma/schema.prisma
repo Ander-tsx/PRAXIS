@@ -349,6 +349,10 @@ model ChatChannelState {
   /// el mismo motivo que `Notification.readAt`.
   mutedAt DateTime?
 
+  /// Cuándo lo eliminó/ocultó. `null` = visible. 
+  /// Si llega un mensaje nuevo después de esta fecha, el chat vuelve a aparecer.
+  hiddenAt DateTime?
+
   @@id([channelId, userId])
   @@index([userId])
   @@schema("projects")

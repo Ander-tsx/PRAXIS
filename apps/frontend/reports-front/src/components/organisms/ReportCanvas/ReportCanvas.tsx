@@ -270,29 +270,42 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setCatalogoAbierto((abierto) => !abierto)}
-            aria-expanded={catalogoAbierto}
-          >
-            {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
-          </Button>
+          {mounted && esAnchoGrande ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => setCatalogoAbierto((abierto) => !abierto)}
+                aria-expanded={catalogoAbierto}
+              >
+                {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
+              </Button>
 
-          {/* Lleva al chat, no abre un formulario: el gráfico a medida se pide
-              hablando y llega como propuesta, con su tarjeta de autorización. */}
-          <Button variant="ghost" onClick={onGenerar}>
-            Generar uno a medida
-          </Button>
+              <Button variant="ghost" onClick={onGenerar}>
+                Generar uno a medida
+              </Button>
+            </>
+          ) : (
+            mounted && (
+              <span className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-1.5 font-sans text-sm text-text-secondary">
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+                Desktop only
+              </span>
+            )
+          )}
         </div>
-
-        {/* Solo aparece cuando importa: en los anchos pequeños se puede mirar
-            todo, y descubrir que no se puede reorganizar al intentarlo es peor
-            que saberlo antes. */}
-        {mounted && !esAnchoGrande && widgets.length > 0 && (
-          <p className="font-sans text-xs text-text-disabled">
-            La disposición se ajusta sola a esta pantalla. Para reorganizarla, una más ancha.
-          </p>
-        )}
       </div>
 
       {catalogoAbierto && (

@@ -90,6 +90,21 @@ export async function sendDirectMessageAction(
   return { error: null };
 }
 
+export async function deleteDirectChatAction(peerId: string): Promise<{ error: string | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await api.delete(`/me/chats/${peerId}`);
+  } catch (error) {
+    return { error: describe(error, 'No se pudo ocultar la conversación.') };
+  }
+
+  // Redirigir o revalidar el directorio
+  revalidatePath('/chat');
+  return { error: null };
+}
+
 /**
  * Sube un archivo a la conversación privada y lo deja en **borrador**.
  *

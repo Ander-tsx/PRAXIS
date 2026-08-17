@@ -51,19 +51,32 @@ export class ChannelsService {
    * esa comprobación, el chat privado sería un directorio de mensajería abierto
    * a toda la plataforma: cualquiera con un `userId` podría escribir a cualquiera.
    */
-  async directo(unUsuario: string, otroUsuario: string): Promise<{ id: string }> {
+  async directo(
+    unUsuario: string,
+    otroUsuario: string,
+    bypassPermissionCheck = false,
+  ): Promise<{ id: string }> {
     if (unUsuario === otroUsuario) {
       throw new RpcException({ statusCode: 400, message: 'No puedes escribirte a ti mismo.' });
     }
 
-    if (!(await this.compartenProyecto(unUsuario, otroUsuario))) {
+    const [directUserA, directUserB] = [unUsuario, otroUsuario].sort();
+
+    // Si ya existe un canal entre ellos, pueden seguir chateando (ej. un admin lo inició
+    // o compartían proyecto antes). Esto cumple con la regla de que el receptor pueda responder.
+    const existente = await this.prisma.chatChannel.findUnique({
+      where: { directUserA_directUserB: { directUserA, directUserB } },
+      select: { id: true },
+    });
+
+    if (existente) return existente;
+
+    if (!bypassPermissionCheck && !(await this.compartenProyecto(unUsuario, otroUsuario))) {
       throw new RpcException({
         statusCode: 403,
         message: 'Solo puedes escribir a quien comparta algún proyecto contigo.',
       });
     }
-
-    const [directUserA, directUserB] = [unUsuario, otroUsuario].sort();
 
     return this.prisma.chatChannel.upsert({
       where: { directUserA_directUserB: { directUserA, directUserB } },

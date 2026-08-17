@@ -11,6 +11,7 @@ import {
   reactDirectAction,
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
+  deleteDirectChatAction,
 } from '@/app/(private)/chat/actions';
 import {
   Badge,
@@ -18,7 +19,9 @@ import {
   ChatPanel,
   type ChatPanelHandle,
   type UserProfile,
+  colors,
 } from '@praxis/commons';
+import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 
 export interface DirectConversationProps {
@@ -29,6 +32,7 @@ export interface DirectConversationProps {
   page: ChatMessagePage;
   usersById: Map<string, UserProfile>;
   currentUserId: string;
+  isAdmin?: boolean;
 }
 
 /**
@@ -47,6 +51,7 @@ export function DirectConversation({
   page,
   usersById,
   currentUserId,
+  isAdmin = false,
 }: DirectConversationProps) {
   /* `useCallback` porque `ChatPanel` las tiene en las dependencias de un efecto:
      recreadas en cada render, marcaría como leído en bucle. */
@@ -72,6 +77,10 @@ export function DirectConversation({
   );
 
   const chatRef = useRef<ChatPanelHandle>(null);
+
+  // Pueden escribir si comparten proyectos, si el usuario actual es admin,
+  // o si ya hay mensajes en la conversación (p. ej. un admin la inició o compartían proyecto antes).
+  const canWrite = proyectosEnComun.length > 0 || isAdmin || page.items.length > 0;
 
   return (
     <ChatPanel
@@ -106,17 +115,12 @@ export function DirectConversation({
       gatewayPath="/dashboard/api/gateway"
       rutaCanal={`/me/chats/${peerId}`}
       /**
-       * Puedes escribir mientras compartáis algún proyecto.
-       *
-       * ⚠️ Si dejáis de compartirlo, el gateway responde 403 al enviar pero **la
-       * conversación se sigue abriendo y leyendo**. Apagar el redactor aquí es lo
-       * que convierte ese 403 en algo que se entiende antes de escribir, en vez
-       * de después de darle a enviar.
+       * Puedes escribir mientras compartáis algún proyecto (o si eres admin, o si ya hay mensajes).
        */
-      canWrite={proyectosEnComun.length > 0}
+      canWrite={canWrite}
       /* Sois dos: el «visto por todos» se cumple en cuanto lo lee esa persona. */
       participantes={1}
-      motivoSinEscribir="Ya no compartís ningún proyecto, así que no puedes escribirle. Lo que os dijisteis sigue aquí."
+      motivoSinEscribir="Para escribirle a esta persona debéis compartir al menos un proyecto."
       /**
        * ⚠️ **En privado no se menciona a nadie.** Sois dos: escribir `@Juan`
        * cuando le estás escribiendo a Juan no aporta nada, y el desplegable
@@ -127,10 +131,13 @@ export function DirectConversation({
       vacio={`Todavía no habéis hablado. Escríbele a ${peerNombre}.`}
       encabezado={
         <Encabezado
+          perfil={usersById.get(peerId)}
           peerId={peerId}
           nombre={peerNombre}
           proyectos={proyectosEnComun}
           muted={page.muted}
+          isAdmin={isAdmin}
+          hasMessages={page.items.length > 0}
           onBuscar={() => chatRef.current?.abrirBusqueda()}
         />
       }
@@ -149,41 +156,117 @@ export function DirectConversation({
  * en vez de dejar el hueco: explica por qué ya no puedes escribirle.
  */
 function Encabezado({
+  perfil,
   peerId,
   nombre,
   proyectos,
   muted,
+  isAdmin,
+  hasMessages,
   onBuscar,
 }: {
+  perfil?: UserProfile;
   peerId: string;
   nombre: string;
   proyectos: { id: string; name: string; slug: string; rol: string }[];
   muted: boolean;
+  isAdmin?: boolean;
+  hasMessages?: boolean;
   onBuscar: () => void;
 }) {
+  const [ampliada, setAmpliada] = useState(false);
+  const inicial = (nombre.charAt(0) || peerId.charAt(0)).toUpperCase();
+
+  const avatarElement = perfil?.avatarUrl ? (
+    <img
+      src={`/dashboard/api/gateway${perfil.avatarUrl}`}
+      alt={nombre}
+      className="h-14 w-14 rounded-full object-cover"
+    />
+  ) : (
+    <div
+      className="flex h-14 w-14 items-center justify-center rounded-full font-sans text-xl font-medium"
+      style={{ background: colors.surfaceElevated, color: colors.textSecondary }}
+    >
+      {inicial}
+    </div>
+  );
+
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
+      <div className="flex min-w-0 items-center gap-4">
+        {/* Avatar clickeable para ampliar */}
+        <button
+          type="button"
+          onClick={() => setAmpliada(true)}
+          aria-label={`Ver foto de ${nombre}`}
+          title="Ver foto"
+          className="shrink-0 cursor-zoom-in transition-transform hover:scale-105 active:scale-95 overflow-hidden rounded-full border border-border"
+        >
+          {avatarElement}
+        </button>
 
-        {proyectos.length === 0 ? (
-          <p className="font-sans text-xs text-text-secondary">
-            Ya no compartís ningún proyecto. Puedes leer lo que os dijisteis, pero no escribir.
-          </p>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {proyectos.map((proyecto) => (
-              <Badge key={proyecto.id} variant="primary">
-                {`${proyecto.rol} · ${proyecto.name}`}
-              </Badge>
-            ))}
+        {ampliada && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <button
+              type="button"
+              aria-label="Cerrar imagen"
+              onClick={() => setAmpliada(false)}
+              className="absolute inset-0 cursor-zoom-out bg-black/80 backdrop-blur-sm transition-opacity"
+            />
+            <div className="relative z-10 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
+              {perfil?.avatarUrl ? (
+                <img
+                  src={`/dashboard/api/gateway${perfil.avatarUrl}`}
+                  alt={nombre}
+                  className="max-h-[70vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
+                />
+              ) : (
+                <div
+                  className="flex h-64 w-64 items-center justify-center rounded-full font-sans text-6xl font-medium shadow-2xl"
+                  style={{ background: colors.surface, color: colors.textSecondary }}
+                >
+                  {inicial}
+                </div>
+              )}
+              <div className="text-center">
+                <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
+                {proyectos.length > 0 && (
+                  <p className="font-sans text-sm text-white/70 drop-shadow-md">
+                    Coincidís en {proyectos.length} {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         )}
+
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
+
+          {proyectos.length === 0 ? (
+            <p className="font-sans text-xs text-text-secondary">
+              {isAdmin 
+                ? 'No compartís ningún proyecto, pero como administrador puedes chatear.'
+                : hasMessages 
+                  ? 'No compartís proyecto, pero podéis continuar esta conversación.'
+                  : 'Ya no compartís ningún proyecto. Puedes leer lo que os dijisteis, pero no escribir.'}
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {proyectos.map((proyecto) => (
+                <Badge key={proyecto.id} variant="primary">
+                  {`${proyecto.rol} · ${proyecto.name}`}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <BotonBuscar onClick={onBuscar} />
-        <BotonSilenciar peerId={peerId} inicial={muted} />
+        <MenuOpciones peerId={peerId} mutedInicial={muted} />
       </div>
     </div>
   );
@@ -224,37 +307,157 @@ function BotonBuscar({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * ⚠️ El texto dice **«avisos»** y no «notificaciones»: silenciar apaga la
- * tarjeta y el sonido, pero **el contador sigue**. Un botón que dijera
- * «silenciar la conversación» prometería no volver a saber nada de ella.
+ * Botón de 3 puntos (más opciones) en la cabecera.
+ * Contiene "Silenciar avisos" y "Eliminar chat".
  */
-function BotonSilenciar({ peerId, inicial }: { peerId: string; inicial: boolean }) {
-  const [muted, setMuted] = useState(inicial);
-  const [enviando, setEnviando] = useState(false);
+function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: boolean }) {
+  const [abierto, setAbierto] = useState(false);
+  const [muted, setMuted] = useState(mutedInicial);
+  const [enviandoMute, setEnviandoMute] = useState(false);
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+  const [borrando, setBorrando] = useState(false);
+  const router = useRouter();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  async function alternar() {
-    setEnviando(true);
+  // Cerrar si se hace click fuera
+  if (typeof window !== 'undefined') {
+    window.onclick = (e) => {
+      if (abierto && dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+        setConfirmandoBorrado(false);
+      }
+    };
+  }
+
+  async function alternarMute() {
+    setEnviandoMute(true);
     const confirmado = await muteDirectAction(peerId, !muted);
-    /* Se corrige con lo que confirma el servidor, no con lo que se pidió: si
-       falla, el interruptor vuelve a la verdad en vez de enseñar la intención. */
     if (confirmado) setMuted(confirmado.muted);
-    setEnviando(false);
+    setEnviandoMute(false);
+    setAbierto(false);
+  }
+
+  async function borrarChat() {
+    setBorrando(true);
+    const { error } = await deleteDirectChatAction(peerId);
+    if (error) {
+      alert(error);
+      setBorrando(false);
+      setConfirmandoBorrado(false);
+    } else {
+      router.push('/chat');
+    }
   }
 
   return (
-    <button
-      type="button"
-      onClick={alternar}
-      disabled={enviando}
-      aria-pressed={muted}
-      title={
-        muted
-          ? 'Los avisos de esta conversación están apagados. Los mensajes sin leer se siguen contando.'
-          : 'Apagar la tarjeta y el sonido. Los mensajes sin leer se siguen contando.'
-      }
-      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {muted ? 'Avisos apagados' : 'Silenciar avisos'}
-    </button>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setAbierto(!abierto)}
+        aria-label="Más opciones"
+        title="Opciones del chat"
+        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary hover:bg-surface"
+      >
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="1" />
+          <circle cx="12" cy="5" r="1" />
+          <circle cx="12" cy="19" r="1" />
+        </svg>
+      </button>
+
+      {abierto && (
+        <div
+          className="absolute right-0 top-full z-50 mt-1 flex w-48 flex-col overflow-hidden rounded-xl border p-1 shadow-lg"
+          style={{ background: colors.surfaceElevated, borderColor: colors.border }}
+        >
+          <button
+            type="button"
+            onClick={alternarMute}
+            disabled={enviandoMute}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:opacity-50"
+          >
+            <svg
+              className="h-3.5 w-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              {muted ? (
+                <>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </>
+              ) : (
+                <>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5L6 9H2v6h4l5 4V5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.54 8.46a5 5 0 010 7.07" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.07 4.93a10 10 0 010 14.14" />
+                </>
+              )}
+            </svg>
+            {muted ? 'Activar avisos' : 'Silenciar chat'}
+          </button>
+
+          <hr className="my-1 border-border" />
+
+          {!confirmandoBorrado ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmandoBorrado(true);
+              }}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-error transition-colors hover:bg-error/10"
+            >
+              <svg
+                className="h-3.5 w-3.5 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 6h18" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+              </svg>
+              Eliminar chat
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2 rounded-lg bg-error/10 p-2">
+              <span className="font-sans text-[11px] font-medium text-error">¿Eliminar chat para mí?</span>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBorrado(false)}
+                  className="rounded px-2 py-1 font-sans text-xs text-error hover:bg-error/20"
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  onClick={borrarChat}
+                  disabled={borrando}
+                  className="rounded bg-error px-2 py-1 font-sans text-xs font-semibold text-text-inverse hover:bg-error/90 disabled:opacity-50"
+                >
+                  {borrando ? '...' : 'Sí'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

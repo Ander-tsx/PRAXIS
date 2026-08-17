@@ -977,17 +977,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   return (
     <div
-      className={`flex min-h-0 flex-1 flex-col ${
-        /* `max-sm:` y no un `hidden sm:flex` en el padre: así el mismo
+      className={`flex min-h-0 flex-1 flex-col w-full max-w-[100vw] overflow-x-hidden ${
+        /* `max-md:` y no un `hidden md:flex` en el padre: así el mismo
            componente sirve en las dos y no hay dos árboles que mantener.
            `bg-background` es obligatorio — al salir del flujo, lo de debajo se
            vería a través. */
         pantallaCompletaEnMovil
-          ? 'max-sm:fixed max-sm:inset-0 max-sm:z-40 max-sm:bg-background max-sm:px-3 max-sm:pb-3'
+          ? 'max-md:fixed max-md:inset-0 max-md:z-40 max-md:bg-background max-md:px-3 max-md:pb-3 max-md:w-full'
           : ''
       }`}
     >
-      {salidaMovil && <div className="shrink-0 pt-2 sm:hidden">{salidaMovil}</div>}
+      {salidaMovil && <div className="shrink-0 pt-2 md:hidden">{salidaMovil}</div>}
       {encabezado}
 
       <PinnedBar
@@ -1006,8 +1006,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
        * chat ocupa todo el ancho. Con hilo, el panel lateral se cuela a la
        * derecha desde `sm` y en móvil (max-sm) es fijo, a pantalla entera.
        */}
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/**
            * ⚠️ **El panel llena siempre el alto que le da su padre, y quien lo
            * monta tiene que darle uno acotado.**
@@ -1020,7 +1020,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * vive en Mensajes, el único montaje es el de alto acotado, y con un
            * solo modo los dos paneles miden lo mismo por construcción.
            */}
-          <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
             <div
               ref={scrollerRef}
               onScroll={alDesplazar}
@@ -1029,7 +1029,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              píxel —una etiqueta larga, una palabra sin espacios— saca una barra
              horizontal en toda la conversación. Aquí nada debe desbordar a lo
              ancho: si algo no cabe, se parte. */
-              className="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
+              className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
             >
               {hasMore && (
                 <div className="mb-2 flex justify-center">
@@ -1126,6 +1126,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         onBorrar={borrar}
                         onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
                         nombreDeAutor={nombreDeAutor}
+                        isProjectChat={rutaCanal.includes('/projects')}
                         {...(acciones.previewDeLink
                           ? { previewDeLink: acciones.previewDeLink }
                           : {})}
@@ -1388,6 +1389,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             onPedirSugerencias={() => void pedirSugerencias()}
             {...(hrefDePersona ? { hrefDePersona } : {})}
             nombreDeAutor={nombreDeAutor}
+            isProjectChat={rutaCanal.includes('/projects')}
             {...(acciones.previewDeLink ? { previewDeLink: acciones.previewDeLink } : {})}
           />
         )}

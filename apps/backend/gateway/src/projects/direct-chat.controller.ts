@@ -64,6 +64,8 @@ import { MentionablesService } from './mentionables.service';
  * El `requesterId` sale **siempre del token**. La ruta solo lleva con quién
  * hablas, nunca quién eres.
  */
+import { GlobalRolesService } from '../common/global-roles/global-roles.service';
+
 @ApiTags('Direct Chat')
 @ApiBearerAuth()
 @UseGuards(JwtGuard)
@@ -72,7 +74,13 @@ export class DirectChatController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly mentionables: MentionablesService,
+    private readonly rolesService: GlobalRolesService,
   ) {}
+
+  private async getIsAdmin(userId: string): Promise<boolean> {
+    const roles = await this.rolesService.rolesOf(userId);
+    return roles.includes('Admin') || roles.includes('SuperAdmin');
+  }
 
   /** Mis conversaciones, con el último mensaje y lo que llevo sin leer. */
   @Get()
@@ -136,15 +144,16 @@ export class DirectChatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mensajes de una conversación privada' })
   @ApiResponse({ status: 200, description: 'Mensajes, si hay más arriba, no leídos y silenciado' })
-  findAll(
+  async findAll(
     @Param('peerId', ParseUUIDPipe) peerId: string,
     @Request() req: Express.Request,
     @Query() query: FindChatMessagesQueryDto,
   ) {
+    const isAdmin = await this.getIsAdmin(req.user!.userId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_find_all' },
-        { ...query, peerId, requesterId: req.user!.userId },
+        { ...query, peerId, requesterId: req.user!.userId, isAdmin },
       ),
     );
   }
@@ -153,15 +162,16 @@ export class DirectChatController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Escribe a alguien en privado' })
   @ApiResponse({ status: 201, description: 'Mensaje creado' })
-  send(
+  async send(
     @Param('peerId', ParseUUIDPipe) peerId: string,
     @Request() req: Express.Request,
     @Body() body: SendChatMessageBodyDto,
   ) {
+    const isAdmin = await this.getIsAdmin(req.user!.userId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_send' },
-        { ...body, peerId, requesterId: req.user!.userId },
+        { ...body, peerId, requesterId: req.user!.userId, isAdmin },
       ),
     );
   }
@@ -177,15 +187,16 @@ export class DirectChatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'El mensaje y sus respuestas, en orden' })
   @ApiResponse({ status: 200, description: '{ root, replies }' })
-  thread(
+  async thread(
     @Param('peerId', ParseUUIDPipe) peerId: string,
     @Param('id') id: string,
     @Request() req: Express.Request,
   ) {
+    const isAdmin = await this.getIsAdmin(req.user!.userId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_thread' },
-        { messageId: id, peerId, requesterId: req.user!.userId },
+        { messageId: id, peerId, requesterId: req.user!.userId, isAdmin },
       ),
     );
   }
@@ -440,6 +451,23 @@ export class DirectChatController {
       this.projectsClient.send(
         { cmd: 'chat_direct_delete' },
         { id, peerId, requesterId: req.user!.userId },
+      ),
+    );
+  }
+
+  @Delete(':peerId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Oculta una conversación privada de la bandeja (eliminar para mí)' })
+  @ApiResponse({ status: 200, description: 'Conversación ocultada' })
+  async hideConversation(
+    @Param('peerId', ParseUUIDPipe) peerId: string,
+    @Request() req: Express.Request,
+  ) {
+    const isAdmin = await this.getIsAdmin(req.user!.userId);
+    return firstValueFrom(
+      this.projectsClient.send(
+        { cmd: 'chat_direct_hide_conversation' },
+        { peerId, requesterId: req.user!.userId, isAdmin },
       ),
     );
   }

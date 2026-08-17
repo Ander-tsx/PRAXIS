@@ -129,7 +129,7 @@ const REGLAS = [
    * de componer uno «plausible» es real. Que no lo encuentre en la lista tiene
    * que ser motivo para negarse, no para inventarlo.
    */
-  'En "tareas" tienes TODAS las tareas del proyecto con su id, titulo, columna, ' +
+  'En "tareas" tienes TODAS las tareas del proyecto con su id, titulo, descripcion, columna, ' +
     'prioridad, vencimiento, encargados y etiquetas. Usala para responder por ' +
     'nombre ("las que no tienen encargados" son las que traen "encargados" ' +
     'vacio) y para sacar el taskId al proponer. NUNCA inventes ni compongas un ' +

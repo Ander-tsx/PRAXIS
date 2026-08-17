@@ -350,6 +350,7 @@ export class StatsService {
       select: {
         id: true,
         title: true,
+        description: true,
         status: true,
         columnId: true,
         /**
@@ -404,6 +405,7 @@ export class StatsService {
     return tareas.map((tarea) => ({
       id: tarea.id,
       titulo: tarea.title,
+      descripcion: tarea.description,
       columna: tarea.status,
       columnId: tarea.columnId,
       /* Sin nombre: tasks-service no conoce los tableros, viven en projects.

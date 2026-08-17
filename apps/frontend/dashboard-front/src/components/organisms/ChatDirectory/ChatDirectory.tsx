@@ -73,13 +73,9 @@ export function ChatDirectory({
   /* Filtros directos y sin `useMemo`: son listas de decenas de elementos, no de
      miles, y memorizarlas obligaría a declarar como dependencias unas funciones
      que se recrean en cada render — más ceremonia que ahorro. */
-  const directosVisibles = conversaciones.filter((conversacion) =>
-    coincide(nombreDe(conversacion.peerId)),
+  const directosVisibles = conversaciones.filter(
+    (conversacion) => conversacion.ultimo && coincide(nombreDe(conversacion.peerId)),
   );
-
-  const nuevosVisibles = contactos
-    .filter((contacto) => !conHilo.has(contacto.userId))
-    .filter((contacto) => coincide(nombreDe(contacto.userId)));
 
   const proyectosVisibles = proyectos.filter((chat) => coincide(chat.project.name));
 
@@ -150,30 +146,12 @@ export function ChatDirectory({
             </Grupo>
           )}
 
-          {nuevosVisibles.length > 0 && (
-            <Grupo titulo="De tus proyectos">
-              {nuevosVisibles.map((contacto) => (
-                <FilaPersona
-                  key={contacto.userId}
-                  peerId={contacto.userId}
-                  nombre={nombreDe(contacto.userId)}
-                  perfil={usersById.get(contacto.userId)}
-                  activo={activo === contacto.userId}
-                  unread={0}
-                  muted={false}
-                  detalle={describirProyectos(contacto)}
-                  cuando={null}
-                />
-              ))}
-            </Grupo>
-          )}
-
-          {directosVisibles.length === 0 && nuevosVisibles.length === 0 && (
+          {directosVisibles.length === 0 && (
             <Vacio
               texto={
                 filtro
                   ? 'Nadie coincide con esa búsqueda.'
-                  : 'Aquí aparecerá quien comparta algún proyecto contigo.'
+                  : 'Aquí aparecerá quien comparta algún proyecto contigo y con quien hayas iniciado una conversación.'
               }
             />
           )}
@@ -252,20 +230,7 @@ function Vacio({ texto }: { texto: string }) {
   return <p className="px-1 py-4 font-sans text-xs text-text-secondary">{texto}</p>;
 }
 
-/**
- * Dónde coincidís y qué es esa persona allí.
- *
- * ⚠️ El rol es **por proyecto**, no global: la misma persona puede administrar
- * uno y solo mirar en otro. Enseñar un rol suelto sería inventarse una jerarquía
- * que no existe, así que va siempre pegado a su proyecto.
- */
-function describirProyectos(contacto: ChatContact): string {
-  const [primero, ...resto] = contacto.proyectos;
-  if (!primero) return '';
 
-  const base = `${primero.rol} en ${primero.name}`;
-  return resto.length > 0 ? `${base} · +${resto.length}` : base;
-}
 
 function FilaPersona({
   peerId,

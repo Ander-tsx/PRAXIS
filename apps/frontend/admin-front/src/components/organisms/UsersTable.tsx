@@ -91,10 +91,20 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                     presence={usuario.presence ?? null}
                   />
                   <div className="min-w-0">
-                    <p className="truncate font-sans text-sm font-semibold text-text-primary">
-                      {nombreDe(usuario)}
+                    <p className="truncate font-sans text-sm font-semibold text-text-primary flex items-center gap-1">
+                      {esMiCuenta ? (
+                        nombreDe(usuario)
+                      ) : (
+                        <a
+                          href={`/dashboard/chat/${usuario.id}`}
+                          className="hover:underline transition-colors hover:text-primary"
+                          title={`Escribir a ${nombreDe(usuario)}`}
+                        >
+                          {nombreDe(usuario)}
+                        </a>
+                      )}
                       {esMiCuenta && (
-                        <span className="ml-2 font-normal text-text-secondary">(tú)</span>
+                        <span className="font-normal text-text-secondary">(tú)</span>
                       )}
                     </p>
                     <p className="truncate font-sans text-xs text-text-secondary">

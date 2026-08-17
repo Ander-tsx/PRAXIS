@@ -54,7 +54,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           value={value}
           maxLength={maxLength}
           className={[
-            'w-full resize-none rounded-lg border bg-surface-elevated px-3 py-2',
+            'w-full resize-y min-h-[80px] rounded-lg border bg-surface-elevated px-3 py-2',
             'font-sans text-sm text-text-primary placeholder:text-text-disabled',
             'outline-none transition-all duration-150',
             'disabled:cursor-not-allowed disabled:opacity-50',

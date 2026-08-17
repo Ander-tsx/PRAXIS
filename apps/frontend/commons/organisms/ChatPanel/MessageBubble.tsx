@@ -136,6 +136,8 @@ export interface MessageBubbleProps {
   nombreDeAutor: (userId: string) => string;
   /** Preview de la primera URL del mensaje, si el panel la sabe pedir. */
   previewDeLink?: (url: string) => Promise<LinkPreview | null>;
+  /** Si el chat es de proyecto o directo. Necesario para mostrar Visto por. */
+  isProjectChat?: boolean;
 }
 
 /**
@@ -186,6 +188,7 @@ export function MessageBubble({
   cuantosPuedenVer = 0,
   nombreDeAutor,
   previewDeLink,
+  isProjectChat = false,
 }: MessageBubbleProps) {
   const fijado = message.pinnedAt !== null && message.pinnedAt !== undefined;
   const editado = message.editedAt !== null && message.editedAt !== undefined;
@@ -499,7 +502,7 @@ export function MessageBubble({
 
   return (
     <article
-      className={`relative flex gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
+      className={`relative flex min-w-0 gap-2.5 ${mine ? 'flex-row-reverse' : ''} ${
         continued ? 'mt-0.5' : 'mt-3'
       }`}
     >
@@ -830,7 +833,7 @@ export function MessageBubble({
           )}
 
           <div
-            className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg transition-all duration-150 max-sm:hidden has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 ${
+            className={`absolute z-10 flex items-center gap-0.5 rounded-xl border p-1 shadow-lg transition-all duration-150 max-md:hidden has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:opacity-100 ${
               /* Abierta por un clic en el mensaje. `pointer-events-none` al
                  estar cerrada: una barra invisible pero clicable se tragaba
                  los clics del mensaje que hay encima. El `has-[:focus-visible]`
@@ -1055,7 +1058,7 @@ export function MessageBubble({
                 {/* Solo en los tuyos: en el mensaje de otra persona, saber quién
                 más lo ha visto no es asunto de quien lo lee — y ahí el dato
                 que importa ya lo da su propio autor. */}
-                {!confirmandoBorrado && mine && vistoPor.length > 0 && (
+                {!confirmandoBorrado && mine && vistoPor.length > 0 && isProjectChat && (
                   <button
                     type="button"
                     onClick={() => setListaDeVistos((previo) => !previo)}
@@ -1151,7 +1154,7 @@ export function MessageBubble({
         </div>
 
         {agrupadas.size > 0 && (
-          <div className={`flex flex-wrap gap-1 px-1 ${mine ? 'justify-end' : ''}`}>
+          <div className={`flex flex-wrap items-center gap-1 px-1 ${mine ? 'justify-end' : ''}`}>
             {[...agrupadas.entries()].map(([emoji, { total, mia }]) => (
               <button
                 key={emoji}

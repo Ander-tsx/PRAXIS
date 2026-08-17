@@ -449,134 +449,203 @@ export function Composer({
         </div>
       )}
 
-      {abierto && (
-        /* Mismo patrón que el átomo `Select`: un `listbox` propio porque el
-           `<datalist>` nativo no admite dos líneas ni insignias, y `tabIndex={-1}`
-           porque **el foco se queda en el textarea a propósito** — moverlo aquí
-           cerraría el teclado en móvil y perdería el cursor de inserción. */
-        <ul
-          role="listbox"
-          tabIndex={-1}
-          aria-label="Sugerencias"
-          className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-border"
-          style={{
-            background: colors.surfaceElevated,
-            boxShadow: `0 16px 40px ${alpha(colors.overlay, 55)}`,
-          }}
-        >
-          {candidatas.map((sugerencia, indice) => (
-            /* El teclado lo lleva el textarea, que es quien conserva el foco a
-               propósito: moverlo aquí cerraría el teclado en móvil. */
-            <li
-              key={`${sugerencia.kind}:${sugerencia.id}`}
-              role="option"
-              aria-selected={indice === marcada}
-              onMouseEnter={() => setMarcada(indice)}
-              /* `onMouseDown` y no `onClick`: al pulsar, el textarea perdería el
-                 foco antes del clic y el cursor dejaría de estar donde hay que
-                 insertar. `preventDefault` evita ese salto. */
-              onMouseDown={(evento) => {
-                evento.preventDefault();
-                elegir(sugerencia);
-              }}
-              className="flex cursor-pointer items-center gap-2 px-3 py-2"
-              style={indice === marcada ? { background: alpha(colors.primary, 14) } : undefined}
-            >
-              {/* El icono es lo que distingue tarea de tablero de un vistazo:
-                  los dos comparten el mismo desplegable de `/` y sin él, «Sprint
-                  1» (un tablero) y «Sprint 1 — revisar métricas» (una tarea)
-                  se leen igual hasta fijarse en el contexto de la derecha. */}
-              {sugerencia.kind !== 'user' &&
-                (sugerencia.kind === 'board' ? (
-                  <KanbanIcon
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
-                  />
-                ) : (
-                  <SquareCheckIcon
-                    aria-hidden="true"
-                    className="h-3.5 w-3.5 shrink-0"
-                    style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
-                  />
-                ))}
-              <span className="truncate font-sans text-sm text-text-primary">
-                {sugerencia.label}
-              </span>
-              <span className="ml-auto flex shrink-0 items-center gap-2">
-                {sugerencia.estado && (
-                  <span
-                    className="rounded px-1.5 py-0.5 font-sans text-[10px]"
-                    style={{ background: alpha(colors.success, 15), color: colors.success }}
-                  >
-                    {sugerencia.estado}
-                  </span>
-                )}
-                <span className="max-w-40 truncate font-sans text-[11px] text-text-disabled">
-                  {sugerencia.contexto}
+      <div className="relative">
+        {abierto && (
+          /* Mismo patrón que el átomo `Select`: un `listbox` propio porque el
+             `<datalist>` nativo no admite dos líneas ni insignias, y `tabIndex={-1}`
+             porque **el foco se queda en el textarea a propósito** — moverlo aquí
+             cerraría el teclado en móvil y perdería el cursor de inserción. */
+          <ul
+            role="listbox"
+            tabIndex={-1}
+            aria-label="Sugerencias"
+            className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-border"
+            style={{
+              background: colors.surfaceElevated,
+              boxShadow: `0 16px 40px ${alpha(colors.overlay, 55)}`,
+            }}
+          >
+            {candidatas.map((sugerencia, indice) => (
+              /* El teclado lo lleva el textarea, que es quien conserva el foco a
+                 propósito: moverlo aquí cerraría el teclado en móvil. */
+              <li
+                key={`${sugerencia.kind}:${sugerencia.id}`}
+                role="option"
+                aria-selected={indice === marcada}
+                onMouseEnter={() => setMarcada(indice)}
+                /* `onMouseDown` y no `onClick`: al pulsar, el textarea perdería el
+                   foco antes del clic y el cursor dejaría de estar donde hay que
+                   insertar. `preventDefault` evita ese salto. */
+                onMouseDown={(evento) => {
+                  evento.preventDefault();
+                  elegir(sugerencia);
+                }}
+                className="flex cursor-pointer items-center gap-2 px-3 py-2"
+                style={indice === marcada ? { background: alpha(colors.primary, 14) } : undefined}
+              >
+                {/* El icono es lo que distingue tarea de tablero de un vistazo:
+                    los dos comparten el mismo desplegable de `/` y sin él, «Sprint
+                    1» (un tablero) y «Sprint 1 — revisar métricas» (una tarea)
+                    se leen igual hasta fijarse en el contexto de la derecha. */}
+                {sugerencia.kind !== 'user' &&
+                  (sugerencia.kind === 'board' ? (
+                    <KanbanIcon
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0"
+                      style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
+                    />
+                  ) : (
+                    <SquareCheckIcon
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 shrink-0"
+                      style={{ color: COLOR_POR_TIPO_DE_REF[sugerencia.kind] }}
+                    />
+                  ))}
+                <span className="truncate font-sans text-sm text-text-primary">
+                  {sugerencia.label}
                 </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+                <span className="ml-auto flex shrink-0 items-center gap-2">
+                  {sugerencia.estado && (
+                    <span
+                      className="rounded px-1.5 py-0.5 font-sans text-[10px]"
+                      style={{ background: alpha(colors.success, 15), color: colors.success }}
+                    >
+                      {sugerencia.estado}
+                    </span>
+                  )}
+                  <span className="max-w-40 truncate font-sans text-[11px] text-text-disabled">
+                    {sugerencia.contexto}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
-      <div
-        className="flex items-end gap-2 rounded-xl border border-border p-2 transition-colors focus-within:border-primary"
-        style={{ background: colors.surfaceElevated }}
-      >
-        <div className="relative min-w-0 flex-1">
-          {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
-          <CapaEtiquetas trozos={trozos} capaRef={capaRef} className="max-h-40 overflow-hidden" />
+        <div
+          className="flex items-end gap-2 rounded-xl border border-border p-2 transition-colors focus-within:border-primary"
+          style={{ background: colors.surfaceElevated }}
+        >
+          <div className="relative min-w-0 flex-1">
+            {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
+            <CapaEtiquetas trozos={trozos} capaRef={capaRef} className="max-h-40 overflow-hidden" />
 
-          <textarea
-            ref={areaRef}
-            value={texto}
-            disabled={deshabilitado}
-            maxLength={CHAT_MESSAGE_MAX}
-            placeholder={placeholder}
-            aria-label="Nuevo mensaje"
-            rows={1}
-            onChange={(evento) => {
-              setTexto(evento.target.value);
-              setCursor(evento.target.selectionStart ?? 0);
-            }}
-            onKeyUp={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
-            onClick={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
-            onKeyDown={alTeclear}
-            onPaste={alPegar}
-            /* Las dos capas se desplazan juntas: si no, al pasar de cuatro
-               líneas el resaltado se queda quieto y el texto sube. */
-            onScroll={(evento) => {
-              if (capaRef.current) capaRef.current.scrollTop = evento.currentTarget.scrollTop;
-            }}
-            onInput={(evento) => {
-              const area = evento.currentTarget;
-              area.style.height = 'auto';
-              area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
-            }}
-            /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
-               se pinta aparte con `caret-color`, o el campo parecería muerto. */
-            className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${TIPOGRAFIA_CAMPO}`}
-            style={{ caretColor: colors.textPrimary }}
-          />
-        </div>
+            <textarea
+              ref={areaRef}
+              value={texto}
+              disabled={deshabilitado}
+              maxLength={CHAT_MESSAGE_MAX}
+              placeholder={placeholder}
+              aria-label="Nuevo mensaje"
+              rows={1}
+              onChange={(evento) => {
+                setTexto(evento.target.value);
+                setCursor(evento.target.selectionStart ?? 0);
+              }}
+              onKeyUp={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
+              onClick={(evento) => setCursor(evento.currentTarget.selectionStart ?? 0)}
+              onKeyDown={alTeclear}
+              onPaste={alPegar}
+              /* Las dos capas se desplazan juntas: si no, al pasar de cuatro
+                 líneas el resaltado se queda quieto y el texto sube. */
+              onScroll={(evento) => {
+                if (capaRef.current) capaRef.current.scrollTop = evento.currentTarget.scrollTop;
+              }}
+              onInput={(evento) => {
+                const area = evento.currentTarget;
+                area.style.height = 'auto';
+                area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
+              }}
+              /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
+                 se pinta aparte con `caret-color`, o el campo parecería muerto. */
+              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${TIPOGRAFIA_CAMPO}`}
+              style={{ caretColor: colors.textPrimary }}
+            />
+          </div>
 
-        {!ocultarAdjuntos && (
+          {!ocultarAdjuntos && (
+            <button
+              type="button"
+              onClick={() => archivoRef.current?.click()}
+              disabled={
+                deshabilitado ||
+                subiendo ||
+                adjuntosPendientes.length >= CHAT_ATTACHMENT_MAX_PER_MESSAGE
+              }
+              aria-label="Adjuntar un archivo"
+              title="Adjuntar archivo"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {subiendo ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+
+          {/* Escondido: lo abre el botón del clip. Se elige un archivo y se sube
+              al instante; no se guarda en el formulario. */}
+          {!ocultarAdjuntos && (
+            <input
+              ref={archivoRef}
+              type="file"
+              multiple={false}
+              /* Las extensiones además de los tipos: el selector de archivos de
+                 algunos sistemas no reconoce `text/markdown` y dejaba los `.md`
+                 en gris aunque el servidor sí los acepte. */
+              accept={`${CHAT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown`}
+              onChange={alElegirArchivo}
+              className="hidden"
+            />
+          )}
+
+          {/* Editando, «Cancelar» va pegado a «Guardar»: son la misma decisión. */}
+          {onCancelar && (
+            <button
+              type="button"
+              onClick={onCancelar}
+              /* `h-9` como «Guardar»: sin alto propio, el botón se alineaba por
+                 su texto y quedaba un par de píxeles más abajo que su vecino en
+                 una fila que se alinea por abajo (`items-end`). */
+              className="flex h-9 shrink-0 cursor-pointer items-center rounded-lg px-3 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Cancelar
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => archivoRef.current?.click()}
+            onClick={enviar}
             disabled={
+              enviando ||
               deshabilitado ||
               subiendo ||
-              adjuntosPendientes.length >= CHAT_ATTACHMENT_MAX_PER_MESSAGE
+              (adjuntosPendientes.length === 0 && texto.trim().length === 0)
             }
-            aria-label="Adjuntar un archivo"
-            title="Adjuntar archivo"
-            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={etiquetaEnviar ?? 'Enviar mensaje'}
+            className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg font-sans text-xs font-semibold transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 ${
+              etiquetaEnviar ? 'px-3' : 'w-9'
+            }`}
+            style={{ background: alpha(colors.primary, 22), color: colors.primary }}
           >
-            {subiendo ? (
+            {enviando ? (
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : etiquetaEnviar ? (
+              etiquetaEnviar
             ) : (
               <svg
                 className="h-4 w-4"
@@ -586,78 +655,11 @@ export function Composer({
                 strokeWidth={2}
                 aria-hidden="true"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
               </svg>
             )}
           </button>
-        )}
-
-        {/* Escondido: lo abre el botón del clip. Se elige un archivo y se sube
-            al instante; no se guarda en el formulario. */}
-        {!ocultarAdjuntos && (
-          <input
-            ref={archivoRef}
-            type="file"
-            multiple={false}
-            /* Las extensiones además de los tipos: el selector de archivos de
-               algunos sistemas no reconoce `text/markdown` y dejaba los `.md`
-               en gris aunque el servidor sí los acepte. */
-            accept={`${CHAT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown`}
-            onChange={alElegirArchivo}
-            className="hidden"
-          />
-        )}
-
-        {/* Editando, «Cancelar» va pegado a «Guardar»: son la misma decisión. */}
-        {onCancelar && (
-          <button
-            type="button"
-            onClick={onCancelar}
-            /* `h-9` como «Guardar»: sin alto propio, el botón se alineaba por
-               su texto y quedaba un par de píxeles más abajo que su vecino en
-               una fila que se alinea por abajo (`items-end`). */
-            className="flex h-9 shrink-0 cursor-pointer items-center rounded-lg px-3 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-          >
-            Cancelar
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={enviar}
-          disabled={
-            enviando ||
-            deshabilitado ||
-            subiendo ||
-            (adjuntosPendientes.length === 0 && texto.trim().length === 0)
-          }
-          aria-label={etiquetaEnviar ?? 'Enviar mensaje'}
-          className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg font-sans text-xs font-semibold transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 ${
-            etiquetaEnviar ? 'px-3' : 'w-9'
-          }`}
-          style={{ background: alpha(colors.primary, 22), color: colors.primary }}
-        >
-          {enviando ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : etiquetaEnviar ? (
-            etiquetaEnviar
-          ) : (
-            <svg
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          )}
-        </button>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 px-1">

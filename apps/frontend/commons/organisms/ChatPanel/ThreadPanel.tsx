@@ -46,6 +46,7 @@ export interface ThreadPanelProps {
   hrefDePersona?: (userId: string) => string | null;
   nombreDeAutor: (userId: string) => string;
   previewDeLink?: (url: string) => Promise<import('../../api/link-preview').LinkPreview | null>;
+  isProjectChat?: boolean;
 }
 
 /**
@@ -96,6 +97,7 @@ export function ThreadPanel({
   hrefDePersona,
   nombreDeAutor,
   previewDeLink,
+  isProjectChat = false,
 }: ThreadPanelProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const bubbles = [raiz, ...replies];
@@ -124,8 +126,8 @@ export function ThreadPanel({
          crece con cada respuesta en vez de quedarse dentro del alto del chat y
          dejar que el scroller de abajo se encargue. Mismo motivo que el `min-h-0`
          del contenedor del chat principal, ver el comentario en `ChatPanel`. */
-      className={`flex min-h-0 w-full flex-col border-l border-border max-sm:fixed max-sm:inset-0 max-sm:z-50 sm:shrink-0 ${
-        plegada ? 'sm:w-96' : 'sm:w-80'
+      className={`flex min-h-0 w-full flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-50 md:shrink-0 ${
+        plegada ? 'md:w-96' : 'md:w-80'
       }`}
       style={{ background: colors.background }}
     >
@@ -224,6 +226,7 @@ export function ThreadPanel({
                    nueva y se mantiene. */
                 ocultarCitaSiApuntaA={raiz.id}
                 nombreDeAutor={nombreDeAutor}
+                isProjectChat={isProjectChat}
                 {...(previewDeLink ? { previewDeLink } : {})}
               />{' '}
             </div>
