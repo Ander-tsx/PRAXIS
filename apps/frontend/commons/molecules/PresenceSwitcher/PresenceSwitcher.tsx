@@ -130,7 +130,7 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
     // Al cerrar la pestaña o cambiar de app, forzar Ausente como "mejor esfuerzo"
     const handleVisibility = () => {
       const current = estadoRef.current;
-      if (document.visibilityState === 'hidden' && current.presencia !== 'AWAY' && !current.guardando) {
+      if (current.presencia !== 'AWAY' && !current.guardando) {
         
         // Next.js Server Actions usan el fetch global, pero el navegador lo cancela al cerrar.
         // Inyectamos keepalive temporalmente para que la petición sobreviva al cierre de la pestaña.
@@ -151,7 +151,6 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
         }, 10);
       }
     };
-    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('pagehide', handleVisibility);
 
     // Registrar actividad inicial al montar
@@ -159,7 +158,6 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
 
     return () => {
       evtTypes.forEach(evt => window.removeEventListener(evt, handleActivity, evtOptions as any));
-      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handleVisibility);
       window.clearInterval(checkInterval);
     };
