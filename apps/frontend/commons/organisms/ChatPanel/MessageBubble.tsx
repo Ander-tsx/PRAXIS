@@ -545,7 +545,12 @@ export function MessageBubble({
 
   async function copiar() {
     try {
-      await navigator.clipboard.writeText(fieldFromBody(message.body).texto);
+      const cuerpo = message?.body ?? '';
+      const extraido = fieldFromBody(cuerpo);
+      const textoParaCopiar = extraido ? extraido.texto : '';
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(textoParaCopiar);
+      }
       setCopiado(true);
       setTimeout(() => {
         setCopiado(false);
