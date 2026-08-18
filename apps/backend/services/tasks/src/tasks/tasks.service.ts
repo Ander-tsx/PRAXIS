@@ -221,6 +221,14 @@ export class TasksService {
     ];
   }
 
+  /** Una lista es un conjunto: el orden del selector no constituye un cambio. */
+  private assigneesChanged(before: string[], after?: string[]): boolean {
+    if (after === undefined) return false;
+    const previous = new Set(before);
+    const next = new Set(after);
+    return previous.size !== next.size || [...previous].some((userId) => !next.has(userId));
+  }
+
   /**
    * Qué eventos genera un cambio de columna, y qué pasa con `completedAt`.
    *
@@ -723,6 +731,7 @@ export class TasksService {
     /* Solo si el `PATCH` toca encargados. Omitirlos los deja como estaban, y
        entonces no hay nada de qué avisar ni por qué consultarlo. */
     const before = assignees !== undefined ? await this.currentAssignees(dto.id) : [];
+    const assigneesChanged = this.assigneesChanged(before, assignees);
 
     /**
      * Este `PATCH` **también mueve**: acepta `columnId`. Se le da el mismo
@@ -743,6 +752,7 @@ export class TasksService {
     const dueDateChanged =
       nextDueDate !== undefined &&
       (task.dueDate?.getTime() ?? null) !== (nextDueDate?.getTime() ?? null);
+    const moved = change.events.some((event) => event.type === 'MOVED');
     const completed = change.events.some((event) => event.type === 'COMPLETED');
     const reopened = change.events.some((event) => event.type === 'REOPENED');
     const correlationId = randomUUID();
@@ -795,6 +805,12 @@ export class TasksService {
         actor: { type: 'USER' as const, id: dto.requesterId },
         correlationId,
       };
+      if (moved) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.moved.v1',
+          payload: { taskId: saved.id, fromColumnId: task.columnId, toColumnId: saved.columnId },
+        });
+      }
       if (dueDateChanged) {
         await this.domainOutbox.persist(tx, eventContext, {
           type: 'task.due-date-changed.v1',
@@ -816,6 +832,15 @@ export class TasksService {
         await this.domainOutbox.persist(tx, eventContext, {
           type: 'task.reopened.v1',
           payload: { taskId: saved.id },
+        });
+      }
+      if (assigneesChanged) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.assignees-changed.v1',
+          payload: {
+            taskId: saved.id,
+            assigneeIds: saved.assignees.map((assignee) => assignee.userId),
+          },
         });
       }
 
@@ -994,6 +1019,8 @@ export class TasksService {
     /* Quién había **antes**: es la única forma de saber a quién avisar de que
        entra y a quién de que sale. Después del reemplazo ya no existe. */
     const before = await this.currentAssignees(dto.id);
+    const assigneesChanged = this.assigneesChanged(before, assignees);
+    const correlationId = randomUUID();
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
@@ -1003,6 +1030,24 @@ export class TasksService {
       });
 
       await this.recordEvents(tx, saved, dto.requesterId, this.assigneeEvents(before, assignees));
+      if (assigneesChanged) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: saved.projectId,
+            taskId: saved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.assignees-changed.v1',
+            payload: {
+              taskId: saved.id,
+              assigneeIds: saved.assignees.map((assignee) => assignee.userId),
+            },
+          },
+        );
+      }
 
       return saved;
     });

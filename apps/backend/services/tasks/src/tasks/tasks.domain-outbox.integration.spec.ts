@@ -19,10 +19,12 @@ const task = {
 
 function createHarness(
   options: {
+    assigneeIds?: string[];
+    beforeAssigneeIds?: string[];
     existingTask?: typeof task;
     failOutbox?: boolean;
     movedColumnId?: string;
-    updatedTask?: typeof task & { dueDate?: Date | null };
+    updatedTask?: typeof task & { assignees?: { userId: string }[]; dueDate?: Date | null };
   } = {},
 ) {
   const committed: CommittedWrites = { tasks: [], taskEvents: [], outbox: [] };
@@ -46,7 +48,11 @@ function createHarness(
             pending.tasks.push(args);
             return movedTask;
           },
-          findUniqueOrThrow: async () => options.existingTask ?? task,
+          findUniqueOrThrow: async () =>
+            options.updatedTask ?? {
+              ...(options.existingTask ?? task),
+              assignees: (options.assigneeIds ?? []).map((userId) => ({ userId })),
+            },
           delete: async (args: unknown) => {
             pending.tasks.push(args);
             return options.existingTask ?? task;
@@ -76,10 +82,12 @@ function createHarness(
   const service = new TasksService(prisma as never, redis as never, { get: jest.fn() } as never);
   jest.spyOn(service as any, 'assertPermission').mockResolvedValue(undefined);
   jest.spyOn(service as any, 'assertColumnInBoard').mockResolvedValue(undefined);
-  jest.spyOn(service as any, 'resolveAssignees').mockResolvedValue([]);
+  jest.spyOn(service as any, 'resolveAssignees').mockResolvedValue(options.assigneeIds ?? []);
   jest.spyOn(service as any, 'resolveLabels').mockResolvedValue([]);
   jest.spyOn(service as any, 'notifyAssigneeChanges').mockResolvedValue(undefined);
   jest.spyOn(service as any, 'loadTaskInProject').mockResolvedValue(options.existingTask ?? task);
+  jest.spyOn(service as any, 'currentAssignees').mockResolvedValue(options.beforeAssigneeIds ?? []);
+  jest.spyOn(service as any, 'replaceAssignees').mockResolvedValue(undefined);
 
   return { committed, redis, service };
 }
@@ -252,7 +260,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
   });
 
-  it('persiste task.completed.v1 al entrar a una columna de cierre', async () => {
+  it('un PATCH que mueve a cierre persiste los hechos de movimiento y completado', async () => {
     const completedAt = new Date('2026-08-20T12:00:00.000Z');
     const { committed, service } = createHarness({
       updatedTask: { ...task, columnId: 'column-2', completedAt },
@@ -267,6 +275,10 @@ describe('TasksService DomainOutbox transaction integration', () => {
     } as never);
 
     expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.moved.v1',
+        payload: { taskId: 'task-1', fromColumnId: 'column-1', toColumnId: 'column-2' },
+      }),
       expect.objectContaining({
         type: 'task.completed.v1',
         payload: { taskId: 'task-1', completedAt: completedAt.toISOString() },
@@ -293,7 +305,7 @@ describe('TasksService DomainOutbox transaction integration', () => {
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
   });
 
-  it('persiste task.reopened.v1 al salir de una columna de cierre', async () => {
+  it('un PATCH que reabre persiste los hechos de movimiento y reapertura', async () => {
     const { committed, service } = createHarness({
       existingTask: { ...task, completedAt: new Date('2026-08-19T12:00:00.000Z') },
       updatedTask: { ...task, columnId: 'column-2', completedAt: null },
@@ -308,6 +320,10 @@ describe('TasksService DomainOutbox transaction integration', () => {
     } as never);
 
     expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.moved.v1',
+        payload: { taskId: 'task-1', fromColumnId: 'column-1', toColumnId: 'column-2' },
+      }),
       expect.objectContaining({
         type: 'task.reopened.v1',
         payload: { taskId: 'task-1' },
@@ -375,5 +391,143 @@ describe('TasksService DomainOutbox transaction integration', () => {
 
     expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
     expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('asignar responsables conserva hechos individuales y un solo estado final agregado', async () => {
+    const { committed, service } = createHarness({ assigneeIds: ['user-1', 'user-2'] });
+
+    await service.assignTask({
+      requesterId: 'manager-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      assigneeIds: ['user-1', 'user-2'],
+    } as never);
+
+    expect(committed.taskEvents[0]).toMatchObject({
+      data: [
+        expect.objectContaining({ type: 'ASSIGNED', subjectId: 'user-1' }),
+        expect.objectContaining({ type: 'ASSIGNED', subjectId: 'user-2' }),
+      ],
+    });
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.assignees-changed.v1',
+        projectId: 'project-1',
+        subjectType: 'TASK',
+        subjectId: 'task-1',
+        actorType: 'USER',
+        actorId: 'manager-1',
+        payload: { taskId: 'task-1', assigneeIds: ['user-1', 'user-2'] },
+      }),
+    ]);
+  });
+
+  it('desasignar responsables conserva un solo DomainEvent con el estado final', async () => {
+    const { committed, service } = createHarness({
+      beforeAssigneeIds: ['user-1', 'user-2'],
+      assigneeIds: ['user-2'],
+    });
+
+    await service.assignTask({
+      requesterId: 'manager-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      assigneeIds: ['user-2'],
+    } as never);
+
+    expect(committed.taskEvents[0]).toMatchObject({
+      data: [expect.objectContaining({ type: 'UNASSIGNED', subjectId: 'user-1' })],
+    });
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.assignees-changed.v1',
+        payload: { taskId: 'task-1', assigneeIds: ['user-2'] },
+      }),
+    ]);
+  });
+
+  it('una sustitución múltiple emite un único DomainEvent coherente y deduplicado', async () => {
+    const { committed, service } = createHarness({
+      beforeAssigneeIds: ['user-1', 'user-2'],
+      assigneeIds: ['user-2', 'user-3', 'user-4'],
+    });
+
+    await service.assignTask({
+      requesterId: 'manager-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      assigneeIds: ['user-2', 'user-3', 'user-4', 'user-3'],
+    } as never);
+
+    expect(committed.taskEvents[0]).toMatchObject({
+      data: expect.arrayContaining([
+        expect.objectContaining({ type: 'UNASSIGNED', subjectId: 'user-1' }),
+        expect.objectContaining({ type: 'ASSIGNED', subjectId: 'user-3' }),
+        expect.objectContaining({ type: 'ASSIGNED', subjectId: 'user-4' }),
+      ]),
+    });
+    expect(committed.outbox).toHaveLength(1);
+    expect(committed.outbox[0]).toMatchObject({
+      payload: { taskId: 'task-1', assigneeIds: ['user-2', 'user-3', 'user-4'] },
+    });
+  });
+
+  it('no emite evento agregado si el estado final de responsables no cambia', async () => {
+    const { committed, service } = createHarness({
+      beforeAssigneeIds: ['user-1', 'user-2'],
+      assigneeIds: ['user-2', 'user-1'],
+    });
+
+    await service.assignTask({
+      requesterId: 'manager-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      assigneeIds: ['user-2', 'user-1'],
+    } as never);
+
+    expect(committed.outbox).toEqual([]);
+  });
+
+  it('hace rollback de responsables sin dejar TaskEvent ni DomainOutbox parcial', async () => {
+    const { committed, redis, service } = createHarness({
+      assigneeIds: ['user-1'],
+      failOutbox: true,
+    });
+
+    await expect(
+      service.assignTask({
+        requesterId: 'manager-1',
+        projectId: 'project-1',
+        id: 'task-1',
+        assigneeIds: ['user-1'],
+      } as never),
+    ).rejects.toThrow('outbox unavailable');
+
+    expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('rechaza asignar responsables a una tarea de otro proyecto antes de la transacción', async () => {
+    const transaction = jest.fn();
+    const service = new TasksService(
+      {
+        task: { findUnique: async () => task },
+        $transaction: transaction,
+      } as never,
+      { del: jest.fn() } as never,
+      { get: jest.fn() } as never,
+    );
+    jest.spyOn(service as any, 'assertPermission').mockResolvedValue(undefined);
+
+    await expect(
+      service.assignTask({
+        requesterId: 'manager-1',
+        projectId: 'project-2',
+        id: 'task-1',
+        assigneeIds: ['user-1'],
+      } as never),
+    ).rejects.toMatchObject({ error: { statusCode: 403 } });
+
+    expect(transaction).not.toHaveBeenCalled();
   });
 });
