@@ -17,11 +17,21 @@ const task = {
   completedAt: null,
 };
 
-function createHarness(options: { failOutbox?: boolean; movedColumnId?: string } = {}) {
+function createHarness(
+  options: {
+    existingTask?: typeof task;
+    failOutbox?: boolean;
+    movedColumnId?: string;
+    updatedTask?: typeof task & { dueDate?: Date | null };
+  } = {},
+) {
   const committed: CommittedWrites = { tasks: [], taskEvents: [], outbox: [] };
   const redis = { del: jest.fn().mockResolvedValue(undefined) };
   const createdTask = { ...task };
-  const movedTask = { ...task, columnId: options.movedColumnId ?? 'column-2' };
+  const movedTask = options.updatedTask ?? {
+    ...task,
+    columnId: options.movedColumnId ?? 'column-2',
+  };
 
   const prisma = {
     $transaction: async (callback: (tx: any) => Promise<unknown>) => {
@@ -35,6 +45,11 @@ function createHarness(options: { failOutbox?: boolean; movedColumnId?: string }
           update: async (args: unknown) => {
             pending.tasks.push(args);
             return movedTask;
+          },
+          findUniqueOrThrow: async () => options.existingTask ?? task,
+          delete: async (args: unknown) => {
+            pending.tasks.push(args);
+            return options.existingTask ?? task;
           },
         },
         taskEvent: {
@@ -64,7 +79,7 @@ function createHarness(options: { failOutbox?: boolean; movedColumnId?: string }
   jest.spyOn(service as any, 'resolveAssignees').mockResolvedValue([]);
   jest.spyOn(service as any, 'resolveLabels').mockResolvedValue([]);
   jest.spyOn(service as any, 'notifyAssigneeChanges').mockResolvedValue(undefined);
-  jest.spyOn(service as any, 'loadTaskInProject').mockResolvedValue(task);
+  jest.spyOn(service as any, 'loadTaskInProject').mockResolvedValue(options.existingTask ?? task);
 
   return { committed, redis, service };
 }
@@ -167,6 +182,194 @@ describe('TasksService DomainOutbox transaction integration', () => {
         projectId: 'project-1',
         id: 'task-1',
         columnId: 'column-2',
+      } as never),
+    ).rejects.toThrow('outbox unavailable');
+
+    expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('persiste task.due-date-changed.v1 al cambiar realmente la fecha de vencimiento', async () => {
+    const previousDueDate = new Date('2026-08-20T12:00:00.000Z');
+    const dueDate = new Date('2026-08-25T12:00:00.000Z');
+    const { committed, service } = createHarness({
+      existingTask: { ...task, dueDate: previousDueDate } as typeof task,
+      updatedTask: { ...task, dueDate },
+    });
+
+    await service.updateTask({
+      requesterId: 'user-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      dueDate: dueDate.toISOString(),
+    } as never);
+
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.due-date-changed.v1',
+        payload: {
+          taskId: 'task-1',
+          previousDueDate: previousDueDate.toISOString(),
+          dueDate: dueDate.toISOString(),
+        },
+      }),
+    ]);
+  });
+
+  it('no persiste DomainOutbox cuando dueDate no cambia realmente', async () => {
+    const dueDate = new Date('2026-08-20T12:00:00.000Z');
+    const { committed, service } = createHarness({
+      existingTask: { ...task, dueDate } as typeof task,
+      updatedTask: { ...task, dueDate },
+    });
+
+    await service.updateTask({
+      requesterId: 'user-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      dueDate: dueDate.toISOString(),
+    } as never);
+
+    expect(committed.outbox).toEqual([]);
+  });
+
+  it('hace rollback del cambio de dueDate cuando falla el DomainOutbox', async () => {
+    const { committed, service } = createHarness({
+      existingTask: { ...task, dueDate: null } as typeof task,
+      updatedTask: { ...task, dueDate: new Date('2026-08-20T12:00:00.000Z') },
+      failOutbox: true,
+    });
+
+    await expect(
+      service.updateTask({
+        requesterId: 'user-1',
+        projectId: 'project-1',
+        id: 'task-1',
+        dueDate: '2026-08-20T12:00:00.000Z',
+      } as never),
+    ).rejects.toThrow('outbox unavailable');
+
+    expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
+  });
+
+  it('persiste task.completed.v1 al entrar a una columna de cierre', async () => {
+    const completedAt = new Date('2026-08-20T12:00:00.000Z');
+    const { committed, service } = createHarness({
+      updatedTask: { ...task, columnId: 'column-2', completedAt },
+    });
+
+    await service.updateTask({
+      requesterId: 'user-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      columnId: 'column-2',
+      isClosingColumn: true,
+    } as never);
+
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.completed.v1',
+        payload: { taskId: 'task-1', completedAt: completedAt.toISOString() },
+      }),
+    ]);
+  });
+
+  it('hace rollback al completar si falla el DomainOutbox', async () => {
+    const { committed, service } = createHarness({
+      updatedTask: { ...task, columnId: 'column-2', completedAt: new Date() },
+      failOutbox: true,
+    });
+
+    await expect(
+      service.updateTask({
+        requesterId: 'user-1',
+        projectId: 'project-1',
+        id: 'task-1',
+        columnId: 'column-2',
+        isClosingColumn: true,
+      } as never),
+    ).rejects.toThrow('outbox unavailable');
+
+    expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
+  });
+
+  it('persiste task.reopened.v1 al salir de una columna de cierre', async () => {
+    const { committed, service } = createHarness({
+      existingTask: { ...task, completedAt: new Date('2026-08-19T12:00:00.000Z') },
+      updatedTask: { ...task, columnId: 'column-2', completedAt: null },
+    });
+
+    await service.updateTask({
+      requesterId: 'user-1',
+      projectId: 'project-1',
+      id: 'task-1',
+      columnId: 'column-2',
+      isClosingColumn: false,
+    } as never);
+
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.reopened.v1',
+        payload: { taskId: 'task-1' },
+      }),
+    ]);
+  });
+
+  it('hace rollback al reabrir si falla el DomainOutbox', async () => {
+    const { committed, service } = createHarness({
+      existingTask: { ...task, completedAt: new Date('2026-08-19T12:00:00.000Z') },
+      updatedTask: { ...task, columnId: 'column-2', completedAt: null },
+      failOutbox: true,
+    });
+
+    await expect(
+      service.updateTask({
+        requesterId: 'user-1',
+        projectId: 'project-1',
+        id: 'task-1',
+        columnId: 'column-2',
+        isClosingColumn: false,
+      } as never),
+    ).rejects.toThrow('outbox unavailable');
+
+    expect(committed).toEqual({ tasks: [], taskEvents: [], outbox: [] });
+  });
+
+  it('conserva TaskEvent y task.deleted.v1 antes de eliminar la tarea', async () => {
+    const { committed, service } = createHarness();
+
+    await service.deleteTask({
+      requesterId: 'user-1',
+      projectId: 'project-1',
+      id: 'task-1',
+    } as never);
+
+    expect(committed.tasks).toHaveLength(1);
+    expect(committed.taskEvents).toEqual([
+      expect.objectContaining({ data: [expect.objectContaining({ type: 'DELETED' })] }),
+    ]);
+    expect(committed.outbox).toEqual([
+      expect.objectContaining({
+        type: 'task.deleted.v1',
+        projectId: 'project-1',
+        subjectType: 'TASK',
+        subjectId: 'task-1',
+        actorType: 'USER',
+        actorId: 'user-1',
+        payload: { taskId: 'task-1' },
+        publishedAt: null,
+      }),
+    ]);
+  });
+
+  it('hace rollback de eliminar cuando falla el DomainOutbox', async () => {
+    const { committed, redis, service } = createHarness({ failOutbox: true });
+
+    await expect(
+      service.deleteTask({
+        requesterId: 'user-1',
+        projectId: 'project-1',
+        id: 'task-1',
       } as never),
     ).rejects.toThrow('outbox unavailable');
 

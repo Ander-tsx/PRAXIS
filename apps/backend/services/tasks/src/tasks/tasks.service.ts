@@ -738,6 +738,14 @@ export class TasksService {
             isClosingColumn: dto.isClosingColumn,
           })
         : { events: [] as TaskEventDraft[], completedAt: undefined };
+    const nextDueDate =
+      dto.dueDate === undefined ? undefined : dto.dueDate ? new Date(dto.dueDate) : null;
+    const dueDateChanged =
+      nextDueDate !== undefined &&
+      (task.dueDate?.getTime() ?? null) !== (nextDueDate?.getTime() ?? null);
+    const completed = change.events.some((event) => event.type === 'COMPLETED');
+    const reopened = change.events.some((event) => event.type === 'REOPENED');
+    const correlationId = randomUUID();
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (assignees !== undefined) {
@@ -757,7 +765,7 @@ export class TasksService {
           ...(dto.priority !== undefined && { priority: dto.priority }),
           // `null` limpia la fecha; sin esto no habría forma de quitarla.
           ...(dto.dueDate !== undefined && {
-            dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+            dueDate: nextDueDate,
           }),
           ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
         },
@@ -780,6 +788,36 @@ export class TasksService {
           : []),
         ...this.assigneeEvents(before, assignees),
       ]);
+
+      const eventContext = {
+        projectId: saved.projectId,
+        taskId: saved.id,
+        actor: { type: 'USER' as const, id: dto.requesterId },
+        correlationId,
+      };
+      if (dueDateChanged) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.due-date-changed.v1',
+          payload: {
+            taskId: saved.id,
+            previousDueDate: task.dueDate?.toISOString() ?? null,
+            dueDate: saved.dueDate?.toISOString() ?? null,
+          },
+        });
+      }
+      if (completed) {
+        if (!saved.completedAt) throw new Error('La tarea completada debe incluir completedAt');
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.completed.v1',
+          payload: { taskId: saved.id, completedAt: saved.completedAt.toISOString() },
+        });
+      }
+      if (reopened) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.reopened.v1',
+          payload: { taskId: saved.id },
+        });
+      }
 
       return saved;
     });
@@ -852,6 +890,37 @@ export class TasksService {
           },
         );
       }
+      if (change.events.some((event) => event.type === 'COMPLETED')) {
+        if (!moved.completedAt) throw new Error('La tarea completada debe incluir completedAt');
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.completed.v1',
+            payload: { taskId: moved.id, completedAt: moved.completedAt.toISOString() },
+          },
+        );
+      }
+      if (change.events.some((event) => event.type === 'REOPENED')) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.reopened.v1',
+            payload: { taskId: moved.id },
+          },
+        );
+      }
       return moved;
     });
 
@@ -867,8 +936,16 @@ export class TasksService {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canDeleteTask');
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
+    const correlationId = randomUUID();
 
     await this.prisma.$transaction(async (tx) => {
+      // Se vuelve a capturar dentro de la transacción: tras borrar no existe
+      // ninguna fuente confiable para reconstruir el hecho durable.
+      const snapshot = await tx.task.findUniqueOrThrow({ where: { id: dto.id } });
+      if (snapshot.projectId !== dto.projectId) {
+        throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+      }
+
       /**
        * El evento **antes** del borrado, y sobrevive a él.
        *
@@ -878,10 +955,20 @@ export class TasksService {
        * se limpió del tablero desaparecería del throughput **retroactivamente**,
        * cambiando cifras del pasado que ya se habían enseñado.
        */
-      await this.recordEvents(tx, task, dto.requesterId, [
-        { type: 'DELETED', fromColumnId: task.columnId },
+      await this.recordEvents(tx, snapshot, dto.requesterId, [
+        { type: 'DELETED', fromColumnId: snapshot.columnId },
       ]);
-      await tx.task.delete({ where: { id: dto.id } });
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: snapshot.projectId,
+          taskId: snapshot.id,
+          actor: { type: 'USER', id: dto.requesterId },
+          correlationId,
+        },
+        { type: 'task.deleted.v1', payload: { taskId: snapshot.id } },
+      );
+      await tx.task.delete({ where: { id: snapshot.id } });
     });
 
     await Promise.all([
