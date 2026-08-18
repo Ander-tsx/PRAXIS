@@ -634,9 +634,52 @@ de ESTADO-ACTUAL §17.7.
 
 - [ ] **E6.1 — Repasar el resto de N+1.** La Fase 1 arregló cinco. Barrer con
       `rg 'ids.map|\.map\(.*api\.get'` por si queda alguno.
-- [ ] **E6.2 — Índices que faltan.** Revisar los planes de las consultas que más
-      se ejecutan: historial del chat, `countUnread`, `misConversaciones`.
-      `contarSinLeerDeVarios` es SQL crudo y merece un `EXPLAIN`.
+- [x] **E6.2 — El `EXPLAIN` de `contarSinLeerDeVarios`, y lo que destapó.**
+
+      🔴 **No faltaba ningún índice: sobraba un `OR`.** La consulta que cuenta
+      los no leídos —la que se ejecuta al abrir la bandeja y al pintar el
+      directorio, o sea de las más frecuentes— agrupaba sobre **todos** los
+      mensajes de los canales pedidos y filtraba después. O sea que contar «3 sin
+      leer» costaba leer el historial entero del canal: el coste no dependía de
+      lo que falta por leer, sino de todo lo que se ha hablado ahí desde siempre.
+      Es la única consulta del sistema que **empeora sola con el uso**.
+
+      El índice `(channelId, createdAt)` ya existía. Lo que impedía usarlo como
+      rango era `OR s."lastReadAt" IS NULL`: con un `OR` ahí, Postgres no puede
+      acotar por `createdAt` y solo le queda leerlo todo. Sustituido por
+      `COALESCE(..., '-infinity')` y reescrito con `LATERAL` por canal, el plan
+      pasa a ser un recorrido de índice acotado.
+
+      **Medido** con 300.000 mensajes en 500 canales y una lectura realista
+      —casi todo leído, unos pocos pendientes—, pidiendo 20 canales:
+
+      | | Antes (`GROUP BY`) | Ahora (`LATERAL`) |
+      |---|---|---|
+      | Filas leídas | 11.700 | **18** |
+      | Buffers | 817 | **109** |
+      | Tiempo | 3,96 ms | **0,73 ms** |
+
+      Y la diferencia **crece con el historial**: la de antes es O(mensajes del
+      canal), esta es O(mensajes sin leer).
+
+      ⚠️ **La primera medición dio lo contrario, y el dato era mío.** Sembré el
+      `lastReadAt` a tres días, así que el 85% estaba sin leer y barrerlo todo
+      *era* el plan correcto: el `LATERAL` salía peor (12.067 buffers). Con una
+      lectura realista se invierte. **Un banco de pruebas mal parametrizado no da
+      un resultado ruidoso: da el resultado contrario, con toda la autoridad de
+      un `EXPLAIN ANALYZE`.**
+
+      ⚠️ El experimento entero va dentro de una transacción con `ROLLBACK`, así
+      que la base de desarrollo queda como estaba.
+
+      Verificado con `api/15-chat.spec.ts` (17 ✅), que incluye la prueba de que
+      el contador sube con lo ajeno, no con lo propio, y se pone a cero al marcar
+      leído.
+
+      Queda por mirar el resto de lo que pedía la tarea: el historial del chat y
+      `misConversaciones`. El historial ya usa `(channelId, createdAt)` con
+      cursor, que es la forma correcta; `misConversaciones` hereda la mejora de
+      arriba porque llama a esta misma función.
 - [x] **E6.3 — Tope de conexiones SSE por cuenta.**
       No había ninguno: cien pestañas eran cien conexiones sostenidas contra el
       gateway, cada una con su latido cada 25 s. Denegación de servicio trivial,
