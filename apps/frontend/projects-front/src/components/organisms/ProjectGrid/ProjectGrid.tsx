@@ -1,8 +1,7 @@
-import type { Project, UserProfile } from '@praxis/commons';
+import { ProjectCard, type Project, type UserProfile, projectPath } from '@praxis/commons';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ProjectSearch } from '../ProjectSearch';
-import { ProjectCard } from './ProjectCard';
 
 export interface ProjectGridProps {
   projects: Project[];
@@ -93,6 +92,11 @@ export function ProjectGrid({
               project={project}
               currentUserId={currentUserId}
               equipo={equiposPorProyecto.get(project.id) ?? null}
+              /* Misma zona → la ruta relativa y `next/link`: Next añade
+                 `/projects` solo. Ver §16. */
+              href={projectPath(project)}
+              sameZone
+              gatewayPath="/projects/api/gateway"
             />
           ))}
 

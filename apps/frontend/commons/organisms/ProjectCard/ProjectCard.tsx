@@ -126,100 +126,98 @@ export function ProjectCard({
 
   const cuerpo = (
     <>
-        <div className="flex items-start gap-3">
-          <span
-            aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-sans text-sm font-semibold uppercase transition-colors"
-            style={{
-              /* Suspendido, el monograma se apaga a gris: la tarjeta entera
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-sans text-sm font-semibold uppercase transition-colors"
+          style={{
+            /* Suspendido, el monograma se apaga a gris: la tarjeta entera
                  tiene que leerse como «esto está parado», y un color de marca
                  vivo dice lo contrario. */
-              background: suspendido ? alpha(colors.textSecondary, 14) : alpha(tono, 16),
-              color: suspendido ? colors.textDisabled : tono,
-              boxShadow: `inset 0 0 0 1px ${alpha(suspendido ? colors.textSecondary : tono, 30)}`,
-            }}
-          >
-            {iniciales(project.name)}
+            background: suspendido ? alpha(colors.textSecondary, 14) : alpha(tono, 16),
+            color: suspendido ? colors.textDisabled : tono,
+            boxShadow: `inset 0 0 0 1px ${alpha(suspendido ? colors.textSecondary : tono, 30)}`,
+          }}
+        >
+          {iniciales(project.name)}
+        </span>
+
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 className="truncate font-sans text-base font-semibold text-text-primary">
+            {project.name}
+          </h3>
+          <span className="font-sans text-xs text-text-disabled">
+            {eresElDueno ? 'Tuyo' : 'Te añadieron'}
           </span>
+        </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <h3 className="truncate font-sans text-base font-semibold text-text-primary">
-              {project.name}
-            </h3>
-            <span className="font-sans text-xs text-text-disabled">
-              {eresElDueno ? 'Tuyo' : 'Te añadieron'}
-            </span>
-          </div>
-
-          {/* Suspendido pesa más que «de quién es»: cambia lo que se puede hacer
+        {/* Suspendido pesa más que «de quién es»: cambia lo que se puede hacer
               al entrar, y saberlo antes evita abrir el proyecto para descubrir
               que ningún botón responde. Una sola insignia, para no convertir la
               tarjeta en una fila de etiquetas — y «de quién es» ya lo dice la
               línea de debajo del nombre, que no gasta insignia. */}
-          {suspendido && (
-            <Badge variant="error" className="shrink-0">
-              SUSPENDIDO
-            </Badge>
-          )}
-        </div>
-
-        {project.description ? (
-          <p className="line-clamp-2 font-sans text-sm text-text-secondary">
-            {project.description}
-          </p>
-        ) : (
-          <p className="font-sans text-sm italic text-text-disabled">Sin descripción</p>
+        {suspendido && (
+          <Badge variant="error" className="shrink-0">
+            SUSPENDIDO
+          </Badge>
         )}
+      </div>
 
-        {/**
-         * El motivo de la suspensión, aquí y no solo dentro.
-         *
-         * `suspendedReason` viene en esta misma respuesta —el `omit` del servicio
-         * solo esconde `suspendedBy`— y antes no se usaba: había que abrir el
-         * proyecto para leer por qué no responde nada. Un aviso que se puede dar
-         * antes de entrar es un viaje menos.
-         */}
-        {suspendido && project.suspendedReason && (
-          <p
-            className="line-clamp-2 rounded-lg px-2.5 py-1.5 font-sans text-xs"
-            style={{ background: alpha(colors.error, 8), color: colors.error }}
-          >
-            {project.suspendedReason}
-          </p>
-        )}
+      {project.description ? (
+        <p className="line-clamp-2 font-sans text-sm text-text-secondary">{project.description}</p>
+      ) : (
+        <p className="font-sans text-sm italic text-text-disabled">Sin descripción</p>
+      )}
 
-        <div
-          className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3"
-          style={{ borderColor: alpha(colors.border, 70) }}
+      {/**
+       * El motivo de la suspensión, aquí y no solo dentro.
+       *
+       * `suspendedReason` viene en esta misma respuesta —el `omit` del servicio
+       * solo esconde `suspendedBy`— y antes no se usaba: había que abrir el
+       * proyecto para leer por qué no responde nada. Un aviso que se puede dar
+       * antes de entrar es un viaje menos.
+       */}
+      {suspendido && project.suspendedReason && (
+        <p
+          className="line-clamp-2 rounded-lg px-2.5 py-1.5 font-sans text-xs"
+          style={{ background: alpha(colors.error, 8), color: colors.error }}
         >
-          {equipo && equipo.length > 0 ? (
-            <Equipo
-              equipo={equipo}
-              total={project._count.members}
-              currentUserId={currentUserId}
-              gatewayPath={gatewayPath}
-            />
-          ) : (
-            <Dato
-              valor={project._count.members}
-              singular="miembro"
-              plural="miembros"
-              icono={<IconoMiembros />}
-            />
-          )}
-          <Dato
-            valor={project._count.workspaces}
-            singular="espacio"
-            plural="espacios"
-            icono={<IconoEspacios />}
+          {project.suspendedReason}
+        </p>
+      )}
+
+      <div
+        className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3"
+        style={{ borderColor: alpha(colors.border, 70) }}
+      >
+        {equipo && equipo.length > 0 ? (
+          <Equipo
+            equipo={equipo}
+            total={project._count.members}
+            currentUserId={currentUserId}
+            gatewayPath={gatewayPath}
           />
-          <span
-            className="ml-auto font-sans text-xs text-text-disabled"
-            title={`Creado el ${fechaLarga.format(new Date(project.createdAt))}`}
-          >
-            {dateFormatter.format(new Date(project.createdAt))}
-          </span>
-        </div>
+        ) : (
+          <Dato
+            valor={project._count.members}
+            singular="miembro"
+            plural="miembros"
+            icono={<IconoMiembros />}
+          />
+        )}
+        <Dato
+          valor={project._count.workspaces}
+          singular="espacio"
+          plural="espacios"
+          icono={<IconoEspacios />}
+        />
+        <span
+          className="ml-auto font-sans text-xs text-text-disabled"
+          title={`Creado el ${fechaLarga.format(new Date(project.createdAt))}`}
+        >
+          {dateFormatter.format(new Date(project.createdAt))}
+        </span>
+      </div>
     </>
   );
 

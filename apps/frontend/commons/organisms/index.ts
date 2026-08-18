@@ -12,3 +12,4 @@ export * from './ChatPanel';
 export * from './CreateProjectDialog';
 export * from './LogoutButton';
 export * from './NotFound';
+export * from './ProjectCard';
