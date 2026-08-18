@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBase64,
   IsIn,
   IsOptional,
   IsString,
@@ -79,6 +80,77 @@ export class AssistantTurnDto {
 /** Cuántos turnos anteriores se aceptan. Ver la nota de `AssistantTurnDto`. */
 export const MAX_HISTORIAL = 12;
 
+/**
+ * Lo que se puede adjuntar a una pregunta.
+ *
+ * ## ⚠️ Los cuatro límites, y por qué son estos
+ *
+ * Un archivo entra **entero en el prompt** de cada turno, así que aquí un tope
+ * generoso no cuesta disco: cuesta cuota, latencia y —lo peor— atención del
+ * modelo. Un PDF de trescientas páginas empuja las reglas y el inventario del
+ * proyecto fuera de la ventana, y el resultado no es un error sino un asistente
+ * que de pronto responde peor sin que nadie sepa por qué.
+ *
+ * - **3 por mensaje.** Suficiente para «estas notas y este pantallazo».
+ * - **5 MB cada uno.** Un PDF de texto normal cabe de sobra; un escaneado de
+ *   200 páginas, no, y es justo el que no queremos.
+ * - **Solo lo que el modelo sabe leer.** PDF e imágenes van nativos; texto y
+ *   Markdown se pegan como texto. Un `.docx` o un `.zip` se rechazan aquí en vez
+ *   de llegar al modelo y volver como «no he podido leer el archivo».
+ * - **40 000 caracteres** por archivo de texto, avisando de que se recortó.
+ *
+ * ## Y no se guardan
+ *
+ * Viajan con el turno y se descartan. No hay fila, ni GCS, ni política de
+ * retención — que es exactamente el trabajo que habría que hacer para poder
+ * guardarlos, y la primera versión no lo necesita: el archivo se manda para que
+ * PRAX lo lea **ahora**, y lo que salga de ahí queda en la conversación.
+ */
+export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
+
+/** 5 MB. En base64 ocupa ~4/3 de eso, y por eso el DTO valida el tamaño ya decodificado. */
+export const ASSISTANT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Lo que Gemini sabe leer y nosotros sabemos mandarle. */
+export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'text/plain',
+  'text/markdown',
+] as const;
+
+/** Los que se pegan como texto en vez de ir como datos binarios. */
+export const ASSISTANT_TEXT_MIME: readonly string[] = ['text/plain', 'text/markdown'];
+
+/** Tope por archivo de texto. Se recorta y se avisa dentro del propio prompt. */
+export const ASSISTANT_TEXT_MAX_CHARS = 40_000;
+
+export class AssistantAttachmentDto {
+  @ApiProperty({ description: 'Nombre original, solo para nombrarlo en el prompt' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  name: string;
+
+  @ApiProperty({ enum: ASSISTANT_ATTACHMENT_ALLOWED_MIME })
+  @IsIn(ASSISTANT_ATTACHMENT_ALLOWED_MIME as unknown as string[])
+  mime: string;
+
+  /**
+   * El contenido en base64, **sin** el prefijo `data:`.
+   *
+   * ⚠️ El tamaño se valida sobre los bytes decodificados y no sobre la longitud
+   * de esta cadena: base64 abulta un tercio, así que un tope sobre el texto
+   * rechazaría archivos de 3,8 MB diciendo que pasan de 5.
+   */
+  @ApiProperty({ description: 'Contenido en base64, sin el prefijo data:' })
+  @IsString()
+  @IsBase64()
+  data: string;
+}
+
 export class AssistantChatBodyDto {
   @ApiProperty({ description: 'Lo que escribe el usuario' })
   @IsString()
@@ -112,6 +184,15 @@ export class AssistantChatBodyDto {
   @ValidateNested({ each: true })
   @Type(() => AssistantTurnDto)
   history?: AssistantTurnDto[];
+
+  /** Archivos que acompañan a la pregunta. Ver `AssistantAttachmentDto`. */
+  @ApiPropertyOptional({ type: [AssistantAttachmentDto] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE)
+  @ValidateNested({ each: true })
+  @Type(() => AssistantAttachmentDto)
+  attachments?: AssistantAttachmentDto[];
 }
 
 /** Renombrar una conversación. */

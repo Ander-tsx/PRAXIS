@@ -1153,13 +1153,17 @@ function Marco({
       {/* El porqué, separado de los hechos por un filete: lo de arriba es lo que
           va a pasar y esto es una opinión del asistente sobre por qué. Mezclarlos
           en el mismo bloque los haría leer con la misma autoridad. */}
+      {/* ⚠️ Un `div` y no un `p`: `ModelText` devuelve bloques —párrafos,
+          listas—, y un `<p>` dentro de otro `<p>` es HTML inválido. El
+          navegador lo «arregla» cerrando el de fuera, así que el estilo del
+          borde izquierdo se perdía a partir del primer salto de línea. */}
       {porQue && (
-        <p
-          className="border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
+        <div
+          className="flex flex-col gap-2 border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
           style={{ borderColor: alpha(colors.primary, 35) }}
         >
           <ModelText texto={porQue} />
-        </p>
+        </div>
       )}
 
       {estado === 'hecho' && resultado ? (

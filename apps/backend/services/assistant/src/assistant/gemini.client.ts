@@ -17,10 +17,34 @@ import type { FunctionDeclaration } from './tools';
  * lenta a un tercero fuera del camino por el que pasa todo lo demás.
  */
 
+/** Un trozo de un turno: texto, una llamada a función, o un archivo. */
+type GeminiPart = {
+  text?: string;
+  functionCall?: { name: string; args: Record<string, unknown> };
+  /**
+   * Un archivo incrustado en la propia petición.
+   *
+   * ⚠️ **`inlineData` y no la File API a propósito.** Subir a la File API de
+   * Gemini da un identificador reutilizable y ahorraría reenviar el archivo en
+   * cada turno, pero también crea un objeto **que vive en la infraestructura de
+   * Google** y que habría que borrar, con su política de retención y su forma de
+   * fallar. Aquí los archivos no se guardan en ninguna parte: viajan con el turno
+   * y se olvidan, y `inlineData` es lo que sostiene esa promesa.
+   */
+  inlineData?: { mimeType: string; data: string };
+};
+
 /** Un turno tal y como lo entiende la API. */
 interface GeminiContent {
   role: 'user' | 'model';
-  parts: { text?: string; functionCall?: { name: string; args: Record<string, unknown> } }[];
+  parts: GeminiPart[];
+}
+
+/** Un archivo que acompaña a la pregunta, ya validado por quien llama. */
+export interface GeminiArchivo {
+  mimeType: string;
+  /** base64, sin el prefijo `data:`. */
+  data: string;
 }
 
 export interface GeminiReply {
@@ -86,13 +110,35 @@ export class GeminiClient {
     history: { role: string; text: string }[];
     message: string;
     tools: FunctionDeclaration[];
+    /** Archivos del turno actual. Los anteriores no se reenvían: ver abajo. */
+    archivos?: GeminiArchivo[];
   }): Promise<GeminiReply> {
+    /**
+     * ⚠️ **Los archivos solo van en el turno actual, nunca en el historial.**
+     *
+     * El hilo se lee de la base y allí solo hay texto: los archivos no se
+     * guardan. Así que una pregunta sobre un PDF de hace tres turnos ya no lo
+     * tiene delante, y eso hay que saberlo — el prompt le pide a PRAX que
+     * resuma lo que leyó, que es lo que convierte el contenido del archivo en
+     * algo que sí sobrevive en el hilo.
+     *
+     * La alternativa —reenviar todos los archivos de la conversación en cada
+     * turno— multiplica el coste por la longitud del hilo y acaba comiéndose la
+     * ventana entera.
+     */
+    const partesDelTurno: GeminiPart[] = [
+      { text: params.message },
+      ...(params.archivos ?? []).map((archivo) => ({
+        inlineData: { mimeType: archivo.mimeType, data: archivo.data },
+      })),
+    ];
+
     const contents: GeminiContent[] = [
       ...params.history.map((turno) => ({
         role: turno.role === 'model' ? ('model' as const) : ('user' as const),
         parts: [{ text: turno.text }],
       })),
-      { role: 'user', parts: [{ text: params.message }] },
+      { role: 'user', parts: partesDelTurno },
     ];
 
     const body: Record<string, unknown> = {

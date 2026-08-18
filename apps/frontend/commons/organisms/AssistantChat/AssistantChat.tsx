@@ -838,7 +838,11 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
     <div className={`flex flex-col gap-1 ${mio ? 'items-end' : 'items-start'}`}>
       <div
         className={[
-          'max-w-[85%] min-w-0 whitespace-pre-wrap rounded-2xl px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
+          /* `flex flex-col gap-2` y no `whitespace-pre-wrap`: desde que
+             `ModelText` devuelve bloques —párrafos, listas, código— el salto de
+             línea lo pone el propio bloque. Manteniendo los dos, cada párrafo
+             quedaba separado dos veces. */
+          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-2xl px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
           /* La esquina de dentro, cuadrada: es lo que da el pico hacia quien
              habla sin necesidad de dibujar ninguno. Igual que en Mensajes. */
           mio ? 'rounded-br-md' : 'rounded-bl-md',
