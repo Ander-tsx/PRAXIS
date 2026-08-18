@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · E4 ✅ · E6 ✅ · **solo queda E5** |
-| **Última tarea terminada** | E4 entera — la bandeja vive en el panel |
-| **Siguiente** | E5.2 — primer lote de renombrado (`commons/realtime/`) |
+| **Última tarea terminada** | E5.2 — primer lote de renombrado (`commons/realtime/`) |
+| **Siguiente** | E5.3 — lote 2 (`commons/api/`) |
 | **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
@@ -733,8 +733,49 @@ de ESTADO-ACTUAL §17.7.
         no `countUnreadOfSeveral` — que sería traducir palabra por palabra y
         seguiría sin decir de qué cuenta.
 
-- [ ] **E5.2 — Lote 1: `commons/realtime/`.** Es el módulo más nuevo, el más
-      pequeño y el que menos gente ha tocado. Sirve de ensayo del método.
+- [x] **E5.2 — Lote 1: `commons/realtime/`.** El módulo más nuevo, el más
+      pequeño y el que menos gente ha tocado: el ensayo del método.
+
+      **20 identificadores exportados** renombrados, ~100 usos en 14 archivos, y
+      los 4 nombres de fichero (`tipos.ts → types.ts`, `presencia.tsx →
+      presence.tsx`, `FuenteEnVivo.tsx → LiveSource.tsx`,
+      `useContadorDeMensajes.ts → useMessageCount.ts`), con `git mv` para no
+      perder el historial.
+
+      | Antes | Ahora |
+      |---|---|
+      | `FuenteEnVivo` | `LiveSource` |
+      | `PresenciasEnVivo` | `LivePresences` |
+      | `useEventoEnVivo` | `useLiveEvent` |
+      | `useContadorDeMensajes` | `useMessageCount` |
+      | `useReconexion` | `useReconnection` |
+      | `usePresencia` | `usePresence` |
+      | `EventoEnVivo` | `LiveEvent` |
+      | `EventoMensaje` | **`ChatMessageEvent`** |
+      | `TipoDeEvento` | `EventType` |
+      | `esEventoConocido` | `isKnownEvent` |
+
+      🔴 **`EventoMensaje` no puede ser `MessageEvent`, que era la traducción
+      obvia.** `MessageEvent` es un tipo **global del DOM** y lo usa `EventSource`
+      en estos mismos archivos: declararlo lo sombrearía, y el resultado sería un
+      error de tipos en el manejador del flujo —o peor, ninguno, y un tipo que no
+      es el que se cree—. De ahí `ChatMessageEvent`.
+
+      ⚠️ **Dos cosas que un `sed` no resuelve y hay que comprobar aparte**, las
+      dos verificadas aquí:
+      1. **Las rutas de import de los ficheros renombrados.** No las toca el
+         renombrado de identificadores y rompen la compilación, así que al menos
+         avisan.
+      2. **Los nombres citados dentro de los comentarios.** Esos **no** avisan:
+         un comentario que menciona `usePresencia` sigue compilando y queda
+         mintiendo. Se barrió a cero.
+
+      ⚠️ **Acotado a `apps/frontend` a propósito**: `EventoEnVivo` existe también
+      en el gateway y en projects-service, y son declaraciones distintas. Van en
+      E5.5 y E5.6.
+
+      ✅ Las siete zonas compilan, `ui/06-chat-zona` en verde (4), y los
+      comentarios siguen en español — comprobado.
 - [ ] **E5.3 — Lote 2: `commons/api/`.**
 - [ ] **E5.4 — Lote 3: `commons/organisms/ChatPanel/`.** El más grande.
 - [ ] **E5.5 — Lote 4: `apps/backend/services/projects/src/{chat,realtime}/`.**

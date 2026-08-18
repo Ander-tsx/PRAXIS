@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, createContext, useContext, useMemo, useState } from 'react';
-import { useEventoEnVivo } from './FuenteEnVivo';
+import { useLiveEvent } from './LiveSource';
 
 /**
  * Las presencias que han cambiado desde que se cargó la página.
@@ -36,10 +36,10 @@ const Contexto = createContext<Map<string, string>>(new Map());
  * suscribirse por su cuenta: cincuenta suscripciones para el mismo dato. Aquí se
  * escucha una vez y se reparte por contexto.
  */
-export function PresenciasEnVivo({ children }: { children: ReactNode }) {
+export function LivePresences({ children }: { children: ReactNode }) {
   const [cambios, setCambios] = useState<Map<string, string>>(new Map());
 
-  useEventoEnVivo('presencia', (evento) => {
+  useLiveEvent('presencia', (evento) => {
     setCambios((previas) => {
       /* Si ya decía eso, no se crea un `Map` nuevo: un `Map` distinto en el
          contexto vuelve a renderizar a todos sus consumidores, y una ráfaga de
@@ -65,7 +65,7 @@ export function PresenciasEnVivo({ children }: { children: ReactNode }) {
  * Fuera del proveedor devuelve lo guardado, sin romper nada: hay pantallas que
  * pintan avatares fuera del armazón privado.
  */
-export function usePresencia(
+export function usePresence(
   userId: string | null | undefined,
   guardada: string | null | undefined,
 ): string | null {

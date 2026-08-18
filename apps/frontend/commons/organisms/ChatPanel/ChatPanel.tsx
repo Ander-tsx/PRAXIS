@@ -21,7 +21,7 @@ import type { LinkPreview } from '../../api/link-preview';
 import { hrefDeAvatar } from '../../api/presence';
 import { useRefrescoAgrupado } from '../../hooks';
 import { Avatar } from '../../atoms/Avatar';
-import { useEventoEnVivo, useReconexion } from '../../realtime';
+import { useLiveEvent, useReconnection } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
 import { Composer, type Sugerencia } from './Composer';
@@ -253,7 +253,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [nuevos, setNuevos] = useState<ChatMessage[]>([]);
 
   /* Para el único caso en que el panel no puede reconstruirse solo: un hueco de
-     reconexión que no cupo. Ver `useReconexion` más abajo. */
+     reconexión que no cupo. Ver `useReconnection` más abajo. */
   const refrescar = useRefrescoAgrupado();
   const [hasMore, setHasMore] = useState(page.hasMore);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
@@ -727,7 +727,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    */
 
   /** Un mensaje: al historial, o al panel del hilo si nació dentro de uno. */
-  useEventoEnVivo('chat.mensaje', (evento) => {
+  useLiveEvent('chat.mensaje', (evento) => {
     if (evento.channelId !== page.channelId) return;
 
     const mensaje = evento.mensaje;
@@ -779,7 +779,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   });
 
   /** Una edición: se aplica encima, como si la hubieras hecho tú. */
-  useEventoEnVivo('chat.editado', (evento) => {
+  useLiveEvent('chat.editado', (evento) => {
     if (evento.channelId !== page.channelId) return;
     setEditadosLocales((previos) =>
       new Map(previos).set(evento.messageId, { body: evento.body, editedAt: evento.editedAt }),
@@ -787,7 +787,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   });
 
   /** Un borrado: lápida en su sitio, y fuera de la barra de fijados. */
-  useEventoEnVivo('chat.borrado', (evento) => {
+  useLiveEvent('chat.borrado', (evento) => {
     if (evento.channelId !== page.channelId) return;
     setBorradosLocales((previos) => new Map(previos).set(evento.messageId, evento.at));
     setFijadosLista((previos) => previos.filter((mensaje) => mensaje.id !== evento.messageId));
@@ -802,7 +802,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * quitado muy rápido, dejándola al revés. Las de los demás van a su propio
    * mapa, que se aplica encima de lo que trajo el servidor.
    */
-  useEventoEnVivo('chat.reaccion', (evento) => {
+  useLiveEvent('chat.reaccion', (evento) => {
     if (evento.channelId !== page.channelId || evento.mio) return;
     setReaccionesAjenas((previas) => {
       const copia = new Map(previas);
@@ -813,7 +813,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   });
 
   /** Un fijado o desfijado de otra persona: se refresca la barra. */
-  useEventoEnVivo('chat.fijado', (evento) => {
+  useLiveEvent('chat.fijado', (evento) => {
     if (evento.channelId !== page.channelId || evento.mio) return;
     setFijadosLocales((previos) =>
       new Map(previos).set(evento.messageId, {
@@ -829,7 +829,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   });
 
   /** Alguien ha leído: mueve los checks de «visto» sin volver a pedir los acuses. */
-  useEventoEnVivo('chat.leido', (evento) => {
+  useLiveEvent('chat.leido', (evento) => {
     if (evento.channelId !== page.channelId || evento.mio) return;
     setAcuses((previos) => {
       const sinEl = previos.filter((acuse) => acuse.userId !== evento.actorId);
@@ -848,7 +848,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * Si no hay ni un mensaje todavía no hay cursor desde el que pedir, y tampoco
    * hay nada que reconstruir: el siguiente mensaje llegará por el flujo.
    */
-  useReconexion(() => {
+  useReconnection(() => {
     if (!ultimoId) return;
 
     createApiClient({ gatewayPath })

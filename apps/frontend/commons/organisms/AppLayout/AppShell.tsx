@@ -4,8 +4,8 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
-import { FuenteEnVivo, PresenciasEnVivo } from '../../realtime';
-import { useContadorDeMensajes } from '../../realtime/useContadorDeMensajes';
+import { LiveSource, LivePresences } from '../../realtime';
+import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
 import { NavList } from './NavList';
 import type { AppNavItem } from './navigation';
@@ -170,14 +170,14 @@ const HREF_DE_MENSAJES = '/chat';
  * ⚠️ **La separación en dos componentes no es estética: sin ella, los hooks del
  * propio armazón no ven el contexto.**
  *
- * `FuenteEnVivo` y `PresenciasEnVivo` son proveedores, y un componente que
+ * `LiveSource` y `LivePresences` son proveedores, y un componente que
  * *renderiza* un proveedor está **por encima** de él en el árbol: su
  * `useContext` devuelve el valor por defecto, no el del proveedor. Con todo
- * junto en una sola función, `useContadorDeMensajes` —que vive aquí, para la
+ * junto en una sola función, `useMessageCount` —que vive aquí, para la
  * insignia de la barra lateral— se suscribía a una fuente que desde su punto de
  * vista **no existía**.
  *
- * Y no daba ningún error, porque `useEventoEnVivo` está escrito para no lanzar
+ * Y no daba ningún error, porque `useLiveEvent` está escrito para no lanzar
  * cuando no encuentra la fuente: quedarse sin tiempo real es una degradación
  * aceptable en una pantalla suelta. Esa tolerancia, pensada para otro caso,
  * convirtió esto en un fallo mudo — la insignia sencillamente no se movía.
@@ -187,13 +187,13 @@ const HREF_DE_MENSAJES = '/chat';
  */
 export function AppShell(props: AppShellProps) {
   return (
-    <FuenteEnVivo gatewayPath={`${props.zonePath}/api/gateway`}>
+    <LiveSource gatewayPath={`${props.zonePath}/api/gateway`}>
       {/* Por encima de todo lo que pinte un avatar: el punto de estado de
           cualquier persona se corrige solo desde aquí. */}
-      <PresenciasEnVivo>
+      <LivePresences>
         <ArmazonInterno {...props} />
-      </PresenciasEnVivo>
-    </FuenteEnVivo>
+      </LivePresences>
+    </LiveSource>
   );
 }
 
@@ -249,13 +249,13 @@ function ArmazonInterno({
    * recargar: lo que lo actualizaba era el `router.refresh()` por evento de
    * chat, que se quitó al desatascar la cola del App Router. Se quedó sin
    * fuente — sonaba el aviso y el número no se movía. Ahora escucha el flujo
-   * como el resto; ver `useContadorDeMensajes`.
+   * como el resto; ver `useMessageCount`.
    *
    * Se sustituye **solo esa entrada**: las demás insignias las sigue
    * calculando el servidor porque cambian con cosas que no viajan por el flujo
    * de chat.
    */
-  const mensajesSinLeer = useContadorDeMensajes(
+  const mensajesSinLeer = useMessageCount(
     navItems.find((item) => item.href === HREF_DE_MENSAJES)?.badge ?? 0,
     `${zonePath}/api/gateway`,
   );

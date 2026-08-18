@@ -6,7 +6,7 @@
  * colocarlo a mano.
  *
  * ⚠️ **Ya no recibe props.** Llevaba `gatewayPath` porque abría su propia
- * conexión SSE; ahora la conexión la abre `FuenteEnVivo` —una por pestaña, en el
+ * conexión SSE; ahora la conexión la abre `LiveSource` —una por pestaña, en el
  * armazón— y esto es solo un consumidor.
  */
 export { AvisosEnVivo } from './AvisosEnVivo';

@@ -9,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { type EventoDe, type EventoEnVivo, type TipoDeEvento, esEventoConocido } from './tipos';
+import { type EventOf, type LiveEvent, type EventType, isKnownEvent } from './types';
 
 /**
  * Cada cuánto manda el servidor un latido. Espejo de `LATIDO_MS` en
@@ -27,7 +27,7 @@ const LATIDO_MS = 25_000;
  */
 const SIN_SENAL_MS = 2 * LATIDO_MS + 10_000;
 
-type Manejador<T extends TipoDeEvento> = (evento: EventoDe<T>) => void;
+type Manejador<T extends EventType> = (evento: EventOf<T>) => void;
 
 interface Fuente {
   /**
@@ -37,7 +37,7 @@ interface Fuente {
    * suscribirse no vuelve a renderizar a nadie y un evento que llega no repinta
    * más que lo que su manejador decida cambiar.
    */
-  suscribir<T extends TipoDeEvento>(tipo: T, manejador: Manejador<T>): () => void;
+  suscribir<T extends EventType>(tipo: T, manejador: Manejador<T>): () => void;
   /**
    * Escucha las **reconexiones**, para volver a sincronizar.
    *
@@ -52,7 +52,7 @@ interface Fuente {
 
 const Contexto = createContext<Fuente | null>(null);
 
-export interface FuenteEnVivoProps {
+export interface LiveSourceProps {
   /**
    * Proxy de la zona, sin barra final: `/dashboard/api/gateway`.
    *
@@ -98,13 +98,13 @@ export interface FuenteEnVivoProps {
  * congela— la conexión sigue «abierta» para el navegador y no llega nada. Sin
  * esto, un chat podía quedarse callado indefinidamente sin un solo error.
  */
-export function FuenteEnVivo({ gatewayPath, children }: FuenteEnVivoProps) {
-  const manejadores = useRef(new Map<TipoDeEvento, Set<(evento: EventoEnVivo) => void>>());
+export function LiveSource({ gatewayPath, children }: LiveSourceProps) {
+  const manejadores = useRef(new Map<EventType, Set<(evento: LiveEvent) => void>>());
   const reconexiones = useRef(new Set<() => void>());
 
-  const suscribir = useCallback(<T extends TipoDeEvento>(tipo: T, manejador: Manejador<T>) => {
+  const suscribir = useCallback(<T extends EventType>(tipo: T, manejador: Manejador<T>) => {
     const oyentes = manejadores.current.get(tipo) ?? new Set();
-    const envoltorio = manejador as (evento: EventoEnVivo) => void;
+    const envoltorio = manejador as (evento: LiveEvent) => void;
     oyentes.add(envoltorio);
     manejadores.current.set(tipo, oyentes);
 
@@ -148,7 +148,7 @@ export function FuenteEnVivo({ gatewayPath, children }: FuenteEnVivoProps) {
       /* Se valida en el borde. Lo que entra es JSON de la red, y un evento de un
          servidor más nuevo que este navegador —un despliegue a medias— se
          descarta aquí en vez de llegar a un manejador que no lo espera. */
-      if (!esEventoConocido(datos)) return;
+      if (!isKnownEvent(datos)) return;
 
       const oyentes = manejadores.current.get(datos.tipo);
       if (!oyentes) return;
@@ -228,18 +228,18 @@ export function FuenteEnVivo({ gatewayPath, children }: FuenteEnVivoProps) {
  * error clásico de este patrón y el que deja huecos por los que se pierden
  * eventos.
  *
- * Fuera de un `FuenteEnVivo` no hace nada, en vez de lanzar: hay pantallas que
+ * Fuera de un `LiveSource` no hace nada, en vez de lanzar: hay pantallas que
  * montan componentes de chat fuera del armazón privado, y quedarse sin tiempo
  * real es una degradación, no un fallo.
  */
-export function useEventoEnVivo<T extends TipoDeEvento>(tipo: T, manejador: Manejador<T>): void {
+export function useLiveEvent<T extends EventType>(tipo: T, manejador: Manejador<T>): void {
   const fuente = useContext(Contexto);
   const ultimo = useRef(manejador);
   ultimo.current = manejador;
 
   useEffect(() => {
     if (!fuente) return;
-    return fuente.suscribir(tipo, ((evento: EventoDe<T>) =>
+    return fuente.suscribir(tipo, ((evento: EventOf<T>) =>
       ultimo.current(evento)) as Manejador<T>);
   }, [fuente, tipo]);
 }
@@ -248,9 +248,9 @@ export function useEventoEnVivo<T extends TipoDeEvento>(tipo: T, manejador: Mane
  * Ejecuta algo cuando el flujo se recupera de un corte.
  *
  * Es donde va la resincronización: pedir lo que se perdió mientras no había
- * conexión. Mismo trato del `ref` que `useEventoEnVivo`, y por lo mismo.
+ * conexión. Mismo trato del `ref` que `useLiveEvent`, y por lo mismo.
  */
-export function useReconexion(manejador: () => void): void {
+export function useReconnection(manejador: () => void): void {
   const fuente = useContext(Contexto);
   const ultimo = useRef(manejador);
   ultimo.current = manejador;

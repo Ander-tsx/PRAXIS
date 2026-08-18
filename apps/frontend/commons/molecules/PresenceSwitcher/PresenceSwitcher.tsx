@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PRESENCES, type Presence, presenciaDe } from '../../api/presence';
-import { useEventoEnVivo } from '../../realtime';
+import { useLiveEvent } from '../../realtime';
 import { colors } from '../../tokens';
 
 export interface PresenceSwitcherProps {
@@ -63,9 +63,9 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
    * escucharlo.
    *
    * `mio` lo resuelve el servidor porque este componente **no conoce tu id**:
-   * recibe el valor de tu presencia, no quién eres. Ver `EventoPresencia`.
+   * recibe el valor de tu presencia, no quién eres. Ver `PresenceEvent`.
    */
-  useEventoEnVivo('presencia', (evento) => {
+  useLiveEvent('presencia', (evento) => {
     if (!evento.mio) return;
     setPresencia(evento.presencia);
   });

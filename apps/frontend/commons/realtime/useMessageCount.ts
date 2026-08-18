@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createApiClient } from '../api/client';
-import { useEventoEnVivo, useReconexion } from './FuenteEnVivo';
+import { useLiveEvent, useReconnection } from './LiveSource';
 
 /**
  * Cuánto se espera antes de reconciliar el contador a la baja.
@@ -43,7 +43,7 @@ const ESPERA_DE_RECONCILIACION_MS = 2500;
  * que se le pregunta al servidor —una petición pequeña, agrupada, y solo cuando
  * hay algo que bajar—.
  */
-export function useContadorDeMensajes(inicial: number, gatewayPath: string): number {
+export function useMessageCount(inicial: number, gatewayPath: string): number {
   const [total, setTotal] = useState(inicial);
 
   /* Lo que sirvió el servidor manda cuando cambia: pasa al navegar, y ahí es
@@ -84,7 +84,7 @@ export function useContadorDeMensajes(inicial: number, gatewayPath: string): num
     [],
   );
 
-  useEventoEnVivo('chat.mensaje', (evento) => {
+  useLiveEvent('chat.mensaje', (evento) => {
     /* Lo tuyo no cuenta como no leído: acabas de escribirlo. Lo de equipo **sí**
        cuenta — la entrada se llama «Mensajes» y lleva a una pantalla con las dos
        pestañas, así que dejarlos fuera hacía que un mensaje de proyecto sonara,
@@ -94,7 +94,7 @@ export function useContadorDeMensajes(inicial: number, gatewayPath: string): num
     setTotal((previo) => previo + 1);
   });
 
-  useEventoEnVivo('chat.leido', (evento) => {
+  useLiveEvent('chat.leido', (evento) => {
     if (!evento.mio) return;
     /* Si ya está a cero no hay nada que bajar: se ahorra la petición, que es lo
        que mantiene acotado el goteo en una conversación activa. */
@@ -105,7 +105,7 @@ export function useContadorDeMensajes(inicial: number, gatewayPath: string): num
   });
 
   /* Tras un corte, lo acumulado aquí puede haberse quedado atrás. */
-  useReconexion(reconciliar);
+  useReconnection(reconciliar);
 
   return total;
 }

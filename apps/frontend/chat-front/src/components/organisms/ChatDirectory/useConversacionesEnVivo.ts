@@ -1,7 +1,7 @@
 'use client';
 
 import type { DirectConversation } from '@praxis/commons';
-import { useEventoEnVivo, useReconexion } from '@praxis/commons';
+import { useLiveEvent, useReconnection } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons';
 import { useCallback, useEffect, useState } from 'react';
 import type { ChatDeProyecto } from './ChatDirectory';
@@ -87,7 +87,7 @@ export function useConversacionesEnVivo(
     });
   }, []);
 
-  useEventoEnVivo('chat.mensaje', (evento) => {
+  useLiveEvent('chat.mensaje', (evento) => {
     /* Lo tuyo no cuenta como no leído: acabas de escribirlo. */
     const suma = evento.mio ? 0 : 1;
 
@@ -121,7 +121,7 @@ export function useConversacionesEnVivo(
     if (!encontrado) volverAPedir();
   });
 
-  useEventoEnVivo('chat.leido', (evento) => {
+  useLiveEvent('chat.leido', (evento) => {
     /* Solo la tuya apaga tu contador. Que otro haya leído mueve sus checks de
        «visto», que es cosa del panel, no de esta lista. */
     if (!evento.mio) return;
@@ -138,7 +138,7 @@ export function useConversacionesEnVivo(
 
   /* Tras un corte, los contadores acumulados aquí pueden haberse quedado atrás:
      se vuelven a pedir enteros en vez de intentar adivinar el hueco. */
-  useReconexion(volverAPedir);
+  useReconnection(volverAPedir);
 
   return listas;
 }

@@ -11,7 +11,7 @@ import {
   hrefDeAvatar,
   nombreDePersona,
   textoPlano,
-  usePresencia,
+  usePresence,
 } from '@praxis/commons';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -361,7 +361,7 @@ function FilaPersona({
   detalle: string | null;
   cuando: string | null;
 }) {
-  const presencia = usePresencia(peerId, perfil?.presence);
+  const presencia = usePresence(peerId, perfil?.presence);
 
   return (
     <li>
@@ -380,7 +380,7 @@ function FilaPersona({
           label={nombre}
           size="sm"
           src={hrefDeAvatar(perfil?.avatarUrl, '/chat/api/gateway')}
-          /* La del perfil es la del último render; `usePresencia` la pisa si ha
+          /* La del perfil es la del último render; `usePresence` la pisa si ha
              cambiado desde entonces. Ver `commons/realtime/presencia.tsx`. */
           presence={presencia}
         />

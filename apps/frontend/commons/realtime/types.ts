@@ -57,7 +57,7 @@ interface BaseDeChat {
 }
 
 /** A dónde lleva la tarjeta emergente de un chat. */
-export interface ContextoDeCanal {
+export interface ChannelContext {
   channelKind: 'PROJECT' | 'DIRECT';
   projectId: string | null;
   projectName: string | null;
@@ -71,46 +71,46 @@ export interface ContextoDeCanal {
   peerId: string | null;
 }
 
-export interface EventoMensaje extends BaseDeChat, ContextoDeCanal {
+export interface ChatMessageEvent extends BaseDeChat, ChannelContext {
   tipo: 'chat.mensaje';
   mensaje: ChatMessage;
   /** Si tienes silenciada esta conversación: llega el dato, pero sin ruido. */
   silenciado: boolean;
 }
 
-export interface EventoEditado extends BaseDeChat {
+export interface EditedEvent extends BaseDeChat {
   tipo: 'chat.editado';
   messageId: string;
   body: string;
   editedAt: string;
 }
 
-export interface EventoBorrado extends BaseDeChat {
+export interface DeletedEvent extends BaseDeChat {
   tipo: 'chat.borrado';
   messageId: string;
 }
 
-export interface EventoReaccion extends BaseDeChat {
+export interface ReactionEvent extends BaseDeChat {
   tipo: 'chat.reaccion';
   messageId: string;
   emoji: string;
   on: boolean;
 }
 
-export interface EventoFijado extends BaseDeChat {
+export interface PinnedEvent extends BaseDeChat {
   tipo: 'chat.fijado';
   messageId: string;
   pinned: boolean;
   pinnedById: string | null;
 }
 
-export interface EventoLeido extends BaseDeChat {
+export interface ReadEvent extends BaseDeChat {
   tipo: 'chat.leido';
   hasta: string;
 }
 
 /** Un aviso de la bandeja. El único que deja fila en `notifications`. */
-export interface EventoAviso {
+export interface NoticeEvent {
   tipo: 'aviso';
   /** El `NotificationType` de la tabla. Aquí es texto: puede estrenar valores. */
   type: string;
@@ -136,7 +136,7 @@ export interface EventoAviso {
  * abierta llega `AWAY` por mucho que la persona tenga «Ocupado» guardado. El
  * navegador no calcula nada.
  */
-export interface EventoPresencia {
+export interface PresenceEvent {
   tipo: 'presencia';
   userId: string;
   presencia: string;
@@ -151,31 +151,31 @@ export interface EventoPresencia {
   mio: boolean;
 }
 
-export type EventoEnVivo =
-  | EventoMensaje
-  | EventoEditado
-  | EventoBorrado
-  | EventoReaccion
-  | EventoFijado
-  | EventoLeido
-  | EventoPresencia
-  | EventoAviso;
+export type LiveEvent =
+  | ChatMessageEvent
+  | EditedEvent
+  | DeletedEvent
+  | ReactionEvent
+  | PinnedEvent
+  | ReadEvent
+  | PresenceEvent
+  | NoticeEvent;
 
 /** Los `tipo` que existen, para el índice de suscriptores del despachador. */
-export type TipoDeEvento = EventoEnVivo['tipo'];
+export type EventType = LiveEvent['tipo'];
 
 /** El evento concreto que corresponde a un `tipo`. */
-export type EventoDe<T extends TipoDeEvento> = Extract<EventoEnVivo, { tipo: T }>;
+export type EventOf<T extends EventType> = Extract<LiveEvent, { tipo: T }>;
 
 /**
  * ¿Esto que ha llegado por el flujo es un evento que sabemos tratar?
  *
  * Se comprueba en el borde y no se confía en el tipo: lo que entra es JSON de la
- * red, y un `as EventoEnVivo` a secas es una promesa que TypeScript no puede
+ * red, y un `as LiveEvent` a secas es una promesa que TypeScript no puede
  * cumplir. Un evento de un servidor más nuevo que este navegador —un despliegue
  * a medias— se descarta aquí en vez de reventar el despachador.
  */
-export function esEventoConocido(valor: unknown): valor is EventoEnVivo {
+export function isKnownEvent(valor: unknown): valor is LiveEvent {
   if (typeof valor !== 'object' || valor === null) return false;
   const tipo = (valor as { tipo?: unknown }).tipo;
   return (

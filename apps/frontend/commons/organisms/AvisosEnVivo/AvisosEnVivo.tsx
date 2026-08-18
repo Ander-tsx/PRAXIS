@@ -4,8 +4,8 @@ import { useCallback, useRef } from 'react';
 import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
 import { useRefrescoAgrupado, useTemaActual } from '../../hooks';
-import { useEventoEnVivo, useReconexion } from '../../realtime';
-import type { EventoAviso, EventoMensaje } from '../../realtime';
+import { useLiveEvent, useReconnection } from '../../realtime';
+import type { NoticeEvent, ChatMessageEvent } from '../../realtime';
 import {
   PRESENTACION_DE_MENSAJE,
   type Presentacion,
@@ -21,7 +21,7 @@ import {
  * Abría la conexión SSE y llamaba a `router.refresh()` con cada evento. Las dos
  * cosas se han ido, y las dos por el mismo motivo.
  *
- * La conexión ahora la abre [`FuenteEnVivo`] —una sola por pestaña, en el
+ * La conexión ahora la abre [`LiveSource`] —una sola por pestaña, en el
  * armazón— porque el chat, la lista de conversaciones y los hilos quieren
  * enterarse de lo mismo, y cuatro `EventSource` por pestaña era pagar cuatro
  * veces por los mismos bytes.
@@ -144,7 +144,7 @@ export function AvisosEnVivo() {
    * conversación por su cuenta, escuchando este mismo evento. Aquí solo se
    * decide si además hay que llamar la atención.
    */
-  useEventoEnVivo('chat.mensaje', (evento) => {
+  useLiveEvent('chat.mensaje', (evento) => {
     /* Lo tuyo no se te anuncia: lo acabas de escribir. El evento te llega igual
        —lo necesitan tus otras pestañas y el panel para reconciliar— pero sin
        ruido. `mio` lo resuelve el servidor, que sabe a quién manda cada copia. */
@@ -175,7 +175,7 @@ export function AvisosEnVivo() {
   });
 
   /** Los avisos de la bandeja: invitaciones, asignaciones, altas y bajas. */
-  useEventoEnVivo('aviso', (evento) => {
+  useLiveEvent('aviso', (evento) => {
     /* Estos sí cambian lo que renderiza el servidor —la bandeja, el tablero— y
        esas pantallas no escuchan nada. */
     pedirRefresco();
@@ -193,7 +193,7 @@ export function AvisosEnVivo() {
    * una petición pequeña y exacta— pero la bandeja y el tablero se pintan en el
    * servidor y hay que volver a pedir la ruta.
    */
-  useReconexion(pedirRefresco);
+  useReconnection(pedirRefresco);
 
   /**
    * ⚠️ **El `theme` va explícito, y no se puede omitir.**
@@ -227,7 +227,7 @@ export function AvisosEnVivo() {
  * Y el proyecto solo se nombra cuando distingue algo: en un mensaje privado no
  * hay proyecto, y decir «un proyecto» ahí sería inventarse un contexto.
  */
-function textoDeMensaje(evento: EventoMensaje): string {
+function textoDeMensaje(evento: ChatMessageEvent): string {
   const quien = evento.actorName?.trim() || null;
   const proyecto = evento.projectName ?? null;
 
@@ -251,7 +251,7 @@ function textoDeMensaje(evento: EventoMensaje): string {
  * `/projects/:id/chat/messages`, y todo lo anidado bajo `/projects/:id` espera
  * el UUID (CLAUDE.md, trampa 10).
  */
-function destinoDeMensaje(evento: EventoMensaje): string | null {
+function destinoDeMensaje(evento: ChatMessageEvent): string | null {
   if (evento.channelKind === 'DIRECT') {
     return evento.peerId ? `/chat/${evento.peerId}` : null;
   }
@@ -267,7 +267,7 @@ function destinoDeMensaje(evento: EventoMensaje): string | null {
  * una cuenta borrada—, que es la forma que tenía antes: se pierde un dato, no el
  * aviso.
  */
-function describir(evento: EventoAviso): string {
+function describir(evento: NoticeEvent): string {
   const proyecto = evento.projectName ?? null;
   const tarea = evento.taskTitle ?? 'una tarea';
   const quien = evento.actorName?.trim() || null;
@@ -318,7 +318,7 @@ function describir(evento: EventoAviso): string {
  * Sin `projectSlug` se cae al `projectId`, que el guard también resuelve: es
  * mejor una URL fea que una tarjeta que no lleva a ningún sitio.
  */
-function destinoDeAviso(evento: EventoAviso): string | null {
+function destinoDeAviso(evento: NoticeEvent): string | null {
   const identificador = evento.projectSlug || evento.projectId;
   if (!identificador) return null;
 

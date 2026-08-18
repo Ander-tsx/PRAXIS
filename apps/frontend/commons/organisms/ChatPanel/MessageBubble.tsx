@@ -14,7 +14,7 @@ import {
 import type { LinkPreview } from '../../api/link-preview';
 import { hrefDeAvatar } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
-import { usePresencia } from '../../realtime';
+import { usePresence } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
 import { Composer, type Sugerencia } from './Composer';
@@ -253,7 +253,7 @@ export function MessageBubble({
    */
   const nombre = author ? personLabel(author) : nombreDeAutor(message.authorId);
   /* Lo del perfil es del último render de la página; el flujo en vivo lo pisa. */
-  const presencia = usePresencia(message.authorId, author?.presence);
+  const presencia = usePresence(message.authorId, author?.presence);
 
   /**
    * Gestos táctiles: deslizar responde, mantener pulsado abre la hoja de
@@ -620,7 +620,7 @@ export function MessageBubble({
           src={hrefDeAvatar(author?.avatarUrl, gatewayPath)}
           /* El punto de estado también en el chat: saber que alguien está en
              una reunión explica por qué no contesta, y ese es justo el momento
-             en que se mira. Va por `usePresencia` para que cambie solo sin
+             en que se mira. Va por `usePresence` para que cambie solo sin
              recargar la conversación. */
           presence={presencia}
         />

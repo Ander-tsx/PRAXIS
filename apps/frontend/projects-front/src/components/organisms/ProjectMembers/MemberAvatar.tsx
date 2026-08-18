@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, usePresencia } from '@praxis/commons';
+import { Avatar, usePresence } from '@praxis/commons';
 
 export interface MemberAvatarProps {
   userId: string;
@@ -40,7 +40,7 @@ export function MemberAvatar({ userId, label, mine, src, presence }: MemberAvata
       mine={mine}
       size="md"
       src={src}
-      presence={usePresencia(userId, presence)}
+      presence={usePresence(userId, presence)}
     />
   );
 }
