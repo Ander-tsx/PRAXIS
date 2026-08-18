@@ -8,9 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · **E6 casi cerrada** (falta E6.5 y E6.6) |
-| **Última tarea terminada** | E6.1 y E6.4 — los dos N+1 que quedaban |
-| **Siguiente** | E6.5 y E6.6 para cerrar E6 · luego E4 · luego E5 |
+| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · **E6 ✅ cerrada** |
+| **Última tarea terminada** | E6.5 y E6.6 — bundles y dependencias |
+| **Siguiente** | E4 (la bandeja al panel) · luego E5 (el código a inglés) |
 | **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
@@ -626,12 +626,54 @@ de ESTADO-ACTUAL §17.7.
 - [x] **E5.0 — Alcance decidido.** Identificadores a inglés; comentarios,
       documentos y commits en español. Ver la tabla de arriba.
 
-- [ ] **E5.1 — Glosario.** Un mapa cerrado antes de tocar nada, para que no
-      salgan tres traducciones del mismo término:
-      `aviso → notice` · `mensaje → message` · `hilo → thread` ·
-      `fijado → pinned` · `adjunto → attachment` · `presencia → presence` ·
-      `directorio → directory` · `evento → event` · `canal → channel` ·
-      `borrado → deleted` · `leído → read` · `silenciado → muted`
+- [x] **E5.1 — Glosario.** Cerrado **antes** de tocar nada, que es el punto: sin
+      él salen tres traducciones del mismo término y el renombrado deja el código
+      peor que como estaba.
+
+      **Medido, no a ojo:** de **1.241 identificadores exportados** en `apps/`,
+      **81 tienen raíz española**. No están repartidos — se concentran en lo más
+      nuevo. Las raíces, por frecuencia real:
+
+      | Raíz | Veces | Traducción |
+      |---|---|---|
+      | `plantilla` | 17 | `template` |
+      | `evento` | 11 | `event` |
+      | `propuesta` | 9 | `proposal` |
+      | `conversacion` | 6 | `conversation` |
+      | `presencia` | 5 | `presence` |
+      | `accion` | 4 | `action` |
+      | `nombre` | 3 | `name` |
+      | `etiqueta` | 3 | `label` |
+      | `tema` | 2 | `theme` |
+      | `resolver` | 2 | `resolve` |
+      | `directorio` | 2 | `directory` |
+      | `borrado` | 2 | `deleted` |
+      | `aviso` | 2 | `notice` |
+
+      Y el resto del vocabulario del dominio, para que no se decida sobre la
+      marcha:
+
+      `mensaje → message` · `hilo → thread` · `fijado → pinned` ·
+      `adjunto → attachment` · `canal → channel` · `leído → read` ·
+      `silenciado → muted` · `oculto → hidden` · `sin leer → unread` ·
+      `cuota → quota` · `columna → column` · `miembro → member` ·
+      `refresco → refresh` · `contar → count` · `repartir → dispatch` ·
+      `anunciar → announce` · `marcar → mark` · `elegida → chosen`
+
+      ⚠️ **`aviso` es la trampa del glosario.** Traducirlo por `notification`
+      parece lo natural y es un error: `Notification` **ya existe** como modelo de
+      Prisma y como tipo del contrato, y son cosas distintas — un `aviso` es la
+      tarjeta emergente y la fila de la bandeja, mientras que por el flujo en vivo
+      viajan además mensajes de chat, que **no** son `NotificationType` y no dejan
+      fila (trampa 14 de CLAUDE.md). Por eso `notice`: mantiene la distinción que
+      el código ya hace.
+
+      ⚠️ **Dos convenciones de forma**, o el resultado será inglés con gramática
+      española:
+      - Los hooks van `useX` en inglés, no `usarX`: `usePresencia → usePresence`.
+      - El orden se invierte. `contarSinLeerDeVarios → countUnreadForChannels`,
+        no `countUnreadOfSeveral` — que sería traducir palabra por palabra y
+        seguiría sin decir de qué cuenta.
 
 - [ ] **E5.2 — Lote 1: `commons/realtime/`.** Es el módulo más nuevo, el más
       pequeño y el que menos gente ha tocado. Sirve de ensayo del método.
@@ -866,9 +908,35 @@ de ESTADO-ACTUAL §17.7.
       síntoma no es un error en un log: es el servicio entero desapareciendo por
       un parpadeo de Postgres o de Redis. Ninguno de los tres daba ningún aviso
       hasta que se caía.
-- [ ] **E6.5 — Revisar el tamaño de los bundles.** `sileo` arrastra `motion`;
-      comprobar cuánto pesa en cada zona y si compensa cargarlo diferido.
-- [~] **E6.6 — Revisión de dependencias.** `pnpm audit`: 38 avisos —1 crítico,
+- [x] **E6.5 — El tamaño de los bundles: `motion` fuera de la carga inicial.**
+
+      Medido sobre la compilación de **producción** de dashboard-front, no a ojo.
+      ⚠️ Next 16 **ya no imprime tamaños** en la tabla de rutas, así que se miden
+      los chunks generados y **comprimidos**, que es lo que viaja por la red.
+
+      `AvisosEnVivo` usa `sileo` para las tarjetas emergentes y `sileo` arrastra
+      `motion`. Y entraba en las **seis** zonas privadas, porque `AppShell` lo
+      monta en todas.
+
+      | | Antes | Después |
+      |---|---|---|
+      | JS de cliente total | 358 KB gzip | **312 KB gzip** |
+      | Chunks con `motion` | **dos**, de 82 KB cada uno | uno, de 48 KB |
+      | ¿En la carga inicial? | Sí, en todas las pantallas privadas | No: se pide cuando hace falta |
+
+      O sea que un **23%** del bundle de cada pantalla privada estaba dedicado a
+      animar unas tarjetas que solo aparecen cuando llega un evento y que nunca
+      están en pantalla al cargar. Con `next/dynamic` y `ssr: false` sale del
+      camino crítico — y de paso desaparece una **copia duplicada** que nadie
+      había visto.
+
+      ⚠️ **Lo que se pierde, dicho claro:** se abre una ventana corta —de la
+      hidratación a la llegada del trozo— en la que un evento no sacaría tarjeta.
+      Es asumible por una razón concreta: **la tarjeta no es el dato**. El
+      contador de la barra lateral, la lista de conversaciones y el panel del
+      chat escuchan el flujo por su cuenta, así que el aviso se sigue viendo
+      donde importa; lo único que falta es el emergente.
+- [x] **E6.6 — Revisión de dependencias.** `pnpm audit`: 38 avisos —1 crítico,
       25 altos, 12 moderados—. Casi todo es transitivo (`tar` vía
       `@mapbox/node-pre-gyp`, `sharp`, `postcss` vía el propio Next), pero hay uno
       que es nuestro y urgente:
@@ -886,8 +954,37 @@ de ESTADO-ACTUAL §17.7.
       sin límite en Edge, DoS del optimizador de imágenes con SVG, y exposición
       sin autenticar de los endpoints internos de Server Functions.
 
-      ✅ Subido a `16.2.11` en las siete (`08cafc0`). Queda confirmar con la
-      regresión entera, que es lo que está corriendo.
+      ✅ Subido a `16.2.11` en las siete (`08cafc0`), confirmado con la regresión
+      entera en verde.
+
+      ✅ **Cerrado (17-08) revisando los que quedaban.** De los nueve paquetes
+      restantes, **ninguno lo declaramos nosotros**: todos entran de forma
+      transitiva. Pero uno tenía padre propio:
+
+      🔴 **El crítico era `tar`, y entraba por `bcrypt`**:
+      `bcrypt 5.1.1 → @mapbox/node-pre-gyp → tar 6.2.1`. `bcrypt@6.0.0` cambió a
+      `node-addon-api` + `node-gyp-build` y **no arrastra ninguno de los dos**.
+
+      | | Antes | Después |
+      |---|---|---|
+      | Críticos | 1 | **0** |
+      | Altos | 21 | 14 |
+      | Moderados | 7 | 3 |
+      | **Total** | 29 | **17** |
+
+      ⚠️ **La pregunta que había que responder antes de subirlo era si los hashes
+      seguían valiendo**, porque esto es la autenticación: un fallo aquí deja
+      fuera a todo el mundo. El formato `$2b$` no cambia entre versiones de la
+      biblioteca, y se comprobó de las dos formas — un login con una cuenta
+      sembrada **antes** del cambio responde 200, y la regresión entera pasa,
+      donde cada prueba inicia sesión.
+
+      Lo que **no** se toca: los 17 restantes (`brace-expansion`, `postcss`,
+      `js-yaml`, `sharp`, `nanoid`, `fast-uri`, `deepmerge-ts`, `uuid`) son
+      transitivos sin padre nuestro. `postcss` entra por el propio Next y se
+      resolverá cuando Next lo suba. Forzarlos con `overrides` de pnpm es
+      posible, pero es cambiar la dependencia de otro por debajo sin que su
+      código lo sepa — no se hace sin un motivo concreto.
 
       Lo que **no** se toca: `tar`, `sharp` y `postcss` son transitivos y no hay
       versión nuestra que los suba. `postcss` entra por el propio Next, así que

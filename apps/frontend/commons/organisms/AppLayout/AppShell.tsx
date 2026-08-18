@@ -1,14 +1,46 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
 import { FuenteEnVivo, PresenciasEnVivo } from '../../realtime';
 import { useContadorDeMensajes } from '../../realtime/useContadorDeMensajes';
 import { alpha, colors } from '../../tokens';
-import { AvisosEnVivo } from '../AvisosEnVivo';
 import { NavList } from './NavList';
 import type { AppNavItem } from './navigation';
+
+/**
+ * Las tarjetas emergentes, **fuera de la carga inicial** (E6.5).
+ *
+ * ## Qué pesa y por qué
+ *
+ * `AvisosEnVivo` usa `sileo` para las tarjetas, y `sileo` arrastra `motion`.
+ * Medido sobre la compilación de producción de dashboard-front: el trozo que
+ * lleva `motion` son **82 KB comprimidos de los 358 KB** de JavaScript de
+ * cliente — un **23%**. Y entraba en las **seis** zonas privadas, porque este
+ * armazón lo monta en todas.
+ *
+ * Eso es un cuarto del bundle de cada pantalla privada dedicado a animar unas
+ * tarjetas que **solo aparecen cuando llega un evento**, y que nunca están en
+ * pantalla al cargar.
+ *
+ * ## Lo que se pierde, dicho claro
+ *
+ * Diferirlo abre una ventana corta —desde que hidrata hasta que llega el
+ * trozo— en la que un evento **no sacaría tarjeta**. Es asumible por una razón
+ * concreta: la tarjeta no es el dato. El contador de la barra lateral, la lista
+ * de conversaciones y el propio panel del chat escuchan el flujo **por su
+ * cuenta**, así que un aviso en esa ventana se sigue viendo en todos los sitios
+ * donde importa; lo único que no aparece es el emergente.
+ *
+ * `ssr: false` porque no hay nada que renderizar en el servidor: sin eventos, no
+ * hay tarjetas.
+ */
+const AvisosEnVivo = dynamic(
+  () => import('../AvisosEnVivo').then((modulo) => modulo.AvisosEnVivo),
+  { ssr: false },
+);
 
 export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
