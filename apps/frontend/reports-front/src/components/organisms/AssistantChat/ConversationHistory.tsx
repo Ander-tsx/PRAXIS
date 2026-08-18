@@ -5,7 +5,7 @@ import {
   conversacionesAction,
   renombrarConversacionAction,
 } from '@/app/(private)/[id]/actions';
-import type { ConversacionResumen } from '@/lib/assistant';
+import type { ConversationSummary } from '@/lib/assistant';
 import { Button, alpha, colors } from '@praxis/commons';
 import { useEffect, useState } from 'react';
 
@@ -39,7 +39,7 @@ export function ConversationHistory({
   /** Si se borra la que estaba abierta, el chat tiene que vaciarse. */
   onBorrarActiva: () => void;
 }) {
-  const [lista, setLista] = useState<ConversacionResumen[] | null>(null);
+  const [lista, setLista] = useState<ConversationSummary[] | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
   const [titulo, setTitulo] = useState('');
 

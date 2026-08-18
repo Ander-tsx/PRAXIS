@@ -14,21 +14,21 @@ import {
   resolverPropuestaAction,
 } from '@/app/(private)/[id]/actions';
 import type {
+  AssignmentProposal,
+  ChartProposal,
+  CheckStepsProposal,
+  ChecklistProposal,
+  CommentProposal,
+  EditProposal,
   EstadoPropuesta,
-  PropuestaAsignacion,
-  PropuestaChecklist,
-  PropuestaComentario,
-  PropuestaEdicion,
-  PropuestaGrafico,
-  PropuestaMarcarPasos,
-  PropuestaMensaje,
-  PropuestaMovimiento,
-  PropuestaTarea,
+  MessageProposal,
+  MoveProposal,
+  TaskProposal,
 } from '@/lib/assistant';
 import { Badge, Button, PRIORITY_LABELS, type Priority, alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { TextoDelModelo } from './TextoDelModelo';
+import { ModelText } from './ModelText';
 
 /**
  * La tarjeta de una propuesta: **lo que se va a crear, antes de que exista.**
@@ -120,7 +120,7 @@ export function TaskProposalCard({
   propuesta,
   nombres,
   etiquetas,
-}: ProposalCardProps & { propuesta: PropuestaTarea }) {
+}: ProposalCardProps & { propuesta: TaskProposal }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -203,7 +203,7 @@ export function AssignProposalCard({
   estadoGuardado,
   propuesta,
   nombres,
-}: ProposalCardProps & { propuesta: PropuestaAsignacion }) {
+}: ProposalCardProps & { propuesta: AssignmentProposal }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -370,7 +370,7 @@ export function EditProposalCard({
   estadoGuardado,
   propuesta,
   etiquetas,
-}: ProposalCardProps & { propuesta: PropuestaEdicion }) {
+}: ProposalCardProps & { propuesta: EditProposal }) {
   const marcas = (propuesta.labelIds ?? []).map((id) => etiquetas[id] ?? 'etiqueta');
 
   return (
@@ -433,7 +433,7 @@ export function MoveProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaMovimiento }) {
+}: ProposalCardProps & { propuesta: MoveProposal }) {
   return (
     <CambioSobreTarea
       titulo="Movimiento propuesto"
@@ -484,7 +484,7 @@ export function ChecklistProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaChecklist }) {
+}: ProposalCardProps & { propuesta: ChecklistProposal }) {
   return (
     <CambioSobreTarea
       titulo="Checklist propuesto"
@@ -522,7 +522,7 @@ export function CommentProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaComentario }) {
+}: ProposalCardProps & { propuesta: CommentProposal }) {
   return (
     <CambioSobreTarea
       titulo="Comentario propuesto"
@@ -560,7 +560,7 @@ export function MarkStepsProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaMarcarPasos }) {
+}: ProposalCardProps & { propuesta: CheckStepsProposal }) {
   return (
     <CambioSobreTarea
       titulo="Pasos que se darían por hechos"
@@ -613,7 +613,7 @@ export function MessageProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaMensaje }) {
+}: ProposalCardProps & { propuesta: MessageProposal }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -691,7 +691,7 @@ export function ChartProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-}: ProposalCardProps & { propuesta: PropuestaGrafico }) {
+}: ProposalCardProps & { propuesta: ChartProposal }) {
   const router = useRouter();
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
@@ -950,7 +950,7 @@ function Marco({
           className="border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
           style={{ borderColor: alpha(colors.primary, 35) }}
         >
-          <TextoDelModelo texto={porQue} />
+          <ModelText texto={porQue} />
         </p>
       )}
 

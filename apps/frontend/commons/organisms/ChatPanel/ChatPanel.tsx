@@ -189,7 +189,7 @@ export interface ChatPanelHandle {
  *
  * ## Cómo llegan los mensajes nuevos
  *
- * **No abre ninguna conexión.** `AvisosEnVivo` ya mantiene un flujo SSE por
+ * **No abre ninguna conexión.** `LiveNotices` ya mantiene un flujo SSE por
  * persona —uno para toda la aplicación— y llama a `router.refresh()` con cada
  * evento; este panel se pinta en el servidor, así que ese refresco lo repinta
  * con lo último sin perder el estado del cliente ni lo que estuvieras

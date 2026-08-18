@@ -4,22 +4,22 @@ import { cargarConversacionAction, preguntarAction } from '@/app/(private)/[id]/
 import {
   type AssistantProposal,
   type AssistantQuota,
-  esPropuestaDeAsignacion,
-  esPropuestaDeChecklist,
-  esPropuestaDeComentario,
-  esPropuestaDeEdicion,
-  esPropuestaDeGrafico,
-  esPropuestaDeMarcarPasos,
-  esPropuestaDeMensaje,
-  esPropuestaDeMovimiento,
-  esPropuestaDeTarea,
   formatoReinicio,
+  isAssignmentProposal,
+  isChartProposal,
+  isCheckStepsProposal,
+  isChecklistProposal,
+  isCommentProposal,
+  isEditProposal,
+  isMessageProposal,
+  isMoveProposal,
+  isTaskProposal,
 } from '@/lib/assistant';
 import { Badge, Button, alpha, colors } from '@praxis/commons';
 import { useEffect, useId, useRef, useState } from 'react';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
-import { GrupoDePropuestas } from './GrupoDePropuestas';
+import { ModelText } from './ModelText';
 import {
   AssignProposalCard,
   ChartProposalCard,
@@ -31,7 +31,7 @@ import {
   MoveProposalCard,
   TaskProposalCard,
 } from './ProposalCard';
-import { TextoDelModelo } from './TextoDelModelo';
+import { ProposalGroup } from './ProposalGroup';
 
 interface Mensaje {
   id: string;
@@ -368,9 +368,9 @@ export function AssistantChat({
                        tarjeta le informa de su estado, así que también cuenta
                        las que se acepten o descarten aquí mismo, no solo las que
                        ya vinieran decididas de una conversación vieja. */
-                    <GrupoDePropuestas>
+                    <ProposalGroup>
                       {(mensaje.proposals ?? []).map((propuesta, indice) => {
-                        if (esPropuestaDeTarea(propuesta)) {
+                        if (isTaskProposal(propuesta)) {
                           return (
                             <TaskProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -383,7 +383,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeAsignacion(propuesta)) {
+                        if (isAssignmentProposal(propuesta)) {
                           return (
                             <AssignProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -396,7 +396,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeEdicion(propuesta)) {
+                        if (isEditProposal(propuesta)) {
                           return (
                             <EditProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -409,7 +409,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeMovimiento(propuesta)) {
+                        if (isMoveProposal(propuesta)) {
                           return (
                             <MoveProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -422,7 +422,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeChecklist(propuesta)) {
+                        if (isChecklistProposal(propuesta)) {
                           return (
                             <ChecklistProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -435,7 +435,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeComentario(propuesta)) {
+                        if (isCommentProposal(propuesta)) {
                           return (
                             <CommentProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -448,7 +448,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeMarcarPasos(propuesta)) {
+                        if (isCheckStepsProposal(propuesta)) {
                           return (
                             <MarkStepsProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -461,7 +461,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeMensaje(propuesta)) {
+                        if (isMessageProposal(propuesta)) {
                           return (
                             <MessageProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -474,7 +474,7 @@ export function AssistantChat({
                             />
                           );
                         }
-                        if (esPropuestaDeGrafico(propuesta)) {
+                        if (isChartProposal(propuesta)) {
                           return (
                             <ChartProposalCard
                               key={propuesta.id ?? `${mensaje.id}-${indice}`}
@@ -491,7 +491,7 @@ export function AssistantChat({
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
                         return null;
                       })}
-                    </GrupoDePropuestas>
+                    </ProposalGroup>
                   )}
                 </div>
               ))}
@@ -624,7 +624,7 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
           mio ? { background: alpha(colors.primary, 14) } : { background: colors.surfaceElevated }
         }
       >
-        <TextoDelModelo texto={mensaje.text} />
+        <ModelText texto={mensaje.text} />
       </div>
     </div>
   );

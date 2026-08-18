@@ -1,14 +1,14 @@
 import {
   COLUMN_COLORS,
   LABEL_COLORS,
-  PLANTILLA_LIMITES,
-  type PlantillaColumna,
-  type PlantillaDeProyecto,
-  type PlantillaEspacio,
-  type PlantillaEtiqueta,
-  type PlantillaRol,
-  type PlantillaTablero,
   ProjectPermission,
+  type ProjectTemplate,
+  TEMPLATE_LIMITS,
+  type TemplateBoard,
+  type TemplateColumn,
+  type TemplateLabel,
+  type TemplateRole,
+  type TemplateSpace,
 } from '@praxis/contracts';
 
 import type { FunctionDeclaration } from './tools';
@@ -96,7 +96,7 @@ export const PROPONER_PLANTILLA: FunctionDeclaration = {
       etiquetas: {
         type: 'ARRAY',
         description:
-          `Vocabulario para clasificar tareas. Como mucho ${PLANTILLA_LIMITES.etiquetas}. ` +
+          `Vocabulario para clasificar tareas. Como mucho ${TEMPLATE_LIMITS.etiquetas}. ` +
           'Del sector de la persona, no genericas: para una constructora "obra civil" o ' +
           '"licencias", no "tarea importante".',
         items: {
@@ -111,7 +111,7 @@ export const PROPONER_PLANTILLA: FunctionDeclaration = {
       roles: {
         type: 'ARRAY',
         description:
-          `Perfiles del equipo. Como mucho ${PLANTILLA_LIMITES.roles}. ⚠️ NO incluyas ` +
+          `Perfiles del equipo. Como mucho ${TEMPLATE_LIMITS.roles}. ⚠️ NO incluyas ` +
           'un rol de administracion: el proyecto ya nace con uno y con su dueno dentro. ' +
           'Da a cada rol lo MINIMO que necesita para su trabajo; un rol que lo puede ' +
           'todo no es un rol.',
@@ -131,7 +131,7 @@ export const PROPONER_PLANTILLA: FunctionDeclaration = {
       espacios: {
         type: 'ARRAY',
         description:
-          `Como se divide el trabajo. Como mucho ${PLANTILLA_LIMITES.espacios}. Un ` +
+          `Como se divide el trabajo. Como mucho ${TEMPLATE_LIMITS.espacios}. Un ` +
           'espacio agrupa tableros; un tablero es un flujo con sus columnas. Si el ' +
           'proyecto es sencillo, UN espacio con UN tablero es la respuesta correcta: ' +
           'no infles la estructura para parecer completo.',
@@ -141,7 +141,7 @@ export const PROPONER_PLANTILLA: FunctionDeclaration = {
             nombre: { type: 'STRING', description: 'Maximo 60 caracteres.' },
             tableros: {
               type: 'ARRAY',
-              description: `Como mucho ${PLANTILLA_LIMITES.tablerosPorEspacio} por espacio.`,
+              description: `Como mucho ${TEMPLATE_LIMITS.tablerosPorEspacio} por espacio.`,
               items: {
                 type: 'OBJECT',
                 properties: {
@@ -149,7 +149,7 @@ export const PROPONER_PLANTILLA: FunctionDeclaration = {
                   columnas: {
                     type: 'ARRAY',
                     description:
-                      `Entre 3 y ${PLANTILLA_LIMITES.columnasPorTablero}, EN ORDEN, de ` +
+                      `Entre 3 y ${TEMPLATE_LIMITS.columnasPorTablero}, EN ORDEN, de ` +
                       'lo que empieza a lo que acaba. Con los nombres del sector de la ' +
                       'persona cuando los tenga.',
                     items: COLUMNA,
@@ -234,7 +234,7 @@ function texto(valor: unknown, maximo: number): string {
 export function validarPlantilla(call: {
   name: string;
   args: Record<string, unknown>;
-}): PlantillaDeProyecto | null {
+}): ProjectTemplate | null {
   if (call.name !== PROPONER_PLANTILLA.name) return null;
 
   const args = call.args ?? {};
@@ -254,7 +254,7 @@ export function validarPlantilla(call: {
   };
 }
 
-function validarEtiquetas(crudas: unknown): PlantillaEtiqueta[] {
+function validarEtiquetas(crudas: unknown): TemplateLabel[] {
   if (!Array.isArray(crudas)) return [];
 
   const vistas = new Set<string>();
@@ -277,7 +277,7 @@ function validarEtiquetas(crudas: unknown): PlantillaEtiqueta[] {
       vistas.add(clave);
       return true;
     })
-    .slice(0, PLANTILLA_LIMITES.etiquetas);
+    .slice(0, TEMPLATE_LIMITS.etiquetas);
 }
 
 /**
@@ -289,7 +289,7 @@ function validarEtiquetas(crudas: unknown): PlantillaEtiqueta[] {
  * el frontend: un array llegaría a `POST /projects/:id/roles` como un 400 que
  * nadie sabría de dónde sale.
  */
-function validarRoles(crudos: unknown): PlantillaRol[] {
+function validarRoles(crudos: unknown): TemplateRole[] {
   if (!Array.isArray(crudos)) return [];
 
   const vistos = new Set<string>();
@@ -316,10 +316,10 @@ function validarRoles(crudos: unknown): PlantillaRol[] {
       vistos.add(clave);
       return true;
     })
-    .slice(0, PLANTILLA_LIMITES.roles);
+    .slice(0, TEMPLATE_LIMITS.roles);
 }
 
-function validarEspacios(crudos: unknown): PlantillaEspacio[] {
+function validarEspacios(crudos: unknown): TemplateSpace[] {
   if (!Array.isArray(crudos)) return [];
 
   return crudos
@@ -331,10 +331,10 @@ function validarEspacios(crudos: unknown): PlantillaEspacio[] {
       };
     })
     .filter((espacio) => espacio.nombre.length > 0 && espacio.tableros.length > 0)
-    .slice(0, PLANTILLA_LIMITES.espacios);
+    .slice(0, TEMPLATE_LIMITS.espacios);
 }
 
-function validarTableros(crudos: unknown): PlantillaTablero[] {
+function validarTableros(crudos: unknown): TemplateBoard[] {
   if (!Array.isArray(crudos)) return [];
 
   return crudos
@@ -346,7 +346,7 @@ function validarTableros(crudos: unknown): PlantillaTablero[] {
       };
     })
     .filter((tablero) => tablero.nombre.length > 0 && tablero.columnas.length > 0)
-    .slice(0, PLANTILLA_LIMITES.tablerosPorEspacio);
+    .slice(0, TEMPLATE_LIMITS.tablerosPorEspacio);
 }
 
 /**
@@ -358,7 +358,7 @@ function validarTableros(crudos: unknown): PlantillaTablero[] {
  * hace: pedirle un color «de acabado» y darle una lista de fases invita a
  * pintar de verde todo lo que suene a terminado.
  */
-function validarColumnas(crudas: unknown): PlantillaColumna[] {
+function validarColumnas(crudas: unknown): TemplateColumn[] {
   if (!Array.isArray(crudas)) return [];
 
   const columnas = crudas
@@ -371,7 +371,7 @@ function validarColumnas(crudas: unknown): PlantillaColumna[] {
       };
     })
     .filter((columna) => columna.nombre.length > 0)
-    .slice(0, PLANTILLA_LIMITES.columnasPorTablero);
+    .slice(0, TEMPLATE_LIMITS.columnasPorTablero);
 
   const ultimaDeCierre = columnas.reduce(
     (encontrada, columna, indice) => (columna.color === 'success' ? indice : encontrada),

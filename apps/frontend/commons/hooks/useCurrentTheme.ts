@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 /** Los dos temas. Espejo de `ThemeName` en `commons/theme/cookie.ts`. */
-export type TemaActual = 'dark' | 'light';
+export type CurrentTheme = 'dark' | 'light';
 
 /**
  * El tema que hay puesto ahora mismo, leído del `<html>`.
@@ -30,8 +30,8 @@ export type TemaActual = 'dark' | 'light';
  * render del servidor y el del cliente coincidan: devolver otra cosa aquí sería
  * un desajuste de hidratación.
  */
-export function useTemaActual(): TemaActual {
-  const [tema, setTema] = useState<TemaActual>('dark');
+export function useCurrentTheme(): CurrentTheme {
+  const [tema, setTema] = useState<CurrentTheme>('dark');
 
   useEffect(() => {
     const raiz = document.documentElement;

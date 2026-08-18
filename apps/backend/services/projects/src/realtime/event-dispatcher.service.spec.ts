@@ -2,8 +2,8 @@
 
 import type { PrismaService } from '../prisma/prisma.service';
 import type { RedisService } from '../redis/redis.service';
-import { liveEventChannel } from './events';
 import { EventDispatcher } from './event-dispatcher.service';
+import { liveEventChannel } from './events';
 
 /**
  * El reparto de eventos en vivo, en prueba.
@@ -270,8 +270,12 @@ describe('EventDispatcher', () => {
 
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
-      expect(publicado.find((p) => p.canal === liveEventChannel(BEA))?.evento.silenciado).toBe(true);
-      expect(publicado.find((p) => p.canal === liveEventChannel(ANA))?.evento.silenciado).toBe(false);
+      expect(publicado.find((p) => p.canal === liveEventChannel(BEA))?.evento.silenciado).toBe(
+        true,
+      );
+      expect(publicado.find((p) => p.canal === liveEventChannel(ANA))?.evento.silenciado).toBe(
+        false,
+      );
     });
 
     it('repartir un evento cuesta **una** sentencia, no cuatro', async () => {

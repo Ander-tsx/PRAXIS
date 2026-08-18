@@ -134,7 +134,7 @@ export function splitMessage(cuerpo: string): ChatToken[] {
  * texto guardara la etiqueta entera —`@[María García](user:2222…)`—, quien
  * edita un mensaje vería un UUID de 36 caracteres en mitad de su frase.
  */
-export interface EtiquetaPlana {
+export interface FlatLabel {
   kind: ChatRefKind;
   id: string;
   /** Lo que se ve en el campo: `@María García`, o el título de la tarea. */
@@ -149,10 +149,10 @@ export interface EtiquetaPlana {
  * convierte en `@María García` + una etiqueta que guarda el id. Si se guarda sin
  * tocar nada, `serializarEtiquetas` reconstruye el cuerpo exacto.
  */
-export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: EtiquetaPlana[] } {
+export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: FlatLabel[] } {
   const trozos = splitMessage(cuerpo);
   const texto: string[] = [];
-  const etiquetas: EtiquetaPlana[] = [];
+  const etiquetas: FlatLabel[] = [];
 
   for (const trozo of trozos) {
     if (trozo.tipo === 'texto') {
@@ -182,7 +182,7 @@ export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: 
  * ese trozo del texto, no se encuentra y se ignora — el mensaje sale con lo que
  * de verdad quedó escrito. Espejo del `serializar()` del Composer.
  */
-export function serializarEtiquetas(texto: string, etiquetas: EtiquetaPlana[]): string {
+export function serializarEtiquetas(texto: string, etiquetas: FlatLabel[]): string {
   const salida: string[] = [];
   let desde = 0;
 

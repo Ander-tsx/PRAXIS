@@ -1,7 +1,7 @@
 'use client';
 
 import { deleteBoardAction, updateBoardAction } from '@/app/(private)/[id]/actions';
-import { MenuDeEntidad } from '@/components/molecules/MenuDeEntidad';
+import { EntityMenu } from '@/components/molecules/EntityMenu';
 import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
 import { useAccion } from '@praxis/commons';
@@ -38,7 +38,7 @@ export function TableroMenu({ projectId, board, canEdit, canDelete }: TableroMen
   const columnas = board.columns.length;
 
   return (
-    <MenuDeEntidad
+    <EntityMenu
       entidad="tablero"
       nombre={board.name}
       nombreMax={BOARD_NAME_MAX}

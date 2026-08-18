@@ -289,7 +289,7 @@ button:disabled,
   }
 }
 
-/* La entrada de los avisos en vivo (AvisosEnVivo), desde el borde derecho.
+/* La entrada de los avisos en vivo (LiveNotices), desde el borde derecho.
 
    Va con los tokens y no en una zona porque el organismo vive en commons: el
    armazón privado lo monta en las cinco zonas, y una animación declarada en una

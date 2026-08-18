@@ -2,18 +2,18 @@
 
 import { randomUUID } from 'node:crypto';
 import {
+  type AssignmentProposal,
   type AssistantChatResult,
   type AssistantQuota,
-  type ConversacionCompleta,
-  type ConversacionResumen,
-  type PropuestaAsignacion,
-  type PropuestaChecklist,
-  type PropuestaComentario,
-  type PropuestaEdicion,
-  type PropuestaGrafico,
-  type PropuestaMarcarPasos,
-  type PropuestaMovimiento,
-  type PropuestaTarea,
+  type ChartProposal,
+  type CheckStepsProposal,
+  type ChecklistProposal,
+  type CommentProposal,
+  type ConversationSummary,
+  type EditProposal,
+  type FullConversation,
+  type MoveProposal,
+  type TaskProposal,
 } from '@/lib/assistant';
 import { CATALOGO, MAX_WIDGETS, type Widget, siguienteFila } from '@/lib/widgets';
 import { ApiError, type ProjectDetail, type Task } from '@praxis/commons';
@@ -198,11 +198,11 @@ export async function preguntarAction(
 }
 
 /** Mis conversaciones en este proyecto, la última movida arriba. */
-export async function conversacionesAction(projectId: string): Promise<ConversacionResumen[]> {
+export async function conversacionesAction(projectId: string): Promise<ConversationSummary[]> {
   const api = await requireApi();
   if (!api) return [];
   return api
-    .get<ConversacionResumen[]>(`/projects/${projectId}/assistant/conversations`)
+    .get<ConversationSummary[]>(`/projects/${projectId}/assistant/conversations`)
     .catch(() => []);
 }
 
@@ -210,11 +210,11 @@ export async function conversacionesAction(projectId: string): Promise<Conversac
 export async function cargarConversacionAction(
   projectId: string,
   conversationId: string,
-): Promise<ConversacionCompleta | null> {
+): Promise<FullConversation | null> {
   const api = await requireApi();
   if (!api) return null;
   return api
-    .get<ConversacionCompleta>(`/projects/${projectId}/assistant/conversations/${conversationId}`)
+    .get<FullConversation>(`/projects/${projectId}/assistant/conversations/${conversationId}`)
     .catch(() => null);
 }
 
@@ -306,7 +306,7 @@ export interface AceptarTareaState {
  */
 export async function aceptarTareaAction(
   projectId: string,
-  propuesta: PropuestaTarea,
+  propuesta: TaskProposal,
 ): Promise<AceptarTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', creada: null };
@@ -372,7 +372,7 @@ export interface AceptarAsignacionState {
  */
 export async function aceptarAsignacionAction(
   projectId: string,
-  propuesta: PropuestaAsignacion,
+  propuesta: AssignmentProposal,
 ): Promise<AceptarAsignacionState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', asignada: null };
@@ -464,7 +464,7 @@ async function tareaDelProyecto(
  */
 export async function aceptarEdicionAction(
   projectId: string,
-  propuesta: PropuestaEdicion,
+  propuesta: EditProposal,
 ): Promise<AceptarSobreTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
@@ -521,7 +521,7 @@ export async function aceptarEdicionAction(
  */
 export async function aceptarMovimientoAction(
   projectId: string,
-  propuesta: PropuestaMovimiento,
+  propuesta: MoveProposal,
 ): Promise<AceptarSobreTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
@@ -578,7 +578,7 @@ export async function aceptarMovimientoAction(
  */
 export async function aceptarChecklistAction(
   projectId: string,
-  propuesta: PropuestaChecklist,
+  propuesta: ChecklistProposal,
 ): Promise<AceptarSobreTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
@@ -634,7 +634,7 @@ export async function aceptarChecklistAction(
  */
 export async function aceptarMarcarPasosAction(
   projectId: string,
-  propuesta: PropuestaMarcarPasos,
+  propuesta: CheckStepsProposal,
 ): Promise<AceptarSobreTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
@@ -692,7 +692,7 @@ export async function aceptarMarcarPasosAction(
  */
 export async function aceptarComentarioAction(
   projectId: string,
-  propuesta: PropuestaComentario,
+  propuesta: CommentProposal,
 ): Promise<AceptarSobreTareaState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', hecha: null };
@@ -840,7 +840,7 @@ export async function guardarLienzoAction(
  */
 export async function aceptarGraficoAction(
   projectId: string,
-  propuesta: PropuestaGrafico,
+  propuesta: ChartProposal,
 ): Promise<{ anadido: boolean; error: string | null }> {
   const api = await requireApi();
   if (!api) return { anadido: false, error: 'Tu sesión ha caducado.' };

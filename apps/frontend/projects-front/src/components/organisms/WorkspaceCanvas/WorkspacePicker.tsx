@@ -5,7 +5,7 @@ import {
   deleteWorkspaceAction,
   updateWorkspaceAction,
 } from '@/app/(private)/[id]/actions';
-import { PanelDeEntidad } from '@/components/molecules/MenuDeEntidad';
+import { EntityPanel } from '@/components/molecules/EntityMenu';
 import { WORKSPACE_INITIAL_STATE } from '@/lib/action-state';
 import { WORKSPACE_NAME_MAX, validateWorkspace } from '@/lib/validation';
 import { Button, type Workspace, alpha, colors, projectPath, useAccion } from '@praxis/commons';
@@ -55,7 +55,7 @@ export interface WorkspacePickerProps {
  * dentro de un contenedor `overflow-hidden`, así que un panel absoluto saldría
  * recortado por arriba y por abajo. En vez de eso sustituye al cuerpo del
  * desplegable, que además funciona igual de bien en móvil. La lógica es la
- * misma que la del menú del tablero: las dos montan `PanelDeEntidad`.
+ * misma que la del menú del tablero: las dos montan `EntityPanel`.
  */
 export function WorkspacePicker({
   projectId,
@@ -190,7 +190,7 @@ export function WorkspacePicker({
                 </button>
               </div>
 
-              <PanelDeEntidad
+              <EntityPanel
                 entidad="espacio"
                 nombre={gestionando.name}
                 nombreMax={WORKSPACE_NAME_MAX}

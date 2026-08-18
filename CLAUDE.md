@@ -16,6 +16,37 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 
 ## Reglas del frontend
 
+**El código en inglés, los comentarios en español.** No es un punto medio ni una
+migración a medias: es la convención.
+
+| Qué | Idioma |
+|---|---|
+| Identificadores: variables, funciones, tipos, props, constantes, nombres de fichero | **Inglés** |
+| Comentarios, JSDoc, documentos y mensajes de commit | **Español** |
+| Textos que ve el usuario y descripciones de Swagger | **Español** |
+
+Un identificador es una interfaz: lo lee quien llama, muchas veces sin abrir el
+cuerpo. Un comentario es una explicación: lo lee quien ya está dentro. Mezclar
+idiomas en lo primero obliga a traducir en cada llamada; en lo segundo no estorba.
+
+⚠️ **Los comentarios no se traducen «por coherencia».** La prosa de este
+repositorio —el porqué de cada decisión, las trampas que ya mordieron— es la
+mitad de su valor, y traducirla sería reescribirla.
+
+⚠️ **Y renombrar con un `sed` global rompe la prosa sin que nada falle.** Ya
+pasó: `etiqueta → tag` dejó comentarios como «una tarea, una columna o una tag»
+y un mensaje de error que decía **«El servidor no guardó la tag.»**, en 80
+ficheros y **compilando**. Una cadena de texto no da error de tipos. Las reglas
+que salieron de ahí:
+
+1. Una palabra que existe en español corriente **no se renombra globalmente**: o
+   se acota a los ficheros del módulo, o no se toca.
+2. Solo son seguros los identificadores **inequívocos** — compuestos y
+   `PascalCase` que nadie escribiría en una frase.
+3. **Comprobar colisiones antes** con un `grep -w` del nombre nuevo. Ya evitó dos:
+   `MessageEvent` (global del DOM) y `PRESENCES` (ya existía en el mismo archivo).
+4. **Revisar el diff buscando prosa y literales**, no solo que compile.
+
 **Next.js 16 tiene breaking changes.** Consulta `node_modules/next/dist/docs/` antes de usar una API que no hayas verificado en este repo.
 
 **Multi-Zones, no Module Federation** (el README miente). Cada microfrontend es una app Next independiente con `basePath: '/<zona>'`, expuesta por el `web-shell` vía `rewrites()`.

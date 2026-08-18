@@ -9,4 +9,4 @@
  * conexión SSE; ahora la conexión la abre `LiveSource` —una por pestaña, en el
  * armazón— y esto es solo un consumidor.
  */
-export { AvisosEnVivo } from './AvisosEnVivo';
+export { LiveNotices } from './LiveNotices';

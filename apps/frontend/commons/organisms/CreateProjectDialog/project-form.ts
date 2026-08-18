@@ -82,7 +82,7 @@ export type CreateProjectAction = (
  * crear. Así una zona nueva no hereda un botón que no sabe atender, y el modo
  * puede apagarse desde fuera sin tocar el organismo.
  */
-export type BorradorDePlantillaAction = (
+export type TemplateDraftAction = (
   brief: string,
   /** Un retoque sobre el plan que ya se propuso. Sin esto, genera de cero. */
   ajuste?: { texto: string; previa: ProjectTemplate },

@@ -119,7 +119,10 @@ export class AuthService {
   private async signRefresh(userId: string): Promise<{ token: string; jti: string }> {
     const expiresIn = this.config.get<any>('REFRESH_TOKEN_EXPIRES_IN', '7d');
     const jti = crypto.randomUUID();
-    const token = await this.jwt.signAsync({ sub: userId, typ: TOKEN_REFRESCO, jti }, { expiresIn });
+    const token = await this.jwt.signAsync(
+      { sub: userId, typ: TOKEN_REFRESCO, jti },
+      { expiresIn },
+    );
     return { token, jti };
   }
 

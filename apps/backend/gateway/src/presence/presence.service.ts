@@ -175,7 +175,9 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
          eso aquí se usaba **una columna**. Ver `idsDeContactos` en
          projects-service. */
       const contactos = await firstValueFrom(
-        this.projectsClient.send<string[]>({ cmd: 'chat_peer_ids' }, { userId }).pipe(timeout(2000)),
+        this.projectsClient
+          .send<string[]>({ cmd: 'chat_peer_ids' }, { userId })
+          .pipe(timeout(2000)),
       );
 
       const at = new Date().toISOString();

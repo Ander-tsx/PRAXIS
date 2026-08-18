@@ -5,14 +5,14 @@ import { Button, Input, Sparkle, Textarea, iniciales } from '../../atoms';
 import { useAccion } from '../../hooks';
 import { Dialog } from '../../molecules';
 import { alpha, colors } from '../../tokens';
-import { PlantillaAsistida } from './PlantillaAsistida';
+import { AssistedTemplate } from './AssistedTemplate';
 import {
   type AplicarPlantillaAction,
-  type BorradorDePlantillaAction,
   CREATE_PROJECT_INITIAL_STATE,
   type CreateProjectAction,
   PROJECT_DESCRIPTION_MAX,
   PROJECT_NAME_MAX,
+  type TemplateDraftAction,
   validateProject,
 } from './project-form';
 
@@ -31,7 +31,7 @@ export interface CreateProjectDialogProps {
    * no hereda una pestaña que no sabe atender, y apagar el modo no obliga a
    * tocar el organismo.
    */
-  borradorAction?: BorradorDePlantillaAction;
+  borradorAction?: TemplateDraftAction;
   aplicarAction?: AplicarPlantillaAction;
   /** Texto del disparador. El estado vacío quiere uno más explícito. */
   triggerLabel?: string;
@@ -70,7 +70,7 @@ export interface CreateProjectDialogProps {
  * | Motivo | Detalle |
  * |---|---|
  * | Lo montan **dos zonas** | El panel lo usa en su estado vacío y Proyectos en la cabecera y en la rejilla. Un panel incrustado habría que colocarlo —y mantenerlo— en cada sitio, o este organismo tendría que saber cómo es la maqueta de cada pantalla |
- * | El modo asistido **no cabe** | `PlantillaAsistida` pinta un árbol de espacios → tableros → columnas; incrustado, empuja la rejilla ~600 px hacia abajo y la página salta al cambiar de pestaña |
+ * | El modo asistido **no cabe** | `AssistedTemplate` pinta un árbol de espacios → tableros → columnas; incrustado, empuja la rejilla ~600 px hacia abajo y la página salta al cambiar de pestaña |
  * | Crear es una tarea **modal de verdad** | Se termina o se cancela; no hace falta ver la lista mientras tanto, y el `<dialog>` nativo da atrapado de foco, Escape y fondo inerte sin reimplementar nada (ESTADO-ACTUAL §17.6) |
  * | Una ruta propia (`/projects/new`) rompería el disparador del panel | En multi-zone, el panel tendría que hacer navegación dura a otra zona para algo que hoy resuelve sin salir de la pantalla |
  *
@@ -221,7 +221,7 @@ export function CreateProjectDialog({
         )}
 
         {modo === 'asistido' && borradorAction && aplicarAction ? (
-          <PlantillaAsistida
+          <AssistedTemplate
             borradorAction={borradorAction}
             aplicarAction={aplicarAction}
             onCancelar={cerrar}

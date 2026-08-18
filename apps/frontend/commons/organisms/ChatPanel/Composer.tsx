@@ -19,11 +19,11 @@ import {
 } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
 import {
-  TagLayer,
   type Etiqueta,
   FIELD_TYPOGRAPHY,
-  serializeField,
+  TagLayer,
   fieldChunks,
+  serializeField,
   visibleLabel,
 } from './tagging';
 

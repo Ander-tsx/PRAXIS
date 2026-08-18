@@ -7,7 +7,7 @@
  */
 
 export * from './AppLayout';
-export * from './AvisosEnVivo';
+export * from './LiveNotices';
 export * from './ChatPanel';
 export * from './CreateProjectDialog';
 export * from './LogoutButton';

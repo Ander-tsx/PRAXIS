@@ -24,7 +24,7 @@ import { Fragment } from 'react';
  * en mitad de una frase se coma media respuesta. Un `**` sin cerrar se queda
  * como está, que es lo correcto — era literal.
  */
-export function TextoDelModelo({ texto }: { texto: string }) {
+export function ModelText({ texto }: { texto: string }) {
   /* `split` con grupo de captura devuelve alternando: fuera, dentro, fuera…
      así que los índices impares son lo que iba entre asteriscos. */
   const trozos = texto.split(/\*\*([\s\S]+?)\*\*/);

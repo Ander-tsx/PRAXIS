@@ -36,7 +36,7 @@ import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
  */
 
 /** Tope de cada lista. Un plan más grande que esto no se lee, se sufre. */
-export const PLANTILLA_LIMITES = {
+export const TEMPLATE_LIMITS = {
   etiquetas: 12,
   roles: 6,
   espacios: 4,
@@ -45,16 +45,16 @@ export const PLANTILLA_LIMITES = {
 } as const;
 
 /** Lo que se le pide a quien va a crear el proyecto. */
-export const PLANTILLA_BRIEF_MIN = 20;
-export const PLANTILLA_BRIEF_MAX = 4000;
+export const TEMPLATE_BRIEF_MIN = 20;
+export const TEMPLATE_BRIEF_MAX = 4000;
 
-export interface PlantillaEtiqueta {
+export interface TemplateLabel {
   nombre: string;
   /** Token de `LABEL_COLORS`. Se valida contra la lista al recibirlo. */
   color: string;
 }
 
-export interface PlantillaRol {
+export interface TemplateRole {
   nombre: string;
   /**
    * Diccionario de booleanos, **nunca un array**.
@@ -67,7 +67,7 @@ export interface PlantillaRol {
   permisos: Record<string, boolean>;
 }
 
-export interface PlantillaColumna {
+export interface TemplateColumn {
   nombre: string;
   /**
    * Token de `COLUMN_COLORS`, opcional.
@@ -79,22 +79,22 @@ export interface PlantillaColumna {
   color?: string;
 }
 
-export interface PlantillaTablero {
+export interface TemplateBoard {
   nombre: string;
-  columnas: PlantillaColumna[];
+  columnas: TemplateColumn[];
 }
 
-export interface PlantillaEspacio {
+export interface TemplateSpace {
   nombre: string;
-  tableros: PlantillaTablero[];
+  tableros: TemplateBoard[];
 }
 
-export interface PlantillaDeProyecto {
+export interface ProjectTemplate {
   nombre: string;
   descripcion: string;
-  etiquetas: PlantillaEtiqueta[];
-  roles: PlantillaRol[];
-  espacios: PlantillaEspacio[];
+  etiquetas: TemplateLabel[];
+  roles: TemplateRole[];
+  espacios: TemplateSpace[];
   /**
    * Por qué esta plantilla y no otra, en dos o tres frases.
    *
@@ -107,14 +107,14 @@ export interface PlantillaDeProyecto {
 }
 
 /** Lo que devuelve `POST /me/assistant/project-draft`. */
-export interface PlantillaDraftResult {
-  plantilla: PlantillaDeProyecto;
+export interface TemplateDraftResult {
+  plantilla: ProjectTemplate;
   /** El contador, para que la pantalla lo pinte como hace el chat. */
   cuota: { plan: string; usados: number; limite: number };
 }
 
 /** Cuánto texto puede ocupar un ajuste sobre un plan ya propuesto. */
-export const PLANTILLA_AJUSTE_MAX = 1000;
+export const TEMPLATE_TWEAK_MAX = 1000;
 
 /**
  * Tope de la plantilla previa **serializada**.
@@ -126,19 +126,19 @@ export const PLANTILLA_AJUSTE_MAX = 1000;
  * modelo como texto del turno anterior. Una cadena con tope es exactamente lo
  * que hace falta y no puede quedarse desincronizada de la forma real.
  */
-export const PLANTILLA_PREVIA_MAX = 20_000;
+export const TEMPLATE_PREVIEW_MAX = 20_000;
 
 export class ProjectDraftBodyDto {
   @ApiProperty({
     description:
       'Lo que la persona cuenta de su proyecto: a qué se dedica, qué equipo tiene, ' +
       'cómo trabaja y qué necesita. Cuanto más concreto, mejor sale la plantilla.',
-    minLength: PLANTILLA_BRIEF_MIN,
-    maxLength: PLANTILLA_BRIEF_MAX,
+    minLength: TEMPLATE_BRIEF_MIN,
+    maxLength: TEMPLATE_BRIEF_MAX,
   })
   @IsString()
-  @MinLength(PLANTILLA_BRIEF_MIN)
-  @MaxLength(PLANTILLA_BRIEF_MAX)
+  @MinLength(TEMPLATE_BRIEF_MIN)
+  @MaxLength(TEMPLATE_BRIEF_MAX)
   brief!: string;
 
   /**
@@ -147,16 +147,16 @@ export class ProjectDraftBodyDto {
    * Con esto y `previa`, la llamada deja de ser «propón algo» y pasa a ser
    * «cambia esto de lo que ya propusiste». Sin los dos, se genera de cero.
    */
-  @ApiPropertyOptional({ maxLength: PLANTILLA_AJUSTE_MAX })
+  @ApiPropertyOptional({ maxLength: TEMPLATE_TWEAK_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(PLANTILLA_AJUSTE_MAX)
+  @MaxLength(TEMPLATE_TWEAK_MAX)
   ajuste?: string;
 
-  /** El plan que se está ajustando, en JSON. Ver `PLANTILLA_PREVIA_MAX`. */
-  @ApiPropertyOptional({ maxLength: PLANTILLA_PREVIA_MAX })
+  /** El plan que se está ajustando, en JSON. Ver `TEMPLATE_PREVIEW_MAX`. */
+  @ApiPropertyOptional({ maxLength: TEMPLATE_PREVIEW_MAX })
   @IsOptional()
   @IsString()
-  @MaxLength(PLANTILLA_PREVIA_MAX)
+  @MaxLength(TEMPLATE_PREVIEW_MAX)
   previa?: string;
 }

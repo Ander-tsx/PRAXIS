@@ -7,5 +7,5 @@
  * viven en `commons/api/domain.ts` y salen por el índice de siempre.
  */
 
-export { aplicarPlantilla } from './aplicar';
-export { pedirBorrador } from './borrador';
+export { aplicarPlantilla } from './apply';
+export { pedirBorrador } from './draft';

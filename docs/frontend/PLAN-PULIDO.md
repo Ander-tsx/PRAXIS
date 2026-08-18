@@ -8,10 +8,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · E4 ✅ · E6 ✅ · **solo queda E5** |
-| **Última tarea terminada** | E5.4 — lote 3 (`ChatPanel`) |
-| **Siguiente** | E5.5 y E5.6 — backend (chat/realtime de projects y gateway), juntos |
-| **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
+| **Etapa actual** | **Todas cerradas: E1 ✅ E2 ✅ E3 ✅ E4 ✅ E5 ✅ E6 ✅** |
+| **Última tarea terminada** | E5.8 — la convención escrita en CLAUDE.md |
+| **Siguiente** | Nada del plan. Lo que queda son las revisiones de arquitectura, en `docs/REVISION-ARQUITECTURA.md` |
+| **Marcador** | **195 ✅ / 0 ❌** · 14 `@security` ✅ · 81 unitarias de backend ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -873,11 +873,45 @@ de ESTADO-ACTUAL §17.7.
       `api/15-chat` (17 ✅) y `ui/06-chat-zona` (4 ✅) — o sea que el tiempo real,
       que cruza los dos servicios, sigue llegando al navegador.
 
-- [ ] **E5.7 — El resto**, zona por zona.
-- [ ] **E5.8 — Escribir la convención en CLAUDE.md**, en la sección de reglas
-      del frontend: **identificadores en inglés, comentarios en español**. Sin
-      esto, la mitad en inglés parece un descuido en vez de una regla, y el
-      primero que llegue «arreglará» un nombre traduciéndolo al español.
+- [x] **E5.7 — El resto.** Las dos familias grandes que quedaban y los sueltos.
+
+      - **`Propuesta*` → `*Proposal`** (el asistente): 9 tipos, 9 guardas de tipo
+        (`esPropuestaDeTarea → isTaskProposal`) y `GrupoDePropuestas →
+        ProposalGroup`.
+      - **`Plantilla*` en el backend** → `Template*`. E5.3 solo cubrió el
+        frontend; el contrato vivía en `contracts/assistant/plantilla.dto.ts`.
+      - Sueltos: `AvisosEnVivo → LiveNotices`, `TemaActual → CurrentTheme`,
+        `MenuDeEntidad → EntityMenu`, `PanelDeEntidad → EntityPanel`,
+        `TextoDelModelo → ModelText`, `ConversacionCompleta → FullConversation`.
+
+      Con 11 ficheros y 3 carpetas renombrados por `git mv`.
+
+      ⚠️ **`Propuesta` a secas NO se renombró**, y ahí está el método
+      funcionando: sus tres apariciones son **texto que lee el usuario**
+      —«Propuesta no encontrada», «Propuesta descartada»—. Además `Proposal` ya
+      existe como modelo de Prisma en assistant-service, así que renombrarlo
+      habría colisionado con el cliente generado.
+
+      ⚠️ **`contracts` publica `dist/`**, así que renombrar un tipo allí deja
+      assistant-service sin compilar hasta un `pnpm build:shared`. Es el aviso de
+      CLAUDE.md, y muerde igual en un renombrado.
+
+      ⚠️ Comprobado que los `@source` de `theme.css` **no** se rompieron al
+      renombrar la carpeta `AvisosEnVivo/`: son comodines (`../organisms/**`). Si
+      hubieran sido rutas literales, el componente se habría quedado sin estilos
+      **sin un solo error**.
+
+      ✅ Las siete zonas, el gateway, assistant y contracts compilan; barrido de
+      comentarios a cero; `ui/03-sesion` + `ui/06-chat-zona` en verde (16).
+
+- [x] **E5.8 — La convención, escrita en CLAUDE.md.** En las reglas del
+      frontend, lo primero de la sección: la tabla de qué va en cada idioma, el
+      porqué —un identificador es una interfaz, un comentario es una
+      explicación— y **las cuatro reglas del renombrado**, con el caso real de
+      «El servidor no guardó la tag.» como aviso.
+
+      Sin esto, la mitad en inglés parece un descuido y el primero que llegue
+      «arregla» un nombre traduciéndolo al español.
 
 ---
 
@@ -1207,3 +1241,6 @@ de ESTADO-ACTUAL §17.7.
 | 2026-08-17 | E2 | Regresión completa tras cerrar E6.7: **191 ✅ / 0 ❌** en 23,2 min (158 `api` + 33 `ui`), stack en caliente. Y de paso se corrigió el marcador de E1, que estaba inflado. |
 | 2026-08-17 | E2 | **Cerrada entera.** El `apply` de E2.1 fue a producción a las 22:45 UTC con ~7,4 s de corte de Cloud SQL. Con esto las dos mitades del arreglo de la lentitud están puestas: el techo de conexiones arriba y los pools acotados abajo. |
 | 2026-08-17 | E3 | **Cerrada, con la suite en verde: 194 ✅ / 0 ❌ (26,3 min) + 14 `@security` ✅.** El chat vive en `chat-front` (4106, `basePath: '/chat'`). `rg 'dashboard/chat'` a cero, redirección 308 para las direcciones viejas, y `ui/06-chat-zona.spec.ts` (3 ✅) fijando la zona y **la URL contra la que se abre el flujo en vivo**. Lo que costó no fue mover archivos: fue que el `basePath` recorta la ruta y siete sitios daban por hecho el prefijo viejo, ninguno con error de compilación. |
+| 2026-08-17 | E4 | Cerrada. La bandeja vive en el panel, con la ruta vieja redirigiendo en 308. |
+| 2026-08-17 | E5 | **Cerrada, y con ella el plan entero.** Seis lotes de renombrado, la convención escrita en CLAUDE.md. El primer intento del lote 3 se revirtió por romper la prosa española: quedan las cuatro reglas que lo evitan. |
+| 2026-08-17 | — | **PLAN COMPLETADO.** 195 ✅ / 0 ❌ · 14 `@security` ✅ · 81 unitarias. Lo que queda son las revisiones de arquitectura, en `docs/REVISION-ARQUITECTURA.md`. |

@@ -12,7 +12,7 @@ import type {
 import { PERMISSION_LABELS, PROJECT_PERMISSIONS } from '../../api/domain';
 import { Button, Input, Textarea } from '../../atoms';
 import { alpha, colors } from '../../tokens';
-import type { AplicarPlantillaAction, BorradorDePlantillaAction } from './project-form';
+import type { AplicarPlantillaAction, TemplateDraftAction } from './project-form';
 import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX } from './project-form';
 
 /**
@@ -45,18 +45,18 @@ import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX } from './project-form';
 
 type Paso = 'contar' | 'revisar' | 'hecho';
 
-export interface PlantillaAsistidaProps {
-  borradorAction: BorradorDePlantillaAction;
+export interface AssistedTemplateProps {
+  borradorAction: TemplateDraftAction;
   aplicarAction: AplicarPlantillaAction;
   /** Para volver al modo manual desde el estado inicial. */
   onCancelar: () => void;
 }
 
-export function PlantillaAsistida({
+export function AssistedTemplate({
   borradorAction,
   aplicarAction,
   onCancelar,
-}: PlantillaAsistidaProps) {
+}: AssistedTemplateProps) {
   const [paso, setPaso] = useState<Paso>('contar');
   const [brief, setBrief] = useState('');
   const [plantilla, setPlantilla] = useState<ProjectTemplate | null>(null);

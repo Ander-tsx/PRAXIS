@@ -14,9 +14,9 @@ import { firstValueFrom } from 'rxjs';
 
 import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
-import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './plantilla';
 import { systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
+import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
 import { herramientasPara } from './tools';
 
 /** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */

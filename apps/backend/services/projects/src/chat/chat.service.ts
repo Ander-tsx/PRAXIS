@@ -1186,7 +1186,7 @@ export class ChatService {
    * Quien recibe el evento ya tiene permiso para leer el canal —es participante,
    * y la lista sale de la base—, así que no es una fuga; lo que no debe hacerse
    * es reproducirlo en una tarjeta que aparece sobre cualquier pantalla, y eso
-   * lo decide `AvisosEnVivo`.
+   * lo decide `LiveNotices`.
    */
   private anunciarMensaje(channelId: string, mensaje: { id: string; authorId: string }, at: Date) {
     return this.eventos.repartir(channelId, (contexto) => ({

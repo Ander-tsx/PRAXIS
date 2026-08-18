@@ -30,11 +30,11 @@ const MINIMO_PARA_APILAR = 2;
  * permisos, y si una falla —columna borrada, permiso retirado— enseña su error
  * mientras las demás siguen.
  */
-export interface GrupoDePropuestasProps {
+export interface ProposalGroupProps {
   children: ReactNode;
 }
 
-export function GrupoDePropuestas({ children }: GrupoDePropuestasProps) {
+export function ProposalGroup({ children }: ProposalGroupProps) {
   const tarjetas = Children.toArray(children);
   const total = tarjetas.length;
 

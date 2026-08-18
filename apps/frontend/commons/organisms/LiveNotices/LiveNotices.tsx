@@ -3,7 +3,7 @@
 import { useCallback, useRef } from 'react';
 import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
-import { useRefrescoAgrupado, useTemaActual } from '../../hooks';
+import { useCurrentTheme, useRefrescoAgrupado } from '../../hooks';
 import { useLiveEvent, useReconnection } from '../../realtime';
 import type { ChatMessageEvent, NoticeEvent } from '../../realtime';
 import {
@@ -11,7 +11,7 @@ import {
   type Presentacion,
   RELLENO_POR_TEMA,
   presentacionDe,
-} from './estilos';
+} from './styles';
 
 /**
  * Las tarjetas que aparecen solas mientras la pantalla está abierta.
@@ -49,9 +49,9 @@ import {
  * ya está guardado y se ve al entrar. Esto es una capa encima; que Redis o el
  * flujo fallen degrada el tiempo real y nada más.
  */
-export function AvisosEnVivo() {
+export function LiveNotices() {
   const pedirRefresco = useRefrescoAgrupado();
-  const tema = useTemaActual();
+  const tema = useCurrentTheme();
 
   /**
    * El contexto de audio se crea una vez y a la primera necesidad.

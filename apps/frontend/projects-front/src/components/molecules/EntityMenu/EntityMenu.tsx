@@ -2,12 +2,12 @@
 
 import { alpha, colors } from '@praxis/commons';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PanelDeEntidad, type PanelDeEntidadProps } from './PanelDeEntidad';
+import { EntityPanel, type EntityPanelProps } from './EntityPanel';
 
-export type MenuDeEntidadProps = Omit<PanelDeEntidadProps, 'alCerrar'>;
+export type EntityMenuProps = Omit<EntityPanelProps, 'alCerrar'>;
 
 /**
- * `PanelDeEntidad` detrás de tres puntos, en un desplegable.
+ * `EntityPanel` detrás de tres puntos, en un desplegable.
  *
  * Es la forma que toma en la cabecera del tablero, al lado de «Ampliar»: el
  * disparador copia el tratamiento de ese botón —texto secundario, fondo al
@@ -17,7 +17,7 @@ export type MenuDeEntidadProps = Omit<PanelDeEntidadProps, 'alCerrar'>;
  * Quien no puede ni renombrar ni borrar no ve nada: tres puntos que abren un
  * menú vacío son ruido.
  */
-export function MenuDeEntidad(props: MenuDeEntidadProps) {
+export function EntityMenu(props: EntityMenuProps) {
   const [abierto, setAbierto] = useState(false);
   const contenedor = useRef<HTMLDivElement>(null);
   const disparador = useRef<HTMLButtonElement>(null);
@@ -91,7 +91,7 @@ export function MenuDeEntidad(props: MenuDeEntidadProps) {
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
           }}
         >
-          <PanelDeEntidad {...props} alCerrar={cerrar} />
+          <EntityPanel {...props} alCerrar={cerrar} />
         </div>
       )}
     </div>

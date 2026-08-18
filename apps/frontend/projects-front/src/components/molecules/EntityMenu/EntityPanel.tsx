@@ -13,7 +13,7 @@ type Vista = 'menu' | 'renombrar' | 'eliminar';
  * que lo usan mandan campos ocultos distintos y validan con reglas distintas, y
  * el hook tiene que vivir en el componente que sabe cuáles son.
  */
-export interface AccionDeEntidad {
+export interface EntityAction {
   ejecutar: (formData: FormData) => void;
   error: string | null;
   /** Lo que confirmó el servidor. Es lo que cierra el panel, no el envío. */
@@ -21,7 +21,7 @@ export interface AccionDeEntidad {
   pendiente: boolean;
 }
 
-export interface PanelDeEntidadProps {
+export interface EntityPanelProps {
   /** «espacio», «tablero». Va en los textos y en el nombre accesible. */
   entidad: string;
   nombre: string;
@@ -42,8 +42,8 @@ export interface PanelDeEntidadProps {
   avisoDeBorrado: ReactNode;
   /** Los `<input type="hidden">` que necesitan las dos acciones. */
   camposOcultos: ReactNode;
-  renombrar: AccionDeEntidad;
-  eliminar: AccionDeEntidad;
+  renombrar: EntityAction;
+  eliminar: EntityAction;
   /** Cerrar del todo: lo resuelve quien nos monta, que sabe dónde vivimos. */
   alCerrar: () => void;
 }
@@ -74,13 +74,13 @@ export interface PanelDeEntidadProps {
  *
  * ## Por qué el panel va aparte del desplegable
  *
- * `MenuDeEntidad` lo envuelve en un popover para la cabecera del tablero. El
+ * `EntityMenu` lo envuelve en un popover para la cabecera del tablero. El
  * selector de espacios **no puede usar ese popover**: su lista es un
  * `overflow-y-auto` dentro de un contenedor `overflow-hidden`, así que un panel
  * absoluto saldría recortado. Allí se monta este panel en el cuerpo del propio
  * desplegable, sustituyendo a la lista. La lógica es la misma en los dos.
  */
-export function PanelDeEntidad({
+export function EntityPanel({
   entidad,
   nombre,
   nombreMax,
@@ -93,7 +93,7 @@ export function PanelDeEntidad({
   renombrar,
   eliminar,
   alCerrar,
-}: PanelDeEntidadProps) {
+}: EntityPanelProps) {
   const [vista, setVista] = useState<Vista>('menu');
   const [nombreNuevo, setNombreNuevo] = useState(nombre);
   const [confirmacion, setConfirmacion] = useState('');

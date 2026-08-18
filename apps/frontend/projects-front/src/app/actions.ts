@@ -102,7 +102,7 @@ export async function borradorDePlantillaAction(
  * Crea el proyecto y todo lo que la plantilla propone.
  *
  * Llama a los endpoints de siempre, uno a uno, con esta sesión: no hay ninguna
- * vía de escritura nueva. Ver `commons/template/aplicar`.
+ * vía de escritura nueva. Ver `commons/template/apply`.
  */
 export async function crearProyectoDesdePlantillaAction(
   plantilla: ProjectTemplate,

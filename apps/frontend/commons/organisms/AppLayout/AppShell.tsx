@@ -15,7 +15,7 @@ import type { AppNavItem } from './navigation';
  *
  * ## Qué pesa y por qué
  *
- * `AvisosEnVivo` usa `sileo` para las tarjetas, y `sileo` arrastra `motion`.
+ * `LiveNotices` usa `sileo` para las tarjetas, y `sileo` arrastra `motion`.
  * Medido sobre la compilación de producción de dashboard-front: el trozo que
  * lleva `motion` son **82 KB comprimidos de los 358 KB** de JavaScript de
  * cliente — un **23%**. Y entraba en las **seis** zonas privadas, porque este
@@ -37,10 +37,9 @@ import type { AppNavItem } from './navigation';
  * `ssr: false` porque no hay nada que renderizar en el servidor: sin eventos, no
  * hay tarjetas.
  */
-const AvisosEnVivo = dynamic(
-  () => import('../AvisosEnVivo').then((modulo) => modulo.AvisosEnVivo),
-  { ssr: false },
-);
+const LiveNotices = dynamic(() => import('../LiveNotices').then((modulo) => modulo.LiveNotices), {
+  ssr: false,
+});
 
 export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
@@ -355,7 +354,7 @@ function ArmazonInterno({
          * projects-front es `/projects/api/gateway`, y ahí es donde esa zona
          * monta su `createGatewayProxy()`.
          */}
-        <AvisosEnVivo />
+        <LiveNotices />
 
         {/* ── Cajón lateral (móvil) ────────────────────────────── */}
         {mobileMenuOpen && (

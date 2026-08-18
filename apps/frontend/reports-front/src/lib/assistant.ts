@@ -25,7 +25,7 @@ export interface AssistantQuota {
  * Lo que el asistente **propone**, nunca lo que hace.
  *
  * `args` llega como diccionario suelto porque cada herramienta trae los suyos.
- * Se estrecha con `esPropuestaDeTarea` / `esPropuestaDeAsignacion` justo antes
+ * Se estrecha con `isTaskProposal` / `isAssignmentProposal` justo antes
  * de pintarla, que es el único sitio donde importa la forma concreta.
  */
 export interface AssistantProposal {
@@ -41,7 +41,7 @@ export interface AssistantProposal {
 }
 
 /** `proponer_tarea`, ya validada contra el proyecto por el servicio. */
-export interface PropuestaTarea {
+export interface TaskProposal {
   title: string;
   description?: string;
   columnId: string;
@@ -64,7 +64,7 @@ export interface PropuestaTarea {
 }
 
 /** `proponer_asignacion`. `taskId` lo da la persona: no está en el contexto. */
-export interface PropuestaAsignacion {
+export interface AssignmentProposal {
   taskId: string;
   /**
    * El título de la tarea, resuelto por el servicio contra su inventario.
@@ -92,7 +92,7 @@ interface SobreTarea {
 }
 
 /** `proponer_edicion`. Solo trae los campos que cambian. */
-export interface PropuestaEdicion extends SobreTarea {
+export interface EditProposal extends SobreTarea {
   title?: string;
   description?: string;
   priority?: string;
@@ -102,7 +102,7 @@ export interface PropuestaEdicion extends SobreTarea {
 }
 
 /** `proponer_movimiento`. */
-export interface PropuestaMovimiento extends SobreTarea {
+export interface MoveProposal extends SobreTarea {
   columnId: string;
   columnName: string;
   /** De dónde sale, para que la tarjeta pueda decir «de X a Y». */
@@ -114,12 +114,12 @@ export interface PropuestaMovimiento extends SobreTarea {
 }
 
 /** `proponer_checklist`. Los pasos se suman a los que ya hubiera. */
-export interface PropuestaChecklist extends SobreTarea {
+export interface ChecklistProposal extends SobreTarea {
   items: string[];
 }
 
 /** `proponer_comentario`. Se publica a nombre de quien acepta. */
-export interface PropuestaComentario extends SobreTarea {
+export interface CommentProposal extends SobreTarea {
   body: string;
 }
 
@@ -133,7 +133,7 @@ export interface PropuestaComentario extends SobreTarea {
  * resuelven aquí: el nombre ya está escrito dentro, así que la tarjeta lo pinta
  * tal cual y el chat lo convierte en etiqueta al mostrarlo.
  */
-export interface PropuestaMensaje {
+export interface MessageProposal {
   body: string;
   porQue?: string;
 }
@@ -145,7 +145,7 @@ export interface PropuestaMensaje {
  * `items` son los textos, para que la tarjeta pueda decir QUÉ se marca sin ir a
  * buscarlo; `itemIds` es lo que se manda al aceptar.
  */
-export interface PropuestaMarcarPasos extends SobreTarea {
+export interface CheckStepsProposal extends SobreTarea {
   itemIds: string[];
   items: string[];
 }
@@ -162,7 +162,7 @@ export interface PropuestaMarcarPasos extends SobreTarea {
  * se vuelve a validar en el gateway al guardarlo. El modelo eligió la forma y la
  * métrica; los números salen de los agregados de siempre.
  */
-export interface PropuestaGrafico {
+export interface ChartProposal {
   grafico: {
     forma: string;
     metrica: string;
@@ -177,7 +177,7 @@ export interface PropuestaGrafico {
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /** Una conversación en la lista lateral, sin sus mensajes. */
-export interface ConversacionResumen {
+export interface ConversationSummary {
   id: string;
   title: string;
   createdAt: string;
@@ -186,7 +186,7 @@ export interface ConversacionResumen {
 }
 
 /** Un turno tal y como vuelve de la base al releer una conversación. */
-export interface MensajeGuardado {
+export interface StoredMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
@@ -194,12 +194,12 @@ export interface MensajeGuardado {
   proposals: AssistantProposal[];
 }
 
-export interface ConversacionCompleta {
+export interface FullConversation {
   id: string;
   title: string;
   createdAt: string;
   updatedAt: string;
-  mensajes: MensajeGuardado[];
+  mensajes: StoredMessage[];
 }
 
 export interface AssistantChatResult {
@@ -220,51 +220,51 @@ export interface ChatTurn {
 /** Tantos turnos como acepta el DTO del gateway. Más da 400. */
 export const MAX_HISTORIAL = 12;
 
-export function esPropuestaDeTarea(
+export function isTaskProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaTarea } {
+): propuesta is AssistantProposal & { args: TaskProposal } {
   return propuesta.tool === 'proponer_tarea' && typeof propuesta.args.title === 'string';
 }
 
-export function esPropuestaDeAsignacion(
+export function isAssignmentProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaAsignacion } {
+): propuesta is AssistantProposal & { args: AssignmentProposal } {
   return propuesta.tool === 'proponer_asignacion' && typeof propuesta.args.taskId === 'string';
 }
 
-export function esPropuestaDeEdicion(
+export function isEditProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaEdicion } {
+): propuesta is AssistantProposal & { args: EditProposal } {
   return propuesta.tool === 'proponer_edicion' && typeof propuesta.args.taskId === 'string';
 }
 
-export function esPropuestaDeMovimiento(
+export function isMoveProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaMovimiento } {
+): propuesta is AssistantProposal & { args: MoveProposal } {
   return propuesta.tool === 'proponer_movimiento' && typeof propuesta.args.columnId === 'string';
 }
 
-export function esPropuestaDeChecklist(
+export function isChecklistProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaChecklist } {
+): propuesta is AssistantProposal & { args: ChecklistProposal } {
   return propuesta.tool === 'proponer_checklist' && Array.isArray(propuesta.args.items);
 }
 
-export function esPropuestaDeComentario(
+export function isCommentProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaComentario } {
+): propuesta is AssistantProposal & { args: CommentProposal } {
   return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
 }
 
-export function esPropuestaDeMarcarPasos(
+export function isCheckStepsProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaMarcarPasos } {
+): propuesta is AssistantProposal & { args: CheckStepsProposal } {
   return propuesta.tool === 'proponer_marcar_pasos' && Array.isArray(propuesta.args.itemIds);
 }
 
-export function esPropuestaDeGrafico(
+export function isChartProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaGrafico } {
+): propuesta is AssistantProposal & { args: ChartProposal } {
   return (
     propuesta.tool === 'proponer_grafico' &&
     typeof propuesta.args.grafico === 'object' &&
@@ -272,9 +272,9 @@ export function esPropuestaDeGrafico(
   );
 }
 
-export function esPropuestaDeMensaje(
+export function isMessageProposal(
   propuesta: AssistantProposal,
-): propuesta is AssistantProposal & { args: PropuestaMensaje } {
+): propuesta is AssistantProposal & { args: MessageProposal } {
   return propuesta.tool === 'proponer_mensaje' && typeof propuesta.args.body === 'string';
 }
 
