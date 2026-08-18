@@ -816,13 +816,34 @@ export interface NotificationPage {
  */
 
 /**
- * Las reacciones que acepta el backend.
+ * Las reacciones que se **ofrecen**, en el orden en que se pintan.
  *
  * Lista **cerrada** y espejo de `CHAT_REACTIONS` en `@praxis/contracts`: el
  * emoji viaja en el cuerpo y acaba en la base, así que dejarlo abierto sería un
  * campo más donde meter lo que sea.
+ *
+ * Cinco y no seis, y estas cinco: el juego anterior —🎉 🚀 👀 😄— eran cuatro
+ * formas de decir que algo te parece bien y **ninguna** de decir que no. Un
+ * selector de reacciones sirve para contestar sin escribir, y contestar incluye
+ * discrepar: sin un 👎, quien no está de acuerdo tiene que escribirlo o
+ * callarse. El orden va de más a menos frecuente y deja el pulgar hacia abajo
+ * en el extremo, lejos del pulgar hacia arriba — son la misma silueta girada y
+ * juntos se pulsan mal.
  */
-export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+export const CHAT_REACTIONS = ['👍', '❤️', '😂', '😮', '👎'] as const;
+
+/**
+ * Las que se **aceptan**, que no son las mismas.
+ *
+ * ⚠️ **Quitar una reacción tiene que seguir funcionando aunque ya no se
+ * ofrezca.** El backend valida el emoji en las dos direcciones, así que al
+ * recortar la lista los 🎉 y 🚀 que ya estaban puestos se habrían quedado
+ * pegados para siempre: el botón daba 400 y no había forma de retirarlos. Los
+ * retirados siguen aquí —y en `CHAT_REACTIONS_ACEPTADAS` de `@praxis/contracts`,
+ * que es quien de verdad valida— pero no salen en ningún selector, así que no
+ * se pueden volver a poner.
+ */
+export const CHAT_REACTIONS_ACEPTADAS = [...CHAT_REACTIONS, '🎉', '👀', '🚀', '😄'] as const;
 
 export type ChatReactionEmoji = (typeof CHAT_REACTIONS)[number];
 

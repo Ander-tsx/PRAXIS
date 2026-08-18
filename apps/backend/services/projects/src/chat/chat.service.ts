@@ -72,13 +72,26 @@ const CON_MENSAJE = {
 } as const;
 
 /**
- * Las reacciones que se aceptan.
+ * Las reacciones que se **ofrecen**.
  *
- * Una lista corta y cerrada, no texto libre: el emoji viaja en la URL y acaba en
- * la base, así que dejarlo abierto es un campo más donde meter lo que sea. Seis
- * cubren lo que la gente usa de verdad y caben en una fila sin desplegable.
+ * Una lista corta y cerrada, no texto libre: el emoji viaja en el cuerpo y acaba
+ * en la base, así que dejarlo abierto es un campo más donde meter lo que sea.
+ * Cinco caben en una fila sin desplegable y cubren aprobar, querer, reír,
+ * sorprenderse y **discrepar** — esto último no lo cubría ninguna de las seis
+ * anteriores. Espejo de `CHAT_REACTIONS` en `@praxis/contracts`.
  */
-export const REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '👎'] as const;
+
+/**
+ * Las que se **aceptan**: las de arriba más las retiradas del selector.
+ *
+ * ⚠️ **Esta comprobación corre también al quitar una reacción**, así que
+ * validar solo contra `REACTIONS` dejaba pegados para siempre los 🎉 y 🚀
+ * que ya estaban guardados: el botón daba 400 y no había forma de retirarlos.
+ * Los retirados se aceptan pero no los ofrece ningún cliente, así que se pueden
+ * quitar y no se pueden volver a poner. Espejo de `CHAT_REACTIONS_ACEPTADAS`.
+ */
+export const ACCEPTED_REACTIONS = [...REACTIONS, '🎉', '👀', '🚀', '😄'] as const;
 
 /**
  * Cuántos mensajes se pueden tener fijados a la vez en un canal.
@@ -735,7 +748,7 @@ export class ChatService {
     emoji: string;
     on: boolean;
   }) {
-    if (!(REACTIONS as readonly string[]).includes(dto.emoji)) {
+    if (!(ACCEPTED_REACTIONS as readonly string[]).includes(dto.emoji)) {
       throw new RpcException({ statusCode: 400, message: 'Esa reacción no está permitida.' });
     }
 
