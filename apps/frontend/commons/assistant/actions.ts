@@ -4,6 +4,7 @@ import type {
   AssignmentProposal,
   AssistantChatResult,
   AssistantQuota,
+  BoardProposal,
   CheckStepsProposal,
   ChecklistProposal,
   CommentProposal,
@@ -14,7 +15,7 @@ import type {
   MoveProposal,
   TaskProposal,
 } from '../api/assistant';
-import type { ProjectDetail, Task } from '../api/domain';
+import type { Board, Column, ProjectDetail, Task, Workspace } from '../api/domain';
 import { cuotaDelError, describe, requireApi } from './helpers';
 
 /**
@@ -39,6 +40,7 @@ import { cuotaDelError, describe, requireApi } from './helpers';
  * | `aceptarMarcarPasosAction` | `POST /tasks/:id/checklists/:item/toggle` | `canMoveTask` |
  * | `aceptarMensajeAction` | `POST /projects/:id/chat/messages` | `canComment` |
  * | `aceptarBorradoAction` | `DELETE /tasks/:id` | `canDeleteTask` |
+ * | `aceptarTableroAction` | `POST /workspaces/:id/boards` + `/columns` | `canCreateBoard` + `canCreateColumn` |
  *
  * No se abre ninguna vía de escritura nueva: sin `canCreateTask`, aceptar falla
  * igual que le fallaría a esa persona pulsando el botón a mano.
@@ -748,6 +750,122 @@ export async function aceptarBorradoAction(
     return { error: null, borrada: { title: tarea.title } };
   } catch (error) {
     return { error: describe(error, 'No se pudo borrar la tarea.'), borrada: null };
+  }
+}
+
+/**
+ * Crear el tablero propuesto, con sus columnas.
+ *
+ * Llama a los **mismos tres endpoints y en el mismo orden** que la plantilla de
+ * proyecto nuevo (`commons/template/apply.ts`), que lleva funcionando desde que
+ * existe el asistente:
+ *
+ * | Paso | Endpoint | Permiso |
+ * |---|---|---|
+ * | El espacio, si no existe | `POST /projects/:id/workspaces` | `canEditBoard` |
+ * | El tablero | `POST /workspaces/:id/boards` | `canCreateBoard` |
+ * | Cada columna | `POST /boards/:id/columns` | `canCreateColumn` |
+ * | El color de la columna | `PATCH /boards/:id/columns/:columnId` | `canEditColumn` |
+ *
+ * Ninguna ruta nueva, ninguna vía de escritura nueva.
+ *
+ * ## ⚠️ El espacio se resuelve contra el proyecto, no se cree
+ *
+ * La propuesta trae un **nombre** —el modelo no ve los ids— así que aquí se pide
+ * el proyecto de verdad y se busca uno que se llame así, sin distinguir mayúsculas
+ * ni acentos sobrantes de espacio. Solo se crea si de verdad no hay ninguno.
+ * Fiarse del nombre a ciegas habría acabado en un espacio «General» duplicado
+ * cada vez que alguien acepta.
+ *
+ * ## ⚠️ El color va en un `PATCH` aparte, y si falla no se pierde la columna
+ *
+ * `POST /boards/:id/columns` solo acepta `name` y `order`: un campo de más es un
+ * 400. Y un color que no se pudo poner **no es una columna perdida** — la columna
+ * está, le falta el color, y contarla como fallo diría que hay que rehacer algo
+ * que ya está hecho.
+ *
+ * ## Fallar a mitad, y decirlo
+ *
+ * Si el tablero se crea y una columna no, no se deshace nada: no hay transacción
+ * que abarque tres endpoints, y borrar lo ya creado para «dejarlo limpio» sería
+ * destruir trabajo por un fallo de red. Se devuelve lo que se creó y lo que no,
+ * y la tarjeta lo dice — el mismo criterio que la plantilla.
+ */
+export async function aceptarTableroAction(
+  projectId: string,
+  propuesta: BoardProposal,
+): Promise<{
+  error: string | null;
+  creado: { boardId: string; nombre: string; columnas: number; fallos: string[] } | null;
+}> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', creado: null };
+
+  const nombreTablero = String(propuesta.nombre ?? '').trim();
+  const nombreEspacio = String(propuesta.espacio ?? '').trim();
+  const columnas = Array.isArray(propuesta.columnas) ? propuesta.columnas : [];
+  if (!nombreTablero || columnas.length === 0) {
+    return { error: 'La propuesta no dice qué tablero crear.', creado: null };
+  }
+
+  const fallos: string[] = [];
+
+  try {
+    const proyecto = await api.get<ProjectDetail>(`/projects/${projectId}`);
+
+    /* El espacio: el que ya se llame así, o uno nuevo. Ver la nota de arriba. */
+    const normalizar = (texto: string) => texto.trim().toLocaleLowerCase('es');
+    let espacio = (proyecto.workspaces ?? []).find(
+      (candidato) => normalizar(candidato.name) === normalizar(nombreEspacio),
+    );
+
+    if (!espacio) {
+      espacio = await api.post<Workspace>(`/projects/${projectId}/workspaces`, {
+        name: nombreEspacio || 'General',
+      });
+      if (!espacio?.id) return { error: 'El servidor no guardó el espacio.', creado: null };
+    }
+
+    const tablero = await api.post<Board>(`/workspaces/${espacio.id}/boards`, {
+      name: nombreTablero,
+    });
+    /* Contra el `data`, no contra el status. */
+    if (!tablero?.id) return { error: 'El servidor no guardó el tablero.', creado: null };
+
+    let creadas = 0;
+    for (const [orden, columna] of columnas.entries()) {
+      const nombreColumna = String(columna.nombre ?? '').trim();
+      if (!nombreColumna) continue;
+
+      try {
+        const creada = await api.post<Column>(`/boards/${tablero.id}/columns`, {
+          name: nombreColumna,
+          order: orden,
+        });
+        if (!creada?.id) {
+          fallos.push(`La columna «${nombreColumna}» no se guardó.`);
+          continue;
+        }
+        creadas += 1;
+
+        if (columna.color) {
+          await api
+            .patch(`/boards/${tablero.id}/columns/${creada.id}`, { color: columna.color })
+            /* La columna está; lo que falta es el color. No se cuenta como fallo
+               de columna ni se avisa: sería ruido sobre algo cosmético. */
+            .catch(() => null);
+        }
+      } catch (error) {
+        fallos.push(`La columna «${nombreColumna}»: ${describe(error, 'no se pudo crear.')}`);
+      }
+    }
+
+    return {
+      error: null,
+      creado: { boardId: tablero.id, nombre: tablero.name, columnas: creadas, fallos },
+    };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo crear el tablero.'), creado: null };
   }
 }
 

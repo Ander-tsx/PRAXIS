@@ -6,6 +6,7 @@ import {
   type AssistantQuota,
   formatoReinicio,
   isAssignmentProposal,
+  isBoardProposal,
   isChartProposal,
   isCheckStepsProposal,
   isChecklistProposal,
@@ -28,6 +29,7 @@ import {
   AccionDelLienzo,
   type AceptarGrafico,
   AssignProposalCard,
+  BoardProposalCard,
   ChartProposalCard,
   ChecklistProposalCard,
   CommentProposalCard,
@@ -600,6 +602,19 @@ export function AssistantChat({
                           /* Preguntar no propone ningún cambio, así que ninguna
                            de las guardas de abajo la reclama: el orden aquí solo
                            ahorra recorrerlas. */
+                          if (isBoardProposal(propuesta)) {
+                            return (
+                              <BoardProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
                           if (isQuestionProposal(propuesta)) {
                             return (
                               <QuestionProposalCard

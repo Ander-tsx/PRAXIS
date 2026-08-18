@@ -60,6 +60,20 @@ interface ChatPayload {
 const MAX_PREGUNTAS = 3;
 const MAX_OPCIONES = 8;
 
+/**
+ * Cuántas columnas admite un tablero propuesto, y cuál es el verde.
+ *
+ * Ocho es el techo antes de que un tablero deje de mantenerse solo; un flujo
+ * normal son tres o cuatro.
+ *
+ * ⚠️ `success` **no es un color, es un estado**: una tarea en una columna verde
+ * cuenta como cerrada en los informes y deja de avisar aunque esté vencida
+ * (`DONE_COLUMN_COLOR`). Por eso solo puede haber una.
+ */
+const MAX_COLUMNAS = 8;
+const COLOR_DE_CIERRE = 'success';
+const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
+
 /** La forma del briefing, en lo que hace falta para validar lo que propone. */
 interface Briefing {
   /**
@@ -574,6 +588,63 @@ export class AssistantService {
              sobre qué tarea es sin ir a buscarla. */
           ...(tarea ? { taskTitle: tarea.titulo } : {}),
           assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /**
+     * Un tablero nuevo con sus columnas.
+     *
+     * ⚠️ **Va antes del filtro de «sobre una tarea»**: no apunta a ninguna, así
+     * que pasando por él se descartaría siempre por no traer `taskId`.
+     *
+     * Lo que se comprueba es la forma y **el verde**. Un tablero con dos columnas
+     * de cierre rompe los informes en silencio: `excludeDone` y el cálculo de
+     * `completed` miran el color, así que dos verdes hacen que una tarea cuente
+     * como terminada en dos sitios del flujo. Se deja el verde **solo en la
+     * última**, que es además donde el modelo lo pone casi siempre.
+     */
+    if (call.name === 'proponer_tablero') {
+      const espacio = String(call.args.espacio ?? '').trim();
+      const nombre = String(call.args.nombre ?? '').trim();
+      if (!espacio || !nombre) return null;
+
+      const crudas = Array.isArray(call.args.columnas) ? call.args.columnas : [];
+      const columnas = crudas
+        .slice(0, MAX_COLUMNAS)
+        .map((cruda: unknown) => {
+          const columna = (cruda ?? {}) as Record<string, unknown>;
+          const nombreColumna = String(columna.nombre ?? '').trim();
+          if (!nombreColumna) return null;
+
+          const color = String(columna.color ?? '');
+          return {
+            nombre: nombreColumna.slice(0, 60),
+            ...(COLORES_DE_COLUMNA.includes(color) ? { color } : {}),
+          };
+        })
+        .filter(Boolean) as { nombre: string; color?: string }[];
+
+      /* Un tablero de una sola columna no es un flujo: es una lista, y para eso
+         no hace falta un tablero nuevo. */
+      if (columnas.length < 2) {
+        this.log.warn('El modelo propuso un tablero con menos de dos columnas: se descarta');
+        return null;
+      }
+
+      /* El verde, solo en la última. Ver la nota de arriba. */
+      const ultima = columnas.length - 1;
+      for (const [indice, columna] of columnas.entries()) {
+        if (columna.color === COLOR_DE_CIERRE && indice !== ultima) delete columna.color;
+      }
+
+      return {
+        tool: call.name,
+        args: {
+          espacio: espacio.slice(0, 80),
+          nombre: nombre.slice(0, 80),
+          columnas,
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };

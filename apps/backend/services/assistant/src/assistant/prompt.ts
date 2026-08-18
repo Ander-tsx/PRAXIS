@@ -152,6 +152,22 @@ const REGLAS = [
     'propio boton. Como mucho una tarjeta de preguntas por respuesta.',
 
   /**
+   * 4 quater — El tablero, y cuándo NO proponerlo.
+   *
+   * ⚠️ La regla que hace falta no es «puedes crear tableros» —eso ya lo dice la
+   * herramienta— sino **cuándo no**. Sin límite, a la primera petición que no
+   * encaja del todo en las columnas que hay, el modelo propone un tablero nuevo:
+   * es la salida fácil, y deja el proyecto lleno de tableros de uno.
+   */
+  'Puedes proponer un tablero con sus columnas cuando no haya donde poner el ' +
+    'trabajo: un proyecto recien creado, o un area nueva que de verdad no encaja ' +
+    'en lo que ya hay. Si existe un tablero donde cabe, USA ESE y no propongas ' +
+    'otro. Las columnas van en orden y son un flujo, no categorias: tres o cuatro ' +
+    'bastan casi siempre. ⚠️ La ULTIMA es la de trabajo terminado y va en color ' +
+    '"success": lo que llegue ahi cuenta como cerrado en los informes, asi que ' +
+    'solo una puede llevarlo y tiene que ser esa.',
+
+  /**
    * 5 — Mirar antes de responder. La otra mitad de «investiga por tu cuenta».
    *
    * El contexto trae el inventario entero: todas las tareas con su columna, su

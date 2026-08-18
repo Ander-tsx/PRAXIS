@@ -517,6 +517,89 @@ const PROPONER_BORRADO: FunctionDeclaration = {
   },
 };
 
+/** Los colores de columna del design system. Espejo de `COLUMN_COLORS`. */
+const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
+
+/**
+ * Montar un tablero con sus columnas.
+ *
+ * ## Por qué existe, si «el asistente no configura proyectos»
+ *
+ * Porque ya lo hacía, solo que en otro sitio. La plantilla de proyecto nuevo
+ * (`proponer_plantilla`) genera el árbol entero —espacios, tableros, columnas,
+ * etiquetas y roles— y nadie la consideró nunca una vía de escritura nueva, por
+ * el mismo motivo que ninguna de las demás lo es: **propone, y ejecuta quien
+ * acepta, con sus permisos**.
+ *
+ * Que esa capacidad estuviera solo en el modal de creación era un accidente de
+ * dónde se implementó, no una decisión. Y se notaba: en un proyecto vacío, a
+ * «créame una tarea» el asistente solo podía contestar que primero hacía falta un
+ * tablero — sabiendo perfectamente cuál proponer.
+ *
+ * ## Un solo tablero por propuesta, y con sus columnas dentro
+ *
+ * No es un generador de proyectos: eso ya existe y vive en su sitio. Aquí se
+ * propone **un** tablero, porque lo que resuelve es el hueco concreto de una
+ * conversación —«no hay dónde poner esto»— y no rehacer la estructura entera.
+ *
+ * Las columnas van dentro y no en una propuesta aparte porque un tablero sin
+ * columnas no sirve para nada: aceptar dos tarjetas para tener algo utilizable
+ * es partir una decisión que es una sola.
+ */
+const PROPONER_TABLERO: FunctionDeclaration = {
+  name: 'proponer_tablero',
+  description:
+    'Prepara la propuesta de un tablero nuevo con sus columnas. NO lo crea: la ' +
+    'persona lo acepta. Usalo cuando haga falta un sitio donde poner el trabajo y ' +
+    'no lo haya —un proyecto recien creado, o un area nueva que no encaja en los ' +
+    'tableros que ya existen—. Si ya hay un tablero donde cabe lo que se esta ' +
+    'hablando, NO propongas otro: usa el que hay.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      espacio: {
+        type: 'STRING',
+        description:
+          'Nombre del espacio de trabajo donde va el tablero. Si en "tableros" ya ' +
+          'hay alguno, usa el nombre de espacio de uno de ellos. Si el proyecto ' +
+          'esta vacio, propon un nombre corto y descriptivo (por ejemplo "General").',
+      },
+      nombre: {
+        type: 'STRING',
+        description: 'Nombre del tablero. Corto y concreto. Maximo 80 caracteres.',
+      },
+      columnas: {
+        type: 'ARRAY',
+        description:
+          'De 2 a 8 columnas, EN ORDEN, de lo que esta por empezar a lo terminado. ' +
+          'Un flujo normal son tres o cuatro; mas de seis se convierte en un ' +
+          'tablero que nadie mantiene.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            nombre: { type: 'STRING', description: 'Nombre de la columna.' },
+            color: {
+              type: 'STRING',
+              enum: COLORES_DE_COLUMNA,
+              description:
+                'Opcional. ⚠️ "success" es el VERDE DE CIERRE y tiene significado: ' +
+                'una tarea en una columna verde cuenta como terminada en los ' +
+                'informes y deja de avisar aunque este vencida. Ponlo SOLO en la ' +
+                'ultima columna, la de trabajo acabado, y nunca en dos.',
+            },
+          },
+          required: ['nombre'],
+        },
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Por que este tablero y por que estas columnas, en una frase.',
+      },
+    },
+    required: ['espacio', 'nombre', 'columnas', 'porQue'],
+  },
+};
+
 /**
  * Preguntar de vuelta, con opciones que se pulsan.
  *
@@ -645,6 +728,15 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
    * quien edita **no** borra.
    */
   if (permisos.canDeleteTask) tools.push(PROPONER_BORRADO);
+  /**
+   * El tablero pide `canCreateBoard` **y** `canCreateColumn`, no uno de los dos.
+   *
+   * Un tablero sin columnas no sirve para nada, así que proponerlo a quien solo
+   * puede lo primero acabaría en una tarjeta que crea un cascarón vacío. Y
+   * `canCreateColumn` no implica `canCreateBoard` ni al revés: son ramas
+   * distintas de la jerarquía, así que hay que exigir las dos.
+   */
+  if (permisos.canCreateBoard && permisos.canCreateColumn) tools.push(PROPONER_TABLERO);
   return tools;
 }
 

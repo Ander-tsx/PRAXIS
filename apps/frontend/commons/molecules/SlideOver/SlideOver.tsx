@@ -49,15 +49,15 @@ export function SlideOver({
     if (open) {
       document.body.style.paddingRight = paddingSizes[size];
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-      
+
       const handleGlobalClick = (event: MouseEvent) => {
         // Ignorar clicks dentro del panel
         if (panelRef.current && panelRef.current.contains(event.target as Node)) {
           return;
         }
-        
+
         // Ignorar clicks en elementos que lo abrieron (como botones con data-state="open")
-        // No tenemos una forma perfecta de saber si el click fue en el trigger, 
+        // No tenemos una forma perfecta de saber si el click fue en el trigger,
         // pero podemos asumir que si se hizo click fuera y está abierto, queremos cerrarlo.
         // Un pequeño retraso para no cerrarlo inmediatamente al abrir.
         onClose();
@@ -104,9 +104,7 @@ export function SlideOver({
         <div className="flex h-full flex-col">
           <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
-              {title && (
-                <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>
-              )}
+              {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}
               {description && (
                 <p className="font-sans text-sm text-text-secondary">{description}</p>
               )}
@@ -130,9 +128,7 @@ export function SlideOver({
             </button>
           </header>
 
-          <div className="flex-1 min-h-0 flex flex-col pr-1 -mr-1">
-            {children}
-          </div>
+          <div className="flex-1 min-h-0 flex flex-col pr-1 -mr-1">{children}</div>
         </div>
       </div>
     </>

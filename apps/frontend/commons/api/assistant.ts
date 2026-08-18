@@ -243,6 +243,34 @@ export interface QuestionProposal {
   porQue?: string;
 }
 
+/**
+ * `proponer_tablero`. Un tablero con sus columnas, listo para crear.
+ *
+ * ## Por qué el asistente puede proponer esto
+ *
+ * Porque ya podía, en otro sitio: la plantilla de proyecto nuevo genera el árbol
+ * entero —espacios, tableros, columnas, etiquetas y roles— y nunca fue una vía
+ * de escritura nueva, por lo mismo que ninguna lo es: **propone, y ejecuta quien
+ * acepta, con sus permisos**. Que esa capacidad viviera solo en el modal de
+ * creación era un accidente de dónde se implementó, y se notaba — en un proyecto
+ * vacío, a «créame una tarea» solo se podía contestar que primero hacía falta un
+ * tablero, sabiendo perfectamente cuál proponer.
+ *
+ * ⚠️ **`espacio` es un nombre, no un id.** El asistente no ve los ids de los
+ * espacios de trabajo, así que propone por nombre y la acción de aceptar lo
+ * resuelve contra el proyecto de verdad: si existe uno que se llame así lo usa, y
+ * si no, lo crea. Es el mismo criterio que ya aplica la tarea con su columna —
+ * nada de lo que llega del chat se toma por bueno sin volver a mirarlo.
+ */
+export interface BoardProposal {
+  /** Nombre del espacio de trabajo. Se resuelve o se crea al aceptar. */
+  espacio: string;
+  nombre: string;
+  /** En orden, de lo que está por empezar a lo terminado. */
+  columnas: { nombre: string; color?: string }[];
+  porQue?: string;
+}
+
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /** Una conversación en la lista lateral, sin sus mensajes. */
@@ -323,6 +351,12 @@ export function isCommentProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: CommentProposal } {
   return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
+}
+
+export function isBoardProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: BoardProposal } {
+  return propuesta.tool === 'proponer_tablero' && Array.isArray(propuesta.args.columnas);
 }
 
 export function isQuestionProposal(

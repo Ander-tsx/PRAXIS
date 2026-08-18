@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Fragment, createContext, useContext, useEffect, useRef, useState } from 'react';
 import type {
   AssignmentProposal,
+  BoardProposal,
   ChartProposal,
   CheckStepsProposal,
   ChecklistProposal,
@@ -27,6 +28,7 @@ import {
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
   aceptarMovimientoAction,
+  aceptarTableroAction,
   aceptarTareaAction,
   resolverPropuestaAction,
 } from '../../assistant/actions';
@@ -703,6 +705,143 @@ export function DeleteProposalCard({
       )}
     </Marco>
   );
+}
+
+/**
+ * Un tablero nuevo con sus columnas.
+ *
+ * ## Enseña el flujo, no una lista
+ *
+ * Las columnas van **en fila y con su color**, en el orden en que se van a
+ * crear: es lo que se va a ver en el tablero, y una lista con viñetas no dice
+ * nada sobre el recorrido que hace el trabajo. Quien acepta tiene que poder
+ * reconocer su propio flujo de un vistazo, o no puede juzgar si está bien.
+ *
+ * ⚠️ **La última se marca como «cierre» con todas las letras.** El verde de esa
+ * columna no es decorativo: una tarea que llega ahí cuenta como terminada en los
+ * informes y deja de avisar aunque esté vencida (`DONE_COLUMN_COLOR`). Es lo
+ * único de esta propuesta con consecuencias que no se ven en el tablero, así que
+ * es lo único que la tarjeta explica.
+ *
+ * ## Fallar a mitad se cuenta
+ *
+ * Tres endpoints y ninguna transacción que los abarque: el tablero puede quedar
+ * creado con dos columnas de cuatro. No se deshace nada —borrar lo ya creado por
+ * un fallo de red sería destruir trabajo— y en su lugar el resultado dice qué se
+ * quedó fuera. Mismo criterio que la plantilla de proyecto nuevo.
+ */
+export function BoardProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: BoardProposal }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  async function aceptar() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await aceptarTableroAction(projectId, propuesta);
+
+    if (respuesta.error || !respuesta.creado) {
+      setError(respuesta.error ?? 'No se pudo crear el tablero.');
+      setEstado('pendiente');
+      return;
+    }
+
+    const { nombre, columnas, fallos } = respuesta.creado;
+    setResultado({
+      texto:
+        fallos.length > 0
+          ? `Se creó «${nombre}» con ${columnas} ${columnas === 1 ? 'columna' : 'columnas'}. ${fallos.join(' ')}`
+          : `Se creó «${nombre}» con ${columnas} ${columnas === 1 ? 'columna' : 'columnas'}.`,
+      /* Cruza a la zona de proyectos → ruta completa del shell. Ver §16. */
+      href: null,
+    });
+    setEstado('hecho');
+  }
+
+  const columnas = propuesta.columnas ?? [];
+
+  return (
+    <Marco
+      titulo="Tablero propuesto"
+      sinAplicar="Todavía no existe."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      onAceptar={aceptar}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+    >
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <Campo termino="Tablero" valor={propuesta.nombre} />
+        <Campo termino="En el espacio" valor={propuesta.espacio} />
+      </dl>
+
+      <div className="flex flex-col gap-1.5">
+        <span className="font-sans text-xs text-text-disabled">
+          {columnas.length} {columnas.length === 1 ? 'columna' : 'columnas'}, en este orden
+        </span>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {columnas.map((columna, indice) => (
+            <Fragment key={`${columna.nombre}-${indice}`}>
+              {indice > 0 && (
+                <span aria-hidden="true" className="font-sans text-xs text-text-disabled">
+                  ›
+                </span>
+              )}
+              <span
+                className="rounded-lg px-2.5 py-1 font-sans text-sm"
+                style={{
+                  background: alpha(colorDeColumna(columna.color), 14),
+                  color: colorDeColumna(columna.color),
+                  boxShadow: `inset 0 0 0 1px ${alpha(colorDeColumna(columna.color), 30)}`,
+                }}
+              >
+                {columna.nombre}
+              </span>
+            </Fragment>
+          ))}
+        </div>
+
+        {/* El verde tiene consecuencias fuera del tablero, así que se dice. */}
+        {columnas.some((columna) => columna.color === 'success') && (
+          <span className="font-sans text-xs text-text-secondary">
+            La última es la <strong className="text-text-primary">columna de cierre</strong>: lo que
+            llegue ahí cuenta como terminado en los informes y deja de avisar aunque esté vencido.
+          </span>
+        )}
+      </div>
+    </Marco>
+  );
+}
+
+/** Token de columna → color real. Sin color, el gris de siempre. */
+function colorDeColumna(token?: string): string {
+  switch (token) {
+    case 'primary':
+      return colors.primary;
+    case 'accent':
+      return colors.accent;
+    case 'info':
+      return colors.info;
+    case 'warning':
+      return colors.warning;
+    case 'error':
+      return colors.error;
+    case 'success':
+      return colors.success;
+    default:
+      return colors.textSecondary;
+  }
 }
 
 /**

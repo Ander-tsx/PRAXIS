@@ -224,8 +224,10 @@ export function CreateProjectSlideOver({
             <div className="flex flex-col gap-6 lg:flex-row">
               <div className="flex min-w-0 flex-1 flex-col gap-6">
                 <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-sm">
-                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">Información Principal</h3>
-                  
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Información Principal
+                  </h3>
+
                   <Input
                     id={nameId}
                     name="name"
@@ -241,17 +243,22 @@ export function CreateProjectSlideOver({
                   />
 
                   <div className="flex flex-col gap-3 pt-2">
-                    <span className="font-sans text-sm font-semibold text-text-primary">Color del logo</span>
+                    <span className="font-sans text-sm font-semibold text-text-primary">
+                      Color del logo
+                    </span>
                     <div className="flex flex-wrap gap-3">
-                      {PROJECT_COLORS.map(c => (
-                        <button 
+                      {PROJECT_COLORS.map((c) => (
+                        <button
                           key={c}
-                          type="button" 
+                          type="button"
                           onClick={() => setColorLogo(c)}
                           className="h-9 w-9 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
-                          style={{ 
-                            backgroundColor: c, 
-                            boxShadow: colorLogo === c ? `0 0 0 3px ${colors.surface}, 0 0 0 5px ${c}` : 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+                          style={{
+                            backgroundColor: c,
+                            boxShadow:
+                              colorLogo === c
+                                ? `0 0 0 3px ${colors.surface}, 0 0 0 5px ${c}`
+                                : 'inset 0 0 0 1px rgba(0,0,0,0.1)',
                           }}
                           aria-label={`Seleccionar color ${c}`}
                           aria-pressed={colorLogo === c}
@@ -262,7 +269,9 @@ export function CreateProjectSlideOver({
                 </div>
 
                 <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
-                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">Detalles Adicionales</h3>
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Detalles Adicionales
+                  </h3>
                   <Textarea
                     id={descriptionId}
                     name="description"
@@ -374,7 +383,11 @@ function ModoOpcion({
  * Las iniciales salen de `iniciales()`, **la misma función** que usa la
  * rejilla: si algún día cambia la regla, cambia en los dos sitios a la vez.
  */
-function VistaPrevia({ nombre, descripcion, colorLogo }: { nombre: string; descripcion: string; colorLogo?: string | null }) {
+function VistaPrevia({
+  nombre,
+  descripcion,
+  colorLogo,
+}: { nombre: string; descripcion: string; colorLogo?: string | null }) {
   const limpio = nombre.trim();
 
   return (
