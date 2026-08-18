@@ -1071,7 +1071,8 @@ export function MessageBubble({
             )}
           </span>
 
-                     * Las dos asas de escritorio.
+          {/**
+           * Las dos asas de escritorio.
            *
            * Van **dentro** de la burbuja aunque una de ellas se pinte fuera:
            * ser descendiente es lo que mantiene vivo el `:hover` del grupo
