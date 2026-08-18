@@ -66,14 +66,40 @@ interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/** La ruta del panel conservando el estado de la bandeja. La usa `Pagination`. */
-function hrefDelPanel(page: number, soloSinLeer: boolean): string {
+/**
+ * El estado de la bandeja como query, sin la ruta.
+ *
+ * 🔴 **Hay que construir dos rutas distintas para el mismo sitio, y mezclarlas
+ * da un 404.** Dentro de una zona con `basePath`, `next/link` **añade el
+ * prefijo** y un `<a>` plano **no**. Así que:
+ *
+ * | Quién | Elemento | Necesita |
+ * |---|---|---|
+ * | `FiltroDeAvisos` | `next/link` | ruta **interna**: `/?…` |
+ * | `Pagination` | `<a>` plano | ruta **absoluta**: `/dashboard?…` |
+ *
+ * Darle la absoluta al `<Link>` produce `/dashboard/dashboard?…`, que es un 404
+ * — y no lo ve el compilador, porque las dos son `string`. Es la misma trampa
+ * que mordió al mudar el chat de zona (E3.3), aquí con el matiz de que **las dos
+ * formas conviven en la misma pantalla**.
+ */
+function queryDeAvisos(page: number, soloSinLeer: boolean): string {
   const params = new URLSearchParams();
   if (page > 1) params.set(PARAM_PAGINA, String(page));
   if (soloSinLeer) params.set(PARAM_FILTRO, SIN_LEER);
 
   const query = params.toString();
-  return query ? `/dashboard?${query}` : '/dashboard';
+  return query ? `?${query}` : '';
+}
+
+/** Para `next/link`: **sin** el prefijo de zona, que lo pone Next. */
+function hrefInterno(page: number, soloSinLeer: boolean): string {
+  return `/${queryDeAvisos(page, soloSinLeer)}`;
+}
+
+/** Para un `<a>` duro: con el prefijo completo. La consume `Pagination`. */
+function hrefAbsoluto(page: number, soloSinLeer: boolean): string {
+  return `/dashboard${queryDeAvisos(page, soloSinLeer)}`;
 }
 
 /**
@@ -281,8 +307,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   <FiltroDeAvisos
                     unread={inbox.unread}
                     soloSinLeer={soloSinLeer}
-                    hrefTodas={hrefDelPanel(1, false)}
-                    hrefSinLeer={hrefDelPanel(1, true)}
+                    hrefTodas={hrefInterno(1, false)}
+                    hrefSinLeer={hrefInterno(1, true)}
                   />
                 }
               />
@@ -298,7 +324,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 page={paginaAvisos}
                 limit={AVISOS_POR_PAGINA}
                 total={inbox.total}
-                hrefFor={(n) => hrefDelPanel(n, soloSinLeer)}
+                hrefFor={(n) => hrefAbsoluto(n, soloSinLeer)}
                 nombre="avisos"
               />
             </>
