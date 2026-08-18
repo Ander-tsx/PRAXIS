@@ -301,6 +301,7 @@ export class AssistantService {
        marcarlas como aceptadas o descartadas después. */
     const proposals = await this.conversaciones.guardarTurno({
       conversationId,
+      projectId: payload.projectId,
       pregunta: payload.message,
       respuesta: reply,
       proposals: validadas,
@@ -405,21 +406,27 @@ export class AssistantService {
     return { plantilla, cuota };
   }
 
-  /** Las conversaciones, delegadas. El gateway habla con este servicio. */
-  listarConversaciones(userId: string, projectId: string) {
-    return this.conversaciones.listar(userId, projectId);
+  /**
+   * Las conversaciones, delegadas. El gateway habla con este servicio.
+   *
+   * ⚠️ **Ninguna lleva ya `projectId`.** Son de la persona, no del proyecto: el
+   * proyecto es el foco de cada turno y puede cambiar a mitad. La clave de acceso
+   * sigue siendo el `userId`, que es lo que impide leer un hilo ajeno.
+   */
+  listarConversaciones(userId: string) {
+    return this.conversaciones.listar(userId);
   }
 
-  detalleConversacion(userId: string, projectId: string, conversationId: string) {
-    return this.conversaciones.detalle(userId, projectId, conversationId);
+  detalleConversacion(userId: string, conversationId: string) {
+    return this.conversaciones.detalle(userId, conversationId);
   }
 
-  renombrarConversacion(userId: string, projectId: string, conversationId: string, title: string) {
-    return this.conversaciones.renombrar(userId, projectId, conversationId, title);
+  renombrarConversacion(userId: string, conversationId: string, title: string) {
+    return this.conversaciones.renombrar(userId, conversationId, title);
   }
 
-  borrarConversacion(userId: string, projectId: string, conversationId: string) {
-    return this.conversaciones.borrar(userId, projectId, conversationId);
+  borrarConversacion(userId: string, conversationId: string) {
+    return this.conversaciones.borrar(userId, conversationId);
   }
 
   resolverPropuesta(userId: string, proposalId: string, status: 'ACCEPTED' | 'DISCARDED') {

@@ -126,22 +126,22 @@ export class AssistantController {
    * es de quien la escribió, y `canViewReports` —lo único que comprueba el
    * gateway— es un permiso del proyecto, no de la conversación. Sin esto, un
    * compañero con el mismo rol leería estos hilos.
+   *
+   * ⚠️ **Y ninguno lleva ya `projectId`.** Desde que el proyecto es un foco
+   * cambiable y no lo que define la conversación, filtrar por él daba 404 al
+   * pedir un hilo que había pasado por otro — que es justo el gesto que todo esto
+   * viene a permitir. El `userId` sigue siendo la clave de acceso, que es la que
+   * de verdad protegía algo.
    */
   @MessagePattern({ cmd: 'assistant_conversations' })
-  conversaciones(@Payload() dto: { userId: string; projectId: string }) {
-    return this.assistant.listarConversaciones(dto.userId, dto.projectId);
+  conversaciones(@Payload() dto: { userId: string }) {
+    return this.assistant.listarConversaciones(dto.userId);
   }
 
   @MessagePattern({ cmd: 'assistant_conversation' })
-  async conversacion(
-    @Payload() dto: { userId: string; projectId: string; conversationId: string },
-  ) {
+  async conversacion(@Payload() dto: { userId: string; conversationId: string }) {
     try {
-      return await this.assistant.detalleConversacion(
-        dto.userId,
-        dto.projectId,
-        dto.conversationId,
-      );
+      return await this.assistant.detalleConversacion(dto.userId, dto.conversationId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }
@@ -150,24 +150,19 @@ export class AssistantController {
   @MessagePattern({ cmd: 'assistant_conversation_rename' })
   async renombrar(
     @Payload()
-    dto: { userId: string; projectId: string; conversationId: string; title: string },
+    dto: { userId: string; conversationId: string; title: string },
   ) {
     try {
-      return await this.assistant.renombrarConversacion(
-        dto.userId,
-        dto.projectId,
-        dto.conversationId,
-        dto.title,
-      );
+      return await this.assistant.renombrarConversacion(dto.userId, dto.conversationId, dto.title);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }
   }
 
   @MessagePattern({ cmd: 'assistant_conversation_delete' })
-  async borrar(@Payload() dto: { userId: string; projectId: string; conversationId: string }) {
+  async borrar(@Payload() dto: { userId: string; conversationId: string }) {
     try {
-      return await this.assistant.borrarConversacion(dto.userId, dto.projectId, dto.conversationId);
+      return await this.assistant.borrarConversacion(dto.userId, dto.conversationId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }

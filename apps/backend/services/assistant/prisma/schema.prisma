@@ -83,28 +83,43 @@ model AssistantUsage {
 /// cada turno y el servidor no lo veía nunca. Recargar la página perdía el hilo,
 /// y cruzar de zona —que en Multi-Zones es una recarga completa— también.
 ///
-/// Es de **una persona en un proyecto**, y las dos mitades importan:
-/// el contexto que ve el modelo es del proyecto, y lo que alguien le escribe al
-/// asistente es suyo. `userId` no es solo para agrupar: es la clave de acceso.
+/// Es **de una persona**, y esa es la mitad que no cambia: lo que alguien le
+/// escribe al asistente es suyo. `userId` no es solo para agrupar, es la clave
+/// de acceso.
 ///
-/// ⚠️ `canViewReports` es del proyecto, no de la conversación. Comprobar solo el
-/// permiso dejaría a cualquier compañero leer estos hilos, así que quien los
-/// sirve comprueba **además** que el `userId` es el de quien llama.
+/// ⚠️ **`projectId` pasó a ser opcional, y es el cambio de fondo.** La
+/// conversación nacía atada a un proyecto y el listado era «mis conversaciones
+/// **de este proyecto**». Eso obligaba a elegir el proyecto **antes** de poder
+/// hablar —con un desplegable, fuera de la conversación— y partía el historial
+/// en tantas listas como proyectos tuvieras.
+///
+/// Ahora la conversación es tuya y el proyecto es un **foco**: empieza sin
+/// ninguno —PRAX pregunta por cuál, dentro del propio chat— y puede cambiar a
+/// mitad. Aquí se guarda el último, que es lo que la lista necesita para decir
+/// de qué iba; el de cada turno vive en su `Message`.
+///
+/// ⚠️ **No se cargan varios proyectos a la vez, y no es una limitación
+/// pendiente.** Los permisos son por proyecto y las herramientas se declaran con
+/// ellos, así que con dos proyectos abiertos `canCreateTask` podría ser sí en uno
+/// y no en otro y una sola lista de herramientas no puede expresarlo. Además el
+/// briefing lleva **todas** las tareas del proyecto: cargar cinco multiplicaría
+/// por cinco la ventana y empujaría las reglas fuera de la atención del modelo.
 ///
 /// Sin clave foránea hacia el proyecto ni hacia el usuario: viven en otros
 /// servicios. Al borrar el proyecto las limpia el gateway, como con las tareas.
 model Conversation {
   id        String    @id @default(uuid())
   userId    String
-  projectId String
+  /// El **último** proyecto del que se habló. `null` mientras no se ha elegido.
+  projectId String?
   /// Las primeras palabras del primer mensaje. Se puede renombrar a mano.
   title     String
   messages  Message[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  /// El listado siempre es «mis conversaciones de este proyecto, la última arriba».
-  @@index([userId, projectId, updatedAt])
+  /// El listado es «mis conversaciones, la última arriba». Sin el proyecto.
+  @@index([userId, updatedAt])
   @@schema("assistant")
   @@map("assistant_conversations")
 }
@@ -123,6 +138,13 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           MessageRole
   text           String
+  /// De qué proyecto iba **este** turno. `null` antes de elegir foco.
+  ///
+  /// ⚠️ Se guarda por mensaje y no solo en la conversación porque el foco cambia
+  /// a mitad: sin esto, al releer un hilo que pasó por dos proyectos, todas las
+  /// propuestas parecerían del último. Es también lo que permite pintar la marca
+  /// de «ahora hablando de X» en el sitio exacto donde ocurrió.
+  projectId      String?
   proposals      Proposal[]
   createdAt      DateTime     @default(now())
 

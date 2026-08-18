@@ -273,10 +273,18 @@ export interface BoardProposal {
 
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
-/** Una conversación en la lista lateral, sin sus mensajes. */
+/**
+ * Una conversación en el historial, sin sus mensajes.
+ *
+ * ⚠️ `projectId` es el **último** proyecto del que se habló, y es `null` en las
+ * que nunca llegaron a elegir uno. Viaja para que la lista pueda decir de qué iba
+ * cada conversación sin abrirla — que es lo que hace usable un historial que ya
+ * no está partido por proyecto.
+ */
 export interface ConversationSummary {
   id: string;
   title: string;
+  projectId: string | null;
   createdAt: string;
   updatedAt: string;
   mensajes: number;

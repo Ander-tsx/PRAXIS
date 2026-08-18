@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   type AssistantProposal,
   type AssistantQuota,
@@ -52,7 +52,37 @@ interface Mensaje {
 }
 
 export interface AssistantChatProps {
-  projectId: string;
+  /**
+   * El proyecto del que se está hablando. **`null` mientras no se ha elegido.**
+   *
+   * ⚠️ Sin foco no se puede preguntar nada: el turno va a
+   * `POST /projects/:id/assistant/chat`, que es donde el gateway comprueba
+   * `canViewReports` y de donde sale el contexto. Así que con `null` la pantalla
+   * no enseña compositor: enseña el recibimiento y los proyectos para elegir.
+   */
+  projectId: string | null;
+  /**
+   * Los proyectos entre los que se puede cambiar, ya filtrados por permiso.
+   *
+   * Hacen dos cosas: son los botones del recibimiento, y son los nombres con los
+   * que el historial dice de qué iba cada conversación.
+   */
+  proyectos?: { id: string; name: string }[];
+  /**
+   * Cambiar de foco.
+   *
+   * ⚠️ **Lo gobierna quien monta esto, y navega.** Podría cambiarse aquí en
+   * estado de cliente, y sería peor: el contexto que ve el modelo —miembros,
+   * etiquetas, cuota— lo resuelve el servidor por proyecto, así que un cambio en
+   * cliente dejaría la conversación hablando de un proyecto con los nombres del
+   * otro. Navegando, el Server Component lo recalcula entero.
+   *
+   * Y el hilo **no se pierde al navegar** porque vive en la base: se recupera con
+   * el `conversationId`, que por eso viaja de vuelta.
+   */
+  onElegirProyecto?: (projectId: string, conversationId: string | null) => void;
+  /** La conversación a recuperar al montar. Viene de la URL. */
+  conversacionInicial?: string | null;
   /** La cuota al cargar la página, antes de escribir nada. */
   cuotaInicial: AssistantQuota | null;
   nombres: Record<string, string>;
@@ -171,6 +201,9 @@ export function AssistantChat({
   cuotaInicial,
   nombres,
   etiquetas,
+  proyectos = [],
+  onElegirProyecto,
+  conversacionInicial = null,
   sugerenciaExterna = null,
   alAceptarGrafico,
   variante = 'panel',
@@ -179,6 +212,13 @@ export function AssistantChat({
      único propio del cajón es su cabecera con el aspa. */
   const aPantalla = variante === 'pantalla' || variante === 'cajon';
   const enCajon = variante === 'cajon';
+  /* `projectId` → nombre, para que el historial diga de qué iba cada
+     conversación sin abrirla. Se construye aquí y no en la page porque el
+     historial es de esta pantalla, no del servidor. */
+  const nombresDeProyecto = useMemo(
+    () => Object.fromEntries(proyectos.map((proyecto) => [proyecto.id, proyecto.name])),
+    [proyectos],
+  );
   /* El cajón lo gobierna el armazón, así que cerrar no es estado de este
      componente: se le pide a quien lo abrió. Fuera del armazón —o en las otras
      variantes— `dock` es `null` y el aspa ni se pinta. */
@@ -192,7 +232,7 @@ export function AssistantChat({
    * están en la lista. Recuperar sola la última convertiría cada visita a
    * Reportes en la continuación de algo que a lo mejor ya estaba cerrado.
    */
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(conversacionInicial ?? null);
   /**
    * Qué enseña la tarjeta: el chat o el historial.
    *
@@ -251,7 +291,7 @@ export function AssistantChat({
     setError(null);
     setVista('chat');
     setPendiente(true);
-    const conversacion = await cargarConversacionAction(projectId, id);
+    const conversacion = await cargarConversacionAction(id);
     setPendiente(false);
 
     if (!conversacion) {
@@ -280,6 +320,10 @@ export function AssistantChat({
     setTexto('');
     setError(null);
     setPendiente(true);
+
+    /* Sin foco no hay a dónde mandar el turno. No debería llegar aquí —sin él no
+       se pinta el compositor— pero el estrechamiento de tipos lo pide. */
+    if (!projectId) return;
 
     const respuesta = await preguntarAction(projectId, limpio, conversationId ?? undefined);
 
@@ -378,6 +422,18 @@ export function AssistantChat({
                   AI
                 </Badge>
               </div>
+              {/* El foco, junto al nombre: en una conversación que puede
+                  cambiar de proyecto, saber de cuál se está hablando no puede
+                  depender de acordarse. */}
+              {projectId && vista === 'chat' && (
+                <span className="font-sans text-xs text-text-disabled">
+                  Hablando de{' '}
+                  <span className="text-text-secondary">
+                    {nombresDeProyecto[projectId] ?? 'este proyecto'}
+                  </span>
+                </span>
+              )}
+
               <p className="font-sans text-sm text-text-secondary">
                 {vista === 'historial'
                   ? 'Tus conversaciones en este proyecto. Abre una para seguir donde la dejaste.'
@@ -450,7 +506,7 @@ export function AssistantChat({
 
         {vista === 'historial' ? (
           <ConversationHistory
-            projectId={projectId}
+            nombresDeProyecto={nombresDeProyecto}
             activaId={conversationId}
             onElegir={cargar}
             onNueva={() => {
@@ -493,7 +549,7 @@ export function AssistantChat({
                             return (
                               <TaskProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -506,7 +562,7 @@ export function AssistantChat({
                             return (
                               <AssignProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -519,7 +575,7 @@ export function AssistantChat({
                             return (
                               <EditProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -532,7 +588,7 @@ export function AssistantChat({
                             return (
                               <MoveProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -545,7 +601,7 @@ export function AssistantChat({
                             return (
                               <ChecklistProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -558,7 +614,7 @@ export function AssistantChat({
                             return (
                               <CommentProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -571,7 +627,7 @@ export function AssistantChat({
                             return (
                               <MarkStepsProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -584,7 +640,7 @@ export function AssistantChat({
                             return (
                               <MessageProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -606,7 +662,7 @@ export function AssistantChat({
                             return (
                               <BoardProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -619,7 +675,7 @@ export function AssistantChat({
                             return (
                               <QuestionProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -635,7 +691,7 @@ export function AssistantChat({
                             return (
                               <DeleteProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -648,7 +704,7 @@ export function AssistantChat({
                             return (
                               <ChartProposalCard
                                 key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                                projectId={projectId}
+                                projectId={projectId ?? ''}
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
@@ -692,25 +748,53 @@ export function AssistantChat({
 
                   <div className="flex max-w-lg flex-col gap-2">
                     <p className="font-display text-2xl text-text-primary">
-                      Pregúntame por este proyecto
+                      {projectId ? 'Pregúntame por este proyecto' : `Hola, soy ${PRAX_NAME}`}
                     </p>
                     <p className="font-serif text-base italic text-text-secondary">
-                      Sé qué hay en cada tablero, quién lleva qué y cómo va el ritmo. Puedo
-                      responder con esos números, y también preparar el trabajo que salga de
-                      hablarlo.
+                      {projectId
+                        ? 'Sé qué hay en cada tablero, quién lleva qué y cómo va el ritmo. Puedo responder con esos números, y también preparar el trabajo que salga de hablarlo.'
+                        : '¿Hay algún proyecto en concreto sobre el que quieras que miremos? Elige uno y te cuento cómo va.'}
                     </p>
                   </div>
 
+                  {/**
+                   * Con foco, preguntas de arranque. Sin foco, **los proyectos**.
+                   *
+                   * Es el mismo gesto —pulsar en vez de escribir— y por eso
+                   * comparten sitio: lo primero que hace falta decidir no es qué
+                   * preguntar, es de qué proyecto. Elegir aquí navega, y el
+                   * contexto lo recalcula el servidor (ver `onElegirProyecto`).
+                   */}
                   <div className="flex max-w-2xl flex-wrap justify-center gap-2">
-                    {SUGERENCIAS.map((sugerencia) => (
-                      <Sugerencia
-                        key={sugerencia}
-                        texto={sugerencia}
-                        agotada={agotada}
-                        onElegir={enviar}
-                      />
-                    ))}
+                    {projectId
+                      ? SUGERENCIAS.map((sugerencia) => (
+                          <Sugerencia
+                            key={sugerencia}
+                            texto={sugerencia}
+                            agotada={agotada}
+                            onElegir={enviar}
+                          />
+                        ))
+                      : proyectos.map((proyecto) => (
+                          <button
+                            key={proyecto.id}
+                            type="button"
+                            onClick={() => onElegirProyecto?.(proyecto.id, conversationId)}
+                            className="rounded-full border border-border px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
+                          >
+                            {proyecto.name}
+                          </button>
+                        ))}
                   </div>
+
+                  {/* Sin proyectos que ofrecer, decirlo: unos botones que no
+                      salen dejan la pantalla con un saludo y nada debajo. */}
+                  {!projectId && proyectos.length === 0 && (
+                    <p className="max-w-md font-sans text-sm text-text-disabled">
+                      No hay ningún proyecto cuyo análisis puedas abrir, así que todavía no tengo
+                      datos de los que hablar.
+                    </p>
+                  )}
                 </div>
               ) : (
                 /* En el panel de Análisis no hay sitio para un recibimiento: el
@@ -728,7 +812,14 @@ export function AssistantChat({
                 </div>
               ))}
 
-            {agotada && cuota ? (
+            {/**
+             * ⚠️ **Sin foco no hay compositor**, y no es una restricción
+             * cosmética: el turno va a `POST /projects/:id/assistant/chat`, que
+             * es donde el gateway comprueba el permiso y de donde sale el
+             * contexto. Un campo de texto que no puede mandar nada es peor que
+             * ninguno — invita a escribir para después decir que no.
+             */}
+            {!projectId ? null : agotada && cuota ? (
               <p
                 role="note"
                 className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"

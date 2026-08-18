@@ -1,31 +1,50 @@
 'use client';
 
-import { AssistantChat, type AssistantQuota, type Project, ProjectPicker } from '@praxis/commons';
+import { AssistantChat, type AssistantQuota, type Project } from '@praxis/commons';
+import { useRouter } from 'next/navigation';
+import { useCallback } from 'react';
 
 export interface PraxScreenProps {
-  /** El UUID resuelto, no el slug de la URL. */
-  projectId: string;
+  /** El foco actual. `null` mientras no se ha elegido proyecto. */
+  projectId: string | null;
   proyectos: Project[];
+  /** La conversación a recuperar, si la URL trae una. */
+  conversacionInicial: string | null;
   cuotaInicial: AssistantQuota | null;
   nombres: Record<string, string>;
   etiquetas: Record<string, string>;
 }
 
 /**
- * El selector y la conversación.
+ * La conversación, con el proyecto y el hilo en la URL.
  *
- * ## Por qué una plantilla de cliente para dos componentes
+ * ## ⚠️ Cambiar de proyecto navega, y eso es lo importante
  *
- * Por la `key`. Al cambiar de proyecto, la conversación tiene que **empezar
- * limpia**: el hilo abierto era de otro proyecto, y sus propuestas apuntan a
- * columnas y tareas que en este no existen. Sin remontar, el historial anterior
- * se quedaría en pantalla ofreciendo botones que darían 404 al pulsarlos.
+ * Podría cambiarse en estado de cliente y sería peor: el contexto que ve el
+ * modelo —los miembros, las etiquetas, la cuota— lo resuelve el Server Component
+ * **por proyecto**, así que un cambio en cliente dejaría la conversación hablando
+ * de un proyecto con los nombres del otro, y las propuestas pintarían un UUID
+ * donde va un nombre.
  *
- * `key={projectId}` es la forma de decirle a React «esto es otro componente, no
- * el mismo con otras props». Cuesta perder el borrador a medio escribir al
- * cambiar de proyecto, y se acepta: escribir una pregunta y luego cambiar de
- * proyecto es un gesto raro, y lo contrario —mandarla al proyecto equivocado—
- * sería peor.
+ * Navegando, el servidor lo recalcula entero. Y **el hilo no se pierde**: vive en
+ * la base, así que basta con llevarse el `conversationId` en la URL para que la
+ * conversación siga donde estaba. Es lo que hace que cambiar de foco a mitad no
+ * cueste nada.
+ *
+ * ## Y por eso ya no hay `key={projectId}`
+ *
+ * Lo llevaba, para remontar el chat al cambiar de proyecto y no arrastrar un hilo
+ * que hablaba de otro. Con el foco cambiable eso es justo lo contrario de lo que
+ * se quiere: la conversación **es la misma**, lo que cambia es de qué va a partir
+ * de ahora. Quien impide arrastrar contexto equivocado ahora es el servidor, que
+ * guarda el proyecto de cada turno.
+ *
+ * ## Y por eso también desaparece el selector
+ *
+ * Era un desplegable encima del chat para elegir proyecto **antes** de poder
+ * hablar. Ahora el proyecto se elige dentro de la conversación —PRAX lo pregunta
+ * con botones— y se cambia desde ahí, así que un control aparte para lo mismo
+ * sobraba y además ocupaba la fila más visible de la pantalla.
  *
  * ## Sin `alAceptarGrafico`, a propósito
  *
@@ -37,46 +56,47 @@ export interface PraxScreenProps {
 export function PraxScreen({
   projectId,
   proyectos,
+  conversacionInicial,
   cuotaInicial,
   nombres,
   etiquetas,
 }: PraxScreenProps) {
+  const router = useRouter();
+
+  const elegirProyecto = useCallback(
+    (siguiente: string, conversationId: string | null) => {
+      const proyecto = proyectos.find((candidato) => candidato.id === siguiente);
+      if (!proyecto) return;
+
+      const params = new URLSearchParams({ p: proyecto.slug });
+      /* El hilo se lleva en la URL para que sobreviva a la navegación. Sin esto,
+         cambiar de proyecto empezaría conversación nueva y se perdería lo
+         hablado — que es exactamente lo que el foco cambiable viene a evitar. */
+      if (conversationId) params.set('c', conversationId);
+
+      /* Sin el basePath: Next añade `/assistant`. `push` y no `replace` para que
+         el botón atrás devuelva al proyecto anterior. Ver §16. */
+      router.push(`/?${params.toString()}`);
+    },
+    [proyectos, router],
+  );
+
   return (
     /* `min-h-0` en toda la cadena hasta el hilo: es lo que hace que el scroll se
        lo quede la conversación y no la página. Sin él, un flex hijo no encoge por
        debajo de su contenido y el compositor se va al fondo del documento. */
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/**
-       * El selector, solo cuando hay entre qué elegir.
-       *
-       * Con un único proyecto era un desplegable de una sola opción: una fila
-       * entera de la pantalla para no ofrecer ninguna decisión, y el proyecto ya
-       * lo nombra la portada de arriba.
-       */}
-      {proyectos.length > 1 && (
-        <ProjectPicker
-          projects={proyectos}
-          activeId={projectId}
-          label="Hablando de"
-          /* Rutas de esta zona y **sin** el basePath: Next añade `/assistant`.
-             El slug en la URL, que es lo que se lee y se comparte. Ver §16.
-             Un diccionario y no una función: ver la nota de `ProjectPicker`. */
-          paths={Object.fromEntries(
-            proyectos.map((proyecto) => [proyecto.id, `/?p=${encodeURIComponent(proyecto.slug)}`]),
-          )}
-          vacio="No tienes ningún proyecto con análisis abierto."
-        />
-      )}
-
+    <div className="flex min-h-0 flex-1 flex-col">
       <AssistantChat
-        key={projectId}
         projectId={projectId}
+        proyectos={proyectos.map((proyecto) => ({ id: proyecto.id, name: proyecto.name }))}
+        onElegirProyecto={elegirProyecto}
+        conversacionInicial={conversacionInicial}
         cuotaInicial={cuotaInicial}
         nombres={nombres}
         etiquetas={etiquetas}
         /* Aquí la conversación **es** la pantalla: sin tarjeta, ocupando el alto
            disponible y con el compositor abajo del todo. En Análisis el mismo
-           organismo va en modo `panel`. */
+           organismo va en modo `cajon`. */
         variante="pantalla"
       />
     </div>

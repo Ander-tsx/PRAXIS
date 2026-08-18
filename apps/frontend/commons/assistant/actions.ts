@@ -179,29 +179,38 @@ export async function preguntarAction(
   }
 }
 
-/** Mis conversaciones en este proyecto, la última movida arriba. */
-export async function conversacionesAction(projectId: string): Promise<ConversationSummary[]> {
+/**
+ * **Mis** conversaciones, la última movida arriba.
+ *
+ * ⚠️ **Ya no van bajo `/projects/:id`.** Una conversación es de la persona y el
+ * proyecto es el foco de cada turno, que puede cambiar a mitad: con la ruta
+ * anterior, pedir un hilo que había pasado por otro proyecto daba 404. Y el
+ * historial estaba partido en tantas listas como proyectos tuvieras, así que para
+ * encontrar aquella conversación de la semana pasada había que acordarse primero
+ * de sobre qué proyecto fue.
+ *
+ * Lo que las protege sigue siendo el `userId` del token, no el permiso de
+ * proyecto — que nunca las protegió: siendo del proyecto, con él cualquier
+ * compañero del mismo rol habría podido leerlas.
+ */
+export async function conversacionesAction(): Promise<ConversationSummary[]> {
   const api = await requireApi();
   if (!api) return [];
-  return api
-    .get<ConversationSummary[]>(`/projects/${projectId}/assistant/conversations`)
-    .catch(() => []);
+  return api.get<ConversationSummary[]>('/me/assistant/conversations').catch(() => []);
 }
 
 /** Una conversación entera, para volver a pintarla. */
 export async function cargarConversacionAction(
-  projectId: string,
   conversationId: string,
 ): Promise<FullConversation | null> {
   const api = await requireApi();
   if (!api) return null;
   return api
-    .get<FullConversation>(`/projects/${projectId}/assistant/conversations/${conversationId}`)
+    .get<FullConversation>(`/me/assistant/conversations/${conversationId}`)
     .catch(() => null);
 }
 
 export async function renombrarConversacionAction(
-  projectId: string,
   conversationId: string,
   title: string,
 ): Promise<{ error: string | null }> {
@@ -212,9 +221,7 @@ export async function renombrarConversacionAction(
   if (limpio.length === 0) return { error: 'El título no puede estar vacío.' };
 
   try {
-    await api.patch(`/projects/${projectId}/assistant/conversations/${conversationId}`, {
-      title: limpio,
-    });
+    await api.patch(`/me/assistant/conversations/${conversationId}`, { title: limpio });
     return { error: null };
   } catch (error) {
     return { error: describe(error, 'No se pudo renombrar.') };
@@ -222,14 +229,13 @@ export async function renombrarConversacionAction(
 }
 
 export async function borrarConversacionAction(
-  projectId: string,
   conversationId: string,
 ): Promise<{ error: string | null }> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.' };
 
   try {
-    await api.delete(`/projects/${projectId}/assistant/conversations/${conversationId}`);
+    await api.delete(`/me/assistant/conversations/${conversationId}`);
     return { error: null };
   } catch (error) {
     return { error: describe(error, 'No se pudo borrar la conversación.') };

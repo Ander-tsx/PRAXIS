@@ -1,17 +1,21 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Inject,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Request,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ProjectDraftBodyDto } from '@praxis/contracts';
+import { ProjectDraftBodyDto, RenameConversationBodyDto } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 
@@ -29,6 +33,25 @@ import { JwtGuard } from '../auth/jwt.guard';
  * un motivo más fuerte: **se pide para crear un proyecto, así que el proyecto
  * todavía no existe**. No hay `projectId` que poner en la ruta ni permisos de
  * proyecto que comprobar.
+ *
+ * ## Y desde el foco cambiable, las conversaciones
+ *
+ * ⚠️ **Estaban en `/projects/:projectId/assistant/conversations` y se han mudado
+ * aquí.** Una conversación ya no es de un proyecto: es de la persona, y el
+ * proyecto es el foco de cada turno, que puede cambiar a mitad. Con la ruta
+ * anterior, pedir un hilo que había pasado por otro proyecto daba 404 — justo el
+ * gesto que el foco cambiable viene a permitir.
+ *
+ * ⚠️ **Eso quita `canViewReports` de estas cuatro rutas, y hay que entender por
+ * qué no es un agujero.** Ese permiso nunca protegió estos hilos: es del
+ * proyecto, así que con él cualquier compañero del mismo rol habría podido leer
+ * las conversaciones ajenas. Lo que las protege —y sigue protegiéndolas— es que
+ * el `userId` sale del token y assistant-service filtra por él, devolviendo 404
+ * y no 403 para no confirmar que un id existe.
+ *
+ * El permiso se sigue exigiendo donde de verdad hace falta: en
+ * `POST /projects/:projectId/assistant/chat`, que es lo único que **lee datos
+ * del proyecto**.
  */
 @ApiTags('Assistant')
 @ApiBearerAuth()
@@ -36,6 +59,70 @@ import { JwtGuard } from '../auth/jwt.guard';
 @Controller('me/assistant')
 export class MyAssistantController {
   constructor(@Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy) {}
+
+  @Get('conversations')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mis conversaciones con el asistente, la última arriba' })
+  conversaciones(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.assistantClient.send({ cmd: 'assistant_conversations' }, { userId: req.user!.userId }),
+    );
+  }
+
+  @Get('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Una conversación con sus mensajes y propuestas' })
+  @ApiResponse({ status: 404, description: 'No existe, o no es tuya' })
+  conversacion(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation' },
+        { userId: req.user!.userId, conversationId },
+      ),
+    );
+  }
+
+  @Patch('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Renombrar una conversación' })
+  renombrar(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+    @Body() body: RenameConversationBodyDto,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation_rename' },
+        { userId: req.user!.userId, conversationId, title: body.title },
+      ),
+    );
+  }
+
+  /**
+   * Borrar una conversación propia.
+   *
+   * No contradice la regla de que el asistente nunca borra: ahí quien borraría
+   * es el modelo, sobre el trabajo de un equipo. Aquí borra una persona sus
+   * propios mensajes, que es lo mínimo que se le debe a quien deja rastro de lo
+   * que escribe.
+   */
+  @Delete('conversations/:conversationId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borrar una conversación propia' })
+  borrar(
+    @Param('conversationId', ParseUUIDPipe) conversationId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_conversation_delete' },
+        { userId: req.user!.userId, conversationId },
+      ),
+    );
+  }
 
   @Get('quota')
   @HttpCode(HttpStatus.OK)

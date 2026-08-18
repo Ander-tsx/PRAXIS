@@ -32,14 +32,26 @@ const MAX_TITULO = 60;
 export class ConversationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Mis conversaciones en este proyecto, la última movida arriba. */
-  async listar(userId: string, projectId: string) {
+  /**
+   * **Mis** conversaciones, la última movida arriba.
+   *
+   * ⚠️ Ya no filtra por proyecto, y ese es el cambio: el historial era «las de
+   * este proyecto» y estaba partido en tantas listas como proyectos tuvieras, así
+   * que para encontrar aquella conversación de la semana pasada había que
+   * acordarse primero de sobre qué proyecto fue.
+   *
+   * `projectId` viaja en cada fila —el **último** del que se habló— para que la
+   * lista pueda decir de qué iba cada una sin abrirla. Es `null` en las que nunca
+   * llegaron a elegir foco.
+   */
+  async listar(userId: string) {
     const conversaciones = await this.prisma.conversation.findMany({
-      where: { userId, projectId },
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
         title: true,
+        projectId: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { messages: true } },
@@ -49,6 +61,7 @@ export class ConversationsService {
     return conversaciones.map((conversacion) => ({
       id: conversacion.id,
       title: conversacion.title,
+      projectId: conversacion.projectId,
       createdAt: conversacion.createdAt,
       updatedAt: conversacion.updatedAt,
       mensajes: conversacion._count.messages,
@@ -61,9 +74,12 @@ export class ConversationsService {
    * Las propuestas viajan con su `status` porque de eso depende si la tarjeta
    * lleva botones al releer: solo las `PENDING` se pueden aplicar todavía.
    */
-  async detalle(userId: string, projectId: string, conversationId: string) {
+  async detalle(userId: string, conversationId: string) {
     const conversacion = await this.prisma.conversation.findFirst({
-      where: { id: conversationId, userId, projectId },
+      /* Sin `projectId`: la conversación es de la persona y puede haber pasado
+         por varios. El `userId` sigue siendo la clave de acceso, y una ajena
+         responde 404 y no 403 — un 403 confirmaría que ese id existe. */
+      where: { id: conversationId, userId },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -129,12 +145,27 @@ export class ConversationsService {
   async resolver(userId: string, projectId: string, mensaje: string, conversationId?: string) {
     if (conversationId) {
       const existente = await this.prisma.conversation.findFirst({
-        where: { id: conversationId, userId, projectId },
-        select: { id: true },
+        /* Sin `projectId` en el `where`: **una conversación puede cambiar de
+           foco**, así que exigir que coincida con el del turno actual daría 404
+           justo al preguntar por otro proyecto — que es el gesto que todo esto
+           viene a permitir. Lo que sigue protegiendo el hilo es el `userId`. */
+        where: { id: conversationId, userId },
+        select: { id: true, projectId: true },
       });
       if (!existente) {
         throw new RpcException({ statusCode: 404, message: 'Conversación no encontrada' });
       }
+
+      /* El foco de la conversación es el del último turno: es lo que la lista
+         del historial enseña. Solo se escribe si cambió, para no tocar la fila
+         —y su `updatedAt`— en cada mensaje del mismo proyecto. */
+      if (existente.projectId !== projectId) {
+        await this.prisma.conversation.update({
+          where: { id: existente.id },
+          data: { projectId },
+        });
+      }
+
       return existente.id;
     }
 
@@ -157,20 +188,30 @@ export class ConversationsService {
    */
   async guardarTurno(params: {
     conversationId: string;
+    /**
+     * De qué proyecto iba este turno.
+     *
+     * ⚠️ Se guarda en los **dos** mensajes y no solo en la conversación: el foco
+     * cambia a mitad, y sin esto un hilo que pasó por dos proyectos parecería
+     * entero del último al releerlo — con sus propuestas apuntando al proyecto
+     * equivocado a ojos de quien lo lee.
+     */
+    projectId: string;
     pregunta: string;
     respuesta: string;
     proposals: { tool: string; args: Record<string, unknown> }[];
   }) {
-    const { conversationId, pregunta, respuesta, proposals } = params;
+    const { conversationId, projectId, pregunta, respuesta, proposals } = params;
 
     return this.prisma.$transaction(async (tx) => {
       await tx.message.create({
-        data: { conversationId, role: 'USER', text: pregunta },
+        data: { conversationId, projectId, role: 'USER', text: pregunta },
       });
 
       const delModelo = await tx.message.create({
         data: {
           conversationId,
+          projectId,
           role: 'MODEL',
           text: respuesta,
           proposals: {
@@ -232,14 +273,14 @@ export class ConversationsService {
   }
 
   /** Renombrar. El título es lo único que se puede editar de una conversación. */
-  async renombrar(userId: string, projectId: string, conversationId: string, title: string) {
+  async renombrar(userId: string, conversationId: string, title: string) {
     const limpio = title.trim().slice(0, MAX_TITULO);
     if (limpio.length === 0) {
       throw new RpcException({ statusCode: 400, message: 'El título no puede estar vacío' });
     }
 
     const { count } = await this.prisma.conversation.updateMany({
-      where: { id: conversationId, userId, projectId },
+      where: { id: conversationId, userId },
       data: { title: limpio },
     });
 
@@ -259,9 +300,9 @@ export class ConversationsService {
    *
    * Los mensajes y las propuestas caen en cascada.
    */
-  async borrar(userId: string, projectId: string, conversationId: string) {
+  async borrar(userId: string, conversationId: string) {
     const { count } = await this.prisma.conversation.deleteMany({
-      where: { id: conversationId, userId, projectId },
+      where: { id: conversationId, userId },
     });
 
     if (count === 0) {
