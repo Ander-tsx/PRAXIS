@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ClientProxy } from '@nestjs/microservices';
 import Redis from 'ioredis';
 import { Observable, Subject, firstValueFrom } from 'rxjs';
@@ -96,10 +97,61 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
    */
   private readonly nombres = new Map<string, { nombre: string; hasta: number }>();
 
+  /**
+   * Tope de flujos simultáneos por cuenta.
+   *
+   * ⚠️ **Se lee aquí y no en una constante del módulo**, que es la trampa 17 de
+   * CLAUDE.md: `ConfigModule.forRoot()` carga el `.env` al **inicializar**, y
+   * los `import` se evalúan antes. Un `process.env.X` arriba del archivo no ve
+   * el `.env` — no falla, coge el valor por defecto en silencio, que es peor.
+   */
+  private readonly maxConexiones: number;
+
   constructor(
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     private readonly presencia: PresenceService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.maxConexiones = config.get<number>('SSE_MAX_CONEXIONES_POR_CUENTA', 10);
+  }
+
+  /**
+   * ¿Le queda cupo de conexiones en vivo a esta cuenta?
+   *
+   * ## Por qué hace falta un tope
+   *
+   * Cada flujo abierto es un socket sostenido contra el gateway, un `Subject`
+   * en memoria y un latido cada 25 s **para siempre**. Sin tope, cien pestañas
+   * son cien conexiones, y no hace falta mala fe: basta con dejar el portátil
+   * con sesiones abiertas. Es una denegación de servicio trivial contra uno
+   * mismo y, compartiendo proceso, contra los demás.
+   *
+   * ## Por qué se rechaza la nueva y no se cierra la vieja
+   *
+   * Cerrar la más antigua parece más amable —tu pestaña actual funciona— pero
+   * entra en bucle: `EventSource` **reconecta solo** cuando el flujo se corta,
+   * así que la pestaña desalojada volvería inmediatamente, desalojando a la
+   * siguiente. Un tope implementado así es una tormenta de reconexiones.
+   *
+   * Rechazar antes de abrir no tiene ese problema, y es por una regla del
+   * propio `EventSource`: ante una respuesta que **no** es 200 con
+   * `text/event-stream`, el navegador da la conexión por fallida y **no
+   * reintenta**. Por eso la comprobación vive aquí y la responde el controlador
+   * con un 429, en vez de dentro del `Observable`.
+   *
+   * ⚠️ Hay una carrera si dos pestañas abren a la vez: las dos pueden ver hueco
+   * y pasar. Está asumido — el desvío es de una conexión, no de cien, y cerrarla
+   * exigiría un candado por cuenta para defenderse de un caso que no es el
+   * ataque.
+   */
+  hayCupo(userId: string): boolean {
+    return (this.oyentes.get(userId)?.size ?? 0) < this.maxConexiones;
+  }
+
+  /** Cuántas conexiones tiene abiertas ahora mismo. Para el mensaje de error. */
+  conexionesDe(userId: string): number {
+    return this.oyentes.get(userId)?.size ?? 0;
+  }
 
   onModuleInit() {
     this.suscriptor = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {

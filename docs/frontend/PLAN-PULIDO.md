@@ -637,9 +637,57 @@ de ESTADO-ACTUAL §17.7.
 - [ ] **E6.2 — Índices que faltan.** Revisar los planes de las consultas que más
       se ejecutan: historial del chat, `countUnread`, `misConversaciones`.
       `contarSinLeerDeVarios` es SQL crudo y merece un `EXPLAIN`.
-- [ ] **E6.3 — Tope de conexiones SSE por cuenta.** Hoy no hay ninguno: cien
-      pestañas abiertas son cien conexiones sostenidas contra el gateway. Es una
-      denegación de servicio trivial contra uno mismo y contra los demás.
+- [x] **E6.3 — Tope de conexiones SSE por cuenta.**
+      No había ninguno: cien pestañas eran cien conexiones sostenidas contra el
+      gateway, cada una con su latido cada 25 s. Denegación de servicio trivial,
+      y sin necesitar mala fe — basta con dejar sesiones abiertas.
+
+      `SSE_MAX_CONEXIONES_POR_CUENTA`, por defecto **10** (una pestaña por zona
+      y alguna repetida). El que sobra recibe **429 `TOO_MANY_STREAMS`**.
+
+      ⚠️ **Se rechaza la nueva conexión, no se cierra la vieja**, y la diferencia
+      es todo. Desalojar la más antigua parece más amable, pero `EventSource`
+      **reconecta solo** cuando un flujo abierto se corta: la pestaña desalojada
+      volvería en el acto y echaría a la siguiente. Un tope hecho así es una
+      tormenta de reconexiones. Ante una respuesta que **no** es 200 con
+      `text/event-stream`, en cambio, el navegador da la conexión por fallida y
+      no reintenta — por eso la comprobación vive en el **controlador**, antes de
+      abrir nada, y no dentro del `Observable`.
+
+      ⚠️ **El valor se lee por `ConfigService` en el constructor**, no en una
+      constante del módulo: es la trampa 17 de CLAUDE.md, donde un
+      `process.env.X` arriba del archivo no ve el `.env` y coge el valor por
+      defecto **en silencio**.
+
+      Verificado en los dos sentidos contra el gateway real, con el tope a 2: dos
+      flujos abiertos y el tercero **429**; al cerrar uno, el siguiente **200**.
+      Esa segunda mitad importa tanto como la primera — si el cupo no se liberase
+      al cerrar, el tope dejaría de ser un límite de concurrencia y sería uno de
+      por vida, y el síntoma sería «a mí no me llegan los mensajes» sin un solo
+      error. Fijado además con 3 unitarias
+      (`notifications-stream.limite.spec.ts`), incluida que el tope es **por
+      cuenta**: uno global dejaría sin tiempo real a toda la plataforma por culpa
+      de una sola persona con muchas pestañas.
+
+- [ ] 🔴 **E6.8 — El gateway recibe TODOS los eventos de TODOS los usuarios.**
+      *(Hallazgo nuevo, 17-08, al revisar la escalabilidad. No estaba en el plan.)*
+
+      `NotificationsStreamService` hace `psubscribe('avisos:*')`, así que **cada
+      instancia del gateway recibe cada evento de cada usuario** y descarta los
+      que no le tocan. Con 3 instancias, el tráfico de pub/sub se multiplica por
+      3; con 20, por 20. Es el techo de escalado horizontal del tiempo real.
+
+      El comentario que lo justifica dice que la alternativa era «abrir un socket
+      a Redis por cada pestaña», y eso es una **falsa disyuntiva**: una sola
+      conexión suscriptora admite miles de canales. Lo correcto es
+      `SUBSCRIBE avisos:<userId>` al abrir el primer flujo de esa persona y
+      `UNSUBSCRIBE` al cerrar el último — que son exactamente los dos puntos
+      donde ya se llama a `marcarVivo` y `marcarIdo`.
+
+      A favor de lo que hay: el descarte ocurre **antes** del `JSON.parse` (se
+      mira `oyentes.get` primero), así que el coste por evento ajeno es una
+      búsqueda en un `Map`, no deserializar. Por eso a la escala de hoy no se
+      nota, y por eso esto es deuda de escalado y no un fallo.
 - [ ] **E6.4 — Repasar los `catch` que se tragan errores.** El patrón
       `.catch(() => null)` fue la causa de que un 429 se leyera como «esta cuenta
       no existe». Buscar los que quedan y decidir en cada uno si degradar es

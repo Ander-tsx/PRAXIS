@@ -24,6 +24,20 @@ export const envValidationSchema = Joi.object({
    */
   TRUSTED_PROXY_HOPS: Joi.number().min(0).default(0),
 
+  /**
+   * Cuántos flujos SSE puede tener abiertos una misma cuenta a la vez.
+   *
+   * Cada uno es un socket sostenido, un `Subject` en memoria y un latido cada
+   * 25 s indefinidamente; sin tope, cien pestañas son cien conexiones. Ver
+   * `NotificationsStreamService.hayCupo`.
+   *
+   * El 10 por defecto sale de lo que hace una persona de verdad: una pestaña
+   * por zona abierta y alguna repetida. Desde que el chat tiene zona propia,
+   * cruzar entre el panel y los mensajes puede solapar dos brevemente, así que
+   * apretarlo a 3 o 4 daría falsos positivos.
+   */
+  SSE_MAX_CONEXIONES_POR_CUENTA: Joi.number().min(1).default(10),
+
   // credentials-service (auth + users) — TCP 3001
   CREDENTIALS_SERVICE_HOST: Joi.string().default('localhost'),
   CREDENTIALS_SERVICE_PORT: Joi.number().default(3001),

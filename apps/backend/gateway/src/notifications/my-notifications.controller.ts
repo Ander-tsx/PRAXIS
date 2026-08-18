@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
   type MessageEvent,
@@ -75,6 +76,33 @@ export class MyNotificationsController {
   @Sse('stream')
   @ApiOperation({ summary: 'Flujo de eventos en vivo de quien hace la petición' })
   stream(@Request() req: Express.Request): Observable<MessageEvent> {
+    const userId = req.user!.userId;
+
+    /**
+     * ⚠️ **El tope se comprueba aquí, antes de abrir nada, y a propósito.**
+     *
+     * Cada flujo es un socket sostenido más un latido cada 25 s indefinidamente.
+     * Sin tope, cien pestañas son cien conexiones contra el gateway — una
+     * denegación de servicio trivial que no necesita mala fe.
+     *
+     * Va en el controlador y no dentro del `Observable` porque lo que importa
+     * es **la forma de la respuesta**: `EventSource` reintenta solo cuando un
+     * flujo ya abierto se corta, pero ante una respuesta que no es 200 con
+     * `text/event-stream` da la conexión por fallida y **no reintenta**. Un 429
+     * limpio corta el bucle; desalojar conexiones desde dentro lo provocaría.
+     *
+     * Ver `NotificationsStreamService.hayCupo`.
+     */
+    if (!this.avisosEnVivo.hayCupo(userId)) {
+      throw new HttpException(
+        {
+          code: 'TOO_MANY_STREAMS',
+          message: `Demasiadas conexiones en vivo abiertas (${this.avisosEnVivo.conexionesDe(userId)}). Cierra alguna pestaña.`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     /**
      * ⚠️ **Un solo nombre de evento SSE (`evento`) para todo lo que no sea el
      * latido, y el tipo real va dentro del cuerpo.**
@@ -93,7 +121,7 @@ export class MyNotificationsController {
      * más.
      */
     const eventos = this.avisosEnVivo
-      .suscribir(req.user!.userId)
+      .suscribir(userId)
       .pipe(map((evento): MessageEvent => ({ type: 'evento', data: evento })));
 
     /**
