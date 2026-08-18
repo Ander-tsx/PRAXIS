@@ -53,28 +53,38 @@ export interface EventoEnVivo {
 const CADUCIDAD_DEL_NOMBRE_MS = 10 * 60 * 1000;
 
 /**
- * El patrón al que se suscribe el gateway. Espejo de `canalDeAvisos()` en
- * projects-service: si allí cambia el prefijo, aquí deja de llegar nada.
+ * El canal de una persona. Espejo de `canalDeEventos()` en projects-service: si
+ * allí cambia el prefijo, aquí deja de llegar nada.
  */
-const PATRON_DE_CANALES = 'avisos:*';
+function canalDe(userId: string): string {
+  return `avisos:${userId}`;
+}
 
 /**
  * Reparte los avisos que publica projects-service a los navegadores conectados.
  *
- * projects-service publica en `avisos:<userId>` cuando crea una notificación.
- * Aquí hay **una sola** conexión de Redis en modo suscriptor para todo el
- * proceso, escuchando el patrón, y un `Subject` por persona con una pestaña
- * abierta.
+ * projects-service publica en `avisos:<userId>` cuando pasa algo. Aquí hay **una
+ * sola** conexión de Redis en modo suscriptor para todo el proceso, y un
+ * `Subject` por pestaña abierta.
  *
- * ⚠️ Una conexión compartida y no una por usuario conectado. En modo suscriptor
- * un cliente de Redis no puede ejecutar ningún otro comando, así que la
- * alternativa era abrir un socket a Redis por cada pestaña de cada persona. Con
- * `psubscribe` el coste es constante y el reparto se hace en memoria.
+ * ⚠️ **Una conexión compartida, pero suscrita canal a canal.** En modo
+ * suscriptor un cliente de Redis no puede ejecutar ningún otro comando, de ahí
+ * que la conexión sea aparte y única. Lo que **no** se sigue de eso es que haya
+ * que suscribirse al patrón entero: una sola conexión admite miles de canales,
+ * así que se abre `avisos:<userId>` con la primera pestaña de esa persona y se
+ * cierra con la última.
+ *
+ * Esto era un `psubscribe('avisos:*')`, que hacía que **cada instancia del
+ * gateway recibiera cada evento de cada usuario** para descartar los ajenos: el
+ * tráfico de pub/sub se multiplicaba por el número de instancias. Con canal por
+ * usuario, cada instancia recibe solo lo de su gente, y añadir instancias deja
+ * de encarecer a las demás.
  *
  * ⚠️ **El aislamiento lo da el nombre del canal, no un filtro nuestro.** El
  * `userId` se extrae del canal por el que llegó el mensaje, no del contenido:
  * un emisor que se equivocara al rellenar el cuerpo no puede colar un aviso en
- * la conexión de otra persona.
+ * la conexión de otra persona. Ahora, además, ni siquiera llega: sin
+ * suscripción no hay entrega.
  */
 @Injectable()
 export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy {
@@ -168,15 +178,26 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
       this.logger.warn(`Redis no disponible para avisos en vivo: ${error.message}`);
     });
 
+    /**
+     * Al (re)conectar, volver a suscribirse a lo que haya abierto ahora mismo.
+     *
+     * ioredis ya reemite sus suscripciones al reconectar, pero esto cubre el
+     * hueco que no cubre: las conexiones que se abrieron **mientras Redis estaba
+     * caído**. Con `enableOfflineQueue: false` esos `SUBSCRIBE` fallaron y nadie
+     * los reintentaría; sin esto, esas personas se quedarían sin tiempo real
+     * hasta recargar, y en silencio.
+     */
     this.suscriptor.on('ready', () => {
+      const canales = [...this.oyentes.keys()].map(canalDe);
+      if (canales.length === 0) return;
       this.suscriptor
-        .psubscribe(PATRON_DE_CANALES)
+        .subscribe(...canales)
         .catch((error: Error) =>
-          this.logger.warn(`No se pudo suscribir a los avisos: ${error.message}`),
+          this.logger.warn(`No se pudo resuscribir a los avisos: ${error.message}`),
         );
     });
 
-    this.suscriptor.on('pmessage', (_patron: string, canal: string, carga: string) => {
+    this.suscriptor.on('message', (canal: string, carga: string) => {
       const userId = canal.slice(canal.indexOf(':') + 1);
       const destinatarios = this.oyentes.get(userId);
       if (!destinatarios?.size) return;
@@ -296,6 +317,34 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
       this.oyentes.set(userId, destinatarios);
 
       /**
+       * La primera pestaña de esta persona abre su canal en Redis.
+       *
+       * ⚠️ **Antes esto era un `psubscribe('avisos:*')` global**, y funcionaba —
+       * pero significaba que **cada instancia del gateway recibía cada evento de
+       * cada usuario** de toda la plataforma, para descartar los que no le
+       * tocaban. Con tres instancias, el tráfico de pub/sub se multiplicaba por
+       * tres; con veinte, por veinte. Era el techo de escalado horizontal del
+       * tiempo real, y no daba ningún síntoma hasta chocar contra él.
+       *
+       * El comentario que lo defendía decía que la alternativa era «un socket a
+       * Redis por cada pestaña». Es una falsa disyuntiva: una **sola** conexión
+       * suscriptora admite miles de canales. Lo que cambia no es el número de
+       * sockets —sigue siendo uno— sino a qué se suscribe.
+       *
+       * ⚠️ Se suscribe solo en la primera y se cancela solo en la última, no por
+       * pestaña: `SUBSCRIBE` al mismo canal dos veces no acumula, así que un
+       * `UNSUBSCRIBE` al cerrar cualquiera dejaría a las demás pestañas sordas.
+       * Son los mismos dos puntos que ya marcan la presencia.
+       */
+      if (eraLaPrimera) {
+        this.suscriptor
+          .subscribe(canalDe(userId))
+          .catch((error: Error) =>
+            this.logger.warn(`No se pudo abrir el canal de ${userId}: ${error.message}`),
+          );
+      }
+
+      /**
        * ⚠️ **Abrir este flujo *es* estar conectado.**
        *
        * La presencia era front-driven: el navegador avisaba al cerrar la
@@ -324,6 +373,16 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
            lenta, una clave por cada persona que haya entrado alguna vez. */
         if (actuales.size === 0) {
           this.oyentes.delete(userId);
+
+          /* Se ha ido la última pestaña: se cierra su canal en Redis. Sin esto,
+             el gateway seguiría recibiendo los eventos de todo el que haya
+             entrado alguna vez desde que arrancó — la misma fuga que el
+             `psubscribe` global, solo que creciendo poco a poco. */
+          this.suscriptor
+            .unsubscribe(canalDe(userId))
+            .catch((error: Error) =>
+              this.logger.warn(`No se pudo cerrar el canal de ${userId}: ${error.message}`),
+            );
           /**
            * La última pestaña se ha ido: ausente, y se anuncia.
            *

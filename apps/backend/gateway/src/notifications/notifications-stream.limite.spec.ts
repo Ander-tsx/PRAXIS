@@ -36,9 +36,15 @@ describe('NotificationsStreamService — tope de conexiones', () => {
   /**
    * El servicio con dobles inertes.
    *
-   * `suscribir` toca la presencia al abrir y al cerrar, así que esos métodos
-   * devuelven promesas resueltas: lo que se prueba es la contabilidad, no lo que
-   * se anuncia.
+   * `suscribir` toca dos cosas además de contar: la presencia (al abrir y al
+   * cerrar) y **el suscriptor de Redis**, desde que cada persona tiene su propio
+   * canal en vez de haber un patrón global (E6.8). Las dos se doblan con
+   * promesas resueltas: lo que se prueba aquí es la contabilidad.
+   *
+   * ⚠️ El suscriptor se inyecta escribiendo el campo privado, que normalmente
+   * rellena `onModuleInit`. La alternativa era llamar a `onModuleInit` y abrir
+   * una conexión de verdad a Redis, que convertiría tres pruebas de aritmética
+   * en una prueba de integración con un servicio externo.
    */
   function servicio(max: number): NotificationsStreamService {
     const presenciaInerte = {
@@ -51,16 +57,23 @@ describe('NotificationsStreamService — tope de conexiones', () => {
 
     const config = { get: () => max } as never;
 
-    return new NotificationsStreamService(
+    const instancia = new NotificationsStreamService(
       { send: () => undefined } as never,
       presenciaInerte,
       config,
     );
+
+    (instancia as unknown as { suscriptor: unknown }).suscriptor = {
+      subscribe: () => Promise.resolve(1),
+      unsubscribe: () => Promise.resolve(0),
+    };
+
+    return instancia;
   }
 
   it('deja abrir hasta el tope y no más', () => {
     const servicioConTope = servicio(3);
-    const abiertas = [];
+    const abiertas: { unsubscribe: () => void }[] = [];
 
     for (let i = 0; i < 3; i++) {
       expect(servicioConTope.hayCupo(ALGUIEN)).toBe(true);
@@ -103,5 +116,97 @@ describe('NotificationsStreamService — tope de conexiones', () => {
     expect(servicioConTope.hayCupo(OTRA)).toBe(true);
 
     deAlguien.unsubscribe();
+  });
+});
+
+/**
+ * Un canal de Redis por persona, no un patrón global (E6.8).
+ *
+ * ## Qué se cambió
+ *
+ * Esto era `psubscribe('avisos:*')`: **cada instancia del gateway recibía cada
+ * evento de cada usuario** de la plataforma y descartaba los ajenos. Funcionaba,
+ * y por eso duró — el descarte es una búsqueda en un `Map` y no se nota con poca
+ * gente. Lo que no se ve mirando una instancia es que el tráfico de pub/sub se
+ * multiplica por el número de instancias: es un techo de escalado, no un fallo.
+ *
+ * ## Por qué esto merece prueba
+ *
+ * Porque las dos formas de equivocarse son **mudas**:
+ *
+ * - Suscribirse en cada pestaña en vez de solo en la primera parece inofensivo
+ *   —`SUBSCRIBE` al mismo canal no acumula— hasta que se cierra **una** pestaña
+ *   de las varias abiertas: el `UNSUBSCRIBE` correspondiente deja sordas a las
+ *   demás, que siguen abiertas y sin recibir nada.
+ * - No cancelar al cerrar la última devuelve poco a poco al problema original:
+ *   el gateway acaba suscrito a todo el que haya entrado desde que arrancó.
+ *
+ * Ninguna de las dos da un error. Las dos salen como «a veces no me llegan los
+ * mensajes».
+ */
+describe('NotificationsStreamService — un canal por persona', () => {
+  const ALGUIEN = '11111111-1111-4111-8111-111111111111';
+
+  function servicioConRedisEspiado() {
+    const suscritos: string[] = [];
+    const cancelados: string[] = [];
+
+    const presenciaInerte = {
+      marcarVivo: () => Promise.resolve(),
+      marcarIdo: () => Promise.resolve(),
+      anunciar: () => Promise.resolve(),
+      elegidaDe: () => Promise.resolve('AVAILABLE'),
+      efectiva: () => 'AVAILABLE',
+    } as never;
+
+    const instancia = new NotificationsStreamService(
+      { send: () => undefined } as never,
+      presenciaInerte,
+      { get: () => 10 } as never,
+    );
+
+    (instancia as unknown as { suscriptor: unknown }).suscriptor = {
+      subscribe: (canal: string) => {
+        suscritos.push(canal);
+        return Promise.resolve(1);
+      },
+      unsubscribe: (canal: string) => {
+        cancelados.push(canal);
+        return Promise.resolve(0);
+      },
+    };
+
+    return { instancia, suscritos, cancelados };
+  }
+
+  it('abre el canal en la primera pestaña y no en las siguientes', () => {
+    const { instancia, suscritos } = servicioConRedisEspiado();
+
+    const primera = instancia.suscribir(ALGUIEN).subscribe();
+    expect(suscritos).toEqual([`avisos:${ALGUIEN}`]);
+
+    const segunda = instancia.suscribir(ALGUIEN).subscribe();
+    /* Sigue habiendo **una** suscripción: la segunda pestaña reutiliza el canal.
+       Suscribir otra vez no rompe nada por sí solo, pero emparejaría con un
+       `UNSUBSCRIBE` al cerrar esa pestaña y dejaría sorda a la primera. */
+    expect(suscritos).toEqual([`avisos:${ALGUIEN}`]);
+
+    primera.unsubscribe();
+    segunda.unsubscribe();
+  });
+
+  it('cierra el canal solo cuando se va la última pestaña', () => {
+    const { instancia, cancelados } = servicioConRedisEspiado();
+
+    const primera = instancia.suscribir(ALGUIEN).subscribe();
+    const segunda = instancia.suscribir(ALGUIEN).subscribe();
+
+    primera.unsubscribe();
+    /* Queda una pestaña abierta: cancelar aquí la dejaría sin eventos con la
+       conexión viva, que es la forma silenciosa de romper esto. */
+    expect(cancelados).toEqual([]);
+
+    segunda.unsubscribe();
+    expect(cancelados).toEqual([`avisos:${ALGUIEN}`]);
   });
 });

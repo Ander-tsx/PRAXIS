@@ -669,29 +669,57 @@ de ESTADO-ACTUAL §17.7.
       cuenta**: uno global dejaría sin tiempo real a toda la plataforma por culpa
       de una sola persona con muchas pestañas.
 
-- [ ] 🔴 **E6.8 — El gateway recibe TODOS los eventos de TODOS los usuarios.**
-      *(Hallazgo nuevo, 17-08, al revisar la escalabilidad. No estaba en el plan.)*
+- [x] **E6.8 — Un canal de Redis por persona, no un patrón global.**
+      *(Hallazgo de esta sesión al revisar la escalabilidad. No estaba en el plan.)*
 
-      `NotificationsStreamService` hace `psubscribe('avisos:*')`, así que **cada
-      instancia del gateway recibe cada evento de cada usuario** y descarta los
-      que no le tocan. Con 3 instancias, el tráfico de pub/sub se multiplica por
-      3; con 20, por 20. Es el techo de escalado horizontal del tiempo real.
+      `NotificationsStreamService` hacía `psubscribe('avisos:*')`, así que **cada
+      instancia del gateway recibía cada evento de cada usuario** y descartaba
+      los ajenos. Con 3 instancias el tráfico de pub/sub se multiplicaba por 3;
+      con 20, por 20. Era el techo de escalado horizontal del tiempo real, y no
+      daba ningún síntoma hasta chocar contra él.
 
-      El comentario que lo justifica dice que la alternativa era «abrir un socket
-      a Redis por cada pestaña», y eso es una **falsa disyuntiva**: una sola
-      conexión suscriptora admite miles de canales. Lo correcto es
-      `SUBSCRIBE avisos:<userId>` al abrir el primer flujo de esa persona y
-      `UNSUBSCRIBE` al cerrar el último — que son exactamente los dos puntos
-      donde ya se llama a `marcarVivo` y `marcarIdo`.
+      El comentario que lo defendía decía que la alternativa era «un socket a
+      Redis por cada pestaña». **Falsa disyuntiva**: una sola conexión
+      suscriptora admite miles de canales. Lo que cambia no es el número de
+      sockets —sigue siendo uno— sino a qué se suscribe.
 
-      A favor de lo que hay: el descarte ocurre **antes** del `JSON.parse` (se
-      mira `oyentes.get` primero), así que el coste por evento ajeno es una
-      búsqueda en un `Map`, no deserializar. Por eso a la escala de hoy no se
-      nota, y por eso esto es deuda de escalado y no un fallo.
-- [ ] **E6.4 — Repasar los `catch` que se tragan errores.** El patrón
-      `.catch(() => null)` fue la causa de que un 429 se leyera como «esta cuenta
-      no existe». Buscar los que quedan y decidir en cada uno si degradar es
-      correcto o si está ocultando algo.
+      Ahora se hace `SUBSCRIBE avisos:<userId>` al abrir la **primera** pestaña
+      de esa persona y `UNSUBSCRIBE` al cerrar la **última** — los mismos dos
+      puntos donde ya se marcaba la presencia.
+
+      ⚠️ **Las dos formas de equivocarse aquí son mudas**, y por eso van con
+      prueba: suscribir en cada pestaña (en vez de solo la primera) empareja con
+      un `UNSUBSCRIBE` al cerrar cualquiera y deja **sordas a las demás**, que
+      siguen abiertas; y no cancelar al cerrar la última devuelve poco a poco al
+      problema original. Ninguna da error: salen como «a veces no me llegan los
+      mensajes».
+
+      ⚠️ Se resuscribe también en el `ready` de Redis. ioredis ya reemite sus
+      suscripciones al reconectar, pero no cubre las conexiones abiertas
+      **mientras Redis estaba caído**: con `enableOfflineQueue: false` esos
+      `SUBSCRIBE` fallan y nadie los reintentaría.
+
+      **Verificado contra Redis real**, que es lo que convierte esto en un hecho:
+
+      | Momento | `PUBSUB CHANNELS 'avisos:*'` | `PUBSUB NUMPAT` |
+      |---|---|---|
+      | Antes (patrón global) | — | **1** |
+      | Ahora, con una persona conectada | 1 canal | **0** |
+      | Al conectarse otra | 2 canales | 0 |
+      | Al cerrar esa | vuelve a 1 canal | 0 |
+
+      Y los eventos siguen llegando: `ui/06-chat-zona` en verde, incluida la que
+      afirma contra qué URL se abre el flujo.
+
+      ⚠️ **Al medir aparecieron dos conexiones zombis** con `psubscribe` de 5,8 y
+      7,8 horas — procesos que maté antes y cuyos sockets Redis aún no había
+      soltado. Daban `NUMPAT = 1` y habrían hecho parecer que el cambio no
+      funcionaba. Un `CLIENT KILL` y a cero.
+
+      A favor de lo que había: el descarte ocurría **antes** del `JSON.parse` (se
+      mira `oyentes.get` primero), así que el coste por evento ajeno era una
+      búsqueda en un `Map`. Por eso a la escala de hoy no se notaba, y por eso
+      esto era deuda de escalado y no un fallo.
 
 - [x] **E6.7 — Promesas sueltas que pueden tumbar un servicio.**
       Un `void promesa()` que se rechaza es un `unhandledRejection`, y en Node
