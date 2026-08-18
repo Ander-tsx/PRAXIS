@@ -878,13 +878,9 @@ export function MessageBubble({
                visualmente sin necesidad de separadores. */
             borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
             borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
-            /* El realce de un mensaje fijado: la marca «Fijado» de arriba ya lo
-               dice, pero en un bloque largo de burbujas seguidas hay que poder
-               distinguirlo sin leer cada una. Un borde entero y no solo un
-               tinte de fondo — el tinte por sí solo se confundía con el propio
-               matiz de "mine" en las burbujas del autor. */
-            outline: fijado ? `1.5px solid ${alpha(colors.primary, 55)}` : undefined,
-            outlineOffset: fijado ? '-1.5px' : undefined,
+            /* El realce de un mensaje fijado se pinta con un div absoluto
+               adentro para que quede por encima del botón de acciones y no
+               se vea mordido por su fondo radial. */
           }}
         >
           {message.replyTo && message.replyTo.id !== ocultarCitaSiApuntaA && (
@@ -1355,6 +1351,16 @@ export function MessageBubble({
                 </div>
               )}
             </div>
+          )}
+
+          {fijado && (
+            <div
+              className="pointer-events-none absolute inset-0 z-40 rounded-[inherit]"
+              style={{
+                outline: `1.5px solid ${alpha(colors.primary, 55)}`,
+                outlineOffset: '-1.5px',
+              }}
+            />
           )}
         </div>
 
