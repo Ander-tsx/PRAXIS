@@ -38,6 +38,10 @@ export const envValidationSchema = Joi.object({
   ALEXA_SERVICE_HOST: Joi.string().default('localhost'),
   ALEXA_SERVICE_PORT: Joi.number().default(3007),
 
+  // automation-service — TCP 3008. El cliente no se usa hasta bloques posteriores.
+  AUTOMATION_SERVICE_HOST: Joi.string().default('localhost'),
+  AUTOMATION_SERVICE_PORT: Joi.number().default(3008),
+
   /**
    * Stripe. Las tres **opcionales**, y a propósito.
    *

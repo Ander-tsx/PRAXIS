@@ -131,6 +131,17 @@ export const BACKEND_SERVICES = [
     color: 91,
     descripcion: 'Praxis Voice · vinculación y consultas',
   },
+  {
+    key: 'automation',
+    pkg: '@praxis/automation-service',
+    dir: 'apps/backend/services/automation',
+    port: 3008,
+    protocolo: 'TCP',
+    prisma: true,
+    seedOrder: null,
+    color: 92,
+    descripcion: 'Automatizaciones · base operativa sin reglas aún',
+  },
 ];
 
 /**
@@ -243,7 +254,7 @@ export const ALL_SERVICES = [...BACKEND_SERVICES, ...FRONTEND_APPS];
 export const PRESETS = [
   {
     key: 'todo',
-    nombre: 'Todo — los 8 servicios y las 6 zonas',
+    nombre: 'Todo — los 9 servicios y las 6 zonas',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: true,
   },
@@ -255,7 +266,7 @@ export const PRESETS = [
   },
   {
     key: 'backend',
-    nombre: 'Solo backend — los 8 servicios, sin frontend',
+    nombre: 'Solo backend — los 9 servicios, sin frontend',
     backend: BACKEND_SERVICES.map((s) => s.key),
     frontend: false,
   },

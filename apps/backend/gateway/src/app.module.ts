@@ -7,6 +7,7 @@ import { envValidationSchema } from './common/config/env.validation';
 
 import { AdminModule } from './admin/admin.module';
 import { AlexaModule } from './alexa/alexa.module';
+import { AutomationModule } from './automation/automation.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssistantModule } from './assistant/assistant.module';
@@ -64,6 +65,7 @@ import { UserModule } from './users/user.module';
     ReportsModule,
     AssistantModule,
     AlexaModule,
+    AutomationModule,
     AdminModule,
     BillingModule,
   ],
