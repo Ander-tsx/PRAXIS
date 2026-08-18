@@ -842,8 +842,37 @@ de ESTADO-ACTUAL §17.7.
 
       ✅ Las siete zonas compilan, la prosa española sobrevive —comprobado— y
       `ui/06-chat-zona` en verde (4).
-- [ ] **E5.5 — Lote 4: `apps/backend/services/projects/src/{chat,realtime}/`.**
-- [ ] **E5.6 — Lote 5: gateway (`presence`, `notifications`).**
+- [x] **E5.5 y E5.6 — Backend: chat y realtime de projects, y el gateway.**
+      **Juntos en un commit a propósito**, aunque el plan los listaba aparte:
+      `EventoEnVivo` está **declarado a los dos lados** —el comentario de
+      `types.ts` dice que los dos archivos se tocan juntos— y renombrarlo en uno
+      solo dejaría el espejo roto a medias.
+
+      | Antes | Ahora |
+      |---|---|
+      | `PublicadorDeEventos` | `EventDispatcher` |
+      | `canalDeEventos` | `liveEventChannel` |
+      | `ContextoDeCanal` | `ChannelContext` |
+      | `EventoEnVivo` | `LiveEvent` |
+      | `MAXIMO_DE_FIJADOS` | `MAX_PINNED` |
+      | `REACCIONES` | `REACTIONS` |
+      | `Presencia` | `Presence` |
+
+      Y tres ficheros: `eventos.ts → events.ts`, `publicador.service.ts →
+      event-dispatcher.service.ts` (con su `.spec`).
+
+      ⚠️ **La revisión del diff cazó una**, que es justo para lo que se hace: un
+      `description: 'Presencia elegida'` de Swagger —texto que ve quien lee la
+      documentación de la API— había quedado como **`'Presence elegida'`**.
+      Restaurado. Compilaba perfectamente, como todo lo que rompió E5.4.
+
+      ⚠️ Y otra que tampoco avisa: **cuatro comentarios citaban
+      `realtime/eventos.ts`**, un fichero que ya no existe. Corregidos.
+
+      ✅ gateway y projects-service compilan, **81 unitarias** en verde (44 + 37),
+      `api/15-chat` (17 ✅) y `ui/06-chat-zona` (4 ✅) — o sea que el tiempo real,
+      que cruza los dos servicios, sigue llegando al navegador.
+
 - [ ] **E5.7 — El resto**, zona por zona.
 - [ ] **E5.8 — Escribir la convención en CLAUDE.md**, en la sección de reglas
       del frontend: **identificadores en inglés, comentarios en español**. Sin

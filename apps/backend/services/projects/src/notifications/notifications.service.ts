@@ -8,14 +8,14 @@ import {
   MarkNotificationReadDto,
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
-import { PublicadorDeEventos } from '../realtime/publicador.service';
+import { EventDispatcher } from '../realtime/event-dispatcher.service';
 
 /** Tope de la bandeja. Por encima de esto nadie baja a mirar. */
 const DEFAULT_LIMIT = 30;
 
 /*
- * ⚠️ `canalDeAvisos` vivía aquí y se ha movido a `realtime/eventos.ts` como
- * `canalDeEventos`. Por ese canal ya no viajan solo avisos de bandeja: viajan
+ * ⚠️ `canalDeAvisos` vivía aquí y se ha movido a `realtime/events.ts` como
+ * `liveEventChannel`. Por ese canal ya no viajan solo avisos de bandeja: viajan
  * también los mensajes, ediciones, borrados y marcas de lectura del chat, así
  * que tenerlo colgando del módulo de notificaciones obligaba al chat a importar
  * de notificaciones para hablar de algo que no son notificaciones.
@@ -25,7 +25,7 @@ const DEFAULT_LIMIT = 30;
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventos: PublicadorDeEventos,
+    private readonly eventos: EventDispatcher,
   ) {}
 
   /**
@@ -74,7 +74,7 @@ export class NotificationsService {
       /* El sobre lleva `tipo: 'aviso'` en la raíz, que es lo que el cliente
          mira para despachar. El `type` de dentro sigue siendo el enum de la
          tabla `notifications` — son dos cosas distintas y por eso no comparten
-         nombre. Ver `realtime/eventos.ts`. */
+         nombre. Ver `realtime/events.ts`. */
       void this.eventos.aUnaPersona(notification.userId, {
         tipo: 'aviso',
         type: notification.type,

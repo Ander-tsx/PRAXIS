@@ -13,13 +13,13 @@ import { PresenceService } from '../presence/presence.service';
  * aquí pasan avisos de bandeja, mensajes de chat, ediciones, borrados,
  * reacciones, fijados y marcas de lectura; el gateway solo reparte y añade el
  * nombre. El contrato de verdad —qué campos lleva cada `tipo`— vive en
- * `projects-service/src/realtime/eventos.ts`, con su espejo en el frontend.
+ * `projects-service/src/realtime/events.ts`, con su espejo en el frontend.
  *
  * Tiparlo aquí como una unión cerrada obligaría a tocar el gateway cada vez que
  * projects-service estrenara un evento, para un servicio que **no lee el
  * contenido**. Se tipa lo que sí toca —`tipo`, `actorId`— y el resto pasa.
  */
-export interface EventoEnVivo {
+export interface LiveEvent {
   tipo: string;
   actorId?: string | null;
   [clave: string]: unknown;
@@ -53,7 +53,7 @@ export interface EventoEnVivo {
 const CADUCIDAD_DEL_NOMBRE_MS = 10 * 60 * 1000;
 
 /**
- * El canal de una persona. Espejo de `canalDeEventos()` en projects-service: si
+ * El canal de una persona. Espejo de `liveEventChannel()` en projects-service: si
  * allí cambia el prefijo, aquí deja de llegar nada.
  */
 function canalDe(userId: string): string {
@@ -95,7 +95,7 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
    * Oyentes por usuario. Un `Set` porque la misma persona puede tener varias
    * pestañas, y las dos tienen que recibir el aviso.
    */
-  private readonly oyentes = new Map<string, Set<Subject<EventoEnVivo>>>();
+  private readonly oyentes = new Map<string, Set<Subject<LiveEvent>>>();
 
   /**
    * `userId` → nombre, con caducidad.
@@ -202,9 +202,9 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
       const destinatarios = this.oyentes.get(userId);
       if (!destinatarios?.size) return;
 
-      let evento: EventoEnVivo;
+      let evento: LiveEvent;
       try {
-        evento = JSON.parse(carga) as EventoEnVivo;
+        evento = JSON.parse(carga) as LiveEvent;
       } catch {
         this.logger.warn(`Evento ilegible en ${canal}`);
         return;
@@ -258,7 +258,7 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
    * —dejar caer el aviso porque no se pudo poner un nombre— convertiría una
    * degradación cosmética en una pérdida de información.
    */
-  private async conNombre(evento: EventoEnVivo): Promise<EventoEnVivo> {
+  private async conNombre(evento: LiveEvent): Promise<LiveEvent> {
     if (!evento.actorId) return evento;
 
     const guardado = this.nombres.get(evento.actorId);
@@ -306,12 +306,12 @@ export class NotificationsStreamService implements OnModuleInit, OnModuleDestroy
    * función de retorno del `Observable` y el oyente se da de baja. Sin eso,
    * cada recarga de página dejaría un `Subject` vivo para siempre.
    */
-  suscribir(userId: string): Observable<EventoEnVivo> {
-    return new Observable<EventoEnVivo>((observador) => {
-      const canal = new Subject<EventoEnVivo>();
+  suscribir(userId: string): Observable<LiveEvent> {
+    return new Observable<LiveEvent>((observador) => {
+      const canal = new Subject<LiveEvent>();
       const suscripcion = canal.subscribe(observador);
 
-      const destinatarios = this.oyentes.get(userId) ?? new Set<Subject<EventoEnVivo>>();
+      const destinatarios = this.oyentes.get(userId) ?? new Set<Subject<LiveEvent>>();
       const eraLaPrimera = destinatarios.size === 0;
       destinatarios.add(canal);
       this.oyentes.set(userId, destinatarios);

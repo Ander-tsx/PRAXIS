@@ -27,7 +27,7 @@ interface CanalParaRepartir {
 }
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { type ContextoDeCanal, type EventoEnVivo, canalDeEventos } from './eventos';
+import { type ChannelContext, type LiveEvent, liveEventChannel } from './events';
 
 /**
  * Quién debe enterarse de lo que pasa en un canal, y el reparto del evento.
@@ -47,7 +47,7 @@ import { type ContextoDeCanal, type EventoEnVivo, canalDeEventos } from './event
  * separa la conexión de una persona de la de otra.
  */
 @Injectable()
-export class PublicadorDeEventos {
+export class EventDispatcher {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -173,8 +173,8 @@ export class PublicadorDeEventos {
   async repartir(
     channelId: string,
     construir: (
-      contexto: ContextoDeCanal & { destinatario: string; silenciado: boolean },
-    ) => EventoEnVivo,
+      contexto: ChannelContext & { destinatario: string; silenciado: boolean },
+    ) => LiveEvent,
   ): Promise<void> {
     try {
       const canal = await this.canal(channelId);
@@ -231,7 +231,7 @@ export class PublicadorDeEventos {
          * porque Redis parpadeó. Una línea aquí lo desacopla.
          */
         this.redis
-          .publish(canalDeEventos(destinatario), {
+          .publish(liveEventChannel(destinatario), {
             ...evento,
             mio: 'actorId' in evento && evento.actorId === destinatario,
           })
@@ -245,7 +245,7 @@ export class PublicadorDeEventos {
   }
 
   /** Publica un evento ya construido a una sola persona. Para los avisos de bandeja. */
-  async aUnaPersona(userId: string, evento: EventoEnVivo): Promise<void> {
-    await this.redis.publish(canalDeEventos(userId), evento);
+  async aUnaPersona(userId: string, evento: LiveEvent): Promise<void> {
+    await this.redis.publish(liveEventChannel(userId), evento);
   }
 }

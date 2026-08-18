@@ -30,7 +30,7 @@ export const CHAT_MESSAGE_MAX = 4000;
  *
  * Una lista corta y **cerrada**, no texto libre: el emoji viaja en la URL y
  * acaba en la base, así que dejarlo abierto es un campo más donde meter lo que
- * sea. Espejo de `REACCIONES` en projects-service.
+ * sea. Espejo de `REACTIONS` en projects-service.
  */
 export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
 

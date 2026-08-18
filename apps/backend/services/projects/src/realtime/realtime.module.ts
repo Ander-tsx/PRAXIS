@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { PublicadorDeEventos } from './publicador.service';
+import { EventDispatcher } from './event-dispatcher.service';
 
 /**
  * El reparto de eventos en vivo.
@@ -11,7 +11,7 @@ import { PublicadorDeEventos } from './publicador.service';
  */
 @Global()
 @Module({
-  providers: [PublicadorDeEventos],
-  exports: [PublicadorDeEventos],
+  providers: [EventDispatcher],
+  exports: [EventDispatcher],
 })
 export class RealtimeModule {}

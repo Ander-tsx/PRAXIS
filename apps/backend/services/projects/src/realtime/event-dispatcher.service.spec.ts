@@ -2,8 +2,8 @@
 
 import type { PrismaService } from '../prisma/prisma.service';
 import type { RedisService } from '../redis/redis.service';
-import { canalDeEventos } from './eventos';
-import { PublicadorDeEventos } from './publicador.service';
+import { liveEventChannel } from './events';
+import { EventDispatcher } from './event-dispatcher.service';
 
 /**
  * El reparto de eventos en vivo, en prueba.
@@ -19,13 +19,13 @@ import { PublicadorDeEventos } from './publicador.service';
  *
  * ## Sin base de datos ni Redis
  *
- * `PublicadorDeEventos` recibe los dos por constructor y no usa nada más, así
+ * `EventDispatcher` recibe los dos por constructor y no usa nada más, así
  * que se le pasan dobles. Eso permite además comprobar algo que con una base de
  * verdad no se ve: **cuántas consultas hace**. Repartir un evento cuesta una, y
  * eso está fijado aquí abajo — eran tres, una por cada mensaje del chat de un
  * equipo.
  */
-describe('PublicadorDeEventos', () => {
+describe('EventDispatcher', () => {
   const CANAL_DIRECTO = 'canal-directo';
   const CANAL_PROYECTO = 'canal-proyecto';
   const ANA = 'usuario-ana';
@@ -36,7 +36,7 @@ describe('PublicadorDeEventos', () => {
   type Publicado = { canal: string; evento: Record<string, unknown> };
 
   interface Dobles {
-    publicador: PublicadorDeEventos;
+    publicador: EventDispatcher;
     publicado: Publicado[];
     llamadas: { canal: number; miembros: number; silenciados: number };
   }
@@ -106,7 +106,7 @@ describe('PublicadorDeEventos', () => {
       },
     } as unknown as RedisService;
 
-    return { publicador: new PublicadorDeEventos(prisma, redis), publicado, llamadas };
+    return { publicador: new EventDispatcher(prisma, redis), publicado, llamadas };
   }
 
   /** Un mensaje nuevo, construido como lo hace `ChatService`. */
@@ -143,7 +143,7 @@ describe('PublicadorDeEventos', () => {
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
       expect(publicado.map((p) => p.canal).sort()).toEqual(
-        [canalDeEventos(ANA), canalDeEventos(BEA)].sort(),
+        [liveEventChannel(ANA), liveEventChannel(BEA)].sort(),
       );
     });
 
@@ -189,7 +189,7 @@ describe('PublicadorDeEventos', () => {
           }) as never,
       );
 
-      expect(publicado.map((p) => p.canal)).toEqual([canalDeEventos(ANA)]);
+      expect(publicado.map((p) => p.canal)).toEqual([liveEventChannel(ANA)]);
     });
 
     it('un canal que ya no existe no publica nada', async () => {
@@ -202,7 +202,7 @@ describe('PublicadorDeEventos', () => {
 
     it('un canal privado a medio crear no publica nada', async () => {
       /* `directUserB` nulo es un canal sin el segundo extremo. Sin el filtro,
-         `canalDeEventos(null)` publicaría en `eventos:null`, un canal al que
+         `liveEventChannel(null)` publicaría en `eventos:null`, un canal al que
          nadie está suscrito pero que existe: fallo silencioso puro. */
       const { publicador, publicado } = montar({
         canal: { kind: 'DIRECT', directUserA: ANA, directUserB: null },
@@ -210,7 +210,7 @@ describe('PublicadorDeEventos', () => {
 
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
-      expect(publicado.map((p) => p.canal)).toEqual([canalDeEventos(ANA)]);
+      expect(publicado.map((p) => p.canal)).toEqual([liveEventChannel(ANA)]);
     });
   });
 
@@ -225,8 +225,8 @@ describe('PublicadorDeEventos', () => {
 
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
-      const deAna = publicado.find((p) => p.canal === canalDeEventos(ANA));
-      const deBea = publicado.find((p) => p.canal === canalDeEventos(BEA));
+      const deAna = publicado.find((p) => p.canal === liveEventChannel(ANA));
+      const deBea = publicado.find((p) => p.canal === liveEventChannel(BEA));
 
       expect(deAna?.evento.mio).toBe(true);
       expect(deBea?.evento.mio).toBe(false);
@@ -241,8 +241,8 @@ describe('PublicadorDeEventos', () => {
 
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
-      expect(publicado.find((p) => p.canal === canalDeEventos(ANA))?.evento.peerId).toBe(BEA);
-      expect(publicado.find((p) => p.canal === canalDeEventos(BEA))?.evento.peerId).toBe(ANA);
+      expect(publicado.find((p) => p.canal === liveEventChannel(ANA))?.evento.peerId).toBe(BEA);
+      expect(publicado.find((p) => p.canal === liveEventChannel(BEA))?.evento.peerId).toBe(ANA);
     });
 
     it('en un canal de proyecto no hay interlocutor', async () => {
@@ -270,8 +270,8 @@ describe('PublicadorDeEventos', () => {
 
       await publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA));
 
-      expect(publicado.find((p) => p.canal === canalDeEventos(BEA))?.evento.silenciado).toBe(true);
-      expect(publicado.find((p) => p.canal === canalDeEventos(ANA))?.evento.silenciado).toBe(false);
+      expect(publicado.find((p) => p.canal === liveEventChannel(BEA))?.evento.silenciado).toBe(true);
+      expect(publicado.find((p) => p.canal === liveEventChannel(ANA))?.evento.silenciado).toBe(false);
     });
 
     it('repartir un evento cuesta **una** sentencia, no cuatro', async () => {
@@ -348,7 +348,7 @@ describe('PublicadorDeEventos', () => {
       } as unknown as PrismaService;
       const redis = { publish: async () => undefined } as unknown as RedisService;
 
-      const publicador = new PublicadorDeEventos(prisma, redis);
+      const publicador = new EventDispatcher(prisma, redis);
 
       await expect(publicador.repartir(CANAL_DIRECTO, mensajeNuevo(ANA))).resolves.toBeUndefined();
     });

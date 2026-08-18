@@ -58,7 +58,7 @@ interface BaseDeChat {
   /**
    * Si lo provocó quien lo está recibiendo.
    *
-   * Lo rellena `PublicadorDeEventos.repartir` al publicar, porque es quien sabe
+   * Lo rellena `EventDispatcher.repartir` al publicar, porque es quien sabe
    * a quién va cada copia. Los emisores no lo ponen — y no deben: no conocen al
    * destinatario.
    */
@@ -72,7 +72,7 @@ interface BaseDeChat {
  * proyecto y uno de equipo no tiene interlocutor: sin esto, los dos serían
  * indistinguibles de un evento al que le faltan datos.
  */
-export interface ContextoDeCanal {
+export interface ChannelContext {
   channelKind: 'PROJECT' | 'DIRECT';
   projectId: string | null;
   projectName: string | null;
@@ -89,7 +89,7 @@ export interface ContextoDeCanal {
 }
 
 /** Un mensaje nuevo, con el mensaje entero dentro. */
-export interface EventoMensaje extends BaseDeChat, ContextoDeCanal {
+export interface ChatMessageEvent extends BaseDeChat, ChannelContext {
   tipo: 'chat.mensaje';
   /** El mensaje tal cual lo devuelve `CON_MENSAJE`. Se pinta sin pedir nada más. */
   mensaje: unknown;
@@ -107,7 +107,7 @@ export interface EventoMensaje extends BaseDeChat, ContextoDeCanal {
 }
 
 /** Un mensaje reescrito. Lleva el texto nuevo, no hace falta releer. */
-export interface EventoEditado extends BaseDeChat {
+export interface EditedEvent extends BaseDeChat {
   tipo: 'chat.editado';
   messageId: string;
   body: string;
@@ -115,13 +115,13 @@ export interface EventoEditado extends BaseDeChat {
 }
 
 /** Un mensaje borrado. El cliente lo convierte en lápida en su sitio. */
-export interface EventoBorrado extends BaseDeChat {
+export interface DeletedEvent extends BaseDeChat {
   tipo: 'chat.borrado';
   messageId: string;
 }
 
 /** Una reacción puesta o quitada. */
-export interface EventoReaccion extends BaseDeChat {
+export interface ReactionEvent extends BaseDeChat {
   tipo: 'chat.reaccion';
   messageId: string;
   emoji: string;
@@ -130,7 +130,7 @@ export interface EventoReaccion extends BaseDeChat {
 }
 
 /** Un mensaje fijado o desfijado. */
-export interface EventoFijado extends BaseDeChat {
+export interface PinnedEvent extends BaseDeChat {
   tipo: 'chat.fijado';
   messageId: string;
   pinned: boolean;
@@ -144,7 +144,7 @@ export interface EventoFijado extends BaseDeChat {
  * —cuando el actor eres tú desde otra pestaña— poner a cero tu propio contador
  * de no leídos sin tener que preguntarlo.
  */
-export interface EventoLeido extends BaseDeChat {
+export interface ReadEvent extends BaseDeChat {
   tipo: 'chat.leido';
   /** Hasta cuándo ha leído, en ISO. Es el `lastReadAt` que se acaba de guardar. */
   hasta: string;
@@ -157,7 +157,7 @@ export interface EventoLeido extends BaseDeChat {
  * mensajes serían cincuenta avisos por persona, y el aviso que de verdad importa
  * se perdería entre ellos.
  */
-export interface EventoAviso {
+export interface NoticeEvent {
   tipo: 'aviso';
   type: string;
   actorId: string | null;
@@ -169,14 +169,14 @@ export interface EventoAviso {
   at: string;
 }
 
-export type EventoEnVivo =
-  | EventoMensaje
-  | EventoEditado
-  | EventoBorrado
-  | EventoReaccion
-  | EventoFijado
-  | EventoLeido
-  | EventoAviso;
+export type LiveEvent =
+  | ChatMessageEvent
+  | EditedEvent
+  | DeletedEvent
+  | ReactionEvent
+  | PinnedEvent
+  | ReadEvent
+  | NoticeEvent;
 
 /**
  * El canal de Redis de una persona.
@@ -187,6 +187,6 @@ export type EventoEnVivo =
  * evento en la conexión de otra persona. El gateway extrae el `userId` **del
  * nombre del canal por el que llegó**, nunca del contenido.
  */
-export function canalDeEventos(userId: string): string {
+export function liveEventChannel(userId: string): string {
   return `avisos:${userId}`;
 }

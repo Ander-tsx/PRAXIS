@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
-import { PublicadorDeEventos } from '../realtime/publicador.service';
+import { EventDispatcher } from '../realtime/event-dispatcher.service';
 import { RedisService } from '../redis/redis.service';
 import { ChannelsService } from './channels.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
@@ -78,7 +78,7 @@ const CON_MENSAJE = {
  * la base, así que dejarlo abierto es un campo más donde meter lo que sea. Seis
  * cubren lo que la gente usa de verdad y caben en una fila sin desplegable.
  */
-export const REACCIONES = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+export const REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
 
 /**
  * Cuántos mensajes se pueden tener fijados a la vez en un canal.
@@ -92,7 +92,7 @@ export const REACCIONES = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as 
  * dos pestañas fijando a la vez, o cualquiera llamando a la ruta a mano, se
  * saltarían un límite que solo viviera en la interfaz.
  */
-export const MAXIMO_DE_FIJADOS = 5;
+export const MAX_PINNED = 5;
 
 /**
  * El `type` del aviso en vivo de un mensaje nuevo.
@@ -129,7 +129,7 @@ export class ChatService {
     private readonly redis: RedisService,
     private readonly channels: ChannelsService,
     private readonly attachments: ChatAttachmentsService,
-    private readonly eventos: PublicadorDeEventos,
+    private readonly eventos: EventDispatcher,
   ) {}
 
   /**
@@ -735,7 +735,7 @@ export class ChatService {
     emoji: string;
     on: boolean;
   }) {
-    if (!(REACCIONES as readonly string[]).includes(dto.emoji)) {
+    if (!(REACTIONS as readonly string[]).includes(dto.emoji)) {
       throw new RpcException({ statusCode: 400, message: 'Esa reacción no está permitida.' });
     }
 
@@ -825,10 +825,10 @@ export class ChatService {
         },
       });
 
-      if (yaFijados >= MAXIMO_DE_FIJADOS) {
+      if (yaFijados >= MAX_PINNED) {
         throw new RpcException({
           statusCode: 400,
-          message: `Solo se pueden fijar ${MAXIMO_DE_FIJADOS} mensajes por conversación. Desfija alguno antes.`,
+          message: `Solo se pueden fijar ${MAX_PINNED} mensajes por conversación. Desfija alguno antes.`,
         });
       }
     }
@@ -1168,7 +1168,7 @@ export class ChatService {
    * algo en un chat». El navegador no podía hacer nada con eso salvo
    * `router.refresh()`, y de ahí venían los dos fallos que parecían inconexos
    * —tu mensaje que a veces no se pintaba, y los hilos y contadores que no se
-   * enteraban—. Explicación entera en `realtime/eventos.ts`.
+   * enteraban—. Explicación entera en `realtime/events.ts`.
    *
    * Tres diferencias concretas:
    *

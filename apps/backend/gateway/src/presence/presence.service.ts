@@ -8,7 +8,7 @@ import { timeout } from 'rxjs/operators';
  * Los estados que puede elegir una persona. Espejo de `UserPresence` en el
  * esquema de credentials y de `USER_PRESENCES` en `@praxis/contracts`.
  */
-export type Presencia = 'AVAILABLE' | 'BUSY' | 'IN_MEETING' | 'EATING' | 'AWAY' | 'DO_NOT_DISTURB';
+export type Presence = 'AVAILABLE' | 'BUSY' | 'IN_MEETING' | 'EATING' | 'AWAY' | 'DO_NOT_DISTURB';
 
 /**
  * Cuánto vive la marca de «tiene una conexión abierta».
@@ -140,10 +140,10 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
    * La tercera es la que respeta la intención: quien se puso «No molestar» sigue
    * en «No molestar» mientras esté conectado, por mucho que esté tecleando.
    */
-  efectiva(elegida: string | null | undefined, conectado: boolean): Presencia {
+  efectiva(elegida: string | null | undefined, conectado: boolean): Presence {
     if (!conectado) return 'AWAY';
     if (!elegida || elegida === 'AWAY') return 'AVAILABLE';
-    return elegida as Presencia;
+    return elegida as Presence;
   }
 
   /**
@@ -168,7 +168,7 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
    * lectura de cualquier lista de usuarios, así que lo peor que pasa es que un
    * punto de color tarde en cambiar de tono.
    */
-  async anunciar(userId: string, presencia: Presencia): Promise<void> {
+  async anunciar(userId: string, presencia: Presence): Promise<void> {
     try {
       /* `chat_peer_ids` y no `chat_contacts`: aquel devuelve por cada persona
          todos los proyectos en común con su nombre, su slug y su rol, y de todo
@@ -195,7 +195,7 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
            de `publish` cae fuera del `try` de esta función y llega a
            `unhandledRejection`, que en Node mata el proceso. Sería el gateway
            entero cayéndose porque Redis parpadeó mientras alguien cambiaba de
-           estado. El mismo caso que en `PublicadorDeEventos.repartir`. */
+           estado. El mismo caso que en `EventDispatcher.repartir`. */
         this.cliente
           .publish(
             `avisos:${destinatario}`,

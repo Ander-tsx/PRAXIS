@@ -3,7 +3,7 @@ import type { ChatMessage } from '../api/domain';
 /**
  * Los eventos que llegan por el flujo en vivo.
  *
- * ⚠️ **Espejo de `realtime/eventos.ts` en projects-service.** Si allí se estrena
+ * ⚠️ **Espejo de `realtime/events.ts` en projects-service.** Si allí se estrena
  * un `tipo` y aquí no, el navegador lo recibe y el despachador lo descarta en
  * silencio — no hay error, simplemente no pasa nada. Los dos archivos se tocan
  * juntos.
