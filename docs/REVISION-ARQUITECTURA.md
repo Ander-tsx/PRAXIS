@@ -232,6 +232,54 @@ detalle:
 
 ---
 
+## 🔴 Desplegar no migra la base, y el síntoma aparece lejos
+
+Vivido el 18-08. Tras desplegar, el chat en producción no cargaba conversaciones
+ni dejaba enviar. La causa estaba tres capas más abajo:
+
+```
+P2022  The column `(not available)` does not exist in the current database.
+       modelName: 'ChatMessage'
+```
+
+Faltaba `deletedAt` en `chat_messages` — la migración `chat_soft_delete`, que
+viajaba en el mismo empujón que el código que la necesita. **Construir la imagen
+y reemplazar las máquinas no aplica migraciones**: eso lo hace `migrar.sh`, a
+mano, y es un paso que se olvida porque nada lo recuerda.
+
+⚠️ **Y falla de la peor manera.** Los ocho servicios arrancan perfectamente con
+la base desactualizada: `pm2 list` sale entero en verde, el health check pasa, y
+solo revienta el endpoint que toca la tabla afectada. El síntoma que ve el
+usuario —«no me carga el chat»— no se parece en nada a «falta una migración».
+
+**El orden correcto al desplegar, y esta es la lección:**
+
+```
+1. gcloud builds submit                     ← construir
+2. rolling-action replace                   ← desplegar el código
+3. docker exec praxis-backend /app/migrar.sh  ← migrar   ← EL QUE SE OLVIDA
+4. comprobar la funcionalidad nueva
+```
+
+⚠️ El paso 3 va **después** del 2 a propósito: el script vive dentro de la
+imagen, así que hasta desplegarla no existe la versión nueva de las migraciones.
+
+### Y una deuda que se cobró en ese mismo momento
+
+`migrate deploy` falló con `42701: column "hiddenAt" already exists`. Alguien
+había añadido esa columna **a mano** en producción, sin su migración: Prisma
+tenía la columna pero no el registro, y al llegar su turno chocó.
+
+Se resolvió con `prisma migrate resolve --applied <migración>`, que **no ejecuta
+SQL** —solo anota que ya está aplicada, que era la verdad—. Comprobando antes
+que esa migración no hiciera nada más, porque marcarla saltándose otras
+sentencias habría dejado el esquema incompleto.
+
+**La lección:** tocar el esquema fuera de las migraciones se paga en el
+siguiente despliegue, y siempre en mal momento.
+
+---
+
 ## 🔴 El despliegue sirve dos versiones a la vez, y eso se nota
 
 Verificado en producción el 18-08. Un `rolling-action replace` con
