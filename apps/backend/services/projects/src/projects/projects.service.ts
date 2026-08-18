@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
+import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 
 import {
   CreateProjectDto,
@@ -49,6 +51,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 @Injectable()
 export class ProjectsService {
+  private readonly domainOutbox = new ProjectDomainOutboxFactory();
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -492,20 +495,33 @@ export class ProjectsService {
     if (!project) {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
     }
+    if (!dto.actorId) {
+      throw new RpcException({ statusCode: 400, message: 'Falta actor confiable' });
+    }
 
     const volviendoAActivo = dto.status === 'ACTIVE';
-
-    const updated = await this.prisma.project.update({
-      where: { id: dto.id },
-      data: {
-        status: dto.status,
-        /* Al reactivar se limpian los tres campos: dejar el motivo de una
-           suspensión pasada haría que la pantalla siguiera enseñando el aviso. */
-        suspendedAt: volviendoAActivo ? null : new Date(),
-        suspendedBy: volviendoAActivo ? null : (dto.actorId ?? null),
-        suspendedReason: volviendoAActivo ? null : (dto.reason ?? null),
-      },
-      include: { _count: { select: { members: true, workspaces: true } } },
+    const correlationId = randomUUID();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.project.update({
+        where: { id: dto.id },
+        data: {
+          status: dto.status,
+          suspendedAt: volviendoAActivo ? null : new Date(),
+          suspendedBy: volviendoAActivo ? null : dto.actorId,
+          suspendedReason: volviendoAActivo ? null : (dto.reason ?? null),
+        },
+        include: { _count: { select: { members: true, workspaces: true } } },
+      });
+      if (project.status !== saved.status) {
+        await this.domainOutbox.persist(tx, {
+          projectId: saved.id, subject: { type: 'PROJECT', id: saved.id },
+          actor: { type: 'USER', id: dto.actorId }, correlationId,
+        }, {
+          type: 'project.status-changed.v1',
+          payload: { previousStatus: project.status, status: saved.status, reason: dto.reason ?? null },
+        });
+      }
+      return saved;
     });
 
     await this.redis.del(`project:${dto.id}`);

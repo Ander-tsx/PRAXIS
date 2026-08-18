@@ -68,6 +68,30 @@ model Project {
   @@map("projects")
 }
 
+/// Hechos durables pendientes de publicación. No tiene transporte en esta etapa.
+model DomainOutbox {
+  id            String   @id @default(uuid())
+  eventId       String   @unique
+  type          String
+  source        String
+  occurredAt    DateTime
+  projectId     String
+  subjectType   String
+  subjectId     String
+  actorType     String
+  actorId       String?
+  correlationId String
+  causationId   String?
+  payload       Json
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([publishedAt, createdAt])
+  @@index([projectId, createdAt])
+  @@schema("projects")
+  @@map("domain_outbox")
+}
+
 /// Estado administrativo de un proyecto.
 ///
 /// ## Por qué son estados y no un borrado

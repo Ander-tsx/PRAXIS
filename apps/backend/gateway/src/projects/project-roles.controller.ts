@@ -64,7 +64,9 @@ export class ProjectRolesController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_ROLES)
   @ApiOperation({ summary: 'Elimina un rol local del proyecto' })
   @ApiResponse({ status: 200, description: 'Rol eliminado exitosamente' })
-  delete(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(this.projectsClient.send({ cmd: 'project_role_delete' }, { id }));
+  delete(@Param('id', ParseUUIDPipe) id: string, @Request() req: Express.Request) {
+    return firstValueFrom(
+      this.projectsClient.send({ cmd: 'project_role_delete' }, { id, projectId: req.projectId, requesterId: req.user!.userId }),
+    );
   }
 }

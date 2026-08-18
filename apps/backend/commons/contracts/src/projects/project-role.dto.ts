@@ -57,6 +57,13 @@ export class UpdateProjectRoleDto extends UpdateProjectRoleBodyDto {
 export class DeleteProjectRoleDto {
   @IsUUID('4')
   id: string;
+
+  /** Inyectado desde JWT por gateway; nunca llega del cuerpo cliente. */
+  @IsUUID('4')
+  requesterId: string;
+
+  @IsUUID('4')
+  projectId: string;
 }
 
 export class CheckProjectPermissionDto {

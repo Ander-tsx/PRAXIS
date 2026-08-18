@@ -24,7 +24,7 @@ export class ProjectRolesController {
 
   @MessagePattern({ cmd: 'project_role_delete' })
   deleteProjectRole(@Payload() dto: DeleteProjectRoleDto) {
-    return this.projectRolesService.deleteProjectRole(dto.id);
+    return this.projectRolesService.deleteProjectRole(dto.id, dto.projectId, dto.requesterId);
   }
 
   @MessagePattern({ cmd: 'project_check_permission' })
