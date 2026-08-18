@@ -1,9 +1,5 @@
-import type {
-  PlantillaBorradorState,
-  PlantillaDeProyecto,
-  PlantillaDraftResult,
-} from '../api/domain';
-import { PLANTILLA_BRIEF_MAX, PLANTILLA_BRIEF_MIN } from '../api/domain';
+import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '../api/domain';
+import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
 import { createServerApiClient } from '../auth/server-client';
 
@@ -31,34 +27,34 @@ export async function pedirBorrador(
    * algo» y pasa a ser «cambia esto de lo que ya propusiste». Sin ellos se
    * genera de cero, que es la primera vez.
    */
-  ajuste?: { texto: string; previa: PlantillaDeProyecto },
-): Promise<PlantillaBorradorState> {
+  ajuste?: { texto: string; previa: ProjectTemplate },
+): Promise<TemplateDraftState> {
   const texto = brief.trim();
 
-  if (texto.length < PLANTILLA_BRIEF_MIN) {
+  if (texto.length < TEMPLATE_BRIEF_MIN) {
     return {
       resultado: null,
-      error: `Cuéntale un poco más: al menos ${PLANTILLA_BRIEF_MIN} caracteres.`,
+      error: `Cuéntale un poco más: al menos ${TEMPLATE_BRIEF_MIN} caracteres.`,
       sinCuota: false,
     };
   }
 
-  if (texto.length > PLANTILLA_BRIEF_MAX) {
+  if (texto.length > TEMPLATE_BRIEF_MAX) {
     return {
       resultado: null,
-      error: `Son ${texto.length} caracteres y el máximo es ${PLANTILLA_BRIEF_MAX}.`,
+      error: `Son ${texto.length} caracteres y el máximo es ${TEMPLATE_BRIEF_MAX}.`,
       sinCuota: false,
     };
   }
 
   try {
-    const resultado = await createServerApiClient().post<PlantillaDraftResult>(
+    const resultado = await createServerApiClient().post<TemplateDraftResult>(
       '/me/assistant/project-draft',
       {
         brief: texto,
         /* Solo si los hay: un campo vacío de más es un 400 (CLAUDE.md). El plan
            anterior viaja en JSON — el DTO lo declara como cadena a propósito,
-           ver `PLANTILLA_PREVIA_MAX`. */
+           ver `TEMPLATE_PREVIEW_MAX`. */
         ...(ajuste?.texto.trim()
           ? { ajuste: ajuste.texto.trim(), previa: JSON.stringify(ajuste.previa) }
           : {}),

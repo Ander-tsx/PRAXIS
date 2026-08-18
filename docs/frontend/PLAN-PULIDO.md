@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · E4 ✅ · E6 ✅ · **solo queda E5** |
-| **Última tarea terminada** | E5.2 — primer lote de renombrado (`commons/realtime/`) |
-| **Siguiente** | E5.3 — lote 2 (`commons/api/`) |
+| **Última tarea terminada** | E5.3 — lote 2 (`commons/api/`) |
+| **Siguiente** | E5.4 — lote 3 (`ChatPanel`, el más grande) |
 | **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
@@ -776,7 +776,29 @@ de ESTADO-ACTUAL §17.7.
 
       ✅ Las siete zonas compilan, `ui/06-chat-zona` en verde (4), y los
       comentarios siguen en español — comprobado.
-- [ ] **E5.3 — Lote 2: `commons/api/`.**
+- [x] **E5.3 — Lote 2: `commons/api/`.** 30 identificadores, **43 ficheros**
+      tocados, más dos renombrados de fichero y carpeta (`api/directorio.ts →
+      api/directory.ts`, `commons/plantilla/ → commons/template/`).
+
+      El grupo grande era la familia `Plantilla*` —13 tipos, ~78 usos— que pasa a
+      `Template*`. El resto: `Directorio → Directory`, `resolverPerfiles →
+      resolveProfiles`, `nombreDePersona → personName`, `hrefDeAvatar →
+      avatarHref`, `trocearMensaje → splitMessage`.
+
+      🔴 **Segunda colisión del método, y esta la habría metido el `sed` sin
+      avisar.** `PRESENCIAS` parecía ir a `PRESENCES`… y `PRESENCES` **ya
+      existe** en el mismo archivo: son las claves de presencia, mientras que
+      `PRESENCIAS` es el diccionario de descripciones. Renombrarlo habría
+      declarado dos veces el mismo nombre en un módulo. Queda
+      `PRESENCE_DESCRIPTIONS`.
+
+      ⚠️ **Comprobar colisiones antes de aplicar es ya un paso del método**, no
+      una precaución opcional: van dos lotes y dos colisiones (`MessageEvent` del
+      DOM en E5.2, `PRESENCES` aquí). Se hace con un `grep -w` de cada nombre
+      nuevo **antes** de tocar nada.
+
+      ✅ Las siete zonas compilan, cero menciones viejas en comentarios, y
+      `ui/05-equipo` + `ui/06-chat-zona` en verde (5).
 - [ ] **E5.4 — Lote 3: `commons/organisms/ChatPanel/`.** El más grande.
 - [ ] **E5.5 — Lote 4: `apps/backend/services/projects/src/{chat,realtime}/`.**
 - [ ] **E5.6 — Lote 5: gateway (`presence`, `notifications`).**

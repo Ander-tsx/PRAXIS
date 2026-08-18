@@ -4,7 +4,7 @@ import {
   COLOR_POR_TIPO_DE_REF,
   type ChatRefKind,
   componerReferencia,
-  trocearMensaje,
+  splitMessage,
 } from '../../api/chat-refs';
 import { alpha } from '../../tokens';
 
@@ -98,7 +98,7 @@ export function serializarCampo(trozos: TrozoDeCampo[]): string {
  * El camino de vuelta: de un cuerpo ya guardado al campo disfrazado.
  *
  * Es lo que permite editar un mensaje sin ver un UUID. Reutiliza
- * `trocearMensaje` —el mismo troceo con el que se pinta el mensaje— así que una
+ * `splitMessage` —el mismo troceo con el que se pinta el mensaje— así que una
  * referencia que se pinta bien se edita bien, sin un segundo analizador que
  * pueda discrepar del primero.
  */
@@ -106,7 +106,7 @@ export function campoDesdeCuerpo(cuerpo: string): { texto: string; etiquetas: Et
   const etiquetas: Etiqueta[] = [];
   let texto = '';
 
-  for (const trozo of trocearMensaje(cuerpo)) {
+  for (const trozo of splitMessage(cuerpo)) {
     if (trozo.tipo === 'ref') {
       const visible = visibleDe(trozo.kind, trozo.label);
       etiquetas.push({ kind: trozo.kind, id: trozo.id, visible });

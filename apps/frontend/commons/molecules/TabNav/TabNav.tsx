@@ -41,7 +41,12 @@ export interface TabNavProps {
  * tiene su propia cabecera, su botón de acción y su estado vacío, apilarlas
  * obliga a bajar mucho para ver algo y ninguna se lee como la principal.
  */
-export function TabNav({ tabs, activeId, renderLink, ariaLabel = 'Secciones de la página' }: TabNavProps) {
+export function TabNav({
+  tabs,
+  activeId,
+  renderLink,
+  ariaLabel = 'Secciones de la página',
+}: TabNavProps) {
   return (
     /**
      * `overflow-y-hidden` es imprescindible: con solo `overflow-x-auto` el

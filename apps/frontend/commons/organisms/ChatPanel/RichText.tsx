@@ -1,7 +1,7 @@
 import { Folder, KanbanIcon, LayoutGrid, SquareCheckIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { COLOR_POR_TIPO_DE_REF, trocearMensaje } from '../../api/chat-refs';
+import { COLOR_POR_TIPO_DE_REF, splitMessage } from '../../api/chat-refs';
 import { alpha } from '../../tokens';
 
 /**
@@ -123,7 +123,7 @@ const PATRON_MARKDOWN =
  *
  * Un `RegExp` con bandera `g` guarda `lastIndex` entre `exec`, así que **nunca**
  * se reutiliza una instancia compartida: se crea una nueva por llamada (el mismo
- * patrón que usa `trocearMensaje` por el mismo motivo).
+ * patrón que usa `splitMessage` por el mismo motivo).
  */
 export function pintarMarkdown(texto: string): ReactNode[] {
   const patron = new RegExp(PATRON_MARKDOWN.source, 'gim');
@@ -196,7 +196,7 @@ export function pintarMarkdown(texto: string): ReactNode[] {
 }
 
 export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
-  const trozos = trocearMensaje(cuerpo);
+  const trozos = splitMessage(cuerpo);
 
   return (
     /* `overflow-wrap:anywhere` y no solo `break-words`: aquel no parte un

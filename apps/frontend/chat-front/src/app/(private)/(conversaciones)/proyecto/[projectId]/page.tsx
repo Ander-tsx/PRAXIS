@@ -5,7 +5,7 @@ import type {
   ProjectDetail,
   ProjectMember,
 } from '@praxis/commons';
-import { resolverPerfiles } from '@praxis/commons';
+import { resolveProfiles } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { notFound } from 'next/navigation';
 
@@ -62,9 +62,9 @@ export default async function ChatDeProyectoPage({ params }: PageProps) {
    * ⚠️ Y **de una vez**, no uno a uno. Un equipo de veinte eran veinte
    * peticiones por carga, todas con la IP del servidor de Next: agotaban el
    * limitador del gateway y el `catch` convertía los 429 en «Alguien que ya no
-   * está» sin fotos. Ver `commons/api/directorio.ts`.
+   * está» sin fotos. Ver `commons/api/directory.ts`.
    */
-  const directorio = await resolverPerfiles(api, [
+  const directorio = await resolveProfiles(api, [
     userId,
     ...page.items.map((mensaje) => mensaje.authorId),
     ...miembros.map((miembro) => miembro.userId),

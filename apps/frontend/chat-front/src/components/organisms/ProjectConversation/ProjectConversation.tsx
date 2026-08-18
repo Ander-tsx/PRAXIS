@@ -16,7 +16,7 @@ import {
   type ChatMessagePage,
   ChatPanel,
   type ChatPanelHandle,
-  type Directorio,
+  type Directory,
   alpha,
   colors,
 } from '@praxis/commons';
@@ -28,8 +28,8 @@ export interface ProjectConversationProps {
   /** Para volver al proyecto desde la cabecera. */
   projectSlug: string;
   page: ChatMessagePage;
-  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
-  directorio: Directorio;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
   currentUserId: string;
   /** `canComment`: el mismo permiso que comentar en una tarea. */
   canWrite: boolean;

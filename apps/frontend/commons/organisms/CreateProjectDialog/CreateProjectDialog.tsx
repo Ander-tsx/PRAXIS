@@ -411,7 +411,6 @@ function VistaPrevia({ nombre, descripcion }: { nombre: string; descripcion: str
           {descripcion.trim() || 'Sin descripción'}
         </p>
       </div>
-
     </aside>
   );
 }

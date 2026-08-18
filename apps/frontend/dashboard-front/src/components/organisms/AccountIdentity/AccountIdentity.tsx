@@ -1,7 +1,7 @@
 'use client';
 
 import { deleteAvatarAction, uploadAvatarAction } from '@/app/(private)/profile/actions';
-import { Avatar, Badge, GlobalRoleBadges, alpha, colors, presenciaDe } from '@praxis/commons';
+import { Avatar, Badge, GlobalRoleBadges, alpha, colors, presenceOf } from '@praxis/commons';
 import { type ReactNode, useRef, useState } from 'react';
 
 export interface AccountIdentityProps {
@@ -122,7 +122,7 @@ export function AccountIdentity({
     setSubiendo(false);
   }
 
-  const estadoActual = presenciaDe(presencia);
+  const estadoActual = presenceOf(presencia);
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border bg-surface">

@@ -1,7 +1,7 @@
 'use client';
 
 import { FileIcon, ImageIcon, VideoIcon } from 'lucide-react';
-import { previewDeMensaje } from '../../api/chat-refs';
+import { messagePreview } from '../../api/chat-refs';
 
 const ICONO_POR_TIPO = {
   imagen: ImageIcon,
@@ -13,7 +13,7 @@ const ICONO_POR_TIPO = {
  * El texto de un mensaje en un sitio que no puede pintarlo entero: la cita, la
  * barra de fijados, un resultado de búsqueda, la hoja «Respondiendo a».
  *
- * Cuando el mensaje es solo un archivo —sin texto propio— `previewDeMensaje`
+ * Cuando el mensaje es solo un archivo —sin texto propio— `messagePreview`
  * ya resuelve qué decir; aquí solo se le pone el icono de Lucide que
  * corresponde, delante. Un componente y no repetir el `if` del icono en los
  * cuatro sitios que lo usan.
@@ -41,13 +41,13 @@ export function AdjuntoPreview({
   maximo?: number;
 }) {
   /* Una lápida no tiene resumen que dar: `body` está vacío y `attachments`
-     también, así que `previewDeMensaje` devolvería una cadena vacía y la cita se
+     también, así que `messagePreview` devolvería una cadena vacía y la cita se
      quedaría en blanco — que es indistinguible de un fallo de carga. */
   if (mensaje.deletedAt) {
     return <span className="italic text-text-disabled">Mensaje eliminado</span>;
   }
 
-  const { texto, tipoAdjunto } = previewDeMensaje(mensaje);
+  const { texto, tipoAdjunto } = messagePreview(mensaje);
   const Icono = tipoAdjunto ? ICONO_POR_TIPO[tipoAdjunto] : null;
 
   const recortado =

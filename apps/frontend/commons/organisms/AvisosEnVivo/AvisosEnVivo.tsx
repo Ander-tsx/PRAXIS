@@ -5,7 +5,7 @@ import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
 import { useRefrescoAgrupado, useTemaActual } from '../../hooks';
 import { useLiveEvent, useReconnection } from '../../realtime';
-import type { NoticeEvent, ChatMessageEvent } from '../../realtime';
+import type { ChatMessageEvent, NoticeEvent } from '../../realtime';
 import {
   PRESENTACION_DE_MENSAJE,
   type Presentacion,

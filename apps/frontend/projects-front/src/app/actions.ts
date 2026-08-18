@@ -4,13 +4,13 @@ import type { CreateProjectState } from '@/lib/action-state';
 import { validateProject } from '@/lib/validation';
 import {
   ApiError,
-  type PlantillaBorradorState,
-  type PlantillaDeProyecto,
-  type PlantillaResultado,
   type Project,
+  type ProjectTemplate,
+  type TemplateDraftState,
+  type TemplateResult,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
-import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/plantilla';
+import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/template';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -89,8 +89,8 @@ function describeProjectError(error: unknown): string {
  */
 export async function borradorDePlantillaAction(
   brief: string,
-  ajuste?: { texto: string; previa: PlantillaDeProyecto },
-): Promise<PlantillaBorradorState> {
+  ajuste?: { texto: string; previa: ProjectTemplate },
+): Promise<TemplateDraftState> {
   const session = await getSession();
   if (!session) {
     return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false };
@@ -102,11 +102,11 @@ export async function borradorDePlantillaAction(
  * Crea el proyecto y todo lo que la plantilla propone.
  *
  * Llama a los endpoints de siempre, uno a uno, con esta sesión: no hay ninguna
- * vía de escritura nueva. Ver `commons/plantilla/aplicar`.
+ * vía de escritura nueva. Ver `commons/template/aplicar`.
  */
 export async function crearProyectoDesdePlantillaAction(
-  plantilla: PlantillaDeProyecto,
-): Promise<PlantillaResultado> {
+  plantilla: ProjectTemplate,
+): Promise<TemplateResult> {
   const session = await getSession();
   if (!session) {
     return {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { Directorio } from '../../api/directorio';
+import type { Directory } from '../../api/directory';
 import type { ChatAttachment, ChatMessage } from '../../api/domain';
 import { colors } from '../../tokens';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
@@ -20,8 +20,8 @@ export interface ThreadPanelProps {
   error: string | null;
   /** Cierra el panel lateral. */
   onCerrar: () => void;
-  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
-  directorio: Directorio;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
   currentUserId: string;
   canWrite: boolean;
   /** Si `@` ofrece personas en las respuestas del hilo. */

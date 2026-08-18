@@ -4,8 +4,8 @@ import {
   type Project,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
-  hrefDeAvatar,
   iniciales,
   personLabel,
   projectPath,
@@ -226,7 +226,7 @@ function Equipo({
                  al anterior: ir primero en el DOM no basta para verse entero,
                  hay que subirlo de capa. Mismo apaño que en `TaskCard`. */
               className={eresTu ? 'relative z-10' : ''}
-              src={hrefDeAvatar(persona.avatarUrl, '/projects/api/gateway')}
+              src={avatarHref(persona.avatarUrl, '/projects/api/gateway')}
             />
           );
         })}

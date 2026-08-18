@@ -34,9 +34,9 @@ import {
   type ProjectDetail,
   type ProjectMember,
   type UserProfile,
-  nombreDePersona,
   personLabel,
-  resolverPerfiles,
+  personName,
+  resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -215,24 +215,21 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * mismo cubo que las de todo el mundo; al pasarse, el 429 se lo tragaba el
    * `catch` y la pantalla escribía «Alguien que ya no está» sobre gente que
    * estaba perfectamente. Es exactamente el fallo que documenta
-   * `commons/api/directorio.ts`, que es donde vive el arreglo bueno.
+   * `commons/api/directory.ts`, que es donde vive el arreglo bueno.
    */
-  const directorio = await resolverPerfiles(api, [
-    ...members.map((m) => m.userId),
-    project.ownerId,
-  ]);
+  const directorio = await resolveProfiles(api, [...members.map((m) => m.userId), project.ownerId]);
 
   const usersById = directorio.perfiles;
 
   /**
    * `userId` → nombre, para que una propuesta no hable en UUID.
    *
-   * Vía `nombreDePersona` y no con un literal: distingue «esta cuenta ya no
+   * Vía `personName` y no con un literal: distingue «esta cuenta ya no
    * existe» de «no se pudo preguntar al directorio», que antes se leían igual.
    */
   const nombres = Object.fromEntries(
     members.map((miembro) => {
-      return [miembro.userId, nombreDePersona(directorio, miembro.userId)];
+      return [miembro.userId, personName(directorio, miembro.userId)];
     }),
   );
   const nombresDeEtiquetas = Object.fromEntries(

@@ -37,10 +37,10 @@ import type { Paginated } from './envelope';
  * 2. **Distinguir «no existe» de «no lo pude preguntar».** Es la parte que
  *    importa de verdad: un fallo de red y una cuenta borrada **no son lo
  *    mismo** y no pueden pintarse igual. Por eso esto no devuelve un `Map` a
- *    secas sino un {@link Directorio} con el `completo` puesto, y
- *    {@link nombreDePersona} lo respeta.
+ *    secas sino un {@link Directory} con el `completo` puesto, y
+ *    {@link personName} lo respeta.
  */
-export interface Directorio {
+export interface Directory {
   /**
    * Los perfiles que se pudieron resolver, por id.
    *
@@ -63,7 +63,7 @@ export interface Directorio {
 }
 
 /** Un directorio vacío que además admite no saber nada. Para los primeros renders. */
-export const DIRECTORIO_VACIO: Directorio = { perfiles: new Map(), completo: true };
+export const EMPTY_DIRECTORY: Directory = { perfiles: new Map(), completo: true };
 
 /**
  * Cuántos ids caben en una petición.
@@ -89,10 +89,10 @@ interface ClienteDeLectura {
  * —salen iniciales en vez de fotos— pero no puede impedir leer la conversación,
  * que es contenido y no decoración.
  */
-export async function resolverPerfiles(
+export async function resolveProfiles(
   api: ClienteDeLectura,
   ids: Iterable<string | null | undefined>,
-): Promise<Directorio> {
+): Promise<Directory> {
   const limpios = [...new Set([...ids].filter((id): id is string => Boolean(id)))];
   if (limpios.length === 0) return { perfiles: new Map(), completo: true };
 
@@ -134,11 +134,7 @@ export async function resolverPerfiles(
  * fallo de red. Ahora se dice lo único que se sabe con certeza en ese momento:
  * que hay una persona detrás y no se ha podido averiguar cuál.
  */
-export function nombreDePersona(
-  directorio: Directorio,
-  userId: string,
-  currentUserId?: string,
-): string {
+export function personName(directorio: Directory, userId: string, currentUserId?: string): string {
   if (currentUserId && userId === currentUserId) return 'Tú';
 
   const perfil = directorio.perfiles.get(userId);

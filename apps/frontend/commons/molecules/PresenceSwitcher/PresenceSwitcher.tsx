@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { PRESENCES, type Presence, presenciaDe } from '../../api/presence';
+import { PRESENCES, type Presence, presenceOf } from '../../api/presence';
 import { useLiveEvent } from '../../realtime';
 import { colors } from '../../tokens';
 
@@ -105,7 +105,7 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
    * **elegir** un estado. Detalle en `gateway/src/presence/presence.service.ts`.
    */
 
-  const actual = presenciaDe(presencia);
+  const actual = presenceOf(presencia);
 
   async function elegir(siguiente: Presence) {
     setAbierto(false);
@@ -151,7 +151,7 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
               en la lista invitaría a marcarse ausente estando delante, que es
               justo la confusión que el modelo viejo tenía. */}
           {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
-            const descripcion = presenciaDe(clave);
+            const descripcion = presenceOf(clave);
             const puesta = clave === presencia;
 
             if (compacto) {

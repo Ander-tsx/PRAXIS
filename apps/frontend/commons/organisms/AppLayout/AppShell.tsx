@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
-import { LiveSource, LivePresences } from '../../realtime';
+import { LivePresences, LiveSource } from '../../realtime';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
 import { NavList } from './NavList';
@@ -46,7 +46,7 @@ export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
   name: string;
   email: string;
-  /** Foto, ya con el proxy de la zona delante (`hrefDeAvatar`). */
+  /** Foto, ya con el proxy de la zona delante (`avatarHref`). */
   avatarSrc?: string | null;
   /** Presencia elegida. Pinta el punto de color sobre el avatar. */
   presence?: string | null;

@@ -6,8 +6,8 @@ import {
   Avatar,
   Badge,
   Button,
+  avatarHref,
   globalRoleLevelOf,
-  hrefDeAvatar,
 } from '@praxis/commons';
 import { useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
@@ -87,7 +87,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                     label={nombreDe(usuario)}
                     mine={esMiCuenta}
                     size="md"
-                    src={hrefDeAvatar(usuario.avatarUrl, '/admin/api/gateway')}
+                    src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
                     presence={usuario.presence ?? null}
                   />
                   <div className="min-w-0">
@@ -103,9 +103,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                           {nombreDe(usuario)}
                         </a>
                       )}
-                      {esMiCuenta && (
-                        <span className="font-normal text-text-secondary">(tú)</span>
-                      )}
+                      {esMiCuenta && <span className="font-normal text-text-secondary">(tú)</span>}
                     </p>
                     <p className="truncate font-sans text-xs text-text-secondary">
                       {usuario.credential.email}

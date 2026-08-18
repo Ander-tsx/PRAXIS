@@ -3,7 +3,7 @@ import {
   AppHeader,
   type ChatContact,
   type DirectConversation,
-  resolverPerfiles,
+  resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -62,9 +62,9 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
    * demás usuarios: se agotaba, llegaban 429, el `catch` se los tragaba y la
    * columna se llenaba de «Alguien que ya no está» sin fotos hasta que la
    * ventana del limitador se reiniciaba. Explicación entera en
-   * `commons/api/directorio.ts`.
+   * `commons/api/directory.ts`.
    */
-  const directorio = await resolverPerfiles(api, [
+  const directorio = await resolveProfiles(api, [
     ...conversaciones.map((conversacion) => conversacion.peerId),
     ...contactos.map((contacto) => contacto.userId),
     /* Quien escribió el último mensaje de un chat de proyecto puede no estar en

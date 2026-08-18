@@ -3,7 +3,7 @@ import { AccountIdentity } from '@/components/organisms/AccountIdentity';
 import { DeleteAccount } from '@/components/organisms/DeleteAccount';
 import { PresencePicker } from '@/components/organisms/PresencePicker';
 import { ProfileForm } from '@/components/organisms/ProfileForm';
-import { AppHeader, LogoutButton, hrefDeAvatar } from '@praxis/commons';
+import { AppHeader, LogoutButton, avatarHref } from '@praxis/commons';
 import { loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
@@ -68,7 +68,7 @@ export default async function CuentaPage() {
           email={profile.credential.email}
           /* La foto se sirve por el proxy de **esta** zona: `avatarUrl` viene
              relativa al gateway justo para no atarla a ninguna. */
-          avatarSrc={hrefDeAvatar(profile.avatarUrl, '/dashboard/api/gateway')}
+          avatarSrc={avatarHref(profile.avatarUrl, '/dashboard/api/gateway')}
           presencia={profile.presence ?? 'AVAILABLE'}
           roles={roles}
           estadoDeCuenta={estadoDeCuenta(profile.status)}

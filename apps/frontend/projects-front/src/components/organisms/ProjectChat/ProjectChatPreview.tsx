@@ -1,13 +1,13 @@
-import type { ChatMessagePage, Directorio } from '@praxis/commons';
-import { nombreDePersona, textoPlano } from '@praxis/commons';
+import type { ChatMessagePage, Directory } from '@praxis/commons';
+import { personName, textoPlano } from '@praxis/commons';
 
 export interface ProjectChatPreviewProps {
   projectId: string;
   projectName: string;
   /** La última página del chat, ya pedida en el servidor. */
   page: ChatMessagePage;
-  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
-  directorio: Directorio;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
   currentUserId: string;
 }
 
@@ -41,9 +41,9 @@ export function ProjectChatPreview({
   /* Los últimos, del más antiguo al más nuevo: el mismo orden que en el chat. */
   const ultimos = page.items.slice(-CUANTOS);
 
-  /* Delega en `nombreDePersona`: distingue «esta cuenta ya no existe» de «no se
+  /* Delega en `personName`: distingue «esta cuenta ya no existe» de «no se
      pudo consultar el directorio», que antes se leían las dos como lo primero. */
-  const nombreDe = (userId: string) => nombreDePersona(directorio, userId, currentUserId);
+  const nombreDe = (userId: string) => personName(directorio, userId, currentUserId);
 
   /* Cruza de zona —el centro de mensajes tiene la suya propia desde E3— así que
      la ruta lleva el prefijo completo y se navega con un `<a>` duro.

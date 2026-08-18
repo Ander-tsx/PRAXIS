@@ -12,8 +12,8 @@ import {
   type NotificationType,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
-  hrefDeAvatar,
   personLabel,
   useAccion,
 } from '@praxis/commons';
@@ -290,7 +290,7 @@ function NotificationRow({
           <Avatar
             label={who}
             size="md"
-            src={hrefDeAvatar(actor.avatarUrl, '/dashboard/api/gateway')}
+            src={avatarHref(actor.avatarUrl, '/dashboard/api/gateway')}
           />
         ) : (
           /* Sin actor —un aviso del sistema— la insignia se queda sola y en

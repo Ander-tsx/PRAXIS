@@ -2,8 +2,8 @@ import { DirectConversation } from '@/components/organisms/DirectConversation';
 import {
   type ChatContact,
   type ChatMessagePage,
-  nombreDePersona,
-  resolverPerfiles,
+  personName,
+  resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { notFound } from 'next/navigation';
@@ -66,10 +66,10 @@ export default async function ConversacionPage({ params }: PageProps) {
    * pedirlo igualmente o su burbuja saldría con el UUID crudo.
    *
    * ⚠️ Era una petición por autor. Ver la nota del layout y
-   * `commons/api/directorio.ts`: con el renderizado en el servidor eso agotaba
+   * `commons/api/directory.ts`: con el renderizado en el servidor eso agotaba
    * el limitador del gateway, que contaba a toda la plataforma en el mismo cubo.
    */
-  const directorio = await resolverPerfiles(api, [
+  const directorio = await resolveProfiles(api, [
     peerId,
     userId,
     ...safePage.items.map((m) => m.authorId),
@@ -86,10 +86,10 @@ export default async function ConversacionPage({ params }: PageProps) {
   return (
     <DirectConversation
       peerId={peerId}
-      /* `nombreDePersona` y no `personLabel` con un respaldo a mano: es quien
+      /* `personName` y no `personLabel` con un respaldo a mano: es quien
          distingue «esta cuenta ya no existe» de «no se pudo consultar», que
          antes se leían las dos como lo primero. */
-      peerNombre={nombreDePersona(directorio, peerId)}
+      peerNombre={personName(directorio, peerId)}
       proyectosEnComun={comun}
       page={safePage}
       directorio={directorio}

@@ -1,4 +1,4 @@
-import { presenciaDe } from '../../api/presence';
+import { presenceOf } from '../../api/presence';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -61,7 +61,7 @@ export interface AvatarProps {
   className?: string;
   title?: string;
   /**
-   * La foto, ya con el proxy de la zona delante (`hrefDeAvatar`).
+   * La foto, ya con el proxy de la zona delante (`avatarHref`).
    *
    * Si falla al cargarse **se vuelve a las iniciales**: una foto rota deja un
    * hueco gris con el icono del navegador, que es peor que no tenerla.
@@ -134,7 +134,7 @@ export function Avatar({
 
   if (!presence) return circulo;
 
-  const { etiqueta, color } = presenciaDe(presence);
+  const { etiqueta, color } = presenceOf(presence);
 
   return (
     /**

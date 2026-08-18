@@ -11,11 +11,7 @@
  * para que no digan cosas distintas.
  */
 
-import type {
-  PlantillaBorradorState,
-  PlantillaDeProyecto,
-  PlantillaResultado,
-} from '../../api/domain';
+import type { ProjectTemplate, TemplateDraftState, TemplateResult } from '../../api/domain';
 
 export const PROJECT_NAME_MIN = 2;
 export const PROJECT_NAME_MAX = 100;
@@ -89,9 +85,7 @@ export type CreateProjectAction = (
 export type BorradorDePlantillaAction = (
   brief: string,
   /** Un retoque sobre el plan que ya se propuso. Sin esto, genera de cero. */
-  ajuste?: { texto: string; previa: PlantillaDeProyecto },
-) => Promise<PlantillaBorradorState>;
+  ajuste?: { texto: string; previa: ProjectTemplate },
+) => Promise<TemplateDraftState>;
 
-export type AplicarPlantillaAction = (
-  plantilla: PlantillaDeProyecto,
-) => Promise<PlantillaResultado>;
+export type AplicarPlantillaAction = (plantilla: ProjectTemplate) => Promise<TemplateResult>;

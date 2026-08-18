@@ -1,7 +1,7 @@
 'use client';
 
 import { setPresenceAction } from '@/app/(private)/profile/actions';
-import { PRESENCES, type Presence, alpha, colors, presenciaDe } from '@praxis/commons';
+import { PRESENCES, type Presence, alpha, colors, presenceOf } from '@praxis/commons';
 import { useState } from 'react';
 
 export interface PresencePickerProps {
@@ -57,7 +57,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
       <legend className="sr-only">Tu estado</legend>
 
       {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {
-        const descripcion = presenciaDe(clave);
+        const descripcion = presenceOf(clave);
         const puesta = clave === presencia;
 
         return (

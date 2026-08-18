@@ -4,12 +4,12 @@ import {
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
-  hrefDeAvatar,
+  avatarHref,
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
-import { MemberAvatar } from './MemberAvatar';
 import { LeaveProjectButton } from './LeaveProjectButton';
+import { MemberAvatar } from './MemberAvatar';
 import { MemberRoleSelect } from './MemberRoleSelect';
 import { PendingInvitations } from './PendingInvitations';
 import { RemoveMemberButton } from './RemoveMemberButton';
@@ -135,7 +135,7 @@ export function ProjectMembers({
                     userId={member.userId}
                     label={label}
                     mine={member.userId === currentUserId}
-                    src={hrefDeAvatar(user?.avatarUrl, '/projects/api/gateway')}
+                    src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
                     presence={user?.presence ?? null}
                   />
 

@@ -14,7 +14,7 @@ import { createGatewayProxy } from '@praxis/commons/auth';
  * avatares y marca leído — todo desde el navegador, con
  * `createApiClient({ gatewayPath: '/chat/api/gateway' })`. Ver E3.4 del plan de
  * pulido: la constante `GATEWAY` de `useConversacionesEnVivo` y los
- * `hrefDeAvatar` son justo las que hay que repuntar aquí al mudar las
+ * `avatarHref` son justo las que hay que repuntar aquí al mudar las
  * pantallas.
  */
 export const { GET, POST, PUT, PATCH, DELETE } = createGatewayProxy();

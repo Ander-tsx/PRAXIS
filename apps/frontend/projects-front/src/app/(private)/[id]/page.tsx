@@ -18,7 +18,7 @@ import {
   TabNav,
   type Task,
   projectPath,
-  resolverPerfiles,
+  resolveProfiles,
   tabLinkClasses,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
@@ -240,8 +240,8 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   /* ⚠️ En **una** petición, no una por persona. Un equipo de veinte eran veinte
      peticiones por carga, todas con la IP del servidor de Next: agotaban el
      limitador del gateway y las que caían se leían como cuentas borradas. Ver
-     `commons/api/directorio.ts`. */
-  const directorio = await resolverPerfiles(api, idsDePersonas);
+     `commons/api/directory.ts`. */
+  const directorio = await resolveProfiles(api, idsDePersonas);
   const directory = {
     items: [...directorio.perfiles.values()],
     total: directorio.perfiles.size,

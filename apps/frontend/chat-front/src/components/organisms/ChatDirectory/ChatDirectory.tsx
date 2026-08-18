@@ -4,12 +4,12 @@ import {
   Avatar,
   type ChatContact,
   type DirectConversation,
-  type Directorio,
+  type Directory,
   type UserProfile,
   alpha,
+  avatarHref,
   colors,
-  hrefDeAvatar,
-  nombreDePersona,
+  personName,
   textoPlano,
   usePresence,
 } from '@praxis/commons';
@@ -38,8 +38,8 @@ export interface ChatDirectoryProps {
   conversaciones: DirectConversation[];
   contactos: ChatContact[];
   proyectos: ChatDeProyecto[];
-  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
-  directorio: Directorio;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
 }
 
 type Pestana = 'directos' | 'proyectos';
@@ -148,9 +148,9 @@ export function ChatDirectory({
     if (tipoAbierto) setPestana(tipoAbierto);
   }, [tipoAbierto, idAbierto]);
 
-  /* Delega en `nombreDePersona`: es quien distingue «esta cuenta ya no existe»
+  /* Delega en `personName`: es quien distingue «esta cuenta ya no existe»
      de «no se pudo consultar el directorio», que antes se leían igual. */
-  const nombreDe = (userId: string) => nombreDePersona(directorio, userId);
+  const nombreDe = (userId: string) => personName(directorio, userId);
 
   const conHilo = new Set(conversaciones.map((conversacion) => conversacion.peerId));
   const filtro = busqueda.trim().toLowerCase();
@@ -379,7 +379,7 @@ function FilaPersona({
         <Avatar
           label={nombre}
           size="sm"
-          src={hrefDeAvatar(perfil?.avatarUrl, '/chat/api/gateway')}
+          src={avatarHref(perfil?.avatarUrl, '/chat/api/gateway')}
           /* La del perfil es la del último render; `usePresence` la pisa si ha
              cambiado desde entonces. Ver `commons/realtime/presencia.tsx`. */
           presence={presencia}

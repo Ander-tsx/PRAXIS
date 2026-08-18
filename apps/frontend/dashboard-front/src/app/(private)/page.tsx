@@ -26,7 +26,7 @@ import {
   type Task,
   displayName,
   dueState,
-  resolverPerfiles,
+  resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -204,13 +204,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
    *
    * Los avisos guardan `actorId`: projects-service no conoce a las personas. Se
    * piden **en una** petición y solo los de esta página —como mucho, uno por
-   * aviso—. Ver `commons/api/directorio.ts` para el fallo que evita hacerlo de
+   * aviso—. Ver `commons/api/directory.ts` para el fallo que evita hacerlo de
    * uno en uno.
    */
   const actores = inbox
     ? [...new Set(inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id))]
     : [];
-  const avisosPorPersona = (await resolverPerfiles(api, actores)).perfiles;
+  const avisosPorPersona = (await resolveProfiles(api, actores)).perfiles;
 
   /* Agrupar es del servidor: donde ya se resuelve el resto de la fila y donde no
      hay riesgo de que el reloj del navegador pinte otra cosa que la servida. */

@@ -1,18 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  PLANTILLA_AJUSTE_MAX,
-  PLANTILLA_BRIEF_MAX,
-  PLANTILLA_BRIEF_MIN,
-  projectHref,
-} from '../../api';
+import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN, TEMPLATE_TWEAK_MAX, projectHref } from '../../api';
 import type {
-  PlantillaColumna,
-  PlantillaCuota,
-  PlantillaDeProyecto,
-  PlantillaResultado,
   ProjectPermission,
+  ProjectTemplate,
+  TemplateColumn,
+  TemplateQuota,
+  TemplateResult,
 } from '../../api/domain';
 import { PERMISSION_LABELS, PROJECT_PERMISSIONS } from '../../api/domain';
 import { Button, Input, Textarea } from '../../atoms';
@@ -64,9 +59,9 @@ export function PlantillaAsistida({
 }: PlantillaAsistidaProps) {
   const [paso, setPaso] = useState<Paso>('contar');
   const [brief, setBrief] = useState('');
-  const [plantilla, setPlantilla] = useState<PlantillaDeProyecto | null>(null);
-  const [cuota, setCuota] = useState<PlantillaCuota | null>(null);
-  const [resultado, setResultado] = useState<PlantillaResultado | null>(null);
+  const [plantilla, setPlantilla] = useState<ProjectTemplate | null>(null);
+  const [cuota, setCuota] = useState<TemplateQuota | null>(null);
+  const [resultado, setResultado] = useState<TemplateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sinCuota, setSinCuota] = useState(false);
   const [trabajando, setTrabajando] = useState(false);
@@ -176,7 +171,7 @@ export function PlantillaAsistida({
   }
 
   const largo = brief.trim().length;
-  const listo = largo >= PLANTILLA_BRIEF_MIN && !trabajando;
+  const listo = largo >= TEMPLATE_BRIEF_MIN && !trabajando;
 
   return (
     <div className="flex flex-col gap-4">
@@ -189,7 +184,7 @@ export function PlantillaAsistida({
         }
         value={brief}
         onChange={(evento) => setBrief(evento.target.value)}
-        maxLength={PLANTILLA_BRIEF_MAX}
+        maxLength={TEMPLATE_BRIEF_MAX}
         rows={7}
         showCount
         fullWidth
@@ -232,7 +227,7 @@ export function PlantillaAsistida({
  * quitaba algo de dentro. Mapeando primero, cada `i`, `j` y `k` es el de la
  * lista tal y como se enseñó.
  */
-function podar(plantilla: PlantillaDeProyecto, excluido: Set<string>): PlantillaDeProyecto {
+function podar(plantilla: ProjectTemplate, excluido: Set<string>): ProjectTemplate {
   return {
     ...plantilla,
     etiquetas: plantilla.etiquetas.filter((_, i) => !excluido.has(`e${i}`)),
@@ -276,7 +271,7 @@ function Revision({
   onCambiarNombre,
   onCambiarDescripcion,
 }: {
-  plantilla: PlantillaDeProyecto;
+  plantilla: ProjectTemplate;
   excluido: Set<string>;
   onAlternar: (clave: string) => void;
   onCambiarNombre: (valor: string) => void;
@@ -543,7 +538,7 @@ function ColumnaChip({
   fuera,
   onAlternar,
 }: {
-  columna: PlantillaColumna;
+  columna: TemplateColumn;
   fuera: boolean;
   onAlternar: () => void;
 }) {
@@ -574,7 +569,7 @@ function ColumnaChip({
  * entraron, quien acaba de crear el proyecto necesita saber cuáles para
  * ponerlas a mano; «hubo 3 errores» le obliga a compararlo todo.
  */
-function Resumen({ resultado }: { resultado: PlantillaResultado }) {
+function Resumen({ resultado }: { resultado: TemplateResult }) {
   const { creado, fallos, proyecto } = resultado;
   if (!proyecto) return null;
 
@@ -744,7 +739,7 @@ function Ajuste({
             value={texto}
             onChange={(evento) => setTexto(evento.target.value)}
             placeholder="Añade un tablero para el equipo de diseño, y quita el rol de becario"
-            maxLength={PLANTILLA_AJUSTE_MAX}
+            maxLength={TEMPLATE_TWEAK_MAX}
             fullWidth
             onKeyDown={(evento) => {
               if (evento.key !== 'Enter') return;

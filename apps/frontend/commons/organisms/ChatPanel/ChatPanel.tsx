@@ -13,14 +13,14 @@ import {
 } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
 import { createApiClient } from '../../api/client';
-import type { Directorio } from '../../api/directorio';
-import { nombreDePersona } from '../../api/directorio';
+import type { Directory } from '../../api/directory';
+import { personName } from '../../api/directory';
 import type { ChatAttachment, ChatMessage, ChatMessagePage } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
-import { hrefDeAvatar } from '../../api/presence';
-import { useRefrescoAgrupado } from '../../hooks';
+import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
+import { useRefrescoAgrupado } from '../../hooks';
 import { useLiveEvent, useReconnection } from '../../realtime';
 import { alpha, colors } from '../../tokens';
 import { AdjuntoPreview } from './AdjuntoPreview';
@@ -137,9 +137,9 @@ export interface ChatPanelProps {
    * está»: un id ausente del mapa se leía como «esa cuenta se fue» tanto si el
    * directorio había respondido que no existe como si la consulta había fallado.
    * Un 429 del limitador se convertía así en una afirmación falsa sobre gente
-   * que estaba perfectamente. Ver `commons/api/directorio.ts`.
+   * que estaba perfectamente. Ver `commons/api/directory.ts`.
    */
-  directorio: Directorio;
+  directorio: Directory;
   currentUserId: string;
   acciones: ChatAcciones;
 
@@ -645,11 +645,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   /**
    * Cómo se lee un autor.
    *
-   * Delega en `nombreDePersona`, que es quien sabe distinguir «esta cuenta ya no
+   * Delega en `personName`, que es quien sabe distinguir «esta cuenta ya no
    * existe» de «no se pudo preguntar». Antes decía lo primero en los dos casos.
    */
   const nombreDeAutor = useCallback(
-    (userId: string) => nombreDePersona(directorio, userId, currentUserId),
+    (userId: string) => personName(directorio, userId, currentUserId),
     [directorio, currentUserId],
   );
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useSidebarPlegada } from '../AppLayout/AppShell';
 import { Button } from '../../atoms';
+import { useSidebarPlegada } from '../AppLayout/AppShell';
 
 /**
  * Cerrar sesión.

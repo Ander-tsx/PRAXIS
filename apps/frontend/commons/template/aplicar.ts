@@ -2,10 +2,10 @@ import type {
   Board,
   Column,
   Label,
-  PlantillaDeProyecto,
-  PlantillaResultado,
   Project,
   ProjectRole,
+  ProjectTemplate,
+  TemplateResult,
   Workspace,
 } from '../api/domain';
 import { ApiError } from '../api/envelope';
@@ -49,7 +49,7 @@ function describe(error: unknown, fallback: string): string {
   return error instanceof ApiError && error.message ? error.message : fallback;
 }
 
-function vacio(): PlantillaResultado['creado'] {
+function vacio(): TemplateResult['creado'] {
   return { etiquetas: 0, roles: 0, espacios: 0, tableros: 0, columnas: 0 };
 }
 
@@ -68,9 +68,7 @@ function vacio(): PlantillaResultado['creado'] {
  * La única excepción es el propio `POST /projects`: si eso falla no hay dónde
  * colgar nada y se vuelve con el error tal cual.
  */
-export async function aplicarPlantilla(
-  plantilla: PlantillaDeProyecto,
-): Promise<PlantillaResultado> {
+export async function aplicarPlantilla(plantilla: ProjectTemplate): Promise<TemplateResult> {
   const api = createServerApiClient();
   const fallos: string[] = [];
   const creado = vacio();
@@ -198,7 +196,7 @@ export async function aplicarPlantilla(
 async function crearColumnas(
   api: ReturnType<typeof createServerApiClient>,
   boardId: string,
-  tablero: PlantillaDeProyecto['espacios'][number]['tableros'][number],
+  tablero: ProjectTemplate['espacios'][number]['tableros'][number],
   fallos: string[],
 ): Promise<number> {
   let creadas = 0;

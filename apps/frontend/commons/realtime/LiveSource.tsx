@@ -9,7 +9,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
-import { type EventOf, type LiveEvent, type EventType, isKnownEvent } from './types';
+import { type EventOf, type EventType, type LiveEvent, isKnownEvent } from './types';
 
 /**
  * Cada cuánto manda el servidor un latido. Espejo de `LATIDO_MS` en
@@ -239,8 +239,7 @@ export function useLiveEvent<T extends EventType>(tipo: T, manejador: Manejador<
 
   useEffect(() => {
     if (!fuente) return;
-    return fuente.suscribir(tipo, ((evento: EventOf<T>) =>
-      ultimo.current(evento)) as Manejador<T>);
+    return fuente.suscribir(tipo, ((evento: EventOf<T>) => ultimo.current(evento)) as Manejador<T>);
   }, [fuente, tipo]);
 }
 

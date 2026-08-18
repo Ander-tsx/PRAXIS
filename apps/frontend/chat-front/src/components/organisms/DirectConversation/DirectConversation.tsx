@@ -18,7 +18,7 @@ import {
   type ChatMessagePage,
   ChatPanel,
   type ChatPanelHandle,
-  type Directorio,
+  type Directory,
   type UserProfile,
   colors,
 } from '@praxis/commons';
@@ -31,8 +31,8 @@ export interface DirectConversationProps {
   /** Dónde coincidís y qué es esa persona allí. */
   proyectosEnComun: { id: string; name: string; slug: string; rol: string }[];
   page: ChatMessagePage;
-  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directorio.ts`. */
-  directorio: Directorio;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
   currentUserId: string;
   isAdmin?: boolean;
 }

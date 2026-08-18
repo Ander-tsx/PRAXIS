@@ -13,7 +13,7 @@ export interface UserProfile {
   lastName: string | null;
   /**
    * Ruta **relativa al gateway** de la foto: `/users/<id>/avatar?v=<epoch>`.
-   * La zona le antepone su propio proxy — ver `hrefDeAvatar`.
+   * La zona le antepone su propio proxy — ver `avatarHref`.
    */
   avatarUrl: string | null;
   /**
@@ -1012,7 +1012,7 @@ export interface ChatContact {
 /**
  * Lo que devuelve `POST /me/assistant/project-draft`.
  *
- * Espejo de `PlantillaDeProyecto` en `@praxis/contracts`. Está copiado por lo
+ * Espejo de `ProjectTemplate` en `@praxis/contracts`. Está copiado por lo
  * mismo que el resto de este archivo: aquel es un paquete de backend y arrastra
  * `class-validator` y los decoradores de Nest, que no pintan nada en el
  * navegador.
@@ -1024,18 +1024,18 @@ export interface ChatContact {
  * IA propone; ejecuta el código que ya existe. Ninguno de estos objetos lleva
  * `id` porque nada de esto existe todavía.
  */
-export interface PlantillaEtiqueta {
+export interface TemplateLabel {
   nombre: string;
   color: LabelColor;
 }
 
-export interface PlantillaRol {
+export interface TemplateRole {
   nombre: string;
   /** Diccionario de booleanos, nunca un array. Trampa 8 de CLAUDE.md. */
   permisos: PermissionMap;
 }
 
-export interface PlantillaColumna {
+export interface TemplateColumn {
   nombre: string;
   /**
    * ⚠️ `success` **no es un color, es un significado**: marca la columna de
@@ -1045,49 +1045,49 @@ export interface PlantillaColumna {
   color?: ColumnColor;
 }
 
-export interface PlantillaTablero {
+export interface TemplateBoard {
   nombre: string;
-  columnas: PlantillaColumna[];
+  columnas: TemplateColumn[];
 }
 
-export interface PlantillaEspacio {
+export interface TemplateSpace {
   nombre: string;
-  tableros: PlantillaTablero[];
+  tableros: TemplateBoard[];
 }
 
-export interface PlantillaDeProyecto {
+export interface ProjectTemplate {
   nombre: string;
   descripcion: string;
-  etiquetas: PlantillaEtiqueta[];
-  roles: PlantillaRol[];
-  espacios: PlantillaEspacio[];
+  etiquetas: TemplateLabel[];
+  roles: TemplateRole[];
+  espacios: TemplateSpace[];
   /** Por qué esta estructura y no otra. Lo pinta la pantalla junto al plan. */
   porQue: string;
 }
 
 /** El contador que acompaña al borrador, para pintarlo como hace el chat. */
-export interface PlantillaCuota {
+export interface TemplateQuota {
   plan: string;
   usados: number;
   limite: number;
 }
 
-export interface PlantillaDraftResult {
-  plantilla: PlantillaDeProyecto;
-  cuota: PlantillaCuota;
+export interface TemplateDraftResult {
+  plantilla: ProjectTemplate;
+  cuota: TemplateQuota;
 }
 
 /** Cuánto texto se le pide a quien describe su proyecto. */
-export const PLANTILLA_BRIEF_MIN = 20;
-export const PLANTILLA_BRIEF_MAX = 4000;
+export const TEMPLATE_BRIEF_MIN = 20;
+export const TEMPLATE_BRIEF_MAX = 4000;
 
 /**
  * Lo que devuelve pedir un borrador. Vive aquí, y no junto a la función que lo
  * produce, porque el diálogo es un componente de cliente y aquella es código de
  * servidor: el tipo tiene que poder cruzar esa frontera.
  */
-export interface PlantillaBorradorState {
-  resultado: PlantillaDraftResult | null;
+export interface TemplateDraftState {
+  resultado: TemplateDraftResult | null;
   error: string | null;
   /**
    * La cuota se acabó.
@@ -1100,7 +1100,7 @@ export interface PlantillaBorradorState {
 }
 
 /** Lo que devuelve materializar una plantilla aceptada. */
-export interface PlantillaResultado {
+export interface TemplateResult {
   /** El proyecto **sí** se creó, aunque algo posterior fallara. */
   proyecto: { id: string; name: string; slug: string } | null;
   creado: {
@@ -1122,4 +1122,4 @@ export interface PlantillaResultado {
 }
 
 /** Cuánto puede ocupar un retoque sobre un plan ya propuesto. */
-export const PLANTILLA_AJUSTE_MAX = 1000;
+export const TEMPLATE_TWEAK_MAX = 1000;

@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatRefKind } from '../../api/chat-refs';
-import { trocearMensaje } from '../../api/chat-refs';
+import { splitMessage } from '../../api/chat-refs';
 import {
   CHAT_REACTIONS,
   type ChatAttachment,
@@ -12,7 +12,7 @@ import {
   personLabel,
 } from '../../api/domain';
 import type { LinkPreview } from '../../api/link-preview';
-import { hrefDeAvatar } from '../../api/presence';
+import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { usePresence } from '../../realtime';
 import { alpha, colors } from '../../tokens';
@@ -516,7 +516,7 @@ export function MessageBubble({
    * de "preguntado y sin metadatos" (`null`), para no volver a pedir.
    */
   const primeraUrl = previewDeLink
-    ? trocearMensaje(message.body).find((trozo) => trozo.tipo === 'url')?.url
+    ? splitMessage(message.body).find((trozo) => trozo.tipo === 'url')?.url
     : undefined;
   useEffect(() => {
     if (!primeraUrl || preview !== undefined) return;
@@ -617,7 +617,7 @@ export function MessageBubble({
           label={nombre}
           mine={mine}
           size="sm"
-          src={hrefDeAvatar(author?.avatarUrl, gatewayPath)}
+          src={avatarHref(author?.avatarUrl, gatewayPath)}
           /* El punto de estado también en el chat: saber que alguien está en
              una reunión explica por qué no contesta, y ese es justo el momento
              en que se mira. Va por `usePresence` para que cambie solo sin
