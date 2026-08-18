@@ -9,11 +9,20 @@
 # problema de raíz y además sube las imágenes sin pasar por tu conexión.
 #
 # Uso:
-#   gcloud builds submit --config infra/ci/cloudbuild.yaml \
-#     --substitutions=_REGION=us-central1,_PREFIJO=praxis,_TAG=latest .
+#   gcloud builds submit --config infra/ci/cloudbuild.yaml .
+#
+# ⚠️ **La región por defecto tiene que ser la del despliegue.** Esto decía
+# `us-central1` mientras toda la infraestructura vive en `us-east1`
+# (`terraform.tfvars`), así que un `submit` sin `--substitutions` buscaba el
+# repositorio de Artifact Registry en una región donde no existe y el build
+# moría con `Repository "praxis" not found`.
+#
+# Y moría **entero**: el paso que falla es el espejo de Redis, pero Cloud Build
+# cancela los otros dos —backend y frontend— aunque ya estuvieran a medias. El
+# error que se ve arriba del todo no es el que importa.
 
 substitutions:
-  _REGION: us-central1
+  _REGION: us-east1
   _PREFIJO: praxis
   _TAG: latest
   # ID de cliente de OAuth para el botón de Google. Va aquí y no en Secret
