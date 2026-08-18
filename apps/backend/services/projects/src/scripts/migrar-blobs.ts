@@ -44,19 +44,62 @@ import { PrismaClient } from '../generated/prisma-client';
 /** Cuántos blobs se traen de una vez. */
 const LOTE = 20;
 
+/**
+ * La URL de la base, compuesta aquí desde las `POSTGRES_*`.
+ *
+ * ⚠️ **En el contenedor no existe `DATABASE_URL`.** Quien la compone es
+ * `backend.pm2.config.cjs`, y solo para los procesos que arranca: un
+ * `docker exec` cualquiera **no la hereda**, así que un script que la diera por
+ * puesta muere con «Environment variable not found: DATABASE_URL» —y el mensaje
+ * apunta al `schema.prisma`, que no tiene nada que ver—.
+ *
+ * Es el mismo patrón que ya usa `migrar.sh`, y por el mismo motivo.
+ */
+function urlDeLaBase(): string {
+  const { POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB } = process.env;
+  const puerto = process.env.POSTGRES_PORT ?? '5432';
+
+  if (!POSTGRES_HOST || !POSTGRES_USER || !POSTGRES_PASSWORD || !POSTGRES_DB) {
+    /* Si ya viene puesta —ejecución local, por ejemplo— se respeta. */
+    if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+    throw new Error('Faltan POSTGRES_HOST, POSTGRES_USER, POSTGRES_PASSWORD y POSTGRES_DB.');
+  }
+
+  const usuario = encodeURIComponent(POSTGRES_USER);
+  const clave = encodeURIComponent(POSTGRES_PASSWORD);
+  return `postgresql://${usuario}:${clave}@${POSTGRES_HOST}:${puerto}/${POSTGRES_DB}?schema=projects`;
+}
+
 async function main(): Promise<void> {
   const borrarOrigen = process.argv.includes('--borrar-origen');
+  const soloContar = process.argv.includes('--contar');
 
   const projectId = process.env.GCS_PROJECT_ID;
   const bucketName = process.env.GCS_BUCKET;
-  if (!projectId || !bucketName) {
+  if (!soloContar && (!projectId || !bucketName)) {
     console.error('Faltan GCS_PROJECT_ID y GCS_BUCKET.');
     process.exit(1);
   }
 
+  const prisma = new PrismaClient({ datasources: { db: { url: urlDeLaBase() } } });
+
+  /* `--contar` responde «cuánto hay» sin tocar el bucket: es lo primero que se
+     quiere saber, y no debe exigir credenciales de GCS para averiguarlo. */
+  if (soloContar) {
+    const [fila] = await prisma.$queryRawUnsafe<{ n: bigint; bytes: bigint }[]>(
+      'SELECT count(*)::bigint AS n, COALESCE(sum(length(data)),0)::bigint AS bytes FROM projects.chat_attachment_blobs',
+    );
+    const mb = Number(fila?.bytes ?? 0) / (1024 * 1024);
+    console.log(`blobs: ${fila?.n ?? 0} · ${mb.toFixed(1)} MB`);
+    await prisma.$disconnect();
+    return;
+  }
+
+  /* Después del `--contar`, así que aquí ya están comprobadas. */
+  if (!projectId || !bucketName) throw new Error('Faltan GCS_PROJECT_ID y GCS_BUCKET.');
+
   const { Storage } = await import('@google-cloud/storage');
   const bucket = new Storage({ projectId }).bucket(bucketName);
-  const prisma = new PrismaClient();
 
   let migrados = 0;
   let saltados = 0;

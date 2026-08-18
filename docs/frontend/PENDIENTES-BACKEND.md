@@ -837,9 +837,27 @@ indisponibilidad: mientras se copia, todo se sigue sirviendo desde Postgres.
 la VPC**, igual que `migrar.sh`:
 
 ```
+# 1. cuánto hay (no toca el bucket ni pide credenciales de GCS)
 gcloud compute ssh <vm-backend> --tunnel-through-iap --zone <zona> \
-  --command "sudo docker exec praxis-backend node dist/scripts/migrar-blobs.js"
+  --command "sudo docker exec praxis-backend node /app/apps/backend/services/projects/dist/scripts/migrar-blobs.js --contar"
+
+# 2. migrar
+gcloud compute ssh <vm-backend> --tunnel-through-iap --zone <zona> \
+  --command "sudo docker exec praxis-backend node /app/apps/backend/services/projects/dist/scripts/migrar-blobs.js"
 ```
+
+⚠️ **El nombre de la máquina cambia en cada despliegue** —el grupo de instancias
+las recrea—, así que no se apunta:
+
+```
+gcloud compute instances list --filter="name~praxis-backend" --format="value(name,zone)"
+```
+
+⚠️ **En el contenedor no existe `DATABASE_URL`.** La compone
+`backend.pm2.config.cjs` y solo para los procesos que arranca; un `docker exec`
+**no la hereda**. El script la construye él mismo desde las `POSTGRES_*`, igual
+que `migrar.sh`. Sin eso, muere con «Environment variable not found:
+DATABASE_URL» y el mensaje apunta al `schema.prisma`, que no tiene nada que ver.
 
 **Qué falta por el lado del backend** (si se quiere conectar):
 
