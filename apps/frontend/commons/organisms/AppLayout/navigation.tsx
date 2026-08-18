@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { PraxAvatar } from '../../atoms/PraxAvatar';
+import { PraxSidebarIcon } from '../../atoms/PraxAvatar';
 
 /**
  * Un enlace de la barra lateral del área privada.
@@ -125,7 +125,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * iconos de trazo: más grande compite con ellos y deja de leerse como parte
      * de la misma lista.
      */
-    icon: <PraxAvatar size="xs" />,
+    icon: <PraxSidebarIcon />,
   },
   {
     /**

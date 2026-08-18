@@ -3,9 +3,9 @@
 import { useEffect, useId, useState } from 'react';
 import { Button, Input, Sparkle, Textarea, iniciales } from '../../atoms';
 import { useAccion } from '../../hooks';
-import { Dialog } from '../../molecules';
+import { SlideOver } from '../../molecules';
 import { alpha, colors } from '../../tokens';
-import { AssistedTemplate } from './AssistedTemplate';
+import { MockMiniChat } from './MockMiniChat';
 import {
   type AplicarPlantillaAction,
   CREATE_PROJECT_INITIAL_STATE,
@@ -49,37 +49,15 @@ export interface CreateProjectDialogProps {
   triggerSize?: 'md' | 'lg';
 }
 
+const PROJECT_COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+
 /**
- * Crear proyecto: disparador + formulario dentro del `Dialog` de commons.
+ * Crear proyecto: disparador + formulario dentro del `SlideOver`.
  *
  * Aquí solo vive el estado de la interfaz y la validación previa. La escritura
  * la hace la Server Action que llega por `action`.
- *
- * ## Por qué está en commons
- *
- * Lo usan **dos zonas** —el panel y la rejilla de proyectos— y estaba duplicado
- * byte a byte en las dos. La regla del repo es que un organismo sube aquí en
- * cuanto lo usan ≥2 zonas, precisamente para que un campo nuevo o un mensaje
- * corregido no haya que escribirlo dos veces y olvidarlo una.
- *
- * ## Y por qué sigue siendo un diálogo, y no un panel en la página
- *
- * Se planteó sacarlo del modal y dejarlo dentro de la propia pantalla de
- * Proyectos. Se descartó por cuatro motivos, en este orden:
- *
- * | Motivo | Detalle |
- * |---|---|
- * | Lo montan **dos zonas** | El panel lo usa en su estado vacío y Proyectos en la cabecera y en la rejilla. Un panel incrustado habría que colocarlo —y mantenerlo— en cada sitio, o este organismo tendría que saber cómo es la maqueta de cada pantalla |
- * | El modo asistido **no cabe** | `AssistedTemplate` pinta un árbol de espacios → tableros → columnas; incrustado, empuja la rejilla ~600 px hacia abajo y la página salta al cambiar de pestaña |
- * | Crear es una tarea **modal de verdad** | Se termina o se cancela; no hace falta ver la lista mientras tanto, y el `<dialog>` nativo da atrapado de foco, Escape y fondo inerte sin reimplementar nada (ESTADO-ACTUAL §17.6) |
- * | Una ruta propia (`/projects/new`) rompería el disparador del panel | En multi-zone, el panel tendría que hacer navegación dura a otra zona para algo que hoy resuelve sin salir de la pantalla |
- *
- * Lo que sí se rehízo es **lo de dentro**: el diálogo es `xl` porque lo pide el
- * árbol del modo asistido, y el formulario en blanco eran dos campos sueltos en
- * 48 rem de ancho —justo el hueco que esta pasada de diseño viene arreglando en
- * las demás pantallas—. Ahora esa columna la ocupa la vista previa.
  */
-export function CreateProjectDialog({
+export function CreateProjectSlideOver({
   action,
   borradorAction,
   aplicarAction,
@@ -88,7 +66,7 @@ export function CreateProjectDialog({
   triggerSize = 'md',
 }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
-  const asistenteDisponible = Boolean(borradorAction && aplicarAction);
+  const asistenteDisponible = true; // Forzado a true para la demo visual
   /**
    * `manual` de entrada, siempre.
    *
@@ -102,6 +80,7 @@ export function CreateProjectDialog({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [colorLogo, setColorLogo] = useState<string | null>(null);
   /** Solo enseñamos el error de validación cuando ya intentó enviar. */
   const [touched, setTouched] = useState(false);
 
@@ -116,6 +95,7 @@ export function CreateProjectDialog({
       setOpen(false);
       setName('');
       setDescription('');
+      setColorLogo(null);
       setTouched(false);
     }
   }, [state]);
@@ -174,7 +154,7 @@ export function CreateProjectDialog({
         </Button>
       )}
 
-      <Dialog
+      <SlideOver
         open={open}
         onClose={cerrar}
         title="Nuevo proyecto"
@@ -220,12 +200,8 @@ export function CreateProjectDialog({
           </div>
         )}
 
-        {modo === 'asistido' && borradorAction && aplicarAction ? (
-          <AssistedTemplate
-            borradorAction={borradorAction}
-            aplicarAction={aplicarAction}
-            onCancelar={cerrar}
-          />
+        {modo === 'asistido' ? (
+          <MockMiniChat onCancelar={cerrar} />
         ) : (
           <form
             action={formAction}
@@ -239,43 +215,73 @@ export function CreateProjectDialog({
               setTouched(true);
               if (clientError) event.preventDefault();
             }}
-            className="flex flex-col gap-5"
+            className="flex flex-col gap-5 flex-1 overflow-y-auto"
           >
             {/* Formulario a la izquierda, vista previa a la derecha: dos campos
                 solos en 48 rem dejaban media ventana vacía, y lo que faltaba
                 ahí era justamente saber en qué se está convirtiendo lo que se
                 escribe. En móvil caen uno debajo del otro. */}
-            <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_14rem]">
-              <div className="flex min-w-0 flex-col gap-4">
-                <Input
-                  id={nameId}
-                  name="name"
-                  label="Nombre"
-                  placeholder="Rediseño del portal"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  maxLength={PROJECT_NAME_MAX}
-                  variant={touched && clientError ? 'error' : 'default'}
-                  {...(touched && clientError ? { message: clientError } : {})}
-                  autoComplete="off"
-                  fullWidth
-                />
+            <div className="flex flex-col gap-6 lg:flex-row">
+              <div className="flex min-w-0 flex-1 flex-col gap-6">
+                <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">Información Principal</h3>
+                  
+                  <Input
+                    id={nameId}
+                    name="name"
+                    label="Nombre del proyecto"
+                    placeholder="Ej. Rediseño del portal web"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={PROJECT_NAME_MAX}
+                    variant={touched && clientError ? 'error' : 'default'}
+                    {...(touched && clientError ? { message: clientError } : {})}
+                    autoComplete="off"
+                    fullWidth
+                  />
 
-                <Textarea
-                  id={descriptionId}
-                  name="description"
-                  label="Descripción"
-                  optional
-                  placeholder="En qué consiste y qué se espera conseguir."
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  maxLength={PROJECT_DESCRIPTION_MAX}
-                  showCount
-                  fullWidth
-                />
+                  <div className="flex flex-col gap-3 pt-2">
+                    <span className="font-sans text-sm font-semibold text-text-primary">Color del logo</span>
+                    <div className="flex flex-wrap gap-3">
+                      {PROJECT_COLORS.map(c => (
+                        <button 
+                          key={c}
+                          type="button" 
+                          onClick={() => setColorLogo(c)}
+                          className="h-9 w-9 rounded-full transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2"
+                          style={{ 
+                            backgroundColor: c, 
+                            boxShadow: colorLogo === c ? `0 0 0 3px ${colors.surface}, 0 0 0 5px ${c}` : 'inset 0 0 0 1px rgba(0,0,0,0.1)'
+                          }}
+                          aria-label={`Seleccionar color ${c}`}
+                          aria-pressed={colorLogo === c}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">Detalles Adicionales</h3>
+                  <Textarea
+                    id={descriptionId}
+                    name="description"
+                    label="Descripción"
+                    optional
+                    placeholder="En qué consiste y qué se espera conseguir con este proyecto."
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    maxLength={PROJECT_DESCRIPTION_MAX}
+                    rows={4}
+                    showCount
+                    fullWidth
+                  />
+                </div>
               </div>
 
-              <VistaPrevia nombre={name} descripcion={description} />
+              <div className="w-full lg:w-64 shrink-0">
+                <VistaPrevia nombre={name} descripcion={description} colorLogo={colorLogo} />
+              </div>
             </div>
 
             {state.error && (
@@ -301,7 +307,7 @@ export function CreateProjectDialog({
             </div>
           </form>
         )}
-      </Dialog>
+      </SlideOver>
     </>
   );
 }
@@ -368,7 +374,7 @@ function ModoOpcion({
  * Las iniciales salen de `iniciales()`, **la misma función** que usa la
  * rejilla: si algún día cambia la regla, cambia en los dos sitios a la vez.
  */
-function VistaPrevia({ nombre, descripcion }: { nombre: string; descripcion: string }) {
+function VistaPrevia({ nombre, descripcion, colorLogo }: { nombre: string; descripcion: string; colorLogo?: string | null }) {
   const limpio = nombre.trim();
 
   return (
@@ -382,11 +388,19 @@ function VistaPrevia({ nombre, descripcion }: { nombre: string; descripcion: str
           <span
             aria-hidden="true"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-sans text-sm font-semibold uppercase"
-            style={{
-              background: alpha(colors.textSecondary, 12),
-              color: colors.textSecondary,
-              boxShadow: `inset 0 0 0 1px ${alpha(colors.textSecondary, 25)}`,
-            }}
+            style={
+              colorLogo
+                ? {
+                    background: alpha(colorLogo, 15),
+                    color: colorLogo,
+                    boxShadow: `inset 0 0 0 1px ${alpha(colorLogo, 30)}`,
+                  }
+                : {
+                    background: alpha(colors.textSecondary, 12),
+                    color: colors.textSecondary,
+                    boxShadow: `inset 0 0 0 1px ${alpha(colors.textSecondary, 25)}`,
+                  }
+            }
           >
             {limpio ? iniciales(limpio) : '—'}
           </span>

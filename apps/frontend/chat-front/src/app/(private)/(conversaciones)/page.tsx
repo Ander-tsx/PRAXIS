@@ -1,7 +1,7 @@
 import { ULTIMO_CHAT_COOKIE, conversacionRecordada } from '@/lib/ultimo-chat';
 import type { DirectConversation } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 /** Un chat de proyecto en la bandeja, con lo poco que hace falta aquí. */
@@ -50,9 +50,17 @@ interface ChatDeProyecto {
  * Volver a la que tú abriste no tiene ese problema — ya la habías leído.
  */
 export default async function ChatVacioPage() {
-  const recordada = conversacionRecordada((await cookies()).get(ULTIMO_CHAT_COOKIE)?.value);
+  const { get: getCookie } = await cookies();
+  const { get: getHeader } = await headers();
+  
+  const recordada = conversacionRecordada(getCookie(ULTIMO_CHAT_COOKIE)?.value);
+  const userAgent = getHeader('user-agent') || '';
+  const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
 
-  if (recordada && (await sigueAccesible(recordada))) {
+  // En móvil, la lista de chats y la conversación ocupan la misma pantalla.
+  // Si redirigimos siempre al último chat, el usuario se queda atrapado en esa
+  // conversación y no puede volver a ver el directorio para elegir otra.
+  if (!isMobile && recordada && (await sigueAccesible(recordada))) {
     /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`) al
        redirigir. Con el `/chat/` de cuando esto vivía en dashboard-front saldría
        `/chat/chat/<uuid>`, que es un 404. */

@@ -18,7 +18,7 @@ import { type VoiceLink, estaActiva } from '@/lib/voice';
 import { MAX_TAREAS_DEL_PANEL, splitWork } from '@/lib/work';
 import {
   AppHeader,
-  CreateProjectDialog,
+  CreateProjectSlideOver,
   DUE_SOON_DAYS,
   type MyInvitation,
   type NotificationPage,
@@ -286,14 +286,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
      hay riesgo de que el reloj del navegador pinte otra cosa que la servida. */
   const gruposDeAvisos = inbox ? agruparPorDia(inbox.items) : [];
 
-  const crearProyecto = (
-    <CreateProjectDialog
-      action={createProjectAction}
-      borradorAction={borradorDePlantillaAction}
-      aplicarAction={crearProyectoDesdePlantillaAction}
-    />
-  );
-
   return (
     <AppHeader title="Panel">
       <div className="flex flex-col gap-8">
@@ -308,10 +300,18 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             proyectos: projects.length,
           })}
           /* La acción principal solo cuando ya hay algo: sin proyectos, quien
-             invita a crear el primero es `DashboardEmptyState`, con su propio
-             botón grande y su explicación. Dos botones de crear en la misma
-             pantalla vacía compiten entre sí. */
-          accionSlot={projects.length > 0 ? crearProyecto : undefined}
+             invita a crear el primero es `DashboardEmptyState`, con su botón
+             grande y su explicación. Dos botones de crear en la misma pantalla
+             vacía compiten entre sí. */
+          accionSlot={
+            projects.length > 0 ? (
+              <CreateProjectSlideOver
+                action={createProjectAction}
+                borradorAction={borradorDePlantillaAction}
+                aplicarAction={crearProyectoDesdePlantillaAction}
+              />
+            ) : undefined
+          }
         />
 
         {/* Antes que nada: es lo único que espera una decisión, y el único
@@ -328,7 +328,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         {projects.length === 0 ? (
           <DashboardEmptyState
             action={
-              <CreateProjectDialog
+              <CreateProjectSlideOver
                 action={createProjectAction}
                 borradorAction={borradorDePlantillaAction}
                 aplicarAction={crearProyectoDesdePlantillaAction}

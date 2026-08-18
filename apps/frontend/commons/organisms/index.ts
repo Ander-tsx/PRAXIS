@@ -10,7 +10,7 @@ export * from './AppLayout';
 export * from './AssistantChat';
 export * from './LiveNotices';
 export * from './ChatPanel';
-export * from './CreateProjectDialog';
+export * from './CreateProjectSlideOver';
 export * from './LogoutButton';
 export * from './NotFound';
 export * from './ProjectCard';

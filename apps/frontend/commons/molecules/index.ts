@@ -10,3 +10,4 @@ export * from './Pagination';
 export * from './ProjectPicker';
 export * from './ThemeToggle';
 export * from './PresenceSwitcher';
+export * from './SlideOver';

@@ -19,6 +19,7 @@ import {
 import { cargarConversacionAction, preguntarAction } from '../../assistant/actions';
 import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
 import { alpha, colors } from '../../tokens';
+import { useDock } from '../AppLayout/DockPanel';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
 import { ModelText } from './ModelText';
@@ -83,18 +84,24 @@ export interface AssistantChatProps {
   /**
    * Qué forma toma la conversación.
    *
-   * - `panel` — una tarjeta con borde, alto acotado, entre otras cosas. Es la de
-   *   Análisis, donde el chat comparte pantalla con los gráficos y no puede
-   *   quedárselo todo.
    * - `pantalla` — sin tarjeta, ocupando el alto disponible, con el hilo
    *   desplazándose por dentro y el compositor abajo del todo. Es la de su propia
    *   zona, donde **la conversación es la pantalla**.
+   * - `cajon` — como `pantalla` pero dentro de la columna lateral del armazón,
+   *   con su propia aspa de cerrar. Es la de Análisis, desde que el chat dejó de
+   *   ocupar sitio en una página cuyo trabajo es analizar.
+   * - `panel` — una tarjeta con borde y alto acotado. **Ya no la usa nadie**: se
+   *   queda porque es lo que hay que poner si algún día el chat vuelve a
+   *   incrustarse en el cuerpo de una página, y borrarla y reescribirla más
+   *   adelante cuesta más que dejarla.
    *
-   * Es una prop y no dos componentes porque lo único que cambia es el envoltorio:
-   * el hilo, las burbujas, las propuestas, el historial y la cuota son idénticos,
-   * y duplicarlos sería duplicar el sitio donde se arregla el próximo fallo.
+   * Es una prop y no tres componentes porque lo único que cambia es el
+   * envoltorio: el hilo, las burbujas, las propuestas, el historial y la cuota
+   * son idénticos. **Tres carcasas, un organismo** — en cuanto haya una cuarta
+   * implementación del chat, empezarán a divergir y el próximo arreglo habrá que
+   * hacerlo cuatro veces.
    */
-  variante?: 'panel' | 'pantalla';
+  variante?: 'panel' | 'pantalla' | 'cajon';
 }
 
 /**
@@ -164,7 +171,15 @@ export function AssistantChat({
   alAceptarGrafico,
   variante = 'panel',
 }: AssistantChatProps) {
-  const aPantalla = variante === 'pantalla';
+  /* Las dos variantes «altas» comparten toda la mecánica de alto y scroll; lo
+     único propio del cajón es su cabecera con el aspa. */
+  const aPantalla = variante === 'pantalla' || variante === 'cajon';
+  const enCajon = variante === 'cajon';
+  /* El cajón lo gobierna el armazón, así que cerrar no es estado de este
+     componente: se le pide a quien lo abrió. Fuera del armazón —o en las otras
+     variantes— `dock` es `null` y el aspa ni se pinta. */
+  const dock = useDock();
+  const cerrarCajon = dock?.cerrar;
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
@@ -323,7 +338,7 @@ export function AssistantChat({
                  contenedor — sin él, un `flex-1` con contenido largo crece y el
                  scroll se lo queda la página entera, que es justo lo que se
                  quiere evitar en un chat. */
-              'flex min-h-0 flex-1 flex-col gap-4'
+              `flex min-h-0 flex-1 flex-col gap-4 ${enCajon ? 'p-4' : ''}`
             : 'flex flex-col gap-4 rounded-2xl border p-5'
         }
         style={

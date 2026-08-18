@@ -7,6 +7,7 @@ import { Avatar } from '../../atoms/Avatar';
 import { LivePresences, LiveSource } from '../../realtime';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
+import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import type { AppNavItem } from './navigation';
 
@@ -190,7 +191,12 @@ export function AppShell(props: AppShellProps) {
       {/* Por encima de todo lo que pinte un avatar: el punto de estado de
           cualquier persona se corrige solo desde aquí. */}
       <LivePresences>
-        <ArmazonInterno {...props} />
+        {/* El cajón lateral, por encima del armazón: la columna la pinta él y
+            el contenido lo proyecta la página, así que el proveedor tiene que
+            envolver a los dos. Ver `DockPanel`. */}
+        <DockProvider>
+          <ArmazonInterno {...props} />
+        </DockProvider>
       </LivePresences>
     </LiveSource>
   );
@@ -343,6 +349,21 @@ function ArmazonInterno({
 
         {/* ── Contenido ────────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+
+        {/**
+         * El cajón lateral, **hermano del contenido y no encima de él**.
+         *
+         * Al ser una columna más de esta misma fila flex, abrirlo recoloca lo de
+         * al lado porque es lo que hace un `flex` — no porque nadie le haya
+         * sumado un margen al `body`. Cerrado mide cero y **conserva dentro lo
+         * que hubiera montado**, que es lo que permite cerrar el panel de PRAX,
+         * mirar un gráfico y volver sin perder la conversación.
+         *
+         * Va después del contenido en el DOM y no antes: el orden de lectura de
+         * un lector de pantalla es el del documento, y un panel accesorio se lee
+         * después de aquello a lo que acompaña.
+         */}
+        <DockColumn />
 
         {/**
          * Los avisos en vivo se enganchan aquí, en el armazón, y no en cada

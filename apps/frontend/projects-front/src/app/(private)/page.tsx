@@ -7,7 +7,7 @@ import { ProjectGrid } from '@/components/organisms/ProjectGrid';
 import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 import {
   AppHeader,
-  CreateProjectDialog,
+  CreateProjectSlideOver,
   type Paginated,
   Pagination,
   type Project,
@@ -164,7 +164,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         {page.items.length === 0 && !search ? (
           <ProjectsEmptyState
             action={
-              <CreateProjectDialog
+              <CreateProjectSlideOver
                 action={createProjectAction}
                 borradorAction={borradorDePlantillaAction}
                 aplicarAction={crearProyectoDesdePlantillaAction}
@@ -182,7 +182,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
               search={search}
               equiposPorProyecto={equiposPorProyecto}
               crearSlot={
-                <CreateProjectDialog
+                <CreateProjectSlideOver
                   action={createProjectAction}
                   borradorAction={borradorDePlantillaAction}
                   aplicarAction={crearProyectoDesdePlantillaAction}
