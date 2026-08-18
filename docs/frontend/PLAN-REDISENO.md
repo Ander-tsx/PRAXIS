@@ -9,9 +9,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R1 — Panel |
-| **Última tarea terminada** | — (plan recién escrito) |
-| **Siguiente** | R1.1 |
+| **Etapa actual** | R2 — Administración |
+| **Última tarea terminada** | R1.8 — el panel entero |
+| **Siguiente** | R2.1 |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -22,7 +22,10 @@ descartado (con motivo escrito al lado)
 
 | Fecha | Tarea | Commit | Nota |
 |---|---|---|---|
-| 2026-08-18 | Plan escrito | — | Este documento |
+| 2026-08-18 | Plan escrito | `451649e` | Este documento |
+| 2026-08-18 | (fuera de plan) | `ab5e9ae` | `main` no compilaba: `MessageBubble` llamaba a `campoDesdeCuerpo`, renombrado a `fieldFromBody` en `c356208`. Bloqueaba el typecheck de las siete zonas |
+| 2026-08-18 | R1.1 | `139f6e2` | `ProjectCard` a `commons`, parametrizada con `href` / `sameZone` / `gatewayPath` |
+| 2026-08-18 | R1.2 – R1.8 | `bc801c5` | Panel entero. Dos consultas de tareas pasan a una; `ProjectList`, `DashboardMetrics` y `DashboardWelcome` retirados |
 
 ---
 
@@ -134,31 +137,43 @@ saltarse una, la tarea está mal planteada.
 
 ### Tareas
 
-- [ ] **R1.1 — `ProjectCard` sube a `commons/organisms`.** Parametrizada con
+- [x] **R1.1 — `ProjectCard` sube a `commons/organisms`.** Parametrizada con
       `href`, `sameZone` y `gatewayPath` (el `avatarHref` de cada zona apunta a
       su propio proxy). La consumen `projects-front` y `dashboard-front`; se
       borra `ProjectList` del panel. Cumple la regla: un organismo sube cuando lo
       usan ≥2 zonas.
-- [ ] **R1.2 — `molecules/StatTile`.** La cifra que **es un enlace**: valor,
+- [x] **R1.2 — `molecules/StatTile`.** La cifra que **es un enlace**: valor,
       etiqueta, pie, tono, icono y destino. Cuatro en el panel — vencidas, vencen
       en 7 días, abiertas, sin leer.
-- [ ] **R1.3 — `organisms/DashboardHero`.** Saludo por hora del día, fecha larga,
-      insignias de rol y las acciones primarias. Absorbe `DashboardWelcome` con su
-      aviso de perfil incompleto, que se conserva entero: el registro no pide
-      nombre y ese es el caso normal de una cuenta nueva.
-- [ ] **R1.4 — `organisms/WorkPulse`.** La fila de cifras más la **barra
+- [x] **R1.3 — `organisms/DashboardHero`.** Saludo, insignias de rol, acción
+      primaria y una frase de estado construida con datos (`resumenDelDia`).
+      Absorbe `DashboardWelcome` con su aviso de perfil incompleto, que se conserva
+      entero: el registro no pide nombre y ese es el caso normal de una cuenta nueva.
+      *Resultado:* **sin saludo por hora del día**, que era lo planeado. Es un
+      Server Component, así que la hora sería la del servidor; con el servidor en
+      otra región el saludo se equivoca a diario y nadie lo reporta. Las salidas
+      —una isla de cliente para decir «buenas tardes», o la zona horaria por
+      cookie— no pagan lo que cuestan.
+- [x] **R1.4 — `organisms/WorkPulse`.** La fila de cifras más la **barra
       segmentada** del reparto de tus tareas abiertas: vencidas · esta semana ·
       más adelante · sin fecha. Colores distintos y etiquetas distintas, nunca una
       suma (invariante 3).
-- [ ] **R1.5 — `organisms/QuickAccess`.** Los accesos directos a las zonas con
+- [x] **R1.5 — `organisms/QuickAccess`.** Los accesos directos a las zonas con
       los contadores que ya se conocen. `<a>` duro, que cruza de zona.
-- [ ] **R1.6 — La segunda petición a `/me/tasks`.** Sin `dueBefore`, con
-      `excludeDone` y `limit=100`, dentro del mismo `Promise.all`: es la que da
-      «abiertas» y el reparto. Degrada a lo que ya hay si falla.
-- [ ] **R1.7 — Recomponer la page en dos columnas** y conservar lo que funciona:
+- [x] **R1.6 — `/me/tasks`, y resultó ser una petición MENOS, no una más.**
+      El plan pedía añadir una segunda consulta para «abiertas» y el reparto.
+      Al mirar `findMyTasks` se vio que ordena por `dueDate ASC` y que en Postgres
+      los nulos de un `ASC` van **al final**: quitando el `dueBefore` de la que ya
+      había salen los dos avisos —el orden ya los pone delante— **y** el reparto
+      completo. Las dos consultas pasan a ser una.
+      ⚠️ Con el detalle escrito en `lib/work.ts`: el `total` de esa respuesta no
+      sirve cuando se pide `excludeDone`, porque el gateway filtra después de
+      consultar y reescribe `total` con lo que le queda, ya recortado por el
+      `take`. Por eso con el tope lleno se escribe `100+`.
+- [x] **R1.7 — Recomponer la page en dos columnas** y conservar lo que funciona:
       invitaciones, bandeja con su filtro y su paginación (con las **dos** familias
       de href), aviso de voz, diálogo de creación con la plantilla del asistente.
-- [ ] **R1.8 — Un solo `resolveProfiles`** para los actores de la bandeja **y**
+- [x] **R1.8 — Un solo `resolveProfiles`** para los actores de la bandeja **y**
       los miembros de los proyectos. Dos llamadas serían el N+1 que ya documenta
       `commons/api/directory.ts`.
 
