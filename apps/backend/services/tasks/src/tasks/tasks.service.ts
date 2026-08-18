@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
+import { TaskDomainOutboxFactory } from '../domain-events/task-domain-outbox.factory';
 import { Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -97,6 +99,7 @@ const TASK_INCLUDE = {
 @Injectable()
 export class TasksService {
   private readonly projectsClient: ClientProxy;
+  private readonly domainOutbox = new TaskDomainOutboxFactory();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -500,6 +503,7 @@ export class TasksService {
 
     /* En transacción con su historial: una tarea que nace sin evento `CREATED`
        no tiene principio, y su tiempo de entrega es incalculable para siempre. */
+    const correlationId = randomUUID();
     const task = await this.prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
@@ -530,6 +534,19 @@ export class TasksService {
            que nace con dueño no tendría registro de cuándo lo ganó. */
         ...assignees.map((userId): TaskEventDraft => ({ type: 'ASSIGNED', subjectId: userId })),
       ]);
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: created.projectId,
+          taskId: created.id,
+          actor: { type: 'USER', id: dto.requesterId },
+          correlationId,
+        },
+        {
+          type: 'task.created.v1',
+          payload: { taskId: created.id, boardId: created.boardId, columnId: created.columnId },
+        },
+      );
 
       return created;
     });
@@ -806,6 +823,7 @@ export class TasksService {
       isClosingColumn: dto.isClosingColumn,
     });
 
+    const correlationId = randomUUID();
     const updated = await this.prisma.$transaction(async (tx) => {
       const moved = await tx.task.update({
         where: { id: dto.id },
@@ -819,6 +837,21 @@ export class TasksService {
       });
 
       await this.recordEvents(tx, moved, dto.requesterId, change.events);
+      if (task.columnId !== moved.columnId) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.moved.v1',
+            payload: { taskId: moved.id, fromColumnId: task.columnId, toColumnId: moved.columnId },
+          },
+        );
+      }
       return moved;
     });
 

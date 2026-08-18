@@ -6,7 +6,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "dev": "tsc --project tsconfig.json --watch"
+    "dev": "tsc --project tsconfig.json --watch",
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "class-validator": "^0.14.0",
@@ -14,6 +15,16 @@
     "@nestjs/swagger": "^11.0.0"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.0.0"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "testEnvironment": "node"
   }
 }

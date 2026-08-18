@@ -3,6 +3,7 @@ export * from './alexa';
 export * from './assistant';
 export * from './auth';
 export * from './credentials';
+export * from './events';
 export * from './notifications';
 export * from './pagination.dto';
 export * from './permissions';
