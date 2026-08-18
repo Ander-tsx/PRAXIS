@@ -212,7 +212,7 @@ export function LiveNotices() {
    * `bottom-right` para no tapar la cabecera ni el buscador, que es donde estaba
    * el apilado anterior.
    */
-  return <Toaster position="bottom-right" theme={tema} offset={16} />;
+  return <Toaster position="bottom-right" theme={tema === 'dark' ? 'light' : 'dark'} offset={16} />;
 }
 
 /**

@@ -154,16 +154,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   };
 
   return (
-    <AppHeader
-      title="Proyectos"
-      headerSlot={
-        <CreateProjectDialog
-          action={createProjectAction}
-          borradorAction={borradorDePlantillaAction}
-          aplicarAction={crearProyectoDesdePlantillaAction}
-        />
-      }
-    >
+    <AppHeader title="Proyectos">
       {/* Sin «Tus proyectos» en un `h2` debajo de «Proyectos»: eran dos títulos
           y una frase en cursiva antes del primer proyecto, en una pantalla a la
           que se llega pulsando «Proyectos» en la barra lateral. Lo que decía la

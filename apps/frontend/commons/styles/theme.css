@@ -481,11 +481,18 @@ button:disabled,
  * orden deja de importar.
  */
 
-/* 1. El botón se comía el ancho de la tarjeta.
+/* 1. La tarjeta necesita un borde sutil para destacar en fondos planos
+ * y el botón se comía el ancho de la tarjeta.
  *
+ * `[data-sileo-card]` o el contenedor se estilizan para añadir contraste.
  * `[data-sileo-button]` es `display: flex` y vive como hijo de bloque dentro de
  * la descripción, así que se estiraba al 100 %: una píldora de borde a borde que
  * parecía salirse de la tarjeta. Con `max-content` mide lo que mide su texto. */
+[data-sileo-viewport][data-position] > div {
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
 [data-sileo-viewport][data-position] [data-sileo-button] {
   width: max-content;
   max-width: 100%;

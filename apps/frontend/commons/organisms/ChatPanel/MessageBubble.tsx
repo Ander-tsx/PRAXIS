@@ -692,11 +692,8 @@ export function MessageBubble({
           )}
 
           <div
-            /* Borde discontinuo y fondo transparente: se lee como un hueco
-               marcado y no como un mensaje más. Una burbuja sólida con texto en
-               cursiva se confundía con alguien que hubiera escrito eso. */
-            className="flex items-center gap-2 rounded-2xl border border-dashed px-3.5 py-2"
-            style={{ borderColor: colors.border }}
+            className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5"
+            style={{ background: alpha(colors.textSecondary, 10) }}
           >
             <svg
               className="h-3.5 w-3.5 shrink-0 text-text-disabled"

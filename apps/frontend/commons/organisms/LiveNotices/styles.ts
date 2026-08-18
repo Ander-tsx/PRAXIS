@@ -149,6 +149,6 @@ export function presentacionDe(tipo: string): Presentacion {
  * descripción, en `commons/styles/theme.css`.
  */
 export const RELLENO_POR_TEMA: Record<'dark' | 'light', string> = {
-  dark: '#e8eaf0',
-  light: '#1e2535',
+  dark: '#2c354a', // A lighter elevated surface for high contrast
+  light: '#1e2535', // Dark background on light theme for high contrast
 };

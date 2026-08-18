@@ -473,6 +473,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   const [respuestasExtra, setRespuestasExtra] = useState<Map<string, number>>(new Map());
 
+  // Limpiar el estado local de respuestas extra si la página servida cambia
+  // (por ejemplo, tras una revalidación, la base de datos ya trae los contadores actualizados)
+  useEffect(() => {
+    setRespuestasExtra(new Map());
+  }, [page.items]);
+
   /**
    * El historial completo: lo viejo, lo que sirvió el servidor y lo que ha
    * llegado después, **sin repetidos y en orden**.
@@ -669,6 +675,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * pinte, así que no se ve la lista aparecer arriba y bajar de golpe.
    */
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const busquedaRef = useRef<HTMLDivElement>(null);
   const bloqueoDeSalto = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: ídem — `ultimoId` es el disparador
   useLayoutEffect(() => {
@@ -680,6 +687,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const scroller = scrollerRef.current;
     if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }, [ultimoId]);
+
+  // Si cambiamos de canal, forzamos que el estado del scroll sea "al final"
+  // para que el efecto de ultimoId nos lleve abajo automáticamente.
+  useLayoutEffect(() => {
+    setAlFinal(true);
+    // Y damos un salto inmediato por si acaso ya estaban cargados
+    const scroller = scrollerRef.current;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  }, [rutaCanal]);
 
   function alDesplazar() {
     const scroller = scrollerRef.current;
@@ -1415,6 +1431,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setTerminoBuscado('');
   }
 
+  useEffect(() => {
+    function alClicFuera(e: MouseEvent) {
+      if (busquedaAbierta && busquedaRef.current && !busquedaRef.current.contains(e.target as Node)) {
+        cerrarBusqueda();
+      }
+    }
+    document.addEventListener('mousedown', alClicFuera);
+    return () => document.removeEventListener('mousedown', alClicFuera);
+  }, [busquedaAbierta]);
+
   function cerrarBusqueda() {
     setBusquedaAbierta(false);
     setTermino('');
@@ -1542,7 +1568,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
        * derecha desde `sm` y en móvil (max-sm) es fijo, a pantalla entera.
        */}
       <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${hiloRaiz ? 'md:mr-4' : ''} `}>
           {/**
            * ⚠️ **El panel llena siempre el alto que le da su padre, y quien lo
            * monta tiene que darle uno acotado.**
@@ -1564,7 +1590,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              píxel —una etiqueta larga, una palabra sin espacios— saca una barra
              horizontal en toda la conversación. Aquí nada debe desbordar a lo
              ancho: si algo no cabe, se parte. */
-              className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-1 pt-3"
+              className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-14 pt-3"
             >
               {hasMore && (
                 <div className="mb-2 flex justify-center">
@@ -1809,7 +1835,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * — o vuelven a desalinearse.
            */}
           {canWrite ? (
-            <div className="shrink-0 border-t border-border p-3">
+            <div className="relative shrink-0 p-3 pt-4 bg-surface rounded-b-2xl">
+              {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
+              <div 
+                className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-surface to-transparent pointer-events-none z-10"
+              />
               <Composer
                 /**
                  * ⚠️ **La `key` es lo que rellena el campo al editar.**
@@ -1924,7 +1954,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
         {hiloRaiz && (
           <ThreadPanel
-            raiz={hiloRaiz}
+            raiz={{
+              ...hiloRaiz,
+              reactions: conMisReacciones(hiloRaiz),
+              ...(fijadosLocales.has(hiloRaiz.id) ? { pinnedAt: fijadosLocales.get(hiloRaiz.id)!.pinnedAt } : {}),
+              ...(editadosLocales.has(hiloRaiz.id) ? { body: editadosLocales.get(hiloRaiz.id)!.body } : {})
+            }}
             replies={hiloMensajes}
             cargando={hiloCargando}
             error={hiloError}

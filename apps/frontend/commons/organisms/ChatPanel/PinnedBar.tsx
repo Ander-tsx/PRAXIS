@@ -2,6 +2,7 @@
 
 import type { ChatMessage } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
+import { useEffect, useRef } from 'react';
 import { AttachmentPreview } from './AttachmentPreview';
 
 export interface PinnedBarProps {
@@ -90,6 +91,17 @@ export function PinnedBar({
   onIr,
   nombreDeAutor,
 }: PinnedBarProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function alClicFuera(e: MouseEvent) {
+      if (expandido && menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onExpandirCambiar(false);
+      }
+    }
+    document.addEventListener('mousedown', alClicFuera);
+    return () => document.removeEventListener('mousedown', alClicFuera);
+  }, [expandido, onExpandirCambiar]);
+
   if (fijados.length === 0) return null;
 
   // Por si la lista encoge (se desfija el último) y el índice se queda corto.
@@ -98,7 +110,7 @@ export function PinnedBar({
   if (!actual) return null;
 
   return (
-    <div className="relative shrink-0 border-b" style={{ borderColor: colors.border }}>
+    <div className="relative shrink-0 border-b" style={{ borderColor: colors.border }} ref={menuRef}>
       {/**
        * ⚠️ El tope de alto va **en esta fila y no en el contenedor de fuera**.
        * El desplegable de «ver todos» es `absolute top-full`, es decir, cuelga
@@ -176,8 +188,8 @@ export function PinnedBar({
 
       {expandido && (
         <div
-          className="absolute inset-x-0 top-full z-20 max-h-64 overflow-y-auto border-b shadow-lg"
-          style={{ background: colors.surfaceElevated, borderColor: colors.border }}
+          className="absolute left-2 right-2 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-2xl shadow-2xl border border-transparent"
+          style={{ background: colors.surfaceElevated }}
         >
           {fijados.map((mensaje) => (
             <button

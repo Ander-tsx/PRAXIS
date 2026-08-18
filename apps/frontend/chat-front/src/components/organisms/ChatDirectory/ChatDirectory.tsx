@@ -40,6 +40,7 @@ export interface ChatDirectoryProps {
   proyectos: ChatDeProyecto[];
   /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
   directorio: Directory;
+  compactoInicial?: boolean;
 }
 
 type Pestana = 'directos' | 'proyectos';
@@ -97,6 +98,7 @@ export function ChatDirectory({
   contactos,
   proyectos: proyectosDelServidor,
   directorio,
+  compactoInicial = false,
 }: ChatDirectoryProps) {
   /**
    * ⚠️ **Las dos listas se mantienen vivas, no se pintan tal cual llegan.**
@@ -129,6 +131,13 @@ export function ChatDirectory({
    */
   const [pestana, setPestana] = useState<Pestana>(abierta?.tipo ?? 'directos');
   const [busqueda, setBusqueda] = useState('');
+  const [compacto, setCompactoState] = useState(compactoInicial);
+
+  function alternarCompacto() {
+    const nuevo = !compacto;
+    setCompactoState(nuevo);
+    document.cookie = `praxis_conversations_compacto=${nuevo ? 'true' : 'false'}; path=/; max-age=31536000; samesite=lax`;
+  }
 
   /**
    * Navegar a una conversación trae su pestaña consigo.
@@ -174,13 +183,34 @@ export function ChatDirectory({
       /* Con una conversación abierta, en móvil la lista **no está**: la
          conversación se lleva la pantalla y volver es el botón de arriba. En
          escritorio conviven, que es donde hay sitio para las dos. */
-      className={`w-full shrink-0 flex-col gap-3 sm:flex sm:w-80 sm:border-r sm:border-border sm:pr-5 ${
-        activo ? 'hidden' : 'flex'
-      }`}
+      className={`group relative shrink-0 flex-col gap-3 transition-all duration-300 sm:flex sm:border-r sm:border-border sm:py-2 ${
+        compacto ? 'sm:w-[72px] sm:pr-2 sm:items-center' : 'sm:w-80 sm:pr-5'
+      } ${activo ? 'hidden' : 'flex w-full'}`}
     >
+      {/* Botón de ocultar/expandir */}
+      <button
+        type="button"
+        onClick={alternarCompacto}
+        aria-label={compacto ? 'Expandir conversaciones' : 'Comprimir conversaciones'}
+        className="absolute -right-3.5 top-[50%] z-10 hidden h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-border opacity-0 shadow-sm transition-all hover:scale-110 group-hover:opacity-100 sm:flex"
+        style={{ background: colors.surfaceElevated }}
+      >
+        <svg
+          className={`h-3.5 w-3.5 transition-transform ${compacto ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
+
       {/* El conmutador. Las dos pestañas llevan su contador de no leídos, que es
           lo que hace que se vea desde la otra que hay algo esperando. */}
-      <div
+      {!compacto && (<div
         className="flex gap-1 rounded-xl p-1"
         style={{ background: alpha(colors.overlay, 18) }}
         role="tablist"
@@ -197,21 +227,21 @@ export function ChatDirectory({
           etiqueta="Proyectos"
           sinLeer={sinLeerProyectos}
         />
-      </div>
+      </div>)}
 
-      <input
+      {!compacto && (<input
         type="search"
         value={busqueda}
         onChange={(evento) => setBusqueda(evento.target.value)}
         placeholder={pestana === 'directos' ? 'Buscar persona…' : 'Buscar proyecto…'}
         aria-label="Buscar"
         className="w-full rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none"
-      />
+      />)}
 
       {pestana === 'directos' ? (
         <div className="flex flex-col gap-4">
           {directosVisibles.length > 0 && (
-            <Grupo titulo="Conversaciones">
+            <Grupo titulo="Conversaciones" compacto={compacto}>
               {directosVisibles.map((conversacion) => (
                 <FilaPersona
                   key={conversacion.channelId}
@@ -227,13 +257,14 @@ export function ChatDirectory({
                       : null
                   }
                   cuando={conversacion.ultimo?.createdAt ?? null}
+                  compacto={compacto}
                 />
               ))}
             </Grupo>
           )}
 
           {directosVisibles.length === 0 && (
-            <Vacio
+            <Vacio compacto={compacto}
               texto={
                 filtro
                   ? 'Nadie coincide con esa búsqueda.'
@@ -245,7 +276,7 @@ export function ChatDirectory({
       ) : (
         <div className="flex flex-col gap-1">
           {proyectosVisibles.length === 0 ? (
-            <Vacio
+            <Vacio compacto={compacto}
               texto={filtro ? 'Ningún proyecto coincide.' : 'Todavía no estás en ningún proyecto.'}
             />
           ) : (
@@ -255,6 +286,7 @@ export function ChatDirectory({
                 chat={chat}
                 autor={chat.ultimo ? nombreDe(chat.ultimo.authorId) : null}
                 activo={activo === chat.project.id}
+                compacto={compacto}
               />
             ))
           )}
@@ -301,18 +333,19 @@ function Solapa({
   );
 }
 
-function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Grupo({ titulo, compacto, children }: { titulo: string; compacto?: boolean; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-1">
-      <h3 className="px-1 font-sans text-[11px] font-semibold uppercase tracking-wide text-text-disabled">
+      {!compacto && <h3 className="px-1 font-sans text-[11px] font-semibold uppercase tracking-wide text-text-disabled">
         {titulo}
-      </h3>
+      </h3>}
       <ul className="flex flex-col gap-0.5">{children}</ul>
     </section>
   );
 }
 
-function Vacio({ texto }: { texto: string }) {
+function Vacio({ texto, compacto }: { texto: string; compacto?: boolean }) {
+  if (compacto) return null;
   return <p className="px-1 py-4 font-sans text-xs text-text-secondary">{texto}</p>;
 }
 
@@ -350,6 +383,7 @@ function FilaPersona({
   muted,
   detalle,
   cuando,
+  compacto,
 }: {
   peerId: string;
   nombre: string;
@@ -360,6 +394,7 @@ function FilaPersona({
   muted: boolean;
   detalle: string | null;
   cuando: string | null;
+  compacto?: boolean;
 }) {
   const presencia = usePresence(peerId, perfil?.presence);
 
@@ -371,7 +406,7 @@ function FilaPersona({
            `/chat/chat/<id>`, que es un 404. */
         href={`/${peerId}`}
         aria-current={activo ? 'page' : undefined}
-        className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
+        className={`flex items-center ${compacto ? 'justify-center' : ''} gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
           activo ? FILA_ACTIVA : ''
         }`}
         style={estiloDeFila(activo)}
@@ -385,7 +420,7 @@ function FilaPersona({
           presence={presencia}
         />
 
-        <span className="flex min-w-0 flex-1 flex-col">
+        {!compacto && (<span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-baseline gap-2">
             <span className="truncate font-sans text-sm text-text-primary">{nombre}</span>
             {cuando && (
@@ -397,9 +432,9 @@ function FilaPersona({
           {detalle && (
             <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
           )}
-        </span>
+        </span>)}
 
-        <Marcas unread={unread} muted={muted} />
+        {!compacto && <Marcas unread={unread} muted={muted} />}
       </Link>
     </li>
   );
@@ -420,7 +455,8 @@ function FilaProyecto({
   chat,
   autor,
   activo,
-}: { chat: ChatDeProyecto; autor: string | null; activo: boolean }) {
+  compacto,
+}: { chat: ChatDeProyecto; autor: string | null; activo: boolean; compacto?: boolean }) {
   const inicial = chat.project.name.trim()[0]?.toUpperCase() ?? '·';
 
   return (
@@ -432,7 +468,7 @@ function FilaProyecto({
     <Link
       href={`/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
-      className={`group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
+      className={`group flex items-center ${compacto ? 'justify-center' : ''} gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
         activo ? FILA_ACTIVA : ''
       }`}
       style={estiloDeFila(activo)}
@@ -447,7 +483,7 @@ function FilaProyecto({
         {inicial}
       </span>
 
-      <span className="flex min-w-0 flex-1 flex-col">
+      {!compacto && (<span className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-baseline gap-2">
           <span className="truncate font-sans text-sm text-text-primary">{chat.project.name}</span>
           {chat.ultimo && (
@@ -461,9 +497,9 @@ function FilaProyecto({
             ? `${autor ?? 'Alguien'}: ${resumenDe(chat.ultimo)}`
             : 'Sin mensajes todavía'}
         </span>
-      </span>
+      </span>)}
 
-      <Marcas unread={chat.unread} muted={chat.muted} />
+      {!compacto && <Marcas unread={chat.unread} muted={chat.muted} />}
 
       <svg
         className="h-3.5 w-3.5 shrink-0 text-text-disabled opacity-0 transition-opacity group-hover:opacity-100"

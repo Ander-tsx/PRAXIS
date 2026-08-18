@@ -58,6 +58,8 @@ export interface ComposerProps {
    * teclea sí molesta.
    */
   permiteMenciones: boolean;
+  hideShortcuts?: boolean;
+  compactButtons?: boolean;
   respuestaSlot?: ReactNode;
   /**
    * El id del mensaje al que se está respondiendo, si hay uno.
@@ -187,6 +189,8 @@ export function Composer({
   etiquetaEnviar,
   ocultarAdjuntos = false,
   autoFoco = false,
+  hideShortcuts = false,
+  compactButtons = false,
 }: ComposerProps) {
   /* `valorInicial` solo se lee al montar: quien edita monta un compositor
      nuevo por mensaje, así que no hay que sincronizar nada después. */
@@ -316,10 +320,18 @@ export function Composer({
        hay nada que enviar. */
     const puedeEnviar = adjuntosPendientes.length > 0 || texto.trim().length > 0;
     if (!puedeEnviar || enviando || subiendo) return;
-    onEnviar(
-      serializeField(trozos).trim(),
-      adjuntosPendientes.map((a) => a.id),
-    );
+    
+    const files = adjuntosPendientes.map((a) => a.id);
+    const text = serializeField(trozos).trim();
+    
+    if (files.length > 1) {
+      onEnviar(text, [files[0]]);
+      for (let i = 1; i < files.length; i++) {
+        onEnviar('', [files[i]]);
+      }
+    } else {
+      onEnviar(text, files);
+    }
     /* Editando no se vacía: si el guardado falla, lo escrito tiene que seguir
        ahí. Quien edita cierra el campo al confirmar, no al enviar. */
     if (editando) return;
@@ -377,9 +389,16 @@ export function Composer({
      campo se vacía para que elegir el mismo archivo dos veces vuelva a
      disparar `onChange`. */
   function alElegirArchivo(evento: React.ChangeEvent<HTMLInputElement>) {
-    const archivo = evento.target.files?.[0];
-    if (!archivo) return;
-    onAdjuntar(archivo);
+    const files = Array.from(evento.target.files || []);
+    if (!files.length) return;
+    
+    let added = 0;
+    for (const file of files) {
+      if (adjuntosPendientes.length + added < CHAT_ATTACHMENT_MAX_PER_MESSAGE) {
+        onAdjuntar(file);
+        added++;
+      }
+    }
     evento.target.value = '';
   }
 
@@ -394,17 +413,23 @@ export function Composer({
    * admite al subir.
    */
   function alPegar(evento: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const items = Array.from(evento.clipboardData.items);
-    const imagen = items.find(
+    const items = Array.from(evento.clipboardData.items).filter(
       (item) =>
         item.kind === 'file' &&
         (CHAT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(item.type),
     );
-    const archivo = imagen?.getAsFile();
-    if (!archivo) return;
-
+    
+    if (items.length === 0) return;
     evento.preventDefault();
-    if (adjuntosPendientes.length < CHAT_ATTACHMENT_MAX_PER_MESSAGE) onAdjuntar(archivo);
+    
+    let added = 0;
+    for (const item of items) {
+      const archivo = item.getAsFile();
+      if (archivo && adjuntosPendientes.length + added < CHAT_ATTACHMENT_MAX_PER_MESSAGE) {
+        onAdjuntar(archivo);
+        added++;
+      }
+    }
   }
 
   return (
@@ -523,7 +548,7 @@ export function Composer({
         )}
 
         <div
-          className="flex items-end gap-2 rounded-xl border border-border p-2 transition-colors focus-within:border-primary"
+          className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
           style={{ background: colors.surfaceElevated }}
         >
           <div className="relative min-w-0 flex-1">
@@ -558,7 +583,7 @@ export function Composer({
               }}
               /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
                  se pinta aparte con `caret-color`, o el campo parecería muerto. */
-              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
+              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-secondary disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
               style={{ caretColor: colors.textPrimary }}
             />
           </div>
@@ -574,7 +599,7 @@ export function Composer({
               }
               aria-label="Adjuntar un archivo"
               title="Adjuntar archivo"
-              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-disabled transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               {subiendo ? (
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -603,7 +628,7 @@ export function Composer({
             <input
               ref={archivoRef}
               type="file"
-              multiple={false}
+              multiple={true}
               /* Las extensiones además de los tipos: el selector de archivos de
                  algunos sistemas no reconoce `text/markdown` y dejaba los `.md`
                  en gris aunque el servidor sí los acepte. */
@@ -618,12 +643,28 @@ export function Composer({
             <button
               type="button"
               onClick={onCancelar}
+              title="Cancelar"
               /* `h-9` como «Guardar»: sin alto propio, el botón se alineaba por
                  su texto y quedaba un par de píxeles más abajo que su vecino en
                  una fila que se alinea por abajo (`items-end`). */
-              className="flex h-9 shrink-0 cursor-pointer items-center rounded-lg px-3 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+              className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg ${
+                compactButtons ? 'w-9 border border-border bg-surface shadow-sm hover:bg-surfaceElevated' : 'px-3 hover:bg-surfaceElevated hover:text-text-primary'
+              } font-sans text-xs text-text-secondary transition-colors`}
             >
-              Cancelar
+              {compactButtons ? (
+                <svg
+                  className="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                'Cancelar'
+              )}
             </button>
           )}
 
@@ -637,15 +678,27 @@ export function Composer({
               (adjuntosPendientes.length === 0 && texto.trim().length === 0)
             }
             aria-label={etiquetaEnviar ?? 'Enviar mensaje'}
+            title={etiquetaEnviar ?? 'Enviar'}
             className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg font-sans text-xs font-semibold transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40 ${
-              etiquetaEnviar ? 'px-3' : 'w-9'
+              etiquetaEnviar && !compactButtons ? 'px-3' : 'w-9'
             }`}
             style={{ background: alpha(colors.primary, 22), color: colors.primary }}
           >
             {enviando ? (
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : etiquetaEnviar ? (
+            ) : etiquetaEnviar && !compactButtons ? (
               etiquetaEnviar
+            ) : etiquetaEnviar && compactButtons ? (
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.5}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
             ) : (
               <svg
                 className="h-4 w-4"
@@ -671,20 +724,31 @@ export function Composer({
          * terminaban a alturas distintas por mucho que midieran igual. El
          * texto completo sigue a la vista en el compositor ancho.
          */}
-        <p className="truncate font-sans text-[11px] text-text-disabled">
-          <kbd className="font-sans">Enter</kbd> envía ·{' '}
-          <kbd className="font-sans">Mayús+Enter</kbd> salta de línea
+        <div className={`flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}>
+          <span className="flex items-center gap-1.5">
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">↵</kbd> enviar
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-0.5">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">⇧</kbd>
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">↵</kbd>
+            </span> nueva línea
+          </span>
           {permiteMenciones && (
-            <>
-              {' · '}
-              <kbd className="font-sans">@</kbd> menciona
-            </>
+            <span className="flex items-center gap-1.5">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1.5 font-sans text-[10px] font-medium shadow-sm">@</kbd> mencionar
+            </span>
           )}
-          {' · '}
-          <kbd className="font-sans">/</kbd> enlaza una tarea
-          {' · '}
-          <kbd className="font-sans">Ctrl+V</kbd> pega una imagen
-        </p>
+          <span className="flex items-center gap-1.5">
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] font-medium shadow-sm">/</kbd> enlazar tarea
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-0.5">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">Ctrl</kbd>
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">V</kbd>
+            </span> pegar imagen
+          </span>
+        </div>
 
         {/* Solo cuando de verdad queda poco: enseñarlo siempre es ruido. */}
         {restantes < 200 && (

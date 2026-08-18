@@ -217,18 +217,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const gruposDeAvisos = inbox ? agruparPorDia(inbox.items) : [];
 
   return (
-    <AppHeader
-      title="Panel"
-      headerSlot={
-        projects.length > 0 ? (
-          <CreateProjectDialog
-            action={createProjectAction}
-            borradorAction={borradorDePlantillaAction}
-            aplicarAction={crearProyectoDesdePlantillaAction}
-          />
-        ) : undefined
-      }
-    >
+    <AppHeader title="Panel">
       <div className="flex flex-col gap-8">
         <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
 

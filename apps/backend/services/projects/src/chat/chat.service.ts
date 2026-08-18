@@ -463,8 +463,12 @@ export class ChatService {
            fuera de aquí. Una respuesta desde el compositor principal fluye
            en su sitio cronológico, como cualquier mensaje. */
         visibleEnChat: true,
-        ...(cursorAt && { createdAt: { lt: cursorAt } }),
-        ...(estado?.hiddenAt && { createdAt: { gt: estado.hiddenAt } }),
+        ...( (cursorAt || estado?.hiddenAt) && {
+          createdAt: {
+            ...(cursorAt && { lt: cursorAt }),
+            ...(estado?.hiddenAt && { gt: estado.hiddenAt }),
+          }
+        }),
       },
       orderBy: { createdAt: 'desc' },
       /* Uno de más: sirve para saber si queda historial por encima sin tener que

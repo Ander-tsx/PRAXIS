@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Directory } from '../../api/directory';
 import type { ChatAttachment, ChatMessage } from '../../api/domain';
 import { colors } from '../../tokens';
@@ -121,18 +121,61 @@ export function ThreadPanel({
      libera sitio que un panel de ancho fijo nunca reclamaba. */
   const plegada = useSidebarPlegada();
 
+  const panelRef = useRef<HTMLDivElement>(null);
+  const arrastrandoRef = useRef(false);
+  const [anchoLibre, setAnchoLibre] = useState<number | null>(null);
+
+  useEffect(() => {
+    function alMover(e: MouseEvent) {
+      if (!arrastrandoRef.current || !panelRef.current) return;
+      const rect = panelRef.current.getBoundingClientRect();
+      const nuevoAncho = rect.right - e.clientX;
+      /* Min 320px (w-80), Max 560px */
+      setAnchoLibre(Math.round(Math.min(560, Math.max(320, nuevoAncho))));
+    }
+    function alSoltar() {
+      if (arrastrandoRef.current) {
+        arrastrandoRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    }
+    document.addEventListener('mousemove', alMover);
+    document.addEventListener('mouseup', alSoltar);
+    return () => {
+      document.removeEventListener('mousemove', alMover);
+      document.removeEventListener('mouseup', alSoltar);
+    };
+  }, []);
+
   return (
     <div
+      ref={panelRef}
       /* `min-h-0`: sin él, este panel es un hijo `flex` cuya altura mínima por
          defecto es la de su contenido —no la fila que lo contiene—, así que
          crece con cada respuesta en vez de quedarse dentro del alto del chat y
          dejar que el scroller de abajo se encargue. Mismo motivo que el `min-h-0`
          del contenedor del chat principal, ver el comentario en `ChatPanel`. */
-      className={`flex min-h-0 w-full flex-col border-l border-border max-md:fixed max-md:inset-0 max-md:z-50 md:shrink-0 ${
-        plegada ? 'md:w-96' : 'md:w-80'
+      className={`relative flex min-h-0 w-full flex-col max-md:fixed max-md:inset-0 max-md:z-50 md:shrink-0 ${
+        anchoLibre === null ? (plegada ? 'md:w-96' : 'md:w-80') : ''
       }`}
-      style={{ background: colors.background }}
+      style={{
+        background: colors.background,
+        ...(anchoLibre !== null ? { width: `${anchoLibre}px` } : {}),
+      }}
     >
+      {/* Resizer visible on desktop */}
+      <div
+        className="group absolute left-0 top-0 bottom-0 w-2 -ml-1 flex justify-center cursor-col-resize z-10 max-md:hidden"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          arrastrandoRef.current = true;
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+        }}
+      >
+        <div className="w-px h-full bg-border transition-colors group-hover:bg-primary/50" />
+      </div>
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <div className="min-w-0">
           <h4 className="font-display text-base text-text-primary">Hilo</h4>
@@ -246,7 +289,7 @@ export function ThreadPanel({
       </div>
 
       {canWrite ? (
-        <div className="shrink-0 border-t border-border p-3">
+        <div className="shrink-0 p-3">
           <Composer
             /* Ver el aviso de la `key` en `ChatPanel`: es lo que rellena el
                campo con el mensaje que se va a editar. */
@@ -270,6 +313,8 @@ export function ThreadPanel({
                   autoFoco: true,
                 }
               : {})}
+            hideShortcuts={true}
+            compactButtons={true}
           />
         </div>
       ) : (

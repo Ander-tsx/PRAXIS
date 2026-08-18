@@ -6,6 +6,7 @@ import {
   resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
+import { cookies } from 'next/headers';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -73,10 +74,13 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
     ...proyectos.map((chat) => chat.ultimo?.authorId),
   ]);
 
+  const cookieStore = await cookies();
+  const compactoCookie = cookieStore.get('praxis_conversations_compacto')?.value === 'true';
+
   return (
     <AppHeader title="Mensajes directos">
       {/**
-       * Alto fijo en función del viewport, y no `flex-1`.
+       * El contenedor que llena el resto de la pantalla.
        *
        * `AppHeader` mete el contenido en un `<main>` con desplazamiento propio y
        * relleno; un `flex-1` aquí dentro no tiene contra qué crecer, así que el
@@ -102,6 +106,7 @@ export default async function ChatLayout({ children }: { children: React.ReactNo
           contactos={contactos}
           proyectos={proyectos}
           directorio={directorio}
+          compactoInicial={compactoCookie}
         />
         <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       </div>
