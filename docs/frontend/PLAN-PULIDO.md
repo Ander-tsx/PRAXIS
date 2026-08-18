@@ -8,9 +8,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ · **E3 ✅ cerrada** |
-| **Última tarea terminada** | E3.6 — el chat vive en `/chat` y su flujo en vivo está fijado por prueba |
-| **Siguiente** | E4.1 — llevar la bandeja de avisos al panel |
+| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · **E6 casi cerrada** (falta E6.5 y E6.6) |
+| **Última tarea terminada** | E6.1 y E6.4 — los dos N+1 que quedaban |
+| **Siguiente** | E6.5 y E6.6 para cerrar E6 · luego E4 · luego E5 |
+| **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -573,43 +574,57 @@ de ESTADO-ACTUAL §17.7.
 
 ---
 
-## E5 — Unificar el idioma del código a inglés
+## E5 — El código en inglés, los comentarios en español
 
-> ⚠️ **Leer esto antes de empezar.** Es la tarea más grande del plan y la de peor
-> relación valor/riesgo si se hace de golpe. El repositorio está en español de
-> forma consistente —identificadores, comentarios, mensajes de commit, los tres
-> documentos de `docs/frontend/` y el propio CLAUDE.md—, así que no es «traducir
-> unas variables»: es un cambio de convención que toca todo.
+> 🔴 **La regla, y no es un punto medio ni una primera fase: es el destino.**
 >
-> **Recomendación:** hacerlo **por lotes y con renombrado mecánico**, nunca a
-> mano y nunca mezclado con otro cambio en el mismo commit. Un renombrado que
-> viaja junto a una corrección hace imposible revisar ninguna de las dos.
+> | Qué | Idioma |
+> |---|---|
+> | Identificadores: variables, funciones, tipos, props, constantes | **Inglés** |
+> | Comentarios y JSDoc | **Español** |
+> | Documentos de `docs/` y CLAUDE.md | **Español** |
+> | Mensajes de commit | **Español** |
+>
+> **Los comentarios no se traducen nunca.** No es una concesión temporal ni algo
+> «a valorar cuando esté hecho lo demás»: es la convención del proyecto. La prosa
+> explicativa de este repositorio —el porqué de cada decisión, las trampas que ya
+> mordieron— es la mitad de su valor, y está escrita en español con cuidado.
+> Traducirla sería reescribirla, y reescribirla es perder el matiz que la hace
+> útil.
+>
+> ⚠️ *(Corrección del 17-08.* Este documento planteaba «tres niveles de alcance
+> por decidir», con los comentarios como nivel 2 opcional. Eso era ambiguo y
+> estaba mal: el objetivo siempre fue el código, y los comentarios se quedan como
+> están. Queda escrito así para que nadie vuelva a abrir esa decisión.)*
 
-> **Medido (17-08), para que la decisión no sea a ojo.** De **1.233
+> **Por qué el código sí.** Un identificador es una interfaz: lo lee quien llama,
+> a menudo sin abrir el cuerpo. Un comentario es una explicación: lo lee quien ya
+> está dentro. Mezclar idiomas en lo primero obliga a traducir mentalmente en
+> cada llamada; en lo segundo no estorba a nadie.
+>
+> **Un ejemplo real, señalado por el usuario (17-08):** `contarSinLeerDeVarios`.
+> Hace falta leer el cuerpo para saber qué cuenta, de qué y para quién. En inglés
+> sería `countUnreadForChannels`, que se entiende sin abrirlo. No es incomodidad
+> estética: es que el nombre no dice lo que hace.
+
+> **Medido (17-08), para que el alcance no sea a ojo.** De **1.233
 > identificadores exportados** en `apps/`, unos **160 tienen raíz española** —el
 > 13%—. No están repartidos: se concentran en lo más nuevo (`realtime/`, el
-> asistente con sus `Propuesta*`, el chat) y el resto del repo ya exporta en
-> inglés. O sea que el nivel 1 —solo identificadores— es un lote acotado y no
-> «tocar todo», que es lo que este documento temía.
+> asistente con sus `Propuesta*`, el chat) y el resto del repositorio ya exporta
+> en inglés. Es un lote acotado, no «tocar todo».
+
+> **Método, y esto sí es innegociable:** por lotes, con renombrado mecánico, y
+> **un commit por lote sin nada más dentro**. Un renombrado que viaja junto a una
+> corrección hace imposible revisar ninguna de las dos — es el riesgo que ya
+> estaba anotado al final de este documento.
 >
-> Lo que sí toca todo es el nivel 3: los comentarios, que son la mitad del valor
-> de este repositorio y están escritos en español con cuidado.
+> ⚠️ **Y el renombrado toca el comentario de al lado.** Si un comentario dice «lo
+> que devuelve `contarSinLeerDeVarios`», ese nombre dentro del texto también
+> cambia. Sigue siendo un comentario en español: lo que cambia es el
+> identificador que cita, no la prosa.
 
-> **Un ejemplo real, señalado por el usuario (17-08):** `contarSinLeerDeVarios`.
-> Hace falta leer el cuerpo para saber qué cuenta, de qué y para quién. En
-> inglés sería `countUnreadForChannels`, que se entiende sin abrirlo. Es la
-> clase de nombre que justifica esta etapa: no es incomodidad estética, es que
-> el nombre no dice lo que hace.
-
-- [ ] **E5.0 — Decidir el alcance.** Tres niveles, de menor a mayor coste:
-      1. **Identificadores** (variables, funciones, tipos, props). Es lo que de
-         verdad se lee como «código en dos idiomas».
-      2. **+ comentarios.** Los de este repositorio son prosa larga y explicativa;
-         traducirlos es reescribirlos, con riesgo real de perder el matiz que los
-         hace útiles.
-      3. **+ documentos y commits.** Alcance máximo.
-      *Decisión:* _(pendiente — mi recomendación es empezar por 1 y valorar 2
-      cuando esté hecho)_
+- [x] **E5.0 — Alcance decidido.** Identificadores a inglés; comentarios,
+      documentos y commits en español. Ver la tabla de arriba.
 
 - [ ] **E5.1 — Glosario.** Un mapa cerrado antes de tocar nada, para que no
       salgan tres traducciones del mismo término:
@@ -625,8 +640,10 @@ de ESTADO-ACTUAL §17.7.
 - [ ] **E5.5 — Lote 4: `apps/backend/services/projects/src/{chat,realtime}/`.**
 - [ ] **E5.6 — Lote 5: gateway (`presence`, `notifications`).**
 - [ ] **E5.7 — El resto**, zona por zona.
-- [ ] **E5.8 — Actualizar CLAUDE.md** con la convención nueva, o el documento
-      seguirá diciendo lo contrario de lo que hace el código.
+- [ ] **E5.8 — Escribir la convención en CLAUDE.md**, en la sección de reglas
+      del frontend: **identificadores en inglés, comentarios en español**. Sin
+      esto, la mitad en inglés parece un descuido en vez de una regla, y el
+      primero que llegue «arreglará» un nombre traduciéndolo al español.
 
 ---
 
@@ -884,6 +901,7 @@ de ESTADO-ACTUAL §17.7.
 |---|---|
 | E3 rompe enlaces del chat en silencio | E1 primero; `rg 'dashboard/chat'` a cero; redirección de cortesía |
 | E5 mezcla renombrado con corrección | Lotes; un commit por lote; nada más en ese commit |
+| Alguien traduce los comentarios «por coherencia» | La regla está en E5 y va a CLAUDE.md (E5.8): el código en inglés, la prosa en español, **a propósito** |
 | E2.1 reinicia Cloud SQL | Ventana acordada; avisar antes |
 | Las fases 1-4 siguen sin cobertura | Es exactamente E1, y por eso va primero |
 
