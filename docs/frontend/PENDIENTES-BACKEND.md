@@ -791,6 +791,56 @@ estructurado alrededor de un proveedor. `projects-service` tiene un
 el `.env` de ese servicio. El proveedor `gcs` usa `@google-cloud/storage` y
 espera `GCS_PROJECT_ID` y `GCS_BUCKET`.
 
+### Lo que faltaba para poder activarlo, y ya está (17-08)
+
+Cambiar `STORAGE_DRIVER` decide **dónde se guarda lo nuevo, no dónde está lo
+viejo**. Ponerlo en `gcs` sin más dejaría cada adjunto ya subido en una tabla
+que nadie vuelve a consultar: la fila de metadatos sigue ahí, el chat sigue
+enseñando el archivo en la lista, y al pulsarlo no hay nada. **Un 404 por cada
+adjunto anterior al cambio, sin un solo error en el servidor.**
+
+1. 🔴 **El proveedor de GCS ignoraba el `mimeType`.** La interfaz lo declara
+   —`put(key, data, mimeType)`— y `ChatAttachmentsService` lo envía, pero
+   `GcsBlobStorage` lo descartaba y guardaba **todo** como
+   `application/octet-stream`. El de Postgres puede permitírselo porque el tipo
+   vive en la fila de metadatos; en un bucket el objeto es lo único que hay, así
+   que perderlo rompe el servido directo y el CORS. Arreglado.
+
+   ⚠️ Este proveedor **está escrito y nunca se ha ejecutado contra un bucket
+   real**. Conviene revisarlo entero al conectarlo, no solo esto.
+
+2. ✅ **Hay script de migración**: `src/scripts/migrar-blobs.ts`, que se compila
+   a `dist/scripts/migrar-blobs.js`. Copia cada blob al bucket con la clave del
+   proveedor (`chat/<attachmentId>`) y **no borra nada** — el borrado va aparte
+   con `--borrar-origen`, y solo cuando alguien haya comprobado que el bucket
+   sirve. Un script que mueve y borra a la vez no deja forma de volver atrás si
+   el bucket estaba mal configurado.
+
+   Es idempotente (`save` sobrescribe), va por lotes de 20 —un adjunto pesa
+   hasta 25 MB y traerlos todos a memoria es lo único que puede tumbarlo— y se
+   puede interrumpir y relanzar.
+
+**El orden para activarlo, que importa:**
+
+```
+1. GCS_PROJECT_ID y GCS_BUCKET en el .env de projects-service
+2. migrar-blobs.js            ← con STORAGE_DRIVER todavía en `postgres`
+3. comprobar que el bucket sirve los archivos
+4. STORAGE_DRIVER=gcs         ← ahora sí
+5. migrar-blobs.js --borrar-origen
+```
+
+Migrar **antes** de cambiar el driver es lo que permite hacerlo sin ventana de
+indisponibilidad: mientras se copia, todo se sigue sirviendo desde Postgres.
+
+⚠️ Cloud SQL no tiene IP pública, así que el script se ejecuta **desde dentro de
+la VPC**, igual que `migrar.sh`:
+
+```
+gcloud compute ssh <vm-backend> --tunnel-through-iap --zone <zona> \
+  --command "sudo docker exec praxis-backend node dist/scripts/migrar-blobs.js"
+```
+
 **Qué falta por el lado del backend** (si se quiere conectar):
 
 - Crear el bucket y decidir la política de acceso (las URLs de los objetos

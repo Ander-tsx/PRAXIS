@@ -61,11 +61,23 @@ export class GcsBlobStorage implements BlobStorage {
     return `chat/${key}`;
   }
 
-  async put(key: string, data: Buffer): Promise<void> {
+  async put(key: string, data: Buffer, mimeType: string): Promise<void> {
     await this.bucket.file(this.claveEnBucket(key)).save(data, {
-      // El tipo del contenido lo usa GCS para servir el objeto y para el CORS;
-      // el `Content-Disposition` real lo pone el gateway al descargar.
-      contentType: 'application/octet-stream',
+      /**
+       * ⚠️ **El tipo real, no `application/octet-stream`.**
+       *
+       * Esto ignoraba el `mimeType` que le pasa quien llama —la interfaz lo
+       * declara y `ChatAttachmentsService` lo envía— y guardaba **todo** como
+       * flujo de bytes. El proveedor de Postgres puede permitírselo porque el
+       * tipo vive en la fila de metadatos; aquí el objeto es lo único que hay,
+       * así que perderlo significa que el bucket no sabe qué contiene: se rompe
+       * el servido directo y el CORS, y una imagen deja de poder mostrarse sin
+       * pasar por el gateway.
+       *
+       * Es la clase de fallo que este proveedor podía tener escondido: está
+       * escrito y **nunca se ha ejecutado contra un bucket real**.
+       */
+      contentType: mimeType || 'application/octet-stream',
       // Sobrescribe si ya existe: un reintento no debe duplicar ni fallar.
       resumable: false,
     });

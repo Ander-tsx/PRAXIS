@@ -80,8 +80,17 @@ y el arranque conmuta `storage_driver` entre `gcs` y `postgres`
 (`infra/terraform/plantillas/arranque-backend.yaml`). El bucket se crea siempre
 (`storage.tf`).
 
-Qué falta: comprobar que el driver de GCS está completo, migrar lo que haya
-guardado, y encenderlo. Documentado como **punto 18 de PENDIENTES-BACKEND**.
+✅ **Avanzado el 17-08.** Se arregló que el proveedor de GCS **ignoraba el
+`mimeType`** —guardaba todo como `application/octet-stream`, lo que rompe el
+servido directo y el CORS— y se escribió el script de migración que faltaba
+(`src/scripts/migrar-blobs.ts`), sin el cual cambiar el driver dejaría cada
+adjunto ya subido en un 404 silencioso.
+
+Qué queda: **ejecutarlo contra un bucket real**. Este proveedor está escrito y
+**nunca se ha ejecutado contra GCS de verdad**, así que hay que revisarlo entero
+al conectarlo, no solo lo ya corregido. El orden exacto de activación —migrar
+primero, cambiar el driver después— está en el **punto 18 de
+PENDIENTES-BACKEND**.
 
 Es el corte que **más beneficio da por menos riesgo**: separa el dato que peor
 encaja en una base transaccional sin tocar ninguna frontera de servicio.
