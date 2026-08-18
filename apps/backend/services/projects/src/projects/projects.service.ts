@@ -33,6 +33,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canDeleteTask: true,
   canManageMembers: true,
   canManageRoles: true,
+  canManageAutomations: true,
+  canManageIntegrations: true,
   canComment: true,
   canManageLabels: true,
   canDeleteProject: true,

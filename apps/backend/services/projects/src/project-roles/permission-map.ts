@@ -50,7 +50,12 @@ export const PERMISSION_HIERARCHY: Record<string, string[]> = {
     'canEditProject',
     'canViewReports',
   ],
-  // Roles y miembros no tienen jerarquía adicional
+  // Quien puede repartir permisos puede administrar las dos capacidades que
+  // dependen de ellos. Los roles administrativos existentes ya tienen
+  // canManageRoles, por lo que obtienen esta ampliación al leerlos sin migrar
+  // por nombre los JSON históricos.
+  canManageRoles: ['canManageAutomations', 'canManageIntegrations'],
+  // Miembros no tiene jerarquía adicional.
 };
 
 /**

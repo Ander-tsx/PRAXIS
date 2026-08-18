@@ -420,7 +420,8 @@ no hay membresía y por tanto no hay permisos — no basta con estar invitado.
   canCreateBoard?, canEditBoard?, canDeleteBoard?,
   canCreateColumn?, canEditColumn?, canDeleteColumn?,
   canManageLabels?, canManageMembers?, canManageRoles?,
-  canEditProject?, canDeleteProject?
+  canManageAutomations?, canManageIntegrations?,
+  canEditProject?, canViewReports?, canDeleteProject?
 }
 ```
 
@@ -429,26 +430,23 @@ no hay membresía y por tanto no hay permisos — no basta con estar invitado.
 > único consumidor. `reorder` sigue pidiendo `canCreateColumn`
 > (PENDIENTES-BACKEND §8).
 
-### 🔴 Un array se acepta con 201 y no concede NADA
+### 🔴 `permissions` debe ser un diccionario de booleanos
 
-`permissions` **tiene que ser el objeto de booleanos**. Si mandas un array, el
-gateway responde `201` con un cuerpo de aspecto normal y el rol queda creado —
-pero vacío. El guard evalúa `permisos[clave]`, y sobre un array eso es
-`undefined`.
+`permissions` **tiene que ser el objeto de booleanos**. El gateway rechaza un
+array, claves desconocidas o valores no booleanos con `400`. Los roles creados
+antes de esa validación que conservan un array se normalizan al leer para no
+dejarles permisos vacíos en silencio.
 
 ```ts
-// ❌ 201, y quien tenga este rol no podrá hacer nada
+// ❌ 400
 { name: 'Colaborador', permissions: ['canEditBoard'] }
 
 // ✅
 { name: 'Colaborador', permissions: { canEditBoard: true } }
 ```
 
-Verificado con dos cuentas: el mismo miembro obtiene **403** con el rol guardado
-como array y **200** con el mismo permiso como diccionario.
-
-Tampoco se validan las claves: `{ canHackearTodo: true }` devuelve 201. Valida
-tú contra la lista de arriba antes de enviar. Ver PENDIENTES-BACKEND §11.
+Valida también en el cliente contra la lista de arriba para señalar el campo
+antes de que el gateway responda.
 
 ### Jerarquía implícita — refléjala en la interfaz
 
@@ -464,13 +462,12 @@ Al evaluar, el backend expande los permisos hacia abajo
 | `canDeleteTask` | `canEditTask`, `canMoveTask`, `canComment`, `canCreateTask` |
 | `canEditTask` | `canMoveTask`, `canComment`, `canCreateTask` |
 | `canDeleteProject` | `canDeleteBoard`, `canEditBoard`, `canCreateBoard`, `canEditProject` |
+| `canManageRoles` | `canManageAutomations`, `canManageIntegrations` |
 
-`canManageMembers` y `canManageRoles` no arrastran nada.
+`canManageMembers` no arrastra permisos adicionales.
 
-⚠️ **`expandPermissions` recorre la tabla una sola vez**, así que la expansión no
-es transitiva por sí sola: hoy sale bien porque el orden de inserción va de mayor
-a menor alcance. Por eso `canEditProject` está escrito en las **tres** entradas
-que deben concederlo, aunque quede repetido.
+`expandPermissions` itera hasta un punto fijo, por lo que las implicaciones son
+transitivas y no dependen del orden de la tabla.
 
 No hace falta guardar los implicados: el backend los deduce al comprobar. Pero
 el formulario de roles **debe enseñarlo** —marcar "eliminar" implica "editar" y

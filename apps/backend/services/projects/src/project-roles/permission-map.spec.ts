@@ -75,6 +75,34 @@ describe('jerarquía de permisos de proyecto', () => {
   });
 
   describe('la implicación es transitiva', () => {
+    it('gestionar roles concede administrar automatizaciones e integraciones', () => {
+      const expandido = expandPermissions({ canManageRoles: true });
+
+      expect(expandido.canManageAutomations).toBe(true);
+      expect(expandido.canManageIntegrations).toBe(true);
+    });
+
+    it('un colaborador con un permiso ordinario no recibe automatizaciones ni integraciones', () => {
+      const expandido = expandPermissions({ canComment: true });
+
+      expect(expandido.canManageAutomations).toBeFalsy();
+      expect(expandido.canManageIntegrations).toBeFalsy();
+    });
+
+    it('gestionar automatizaciones no concede gestionar integraciones', () => {
+      const expandido = expandPermissions({ canManageAutomations: true });
+
+      expect(expandido.canManageAutomations).toBe(true);
+      expect(expandido.canManageIntegrations).toBeFalsy();
+    });
+
+    it('gestionar integraciones no concede gestionar automatizaciones', () => {
+      const expandido = expandPermissions({ canManageIntegrations: true });
+
+      expect(expandido.canManageIntegrations).toBe(true);
+      expect(expandido.canManageAutomations).toBeFalsy();
+    });
+
     it('borrar un tablero llega hasta ver los reportes, saltando dos reglas', () => {
       /**
        * La cadena entera: `canDeleteBoard` → `canEditProject` → `canViewReports`.

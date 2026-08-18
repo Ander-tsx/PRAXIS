@@ -28,6 +28,8 @@ export const PERMISSION_GROUPS: { title: string; permissions: ProjectPermission[
     permissions: [
       'canManageMembers',
       'canManageRoles',
+      'canManageAutomations',
+      'canManageIntegrations',
       'canViewReports',
       'canEditProject',
       'canDeleteProject',

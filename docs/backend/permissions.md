@@ -73,7 +73,9 @@ A cada rol se le asignan permisos concretos:
 | `canDeleteColumn` | Puede eliminar columnas |
 | `canManageLabels` | Crear, renombrar y borrar las etiquetas del proyecto |
 | `canManageMembers` | Puede agregar o quitar personas del proyecto |
-| `canManageRoles` | Puede crear roles y modificar sus permisos |
+| `canManageRoles` | Puede crear roles y modificar sus permisos; implica administrar automatizaciones e integraciones |
+| `canManageAutomations` | Puede crear, editar, habilitar, deshabilitar y eliminar reglas de automatización |
+| `canManageIntegrations` | Puede conectar, reconectar y desconectar integraciones externas del proyecto |
 | `canEditProject` | Cambiar el nombre y la descripción del proyecto |
 | `canViewReports` | Ver los informes **y preguntarle al asistente** sobre el proyecto |
 | `canDeleteProject` | Eliminar el proyecto entero |
