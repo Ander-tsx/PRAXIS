@@ -68,6 +68,25 @@ export function TaskAlerts({ overdue, soon, projectsById, soonDays }: TaskAlerts
   );
 }
 
+/**
+ * Cuántas filas se ven sin desplazar.
+ *
+ * ⚠️ **Y por qué hay scroll dentro en vez de recortar la lista.** Recortar a
+ * cinco y poner un «ver todas» mandaría a otra pantalla a por lo que ya se ha
+ * pedido: estas tareas **ya están aquí**, cargadas y resueltas. Y no recortar
+ * nada convertía el bloque en una columna de treinta filas que empujaba el resto
+ * del panel fuera de la pantalla — con doce vencidas, los proyectos quedaban a
+ * un scroll de distancia.
+ *
+ * Cinco es lo que cabe sin que el bloque deje de leerse como un aviso y empiece
+ * a leerse como una lista.
+ */
+const FILAS_A_LA_VISTA = 5;
+
+/** La altura de una fila más su hueco, para calcular el tope del contenedor. */
+const ALTO_DE_FILA = 44;
+const HUECO = 6;
+
 function TaskRows({
   tasks,
   tone,
@@ -77,8 +96,21 @@ function TaskRows({
   tone: string;
   projectsById: Map<string, Project>;
 }) {
+  const desborda = tasks.length > FILAS_A_LA_VISTA;
+
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul
+      className={`flex flex-col gap-1.5 ${desborda ? 'scrollbar-slim overflow-y-auto pr-1' : ''}`}
+      /* El tope se calcula, no se pone a ojo: cinco filas y sus cuatro huecos,
+         más medio renglón para que la sexta asome. Que asome es la mitad del
+         gesto — un contenedor que corta justo en el borde de la quinta no se
+         distingue de una lista que se acaba ahí. */
+      style={
+        desborda
+          ? { maxHeight: FILAS_A_LA_VISTA * ALTO_DE_FILA + (FILAS_A_LA_VISTA - 1) * HUECO + 18 }
+          : undefined
+      }
+    >
       {tasks.map((task) => {
         const project = projectsById.get(task.projectId);
         const { done, total } = checklistProgress(task);
@@ -121,14 +153,8 @@ function TaskRows({
                 </span>
               )}
 
-              <span className="flex shrink-0 items-center gap-1 font-sans text-xs text-text-disabled">
+              <span className="shrink-0 font-sans text-xs text-text-disabled">
                 {project?.name ?? 'Proyecto'}
-                <span
-                  aria-hidden="true"
-                  className="opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  →
-                </span>
               </span>
             </a>
           </li>

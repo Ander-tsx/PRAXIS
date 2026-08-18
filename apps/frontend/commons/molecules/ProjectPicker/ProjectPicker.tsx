@@ -10,14 +10,26 @@ export interface ProjectPickerProps {
   /** El proyecto abierto. **El UUID resuelto, no el parámetro de la ruta.** */
   activeId: string;
   /**
-   * La ruta a la que lleva elegir un proyecto, **relativa a la zona**.
+   * `project.id` → la ruta a la que lleva elegirlo, **relativa a la zona**.
    *
-   * ⚠️ Sin el basePath: Next lo añade solo al navegar con `router.push`, y
-   * escribirlo aquí daría `/reports/reports/…`. La construye quien usa el
-   * selector porque cada zona tiene la suya —`reportPath` en Análisis, una query
-   * en la del asistente— y ninguna de las dos vale en la otra. Ver §16.
+   * ⚠️ **Es un diccionario y no una función `(project) => string`, y la
+   * diferencia no es de estilo.** Esto es un componente de cliente, y quien lo
+   * monta en Análisis es un Server Component: pasarle una función revienta con
+   * *«Functions cannot be passed directly to Client Components»*, porque no hay
+   * forma de serializar una función en la frontera servidor→cliente. Un objeto
+   * de cadenas sí viaja.
+   *
+   * Costó encontrarlo porque **el HTML se sirve igual**: el 200 llega, la página
+   * se pinta, y el fallo salta después al hidratar — o sea que la pantalla
+   * aparece un instante y la sustituye el `error.tsx` con «no pudimos cargar
+   * esta página», que no dice nada de funciones ni de fronteras.
+   *
+   * ⚠️ Y las rutas van **sin el basePath**: Next lo añade solo al navegar con
+   * `router.push`, y escribirlo aquí daría `/reports/reports/…`. Las construye
+   * quien usa el selector porque cada zona tiene la suya —una ruta en Análisis,
+   * una query en la del asistente— y ninguna vale en la otra. Ver §16.
    */
-  pathDe: (project: Project) => string;
+  paths: Record<string, string>;
   /** El rótulo de encima del nombre. Por defecto, «Proyecto». */
   label?: string;
   /** Qué se dice cuando no hay ninguno elegido. */
@@ -49,7 +61,7 @@ export interface ProjectPickerProps {
 export function ProjectPicker({
   projects,
   activeId,
-  pathDe,
+  paths,
   label = 'Proyecto',
   placeholder = 'Elige un proyecto',
   vacio = 'Todavía no estás en ningún proyecto.',
@@ -80,10 +92,15 @@ export function ProjectPicker({
   }, [open]);
 
   function select(project: Project) {
+    const destino = paths[project.id];
+    /* Un proyecto sin ruta no debería estar en la lista, pero si pasa es mejor
+       no hacer nada que navegar a `undefined`. */
+    if (!destino) return;
+
     setOpen(false);
     /* `push` y no `replace` para que el botón atrás devuelva al proyecto
        anterior, que es lo que se espera al estar comparando dos. */
-    router.push(pathDe(project));
+    router.push(destino);
   }
 
   return (

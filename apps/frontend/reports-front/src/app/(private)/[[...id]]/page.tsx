@@ -386,12 +386,17 @@ export default async function ReportsPage({ params }: PageProps) {
           {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
               de los proyectos es el activo, y comparando contra el slug de la
               URL no encontraba ninguno. */}
+          {/* ⚠️ Un **diccionario**, no la función `reportPath`. Esta page es un
+              Server Component y el selector es de cliente: una función no cruza
+              esa frontera, y el síntoma no es un error de compilación sino la
+              pantalla de «no pudimos cargar esta página» **después** de que la
+              página ya se haya pintado. Ver `ProjectPicker`. */}
           <ProjectPicker
             projects={proyectos.items}
             activeId={projectId}
-            /* Ruta de esta zona y **sin** el basePath: Next añade `/reports`.
-               El slug va en la URL y el UUID en la API. Ver §16 y `routes.ts`. */
-            pathDe={reportPath}
+            paths={Object.fromEntries(
+              proyectos.items.map((proyecto) => [proyecto.id, reportPath(proyecto)]),
+            )}
             vacio="No tienes ningún proyecto con análisis abierto."
           />
         </div>

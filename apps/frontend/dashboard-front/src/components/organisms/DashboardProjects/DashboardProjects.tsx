@@ -65,7 +65,7 @@ export function DashboardProjects({
           href="/projects"
           className="font-sans text-sm text-primary underline-offset-2 transition-colors hover:underline"
         >
-          {restantes > 0 ? `Ver los ${total}` : 'Ver todos'} →
+          {restantes > 0 ? `Ver los ${total}` : 'Ver todos'}
         </a>
       </div>
 

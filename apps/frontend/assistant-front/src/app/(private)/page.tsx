@@ -8,13 +8,22 @@ import {
   type Paginated,
   type Project,
   type ProjectMember,
+  displayName,
   personName,
   resolveProfiles,
 } from '@praxis/commons';
-import { createServerApiClient } from '@praxis/commons/auth';
+import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: PRAX_NAME };
+/**
+ * ⚠️ **La pestaña dice «Asistente», no «PRAX».**
+ *
+ * El nombre propio funciona dentro de la aplicación, donde ya hay contexto y una
+ * cara al lado. En la pestaña del navegador —entre otras quince— «PRAX | Praxis»
+ * no dice de qué va, y quien lo lea sin haber entrado nunca no puede saberlo.
+ * Dentro de la pantalla PRAX sigue llamándose PRAX.
+ */
+export const metadata: Metadata = { title: 'Asistente' };
 
 interface PageProps {
   searchParams: Promise<{ p?: string }>;
@@ -59,6 +68,12 @@ export default async function AssistantPage({ searchParams }: PageProps) {
   const { p } = await searchParams;
   const api = createServerApiClient();
 
+  /* Solo para el saludo. Va con la lista en paralelo: no decide nada, así que
+     no puede hacer esperar a lo que sí. */
+  const perfilPromesa = loadCurrentUser()
+    .then((usuario) => displayName(usuario.profile))
+    .catch(() => '');
+
   /**
    * ⚠️ **No se atrapa el fallo, y es a propósito.**
    *
@@ -80,9 +95,9 @@ export default async function AssistantPage({ searchParams }: PageProps) {
 
   if (!activo) {
     return (
-      <AppHeader title={PRAX_NAME}>
+      <AppHeader title="Asistente">
         <div className="flex flex-col gap-6">
-          <PraxHero />
+          <PraxHero nombre={await perfilPromesa} />
           <SinProyectos />
         </div>
       </AppHeader>
@@ -125,9 +140,9 @@ export default async function AssistantPage({ searchParams }: PageProps) {
   );
 
   return (
-    <AppHeader title={PRAX_NAME}>
+    <AppHeader title="Asistente">
       <div className="flex flex-col gap-6">
-        <PraxHero />
+        <PraxHero nombre={await perfilPromesa} proyecto={activo.name} />
 
         <PraxScreen
           projectId={projectId}

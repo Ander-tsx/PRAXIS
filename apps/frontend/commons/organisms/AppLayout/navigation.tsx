@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PraxAvatar } from '../../atoms/PraxAvatar';
 
 /**
  * Un enlace de la barra lateral del área privada.
@@ -111,24 +112,21 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * mira un gráfico y tiene una duda ahí mismo. Las dos pantallas montan el
      * mismo organismo (`commons/organisms/AssistantChat`).
      */
-    label: 'PRAX',
+    label: 'Asistente',
     href: '/assistant',
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        {/* Un bocadillo con una chispa: conversación, y algo que no es una
-            persona. El mismo par de ideas que la cara del avatar. */}
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M20 11.5c0 3.9-3.6 7-8 7-.9 0-1.8-.1-2.6-.4L5 19.5l1.2-3.1A6.6 6.6 0 014 11.5c0-3.9 3.6-7 8-7s8 3.1 8 7z"
-        />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 8.2l.85 1.95L14.8 11l-1.95.85L12 13.8l-.85-1.95L9.2 11l1.95-.85z"
-        />
-      </svg>
-    ),
+    /**
+     * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
+     * miniatura. Un bocadillo con una chispa —que es lo que había— decía
+     * «conversación con una IA», o sea lo mismo que dicen ya otras cincuenta
+     * aplicaciones. La cara dice **quién**, que es lo que hace que se reconozca
+     * de un vistazo entre siete entradas que por lo demás son líneas grises.
+     *
+     * `quieto` porque aquí es un icono y no un personaje: algo parpadeando al
+     * lado de «Proyectos» y «Mensajes» pide una atención que no le corresponde.
+     * Los gestos se los queda su propia pantalla y el panel de Análisis, donde sí
+     * son la señal de que está trabajando.
+     */
+    icon: <PraxAvatar size="xs" quieto />,
   },
   {
     /**

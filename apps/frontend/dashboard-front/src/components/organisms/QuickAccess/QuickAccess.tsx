@@ -165,13 +165,6 @@ function Acceso({
         <span className="truncate font-sans text-sm font-semibold text-text-primary">{label}</span>
         <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
       </span>
-
-      <span
-        aria-hidden="true"
-        className="shrink-0 font-sans text-text-disabled opacity-0 transition-opacity group-hover:opacity-100"
-      >
-        →
-      </span>
     </>
   );
 

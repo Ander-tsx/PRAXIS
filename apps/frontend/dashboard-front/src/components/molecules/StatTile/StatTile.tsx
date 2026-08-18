@@ -94,14 +94,12 @@ export function StatTile({
         {display ?? value}
       </span>
 
-      <span className="flex items-center gap-1 font-sans text-xs text-text-disabled">
-        {hint}
-        {/* La flecha solo al apuntar: en reposo, cuatro flechas en fila son
-            cuatro veces el mismo aviso de que esto se puede pulsar. */}
-        <span aria-hidden="true" className="opacity-0 transition-opacity group-hover:opacity-100">
-          →
-        </span>
-      </span>
+      {/* ⚠️ **Sin flecha de «esto se pulsa».** La llevó y se quitó: cuatro
+          mosaicos en fila con su flechita cada uno son cuatro veces el mismo
+          aviso, y una flecha de texto sobre una tarjeta se lee como un carácter
+          suelto, no como un icono. Que se puede pulsar ya lo dicen el cursor, el
+          realce del borde y el pequeño levantamiento al apuntar. */}
+      <span className="font-sans text-xs text-text-disabled">{hint}</span>
     </>
   );
 

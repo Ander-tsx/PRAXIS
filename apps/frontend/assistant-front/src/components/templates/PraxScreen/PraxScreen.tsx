@@ -42,16 +42,28 @@ export function PraxScreen({
   etiquetas,
 }: PraxScreenProps) {
   return (
-    <div className="flex flex-col gap-5">
-      <ProjectPicker
-        projects={proyectos}
-        activeId={projectId}
-        label="Hablando de"
-        /* Ruta de esta zona y **sin** el basePath: Next añade `/assistant`. El
-           slug en la URL, que es lo que se lee y se comparte. Ver §16. */
-        pathDe={(proyecto) => `/?p=${encodeURIComponent(proyecto.slug)}`}
-        vacio="No tienes ningún proyecto con análisis abierto."
-      />
+    <div className="flex flex-col gap-4">
+      {/**
+       * El selector, solo cuando hay entre qué elegir.
+       *
+       * Con un único proyecto era un desplegable de una sola opción: una fila
+       * entera de la pantalla para no ofrecer ninguna decisión, y el proyecto ya
+       * lo nombra la portada de arriba.
+       */}
+      {proyectos.length > 1 && (
+        <ProjectPicker
+          projects={proyectos}
+          activeId={projectId}
+          label="Hablando de"
+          /* Rutas de esta zona y **sin** el basePath: Next añade `/assistant`.
+             El slug en la URL, que es lo que se lee y se comparte. Ver §16.
+             Un diccionario y no una función: ver la nota de `ProjectPicker`. */
+          paths={Object.fromEntries(
+            proyectos.map((proyecto) => [proyecto.id, `/?p=${encodeURIComponent(proyecto.slug)}`]),
+          )}
+          vacio="No tienes ningún proyecto con análisis abierto."
+        />
+      )}
 
       <AssistantChat
         key={projectId}

@@ -59,7 +59,20 @@ export function AppHeader({ title, headerSlot, children }: AppHeaderProps) {
         {headerSlot && <div className="flex shrink-0 items-center gap-3">{headerSlot}</div>}
       </header>
 
-      <main className="relative flex-1 overflow-y-auto bg-background">
+      {/**
+       * ⚠️ **El scroll suave va aquí y no en `html`.**
+       *
+       * `theme.css` declara `scroll-behavior: smooth` sobre `html`, y no servía
+       * de nada para las anclas de una pantalla: quien desplaza **es este
+       * `<main>`**, porque lleva el `overflow-y-auto`. Un `#ancla` dentro de él
+       * lo resuelve el contenedor, no el documento, así que el salto era seco
+       * por mucho que el documento dijera lo contrario.
+       *
+       * `motion-safe:` porque un desplazamiento animado es justo lo que molesta
+       * a quien pide menos movimiento — y ahí el salto instantáneo es correcto,
+       * no un defecto.
+       */}
+      <main className="relative flex-1 overflow-y-auto bg-background motion-safe:scroll-smooth">
         <div
           className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`}
         >
