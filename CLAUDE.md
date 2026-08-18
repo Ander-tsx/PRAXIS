@@ -10,7 +10,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/ESTADO-ACTUAL.md](docs/frontend/ESTADO-ACTUAL.md) | Arquitectura, estado de cada microfrontend, deuda técnica priorizada, roadmap |
 | [docs/frontend/CONTRATO-API.md](docs/frontend/CONTRATO-API.md) | **Antes de escribir cualquier fetch.** Rutas, DTOs, permisos, trampas |
 | [docs/frontend/PENDIENTES-BACKEND.md](docs/frontend/PENDIENTES-BACKEND.md) | Lo que necesitamos del backend y no podemos resolver. Para pasárselo a ese equipo |
-| [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | **Etapa de pulido en curso.** Estado, tareas y orden. Se lee al retomar y se marca al terminar cada una |
+| [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | Etapa de pulido. Cerrada; se conserva por el registro de qué se arregló y por qué |
+| [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | **Etapa de rediseño en curso** — Panel, Administración, Asistente y Análisis. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
