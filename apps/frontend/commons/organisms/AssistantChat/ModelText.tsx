@@ -169,14 +169,18 @@ function enBloques(texto: string): ReactNode[] {
     const vineta = /^\s*[-*+]\s+(.*)$/.exec(linea);
     const numerada = /^\s*\d+[.)]\s+(.*)$/.exec(linea);
 
-    if (vineta || numerada) {
+    /* El texto del ítem, sin la viñeta. Se saca aquí y no dentro del `if` para
+       no tener que afirmar con un `!` que una de las dos coincidencias existe:
+       el compilador ya lo sabe si se estrecha sobre esta constante. */
+    const item = vineta?.[1] ?? numerada?.[1];
+    if (item !== undefined) {
       cerrarParrafo();
       const ordenada = Boolean(numerada);
       /* Cambiar de tipo de lista cierra la anterior: `- uno` seguido de `1. dos`
          son dos listas, no una con dos formas de viñeta. */
       if (lista && lista.ordenada !== ordenada) cerrarLista();
       if (!lista) lista = { ordenada, items: [] };
-      lista.items.push((vineta ?? numerada)![1]);
+      lista.items.push(item);
       continue;
     }
 

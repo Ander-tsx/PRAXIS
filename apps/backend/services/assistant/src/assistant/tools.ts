@@ -518,6 +518,80 @@ const PROPONER_BORRADO: FunctionDeclaration = {
 };
 
 /**
+ * Preguntar de vuelta, con opciones que se pulsan.
+ *
+ * ## ⚠️ Es la única herramienta que no propone ningún cambio
+ *
+ * Las otras diez preparan algo que la persona acepta o descarta. Esta no toca
+ * nada: **es una pregunta**. Y sin embargo es una herramienta y no texto libre,
+ * por un motivo concreto — cuando el modelo pregunta escribiendo («¿te refieres
+ * a la del tablero de Diseño o a la de Backend?»), la respuesta hay que
+ * teclearla, y teclear una desambiguación que el modelo ya tiene enumerada es
+ * trabajo que sobra. Con esto, responder es un clic.
+ *
+ * Lo que gana no es comodidad: es **precisión**. Una respuesta elegida de una
+ * lista no se puede escribir mal, así que el turno siguiente no vuelve a
+ * empezar por «no te he entendido».
+ *
+ * ## Cuándo se le pide que la use
+ *
+ * Cuando le falta un dato para poder seguir y **las respuestas posibles son
+ * pocas y conocidas**: cuál de tres tareas, qué prioridad, en qué tablero. No
+ * para preguntas abiertas —«¿qué quieres hacer?»— que se responden mejor
+ * escribiendo, ni para pedir confirmación de algo que ya va a salir como
+ * propuesta con su propio botón.
+ */
+const PROPONER_PREGUNTA: FunctionDeclaration = {
+  name: 'proponer_pregunta',
+  description:
+    'Hazle una o varias preguntas a la persona con opciones que pueda PULSAR en vez ' +
+    'de escribir. Usalo cuando te falte un dato para seguir y las respuestas ' +
+    'posibles sean pocas y concretas: cual de varias tareas, que prioridad, en que ' +
+    'tablero, si quiere una cosa u otra. NO lo uses para preguntas abiertas ("que ' +
+    'quieres hacer?") ni para confirmar algo que ya vas a proponer con su tarjeta. ' +
+    'Acompanalo SIEMPRE de una frase tuya en el texto: la tarjeta son las opciones, ' +
+    'el contexto lo pones tu.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      preguntas: {
+        type: 'ARRAY',
+        description:
+          'De 1 a 3. Mas de tres de golpe es un formulario, y a un formulario se ' +
+          'responde peor que a una conversacion.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            texto: {
+              type: 'STRING',
+              description: 'La pregunta, corta y en el idioma de la conversacion.',
+            },
+            tipo: {
+              type: 'STRING',
+              enum: ['una', 'varias'],
+              description:
+                '"una" si solo cabe una respuesta (que prioridad); "varias" si se ' +
+                'pueden marcar varias (cuales de estas tareas).',
+            },
+            opciones: {
+              type: 'ARRAY',
+              description: 'De 2 a 8 respuestas posibles, cortas.',
+              items: { type: 'STRING' },
+            },
+          },
+          required: ['texto', 'tipo', 'opciones'],
+        },
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Opcional. Para que necesitas saberlo, en una frase.',
+      },
+    },
+    required: ['preguntas'],
+  },
+};
+
+/**
  * Las herramientas que le tocan a esta persona.
  *
  * `canEditTask` implica `canMoveTask` y demás por jerarquía, y el mapa que llega
@@ -528,7 +602,15 @@ const PROPONER_BORRADO: FunctionDeclaration = {
  * lectura: el asistente responde preguntas y no propone nada.
  */
 export function herramientasPara(permisos: Record<string, boolean>): FunctionDeclaration[] {
-  const tools: FunctionDeclaration[] = [];
+  /**
+   * Preguntar **no depende de ningún permiso**, y es la única así.
+   *
+   * Las demás preparan un cambio, así que se filtran por lo que esa persona
+   * puede hacer. Esta solo pide un dato: negársela a un rol de solo lectura
+   * dejaría al asistente sin forma de desambiguar justo con quien más falta hace
+   * —quien no puede tocar nada solo puede preguntar— y le obligaría a adivinar.
+   */
+  const tools: FunctionDeclaration[] = [PROPONER_PREGUNTA];
   if (permisos.canCreateTask) tools.push(PROPONER_TAREA);
   if (permisos.canEditTask) tools.push(PROPONER_ASIGNACION, PROPONER_EDICION, PROPONER_CHECKLIST);
   /**

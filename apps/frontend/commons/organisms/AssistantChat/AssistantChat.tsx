@@ -14,6 +14,7 @@ import {
   isEditProposal,
   isMessageProposal,
   isMoveProposal,
+  isQuestionProposal,
   isTaskProposal,
 } from '../../api/assistant';
 import { cargarConversacionAction, preguntarAction } from '../../assistant/actions';
@@ -35,6 +36,7 @@ import {
   MarkStepsProposalCard,
   MessageProposalCard,
   MoveProposalCard,
+  QuestionProposalCard,
   TaskProposalCard,
 } from './ProposalCard';
 import { ProposalGroup } from './ProposalGroup';
@@ -595,6 +597,25 @@ export function AssistantChat({
                            nunca es lo contrario —que una guarda ancha se coma un
                            borrado y lo pinte como un cambio inocuo—, y ninguna
                            de las de arriba mira este `tool`. */
+                          /* Preguntar no propone ningún cambio, así que ninguna
+                           de las guardas de abajo la reclama: el orden aquí solo
+                           ahorra recorrerlas. */
+                          if (isQuestionProposal(propuesta)) {
+                            return (
+                              <QuestionProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                                /* Responder es mandar un turno más, no llamar a
+                                 ningún endpoint. Ver `QuestionProposalCard`. */
+                                onResponder={enviar}
+                              />
+                            );
+                          }
                           if (isDeleteProposal(propuesta)) {
                             return (
                               <DeleteProposalCard

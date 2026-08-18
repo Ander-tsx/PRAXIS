@@ -213,6 +213,36 @@ export interface ChartProposal {
   porQue?: string;
 }
 
+/**
+ * `proponer_pregunta`. **La única propuesta que no propone ningún cambio.**
+ *
+ * Las otras diez preparan algo que se acepta o se descarta; esta es una
+ * pregunta con las respuestas ya enumeradas, para poder contestar con un clic.
+ *
+ * ## Por qué es una propuesta y no texto
+ *
+ * Porque lo que gana no es comodidad, es **precisión**: una respuesta elegida de
+ * una lista no se puede escribir mal, así que el turno siguiente no empieza por
+ * «no te he entendido». Cuando el modelo pregunta escribiendo, la
+ * desambiguación que él ya tiene enumerada hay que teclearla otra vez.
+ *
+ * ⚠️ **Al responder no se llama a ningún endpoint nuevo**: las respuestas se
+ * componen en una frase y se mandan como **un turno más** de la conversación.
+ * Eso es lo que hace que el modelo las entienda sin ninguna maquinaria extra —
+ * ve una respuesta en español, no un formulario serializado— y lo que mantiene
+ * el hilo legible al releerlo días después.
+ */
+export interface QuestionProposal {
+  preguntas: {
+    id: string;
+    texto: string;
+    /** `una` se pinta como opciones excluyentes; `varias`, como casillas. */
+    tipo: 'una' | 'varias';
+    opciones: { id: string; texto: string }[];
+  }[];
+  porQue?: string;
+}
+
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /** Una conversación en la lista lateral, sin sus mensajes. */
@@ -293,6 +323,12 @@ export function isCommentProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: CommentProposal } {
   return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
+}
+
+export function isQuestionProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: QuestionProposal } {
+  return propuesta.tool === 'proponer_pregunta' && Array.isArray(propuesta.args.preguntas);
 }
 
 export function isDeleteProposal(

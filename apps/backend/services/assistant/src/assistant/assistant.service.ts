@@ -50,6 +50,16 @@ interface ChatPayload {
   chat?: { autor: string; texto: string; cuando: string }[];
 }
 
+/**
+ * Cuántas preguntas y cuántas opciones se aceptan de una vez.
+ *
+ * Más de tres preguntas juntas dejan de ser una conversación y pasan a ser un
+ * formulario, y a un formulario se responde peor —y más tarde—. Ocho opciones es
+ * donde una lista deja de leerse de un vistazo y hay que ponerse a buscar.
+ */
+const MAX_PREGUNTAS = 3;
+const MAX_OPCIONES = 8;
+
 /** La forma del briefing, en lo que hace falta para validar lo que propone. */
 interface Briefing {
   /**
@@ -403,6 +413,19 @@ export class AssistantService {
    * único que el texto puede aportar y la tarjeta no.
    */
   private textoPorDefecto(propuestas: AssistantProposal[]): string {
+    /**
+     * ⚠️ **Preguntar no es proponer**, y la frase tiene que distinguirlo.
+     *
+     * Con una tarjeta de preguntas, «Te propongo esto. Revísalo antes de
+     * aceptar» es sencillamente falso: no hay nada que aceptar ni que revisar,
+     * hay algo que contestar. Y como el modelo suele devolver la llamada sin una
+     * palabra, esta frase es la que se lee de verdad la mayoría de las veces.
+     */
+    const soloPreguntas = propuestas.every((propuesta) => propuesta.tool === 'proponer_pregunta');
+    if (soloPreguntas && propuestas.length > 0) {
+      return 'Antes de seguir necesito que me aclares una cosa.';
+    }
+
     if (propuestas.length === 1) return 'Te propongo esto. Revisalo antes de aceptar.';
     if (propuestas.length > 1) {
       return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
@@ -551,6 +574,66 @@ export class AssistantService {
              sobre qué tarea es sin ir a buscarla. */
           ...(tarea ? { taskTitle: tarea.titulo } : {}),
           assigneeIds: this.soloConocidos(call.args.assigneeIds, miembros),
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    /**
+     * Preguntar de vuelta con opciones.
+     *
+     * ⚠️ **Va antes del filtro de «sobre una tarea»**, como el mensaje del
+     * equipo: no apunta a ninguna tarea, así que pasando por él se descartaría
+     * siempre por no traer `taskId` y el modelo parecería estar ignorando la
+     * herramienta.
+     *
+     * Lo que se comprueba aquí es la **forma**, porque una tarjeta de preguntas
+     * mal formada es peor que ninguna: una pregunta sin opciones es un texto que
+     * no se puede responder, y una con una sola opción es un botón que no
+     * decide nada. Las que no cumplen se caen; si no queda ninguna, se descarta
+     * la propuesta entera y el texto del modelo se queda solo — que es
+     * exactamente lo que habría pasado si no hubiera llamado a la herramienta.
+     */
+    if (call.name === 'proponer_pregunta') {
+      const crudas = Array.isArray(call.args.preguntas) ? call.args.preguntas : [];
+
+      const preguntas = crudas
+        .slice(0, MAX_PREGUNTAS)
+        .map((cruda: unknown, indice: number) => {
+          const pregunta = (cruda ?? {}) as Record<string, unknown>;
+          const texto = String(pregunta.texto ?? '').trim();
+
+          const opciones = (Array.isArray(pregunta.opciones) ? pregunta.opciones : [])
+            .map((opcion: unknown) => String(opcion ?? '').trim())
+            .filter((opcion: string) => opcion.length > 0)
+            .slice(0, MAX_OPCIONES);
+
+          if (!texto || opciones.length < 2) return null;
+
+          return {
+            /* El id lo pone el servidor y no el modelo: es lo que la tarjeta usa
+               como clave de formulario, y un id repetido —o vacío— rompería el
+               marcado sin que se note hasta que dos casillas se marcan a la vez. */
+            id: `p${indice}`,
+            texto: texto.slice(0, 200),
+            tipo: pregunta.tipo === 'varias' ? 'varias' : 'una',
+            opciones: opciones.map((opcion: string, i: number) => ({
+              id: `o${i}`,
+              texto: opcion.slice(0, 120),
+            })),
+          };
+        })
+        .filter(Boolean);
+
+      if (preguntas.length === 0) {
+        this.log.warn('El modelo propuso preguntas sin opciones suficientes: se descarta');
+        return null;
+      }
+
+      return {
+        tool: call.name,
+        args: {
+          preguntas,
           ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
         },
       };

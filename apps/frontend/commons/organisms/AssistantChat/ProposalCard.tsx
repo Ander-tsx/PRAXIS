@@ -13,6 +13,7 @@ import type {
   EstadoPropuesta,
   MessageProposal,
   MoveProposal,
+  QuestionProposal,
   TaskProposal,
 } from '../../api/assistant';
 import { PRIORITY_LABELS, type Priority } from '../../api/domain';
@@ -705,6 +706,187 @@ export function DeleteProposalCard({
 }
 
 /**
+ * Las preguntas de PRAX, con las respuestas para pulsar.
+ *
+ * ## No se parece a las demás porque no es lo mismo
+ *
+ * Las otras diez tarjetas dicen «esto va a pasar, ¿lo aceptas?» y tienen dos
+ * botones. Esta no propone ningún cambio: **es una pregunta**, así que no lleva
+ * «Aceptar» ni «Descartar» sino un formulario y un «Responder». Meterla en el
+ * mismo marco habría sido llamar «aceptar» a contestar.
+ *
+ * ## ⚠️ La respuesta vuelve como un turno normal
+ *
+ * Al enviar no se llama a ningún endpoint nuevo: se compone una frase en español
+ * —«Cuál de estas: la de Diseño. Prioridad: alta»— y se manda como el siguiente
+ * mensaje de la conversación. Dos cosas salen de ahí, y las dos importan:
+ *
+ * - el modelo lo entiende **sin maquinaria extra**, porque ve una respuesta
+ *   escrita y no un formulario serializado;
+ * - y el hilo **se sigue leyendo** al releerlo dentro de una semana, en vez de
+ *   tener un hueco donde hubo unos clics.
+ *
+ * ## Y se puede pasar de largo
+ *
+ * «Prefiero escribirlo» descarta la tarjeta sin responder. Una pregunta que
+ * bloquea la conversación hasta que la contestes es un formulario disfrazado:
+ * si lo que hace falta decir no está entre las opciones, escribirlo tiene que
+ * seguir siendo posible.
+ */
+export function QuestionProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+  onResponder,
+}: ProposalCardProps & {
+  propuesta: QuestionProposal;
+  /** Manda la respuesta como un turno más. La pone `AssistantChat`. */
+  onResponder?: (texto: string) => void;
+}) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  /** Pregunta → respuestas marcadas. Un `Set` por pregunta, también en las de una. */
+  const [marcadas, setMarcadas] = useState<Record<string, Set<string>>>({});
+
+  function alternar(preguntaId: string, opcionId: string, unaSola: boolean) {
+    setMarcadas((previas) => {
+      const actuales = previas[preguntaId] ?? new Set<string>();
+      /* En las de una sola respuesta, marcar sustituye en vez de sumar: es lo
+         que hace un grupo de opciones excluyentes, y ahorra tener que
+         desmarcar la anterior. */
+      if (unaSola) return { ...previas, [preguntaId]: new Set([opcionId]) };
+
+      const siguientes = new Set(actuales);
+      if (siguientes.has(opcionId)) siguientes.delete(opcionId);
+      else siguientes.add(opcionId);
+      return { ...previas, [preguntaId]: siguientes };
+    });
+  }
+
+  /* Todas contestadas: sin esto se puede enviar media respuesta, y el modelo
+     vuelve a preguntar por lo que falta — dos turnos para lo que era uno. */
+  const completo = propuesta.preguntas.every((pregunta) => (marcadas[pregunta.id]?.size ?? 0) > 0);
+
+  function responder() {
+    if (!completo || !onResponder) return;
+
+    /**
+     * La frase que se manda.
+     *
+     * Se escribe como lo escribiría una persona —«pregunta: respuesta»— y no
+     * como JSON: el modelo la lee en el hilo igual que leería una respuesta
+     * tecleada, sin ninguna instrucción especial que explicarle en el prompt.
+     */
+    const frase = propuesta.preguntas
+      .map((pregunta) => {
+        const elegidas = pregunta.opciones
+          .filter((opcion) => marcadas[pregunta.id]?.has(opcion.id))
+          .map((opcion) => opcion.texto);
+        return `${pregunta.texto} ${elegidas.join(', ')}`;
+      })
+      .join('. ');
+
+    setEstado('hecho');
+    onResponder(frase);
+  }
+
+  /* Ya se contestó en su día, o se acaba de contestar: la tarjeta se queda
+     legible —importa saber qué se preguntó— y sin nada que pulsar. */
+  const decidida = estado !== 'pendiente' || (estadoGuardado && estadoGuardado !== 'PENDING');
+
+  return (
+    <Marco
+      titulo={propuesta.preguntas.length === 1 ? 'Una pregunta' : 'Unas preguntas'}
+      sinAplicar="Elige y responde, o escríbelo tú."
+      porQue={propuesta.porQue}
+      estado={decidida ? 'hecho' : 'pendiente'}
+      error={null}
+      resultado={decidida ? { texto: 'Respondido.', href: null } : null}
+      /* Sin acción de aceptar: el botón propio de esta tarjeta es «Responder», y
+         va dentro, junto a las opciones que activa. */
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+      etiquetaDescartar="Prefiero escribirlo"
+    >
+      <div className="flex flex-col gap-4">
+        {propuesta.preguntas.map((pregunta) => {
+          const unaSola = pregunta.tipo === 'una';
+
+          return (
+            <fieldset
+              key={pregunta.id}
+              className="flex flex-col gap-2"
+              disabled={Boolean(decidida)}
+            >
+              <legend className="mb-1 font-sans text-sm text-text-primary">{pregunta.texto}</legend>
+
+              <div className="flex flex-wrap gap-2">
+                {pregunta.opciones.map((opcion) => {
+                  const puesta = marcadas[pregunta.id]?.has(opcion.id) ?? false;
+
+                  return (
+                    <button
+                      key={opcion.id}
+                      type="button"
+                      /* `aria-pressed` y no `role="radio"`/`"checkbox"`: esos
+                         roles prometen navegación con flechas y gestión de foco
+                         de grupo, y anunciarlos sin implementarlos engaña al
+                         lector de pantalla. Es el mismo criterio que ya toman
+                         `ProjectPicker` y `RowActions`. */
+                      aria-pressed={puesta}
+                      disabled={Boolean(decidida)}
+                      onClick={() => alternar(pregunta.id, opcion.id, unaSola)}
+                      className="rounded-full border px-3 py-1.5 font-sans text-sm transition-colors disabled:cursor-not-allowed"
+                      style={
+                        puesta
+                          ? {
+                              borderColor: colors.primary,
+                              background: alpha(colors.primary, 14),
+                              color: colors.primary,
+                            }
+                          : {
+                              borderColor: colors.border,
+                              color: colors.textSecondary,
+                            }
+                      }
+                    >
+                      {opcion.texto}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Solo cuando se pueden marcar varias: en las de una, decir «elige
+                  una» al lado de opciones excluyentes es explicar lo evidente. */}
+              {!unaSola && (
+                <span className="font-sans text-xs text-text-disabled">Puedes marcar varias.</span>
+              )}
+            </fieldset>
+          );
+        })}
+
+        {!decidida && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" onClick={responder} disabled={!completo}>
+              Responder
+            </Button>
+            {!completo && (
+              <span className="font-sans text-xs text-text-disabled">
+                {propuesta.preguntas.length === 1
+                  ? 'Elige una respuesta.'
+                  : 'Responde a todas para enviar.'}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </Marco>
+  );
+}
+
+/**
  * Marcar pasos del checklist como hechos.
  *
  * Enseña **los pasos, uno a uno y con su texto**, no «se marcarán 3 pasos»: dar
@@ -996,6 +1178,7 @@ function Marco({
   proposalId,
   estadoGuardado,
   tono = 'normal',
+  etiquetaDescartar = 'Descartar',
   children,
 }: {
   titulo: string;
@@ -1023,6 +1206,15 @@ function Marco({
    */
   onAceptar?: () => void;
   onDescartar: () => void;
+  /**
+   * Qué dice el botón de descartar.
+   *
+   * Por defecto «Descartar», que es lo correcto cuando se está rechazando un
+   * cambio. En la tarjeta de preguntas no se descarta nada —no había nada que
+   * aplicar— así que ahí dice «Prefiero escribirlo», que es lo que de verdad
+   * pasa al pulsarlo.
+   */
+  etiquetaDescartar?: string;
   projectId: string;
   proposalId?: string;
   estadoGuardado?: EstadoPropuesta;
@@ -1194,7 +1386,7 @@ function Marco({
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onDescartar} disabled={estado === 'enviando'}>
-            Descartar
+            {etiquetaDescartar}
           </Button>
           {error && <span className="font-sans text-sm text-error">{error}</span>}
         </div>
