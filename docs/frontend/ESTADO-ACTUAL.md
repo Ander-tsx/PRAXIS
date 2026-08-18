@@ -920,9 +920,29 @@ Checklist, salida de montar esta:
 8. `.env.local` con `GATEWAY_URL` y el **mismo** `JWT_SECRET` que el gateway.
 9. El rewrite en `web-shell/next.config.ts` (las **dos** entradas) y
    `<ZONA>_FRONT_URL` en su `.env.local`.
+10. `scripts/dev-cli/config/services.mjs` → `FRONTEND_APPS`, de donde salen los
+    `.env.local` y los puertos que el CLI espera antes de dar la zona por arriba.
 
-`pnpm dev:frontend` la recoge sola: el filtro es por directorio
-(`--filter="./apps/frontend/*"`), no una lista de paquetes.
+🔴 **11. Y el despliegue, que es lo que se olvida.** `pnpm dev:frontend` recoge
+la zona sola —su filtro es por directorio (`--filter="./apps/frontend/*"`)— y
+eso hace creer que basta con `git push`. **No basta.** La imagen de producción
+enumera las zonas **a mano** en dos sitios de
+`infra/docker/images/frontend.Dockerfile`:
+
+- el `COPY apps/frontend/<zona>/package.json` de la capa de instalación;
+- el `--filter "@praxis/<zona>"` del `RUN pnpm … run build`.
+
+Más el proceso y su `<ZONA>_FRONT_URL` en `frontend.pm2.config.cjs`.
+
+⚠️ **Y lo que hace esto peligroso es cómo falla.** Sin el `--filter`, la imagen
+**se construye sin error**: simplemente no lleva esa zona dentro. El
+contenedor arranca, las otras seis funcionan, y el fallo solo aparece cuando
+alguien entra a `/<zona>` en producción. `cloudbuild.yaml` no ayuda: construye
+una sola imagen del frontend y no enumera zonas, así que no hay dónde
+enterarse.
+
+No hace falta tocar el cortafuegos: las zonas solo son alcanzables por
+loopback (`--network host`) y únicamente el 4100 acepta tráfico de fuera.
 
 ### 17.8 Verificado en navegador real
 

@@ -44,6 +44,7 @@ COPY apps/backend/services/reports/package.json         apps/backend/services/re
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
 COPY apps/frontend/admin-front/package.json             apps/frontend/admin-front/
 COPY apps/frontend/auth-front/package.json              apps/frontend/auth-front/
+COPY apps/frontend/chat-front/package.json              apps/frontend/chat-front/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
 COPY apps/frontend/dashboard-front/package.json         apps/frontend/dashboard-front/
 COPY apps/frontend/projects-front/package.json          apps/frontend/projects-front/
@@ -86,6 +87,7 @@ ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 RUN pnpm --filter "@praxis/web-shell" \
          --filter "@praxis/auth-front" \
          --filter "@praxis/dashboard-front" \
+         --filter "@praxis/chat-front" \
          --filter "@praxis/projects-front" \
          --filter "@praxis/reports-front" \
          --filter "@praxis/admin-front" \
