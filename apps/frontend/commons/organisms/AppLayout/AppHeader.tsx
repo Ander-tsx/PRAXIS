@@ -6,6 +6,20 @@ import { useAppShell, useSidebarPlegada } from './AppShell';
 export interface AppHeaderProps {
   /** Título de la pantalla. */
   title: string;
+  /**
+   * La pantalla ocupa el alto disponible y **no desplaza**.
+   *
+   * Por defecto el contenido crece y `<main>` lo desplaza, que es lo correcto
+   * para una página de documento: un panel, un informe, una lista. Con `lleno`,
+   * el contenedor se queda del alto exacto de la ventana y quien desplaza es lo
+   * que haya dentro.
+   *
+   * ⚠️ **Lo pide una pantalla que es un chat**, donde la cabecera y el
+   * compositor tienen que quedarse quietos y solo los mensajes se mueven. Sin
+   * esto había que adivinar el alto con `100dvh` menos la barra menos el
+   * relleno — un cálculo que se rompe en cuanto cualquiera de los tres cambia.
+   */
+  lleno?: boolean;
   /** Zona derecha: la acción principal de la pantalla, si la tiene. */
   headerSlot?: ReactNode;
   children: ReactNode;
@@ -23,7 +37,7 @@ export interface AppHeaderProps {
  * lo que abre es el cajón de `AppShell`: por eso pide la función por contexto en
  * vez de recibirla por props a través de media aplicación.
  */
-export function AppHeader({ title, headerSlot, children }: AppHeaderProps) {
+export function AppHeader({ title, headerSlot, lleno = false, children }: AppHeaderProps) {
   const { openMenu } = useAppShell();
   /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
      libera ~184px que esta columna nunca reclama —se queda en el margen
@@ -72,9 +86,18 @@ export function AppHeader({ title, headerSlot, children }: AppHeaderProps) {
        * a quien pide menos movimiento — y ahí el salto instantáneo es correcto,
        * no un defecto.
        */}
-      <main className="relative flex-1 overflow-y-auto bg-background motion-safe:scroll-smooth">
+      <main
+        className={`relative flex-1 bg-background motion-safe:scroll-smooth ${
+          /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
+             hijo, y dejar aquí un scroll de reserva produce dos barras
+             anidadas —una que no se mueve nunca— en cuanto el hijo mide justo. */
+          lleno ? 'min-h-0 overflow-hidden' : 'overflow-y-auto'
+        }`}
+      >
         <div
-          className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`}
+          className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'} ${
+            lleno ? 'flex h-full min-h-0 flex-col' : ''
+          }`}
         >
           {children}
         </div>

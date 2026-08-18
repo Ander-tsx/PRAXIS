@@ -165,10 +165,32 @@ export class ConversationsService {
         throw new RpcException({ statusCode: 404, message: 'Conversación no encontrada' });
       }
 
-      /* El foco de la conversación es el del último turno: es lo que la lista
-         del historial enseña. Solo se escribe si cambió, para no tocar la fila
-         —y su `updatedAt`— en cada mensaje del mismo proyecto. */
-      if (existente.projectId !== projectId) {
+      /**
+       * ⚠️ **Una conversación NO cambia de proyecto.** Decisión de producto del
+       * 2026-08-18, y el motivo es el mismo que llevó a un foco por conversación
+       * en vez de multiproyecto: el hilo que ve el modelo se reenvía entero en
+       * cada turno, así que una conversación que empezó hablando del proyecto A
+       * y sigue en el B le mete **los dos contextos en la ventana** — con sus
+       * tareas, sus columnas y su gente mezcladas. Las propuestas salen apuntando
+       * a ids del proyecto equivocado, y la validación las descarta: por fuera se
+       * ve como un asistente que de pronto no entiende nada.
+       *
+       * Hubo una versión en que sí cambiaba y el `projectId` de la conversación
+       * era «el del último turno». Se retira: cada proyecto, su conversación.
+       *
+       * Se responde 409 y no 404 a propósito: la conversación existe y es tuya —
+       * lo que no encaja es el proyecto—, y un 404 mandaría a buscar un id que
+       * está perfectamente.
+       */
+      if (existente.projectId && existente.projectId !== projectId) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Esta conversación es de otro proyecto. Empieza una nueva para hablar de este.',
+        });
+      }
+
+      /* La primera pregunta de una conversación sin foco es la que lo fija. */
+      if (!existente.projectId) {
         await this.prisma.conversation.update({
           where: { id: existente.id },
           data: { projectId },

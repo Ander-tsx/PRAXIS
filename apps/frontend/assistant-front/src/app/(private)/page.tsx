@@ -149,18 +149,16 @@ export default async function AssistantPage({ searchParams }: PageProps) {
   );
 
   return (
-    <AppHeader title="Asistente">
+    <AppHeader title="Asistente" lleno>
       {/**
-       * ⚠️ **La pantalla entera es el chat**, y por eso esto no lleva el
-       * `flex-col gap-6` de las demás páginas: la conversación tiene que poder
-       * estirarse hasta el borde inferior y desplazarse por dentro.
+       * ⚠️ **La pantalla entera es el chat.**
        *
-       * El alto sale de `100dvh` menos la barra de `AppHeader` (4 rem) y el
-       * relleno del contenedor (2 · 1,5 rem en escritorio). `dvh` y no `vh`
-       * porque en un móvil la barra del navegador aparece y desaparece: con
-       * `vh` el compositor se queda debajo del pliegue justo cuando escribes.
+       * El alto lo da `lleno` de `AppHeader`, no un `calc(100dvh - …)` a mano:
+       * aquel había que recalcularlo cada vez que cambiara la altura de la barra
+       * o el relleno del contenedor, y se rompía en silencio — el compositor se
+       * iba unos píxeles por debajo del pliegue y solo se notaba escribiendo.
        */}
-      <div className="flex min-h-[calc(100dvh-4rem-2rem)] flex-col sm:min-h-[calc(100dvh-4rem-3rem)]">
+      <div className="flex min-h-0 flex-1 flex-col">
         <PraxScreen
           projectId={projectId}
           proyectos={proyectos}

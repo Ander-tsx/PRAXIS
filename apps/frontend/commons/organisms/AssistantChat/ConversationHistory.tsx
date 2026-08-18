@@ -7,7 +7,6 @@ import {
   conversacionesAction,
   renombrarConversacionAction,
 } from '../../assistant/actions';
-import { Button } from '../../atoms';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -52,6 +51,18 @@ export function ConversationHistory({
   const [lista, setLista] = useState<ConversationSummary[] | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
   const [titulo, setTitulo] = useState('');
+  /**
+   * Cuál está pidiendo confirmación para borrarse.
+   *
+   * ⚠️ Antes se borraba al primer clic. Borrar una conversación **no se
+   * deshace** —no hay papelera— y el botón estaba a un píxel del de renombrar,
+   * así que un clic desviado se llevaba un hilo entero sin decir nada.
+   *
+   * La confirmación va en la propia fila y no en un diálogo: un modal para
+   * borrar una conversación de tres mensajes es más ceremonia de la que merece,
+   * y saca el foco de la lista que se está repasando.
+   */
+  const [borrando, setBorrando] = useState<string | null>(null);
 
   useEffect(() => {
     let vigente = true;
@@ -76,6 +87,7 @@ export function ConversationHistory({
   }
 
   async function borrar(id: string) {
+    setBorrando(null);
     setLista((previa) => (previa ?? []).filter((c) => c.id !== id));
     if (id === activaId) onBorrarActiva();
     await borrarConversacionAction(id);
@@ -86,10 +98,10 @@ export function ConversationHistory({
        tarjetas sueltas. Con el hueco de antes, seis conversaciones ya no cabían
        en el cajón. */
     <div className="flex min-h-0 flex-col gap-3">
-      <Button size="sm" onClick={onNueva}>
-        Nueva conversación
-      </Button>
-
+      {/* ⚠️ Aquí había un «Nueva conversación» a lo ancho, en morado. Se quitó
+          al añadir el botón de icono de la cabecera: dos disparadores para lo
+          mismo en la misma pantalla, y el de aquí además empujaba la lista —que
+          es lo que se viene a leer— una fila hacia abajo. */}
       <div className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
         {lista === null && (
           <p className="py-8 text-center font-sans text-sm text-text-disabled">Cargando…</p>
@@ -123,20 +135,66 @@ export function ConversationHistory({
               }}
             >
               {editando === conversacion.id ? (
-                <input
-                  value={titulo}
-                  onChange={(evento) => setTitulo(evento.target.value)}
-                  onBlur={() => renombrar(conversacion.id)}
-                  onKeyDown={(evento) => {
-                    if (evento.key === 'Enter') renombrar(conversacion.id);
-                    if (evento.key === 'Escape') setEditando(null);
-                  }}
-                  maxLength={60}
-                  // biome-ignore lint/a11y/noAutofocus: se acaba de pulsar «Renombrar»; el foco es lo que se pidió
-                  autoFocus
-                  className="min-w-0 flex-1 rounded-lg bg-background px-3 py-2 font-sans text-sm text-text-primary outline-none ring-1 ring-primary"
-                  aria-label="Nuevo título de la conversación"
-                />
+                <>
+                  <input
+                    value={titulo}
+                    onChange={(evento) => setTitulo(evento.target.value)}
+                    onKeyDown={(evento) => {
+                      if (evento.key === 'Enter') renombrar(conversacion.id);
+                      if (evento.key === 'Escape') setEditando(null);
+                    }}
+                    maxLength={60}
+                    // biome-ignore lint/a11y/noAutofocus: se acaba de pulsar «Renombrar»; el foco es lo que se pidió
+                    autoFocus
+                    className="min-w-0 flex-1 rounded-lg bg-background px-3 py-1.5 font-sans text-sm text-text-primary outline-none ring-1 ring-primary"
+                    aria-label="Nuevo título de la conversación"
+                  />
+                  {/**
+                   * ⚠️ **Guardar y cancelar — y el `onBlur` fuera.**
+                   *
+                   * El campo guardaba al perder el foco y no había forma visible
+                   * de cancelar: Escape servía, pero solo si lo sabías. Y peor —
+                   * un botón de cancelar habría disparado el `blur` **antes** que
+                   * su propio clic, guardando justo lo que se quería descartar.
+                   * Quitando el `onBlur`, la única forma de salir es decidiendo.
+                   */}
+                  <AccionDeFila
+                    etiqueta="Guardar el título"
+                    onClick={() => renombrar(conversacion.id)}
+                    trazado="M4.5 12.75l6 6 9-13.5"
+                  />
+                  <AccionDeFila
+                    etiqueta="Cancelar"
+                    onClick={() => setEditando(null)}
+                    trazado="M6 18L18 6M6 6l12 12"
+                  />
+                </>
+              ) : borrando === conversacion.id ? (
+                /**
+                 * La confirmación, **en la propia fila y sustituyendo al
+                 * título**. Añadida debajo cambiaría el alto de la fila y la
+                 * lista daría un salto al pedir confirmación en la de arriba.
+                 */
+                <>
+                  <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-secondary">
+                    ¿Borrar «{conversacion.title}»?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => borrar(conversacion.id)}
+                    className="shrink-0 rounded-md px-2 py-1 font-sans text-xs font-semibold transition-colors"
+                    style={{ background: alpha(colors.error, 14), color: colors.error }}
+                  >
+                    Borrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBorrando(null)}
+                    className="shrink-0 rounded-md px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    No
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -146,15 +204,38 @@ export function ConversationHistory({
                   <span className="block truncate font-sans text-sm text-text-primary">
                     {conversacion.title}
                   </span>
-                  <span className="mt-0.5 block truncate font-sans text-xs text-text-disabled">
-                    {/* El proyecto primero: es lo que se busca al repasar la lista
-                      desde que el historial ya no está partido por proyecto. */}
-                    {conversacion.projectId
-                      ? (nombresDeProyecto[conversacion.projectId] ?? 'otro proyecto')
-                      : 'sin proyecto'}
-                    {' · '}
-                    {cuando(conversacion.updatedAt)}
-                    {activa && ' · abierta'}
+                  {/**
+                   * El proyecto **como insignia**, igual que en la cabecera del
+                   * chat. Era texto gris junto a la fecha y se perdía entre lo
+                   * demás; con el color de la marca es lo primero que se
+                   * distingue al repasar la lista — que es exactamente para lo
+                   * que hace falta desde que el historial no está partido por
+                   * proyecto.
+                   */}
+                  <span className="mt-1 flex items-center gap-2">
+                    <span
+                      className="max-w-40 shrink-0 truncate rounded-full px-2 py-0.5 font-sans text-[11px] font-medium"
+                      style={
+                        conversacion.projectId
+                          ? {
+                              background: alpha(colors.primary, 12),
+                              color: colors.primary,
+                              boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 22)}`,
+                            }
+                          : {
+                              background: alpha(colors.textSecondary, 10),
+                              color: colors.textDisabled,
+                            }
+                      }
+                    >
+                      {conversacion.projectId
+                        ? (nombresDeProyecto[conversacion.projectId] ?? 'otro proyecto')
+                        : 'sin proyecto'}
+                    </span>
+                    <span className="truncate font-sans text-xs text-text-disabled">
+                      {cuando(conversacion.updatedAt)}
+                      {activa && ' · abierta'}
+                    </span>
                   </span>
                 </button>
               )}
@@ -165,7 +246,16 @@ export function ConversationHistory({
                 lista se leía como una tabla de botones en vez de como un
                 historial. En táctil no hay hover, así que ahí se quedan siempre
                 visibles (`opacity-100` de base, se apagan solo desde `sm`). */}
-              <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+              {/* Mientras se edita o se confirma un borrado, la fila ya tiene
+                  sus propios botones: dejar además los de siempre daría cuatro
+                  controles para dos decisiones. */}
+              <div
+                className={`flex shrink-0 items-center gap-0.5 transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100 ${
+                  editando === conversacion.id || borrando === conversacion.id
+                    ? 'hidden'
+                    : 'opacity-100 sm:opacity-0'
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => {
@@ -244,4 +334,47 @@ function cuando(iso: string): string {
   if (dias === 1) return 'ayer';
   if (dias < 7) return `hace ${dias} días`;
   return fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+}
+
+/**
+ * Un botón de icono de una fila del historial.
+ *
+ * Existe porque hay cuatro con exactamente el mismo tratamiento —renombrar,
+ * borrar, guardar y cancelar— y tenerlos escritos cuatro veces era el sitio
+ * perfecto para que uno se quedara con otro tamaño o sin `aria-label`.
+ */
+function AccionDeFila({
+  etiqueta,
+  onClick,
+  trazado,
+  peligroso = false,
+}: {
+  etiqueta: string;
+  onClick: () => void;
+  /** El `d` del `<path>`. Todos comparten caja y grosor de trazo. */
+  trazado: string;
+  peligroso?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={etiqueta}
+      title={etiqueta}
+      className={`shrink-0 rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface ${
+        peligroso ? 'hover:text-error' : 'hover:text-text-primary'
+      }`}
+    >
+      <svg
+        className="h-3.5 w-3.5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d={trazado} />
+      </svg>
+    </button>
+  );
 }

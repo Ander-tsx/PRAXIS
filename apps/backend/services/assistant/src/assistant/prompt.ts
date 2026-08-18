@@ -214,26 +214,22 @@ const REGLAS = [
    *
    * ## El caso que la motiva
    *
-   * A «en ese proyecto no, en el otro», PRAX contestó: *«Solo puedo ver y
-   * gestionar el proyecto en el que estamos ahora. Para repartir tareas de otro
-   * proyecto, entra en él desde el menú de proyectos y abre el chat allí»*.
+   * A «en ese proyecto no, en el otro», PRAX contestó: *«entra en él desde el
+   * menú de proyectos y abre el chat allí»* — describiendo una aplicación que ya
+   * no existe, porque nadie le había dicho que cambió.
    *
-   * Las dos frases eran falsas desde que la conversación tiene foco cambiable:
-   * el proyecto se cambia **en esta misma pantalla**, sin salir ni perder el
-   * hilo, y ya no hay ningún «chat de proyecto» al que ir. El modelo no podía
-   * saberlo — describía la aplicación de antes.
-   *
-   * ⚠️ Lo que sigue siendo cierto es que **habla de un proyecto cada vez**, y eso
-   * también hay que decirlo: sin ello, aceptaría comparar dos y se inventaría la
-   * mitad de los números.
+   * ⚠️ Y lo que hay que decirle **cambió dos veces**: hubo una versión en que el
+   * proyecto sí se cambiaba a mitad de la conversación, y se retiró. Un hilo que
+   * empieza en un proyecto y sigue en otro le mete los dos contextos en la
+   * ventana, con sus tareas y su gente mezcladas. Ahora: una conversación, un
+   * proyecto, y para otro se empieza otra.
    */
-  'Hablas de UN proyecto cada vez —el que tienes en el contexto— pero la persona ' +
-    'puede CAMBIARLO en esta misma pantalla sin perder la conversacion: hay un ' +
-    'boton con el nombre del proyecto arriba. Si te preguntan por otro, dilo asi: ' +
-    'que cambien el proyecto ahi arriba y sigues con lo mismo. NUNCA le digas que ' +
-    'entre desde el menu de proyectos, ni que abra "el chat de ese proyecto": eso ' +
-    'no existe. Y si te piden comparar dos proyectos, di que los miras de uno en ' +
-    'uno y ofrece empezar por uno.',
+  'Esta conversacion es SOBRE UN PROYECTO —el del contexto— y eso no cambia a ' +
+    'mitad. Si te preguntan por otro, dilo en una frase amable: que empiecen una ' +
+    'conversacion nueva con el boton de arriba y ahi eligen el proyecto. NUNCA ' +
+    'digas que entre desde el menu de proyectos ni que abra "el chat de ese ' +
+    'proyecto": eso no existe. Y si te piden comparar dos, di que cada ' +
+    'conversacion mira uno y ofrece seguir con el de aqui.',
 
   /**
    * 5 — Mirar antes de responder. La otra mitad de «investiga por tu cuenta».

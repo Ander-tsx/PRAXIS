@@ -219,32 +219,20 @@ export function AssistantChat({
      conversación sin abrirla. Se construye aquí y no en la page porque el
      historial es de esta pantalla, no del servidor. */
   /**
-   * Empezar de cero: mismo proyecto, conversación nueva.
+   * Conversación nueva.
    *
-   * No navega —el foco no cambia— así que basta con vaciar el estado. El hilo
-   * anterior no se pierde: está guardado y sale en el historial.
+   * ⚠️ **Vuelve a preguntar por el proyecto**, no se queda en el actual. Desde
+   * que una conversación es sobre un proyecto y no cambia, «empezar otra» es
+   * justo el momento —el único— en que se puede elegir otro. Quedarse en el de
+   * antes obligaría a salir de la pantalla para cambiar.
+   *
+   * El hilo anterior no se pierde: está guardado y sale en el historial.
    */
   const empezarDeCero = useCallback(() => {
     setConversationId(null);
     setMensajes([]);
     setError(null);
     setVista('chat');
-  }, []);
-
-  /**
-   * Volver a elegir proyecto.
-   *
-   * Deja la pantalla como al entrar —sin foco, con los proyectos como botones—
-   * navegando a la ruta sin `?p=`. Es lo que hace que la insignia del proyecto
-   * sea un control y no un rótulo, y lo que hace verdad lo que PRAX responde
-   * cuando le piden hablar de otro.
-   *
-   * ⚠️ Empieza conversación nueva a propósito: **no se arrastra el hilo**. Un
-   * hilo que hablaba de un proyecto, continuado sobre otro, mezcla dos contextos
-   * en la ventana del modelo — que es justo lo que el foco de uno en uno evita.
-   * El anterior sigue en el historial.
-   */
-  const volverAElegirProyecto = useCallback(() => {
     onElegirProyecto?.('', null);
   }, [onElegirProyecto]);
 
@@ -541,7 +529,10 @@ export function AssistantChat({
         }
         aria-label={`${PRAX_NAME}, el asistente`}
       >
-        <header className="flex flex-wrap items-start justify-between gap-3">
+        {/* ⚠️ `shrink-0`: en una columna flex, un hijo se encoge por defecto
+            cuando falta sitio — y con una conversación larga la cabecera perdía
+            altura hasta recortar el nombre. Fija arriba, siempre. */}
+        <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             {/* La cara, a la izquierda del título: es lo que convierte esto en
               «hablar con alguien» y no en «usar un cuadro de texto». Y mientras
@@ -583,32 +574,33 @@ export function AssistantChat({
                * proyectos. Es además lo que hace verdad lo que PRAX dice cuando
                * le piden otro proyecto — ver la regla del prompt.
                */}
+              {/**
+               * El proyecto, como insignia. **Y solo como insignia.**
+               *
+               * ⚠️ Fue un botón para cambiar de proyecto, y se retiró: una
+               * conversación es sobre un proyecto y no cambia a mitad. El hilo se
+               * reenvía entero al modelo en cada turno, así que empezar en un
+               * proyecto y seguir en otro le mete los dos contextos —tareas,
+               * columnas, gente— en la misma ventana, y las propuestas salen
+               * apuntando a ids del proyecto equivocado.
+               *
+               * Para hablar de otro se empieza otra conversación, que es el botón
+               * de al lado. Esto es un rótulo: dice de qué va lo que se está
+               * leyendo, que en una lista de conversaciones hace falta.
+               */}
               {vista === 'chat' && projectId && (
-                <button
-                  type="button"
-                  onClick={volverAElegirProyecto}
-                  title="Cambiar de proyecto"
-                  className="flex max-w-full items-center gap-1.5 self-start rounded-full py-1 pl-2.5 pr-2 font-sans text-xs transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                <span
+                  className="flex max-w-full items-center self-start rounded-full px-2.5 py-1 font-sans text-xs font-medium"
                   style={{
                     background: alpha(colors.primary, 12),
                     color: colors.primary,
                     boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 25)}`,
                   }}
                 >
-                  <span className="truncate font-medium">
+                  <span className="truncate">
                     {nombresDeProyecto[projectId] ?? 'Este proyecto'}
                   </span>
-                  <svg
-                    className="h-3 w-3 shrink-0 opacity-70"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                    aria-hidden="true"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                </span>
               )}
 
               {vista === 'historial' && (
@@ -1038,7 +1030,7 @@ export function AssistantChat({
             {!projectId ? null : agotada && cuota ? (
               <p
                 role="note"
-                className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
+                className="mt-auto shrink-0 rounded-xl border px-4 py-3 font-sans text-sm text-warning"
                 style={{
                   background: alpha(colors.warning, 8),
                   borderColor: alpha(colors.warning, 30),
@@ -1049,7 +1041,10 @@ export function AssistantChat({
               </p>
             ) : (
               <form
-                className="flex flex-col gap-2"
+                /* `shrink-0` y `mt-auto`: el compositor se queda pegado abajo
+                   aunque la conversación sea corta, y no se encoge cuando es
+                   larga. Es la otra mitad de que solo desplacen los mensajes. */
+                className="mt-auto flex shrink-0 flex-col gap-2"
                 onSubmit={(evento) => {
                   evento.preventDefault();
                   enviar(texto);
