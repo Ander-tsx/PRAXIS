@@ -62,9 +62,24 @@ export class GeminiClient {
   /**
    * Un turno de conversación.
    *
-   * `temperature` baja a propósito: aquí se explican números y se rellenan ids
-   * de columnas y etiquetas. La creatividad no aporta nada y sí produce
-   * variaciones donde no se quieren.
+   * ## ⚠️ `temperature` sube de 0.2 a 0.6, y conviene saber por qué
+   *
+   * Estaba en 0.2 con un argumento razonable: aquí se explican números y se
+   * rellenan ids de columnas, y la creatividad no aporta nada. Pero una
+   * temperatura tan baja no solo quita variedad — **quita iniciativa**. El modelo
+   * se pegaba a la ruta más segura, que con un prompt lleno de prohibiciones era
+   * callarse o emitir una llamada a función y ni una palabra. El resultado era un
+   * asistente que no se podía usar para conversar.
+   *
+   * Los ids no se protegen con la temperatura: los protege que **se validan**
+   * contra el proyecto real en `validarPropuesta`, y que las herramientas
+   * declaran conjuntos cerrados. Bajarla era pagar en conversación una seguridad
+   * que ya estaba puesta en otro sitio.
+   *
+   * `maxOutputTokens` va explícito porque el defecto de la API es corto para una
+   * respuesta que además lleva llamadas a función: al agotarse, `finishReason`
+   * queda en `MAX_TOKENS` y **el texto llega recortado o vacío**, que es otra de
+   * las formas en que salía «no he sabido responder».
    */
   async chat(params: {
     system: string;
@@ -83,7 +98,7 @@ export class GeminiClient {
     const body: Record<string, unknown> = {
       systemInstruction: { parts: [{ text: params.system }] },
       contents,
-      generationConfig: { temperature: 0.2 },
+      generationConfig: { temperature: 0.6, topP: 0.95, maxOutputTokens: 2048 },
     };
 
     /* Un `tools: [{ functionDeclarations: [] }]` vacío es un error de la API, no
@@ -130,7 +145,16 @@ export class GeminiClient {
       throw new GeminiError('El asistente ha rechazado la peticion.');
     }
 
-    const parts = json.candidates?.[0]?.content?.parts ?? [];
+    const candidato = json.candidates?.[0];
+    const parts = candidato?.content?.parts ?? [];
+
+    /* ⚠️ Un corte por longitud **no es una respuesta vacía**, y confundirlos
+       manda a la persona a reintentar algo que va a volver a cortarse. Se
+       registra para poder verlo en los logs; el texto que haya llegado se
+       devuelve igual, porque medio párrafo útil vale más que nada. */
+    if (candidato?.finishReason && !['STOP', 'MAX_TOKENS'].includes(candidato.finishReason)) {
+      this.log.warn(`Gemini corto la respuesta por ${candidato.finishReason}`);
+    }
 
     /* La respuesta puede traer texto y llamadas a la vez, o solo llamadas: con
        function calling lo normal es que el texto venga vacío. Se recogen las dos

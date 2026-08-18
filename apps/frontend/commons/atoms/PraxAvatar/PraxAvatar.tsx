@@ -1,6 +1,3 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -31,48 +28,39 @@ export type PraxMood =
   | 'oops';
 
 /**
- * Los fotogramas de cada estado.
+ * La cara de cada estado.
  *
  * ## ⚠️ Es ASCII de verdad, y eso fue una decisión
  *
- * Todo lo que hay aquí sale del teclado: `^ - o v _ < > u`. La versión anterior
- * usaba `ω` (U+03C9) y `•` (U+2022) buscando un kaomoji más «mono», y aunque son
- * caracteres comunes seguía siendo tipografía prestada: en una fuente monoespacio
- * el `ω` es ancho, se descuelga por abajo y arrastra la cara fuera del centro.
- * Con ASCII puro la cara **cae siempre donde tiene que caer**, en cualquier
- * fuente y en cualquier tamaño.
+ * Todo lo que hay aquí sale del teclado: `^ - o _ < >`. Una versión intermedia
+ * usó `ω` (U+03C9) buscando un kaomoji más «mono», y no valía: en una fuente
+ * monoespacio esa letra es ancha, se descuelga por abajo y arrastra la cara
+ * fuera del centro del cuadrado. Con ASCII puro **cae siempre donde tiene que
+ * caer**, en cualquier fuente y a cualquier tamaño.
  *
- * ## Y por qué cada estado tiene varios
+ * ## ⚠️ Y no se anima, aunque se probó
  *
- * Porque una cara fija no está viva. El primero de cada lista es el de reposo del
- * estado —el que se ve el 90 % del tiempo— y los demás son gestos breves: un
- * parpadeo, una mirada de lado, los ojos muy abiertos. Se alternan con pausas
- * desiguales para que no se lea como un bucle. Ver `PraxAvatar`.
+ * Hubo una versión con varios fotogramas por estado —parpadeos, miradas de
+ * lado— que se alternaban con pausas sorteadas. Se quitó a petición, y con
+ * razón: una cara que gesticula sola en una esquina de la pantalla **pide
+ * atención constantemente** mientras estás leyendo otra cosa, y la información
+ * que aportaba ya la da el estado.
  *
- * ⚠️ **El de reposo de cada estado va el primero**, y el orden importa: es el que
- * se pinta en el servidor y el que se ve sin JavaScript. Si el primero fuera un
- * parpadeo, la cara aparecería con los ojos cerrados en cada carga.
+ * Lo que se conserva es lo que sí informa: que la cara **cambia con lo que está
+ * pasando**. Eso no es animación, es estado — y sin ello, un asistente que tarda
+ * ocho segundos parece colgado.
  */
-export const PRAX_FACES: Record<PraxMood, readonly string[]> = {
-  /* En reposo mira de frente, parpadea, y de vez en cuando se distrae mirando a
-     un lado. Lo de mirar a los lados es lo que más «piensa por su cuenta» dice. */
-  idle: ['^-^', '^-^', '-_-', 'o-o', '^-<', '>-^'],
-  /* Pensando: los ojos se van arriba y a los lados, que es lo que hace cualquiera
-     al buscar algo en la cabeza. Ninguno es una cara de esfuerzo: no está
-     sufriendo, está mirando sus datos. */
-  thinking: ['o_o', 'o_o', '^_o', 'o_^', '-_o', 'o_-'],
-  /* Contento: ojos cerrados hacia arriba, que es como se sonríe de verdad, y un
-     par de fotogramas con la boca abierta para el momento de responder. */
-  happy: ['^o^', '^o^', '^u^', '^-^', '^O^'],
-  /* Apretados y torcidos. Ni asustado ni enfadado: incómodo, que es lo que toca
-     cuando el que ha fallado eres tú. */
-  oops: ['>_<', '>_<', 'x_x', '>_o', 'T_T'],
+export const PRAX_FACES: Record<PraxMood, string> = {
+  /* De frente y contento de estar ahí. La cara por defecto de todo el producto. */
+  idle: '^-^',
+  /* Los ojos muy abiertos: está mirando sus datos, no sufriendo. */
+  thinking: 'o_o',
+  /* Ojos arqueados hacia arriba, que es como se sonríe de verdad. */
+  happy: '^o^',
+  /* Apretados. Ni asustado ni enfadado: incómodo, que es lo que toca cuando el
+     que ha fallado eres tú. */
+  oops: '>_<',
 };
-
-/** El fotograma de reposo: el que se sirve desde el servidor. Ver arriba. */
-function caraEnReposo(mood: PraxMood): string {
-  return PRAX_FACES[mood][0];
-}
 
 /** Qué se dice de cada estado, para quien no ve la cara. */
 const PRAX_LABELS: Record<PraxMood, string> = {
@@ -81,24 +69,6 @@ const PRAX_LABELS: Record<PraxMood, string> = {
   happy: `${PRAX_NAME} ha respondido`,
   oops: `${PRAX_NAME} no ha podido`,
 };
-
-/**
- * Cada cuánto cambia de gesto, en milisegundos.
- *
- * `[minimo, maximo]` y se sortea dentro: un intervalo fijo se lee como un reloj y
- * deja de parecer vivo a los diez segundos. Pensando va más rápido —está
- * haciendo algo— y en reposo va lento, porque una cara que se mueve cada segundo
- * en una esquina de la pantalla es una distracción, no compañía.
- */
-const RITMO: Record<PraxMood, [number, number]> = {
-  idle: [2600, 5200],
-  thinking: [420, 900],
-  happy: [900, 1800],
-  oops: [1400, 2600],
-};
-
-/** Cuánto dura el gesto antes de volver al reposo del estado. */
-const DURACION_DEL_GESTO = 260;
 
 export type PraxSize = 'xs' | 'sm' | 'md' | 'lg';
 
@@ -124,14 +94,6 @@ const MEDIDAS: Record<PraxSize, { caja: string; cara: string; radio: string }> =
 export interface PraxAvatarProps {
   mood?: PraxMood;
   size?: PraxSize;
-  /**
-   * Quieto, sin gestos.
-   *
-   * Para donde la cara es un **icono** y no un personaje: la entrada de la barra
-   * lateral, por ejemplo, donde algo que parpadea al lado de «Mensajes» y
-   * «Proyectos» pide atención que no le corresponde.
-   */
-  quieto?: boolean;
   className?: string;
 }
 
@@ -148,21 +110,13 @@ export interface PraxAvatarProps {
  *    `data-theme`. Un PNG habría necesitado dos archivos y acordarse de los dos.
  * 2. **No pesa nada** ni añade una petición a la carga inicial.
  * 3. **Escala** de 20 px en la barra lateral a 80 px en su portada sin borrarse.
- * 4. **Se mueve**, que es lo que la convierte en información y no en adorno:
- *    mientras el modelo tarda, esta cara es lo único que dice que sigue vivo.
+ * 4. **Cambia con el estado**, que es lo que la convierte en información y no en
+ *    adorno: mientras el modelo tarda, esta cara es lo único que dice que sigue
+ *    vivo.
  *
- * ## ⚠️ La animación es de cliente, y el primer fotograma es de servidor
- *
- * El componente lleva `'use client'` porque los gestos necesitan temporizadores.
- * Pero **arranca siempre en el fotograma de reposo**, que es el que se sirve
- * desde el servidor: así el HTML y el primer render del cliente pintan lo mismo y
- * no hay desajuste de hidratación — que con un fotograma sorteado al azar
- * saltaría en cada carga.
- *
- * Y con `prefers-reduced-motion` no se mueve en absoluto. Una cara que gesticula
- * es exactamente el tipo de movimiento decorativo que esa preferencia pide
- * quitar, y aquí quitarlo no cuesta información: el estado se sigue leyendo en la
- * cara de reposo y en el `aria-label`.
+ * Es un componente **de servidor**: sin estado, sin efectos y sin `'use client'`.
+ * Lo fue de cliente mientras tuvo gestos animados; al quitarlos, arrastrar toda
+ * una isla de JavaScript para pintar tres caracteres dejó de tener sentido.
  *
  * ⚠️ El degradado va en `background` inline y no en una clase de Tailwind porque
  * se construye con `alpha()` sobre los tokens; una utilidad literal no puede
@@ -170,50 +124,8 @@ export interface PraxAvatarProps {
  * en silencio** si no está en `@theme static` — la trampa que documenta
  * `theme.css`.
  */
-export function PraxAvatar({
-  mood = 'idle',
-  size = 'md',
-  quieto = false,
-  className = '',
-}: PraxAvatarProps) {
+export function PraxAvatar({ mood = 'idle', size = 'md', className = '' }: PraxAvatarProps) {
   const medidas = MEDIDAS[size];
-  const [cara, setCara] = useState(() => caraEnReposo(mood));
-
-  /* Al cambiar de estado se vuelve a su reposo al momento, sin esperar al
-     temporizador: si no, PRAX se quedaba sonriendo medio segundo después de
-     fallar. */
-  useEffect(() => {
-    setCara(caraEnReposo(mood));
-  }, [mood]);
-
-  useEffect(() => {
-    if (quieto) return;
-
-    /* La preferencia se consulta aquí y no con una clase CSS porque lo que hay
-       que apagar no es una transición, es un `setTimeout` que cambia el texto. */
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-
-    const gestos = PRAX_FACES[mood];
-    const [minimo, maximo] = RITMO[mood];
-    let vuelta: ReturnType<typeof setTimeout>;
-
-    function programar(): ReturnType<typeof setTimeout> {
-      const espera = minimo + Math.random() * (maximo - minimo);
-      return setTimeout(() => {
-        /* De la lista sin contar el reposo, que ya es lo que se está viendo. */
-        const gesto = gestos[1 + Math.floor(Math.random() * (gestos.length - 1))];
-        setCara(gesto);
-        vuelta = setTimeout(() => setCara(caraEnReposo(mood)), DURACION_DEL_GESTO);
-        siguiente = programar();
-      }, espera);
-    }
-
-    let siguiente = programar();
-    return () => {
-      clearTimeout(siguiente);
-      clearTimeout(vuelta);
-    };
-  }, [mood, quieto]);
 
   return (
     <span
@@ -236,7 +148,7 @@ export function PraxAvatar({
     >
       {/* La cara sube un pelo: los guiones bajos y las `o` tiran del peso hacia
           abajo, y centrada geométricamente parece descolgada. */}
-      <span style={{ transform: 'translateY(-0.04em)' }}>{cara}</span>
+      <span style={{ transform: 'translateY(-0.04em)' }}>{PRAX_FACES[mood]}</span>
     </span>
   );
 }

@@ -80,12 +80,40 @@ export interface AssistantChatProps {
    * ofrecer un botón que no podría cumplir lo que promete.
    */
   alAceptarGrafico?: AceptarGrafico;
+  /**
+   * Qué forma toma la conversación.
+   *
+   * - `panel` — una tarjeta con borde, alto acotado, entre otras cosas. Es la de
+   *   Análisis, donde el chat comparte pantalla con los gráficos y no puede
+   *   quedárselo todo.
+   * - `pantalla` — sin tarjeta, ocupando el alto disponible, con el hilo
+   *   desplazándose por dentro y el compositor abajo del todo. Es la de su propia
+   *   zona, donde **la conversación es la pantalla**.
+   *
+   * Es una prop y no dos componentes porque lo único que cambia es el envoltorio:
+   * el hilo, las burbujas, las propuestas, el historial y la cuota son idénticos,
+   * y duplicarlos sería duplicar el sitio donde se arregla el próximo fallo.
+   */
+  variante?: 'panel' | 'pantalla';
 }
 
+/**
+ * Las preguntas de arranque.
+ *
+ * ⚠️ **No son ejemplos de sintaxis, son puertas de entrada.** Las tres primeras
+ * piden un dato y las dos últimas abren una conversación —«qué debería mirar»,
+ * «ayúdame a repartir»— que es donde el asistente aporta algo que un informe no
+ * puede: no solo decir cómo va, sino qué hacer con ello.
+ *
+ * Cinco y no más: una rejilla de nueve sugerencias se lee como un menú y quita
+ * las ganas de escribir la propia, que es lo que de verdad se quiere.
+ */
 const SUGERENCIAS = [
   '¿Cómo va el proyecto?',
   '¿Dónde se está acumulando el trabajo?',
-  '¿Para cuándo estaría vacío el tablero?',
+  '¿Qué debería mirar hoy?',
+  'Ayúdame a repartir lo que está sin encargado',
+  '¿Hay algo que lleve parado demasiado tiempo?',
 ];
 
 /**
@@ -134,7 +162,9 @@ export function AssistantChat({
   etiquetas,
   sugerenciaExterna = null,
   alAceptarGrafico,
+  variante = 'panel',
 }: AssistantChatProps) {
+  const aPantalla = variante === 'pantalla';
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
@@ -285,8 +315,22 @@ export function AssistantChat({
     <AccionDelLienzo.Provider value={alAceptarGrafico ?? null}>
       <section
         ref={seccionRef}
-        className="flex flex-col gap-4 rounded-2xl border p-5"
-        style={{ borderColor: alpha(colors.primary, 25), background: colors.surface }}
+        className={
+          aPantalla
+            ? /* Sin tarjeta y sin borde: aquí no hay nada de lo que separarse,
+                 porque la conversación **es** la pantalla. `min-h-0` es lo que
+                 permite que el hilo de dentro se desplace en vez de estirar el
+                 contenedor — sin él, un `flex-1` con contenido largo crece y el
+                 scroll se lo queda la página entera, que es justo lo que se
+                 quiere evitar en un chat. */
+              'flex min-h-0 flex-1 flex-col gap-4'
+            : 'flex flex-col gap-4 rounded-2xl border p-5'
+        }
+        style={
+          aPantalla
+            ? undefined
+            : { borderColor: alpha(colors.primary, 25), background: colors.surface }
+        }
         aria-label={`${PRAX_NAME}, el asistente`}
       >
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -402,11 +446,17 @@ export function AssistantChat({
             }}
           />
         ) : (
-          <>
+          /* En pantalla completa esto tiene que ser una columna que crezca: el
+             hilo se lleva el alto sobrante y el compositor se queda abajo. Un
+             fragmento no puede llevar clases, así que aquí sí hace falta un
+             `div` — en modo panel es transparente porque no lleva ninguna. */
+          <div className={aPantalla ? 'flex min-h-0 flex-1 flex-col gap-4' : 'contents'}>
             {mensajes.length > 0 && (
               <div
                 ref={hiloRef}
-                className="flex max-h-[28rem] flex-col gap-4 overflow-y-auto pr-1"
+                className={`scrollbar-slim flex flex-col gap-4 overflow-y-auto pr-1 ${
+                  aPantalla ? 'min-h-0 flex-1' : 'max-h-[28rem]'
+                }`}
                 aria-live="polite"
               >
                 {mensajes.map((mensaje) => (
@@ -569,21 +619,63 @@ export function AssistantChat({
               </div>
             )}
 
-            {mensajes.length === 0 && (
-              <div className="flex flex-wrap gap-2">
-                {SUGERENCIAS.map((sugerencia) => (
-                  <button
-                    key={sugerencia}
-                    type="button"
-                    disabled={agotada}
-                    onClick={() => enviar(sugerencia)}
-                    className="rounded-full border border-border px-3 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {sugerencia}
-                  </button>
-                ))}
-              </div>
-            )}
+            {mensajes.length === 0 &&
+              (aPantalla ? (
+                /**
+                 * El recibimiento, **dentro del hilo y en el sitio donde va a
+                 * aparecer la primera respuesta**.
+                 *
+                 * Antes esto era una portada aparte encima del chat: la cara
+                 * grande, cuatro tarjetas de capacidades y un aviso. Ocupaba
+                 * media pantalla para decir algo que solo hace falta leer una
+                 * vez, y empujaba la conversación —que es a lo que se viene—
+                 * hacia abajo.
+                 *
+                 * Ahora vive donde estaba el vacío: se lee al entrar, y en
+                 * cuanto se escribe la primera pregunta desaparece solo, sin
+                 * dejar hueco. Es la diferencia entre una pantalla con un chat
+                 * dentro y una pantalla que **es** un chat.
+                 */
+                <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
+                  <PraxAvatar mood="idle" size="lg" />
+
+                  <div className="flex max-w-lg flex-col gap-2">
+                    <p className="font-display text-2xl text-text-primary">
+                      Pregúntame por este proyecto
+                    </p>
+                    <p className="font-serif text-base italic text-text-secondary">
+                      Sé qué hay en cada tablero, quién lleva qué y cómo va el ritmo. Puedo
+                      responder con esos números, y también preparar el trabajo que salga de
+                      hablarlo.
+                    </p>
+                  </div>
+
+                  <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                    {SUGERENCIAS.map((sugerencia) => (
+                      <Sugerencia
+                        key={sugerencia}
+                        texto={sugerencia}
+                        agotada={agotada}
+                        onElegir={enviar}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* En el panel de Análisis no hay sitio para un recibimiento: el
+                   chat comparte pantalla con los gráficos y su cabecera ya dice
+                   qué es. Solo las sugerencias, que son lo accionable. */
+                <div className="flex flex-wrap gap-2">
+                  {SUGERENCIAS.map((sugerencia) => (
+                    <Sugerencia
+                      key={sugerencia}
+                      texto={sugerencia}
+                      agotada={agotada}
+                      onElegir={enviar}
+                    />
+                  ))}
+                </div>
+              ))}
 
             {agotada && cuota ? (
               <p
@@ -654,7 +746,7 @@ export function AssistantChat({
                 {error && <p className="font-sans text-sm text-error">{error}</p>}
               </form>
             )}
-          </>
+          </div>
         )}
       </section>
     </AccionDelLienzo.Provider>
@@ -680,22 +772,89 @@ function ContadorCuota({ cuota }: { cuota: AssistantQuota }) {
   );
 }
 
+/**
+ * Una pregunta de arranque.
+ *
+ * Existe como componente porque se pinta en los dos modos y con el mismo
+ * aspecto: tenerlo dos veces en línea era el sitio perfecto para que uno se
+ * quedara sin el `disabled` al agotarse la cuota.
+ */
+function Sugerencia({
+  texto,
+  agotada,
+  onElegir,
+}: { texto: string; agotada: boolean; onElegir: (texto: string) => void }) {
+  return (
+    <button
+      type="button"
+      disabled={agotada}
+      onClick={() => onElegir(texto)}
+      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {texto}
+    </button>
+  );
+}
+
+/** `14:07`. Solo la hora: la conversación es de hoy o no importa cuándo fue. */
+const HORA = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Un turno de la conversación.
+ *
+ * ## Se parece a las burbujas de Mensajes, y es a propósito
+ *
+ * Mismo radio, mismo relleno, mismo tinte —`color-mix` del primario contra el
+ * fondo para lo tuyo, `surface-elevated` para lo suyo— y la esquina de dentro
+ * cuadrada. Hablar con PRAX y hablar con una persona son la misma clase de gesto,
+ * y dos lenguajes visuales para lo mismo se aprenden dos veces.
+ *
+ * ## ⚠️ Y **deliberadamente** no se parece en nada más
+ *
+ * La burbuja del chat de equipo lleva menú de tres puntos, copiar, responder,
+ * citar, abrir hilo, fijar, reacciones, marcas de leído y deslizamiento táctil.
+ * Aquí no hay nada de eso, y no por falta de tiempo:
+ *
+ * - **Responder, citar y abrir hilo** no significan nada en una conversación de
+ *   dos donde cada mensaje ya responde al anterior.
+ * - **Fijar y reaccionar** existen para que otros lo vean, y aquí no hay otros:
+ *   esta conversación es tuya y de nadie más.
+ * - **Las marcas de leído** contestarían a «¿lo ha visto?» sobre alguien que
+ *   siempre lo ve.
+ *
+ * Lo único que se queda es **la hora**, que sí sirve: al releer un hilo de hace
+ * días, dice cuándo se dijo cada cosa.
+ *
+ * ⚠️ La hora se calcula al pintar y no viene del servidor. En un mensaje recién
+ * enviado eso es exacto; al releer una conversación guardada, `createdAt` no
+ * viaja hasta esta burbuja y se enseña la del momento en que se cargó. Es la
+ * razón por la que la hora va tenue y pequeña, y no como un dato del que fiarse
+ * para nada que importe.
+ */
 function Burbuja({ mensaje }: { mensaje: Mensaje }) {
   const mio = mensaje.role === 'user';
 
   return (
-    <div className={`flex ${mio ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex flex-col gap-1 ${mio ? 'items-end' : 'items-start'}`}>
       <div
         className={[
-          'max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 font-sans text-sm leading-relaxed',
-          mio ? 'text-text-primary' : 'text-text-secondary',
+          'max-w-[85%] min-w-0 whitespace-pre-wrap rounded-2xl px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
+          /* La esquina de dentro, cuadrada: es lo que da el pico hacia quien
+             habla sin necesidad de dibujar ninguno. Igual que en Mensajes. */
+          mio ? 'rounded-br-md' : 'rounded-bl-md',
         ].join(' ')}
-        style={
-          mio ? { background: alpha(colors.primary, 14) } : { background: colors.surfaceElevated }
-        }
+        style={{
+          background: mio
+            ? `color-mix(in srgb, ${colors.primary} 16%, ${colors.background})`
+            : colors.surfaceElevated,
+        }}
       >
         <ModelText texto={mensaje.text} />
       </div>
+
+      <span className="px-1 font-sans text-[11px] tabular-nums text-text-disabled">
+        {HORA.format(new Date())}
+      </span>
     </div>
   );
 }

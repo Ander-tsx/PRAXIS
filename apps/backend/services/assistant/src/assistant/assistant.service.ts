@@ -407,7 +407,23 @@ export class AssistantService {
     if (propuestas.length > 1) {
       return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
     }
-    return 'No he sabido responder a eso.';
+
+    /**
+     * ⚠️ **Sin texto y sin propuestas.** Decía «No he sabido responder a eso», y
+     * era la peor frase de todo el sistema: culpa a la persona por su pregunta
+     * cuando lo que ha pasado es que el modelo devolvió una llamada a función que
+     * la validación descartó —una columna que no existe, una tarea de otro
+     * proyecto— o simplemente se quedó callado.
+     *
+     * Ahora dice lo que de verdad pasó y **deja la puerta abierta**, que es lo
+     * único que se puede hacer desde aquí: no hay forma de saber cuál de los dos
+     * casos fue sin mirar los logs, pero los dos se arreglan igual, repitiéndolo
+     * con más contexto.
+     */
+    return (
+      'Me he quedado sin respuesta para eso. Puede que lo que iba a proponerte no ' +
+      'encajara con el proyecto. Cuéntamelo de otra forma y lo intento otra vez.'
+    );
   }
 
   /**

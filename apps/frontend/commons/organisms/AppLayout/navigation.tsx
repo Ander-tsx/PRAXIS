@@ -121,12 +121,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * aplicaciones. La cara dice **quién**, que es lo que hace que se reconozca
      * de un vistazo entre siete entradas que por lo demás son líneas grises.
      *
-     * `quieto` porque aquí es un icono y no un personaje: algo parpadeando al
-     * lado de «Proyectos» y «Mensajes» pide una atención que no le corresponde.
-     * Los gestos se los queda su propia pantalla y el panel de Análisis, donde sí
-     * son la señal de que está trabajando.
+     * En `xs`, que es la única medida pensada para ir en una fila junto a
+     * iconos de trazo: más grande compite con ellos y deja de leerse como parte
+     * de la misma lista.
      */
-    icon: <PraxAvatar size="xs" quieto />,
+    icon: <PraxAvatar size="xs" />,
   },
   {
     /**

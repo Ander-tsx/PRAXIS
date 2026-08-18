@@ -1,4 +1,3 @@
-import { PraxHero } from '@/components/organisms/PraxHero';
 import { PraxScreen } from '@/components/templates/PraxScreen';
 import {
   AppHeader,
@@ -8,11 +7,10 @@ import {
   type Paginated,
   type Project,
   type ProjectMember,
-  displayName,
   personName,
   resolveProfiles,
 } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
 /**
@@ -68,12 +66,6 @@ export default async function AssistantPage({ searchParams }: PageProps) {
   const { p } = await searchParams;
   const api = createServerApiClient();
 
-  /* Solo para el saludo. Va con la lista en paralelo: no decide nada, así que
-     no puede hacer esperar a lo que sí. */
-  const perfilPromesa = loadCurrentUser()
-    .then((usuario) => displayName(usuario.profile))
-    .catch(() => '');
-
   /**
    * ⚠️ **No se atrapa el fallo, y es a propósito.**
    *
@@ -96,10 +88,7 @@ export default async function AssistantPage({ searchParams }: PageProps) {
   if (!activo) {
     return (
       <AppHeader title="Asistente">
-        <div className="flex flex-col gap-6">
-          <PraxHero nombre={await perfilPromesa} />
-          <SinProyectos />
-        </div>
+        <SinProyectos />
       </AppHeader>
     );
   }
@@ -141,9 +130,17 @@ export default async function AssistantPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Asistente">
-      <div className="flex flex-col gap-6">
-        <PraxHero nombre={await perfilPromesa} proyecto={activo.name} />
-
+      {/**
+       * ⚠️ **La pantalla entera es el chat**, y por eso esto no lleva el
+       * `flex-col gap-6` de las demás páginas: la conversación tiene que poder
+       * estirarse hasta el borde inferior y desplazarse por dentro.
+       *
+       * El alto sale de `100dvh` menos la barra de `AppHeader` (4 rem) y el
+       * relleno del contenedor (2 · 1,5 rem en escritorio). `dvh` y no `vh`
+       * porque en un móvil la barra del navegador aparece y desaparece: con
+       * `vh` el compositor se queda debajo del pliegue justo cuando escribes.
+       */}
+      <div className="flex min-h-[calc(100dvh-4rem-2rem)] flex-col sm:min-h-[calc(100dvh-4rem-3rem)]">
         <PraxScreen
           projectId={projectId}
           proyectos={proyectos}

@@ -42,7 +42,10 @@ export function PraxScreen({
   etiquetas,
 }: PraxScreenProps) {
   return (
-    <div className="flex flex-col gap-4">
+    /* `min-h-0` en toda la cadena hasta el hilo: es lo que hace que el scroll se
+       lo quede la conversación y no la página. Sin él, un flex hijo no encoge por
+       debajo de su contenido y el compositor se va al fondo del documento. */
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/**
        * El selector, solo cuando hay entre qué elegir.
        *
@@ -71,6 +74,10 @@ export function PraxScreen({
         cuotaInicial={cuotaInicial}
         nombres={nombres}
         etiquetas={etiquetas}
+        /* Aquí la conversación **es** la pantalla: sin tarjeta, ocupando el alto
+           disponible y con el compositor abajo del todo. En Análisis el mismo
+           organismo va en modo `panel`. */
+        variante="pantalla"
       />
     </div>
   );
