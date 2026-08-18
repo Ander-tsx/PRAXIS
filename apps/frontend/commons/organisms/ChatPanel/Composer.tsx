@@ -19,13 +19,13 @@ import {
 } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
 import {
-  CapaEtiquetas,
+  TagLayer,
   type Etiqueta,
-  TIPOGRAFIA_CAMPO,
-  serializarCampo,
-  trozosDeCampo,
-  visibleDe,
-} from './etiquetado';
+  FIELD_TYPOGRAPHY,
+  serializeField,
+  fieldChunks,
+  visibleLabel,
+} from './tagging';
 
 /** Tope de un mensaje. Espejo de `CHAT_MESSAGE_MAX` en `@praxis/contracts`. */
 export const CHAT_MESSAGE_MAX = 4000;
@@ -80,7 +80,7 @@ export interface ComposerProps {
    * Con qué texto nace el campo. **Solo se lee al montar.**
    *
    * Es lo que permite reutilizar este mismo compositor para editar un mensaje
-   * ya enviado: se le pasa el cuerpo ya disfrazado (`campoDesdeCuerpo`) y desde
+   * ya enviado: se le pasa el cuerpo ya disfrazado (`fieldFromBody`) y desde
    * ahí se escribe con las mismas menciones, las mismas referencias de `/` y el
    * mismo tamaño de campo que al escribirlo por primera vez. El editor
    * anterior era un `<textarea>` aparte, más pequeño y sin desplegables.
@@ -237,7 +237,7 @@ export function Composer({
   function elegir(sugerencia: Sugerencia) {
     if (!disparador) return;
 
-    const visible = visibleDe(sugerencia.kind, sugerencia.label);
+    const visible = visibleLabel(sugerencia.kind, sugerencia.label);
 
     /* Un espacio detrás: sin él, seguir escribiendo pega la palabra a la
        etiqueta y el desplegable se vuelve a abrir sobre ella. */
@@ -309,7 +309,7 @@ export function Composer({
   }, [citaId]);
 
   /** Los trozos del texto, marcando cuáles son etiqueta. Ver `etiquetado.tsx`. */
-  const trozos = useMemo(() => trozosDeCampo(texto, etiquetas), [texto, etiquetas]);
+  const trozos = useMemo(() => fieldChunks(texto, etiquetas), [texto, etiquetas]);
 
   function enviar() {
     /* Un mensaje puede ir solo con archivos: si no hay texto ni adjuntos, no
@@ -317,7 +317,7 @@ export function Composer({
     const puedeEnviar = adjuntosPendientes.length > 0 || texto.trim().length > 0;
     if (!puedeEnviar || enviando || subiendo) return;
     onEnviar(
-      serializarCampo(trozos).trim(),
+      serializeField(trozos).trim(),
       adjuntosPendientes.map((a) => a.id),
     );
     /* Editando no se vacía: si el guardado falla, lo escrito tiene que seguir
@@ -528,7 +528,7 @@ export function Composer({
         >
           <div className="relative min-w-0 flex-1">
             {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
-            <CapaEtiquetas trozos={trozos} capaRef={capaRef} className="max-h-40 overflow-hidden" />
+            <TagLayer trozos={trozos} capaRef={capaRef} className="max-h-40 overflow-hidden" />
 
             <textarea
               ref={areaRef}
@@ -558,7 +558,7 @@ export function Composer({
               }}
               /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
                  se pinta aparte con `caret-color`, o el campo parecería muerto. */
-              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${TIPOGRAFIA_CAMPO}`}
+              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-disabled disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
               style={{ caretColor: colors.textPrimary }}
             />
           </div>

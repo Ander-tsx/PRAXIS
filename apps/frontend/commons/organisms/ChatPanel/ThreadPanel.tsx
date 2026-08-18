@@ -7,7 +7,7 @@ import { colors } from '../../tokens';
 import { useSidebarPlegada } from '../AppLayout/AppShell';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
-import { campoDesdeCuerpo } from './etiquetado';
+import { fieldFromBody } from './tagging';
 
 export interface ThreadPanelProps {
   /** El mensaje que abre el hilo. */
@@ -263,7 +263,7 @@ export function ThreadPanel({
             subiendo={subiendo}
             {...(editando
               ? {
-                  valorInicial: campoDesdeCuerpo(editando.body),
+                  valorInicial: fieldFromBody(editando.body),
                   onCancelar: () => setEditando(null),
                   etiquetaEnviar: 'Guardar',
                   ocultarAdjuntos: true,

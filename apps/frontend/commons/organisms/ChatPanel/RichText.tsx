@@ -125,7 +125,7 @@ const PATRON_MARKDOWN =
  * se reutiliza una instancia compartida: se crea una nueva por llamada (el mismo
  * patrón que usa `splitMessage` por el mismo motivo).
  */
-export function pintarMarkdown(texto: string): ReactNode[] {
+export function renderMarkdown(texto: string): ReactNode[] {
   const patron = new RegExp(PATRON_MARKDOWN.source, 'gim');
   const nodos: ReactNode[] = [];
   let desde = 0;
@@ -206,7 +206,7 @@ export function RichText({ cuerpo, hrefDeRef, currentUserId }: RichTextProps) {
       {trozos.map((trozo, indice) => {
         if (trozo.tipo === 'texto') {
           // biome-ignore lint/suspicious/noArrayIndexKey: los trozos no tienen id propio y la lista solo cambia si cambia el mensaje entero
-          return <Fragment key={indice}>{pintarMarkdown(trozo.texto)}</Fragment>;
+          return <Fragment key={indice}>{renderMarkdown(trozo.texto)}</Fragment>;
         }
 
         if (trozo.tipo === 'url') {

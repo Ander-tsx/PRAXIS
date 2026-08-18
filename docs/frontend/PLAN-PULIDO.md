@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · E4 ✅ · E6 ✅ · **solo queda E5** |
-| **Última tarea terminada** | E5.3 — lote 2 (`commons/api/`) |
-| **Siguiente** | E5.4 — lote 3 (`ChatPanel`, el más grande) |
+| **Última tarea terminada** | E5.4 — lote 3 (`ChatPanel`) |
+| **Siguiente** | E5.5 y E5.6 — backend (chat/realtime de projects y gateway), juntos |
 | **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
@@ -799,7 +799,49 @@ de ESTADO-ACTUAL §17.7.
 
       ✅ Las siete zonas compilan, cero menciones viejas en comentarios, y
       `ui/05-equipo` + `ui/06-chat-zona` en verde (5).
-- [ ] **E5.4 — Lote 3: `commons/organisms/ChatPanel/`.** El más grande.
+- [x] **E5.4 — Lote 3: `commons/organisms/ChatPanel/`.** El más grande: 5.849
+      líneas en 9 archivos. Renombrada la **superficie exportada** y los dos
+      ficheros del módulo (`AdjuntoPreview.tsx → AttachmentPreview.tsx`,
+      `etiquetado.tsx → tagging.tsx`).
+
+      | Antes | Ahora |
+      |---|---|
+      | `AdjuntoPreview` | `AttachmentPreview` |
+      | `ChatAcciones` | `ChatActions` |
+      | `CapaEtiquetas` | `TagLayer` |
+      | `TrozoDeCampo` / `trozosDeCampo` | `FieldChunk` / `fieldChunks` |
+      | `campoDesdeCuerpo` / `serializarCampo` | `fieldFromBody` / `serializeField` |
+      | `pintarMarkdown` | `renderMarkdown` |
+      | `visibleDe` | `visibleLabel` |
+
+      🔴 **El primer intento se revirtió entero, y es la lección más importante
+      de E5.** Metí en el mapa palabras españolas de uso común —`etiqueta`,
+      `trozo`— porque dentro de este módulo son identificadores. El renombrado
+      global las cambió **también en la prosa y en los textos que lee el
+      usuario**: quedaron comentarios como «una tarea, una columna o una tag» y
+      un mensaje de error que decía **«El servidor no guardó la tag.»**. 80
+      ficheros tocados, y **todo compilaba** — una cadena de texto no da error de
+      tipos.
+
+      Es exactamente lo que este plan quiere evitar: el código en inglés no puede
+      costar que la prosa deje de estar bien escrita en español.
+
+      ⚠️ **Reglas que salen de ahí, y valen para los lotes que quedan:**
+      1. **Una palabra que existe en español corriente no se renombra
+         globalmente.** O se acota a los ficheros del módulo, o no se toca.
+      2. **Solo son seguros los identificadores inequívocos** — los compuestos y
+         los `PascalCase` que nadie escribiría en una frase.
+      3. **Revisar el diff buscando prosa y literales**, no solo que compile. La
+         compilación no distingue una variable de una frase.
+
+      ⚠️ Quedan sin traducir los **locales** de `ChatPanel.tsx` y
+      `MessageBubble.tsx` (`mensaje`, `hilo`, `fijado`…). No por olvido: ahí
+      `message`, `pinned` y `reactions` **ya existen** como props del dominio —52,
+      8 y 8 usos— así que renombrar los locales encima los sombrearía. Es un lote
+      aparte que pide ir archivo por archivo, y se anota como tal en E5.7.
+
+      ✅ Las siete zonas compilan, la prosa española sobrevive —comprobado— y
+      `ui/06-chat-zona` en verde (4).
 - [ ] **E5.5 — Lote 4: `apps/backend/services/projects/src/{chat,realtime}/`.**
 - [ ] **E5.6 — Lote 5: gateway (`presence`, `notifications`).**
 - [ ] **E5.7 — El resto**, zona por zona.

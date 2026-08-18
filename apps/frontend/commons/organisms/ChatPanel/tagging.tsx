@@ -36,7 +36,7 @@ export interface Etiqueta {
 }
 
 /** Un trozo del campo: texto suelto, o una etiqueta con su id detrás. */
-export interface TrozoDeCampo {
+export interface FieldChunk {
   texto: string;
   etiqueta?: Etiqueta;
 }
@@ -46,10 +46,10 @@ export interface TrozoDeCampo {
  * estas clases exactas. Cualquier diferencia de fuente o relleno desplaza el
  * resaltado respecto al cursor.
  */
-export const TIPOGRAFIA_CAMPO = 'px-2 py-1.5 font-sans text-sm leading-relaxed';
+export const FIELD_TYPOGRAPHY = 'px-2 py-1.5 font-sans text-sm leading-relaxed';
 
 /** Cómo se ve una etiqueta en el campo: `@Nombre` para personas, el título si no. */
-export function visibleDe(kind: ChatRefKind, label: string): string {
+export function visibleLabel(kind: ChatRefKind, label: string): string {
   return kind === 'user' ? `@${label}` : label;
 }
 
@@ -62,8 +62,8 @@ export function visibleDe(kind: ChatRefKind, label: string): string {
  * trozo del texto, no se encuentra y se ignora — el mensaje sale con lo que de
  * verdad quedó escrito.
  */
-export function trozosDeCampo(texto: string, etiquetas: Etiqueta[]): TrozoDeCampo[] {
-  const salida: TrozoDeCampo[] = [];
+export function fieldChunks(texto: string, etiquetas: Etiqueta[]): FieldChunk[] {
+  const salida: FieldChunk[] = [];
   let desde = 0;
 
   for (const etiqueta of etiquetas) {
@@ -79,7 +79,7 @@ export function trozosDeCampo(texto: string, etiquetas: Etiqueta[]): TrozoDeCamp
 }
 
 /** Los trozos con los ids pegados: es lo que viaja al servidor. */
-export function serializarCampo(trozos: TrozoDeCampo[]): string {
+export function serializeField(trozos: FieldChunk[]): string {
   return trozos
     .map((trozo) =>
       trozo.etiqueta
@@ -102,13 +102,13 @@ export function serializarCampo(trozos: TrozoDeCampo[]): string {
  * referencia que se pinta bien se edita bien, sin un segundo analizador que
  * pueda discrepar del primero.
  */
-export function campoDesdeCuerpo(cuerpo: string): { texto: string; etiquetas: Etiqueta[] } {
+export function fieldFromBody(cuerpo: string): { texto: string; etiquetas: Etiqueta[] } {
   const etiquetas: Etiqueta[] = [];
   let texto = '';
 
   for (const trozo of splitMessage(cuerpo)) {
     if (trozo.tipo === 'ref') {
-      const visible = visibleDe(trozo.kind, trozo.label);
+      const visible = visibleLabel(trozo.kind, trozo.label);
       etiquetas.push({ kind: trozo.kind, id: trozo.id, visible });
       texto += visible;
     } else if (trozo.tipo === 'url') {
@@ -127,12 +127,12 @@ export function campoDesdeCuerpo(cuerpo: string): { texto: string; etiquetas: Et
  * Va detrás de un `<textarea>` de tinta transparente, así que **tiene que medir
  * exactamente lo mismo que él**. Ver el aviso del `box-shadow`, abajo.
  */
-export function CapaEtiquetas({
+export function TagLayer({
   trozos,
   capaRef,
   className = '',
 }: {
-  trozos: TrozoDeCampo[];
+  trozos: FieldChunk[];
   capaRef?: React.RefObject<HTMLDivElement | null>;
   /** Tope de alto y desbordamiento: los pone quien monta el campo. */
   className?: string;
@@ -141,7 +141,7 @@ export function CapaEtiquetas({
     <div
       ref={capaRef}
       aria-hidden="true"
-      className={`pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-text-primary ${TIPOGRAFIA_CAMPO} ${className}`}
+      className={`pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-text-primary ${FIELD_TYPOGRAPHY} ${className}`}
     >
       {trozos.map((trozo, indice) =>
         trozo.etiqueta ? (

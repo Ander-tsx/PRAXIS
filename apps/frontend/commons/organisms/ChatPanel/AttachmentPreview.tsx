@@ -18,7 +18,7 @@ const ICONO_POR_TIPO = {
  * corresponde, delante. Un componente y no repetir el `if` del icono en los
  * cuatro sitios que lo usan.
  */
-export function AdjuntoPreview({
+export function AttachmentPreview({
   mensaje,
   maximo,
 }: {

@@ -16,10 +16,10 @@ import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
 import { usePresence } from '../../realtime';
 import { alpha, colors } from '../../tokens';
-import { AdjuntoPreview } from './AdjuntoPreview';
+import { AttachmentPreview } from './AttachmentPreview';
 import { Composer, type Sugerencia } from './Composer';
 import { RichText } from './RichText';
-import { campoDesdeCuerpo } from './etiquetado';
+import { fieldFromBody } from './tagging';
 
 export interface MessageBubbleProps {
   message: ChatMessage;
@@ -825,7 +825,7 @@ export function MessageBubble({
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
               <span className="line-clamp-2 font-sans text-xs text-text-secondary">
-                <AdjuntoPreview mensaje={message.replyTo} />
+                <AttachmentPreview mensaje={message.replyTo} />
               </span>
             </div>
           )}

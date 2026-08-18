@@ -23,12 +23,12 @@ import { Avatar } from '../../atoms/Avatar';
 import { useRefrescoAgrupado } from '../../hooks';
 import { useLiveEvent, useReconnection } from '../../realtime';
 import { alpha, colors } from '../../tokens';
-import { AdjuntoPreview } from './AdjuntoPreview';
+import { AttachmentPreview } from './AttachmentPreview';
 import { Composer, type Sugerencia } from './Composer';
 import { MessageBubble } from './MessageBubble';
 import { PinnedBar } from './PinnedBar';
 import { ThreadPanel } from './ThreadPanel';
-import { campoDesdeCuerpo } from './etiquetado';
+import { fieldFromBody } from './tagging';
 
 /** Cuántos mensajes trae cada tirón del historial. */
 const PAGINA = 50;
@@ -42,7 +42,7 @@ const PAGINA = 50;
  */
 const CORTE_DE_BLOQUE_MS = 5 * 60_000;
 
-export interface ChatAcciones {
+export interface ChatActions {
   /**
    * `enHilo` separa «responder» de «hilo»: los dos citan con `replyToId`,
    * pero solo un envío desde el panel del hilo (`enHilo: true`) se guarda
@@ -141,7 +141,7 @@ export interface ChatPanelProps {
    */
   directorio: Directory;
   currentUserId: string;
-  acciones: ChatAcciones;
+  acciones: ChatActions;
 
   /** Proxy de la zona, sin barra final: `/dashboard/api/gateway`. */
   gatewayPath: string;
@@ -1789,7 +1789,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             {mensaje.pinnedAt && <span className="text-text-disabled">📌</span>}
                           </span>
                           <span className="mt-0.5 line-clamp-2 block font-sans text-sm text-text-secondary">
-                            <AdjuntoPreview mensaje={mensaje} />
+                            <AttachmentPreview mensaje={mensaje} />
                           </span>
                         </button>
                       </li>
@@ -1835,7 +1835,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 citaId={respondiendo?.id ?? null}
                 {...(editando
                   ? {
-                      valorInicial: campoDesdeCuerpo(editando.body),
+                      valorInicial: fieldFromBody(editando.body),
                       onCancelar: () => setEditando(null),
                       etiquetaEnviar: 'Guardar',
                       ocultarAdjuntos: true,
@@ -1864,7 +1864,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                               Respondiendo a {nombreDeAutor(respondiendo.authorId)}
                             </span>
                             <span className="line-clamp-1 font-sans text-xs text-text-secondary">
-                              <AdjuntoPreview mensaje={respondiendo} />
+                              <AttachmentPreview mensaje={respondiendo} />
                             </span>
                           </span>
                           <button

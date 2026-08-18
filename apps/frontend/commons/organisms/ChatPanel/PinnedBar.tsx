@@ -2,7 +2,7 @@
 
 import type { ChatMessage } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
-import { AdjuntoPreview } from './AdjuntoPreview';
+import { AttachmentPreview } from './AttachmentPreview';
 
 export interface PinnedBarProps {
   /** Los fijados, del más reciente al más antiguo — el mismo orden que da el servidor. */
@@ -146,7 +146,7 @@ export function PinnedBar({
             <span className="font-medium text-text-primary">
               {nombreDeAutor(actual.authorId)}:{' '}
             </span>
-            <AdjuntoPreview mensaje={actual} maximo={RESUMEN_MAXIMO} />
+            <AttachmentPreview mensaje={actual} maximo={RESUMEN_MAXIMO} />
           </span>
         </button>
 
@@ -194,7 +194,7 @@ export function PinnedBar({
                   {nombreDeAutor(mensaje.authorId)}
                 </span>
                 <span className="font-sans text-xs text-text-secondary" style={UNA_LINEA}>
-                  <AdjuntoPreview mensaje={mensaje} maximo={RESUMEN_MAXIMO} />
+                  <AttachmentPreview mensaje={mensaje} maximo={RESUMEN_MAXIMO} />
                 </span>
               </span>
             </button>
