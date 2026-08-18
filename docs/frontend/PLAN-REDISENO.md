@@ -9,9 +9,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R2 — Administración |
-| **Última tarea terminada** | R1.8 — el panel entero |
-| **Siguiente** | R2.1 |
+| **Etapa actual** | R4 — Análisis (R4.1 hecho) |
+| **Última tarea terminada** | R4.1 — `/reports` deja de redirigir |
+| **Siguiente** | R4.2 |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -26,6 +26,10 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | (fuera de plan) | `ab5e9ae` | `main` no compilaba: `MessageBubble` llamaba a `campoDesdeCuerpo`, renombrado a `fieldFromBody` en `c356208`. Bloqueaba el typecheck de las siete zonas |
 | 2026-08-18 | R1.1 | `139f6e2` | `ProjectCard` a `commons`, parametrizada con `href` / `sameZone` / `gatewayPath` |
 | 2026-08-18 | R1.2 – R1.8 | `bc801c5` | Panel entero. Dos consultas de tareas pasan a una; `ProjectList`, `DashboardMetrics` y `DashboardWelcome` retirados |
+| 2026-08-18 | R1 (cierre) | `f1b17a2` | Registro de las dos desviaciones respecto a lo planeado |
+| 2026-08-18 | R2.1 – R2.5 | `4211b03` | Administración entera. `DataTable`, `RowActions`, `FilterBar`, `AdminHeader`; tres errores de lint que ya estaban |
+| 2026-08-18 | (ajeno) | `3c34162` | Commit de la cuenta del usuario sobre esta rama. Ver «El incidente de la rama» |
+| 2026-08-18 | R3.1 – R3.7 + R4.1 | `0689295` | Zona `assistant-front`, identidad PRAX, `AssistantChat` y `ProjectPicker` a commons, borrado del asistente, y Análisis sin redirect |
 
 ---
 
@@ -207,19 +211,19 @@ saltarse una, la tarea está mal planteada.
 
 ### Tareas
 
-- [ ] **R2.1 — `molecules/DataTable`.** Una **sola** rejilla para cabecera y
+- [x] **R2.1 — `molecules/DataTable`.** Una **sola** rejilla para cabecera y
       filas, con anchos deterministas y `auto` prohibido, más el modo tarjeta en
       móvil que ya existe y funciona bien. Las tres tablas pasan por ahí, así que
       el fallo no puede volver por una de ellas.
-- [ ] **R2.2 — Las acciones de fila, a un menú.** Tres puntos, con el motivo del
+- [x] **R2.2 — Las acciones de fila, a un menú.** Tres puntos, con el motivo del
       bloqueo dentro en vez de en un `title`. La fila se lee, y lo destructivo
       deja de estar a un clic de distancia.
-- [ ] **R2.3 — Cabecera de sección con cifras**, sacadas de los `total` que ya
+- [x] **R2.3 — Cabecera de sección con cifras**, sacadas de los `total` que ya
       vienen. Sin peticiones nuevas.
-- [ ] **R2.4 — Barras de filtro.** Buscador con el icono **dentro** —ojo con
+- [x] **R2.4 — Barras de filtro.** Buscador con el icono **dentro** —ojo con
       §40.5, que ya se pintó debajo del campo una vez—, filtros como segmentos,
       contador de resultados y salida del filtro cuando no hay ninguno.
-- [ ] **R2.5 — `AdminTabs`** se lee como navegación, no como una fila de botones.
+- [x] **R2.5 — `AdminTabs`** se lee como navegación, no como una fila de botones.
 
 ### Lo que no cambia
 
@@ -234,29 +238,29 @@ viven en otros microservicios donde la cascada no llega.
 
 ### Tareas
 
-- [ ] **R3.1 — PRAX, la identidad, en un solo sitio.** Nombre, avatar **SVG** con
+- [x] **R3.1 — PRAX, la identidad, en un solo sitio.** Nombre, avatar **SVG** con
       carita kaomoji y estados —reposo, pensando, respondiendo, error— sobre el
       primario de la marca. SVG y no imagen: pesa nada, escala, y sigue al tema
       claro/oscuro sin un segundo archivo.
-- [ ] **R3.2 — La zona `assistant-front`** en el 4107, `basePath: '/assistant'`.
+- [x] **R3.2 — La zona `assistant-front`** en el 4107, `basePath: '/assistant'`.
       Checklist de zona nueva (§17.7): `proxy.ts` con su guard **y `'/'` como
       entrada aparte del matcher** (§17.6), `api/gateway/[...path]` con
       `createGatewayProxy()`, `globals.css` que importe `theme.css` y añada solo
       su `@source` y sus `@font-face` con el basePath, `layout.tsx` con `AppShell`,
       `error.tsx` y `not-found.tsx`.
-- [ ] **R3.3 — Enganchar la zona:** `rewrites()` del `web-shell` con **las dos**
+- [x] **R3.3 — Enganchar la zona:** `rewrites()` del `web-shell` con **las dos**
       entradas (`/assistant` y `/assistant/:path*`), `scripts/dev-cli/config/services.mjs`,
       Docker/infra, `.env` y la entrada en `APP_NAV_ITEMS` entre Análisis y Mensajes.
-- [ ] **R3.4 — `AssistantChat` sube a `commons/organisms`** con sus piezas
+- [x] **R3.4 — `AssistantChat` sube a `commons/organisms`** con sus piezas
       (`ProposalCard`, `ProposalGroup`, `FlujoDePensamiento`, `ConversationHistory`,
       `ModelText`). Lo van a usar dos zonas. Los comentarios se mueven intactos.
-- [ ] **R3.5 — La pantalla `/assistant`.** Conversación a pantalla completa,
+- [x] **R3.5 — La pantalla `/assistant`.** Conversación a pantalla completa,
       **proyecto opcional** en vez de obligatorio, historial de conversaciones y la
       cuota a la vista de quien la gasta.
-- [ ] **R3.6 — El panel contextual en Análisis.** Un cajón lateral que monta el
+- [x] **R3.6 — El panel contextual en Análisis.** Un cajón lateral que monta el
       mismo organismo con el proyecto ya puesto, para que quien esté mirando un
       gráfico pueda preguntar sin cambiar de pantalla ni volver a dar contexto.
-- [ ] **R3.7 — «Más agéntico»: herramientas nuevas, incluido el borrado.**
+- [x] **R3.7 — «Más agéntico»: herramientas nuevas, incluido el borrado.**
       Lo que se amplía es el catálogo de **propuestas** y el contexto de
       **lectura**; lo que no se toca es que el asistente no ejecuta.
       - `proponer_borrado` de tarea, con `taskId` y motivo. Requiere
@@ -302,7 +306,7 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
 
 ### Tareas
 
-- [ ] **R4.1 — Las rutas, sin un solo redirect.** `/reports` pasa a ser la
+- [x] **R4.1 — Las rutas, sin un solo redirect.** `/reports` pasa a ser la
       pantalla real. El proyecto activo sale de una cookie
       (`praxis_reports_project`), con caída al primero con `canViewReports`.
       `/reports/[id]` se queda para enlaces directos y **escribe la cookie**.
@@ -357,6 +361,34 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
 - [ ] **R5.3 — Verificación.** `pnpm e2e:regresion` si el stack levanta en esta
       máquina. Si no levanta, **se dice**: «compila» no es «funciona», y esa
       distinción ya costó seis fallos en producción.
+
+---
+
+## ⚠️ El incidente de la rama (2026-08-18)
+
+Queda escrito porque volverá a pasar y cuesta media hora entenderlo.
+
+A media tarea alguien hizo `git checkout main` sobre este mismo árbol de trabajo.
+Durante un rato estuve editando archivos **sobre `main`**, no sobre la rama, y al
+volver parecía que se había perdido todo: `git log` no mostraba ninguno de los
+commits y los archivos modificados habían «vuelto atrás».
+
+Lo que había pasado de verdad:
+
+1. Los commits estaban intactos en `feature/rediseno-panel-admin-analisis`. El
+   `reflog` lo dijo en la primera línea (`checkout: moving from … to main`).
+2. Los archivos **sin seguimiento** (una zona nueva entera, por ejemplo)
+   sobreviven a un `checkout`, así que el trabajo nuevo seguía ahí.
+3. Los cambios sobre archivos **ya seguidos** sí se perdieron, y hubo que
+   reaplicarlos.
+4. Y un commit hecho desde fuera (`3c34162`) **capturó de rebote lo que estaba en
+   el índice**: los `git mv` de `AssistantChat` y `assistant.ts` a `commons`
+   estaban preparados, así que se los llevó — pero sin los arreglos de imports,
+   que estaban sin preparar. La rama quedó un rato sin compilar por eso.
+
+**Lo que hay que hacer si vuelve a pasar:** `git reflog` antes que nada, volver a
+la rama, y comprobar qué sobrevivió con `git status` **antes** de reescribir
+nada. Y no dar por perdido lo que no esté en `git log`.
 
 ---
 
