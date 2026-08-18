@@ -1146,7 +1146,7 @@ export function MessageBubble({
           )}
 
           {hayAcciones && !editandose && (
-            <div className={`absolute top-0 z-30 max-md:hidden ${mine ? 'right-0' : 'left-0'}`}>
+            <div className={`absolute top-0 max-md:hidden ${mine ? 'right-0' : 'left-0'}`}>
               <button
                 type="button"
                 onClick={() => (menuAbierto ? setMenuAbierto(false) : abrirMenu())}
@@ -1154,7 +1154,7 @@ export function MessageBubble({
                 aria-expanded={menuAbierto}
                 aria-haspopup="menu"
                 title="Acciones"
-                className={`flex h-7 w-10 cursor-pointer items-start justify-center pt-1.5 transition-opacity duration-100 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/burbuja:pointer-events-auto group-hover/burbuja:opacity-100 ${
+                className={`relative z-30 flex h-7 w-10 cursor-pointer items-start justify-center pt-1.5 transition-opacity duration-100 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/burbuja:pointer-events-auto group-hover/burbuja:opacity-100 ${
                   menuAbierto ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                 }`}
                 /**
@@ -1198,7 +1198,7 @@ export function MessageBubble({
               {menuAbierto && (
                 <div
                   role="menu"
-                  className={`absolute z-30 flex w-52 flex-col overflow-hidden rounded-xl border py-1 ${
+                  className={`absolute z-50 flex w-52 flex-col overflow-hidden rounded-xl border py-1 ${
                     menuArriba ? 'bottom-full mb-1' : 'top-full mt-1'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
