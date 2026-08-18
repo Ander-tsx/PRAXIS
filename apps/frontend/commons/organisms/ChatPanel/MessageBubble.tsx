@@ -535,7 +535,7 @@ export function MessageBubble({
    *
    * ⚠️ **Lo que se copia es lo que se lee, no lo que se guarda.** El cuerpo
    * viaja con los ids dentro —`@[María](user:2222-…)`— y pegar eso en otro
-   * sitio sería pegar un UUID. `campoDesdeCuerpo` deshace el disfraz igual que
+   * sitio sería pegar un UUID. `fieldFromBody` deshace el disfraz igual que
    * al editar, así que se copia `@María`.
    *
    * El acuse es la propia fila, que dice «Copiado» y cierra sola: sin él no hay
@@ -545,7 +545,7 @@ export function MessageBubble({
 
   async function copiar() {
     try {
-      await navigator.clipboard.writeText(campoDesdeCuerpo(message.body).texto);
+      await navigator.clipboard.writeText(fieldFromBody(message.body).texto);
       setCopiado(true);
       setTimeout(() => {
         setCopiado(false);
@@ -1006,7 +1006,6 @@ export function MessageBubble({
            * siempre `px-3.5 py-2`.
            */}
 
-
           {/**
            * El pie de la burbuja: hora, «editado» y los checks de lectura.
            *
@@ -1362,7 +1361,9 @@ export function MessageBubble({
         </div>
 
         {mostrarMarcaDeHilo && message._count.replies > 0 && (
-          <div className={`flex items-center gap-2 mt-1 ${mine ? 'flex-row-reverse mr-2' : 'ml-2'}`}>
+          <div
+            className={`flex items-center gap-2 mt-1 ${mine ? 'flex-row-reverse mr-2' : 'ml-2'}`}
+          >
             <div
               className={`w-4 h-5 border-b-2 ${
                 mine ? 'border-r-2 rounded-br-xl -mr-1' : 'border-l-2 rounded-bl-xl -ml-1'
@@ -1376,7 +1377,8 @@ export function MessageBubble({
               style={{ color: colors.textSecondary }}
               title="Ver las respuestas"
             >
-              {message._count.replies} {message._count.replies === 1 ? 'respuesta al hilo' : 'respuestas al hilo'}
+              {message._count.replies}{' '}
+              {message._count.replies === 1 ? 'respuesta al hilo' : 'respuestas al hilo'}
             </button>
           </div>
         )}
