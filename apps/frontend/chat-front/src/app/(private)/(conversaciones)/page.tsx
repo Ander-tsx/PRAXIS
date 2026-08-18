@@ -1,6 +1,13 @@
 import { ULTIMO_CHAT_COOKIE, conversacionRecordada } from '@/lib/ultimo-chat';
+import type { DirectConversation } from '@praxis/commons';
+import { createServerApiClient } from '@praxis/commons/auth';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+
+/** Un chat de proyecto en la bandeja, con lo poco que hace falta aquí. */
+interface ChatDeProyecto {
+  project: { id: string };
+}
 
 /**
  * Mensajes, sin conversación en la URL.
@@ -17,6 +24,26 @@ import { redirect } from 'next/navigation';
  * un `redirect()`, y una cookie es algo que manda el navegador, no algo en lo
  * que se pueda confiar por haberla escrito nosotros.
  *
+ * ## 🔴 Y validar la **forma** no basta: hay que comprobar que siga existiendo
+ *
+ * Reportado por el usuario: entrar en Mensajes redirigía solo a una conversación
+ * y daba **404**. La cookie era correcta —un UUID bien formado, escrito por
+ * nosotros— pero apuntaba a alguien que ya no comparte proyecto, o a una cuenta
+ * que ya no está.
+ *
+ * Lo grave no es el 404: es que ocurría **al entrar**, así que la persona no
+ * podía llegar al directorio **nunca**. Cada intento de abrir Mensajes la
+ * mandaba de vuelta al mismo 404, sin forma de salir salvo conociendo otra URL.
+ * Un atajo de conveniencia dejaba inservible la pantalla entera.
+ *
+ * Por eso ahora se comprueba contra las conversaciones que la persona tiene de
+ * verdad. Si la recordada ya no está, **no se redirige** y se enseña el
+ * directorio, que es exactamente lo que hace falta en ese momento.
+ *
+ * ⚠️ La cookie obsoleta **no se borra aquí**: una page no puede escribir
+ * cookies, solo puede hacerlo el proxy o una Server Action. No hace falta —
+ * queda inerte y la pisa la próxima conversación que se abra.
+ *
  * ⚠️ **No redirige a la primera de la lista cuando no hay recuerdo**, que era la
  * razón original de que esta pantalla existiera: abrir una conversación que
  * nadie pidió **marca sus mensajes como leídos** sin que los haya visto nadie.
@@ -24,10 +51,13 @@ import { redirect } from 'next/navigation';
  */
 export default async function ChatVacioPage() {
   const recordada = conversacionRecordada((await cookies()).get(ULTIMO_CHAT_COOKIE)?.value);
-  /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`) al
-     redirigir. Con el `/chat/` de cuando esto vivía en dashboard-front saldría
-     `/chat/chat/<uuid>`, que es un 404. */
-  if (recordada) redirect(`/${recordada}`);
+
+  if (recordada && (await sigueAccesible(recordada))) {
+    /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`) al
+       redirigir. Con el `/chat/` de cuando esto vivía en dashboard-front saldría
+       `/chat/chat/<uuid>`, que es un 404. */
+    redirect(`/${recordada}`);
+  }
 
   return (
     <div className="flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed border-border p-8">
@@ -37,4 +67,31 @@ export default async function ChatVacioPage() {
       </p>
     </div>
   );
+}
+
+/**
+ * ¿La conversación recordada sigue estando entre las suyas?
+ *
+ * Se pregunta por las listas que ya alimentan el directorio, así que no se
+ * inventa una comprobación nueva: si sale en la columna de la izquierda, se
+ * puede abrir; si no sale, redirigir allí es mandar a un 404.
+ *
+ * ⚠️ **Ante un fallo de red se responde `false`, no `true`.** Las dos opciones
+ * son malas y hay que elegir la que se pueda deshacer: no redirigir deja el
+ * directorio delante —con su propio mensaje si tampoco cargó— y quien mira
+ * puede pulsar. Redirigir a ciegas sobre un gateway caído reproduce justo el
+ * fallo que esto arregla, y sin salida.
+ */
+async function sigueAccesible(recordada: string): Promise<boolean> {
+  const api = createServerApiClient();
+  const deProyecto = recordada.startsWith('proyecto/');
+
+  if (deProyecto) {
+    const projectId = recordada.slice('proyecto/'.length);
+    const chats = await api.get<ChatDeProyecto[]>('/me/chats/projects').catch(() => null);
+    return chats?.some((chat) => chat.project.id === projectId) ?? false;
+  }
+
+  const conversaciones = await api.get<DirectConversation[]>('/me/chats').catch(() => null);
+  return conversaciones?.some((conversacion) => conversacion.peerId === recordada) ?? false;
 }

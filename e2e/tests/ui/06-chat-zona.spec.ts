@@ -233,3 +233,59 @@ test.describe('El chat en su propia zona', () => {
     await expect(page.getByText(texto).first()).toBeVisible({ timeout: 20_000 });
   });
 });
+
+/**
+ * Entrar en Mensajes con un recuerdo que ya no vale.
+ *
+ * ## El fallo que fija
+ *
+ * Reportado por el usuario. El proxy de la zona anota la última conversación
+ * abierta en una cookie y el índice redirige a ella — «vuelve a donde lo
+ * dejaste». La cookie se validaba en la **forma** (un UUID, para que su valor no
+ * pudiera convertir el redirect en uno abierto) pero no en si esa conversación
+ * **seguía existiendo**.
+ *
+ * Con un compañero que sale de un proyecto compartido, o una cuenta que
+ * desaparece, el recuerdo apunta a un sitio que ya devuelve 404. Y lo grave no
+ * es el 404: es que ocurría **al entrar**, así que la persona no llegaba al
+ * directorio **nunca** — cada intento de abrir Mensajes la devolvía al mismo
+ * error, sin salida salvo conociendo otra URL. Un atajo de conveniencia dejaba
+ * inservible la pantalla entera.
+ *
+ * ## Por qué con una cookie inventada y no reproduciendo el escenario
+ *
+ * El escenario real —dar de alta a alguien, hablar, sacarlo del proyecto— prueba
+ * lo mismo con cuatro llamadas más y una dependencia extra: que sacar a alguien
+ * de un proyecto rompa la conversación privada, que es **otra** regla y ya tiene
+ * su sitio. Lo que aquí importa es qué hace el índice ante un recuerdo que no
+ * resuelve, y eso una cookie a un id inexistente lo dice igual de bien.
+ */
+test.describe('El recuerdo de la última conversación', () => {
+  test('un recuerdo que ya no vale no deja atrapado en un 404', async ({ page, context }) => {
+    const api = await contextoDePeticion.newContext({
+      baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
+    });
+    const { duenno } = await parejaQueSePuedeEscribir(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, duenno.email);
+
+    /* Un id con forma válida y sin nadie detrás: es justo lo que queda en la
+       cookie cuando la otra persona deja de ser accesible. */
+    await context.addCookies([
+      {
+        name: 'praxis_ultimo_chat',
+        value: '99999999-9999-4999-8999-999999999999',
+        domain: 'localhost',
+        path: '/',
+      },
+    ]);
+
+    await page.goto('/chat');
+
+    /* Lo que se exige no es «no hay 404»: es que se llegue al **directorio**,
+       que es la pantalla desde la que se puede seguir. */
+    await expect(page.getByRole('navigation', { name: 'Conversaciones' })).toBeVisible();
+    await expect(page).toHaveURL(/\/chat\/?$/);
+  });
+});
