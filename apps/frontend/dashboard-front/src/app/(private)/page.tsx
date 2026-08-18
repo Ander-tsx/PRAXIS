@@ -5,15 +5,17 @@ import {
 } from '@/app/actions';
 import { FiltroDeAvisos } from '@/components/molecules/FiltroDeAvisos';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
-import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
-import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
+import { DashboardHero, resumenDelDia } from '@/components/organisms/DashboardHero';
+import { DashboardProjects } from '@/components/organisms/DashboardProjects';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { NotificationList } from '@/components/organisms/NotificationList';
-import { ProjectList } from '@/components/organisms/ProjectList';
+import { QuickAccess } from '@/components/organisms/QuickAccess';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
 import { VoiceCallout } from '@/components/organisms/VoiceCallout';
+import { WorkPulse } from '@/components/organisms/WorkPulse';
 import { agruparPorDia } from '@/lib/notifications';
 import { type VoiceLink, estaActiva } from '@/lib/voice';
+import { MAX_TAREAS_DEL_PANEL, splitWork } from '@/lib/work';
 import {
   AppHeader,
   CreateProjectDialog,
@@ -24,8 +26,9 @@ import {
   Pagination,
   type Project,
   type Task,
+  type UserProfile,
+  colors,
   displayName,
-  dueState,
   resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
@@ -62,6 +65,17 @@ const SIN_LEER = 'sin-leer';
 const PARAM_PAGINA = 'avisos_page';
 const PARAM_FILTRO = 'avisos_filtro';
 
+/**
+ * Las anclas de la propia página, a las que apuntan las cifras del pulso.
+ *
+ * Van como constantes y no escritas a mano en los dos sitios porque el `id` y el
+ * `href` tienen que coincidir **exactamente** y un desajuste no da ningún error:
+ * la cifra simplemente deja de llevar a ninguna parte, que es lo que hacía toda
+ * la pantalla antes de esta pasada.
+ */
+const ANCLA_TRABAJO = 'trabajo';
+const ANCLA_AVISOS = 'avisos';
+
 interface PageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
@@ -97,9 +111,16 @@ function hrefInterno(page: number, soloSinLeer: boolean): string {
   return `/${queryDeAvisos(page, soloSinLeer)}`;
 }
 
-/** Para un `<a>` duro: con el prefijo completo. La consume `Pagination`. */
+/**
+ * Para un `<a>` duro: con el prefijo completo. La consume `Pagination`.
+ *
+ * ⚠️ Y **acaba en el ancla de la bandeja**. Sin eso, pasar de página devolvía al
+ * principio del panel y había que volver a bajar hasta la lista que se estaba
+ * leyendo — un fallo que solo aparece desde que la bandeja no es la pantalla
+ * entera sino su última sección.
+ */
 function hrefAbsoluto(page: number, soloSinLeer: boolean): string {
-  return `/dashboard${queryDeAvisos(page, soloSinLeer)}`;
+  return `/dashboard${queryDeAvisos(page, soloSinLeer)}#${ANCLA_AVISOS}`;
 }
 
 /**
@@ -110,6 +131,24 @@ function hrefAbsoluto(page: number, soloSinLeer: boolean): string {
  *
  * La ruta la protege `src/proxy.ts`; `loadCurrentUser` vuelve a exigir sesión
  * porque la autorización nunca debe depender de una sola capa.
+ *
+ * ## La forma de la pantalla, y por qué esta
+ *
+ * Era una **pila de siete secciones a 1400 px**: bienvenida, invitaciones,
+ * avisos de tareas, aviso de voz, métricas, proyectos y bandeja, una debajo de
+ * otra. Todo del mismo ancho y del mismo peso, así que la jerarquía había que
+ * deducirla del orden, y los proyectos —que son el objeto principal de la
+ * aplicación— quedaban a medio scroll con veinte filas de bandeja debajo.
+ *
+ * Ahora son cuatro alturas con un criterio:
+ *
+ * 1. **La cabecera dice en una frase qué pasa hoy** (`resumenDelDia`), en vez de
+ *    un subtítulo idéntico para todo el mundo todos los días.
+ * 2. **Lo que espera una decisión** —las invitaciones— sigue lo primero, porque
+ *    es lo único de la pantalla donde alguien está esperando por ti.
+ * 3. **Cuatro cifras que se pueden pulsar**, y debajo el reparto de tu trabajo.
+ * 4. **Dos columnas**: a la izquierda lo que hay que mirar (tareas y proyectos),
+ *    a la derecha a dónde ir. La bandeja cierra, a lo ancho, como antes.
  */
 export default async function DashboardPage({ searchParams }: PageProps) {
   const { userId, profile, roles } = await loadCurrentUser();
@@ -119,22 +158,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const paginaAvisos = Math.max(1, Number.parseInt(String(params[PARAM_PAGINA] ?? '1'), 10) || 1);
   const soloSinLeer = params[PARAM_FILTRO] === SIN_LEER;
 
-  /**
-   * Ya viene filtrado por el backend: proyectos donde el usuario es **dueño o
-   * miembro**. Antes había que filtrar aquí por `ownerId` porque `GET /projects`
-   * devolvía todos los del sistema, y el coste era que no aparecían los
-   * proyectos a los que te habían añadido.
-   */
-  /**
-   * Una sola petición cubre los dos avisos.
-   *
-   * Se pide la ventana entera —hasta dentro de `DUE_SOON_DAYS` días— y el
-   * reparto entre «vencidas» y «vencen pronto» se hace aquí comparando con
-   * ahora. Pedirlas por separado serían dos viajes para los mismos datos.
-   */
-  const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
-
-  const [page, invitations, voiceLinks, dueTasks, inbox] = await Promise.all([
+  const [page, invitations, voiceLinks, misTareas, inbox] = await Promise.all([
+    /**
+     * Ya viene filtrado por el backend: proyectos donde el usuario es **dueño o
+     * miembro**. Antes había que filtrar aquí por `ownerId` porque `GET /projects`
+     * devolvía todos los del sistema, y el coste era que no aparecían los
+     * proyectos a los que te habían añadido.
+     */
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api
@@ -145,13 +175,26 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     api
       .get<VoiceLink[]>('/alexa/links')
       .catch(() => [] as VoiceLink[]),
+    /**
+     * Tu trabajo abierto, **de una sola petición**.
+     *
+     * ⚠️ Antes eran dos consultas y ahora es una, y el motivo está en el
+     * `orderBy` de `findMyTasks`: ordena por `dueDate ASC`, y en Postgres los
+     * nulos de un `ASC` van **al final**. O sea que las primeras que llegan son
+     * las que vencen antes —que es justo lo que el panel necesita destacar— y lo
+     * que se queda fuera del tope es la cola de las lejanas y las sin fecha.
+     *
+     * Aquella pedía `dueBefore=<hoy+7d>` para sacar los dos avisos; quitando ese
+     * filtro sale lo mismo, **más** el reparto completo con el que se dibuja la
+     * tira del pulso. Ver `lib/work.ts` para el detalle, incluido por qué el
+     * `total` de la respuesta no se puede usar aquí.
+     *
+     * `excludeDone`: una tarea que ya está en la columna de cierre —la verde— no
+     * es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar el
+     * trabajo no quitaba el aviso y el panel mentía.
+     */
     api
-      /* `excludeDone`: una tarea que ya está en la columna de cierre —la verde—
-         no es un pendiente por mucho que su fecha haya pasado. Sin esto, cerrar
-         el trabajo no quitaba el aviso y el panel mentía. */
-      .get<Paginated<Task>>(
-        `/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&excludeDone=true&limit=50`,
-      )
+      .get<Paginated<Task>>(`/me/tasks?excludeDone=true&limit=${MAX_TAREAS_DEL_PANEL}`)
       .catch(() => ({ items: [] as Task[], total: 0 })),
     /**
      * ⚠️ **`null` es «no se pudo leer», no «no hay nada».**
@@ -170,19 +213,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       )
       .catch(() => null),
   ]);
+
   const projects = page.items;
 
   /**
-   * Vencidas y por vencer, separadas.
+   * Vencidas, por vencer, lejanas y sin fecha.
    *
-   * `dueState` decide con la misma regla que usa la tarjeta del tablero, así
-   * que un aviso y su tarjeta nunca se contradicen. Las sin fecha no llegan
-   * aquí: `dueBefore` ya las deja fuera en el backend.
+   * `splitWork` decide con `dueState`, la misma regla que usa la tarjeta del
+   * tablero, así que un aviso y su tarjeta nunca se contradicen.
    */
-  const overdue = dueTasks.items.filter((task) => dueState(task.dueDate) === 'overdue');
-  const dueSoon = dueTasks.items.filter((task) => dueState(task.dueDate) === 'soon');
-
-  const owned = projects.filter((project) => project.ownerId === userId);
+  const work = splitWork(misTareas.items);
 
   const totals = projects.reduce(
     (acc, project) => ({
@@ -200,44 +240,90 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const sinVoz = !voiceLinks.some(estaActiva);
 
   /**
-   * Las caras y los nombres de quienes salen en la bandeja.
+   * Las caras de esta pantalla, en **una sola** petición.
    *
-   * Los avisos guardan `actorId`: projects-service no conoce a las personas. Se
-   * piden **en una** petición y solo los de esta página —como mucho, uno por
-   * aviso—. Ver `commons/api/directory.ts` para el fallo que evita hacerlo de
-   * uno en uno.
+   * ⚠️ Aquí se juntan dos necesidades que antes no coexistían: quienes salen en
+   * la bandeja (`actorId` de cada aviso) y los equipos de las tarjetas de
+   * proyecto (los cuatro primeros `members` que trae `GET /projects`). Pedirlos
+   * por separado serían dos viajes, y hacerlo de uno en uno es el N+1 que
+   * documenta `commons/api/directory.ts` y que ya escribió «Alguien que ya no
+   * está» sobre gente que estaba perfectamente.
+   *
+   * El `Set` deduplica: quien te ha asignado una tarea suele estar además en el
+   * equipo del proyecto, así que la lista cruda repite bastante.
    */
-  const actores = inbox
-    ? [...new Set(inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id))]
+  const idsDeAvisos = inbox
+    ? inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id)
     : [];
-  const avisosPorPersona = (await resolveProfiles(api, actores)).perfiles;
+  const idsDeEquipos = projects.flatMap((project) =>
+    (project.members ?? []).map((miembro) => miembro.userId),
+  );
+  const directorio = await resolveProfiles(api, [...new Set([...idsDeAvisos, ...idsDeEquipos])]);
+
+  /**
+   * Proyecto → su equipo resuelto, con quien mira el primero.
+   *
+   * ⚠️ **`null` cuando el directorio no respondió**, y no una lista vacía: la
+   * tarjeta lo distingue y vuelve al número de miembros en vez de dibujar un
+   * equipo de cero personas sobre un proyecto que tiene ocho.
+   */
+  const equiposPorProyecto = new Map<string, UserProfile[] | null>(
+    projects.map((project) => {
+      if (!directorio.completo) return [project.id, null];
+
+      const equipo = (project.members ?? [])
+        .map((miembro) => directorio.perfiles.get(miembro.userId))
+        .filter((persona): persona is UserProfile => !!persona)
+        /* Tú primero: es la cara que se busca para saber si estás dentro, y el
+           `Avatar` la pinta en rojo. Mismo criterio que en la rejilla. */
+        .sort((a, b) => Number(b.id === userId) - Number(a.id === userId));
+
+      return [project.id, equipo];
+    }),
+  );
 
   /* Agrupar es del servidor: donde ya se resuelve el resto de la fila y donde no
      hay riesgo de que el reloj del navegador pinte otra cosa que la servida. */
   const gruposDeAvisos = inbox ? agruparPorDia(inbox.items) : [];
 
+  const crearProyecto = (
+    <CreateProjectDialog
+      action={createProjectAction}
+      borradorAction={borradorDePlantillaAction}
+      aplicarAction={crearProyectoDesdePlantillaAction}
+    />
+  );
+
   return (
     <AppHeader title="Panel">
       <div className="flex flex-col gap-8">
-        <DashboardWelcome name={name} email={profile.credential.email} roles={roles} />
+        <DashboardHero
+          name={name}
+          email={profile.credential.email}
+          roles={roles}
+          resumen={resumenDelDia({
+            vencidas: work.vencidas.length,
+            pronto: work.pronto.length,
+            invitaciones: invitations.length,
+            proyectos: projects.length,
+          })}
+          /* La acción principal solo cuando ya hay algo: sin proyectos, quien
+             invita a crear el primero es `DashboardEmptyState`, con su propio
+             botón grande y su explicación. Dos botones de crear en la misma
+             pantalla vacía compiten entre sí. */
+          accionSlot={projects.length > 0 ? crearProyecto : undefined}
+        />
 
         {/* Antes que nada: es lo único que espera una decisión, y el único
             sitio donde se entera de que le han invitado. */}
         <MyInvitations invitations={invitations} />
 
-        {/* Después de las invitaciones: aquellas esperan una decisión, esto
-            solo avisa. Pero antes de las métricas, que no urgen. */}
-        <TaskAlerts
-          overdue={overdue}
-          soon={dueSoon}
-          projectsById={new Map(projects.map((project) => [project.id, project]))}
-          soonDays={DUE_SOON_DAYS}
+        <WorkPulse
+          work={work}
+          sinLeer={inbox?.unread ?? null}
+          hrefTrabajo={`#${ANCLA_TRABAJO}`}
+          hrefAvisos={`#${ANCLA_AVISOS}`}
         />
-
-        {/* Detrás de invitaciones y avisos de tareas: aquello es trabajo que
-            espera, esto es una función que descubrir. Delante de las métricas
-            porque ahí abajo ya no lo ve nadie. */}
-        {sinVoz && <VoiceCallout />}
 
         {projects.length === 0 ? (
           <DashboardEmptyState
@@ -252,15 +338,61 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             }
           />
         ) : (
-          <>
-            <DashboardMetrics
-              projects={projects.length}
-              owned={owned.length}
-              workspaces={totals.workspaces}
-              members={totals.members}
-            />
-            <ProjectList projects={projects} currentUserId={userId} />
-          </>
+          /**
+           * Dos columnas a partir de `xl`, y no antes.
+           *
+           * En `lg` la columna de la izquierda se quedaría en unos 600 px, que es
+           * menos de lo que necesita una rejilla de tarjetas de proyecto para
+           * caber a dos por fila sin partir los nombres. Por debajo de eso todo
+           * se apila, que es lo correcto en una tableta en vertical.
+           */
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2.4fr)_minmax(0,1fr)] xl:items-start">
+            <div id={ANCLA_TRABAJO} className="flex min-w-0 flex-col gap-6 scroll-mt-6">
+              <TaskAlerts
+                overdue={work.vencidas}
+                soon={work.pronto}
+                projectsById={new Map(projects.map((project) => [project.id, project]))}
+                soonDays={DUE_SOON_DAYS}
+              />
+
+              {/**
+               * Cuando no hay nada que avisar, `TaskAlerts` devuelve `null` y el
+               * ancla se quedaba apuntando a un hueco. Decirlo con todas las
+               * letras vale más que un vacío: las cifras de arriba llevan aquí,
+               * y aterrizar en la nada se lee como que el enlace está roto.
+               */}
+              {work.vencidas.length === 0 && work.pronto.length === 0 && (
+                <p
+                  className="rounded-2xl border border-dashed px-6 py-8 text-center font-sans text-sm"
+                  style={{ borderColor: colors.border, color: colors.textSecondary }}
+                >
+                  {work.total === 0
+                    ? 'No tienes ninguna tarea asignada ahora mismo.'
+                    : 'Nada vencido ni por vencer esta semana. Tu trabajo abierto está más adelante.'}
+                </p>
+              )}
+
+              <DashboardProjects
+                projects={projects}
+                currentUserId={userId}
+                equiposPorProyecto={equiposPorProyecto}
+                total={page.total}
+              />
+            </div>
+
+            <aside className="flex min-w-0 flex-col gap-6">
+              <QuickAccess
+                roles={roles}
+                proyectos={page.total}
+                espacios={totals.workspaces}
+                miembros={totals.members}
+              />
+
+              {/* Detrás de los accesos: aquello se usa a diario y esto es una
+                  función que descubrir una vez. */}
+              {sinVoz && <VoiceCallout />}
+            </aside>
+          </div>
         )}
 
         {/**
@@ -275,11 +407,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
          * fuera de la pantalla. Y por orden de urgencia también le toca el
          * final: las invitaciones esperan una decisión y los avisos de tareas
          * apremian, mientras que esto es el registro de lo que ya pasó.
+         *
+         * Lo que sí ganó es una forma de llegar sin scroll: la cifra de «sin
+         * leer» del pulso apunta a este ancla.
          */}
-        <section className="flex flex-col gap-4" aria-labelledby="titulo-avisos">
-          <h2 id="titulo-avisos" className="font-display text-2xl text-text-primary">
-            Avisos
-          </h2>
+        <section id={ANCLA_AVISOS} className="flex flex-col gap-4 scroll-mt-6">
+          <h2 className="font-display text-2xl text-text-primary">Avisos</h2>
 
           {inbox === null ? (
             <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
@@ -290,7 +423,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               <NotificationList
                 grupos={gruposDeAvisos}
                 unread={inbox.unread}
-                usersById={avisosPorPersona}
+                usersById={directorio.perfiles}
                 soloSinLeer={soloSinLeer}
                 filtroSlot={
                   <FiltroDeAvisos

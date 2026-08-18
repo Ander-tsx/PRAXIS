@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { avatarHref } from '../../api/presence';
 import type { Project, UserProfile } from '../../api/domain';
 import { personLabel } from '../../api/domain';
+import { avatarHref } from '../../api/presence';
 import { Avatar, Badge, iniciales } from '../../atoms';
 import { alpha, colors, serieColors } from '../../tokens';
 
