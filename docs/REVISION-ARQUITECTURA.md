@@ -232,6 +232,43 @@ detalle:
 
 ---
 
+## 🔴 El despliegue sirve dos versiones a la vez, y eso se nota
+
+Verificado en producción el 18-08. Un `rolling-action replace` con
+`--max-unavailable 0` **no corta el servicio**, pero durante varios minutos hay
+**dos máquinas del grupo recibiendo tráfico**: la nueva y la vieja. El
+balanceador reparte entre las dos, así que una misma persona ve respuestas de
+las dos versiones alternándose.
+
+Lo que se vio: el chat en producción **sin conversaciones, sin chats de grupo y
+fallando al enviar**, de forma intermitente. No era un fallo del código —el
+backend nuevo respondía correctamente a todo— sino que aproximadamente la mitad
+de las peticiones iban a la imagen anterior, que no tenía esos cambios.
+
+⚠️ **Se diagnostica mal con facilidad.** El síntoma parece un fallo de la
+versión nueva, y lleva a buscar en el código recién desplegado. Lo que lo
+descarta en un minuto es preguntar al balanceador **cuántas instancias está
+sirviendo**:
+
+```
+gcloud compute backend-services get-health praxis-backend-servicio --region us-east1
+gcloud compute instance-groups managed describe praxis-backend-us-east1 \
+  --region us-east1 --format='value(status.isStable)'
+```
+
+Con `isStable=False` hay dos versiones vivas y **no se puede concluir nada** de
+lo que se vea en la aplicación. Hay que esperar.
+
+**Lo que merece decidirse**, y no está decidido: si esa inconsistencia es
+aceptable. Para un cambio de estilos lo es; para uno que añade rutas o cambia el
+contrato del chat, significa que durante el despliegue hay usuarios viendo una
+aplicación rota. Las salidas habituales son desplegar con la versión anterior
+todavía compatible, o aceptar una ventana corta de indisponibilidad real
+(`--max-unavailable 1` con una sola instancia) a cambio de que nadie vea dos
+versiones.
+
+---
+
 ## Dos trampas de entorno que cuestan una hora si no las conoces
 
 1. **Un servicio que no compila no se anuncia.** `pnpm dev:backend` sigue en pie
