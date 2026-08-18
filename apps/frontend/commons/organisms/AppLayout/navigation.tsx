@@ -92,6 +92,46 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
+     * PRAX, el asistente.
+     *
+     * ## Por qué tiene entrada propia
+     *
+     * Vivía dentro de Análisis, en un panel al lado de los gráficos, y eso lo
+     * definía: se le preguntaba por el informe que se estaba viendo. Pero sabe
+     * hacer bastante más —proponer tareas, repartir trabajo, escribir al chat
+     * del equipo— y nada de eso tiene que ver con estar mirando un percentil.
+     * Metido en una esquina, la mitad de lo que sabe no se descubría nunca.
+     *
+     * Va **después de Análisis y antes de Mensajes**, y el sitio no es
+     * arbitrario: Panel, Proyectos y Análisis son los tres sitios donde se mira
+     * el trabajo, y a partir de aquí empiezan los sitios donde se habla — con
+     * PRAX primero y con el equipo después.
+     *
+     * ⚠️ Sigue estando dentro de Análisis, con el proyecto ya puesto, para quien
+     * mira un gráfico y tiene una duda ahí mismo. Las dos pantallas montan el
+     * mismo organismo (`commons/organisms/AssistantChat`).
+     */
+    label: 'PRAX',
+    href: '/assistant',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        {/* Un bocadillo con una chispa: conversación, y algo que no es una
+            persona. El mismo par de ideas que la cara del avatar. */}
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M20 11.5c0 3.9-3.6 7-8 7-.9 0-1.8-.1-2.6-.4L5 19.5l1.2-3.1A6.6 6.6 0 014 11.5c0-3.9 3.6-7 8-7s8 3.1 8 7z"
+        />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8.2l.85 1.95L14.8 11l-1.95.85L12 13.8l-.85-1.95L9.2 11l1.95-.85z"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
      * Las conversaciones privadas.
      *
      * Va antes de Notificaciones porque es un sitio donde se **trabaja**, no un

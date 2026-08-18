@@ -458,6 +458,66 @@ const PROPONER_GRAFICO: FunctionDeclaration = {
 };
 
 /**
+ * Borrar una tarea.
+ *
+ * ## ⚠️ Esta herramienta no existía, y su ausencia estaba documentada tres veces
+ *
+ * El argumento era que el asistente no debía poder destruir nada, y que la
+ * garantía tenía que ser **estructural**: una capacidad que no se declara no se
+ * puede invocar, mientras que una regla del prompt que diga «nunca borres» se
+ * rodea con la pregunta adecuada.
+ *
+ * Se añade el 2026-08-18 por decisión explícita, y el argumento que la vetaba no
+ * se sostiene con el patrón de propuestas: **esto no borra nada**. Devuelve una
+ * propuesta, la persona la revisa y, si acepta, quien llama a `DELETE /tasks/:id`
+ * es el frontend con **su** sesión y **sus** permisos. Es técnicamente idéntico a
+ * que lo borre desde el tablero. Sin `canDeleteTask`, aceptar falla igual que le
+ * fallaría pulsando el botón a mano — y de hecho la herramienta ni se le declara.
+ *
+ * ## Lo que sí la hace distinta de las otras nueve
+ *
+ * **No se deshace.** Una tarea propuesta de más se borra; una borrada de más no
+ * vuelve, y se lleva por delante sus subtareas, su checklist, sus comentarios y
+ * sus adjuntos, que viven en otro microservicio. Por eso:
+ *
+ * - la descripción le prohíbe proponerlo por iniciativa propia;
+ * - `porQue` no vale con una frase de relleno: la tarjeta lo enseña como el
+ *   motivo por el que alguien va a perder trabajo;
+ * - y la tarjeta es destructiva a la vista, con su propia confirmación. Ver
+ *   `DeleteProposalCard`.
+ */
+const PROPONER_BORRADO: FunctionDeclaration = {
+  name: 'proponer_borrado',
+  description:
+    'Prepara una propuesta para BORRAR una tarea. NO la borra: la persona tiene que ' +
+    'aceptarla. ⚠️ Borrar NO SE DESHACE y se lleva las subtareas, el checklist, los ' +
+    'comentarios y los adjuntos. Usala SOLO cuando te pidan explicitamente borrar, ' +
+    'eliminar o quitar una tarea concreta. NUNCA la propongas por tu cuenta como ' +
+    'limpieza, ni para duplicados, ni para tareas viejas o paradas: para eso propon ' +
+    'moverlas o cerrarlas. Si tienes cualquier duda de CUAL es la tarea, PREGUNTA en ' +
+    'vez de proponer.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description:
+          'id de una tarea del inventario del contexto. Si lo que te han dicho encaja ' +
+          'con varias, no elijas: pregunta cual.',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Por que se borra ESTA tarea, con lo que te hayan dicho. La ' +
+          'tarjeta lo enseña junto al aviso de que no se puede deshacer, asi que una ' +
+          'frase generica ahi no ayuda a nadie a decidir.',
+      },
+    },
+    required: ['taskId', 'porQue'],
+  },
+};
+
+/**
  * Las herramientas que le tocan a esta persona.
  *
  * `canEditTask` implica `canMoveTask` y demás por jerarquía, y el mapa que llega
@@ -494,26 +554,45 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
    * los datos de otra forma no es tocar el trabajo de nadie.
    */
   if (permisos.canViewReports) tools.push(PROPONER_GRAFICO);
+  /**
+   * El borrado cuelga de `canDeleteTask`, igual que su endpoint.
+   *
+   * ⚠️ **Y va aparte, no colgado de `canEditTask`.** `canDeleteTask` sí implica
+   * `canEditTask`, `canMoveTask`, `canComment` y `canCreateTask` por jerarquía,
+   * así que quien llega aquí ya tiene todas las demás. Lo que no pasa al revés:
+   * quien edita **no** borra.
+   */
+  if (permisos.canDeleteTask) tools.push(PROPONER_BORRADO);
   return tools;
 }
 
 /**
- * ⚠️ **Aquí no hay, ni va a haber, una herramienta de borrado.**
+ * ⚠️ **Aquí hay exactamente UNA herramienta destructiva, y solo una.**
  *
- * No es un olvido ni una decisión que se pueda revisar a la ligera: es la
- * garantía de que el asistente no puede destruir nada. Y la garantía es
- * **estructural, no una instrucción** — el prompt no menciona el borrado a
- * propósito, porque una regla que dice «nunca borres» se rodea con la pregunta
- * adecuada, mientras que una capacidad que no existe no se puede invocar.
+ * Este bloque decía que no había ninguna ni la iba a haber. Cambió el
+ * 2026-08-18, y conviene que quede escrito **por qué el argumento de entonces no
+ * se sostenía**, para que no se reabra cada seis meses:
  *
- * Son tres capas y ninguna depende de que el modelo obedezca:
+ * La regla de la casa nunca fue «el asistente no borra». Es **«el asistente
+ * propone; ejecuta el código que ya existe»**. Y con el patrón de propuestas,
+ * borrar cumple esa regla igual que crear: la herramienta devuelve una
+ * propuesta, la persona la revisa, y quien llama a `DELETE /tasks/:id` es el
+ * frontend con su sesión y sus permisos. Es indistinguible de que lo borre desde
+ * el tablero.
  *
- * 1. la herramienta no se le declara, así que no tiene forma de expresarlo;
- * 2. `validarPropuesta` descarta cualquier `call` fuera de esta lista;
- * 3. las server actions solo saben llamar a los endpoints que tienen escritos.
+ * Las tres capas siguen intactas y ninguna depende de que el modelo obedezca:
  *
- * Si alguna vez alguien añade aquí algo destructivo, que sea sabiendo que
- * rompe las tres a la vez.
+ * 1. las herramientas se declaran **filtradas por permiso**, así que lo que no
+ *    te toca no se puede ni expresar;
+ * 2. `validarPropuesta` descarta cualquier `call` fuera de la lista, y comprueba
+ *    el `taskId` contra el inventario real del proyecto;
+ * 3. las server actions solo saben llamar a los endpoints que tienen escritos, y
+ *    el gateway vuelve a comprobar permisos en cada uno.
+ *
+ * Lo que **sí** es distinto del resto: un borrado **no se deshace**. Toda la
+ * diferencia está en la interfaz —la tarjeta es destructiva, lleva confirmación
+ * propia y dice qué se lleva por delante— y en la descripción de la herramienta,
+ * que le prohíbe proponerlo por iniciativa propia.
  *
  * **`proponer_grafico` no es la excepción**, aunque sea la primera que no toca
  * el tablero. Solo **añade** al lienzo de quien habla; no existe la de quitar, y

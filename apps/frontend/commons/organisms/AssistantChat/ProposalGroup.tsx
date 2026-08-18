@@ -1,7 +1,7 @@
 'use client';
 
-import { alpha, colors } from '@praxis/commons';
 import { Children, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { alpha, colors } from '../../tokens';
 import { type Estado, RegistroDeEstado, SenalDeAceptarTodas } from './ProposalCard';
 
 /** A partir de cuántas propuestas deja de compensar apilarlas. */

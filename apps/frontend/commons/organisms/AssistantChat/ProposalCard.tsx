@@ -1,33 +1,36 @@
 'use client';
 
-import {
-  type AceptarSobreTareaState,
-  aceptarAsignacionAction,
-  aceptarChecklistAction,
-  aceptarComentarioAction,
-  aceptarEdicionAction,
-  aceptarGraficoAction,
-  aceptarMarcarPasosAction,
-  aceptarMensajeAction,
-  aceptarMovimientoAction,
-  aceptarTareaAction,
-  resolverPropuestaAction,
-} from '@/app/(private)/[id]/actions';
+import { useRouter } from 'next/navigation';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type {
   AssignmentProposal,
   ChartProposal,
   CheckStepsProposal,
   ChecklistProposal,
   CommentProposal,
+  DeleteProposal,
   EditProposal,
   EstadoPropuesta,
   MessageProposal,
   MoveProposal,
   TaskProposal,
-} from '@/lib/assistant';
-import { Badge, Button, PRIORITY_LABELS, type Priority, alpha, colors } from '@praxis/commons';
-import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+} from '../../api/assistant';
+import { PRIORITY_LABELS, type Priority } from '../../api/domain';
+import {
+  type AceptarSobreTareaState,
+  aceptarAsignacionAction,
+  aceptarBorradoAction,
+  aceptarChecklistAction,
+  aceptarComentarioAction,
+  aceptarEdicionAction,
+  aceptarMarcarPasosAction,
+  aceptarMensajeAction,
+  aceptarMovimientoAction,
+  aceptarTareaAction,
+  resolverPropuestaAction,
+} from '../../assistant/actions';
+import { Badge, Button } from '../../atoms';
+import { alpha, colors } from '../../tokens';
 import { ModelText } from './ModelText';
 
 /**
@@ -84,6 +87,40 @@ export const RegistroDeEstado = createContext<((estado: Estado) => void) | null>
  * que ya estaba en `true` no cambia nada y el efecto no se ejecutaría.
  */
 export const SenalDeAceptarTodas = createContext(0);
+
+/**
+ * La firma de «añadir este gráfico a mi lienzo».
+ *
+ * Es la misma que `aceptarGraficoAction` de `reports-front`. Se declara aquí
+ * —y no se importa— porque el sentido de todo esto es que este paquete **no**
+ * dependa de aquella zona.
+ */
+export type AceptarGrafico = (
+  projectId: string,
+  propuesta: ChartProposal,
+) => Promise<{ anadido: boolean; error: string | null }>;
+
+/**
+ * De dónde saca `ChartProposalCard` su acción.
+ *
+ * ## ⚠️ Por qué esta llega por contexto y las otras nueve por importación
+ *
+ * Porque las otras **valen en cualquier zona**: crear una tarea, comentar, mover
+ * o borrar es lo mismo se pida desde donde se pida, y viven en
+ * `commons/assistant/actions`. Aceptar un gráfico no: escribe en el lienzo, y el
+ * lienzo lo dibuja `reports-front` — necesita su catálogo de widgets para saber
+ * de qué tamaño nace la tarjeta, y revalida *aquella* página.
+ *
+ * `null` es el caso normal en `assistant-front`, donde no hay lienzo delante. La
+ * tarjeta entonces **no ofrece un botón que no llevaría a ninguna parte**: dice
+ * dónde se coloca y enlaza a Análisis. Es el mismo criterio que apagar una acción
+ * que va a dar 403 en vez de dejar que reviente al pulsarla.
+ *
+ * Contexto y no una prop encadenada porque entre `AssistantChat` y esta tarjeta
+ * hay tres componentes que no tienen nada que ver con gráficos y tendrían que
+ * llevarla de la mano solo para pasarla.
+ */
+export const AccionDelLienzo = createContext<AceptarGrafico | null>(null);
 
 interface Resultado {
   texto: string;
@@ -550,6 +587,124 @@ export function CommentProposalCard({
 }
 
 /**
+ * Borrar una tarea. **La única tarjeta destructiva de las diez.**
+ *
+ * ## Por qué no usa `CambioSobreTarea` como las otras cuatro
+ *
+ * Porque aquellas comparten una forma —«esto cambia, ¿lo aplicas?»— y esta no es
+ * un cambio: es una pérdida. Meterla en el mismo marco la habría convertido en un
+ * «Aceptar» más en una fila de «Aceptar», que es exactamente lo que no puede
+ * pasar cuando el gesto no se deshace.
+ *
+ * Las tres diferencias, y ninguna es cosmética:
+ *
+ * 1. **Confirmación propia.** El primer botón no borra: descubre el segundo. Dos
+ *    gestos separados por medio segundo de lectura es lo que distingue decidir de
+ *    despachar, y es la misma razón por la que borrar un proyecto pide escribir
+ *    su nombre.
+ * 2. **Dice qué se lleva por delante**, no solo qué se borra. Una tarea con nueve
+ *    pasos de checklist y sus comentarios no es «una tarea».
+ *    ⚠️ Los pasos se enseñan con su número porque la propuesta lo trae; los
+ *    comentarios y los adjuntos, en genérico, porque **no** llega ninguna cifra y
+ *    un número inventado en una tarjeta de borrado sería la peor clase de mentira.
+ * 3. **«Aceptar todas» no la toca.** Lo resuelve `Marco` sin saber de borrados:
+ *    hasta que no se confirma, `onAceptar` no existe, y la señal de aceptar en
+ *    bloque solo llama a lo que existe. Un botón pensado para despachar cinco
+ *    propuestas de golpe no puede llevarse por delante algo irreversible.
+ *
+ * ## Y sigue sin ser una vía de escritura nueva
+ *
+ * Aceptar llama a `DELETE /tasks/:id`, el mismo endpoint y el mismo
+ * `canDeleteTask` que el botón del diálogo de tarea. Sin ese permiso, al modelo
+ * ni se le declara la herramienta.
+ */
+export function DeleteProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+}: ProposalCardProps & { propuesta: DeleteProposal }) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+  /** El segundo gesto. Hasta que no está puesto, no hay botón que borre. */
+  const [confirmando, setConfirmando] = useState(false);
+
+  async function borrar() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await aceptarBorradoAction(projectId, propuesta);
+
+    if (respuesta.error || !respuesta.borrada) {
+      setError(respuesta.error ?? 'No se pudo borrar la tarea.');
+      setEstado('pendiente');
+      /* Se vuelve al primer gesto: si falló, que haya que volver a confirmar. */
+      setConfirmando(false);
+      return;
+    }
+
+    /* Sin `href`: la tarea ya no existe, así que no hay nada que ir a ver. Es la
+       única de las diez donde el resultado no puede ofrecer un enlace. */
+    setResultado({ texto: `Se borró «${respuesta.borrada.title}».`, href: null });
+    setEstado('hecho');
+  }
+
+  const detalles = [
+    propuesta.tablero && propuesta.columna
+      ? `${propuesta.tablero} · ${propuesta.columna}`
+      : propuesta.columna,
+    propuesta.pasos ? `${propuesta.pasos} ${propuesta.pasos === 1 ? 'paso' : 'pasos'}` : null,
+    propuesta.cerrada ? 'ya cerrada' : null,
+  ].filter(Boolean);
+
+  return (
+    <Marco
+      titulo="Borrado propuesto"
+      sinAplicar="Todavía no se ha borrado nada."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={error}
+      resultado={resultado}
+      /* Hasta que no se confirma no hay acción de aceptar. Es lo que además
+         mantiene esta tarjeta fuera de «Aceptar todas». */
+      onAceptar={confirmando ? borrar : undefined}
+      onDescartar={() => setEstado('descartada')}
+      projectId={projectId}
+      proposalId={proposalId}
+      estadoGuardado={estadoGuardado}
+      tono="destructivo"
+    >
+      <p className="font-sans text-sm text-text-primary">
+        <strong>{propuesta.taskTitle ?? 'Una tarea'}</strong>
+        {detalles.length > 0 && (
+          <span className="font-normal text-text-secondary"> — {detalles.join(' · ')}</span>
+        )}
+      </p>
+
+      <p
+        className="rounded-lg px-3 py-2 font-sans text-sm"
+        style={{ background: alpha(colors.error, 10), color: colors.error }}
+      >
+        <strong>Esto no se puede deshacer.</strong> Se borra la tarea y con ella sus subtareas, su
+        checklist, sus comentarios y sus adjuntos.
+      </p>
+
+      {!confirmando && estado === 'pendiente' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="danger" onClick={() => setConfirmando(true)}>
+            Sí, quiero borrarla
+          </Button>
+          <span className="font-sans text-xs text-text-disabled">
+            Te lo preguntamos otra vez antes de hacerlo.
+          </span>
+        </div>
+      )}
+    </Marco>
+  );
+}
+
+/**
  * Marcar pasos del checklist como hechos.
  *
  * Enseña **los pasos, uno a uno y con su texto**, no «se marcarán 3 pasos»: dar
@@ -693,15 +848,21 @@ export function ChartProposalCard({
   propuesta,
 }: ProposalCardProps & { propuesta: ChartProposal }) {
   const router = useRouter();
+  const aceptarGrafico = useContext(AccionDelLienzo);
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
   async function aceptar() {
+    /* No debería llegar aquí sin acción —sin ella la tarjeta no pinta el botón—
+       pero el estrechamiento de tipos lo pide, y una guarda de más en un camino
+       de escritura no estorba. */
+    if (!aceptarGrafico) return;
+
     setEstado('enviando');
     setError(null);
 
-    const respuesta = await aceptarGraficoAction(projectId, propuesta);
+    const respuesta = await aceptarGrafico(projectId, propuesta);
 
     if (respuesta.error || !respuesta.anadido) {
       setError(respuesta.error ?? 'No se pudo añadir el gráfico.');
@@ -735,7 +896,19 @@ export function ChartProposalCard({
       estado={estado}
       error={error}
       resultado={resultado}
-      onAceptar={aceptar}
+      /**
+       * ⚠️ **Sin lienzo delante no hay botón de aceptar.**
+       *
+       * Pasa en `assistant-front`, donde PRAX tiene pantalla propia y no hay
+       * ningún gráfico a la vista: un «Aceptar» ahí escribiría en una pantalla
+       * que no se está viendo, y la promesa de «Añadido» no se podría comprobar.
+       *
+       * Se prefiere a esconder la propuesta entera: que PRAX haya pensado que
+       * este corte de los datos es interesante **es** parte de la respuesta, y
+       * tirarla porque esta pantalla no puede aplicarla sería perder justo lo que
+       * se preguntó.
+       */
+      onAceptar={aceptarGrafico ? aceptar : undefined}
       onDescartar={() => setEstado('descartada')}
       projectId={projectId}
       proposalId={proposalId}
@@ -744,6 +917,20 @@ export function ChartProposalCard({
       <p className="font-sans text-sm text-text-primary">
         <strong>{grafico.titulo}</strong>
       </p>
+
+      {!aceptarGrafico && (
+        <p className="font-sans text-xs text-text-secondary">
+          Los gráficos se colocan desde{' '}
+          {/* Cruza de zona → `<a>` duro, nunca `next/link`. Ver §16. */}
+          <a
+            href="/reports"
+            className="text-primary underline-offset-2 transition-colors hover:underline"
+          >
+            Análisis
+          </a>
+          , y ahí se queda puesto para la próxima vez.
+        </p>
+      )}
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
         <Campo termino="Qué mide" valor={ETIQUETA_METRICA[grafico.metrica] ?? grafico.metrica} />
@@ -808,6 +995,7 @@ function Marco({
   projectId,
   proposalId,
   estadoGuardado,
+  tono = 'normal',
   children,
 }: {
   titulo: string;
@@ -825,11 +1013,28 @@ function Marco({
   estado: Estado;
   error: string | null;
   resultado: Resultado | null;
-  onAceptar: () => void;
+  /**
+   * Qué pasa al aceptar.
+   *
+   * **Opcional**: sin ella la tarjeta enseña lo que se propone y no ofrece el
+   * botón. La dejan fuera dos casos —el gráfico cuando no hay lienzo delante, y
+   * el borrado mientras no se ha confirmado— y los dos por lo mismo: un botón
+   * que no puede cumplir lo que promete es peor que su ausencia.
+   */
+  onAceptar?: () => void;
   onDescartar: () => void;
   projectId: string;
   proposalId?: string;
   estadoGuardado?: EstadoPropuesta;
+  /**
+   * El color del marco.
+   *
+   * `destructivo` lo tiñe de rojo, y **solo lo lleva el borrado**. Si algún día
+   * lo llevara una segunda tarjeta habría que preguntarse si de verdad las dos
+   * son irreversibles: en cuanto el rojo aparece en dos sitios distintos deja de
+   * significar «cuidado» y pasa a ser un color más de la paleta.
+   */
+  tono?: 'normal' | 'destructivo';
   children: React.ReactNode;
 }) {
   /**
@@ -869,7 +1074,7 @@ function Marco({
   useEffect(() => {
     if (senal === senalAtendida.current) return;
     senalAtendida.current = senal;
-    if (estado === 'pendiente' && !decididaAntes) onAceptar();
+    if (estado === 'pendiente' && !decididaAntes) onAceptar?.();
   }, [senal, estado, decididaAntes, onAceptar]);
 
   /**
@@ -923,16 +1128,19 @@ function Marco({
     );
   }
 
+  /* El rojo se reserva para lo que no se deshace. Ver la nota de `tono`. */
+  const acento = tono === 'destructivo' ? colors.error : colors.primary;
+
   return (
     <article
       className="flex flex-col gap-3 rounded-xl border p-4"
       style={{
-        borderColor: alpha(colors.primary, 30),
-        background: alpha(colors.primary, 6),
+        borderColor: alpha(acento, tono === 'destructivo' ? 45 : 30),
+        background: alpha(acento, 6),
       }}
     >
       <header className="flex items-center gap-2">
-        <span className="font-sans text-[11px] uppercase tracking-wider text-primary">
+        <span className="font-sans text-[11px] uppercase tracking-wider" style={{ color: acento }}>
           {titulo}
         </span>
         <span className="font-sans text-[11px] text-text-disabled">
@@ -968,9 +1176,19 @@ function Marco({
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={onAceptar} isLoading={estado === 'enviando'}>
-            Aceptar
-          </Button>
+          {/* Sin acción no hay «Aceptar»: un botón que no puede cumplir lo que
+              promete es peor que su ausencia. «Descartar» se queda, porque
+              quitarse la tarjeta de delante sí se puede hacer desde aquí. */}
+          {onAceptar && (
+            <Button
+              size="sm"
+              variant={tono === 'destructivo' ? 'danger' : 'primary'}
+              onClick={onAceptar}
+              isLoading={estado === 'enviando'}
+            >
+              {tono === 'destructivo' ? 'Borrar definitivamente' : 'Aceptar'}
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onDescartar} disabled={estado === 'enviando'}>
             Descartar
           </Button>

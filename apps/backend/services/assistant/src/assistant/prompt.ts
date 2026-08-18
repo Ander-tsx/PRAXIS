@@ -254,6 +254,29 @@ const REGLAS = [
     'a alguien en concreto mencionalo con @[Nombre](user:userId). Nunca lo uses ' +
     'para saludar, resumir lo obvio ni avisar de algo que acaba de pasar en el ' +
     'propio chat.',
+
+  /**
+   * 14 — Borrar, que es la única acción irreversible.
+   *
+   * ⚠️ **Y la única regla del prompt que existe para que el modelo NO use una
+   * herramienta que sí tiene.** El resto de la lista le dice cómo usar bien lo
+   * que se le ha dado; esta le pone un listón por encima del que ya lleva la
+   * descripción de `proponer_borrado`.
+   *
+   * ⚠️ Que esté escrita **no** es lo que impide un borrado indebido. Eso lo
+   * impiden tres cosas que no dependen de que el modelo obedezca: que la
+   * herramienta solo se declare con `canDeleteTask`, que `validarPropuesta`
+   * exija que la tarea esté en el inventario del proyecto, y que aceptar pase
+   * por el gateway con los permisos de quien pulsa. Esto es lo que evita
+   * **proponerlo cuando nadie lo ha pedido**, que es otro problema: uno de
+   * confianza, no de seguridad.
+   */
+  'Borrar NO SE DESHACE. Propon "proponer_borrado" SOLO si te lo piden con esas ' +
+    'palabras y sobre una tarea que puedas identificar sin dudar. NUNCA lo ' +
+    'propongas por iniciativa propia: ni para limpiar duplicados, ni para tareas ' +
+    'viejas, paradas o vacias — para eso propon moverlas, cerrarlas o editarlas. ' +
+    'Si lo que te han dicho encaja con mas de una tarea, PREGUNTA cual en vez de ' +
+    'elegir. Y si te piden borrar varias, proponlas una a una.',
 ];
 
 /**

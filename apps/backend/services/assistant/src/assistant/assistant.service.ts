@@ -90,6 +90,18 @@ interface Briefing {
   }[];
 }
 
+/**
+ * Una tarea del inventario, tal y como la trae el briefing.
+ *
+ * ⚠️ **Se deriva de `Briefing` en vez de volver a escribirse.** Estaba
+ * redeclarada a mano en el tipo de retorno de `tareaDeLaPropuesta` con cinco de
+ * sus campos, y al añadir `proponer_borrado` —que necesita `pasos` y `cerrada`—
+ * el compilador dijo que no existían **aunque sí estaban** en el objeto que
+ * llega. Dos declaraciones de la misma forma solo coinciden hasta que alguien
+ * toca una.
+ */
+type TareaDelBriefing = NonNullable<Briefing['tareas']>[number];
+
 @Injectable()
 export class AssistantService {
   private readonly log = new Logger(AssistantService.name);
@@ -648,6 +660,41 @@ export class AssistantService {
       ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
     };
 
+    /**
+     * Borrar una tarea.
+     *
+     * ⚠️ **Es la única propuesta que exige que la tarea esté en el inventario**,
+     * sin el «si no hay inventario, pasa» que aplican las demás por
+     * compatibilidad con un briefing viejo. Aquí no se puede ser laxo: una
+     * propuesta de borrado sobre un id que nadie ha comprobado es una tarjeta
+     * roja apuntando a algo que no se sabe qué es.
+     *
+     * Lo que viaja además del id es **contexto para decidir**: dónde está y
+     * cuántos pasos de checklist se lleva. No se manda un recuento de
+     * comentarios ni de adjuntos porque el briefing no los trae, y la tarjeta lo
+     * dice en genérico —que es cierto— en vez de inventar un número.
+     */
+    if (call.name === 'proponer_borrado') {
+      if (!tarea) {
+        this.log.warn(`El modelo propuso borrar ${taskId}, que no esta en el inventario`);
+        return null;
+      }
+
+      return {
+        tool: call.name,
+        args: {
+          ...base,
+          taskTitle: tarea.titulo,
+          columna: tarea.columna,
+          ...(tarea.tablero ? { tablero: tarea.tablero } : {}),
+          pasos: (tarea.pasos ?? []).length,
+          /* Que ya esté cerrada cambia lo que significa borrarla: no es lo mismo
+             tirar trabajo pendiente que retirar algo terminado del historial. */
+          cerrada: tarea.cerrada,
+        },
+      };
+    }
+
     if (call.name === 'proponer_edicion') {
       const cambios: Record<string, unknown> = {};
 
@@ -738,14 +785,8 @@ export class AssistantService {
     briefing: Briefing,
   ): {
     taskId: string;
-    tarea?: {
-      id: string;
-      titulo: string;
-      columnId?: string;
-      columna?: string;
-      /** En qué tablero está hoy. Lo usa la tarjeta para decir «de X a Y». */
-      tablero?: string | null;
-    };
+    /** La del inventario, entera. Ver `TareaDelBriefing`. */
+    tarea?: TareaDelBriefing;
   } | null {
     const taskId = String(call.args.taskId ?? '').trim();
     if (!taskId) return null;

@@ -3,6 +3,7 @@ export * from './Avatar';
 export * from './Badge';
 export * from './Checkbox';
 export * from './Input';
+export * from './PraxAvatar';
 export * from './Select';
 export * from './Sparkle';
 export * from './StatItem';

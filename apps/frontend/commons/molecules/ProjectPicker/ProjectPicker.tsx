@@ -1,29 +1,59 @@
 'use client';
 
-import { type Project, alpha, colors, reportPath } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import type { Project } from '../../api/domain';
+import { alpha, colors } from '../../tokens';
 
 export interface ProjectPickerProps {
   projects: Project[];
+  /** El proyecto abierto. **El UUID resuelto, no el parámetro de la ruta.** */
   activeId: string;
+  /**
+   * La ruta a la que lleva elegir un proyecto, **relativa a la zona**.
+   *
+   * ⚠️ Sin el basePath: Next lo añade solo al navegar con `router.push`, y
+   * escribirlo aquí daría `/reports/reports/…`. La construye quien usa el
+   * selector porque cada zona tiene la suya —`reportPath` en Análisis, una query
+   * en la del asistente— y ninguna de las dos vale en la otra. Ver §16.
+   */
+  pathDe: (project: Project) => string;
+  /** El rótulo de encima del nombre. Por defecto, «Proyecto». */
+  label?: string;
+  /** Qué se dice cuando no hay ninguno elegido. */
+  placeholder?: string;
+  /** Qué se dice cuando la lista está vacía. */
+  vacio?: string;
 }
 
 /**
- * Selector del proyecto del que se ven los reportes.
+ * Selector del proyecto sobre el que se está trabajando.
  *
  * Mismo gesto que el selector de espacios del tablero, y a propósito: cambiar de
  * proyecto aquí es la misma clase de acción que cambiar de espacio allí, y dos
  * formas distintas de hacer lo mismo se aprenden dos veces.
  *
- * Antes esto era una rejilla de tarjetas en una pantalla aparte, y obligaba a un
- * viaje de ida y vuelta cada vez que se quería comparar dos proyectos. Como
- * desplegable, cambiar de proyecto no cambia de pantalla.
+ * En Análisis esto era antes una rejilla de tarjetas en una pantalla aparte, y
+ * obligaba a un viaje de ida y vuelta cada vez que se quería comparar dos
+ * proyectos. Como desplegable, cambiar de proyecto no cambia de pantalla.
  *
- * El proyecto activo vive en la URL, así que un reporte se puede enlazar y el
- * botón atrás funciona.
+ * El proyecto activo vive en la URL, así que la vista se puede enlazar y el botón
+ * atrás funciona.
+ *
+ * ## Por qué vive en `commons`
+ *
+ * Porque desde que PRAX tiene pantalla propia hacen falta dos: uno elige de qué
+ * proyecto son los gráficos y el otro de qué proyecto se habla. Lo único que
+ * cambia entre ellos es a dónde lleva elegir, y eso entra por `pathDe`.
  */
-export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
+export function ProjectPicker({
+  projects,
+  activeId,
+  pathDe,
+  label = 'Proyecto',
+  placeholder = 'Elige un proyecto',
+  vacio = 'Todavía no estás en ningún proyecto.',
+}: ProjectPickerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,12 +79,11 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
     };
   }, [open]);
 
-  function select(slug: string) {
+  function select(project: Project) {
     setOpen(false);
-    /* Sin el basePath: Next añade `/reports`. `push` y no `replace` para que el
-       botón atrás devuelva al proyecto anterior, que es lo que se espera al
-       estar comparando. */
-    router.push(reportPath({ slug }));
+    /* `push` y no `replace` para que el botón atrás devuelva al proyecto
+       anterior, que es lo que se espera al estar comparando dos. */
+    router.push(pathDe(project));
   }
 
   return (
@@ -68,10 +97,10 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
       >
         <span className="flex min-w-0 flex-col">
           <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
-            Proyecto
+            {label}
           </span>
           <span className="truncate font-sans text-base font-semibold text-text-primary">
-            {active?.name ?? 'Elige un proyecto'}
+            {active?.name ?? placeholder}
           </span>
         </span>
 
@@ -103,7 +132,7 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
                   <button
                     type="button"
                     aria-current={isActive ? 'true' : undefined}
-                    onClick={() => select(project.slug)}
+                    onClick={() => select(project)}
                     className={[
                       'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors',
                       isActive
@@ -124,9 +153,7 @@ export function ProjectPicker({ projects, activeId }: ProjectPickerProps) {
           </ul>
 
           {projects.length === 0 && (
-            <p className="px-4 py-3 font-sans text-sm text-text-disabled">
-              Todavía no estás en ningún proyecto.
-            </p>
+            <p className="px-4 py-3 font-sans text-sm text-text-disabled">{vacio}</p>
           )}
         </div>
       )}

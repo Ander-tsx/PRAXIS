@@ -320,10 +320,10 @@ export function Composer({
        hay nada que enviar. */
     const puedeEnviar = adjuntosPendientes.length > 0 || texto.trim().length > 0;
     if (!puedeEnviar || enviando || subiendo) return;
-    
+
     const files = adjuntosPendientes.map((a) => a.id);
     const text = serializeField(trozos).trim();
-    
+
     if (files.length > 1) {
       onEnviar(text, [files[0]]);
       for (let i = 1; i < files.length; i++) {
@@ -391,7 +391,7 @@ export function Composer({
   function alElegirArchivo(evento: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(evento.target.files || []);
     if (!files.length) return;
-    
+
     let added = 0;
     for (const file of files) {
       if (adjuntosPendientes.length + added < CHAT_ATTACHMENT_MAX_PER_MESSAGE) {
@@ -418,10 +418,10 @@ export function Composer({
         item.kind === 'file' &&
         (CHAT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(item.type),
     );
-    
+
     if (items.length === 0) return;
     evento.preventDefault();
-    
+
     let added = 0;
     for (const item of items) {
       const archivo = item.getAsFile();
@@ -648,7 +648,9 @@ export function Composer({
                  su texto y quedaba un par de píxeles más abajo que su vecino en
                  una fila que se alinea por abajo (`items-end`). */
               className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg ${
-                compactButtons ? 'w-9 border border-border bg-surface shadow-sm hover:bg-surfaceElevated' : 'px-3 hover:bg-surfaceElevated hover:text-text-primary'
+                compactButtons
+                  ? 'w-9 border border-border bg-surface shadow-sm hover:bg-surfaceElevated'
+                  : 'px-3 hover:bg-surfaceElevated hover:text-text-primary'
               } font-sans text-xs text-text-secondary transition-colors`}
             >
               {compactButtons ? (
@@ -724,29 +726,50 @@ export function Composer({
          * terminaban a alturas distintas por mucho que midieran igual. El
          * texto completo sigue a la vista en el compositor ancho.
          */}
-        <div className={`flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}>
+        <div
+          className={`flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
+        >
           <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">↵</kbd> enviar
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+              ↵
+            </kbd>{' '}
+            enviar
           </span>
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">⇧</kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">↵</kbd>
-            </span> nueva línea
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+                ⇧
+              </kbd>
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+                ↵
+              </kbd>
+            </span>{' '}
+            nueva línea
           </span>
           {permiteMenciones && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1.5 font-sans text-[10px] font-medium shadow-sm">@</kbd> mencionar
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1.5 font-sans text-[10px] font-medium shadow-sm">
+                @
+              </kbd>{' '}
+              mencionar
             </span>
           )}
           <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] font-medium shadow-sm">/</kbd> enlazar tarea
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] font-medium shadow-sm">
+              /
+            </kbd>{' '}
+            enlazar tarea
           </span>
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">Ctrl</kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">V</kbd>
-            </span> pegar imagen
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+                Ctrl
+              </kbd>
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+                V
+              </kbd>
+            </span>{' '}
+            pegar imagen
           </span>
         </div>
 

@@ -135,7 +135,7 @@ export const BACKEND_SERVICES = [
 ];
 
 /**
- * Las siete zonas del frontend.
+ * Las ocho zonas del frontend (el shell y las siete de negocio).
  *
  * ⚠️ Su archivo de entorno es **`.env.local`**, no `.env`. Next solo carga el
  * primero, así que rellenar `.env` aquí es escribir un archivo que nadie lee —
@@ -186,7 +186,7 @@ export const FRONTEND_APPS = [
     port: 4104,
     envFile: '.env.local',
     color: 96,
-    descripcion: 'Análisis y asistente',
+    descripcion: 'Análisis: lienzo de gráficos',
   },
   {
     key: 'admin-front',
@@ -206,6 +206,15 @@ export const FRONTEND_APPS = [
     color: 96,
     descripcion: 'Mensajes directos y de proyecto',
   },
+  {
+    key: 'assistant-front',
+    pkg: '@praxis/assistant-front',
+    dir: 'apps/frontend/assistant-front',
+    port: 4107,
+    envFile: '.env.local',
+    color: 96,
+    descripcion: 'PRAX, el asistente',
+  },
 ];
 
 /**
@@ -223,7 +232,7 @@ export const FRONTEND_TURBO_SERVICE = {
   prisma: false,
   seedOrder: null,
   color: 96,
-  descripcion: 'Las 7 zonas juntas',
+  descripcion: 'Las 8 zonas juntas',
   /**
    * ⚠️ Va por `pnpm run`, **no invocando `turbo` directamente**.
    *

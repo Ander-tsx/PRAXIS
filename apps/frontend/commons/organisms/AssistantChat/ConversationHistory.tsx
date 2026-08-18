@@ -1,13 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import type { ConversationSummary } from '../../api/assistant';
 import {
   borrarConversacionAction,
   conversacionesAction,
   renombrarConversacionAction,
-} from '@/app/(private)/[id]/actions';
-import type { ConversationSummary } from '@/lib/assistant';
-import { Button, alpha, colors } from '@praxis/commons';
-import { useEffect, useState } from 'react';
+} from '../../assistant/actions';
+import { Button } from '../../atoms';
+import { alpha, colors } from '../../tokens';
 
 /**
  * El historial, **ocupando toda la sección**.

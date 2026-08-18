@@ -7,5 +7,6 @@ export * from './GlobalRoleBadges';
 export * from './RoleBadge';
 export * from './AuthForm';
 export * from './Pagination';
+export * from './ProjectPicker';
 export * from './ThemeToggle';
 export * from './PresenceSwitcher';

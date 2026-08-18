@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { ChatMessage } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
-import { useEffect, useRef } from 'react';
 import { AttachmentPreview } from './AttachmentPreview';
 
 export interface PinnedBarProps {
@@ -110,7 +110,11 @@ export function PinnedBar({
   if (!actual) return null;
 
   return (
-    <div className="relative shrink-0 border-b" style={{ borderColor: colors.border }} ref={menuRef}>
+    <div
+      className="relative shrink-0 border-b"
+      style={{ borderColor: colors.border }}
+      ref={menuRef}
+    >
       {/**
        * ⚠️ El tope de alto va **en esta fila y no en el contenedor de fuera**.
        * El desplegable de «ver todos» es `absolute top-full`, es decir, cuelga

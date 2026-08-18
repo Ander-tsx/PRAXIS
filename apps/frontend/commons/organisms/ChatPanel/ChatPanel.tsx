@@ -1433,7 +1433,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   useEffect(() => {
     function alClicFuera(e: MouseEvent) {
-      if (busquedaAbierta && busquedaRef.current && !busquedaRef.current.contains(e.target as Node)) {
+      if (
+        busquedaAbierta &&
+        busquedaRef.current &&
+        !busquedaRef.current.contains(e.target as Node)
+      ) {
         cerrarBusqueda();
       }
     }
@@ -1837,9 +1841,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           {canWrite ? (
             <div className="relative shrink-0 p-3 pt-4 bg-surface rounded-b-2xl">
               {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
-              <div 
-                className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-surface to-transparent pointer-events-none z-10"
-              />
+              <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-surface to-transparent pointer-events-none z-10" />
               <Composer
                 /**
                  * ⚠️ **La `key` es lo que rellena el campo al editar.**
@@ -1957,8 +1959,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             raiz={{
               ...hiloRaiz,
               reactions: conMisReacciones(hiloRaiz),
-              ...(fijadosLocales.has(hiloRaiz.id) ? { pinnedAt: fijadosLocales.get(hiloRaiz.id)!.pinnedAt } : {}),
-              ...(editadosLocales.has(hiloRaiz.id) ? { body: editadosLocales.get(hiloRaiz.id)!.body } : {})
+              ...(fijadosLocales.has(hiloRaiz.id)
+                ? { pinnedAt: fijadosLocales.get(hiloRaiz.id)!.pinnedAt }
+                : {}),
+              ...(editadosLocales.has(hiloRaiz.id)
+                ? { body: editadosLocales.get(hiloRaiz.id)!.body }
+                : {}),
             }}
             replies={hiloMensajes}
             cargando={hiloCargando}

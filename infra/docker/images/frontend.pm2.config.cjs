@@ -1,9 +1,9 @@
 /**
- * El shell y las 6 zonas dentro del contenedor.
+ * El shell y las 7 zonas dentro del contenedor.
  *
  * Las tres variables que de verdad vienen de fuera son `GATEWAY_URL` (la
  * dirección interna del backend), `JWT_SECRET` (el mismo que el gateway) y
- * `NODE_ENV`. Las `*_FRONT_URL` se resuelven a loopback porque las siete apps
+ * `NODE_ENV`. Las `*_FRONT_URL` se resuelven a loopback porque las ocho apps
  * comparten máquina.
  *
  * ⚠️ `JWT_SECRET` tiene que ser EXACTAMENTE el mismo que el del gateway y el de
@@ -39,6 +39,7 @@ const zonas = {
   REPORTS_FRONT_URL: `http://${LOCAL}:4104`,
   ADMIN_FRONT_URL: `http://${LOCAL}:4105`,
   CHAT_FRONT_URL: `http://${LOCAL}:4106`,
+  ASSISTANT_FRONT_URL: `http://${LOCAL}:4107`,
 };
 
 const comun = {
@@ -81,6 +82,7 @@ module.exports = {
     zona('reports-front', 'reports-front', 4104),
     zona('admin-front', 'admin-front', 4105),
     zona('chat-front', 'chat-front', 4106),
+    zona('assistant-front', 'assistant-front', 4107),
 
     /* Lo único que ve el balanceador. Su `/` es la landing pública, que además
        sirve de health check: responde 200 sin sesión. */

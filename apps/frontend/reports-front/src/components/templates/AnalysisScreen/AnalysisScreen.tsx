@@ -1,9 +1,9 @@
 'use client';
 
-import { AssistantChat } from '@/components/organisms/AssistantChat';
+import { aceptarGraficoAction } from '@/app/(private)/[[...id]]/actions';
 import { ReportCanvas } from '@/components/organisms/ReportCanvas';
-import type { AssistantQuota } from '@/lib/assistant';
 import type { Widget } from '@/lib/widgets';
+import { AssistantChat, type AssistantQuota } from '@praxis/commons';
 import { type ReactNode, useCallback, useState } from 'react';
 
 /**
@@ -71,6 +71,19 @@ export function AnalysisScreen({
         nombres={nombres}
         etiquetas={etiquetas}
         sugerenciaExterna={sugerencia}
+        /**
+         * La única acción que la conversación no trae de serie.
+         *
+         * `AssistantChat` vive en `commons` desde que PRAX tiene pantalla
+         * propia, y las nueve acciones que llaman a endpoints del tablero se
+         * fueron con él. Esta no: escribe en el **lienzo**, así que necesita el
+         * catálogo de widgets de esta zona y revalida esta página.
+         *
+         * En `assistant-front` no se pasa, y entonces la tarjeta de un gráfico
+         * propuesto explica dónde se coloca en vez de ofrecer un «Aceptar» que
+         * escribiría en una pantalla que no se está viendo.
+         */
+        alAceptarGrafico={aceptarGraficoAction}
       />
 
       <ReportCanvas inicial={lienzoInicial} slots={slots} guardar={guardar} onGenerar={generar} />

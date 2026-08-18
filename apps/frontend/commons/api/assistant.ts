@@ -2,8 +2,13 @@
  * Las formas que devuelve `assistant-service` a través del gateway.
  *
  * Se declaran aquí y no se importan de `@praxis/contracts` por lo mismo que las
- * de `reports.ts`: ese paquete es de backend —arrastra `class-validator` y los
- * decoradores de Swagger— y el frontend solo necesita la forma.
+ * de `reports.ts` en `reports-front`: ese paquete es de backend —arrastra
+ * `class-validator` y los decoradores de Swagger— y el frontend solo necesita la
+ * forma.
+ *
+ * ⚠️ **Vive en `commons` y no en una zona** desde que PRAX tiene pantalla
+ * propia: lo consumen `assistant-front` y `reports-front`, y las formas de una
+ * respuesta no pueden estar declaradas dos veces.
  *
  * ⚠️ Los límites de cuota **no** se copian aquí. El backend los manda dentro de
  * `AssistantQuota.limite` en cada respuesta, y un segundo sitio donde apuntar
@@ -121,6 +126,40 @@ export interface ChecklistProposal extends SobreTarea {
 /** `proponer_comentario`. Se publica a nombre de quien acepta. */
 export interface CommentProposal extends SobreTarea {
   body: string;
+}
+
+/**
+ * `proponer_borrado`. **La única propuesta que no se deshace.**
+ *
+ * ## Por qué existe, si durante meses estuvo prohibida
+ *
+ * Porque el argumento que la vetaba no era la regla de la casa. La regla es «el
+ * asistente propone; ejecuta el código que ya existe», y borrar la cumple igual
+ * que crear: esto no borra nada. Aceptar llama a `DELETE /tasks/:id` desde el
+ * frontend, con la sesión y los permisos de quien pulsa — lo mismo, exactamente,
+ * que borrarla desde el tablero. Sin `canDeleteTask` la herramienta ni se le
+ * declara al modelo, y aun así el gateway lo rechazaría.
+ *
+ * ## Lo que sí la hace distinta, y por eso trae tanto contexto
+ *
+ * Que **no se deshace**. Una tarea propuesta de más se borra; una borrada de más
+ * no vuelve, y se lleva sus subtareas, su checklist, sus comentarios y sus
+ * adjuntos. Así que la tarjeta tiene que poder decir **qué** se va a perder sin
+ * ir a buscarlo, y de ahí los campos de abajo.
+ *
+ * ⚠️ **No hay recuento de comentarios ni de adjuntos, a propósito.** El briefing
+ * que ve el asistente no los trae, y un número inventado en una tarjeta de
+ * borrado sería la peor clase de mentira posible. La tarjeta lo dice en
+ * genérico, que es cierto.
+ */
+export interface DeleteProposal extends SobreTarea {
+  /** Dónde está ahora. Un título suelto no identifica una tarea de un vistazo. */
+  columna?: string;
+  tablero?: string;
+  /** Cuántos pasos de checklist se van con ella. */
+  pasos?: number;
+  /** Ya estaba cerrada: no es lo mismo tirar trabajo pendiente que archivo. */
+  cerrada?: boolean;
 }
 
 /**
@@ -254,6 +293,12 @@ export function isCommentProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: CommentProposal } {
   return propuesta.tool === 'proponer_comentario' && typeof propuesta.args.body === 'string';
+}
+
+export function isDeleteProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: DeleteProposal } {
+  return propuesta.tool === 'proponer_borrado' && typeof propuesta.args.taskId === 'string';
 }
 
 export function isCheckStepsProposal(

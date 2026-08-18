@@ -1,7 +1,7 @@
 'use client';
 
-import { alpha, colors } from '@praxis/commons';
 import { type ReactNode, useEffect, useState } from 'react';
+import { alpha, colors } from '../../tokens';
 
 /**
  * Cada cuánto avanza el paso visible.

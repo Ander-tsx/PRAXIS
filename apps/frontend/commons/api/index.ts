@@ -7,3 +7,4 @@ export * from './routes';
 export * from './chat-refs';
 export * from './presence';
 export * from './directory';
+export * from './assistant';

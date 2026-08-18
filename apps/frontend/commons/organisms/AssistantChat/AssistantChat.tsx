@@ -1,6 +1,6 @@
 'use client';
 
-import { cargarConversacionAction, preguntarAction } from '@/app/(private)/[id]/actions';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   type AssistantProposal,
   type AssistantQuota,
@@ -10,21 +10,26 @@ import {
   isCheckStepsProposal,
   isChecklistProposal,
   isCommentProposal,
+  isDeleteProposal,
   isEditProposal,
   isMessageProposal,
   isMoveProposal,
   isTaskProposal,
-} from '@/lib/assistant';
-import { Badge, Button, alpha, colors } from '@praxis/commons';
-import { useEffect, useId, useRef, useState } from 'react';
+} from '../../api/assistant';
+import { cargarConversacionAction, preguntarAction } from '../../assistant/actions';
+import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
+import { alpha, colors } from '../../tokens';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
 import { ModelText } from './ModelText';
 import {
+  AccionDelLienzo,
+  type AceptarGrafico,
   AssignProposalCard,
   ChartProposalCard,
   ChecklistProposalCard,
   CommentProposalCard,
+  DeleteProposalCard,
   EditProposalCard,
   MarkStepsProposalCard,
   MessageProposalCard,
@@ -60,6 +65,21 @@ export interface AssistantChatProps {
    * queda como estaba, como si el botón se hubiera roto.
    */
   sugerenciaExterna?: { texto: string; sello: number } | null;
+  /**
+   * Qué hacer cuando alguien acepta un **gráfico** propuesto.
+   *
+   * ⚠️ **Es la única acción que llega por props**, y merece la pena entender por
+   * qué las otras nueve no. Aquellas —crear una tarea, comentar, mover, borrar—
+   * valen en cualquier zona y viven en `commons/assistant/actions`. Aceptar un
+   * gráfico escribe en el **lienzo**, que dibuja `reports-front`: necesita su
+   * catálogo de widgets para saber de qué tamaño nace la tarjeta, y revalida
+   * *aquella* página.
+   *
+   * Sin ella —el caso de `assistant-front`, donde no hay ningún gráfico a la
+   * vista— la tarjeta enseña qué se propone y remite a Análisis, en vez de
+   * ofrecer un botón que no podría cumplir lo que promete.
+   */
+  alAceptarGrafico?: AceptarGrafico;
 }
 
 const SUGERENCIAS = [
@@ -113,6 +133,7 @@ export function AssistantChat({
   nombres,
   etiquetas,
   sugerenciaExterna = null,
+  alAceptarGrafico,
 }: AssistantChatProps) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
@@ -239,328 +260,376 @@ export function AssistantChat({
     ]);
   }
 
+  /**
+   * El estado de la cara, deducido de lo que está pasando.
+   *
+   * No hay un `useState` para esto y no debería haberlo: sería un segundo sitio
+   * donde apuntar en qué anda el asistente, y los dos podrían discrepar. La cara
+   * es una **función** de lo que ya se sabe.
+   */
+  const animo: PraxMood = pendiente
+    ? 'thinking'
+    : error
+      ? 'oops'
+      : mensajes.length > 0
+        ? 'happy'
+        : 'idle';
+
   return (
-    <section
-      ref={seccionRef}
-      className="flex flex-col gap-4 rounded-2xl border p-5"
-      style={{ borderColor: alpha(colors.primary, 25), background: colors.surface }}
-      aria-label="Asistente del proyecto"
-    >
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-display text-xl text-text-primary">
-              {vista === 'historial' ? 'Historial' : 'Pregúntale a los datos'}
-            </h3>
-            <Badge
-              variant="accent"
-              className="inline-flex items-center gap-1 uppercase"
-              style={{
-                borderRadius: 4,
-                background: alpha(colors.accent, 15),
-                border: `1px solid ${alpha(colors.accent, 40)}`,
-                color: colors.accent,
-                fontWeight: 700,
-              }}
-            >
-              AI
-            </Badge>
+    /**
+     * ⚠️ El proveedor envuelve la sección **entera**, no solo la lista de
+     * propuestas: `ChartProposalCard` cuelga tres componentes por debajo y el
+     * contexto tiene que alcanzarla también cuando el hilo se repinta desde el
+     * historial.
+     */
+    <AccionDelLienzo.Provider value={alAceptarGrafico ?? null}>
+      <section
+        ref={seccionRef}
+        className="flex flex-col gap-4 rounded-2xl border p-5"
+        style={{ borderColor: alpha(colors.primary, 25), background: colors.surface }}
+        aria-label={`${PRAX_NAME}, el asistente`}
+      >
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* La cara, a la izquierda del título: es lo que convierte esto en
+              «hablar con alguien» y no en «usar un cuadro de texto». Y mientras
+              el modelo tarda es la única señal de que sigue vivo. */}
+            <PraxAvatar mood={animo} size="md" />
+
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-xl text-text-primary">
+                  {vista === 'historial' ? 'Historial' : PRAX_NAME}
+                </h3>
+                <Badge
+                  variant="accent"
+                  className="inline-flex items-center gap-1 uppercase"
+                  style={{
+                    borderRadius: 4,
+                    background: alpha(colors.accent, 15),
+                    border: `1px solid ${alpha(colors.accent, 40)}`,
+                    color: colors.accent,
+                    fontWeight: 700,
+                  }}
+                >
+                  AI
+                </Badge>
+              </div>
+              <p className="font-sans text-sm text-text-secondary">
+                {vista === 'historial'
+                  ? 'Tus conversaciones en este proyecto. Abre una para seguir donde la dejaste.'
+                  : 'Lee los datos del proyecto y responde con sus números. Cuando propone algo, no lo hace: lo deja para que lo revises.'}
+              </p>
+            </div>
           </div>
-          <p className="font-sans text-sm text-text-secondary">
-            {vista === 'historial'
-              ? 'Tus conversaciones en este proyecto. Abre una para seguir donde la dejaste.'
-              : 'Lee este mismo informe y responde con sus números. Cuando propone algo, no lo hace: lo deja para que lo revises.'}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {/* El contador solo en el chat: en el historial no se gasta nada, y un
+          <div className="flex shrink-0 items-center gap-3">
+            {/* El contador solo en el chat: en el historial no se gasta nada, y un
               número de cuota sobre una lista de títulos solo distrae. */}
-          {vista === 'chat' && cuota && <ContadorCuota cuota={cuota} />}
-          {/**
-           * Icono y no texto: la cabecera ya lleva el título, la insignia «AI» y
-           * el contador de cuota, y una palabra más la volvía una fila de cosas
-           * que leer. Lo que se pierde —saber a qué lleva sin pasar por encima—
-           * se recupera con el `title`, y el nombre accesible va completo.
-           */}
-          <button
-            type="button"
-            onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
-            aria-label={vista === 'historial' ? 'Volver al chat' : 'Ver el historial'}
-            aria-pressed={vista === 'historial'}
-            title={vista === 'historial' ? 'Volver al chat' : 'Historial'}
-            /* 40×40 con borde: el contador de cuota que tiene al lado son dos
+            {vista === 'chat' && cuota && <ContadorCuota cuota={cuota} />}
+            {/**
+             * Icono y no texto: la cabecera ya lleva el título, la insignia «AI» y
+             * el contador de cuota, y una palabra más la volvía una fila de cosas
+             * que leer. Lo que se pierde —saber a qué lleva sin pasar por encima—
+             * se recupera con el `title`, y el nombre accesible va completo.
+             */}
+            <button
+              type="button"
+              onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
+              aria-label={vista === 'historial' ? 'Volver al chat' : 'Ver el historial'}
+              aria-pressed={vista === 'historial'}
+              title={vista === 'historial' ? 'Volver al chat' : 'Historial'}
+              /* 40×40 con borde: el contador de cuota que tiene al lado son dos
                líneas (~32 px de alto) y un icono suelto de 16 px quedaba
                diminuto y descolgado. Con este tamaño los dos bloques pesan lo
                mismo y la cabecera se lee simétrica. */
-            className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-              vista === 'historial'
-                ? 'bg-surface-elevated text-text-primary'
-                : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
-            }`}
-            style={{ borderColor: colors.border }}
-          >
-            {vista === 'historial' ? (
-              /* De vuelta: una flecha, que es lo que se espera de «salir de
-                 aquí» y no se confunde con otra sección. */
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            ) : (
-              /* Un reloj con la flecha de retroceso: el icono estándar de
-                 «historial», que se reconoce sin leer nada. */
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.05 11a9 9 0 111.5 6M3 20v-5h5"
-                />
-              </svg>
-            )}
-          </button>
-        </div>
-      </header>
-
-      {vista === 'historial' ? (
-        <ConversationHistory
-          projectId={projectId}
-          activaId={conversationId}
-          onElegir={cargar}
-          onNueva={() => {
-            setConversationId(null);
-            setMensajes([]);
-            setError(null);
-            setVista('chat');
-          }}
-          onBorrarActiva={() => {
-            setConversationId(null);
-            setMensajes([]);
-          }}
-        />
-      ) : (
-        <>
-          {mensajes.length > 0 && (
-            <div
-              ref={hiloRef}
-              className="flex max-h-[28rem] flex-col gap-4 overflow-y-auto pr-1"
-              aria-live="polite"
+              className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                vista === 'historial'
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
+              }`}
+              style={{ borderColor: colors.border }}
             >
-              {mensajes.map((mensaje) => (
-                <div key={mensaje.id} className="flex flex-col gap-3">
-                  <Burbuja mensaje={mensaje} />
+              {vista === 'historial' ? (
+                /* De vuelta: una flecha, que es lo que se espera de «salir de
+                 aquí» y no se confunde con otra sección. */
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              ) : (
+                /* Un reloj con la flecha de retroceso: el icono estándar de
+                 «historial», que se reconoce sin leer nada. */
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3.05 11a9 9 0 111.5 6M3 20v-5h5"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+        </header>
 
-                  {(mensaje.proposals ?? []).length > 0 && (
-                    /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
+        {vista === 'historial' ? (
+          <ConversationHistory
+            projectId={projectId}
+            activaId={conversationId}
+            onElegir={cargar}
+            onNueva={() => {
+              setConversationId(null);
+              setMensajes([]);
+              setError(null);
+              setVista('chat');
+            }}
+            onBorrarActiva={() => {
+              setConversationId(null);
+              setMensajes([]);
+            }}
+          />
+        ) : (
+          <>
+            {mensajes.length > 0 && (
+              <div
+                ref={hiloRef}
+                className="flex max-h-[28rem] flex-col gap-4 overflow-y-auto pr-1"
+                aria-live="polite"
+              >
+                {mensajes.map((mensaje) => (
+                  <div key={mensaje.id} className="flex flex-col gap-3">
+                    <Burbuja mensaje={mensaje} />
+
+                    {(mensaje.proposals ?? []).length > 0 && (
+                      /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
                        tarjeta le informa de su estado, así que también cuenta
                        las que se acepten o descarten aquí mismo, no solo las que
                        ya vinieran decididas de una conversación vieja. */
-                    <ProposalGroup>
-                      {(mensaje.proposals ?? []).map((propuesta, indice) => {
-                        if (isTaskProposal(propuesta)) {
-                          return (
-                            <TaskProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isAssignmentProposal(propuesta)) {
-                          return (
-                            <AssignProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isEditProposal(propuesta)) {
-                          return (
-                            <EditProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isMoveProposal(propuesta)) {
-                          return (
-                            <MoveProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isChecklistProposal(propuesta)) {
-                          return (
-                            <ChecklistProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isCommentProposal(propuesta)) {
-                          return (
-                            <CommentProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isCheckStepsProposal(propuesta)) {
-                          return (
-                            <MarkStepsProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isMessageProposal(propuesta)) {
-                          return (
-                            <MessageProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        if (isChartProposal(propuesta)) {
-                          return (
-                            <ChartProposalCard
-                              key={propuesta.id ?? `${mensaje.id}-${indice}`}
-                              projectId={projectId}
-                              proposalId={propuesta.id}
-                              estadoGuardado={propuesta.status}
-                              propuesta={propuesta.args}
-                              nombres={nombres}
-                              etiquetas={etiquetas}
-                            />
-                          );
-                        }
-                        /* Una herramienta que el servicio conozca y esta pantalla no.
+                      <ProposalGroup>
+                        {(mensaje.proposals ?? []).map((propuesta, indice) => {
+                          if (isTaskProposal(propuesta)) {
+                            return (
+                              <TaskProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isAssignmentProposal(propuesta)) {
+                            return (
+                              <AssignProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isEditProposal(propuesta)) {
+                            return (
+                              <EditProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isMoveProposal(propuesta)) {
+                            return (
+                              <MoveProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isChecklistProposal(propuesta)) {
+                            return (
+                              <ChecklistProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isCommentProposal(propuesta)) {
+                            return (
+                              <CommentProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isCheckStepsProposal(propuesta)) {
+                            return (
+                              <MarkStepsProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isMessageProposal(propuesta)) {
+                            return (
+                              <MessageProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          /* El borrado es el único destructivo, así que su guarda
+                           es la más estrecha de la cadena: `proponer_borrado`
+                           **y** un `taskId` de verdad. Lo que no puede pasar
+                           nunca es lo contrario —que una guarda ancha se coma un
+                           borrado y lo pinte como un cambio inocuo—, y ninguna
+                           de las de arriba mira este `tool`. */
+                          if (isDeleteProposal(propuesta)) {
+                            return (
+                              <DeleteProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          if (isChartProposal(propuesta)) {
+                            return (
+                              <ChartProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                nombres={nombres}
+                                etiquetas={etiquetas}
+                              />
+                            );
+                          }
+                          /* Una herramienta que el servicio conozca y esta pantalla no.
                    Se ignora en silencio: la burbuja de texto ya está pintada. */
-                        return null;
-                      })}
-                    </ProposalGroup>
-                  )}
-                </div>
-              ))}
+                          return null;
+                        })}
+                      </ProposalGroup>
+                    )}
+                  </div>
+                ))}
 
-              {pendiente && <FlujoDePensamiento />}
-            </div>
-          )}
+                {pendiente && <FlujoDePensamiento />}
+              </div>
+            )}
 
-          {mensajes.length === 0 && (
-            <div className="flex flex-wrap gap-2">
-              {SUGERENCIAS.map((sugerencia) => (
-                <button
-                  key={sugerencia}
-                  type="button"
-                  disabled={agotada}
-                  onClick={() => enviar(sugerencia)}
-                  className="rounded-full border border-border px-3 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {sugerencia}
-                </button>
-              ))}
-            </div>
-          )}
+            {mensajes.length === 0 && (
+              <div className="flex flex-wrap gap-2">
+                {SUGERENCIAS.map((sugerencia) => (
+                  <button
+                    key={sugerencia}
+                    type="button"
+                    disabled={agotada}
+                    onClick={() => enviar(sugerencia)}
+                    className="rounded-full border border-border px-3 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {sugerencia}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {agotada && cuota ? (
-            <p
-              role="note"
-              className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
-              style={{
-                background: alpha(colors.warning, 8),
-                borderColor: alpha(colors.warning, 30),
-              }}
-            >
-              Has gastado los <strong>{cuota.limite}</strong> mensajes de este mes. Vuelven el{' '}
-              <strong>{formatoReinicio(cuota.reinicia)}</strong>.
-            </p>
-          ) : (
-            <form
-              className="flex flex-col gap-2"
-              onSubmit={(evento) => {
-                evento.preventDefault();
-                enviar(texto);
-              }}
-            >
-              <label htmlFor={campoId} className="sr-only">
-                Pregunta al asistente
-              </label>
-              <div className="flex items-stretch gap-2">
-                <textarea
-                  ref={campoRef}
-                  id={campoId}
-                  rows={2}
-                  maxLength={2000}
-                  value={texto}
-                  disabled={pendiente}
-                  placeholder="¿Quién puede llevar el formulario de login?"
-                  onChange={(evento) => setTexto(evento.target.value)}
-                  onKeyDown={(evento) => {
-                    /* Enter envía, Mayús+Enter parte la línea: es lo que hace
+            {agotada && cuota ? (
+              <p
+                role="note"
+                className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
+                style={{
+                  background: alpha(colors.warning, 8),
+                  borderColor: alpha(colors.warning, 30),
+                }}
+              >
+                Has gastado los <strong>{cuota.limite}</strong> mensajes de este mes. Vuelven el{' '}
+                <strong>{formatoReinicio(cuota.reinicia)}</strong>.
+              </p>
+            ) : (
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={(evento) => {
+                  evento.preventDefault();
+                  enviar(texto);
+                }}
+              >
+                <label htmlFor={campoId} className="sr-only">
+                  Pregunta al asistente
+                </label>
+                <div className="flex items-stretch gap-2">
+                  <textarea
+                    ref={campoRef}
+                    id={campoId}
+                    rows={2}
+                    maxLength={2000}
+                    value={texto}
+                    disabled={pendiente}
+                    placeholder="¿Quién puede llevar el formulario de login?"
+                    onChange={(evento) => setTexto(evento.target.value)}
+                    onKeyDown={(evento) => {
+                      /* Enter envía, Mayús+Enter parte la línea: es lo que hace
                    cualquier chat, y `requestSubmit` respeta la validación del
                    formulario en vez de saltársela. */
-                    if (evento.key === 'Enter' && !evento.shiftKey) {
-                      evento.preventDefault();
-                      evento.currentTarget.form?.requestSubmit();
-                    }
-                  }}
-                  className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-                />
-                {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
+                      if (evento.key === 'Enter' && !evento.shiftKey) {
+                        evento.preventDefault();
+                        evento.currentTarget.form?.requestSubmit();
+                      }
+                    }}
+                    className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                  />
+                  {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
                 filas el botón por defecto mide una (`size="md"`, 40px) y quedaba
                 anclado abajo, con un hueco encima que rompía la simetría con el
                 campo. Va por `style` y no por una clase `h-full`: la clase
@@ -568,26 +637,27 @@ export function AssistantChat({
                 especificidad, y quién gana depende del orden en que Tailwind
                 generó el CSS, no del orden en el `className` — un `style` en
                 línea no tiene esa ambigüedad. */}
-                <Button
-                  type="submit"
-                  isLoading={pendiente}
-                  disabled={texto.trim().length === 0}
-                  style={{ height: 70 }}
-                >
-                  Preguntar
-                </Button>
-              </div>
+                  <Button
+                    type="submit"
+                    isLoading={pendiente}
+                    disabled={texto.trim().length === 0}
+                    style={{ height: 70 }}
+                  >
+                    Preguntar
+                  </Button>
+                </div>
 
-              <p className="font-sans text-xs text-text-disabled">
-                El asistente puede equivocarse. Revisa cada propuesta antes de aceptarla.
-              </p>
+                <p className="font-sans text-xs text-text-disabled">
+                  {PRAX_NAME} puede equivocarse. Revisa cada propuesta antes de aceptarla.
+                </p>
 
-              {error && <p className="font-sans text-sm text-error">{error}</p>}
-            </form>
-          )}
-        </>
-      )}
-    </section>
+                {error && <p className="font-sans text-sm text-error">{error}</p>}
+              </form>
+            )}
+          </>
+        )}
+      </section>
+    </AccionDelLienzo.Provider>
   );
 }
 

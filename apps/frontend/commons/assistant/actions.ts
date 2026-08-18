@@ -1,24 +1,21 @@
 'use server';
 
-import { randomUUID } from 'node:crypto';
-import {
-  type AssignmentProposal,
-  type AssistantChatResult,
-  type AssistantQuota,
-  type ChartProposal,
-  type CheckStepsProposal,
-  type ChecklistProposal,
-  type CommentProposal,
-  type ConversationSummary,
-  type EditProposal,
-  type FullConversation,
-  type MoveProposal,
-  type TaskProposal,
-} from '@/lib/assistant';
-import { CATALOGO, MAX_WIDGETS, type Widget, siguienteFila } from '@/lib/widgets';
-import { ApiError, type ProjectDetail, type Task } from '@praxis/commons';
-import { createServerApiClient, getSession } from '@praxis/commons/auth';
-import { revalidatePath } from 'next/cache';
+import type {
+  AssignmentProposal,
+  AssistantChatResult,
+  AssistantQuota,
+  CheckStepsProposal,
+  ChecklistProposal,
+  CommentProposal,
+  ConversationSummary,
+  DeleteProposal,
+  EditProposal,
+  FullConversation,
+  MoveProposal,
+  TaskProposal,
+} from '../api/assistant';
+import type { ProjectDetail, Task } from '../api/domain';
+import { cuotaDelError, describe, requireApi } from './helpers';
 
 /**
  * Las acciones del asistente.
@@ -41,19 +38,33 @@ import { revalidatePath } from 'next/cache';
  * | `aceptarComentarioAction` | `POST /tasks/:id/comments` | `canComment` |
  * | `aceptarMarcarPasosAction` | `POST /tasks/:id/checklists/:item/toggle` | `canMoveTask` |
  * | `aceptarMensajeAction` | `POST /projects/:id/chat/messages` | `canComment` |
- * | `aceptarGraficoAction` | `PUT /projects/:id/reports/layout` | `canViewReports` |
+ * | `aceptarBorradoAction` | `DELETE /tasks/:id` | `canDeleteTask` |
  *
  * No se abre ninguna vía de escritura nueva: sin `canCreateTask`, aceptar falla
  * igual que le fallaría a esa persona pulsando el botón a mano.
  *
- * ⚠️ **La última de la tabla es la excepción que conviene entender.** No escribe
- * en el proyecto sino en el **lienzo de quien acepta**, y usa el mismo endpoint,
- * el mismo permiso y la misma fila que el propio lienzo al arrastrar un gráfico.
- * Sigue sin haber una vía nueva: si esa persona puede colocar un gráfico a mano,
- * puede aceptarlo propuesto; y si no puede entrar aquí, tampoco hay asistente.
+ * ⚠️ **La última entró el 2026-08-18 y es la única que no se deshace.** Durante
+ * meses no existió, y el argumento era que el asistente no debía poder destruir
+ * nada. No se sostenía: la regla de la casa es «propone; ejecuta el código que ya
+ * existe», y borrar la cumple igual que crear — esta acción llama al mismo
+ * endpoint que el botón del diálogo de tarea, con la sesión y los permisos de
+ * quien acepta. Lo que sí cambia es la **interfaz**: la tarjeta de un borrado
+ * lleva confirmación propia, aspecto destructivo y el inventario de lo que se
+ * lleva por delante. Ver `DeleteProposalCard`.
  *
- * **Y no hay ninguna que borre.** No existe `aceptarBorradoAction` ni la va a
- * haber: ver la nota al pie de `tools.ts`.
+ * ## Por qué esto vive en `commons` y no en una zona
+ *
+ * Porque desde que PRAX tiene pantalla propia lo usan **dos**: `assistant-front`
+ * —donde la conversación es toda la pantalla— y `reports-front`, donde es un
+ * panel al lado de los gráficos. Duplicar novecientas líneas de acciones que
+ * llaman a endpoints con permisos delicados es duplicar el sitio donde se puede
+ * colar un fallo de autorización.
+ *
+ * ⚠️ **`aceptarGraficoAction` NO está aquí**, y es la única que se quedó en
+ * `reports-front`. Escribe en el lienzo, así que necesita el catálogo de widgets
+ * —que es de aquella zona— y además revalida *su* página. Llega a la
+ * conversación **inyectada por props**; donde no hay lienzo no se inyecta, y la
+ * tarjeta lo dice en vez de ofrecer un botón que no llevaría a ninguna parte.
  *
  * ⚠️ **Nada de lo que llega aquí desde el chat es de fiar**, y no hace falta que
  * lo sea: la propuesta viaja por el navegador, así que el `columnId` se vuelve a
@@ -63,47 +74,16 @@ import { revalidatePath } from 'next/cache';
  * viaja como POST a la ruta donde se usa y un cambio de `matcher` en `proxy.ts`
  * podría dejarla fuera del guard.
  *
- * ⚠️ **Ninguna de las del tablero llama a `revalidatePath`, y es a propósito.**
- * Lo que cambian vive en otra zona y no comparte caché con esta; revalidar aquí
- * solo conseguiría volver a renderizar los informes para no cambiar ni un píxel
+ * ⚠️ **Ninguna llama a `revalidatePath`, y es a propósito.** Lo que cambian
+ * —una tarea, un comentario, un mensaje del chat— vive en **otra zona**, que no
+ * comparte caché con la que está pintando la conversación. Revalidar aquí solo
+ * conseguiría volver a renderizar la pantalla actual para no cambiar ni un píxel
  * de lo que se está viendo.
  *
- * `aceptarGraficoAction` **sí** revalida, y es la excepción exacta que confirma
- * la regla: lo que cambia es esta misma página. Sin revalidar, el gráfico
- * aceptado no aparecería hasta que alguien recargue.
+ * Y ahora que esto es compartido hay un motivo más fuerte: **desde aquí no se
+ * sabe en qué zona se está**, así que cualquier ruta que se pasara a
+ * `revalidatePath` sería correcta como mucho en una de las dos.
  */
-
-async function requireApi() {
-  const session = await getSession();
-  if (!session) return null;
-  return createServerApiClient();
-}
-
-/**
- * Traduce el fallo a algo que se pueda leer en una burbuja de chat.
- *
- * El 429 es el único con un mensaje propio del backend que merece salir tal
- * cual: lleva el límite y la fecha de reinicio.
- */
-function describe(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    if (error.status === 403) return 'No tienes permiso para hacer esto en este proyecto.';
-    if (error.status === 404) return 'Eso ya no existe en el proyecto.';
-    if (error.status >= 500 && error.status !== 502) return fallback;
-    return error.message;
-  }
-  return fallback;
-}
-
-/** La cuota que el backend mete en `details` del 429, si viene. */
-function cuotaDelError(error: unknown): AssistantQuota | null {
-  if (!(error instanceof ApiError)) return null;
-  const details = error.details;
-  if (details && typeof details === 'object' && 'cuota' in details) {
-    return (details as { cuota: AssistantQuota }).cuota;
-  }
-  return null;
-}
 
 export interface RespuestaChat {
   reply: string | null;
@@ -724,6 +704,54 @@ export async function aceptarComentarioAction(
 }
 
 /**
+ * Borrar una tarea. **La única acción del asistente que no se deshace.**
+ *
+ * Va a `DELETE /tasks/:id`, que pide `canDeleteTask` — el mismo endpoint y el
+ * mismo permiso que el botón de borrar del diálogo de tarea. No hay ninguna vía
+ * nueva: si esta persona no puede borrarla a mano, esto responde el mismo 403.
+ *
+ * ## Las dos comprobaciones de más, y por qué solo aquí
+ *
+ * `tareaDelProyecto` ya confirma que la tarea existe y que es **de este
+ * proyecto** —eso lo hacen las ocho— pero aquí importa el doble: la propuesta ha
+ * viajado por el navegador, y un `taskId` cambiado a mano apuntando a otro
+ * proyecto sería un borrado dirigido. La comprobación de `projectId` es lo que
+ * lo corta antes de llegar al gateway; el gateway lo cortaría igual con su
+ * permiso, pero aquí el mensaje se puede explicar.
+ *
+ * Y se devuelve **el título en el resultado**, no un enlace: en las demás la
+ * tarjeta ofrece «verla en el tablero», y aquí ya no hay nada que ver. Decir qué
+ * se borró es lo único que queda por decir.
+ *
+ * ⚠️ **No confirma nada.** La confirmación es de la interfaz —`DeleteProposalCard`
+ * pide un segundo gesto— y meterla también aquí no añadiría seguridad: una
+ * Server Action se puede invocar sin pasar por su tarjeta, y lo que protege eso
+ * es el permiso del gateway, no un `confirm`.
+ */
+export async function aceptarBorradoAction(
+  projectId: string,
+  propuesta: DeleteProposal,
+): Promise<{ error: string | null; borrada: { title: string } | null }> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', borrada: null };
+
+  const encontrada = await tareaDelProyecto(api, projectId, String(propuesta.taskId ?? '').trim());
+  if ('error' in encontrada) return { error: encontrada.error, borrada: null };
+
+  const { tarea } = encontrada;
+
+  try {
+    await api.delete(`/tasks/${tarea.id}`);
+    /* Contra el `data` no se puede: un DELETE correcto no devuelve cuerpo. Aquí
+       la ausencia de excepción **es** la confirmación, que es la única de las
+       nueve donde eso vale — en las demás hay una entidad que comprobar. */
+    return { error: null, borrada: { title: tarea.title } };
+  } catch (error) {
+    return { error: describe(error, 'No se pudo borrar la tarea.'), borrada: null };
+  }
+}
+
+/**
  * Enviar un mensaje al chat del equipo.
  *
  * Va a `POST /projects/:id/chat/messages`, que pide `canComment` — el mismo
@@ -771,125 +799,4 @@ export async function aceptarMensajeAction(
 function toIsoDueDate(value: string): string {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
-}
-
-/* ─── El lienzo ───────────────────────────────────────────────────────── */
-
-/**
- * Guarda la disposición del lienzo de quien llama.
- *
- * ⚠️ **No lleva `revalidatePath`, por el mismo motivo que las del asistente.**
- * Mover un gráfico ya lo ha movido el navegador; volver a renderizar la page en
- * el servidor solo pediría otra vez los mismos informes para pintar exactamente
- * lo que ya se está viendo. Quien sí lo necesita es *añadir* un widget, porque
- * su informe todavía no se ha pedido — y eso lo hace el propio lienzo con
- * `router.refresh()`, que es una decisión del gesto y no de la escritura.
- *
- * El `userId` **no viaja**: lo pone el gateway desde el token. Aquí no hay forma
- * de escribir en el lienzo de otra persona ni equivocándose.
- */
-export async function guardarLienzoAction(
-  projectId: string,
-  widgets: Widget[],
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const api = await requireApi();
-  if (!api) return { ok: false, error: 'Tu sesión ha caducado.' };
-
-  try {
-    /* Solo los campos que el DTO declara: uno de sobra ya da 400. `tipo` y
-       `grafico` viajan tal cual porque el servidor los valida contra el
-       catálogo cerrado, que es donde tiene que estar esa comprobación. */
-    await api.put(`/projects/${projectId}/reports/layout`, {
-      widgets: widgets.map((widget) => ({
-        id: widget.id,
-        tipo: widget.tipo,
-        x: widget.x,
-        y: widget.y,
-        w: widget.w,
-        h: widget.h,
-        ...(widget.grafico ? { grafico: widget.grafico } : {}),
-      })),
-    });
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: describe(error, 'No se pudo guardar la disposición.') };
-  }
-}
-
-/**
- * Acepta un gráfico propuesto: lo **añade al lienzo de quien acepta**.
- *
- * ⚠️ **No es una vía de escritura nueva sobre el proyecto**, y conviene decirlo
- * porque es la primera acción del asistente que no llama a un endpoint del
- * tablero. Escribe en `PUT /projects/:id/reports/layout`, que es exactamente el
- * mismo endpoint que usa el lienzo al arrastrar un gráfico, con el mismo permiso
- * —`canViewReports`, que ya hizo falta para llegar al asistente— y sobre la
- * misma fila: la de esta persona en este proyecto. No hay forma de tocar el
- * lienzo de nadie más, porque el `userId` lo pone el gateway desde el token.
- *
- * Se lee el lienzo antes de escribirlo en vez de mandar solo el gráfico nuevo,
- * porque la ruta guarda la disposición **entera**. Se acepta la carrera que eso
- * abre —mover una tarjeta en otra pestaña entre la lectura y la escritura— por
- * lo mismo que no hay control de concurrencia en la tabla: las dos pestañas que
- * podrían pisarse son las de la misma persona.
- *
- * La parametrización se manda **tal cual vino**: el gateway la valida contra el
- * catálogo cerrado, que es donde esa comprobación se puede garantizar. Si el
- * modelo hubiera colado algo imposible, esto devuelve el 400 y la tarjeta lo
- * dice, en vez de dibujar un gráfico que no significa nada.
- */
-export async function aceptarGraficoAction(
-  projectId: string,
-  propuesta: ChartProposal,
-): Promise<{ anadido: boolean; error: string | null }> {
-  const api = await requireApi();
-  if (!api) return { anadido: false, error: 'Tu sesión ha caducado.' };
-
-  try {
-    const lienzo = await api.get<{ widgets: Widget[] }>(`/projects/${projectId}/reports/layout`);
-    const widgets = lienzo.widgets ?? [];
-
-    if (widgets.length >= MAX_WIDGETS) {
-      return {
-        anadido: false,
-        error: `Tu lienzo ya tiene ${MAX_WIDGETS} gráficos. Quita alguno para añadir este.`,
-      };
-    }
-
-    const nuevo: Widget = {
-      id: randomUUID(),
-      tipo: 'generado',
-      x: 0,
-      y: siguienteFila(widgets),
-      w: CATALOGO.generado.w,
-      h: CATALOGO.generado.h,
-      grafico: propuesta.grafico as Widget['grafico'],
-    };
-
-    const resultado = await guardarLienzoAction(projectId, [...widgets, nuevo]);
-    if (!resultado.ok) return { anadido: false, error: resultado.error };
-
-    /**
-     * ⚠️ **Esta sí revalida, al revés que las otras ocho.**
-     *
-     * Las del tablero no lo hacen porque lo que cambian vive en otra zona, que
-     * no comparte caché con esta: revalidar aquí volvería a renderizar los
-     * informes para no cambiar un píxel. Esta es la excepción exacta — lo que
-     * cambia **es esta página**, y sin revalidar el gráfico aceptado no aparece
-     * hasta que alguien recargue, que se lee como que aceptar no hizo nada.
-     */
-    /**
-     * ⚠️ **La ruta, no el valor.** Estaba como `/${projectId}`, con el UUID, y
-     * no revalidaba nada: la URL de esta pantalla lleva el **slug**
-     * (`/reports/rediseno-del-panel`), así que ese path no casaba con ninguna
-     * página renderizada y el gráfico aceptado no aparecía hasta recargar a
-     * mano. Con la forma del segmento dinámico y `'page'` se revalida la ruta
-     * sea cual sea el parámetro, que es justo lo que hace falta cuando el mismo
-     * proyecto se puede alcanzar por slug o por id.
-     */
-    revalidatePath('/[id]', 'page');
-    return { anadido: true, error: null };
-  } catch (error) {
-    return { anadido: false, error: describe(error, 'No se pudo añadir el gráfico.') };
-  }
 }

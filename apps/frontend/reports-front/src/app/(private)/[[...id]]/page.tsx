@@ -1,7 +1,6 @@
 import { SyntheticBanner } from '@/components/molecules/ChartCard';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 import { GeneratedChart } from '@/components/organisms/Charts';
-import { ProjectPicker } from '@/components/organisms/ProjectPicker';
 import {
   CicloWidget,
   FlujoWidget,
@@ -13,7 +12,6 @@ import {
   TiemposWidget,
 } from '@/components/organisms/ReportWidgets';
 import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
-import type { AssistantQuota } from '@/lib/assistant';
 import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
 import type {
   ReportBlocked,
@@ -27,15 +25,16 @@ import type {
 import { type Widget, informesNecesarios } from '@/lib/widgets';
 import {
   AppHeader,
+  type AssistantQuota,
   type EffectivePermissions,
   type Label,
   type Paginated,
   type Project,
   type ProjectDetail,
   type ProjectMember,
-  type UserProfile,
-  personLabel,
+  ProjectPicker,
   personName,
+  reportPath,
   resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
@@ -45,14 +44,37 @@ import type { ReactNode } from 'react';
 
 import { guardarLienzoAction } from './actions';
 
+/**
+ * ⚠️ **Catch-all opcional, y ahí está el arreglo de la pantalla negra.**
+ *
+ * `[[...id]]` casa con `/reports` **y** con `/reports/<slug>`, así que las dos
+ * las sirve esta misma página. Lo que había antes eran dos rutas: una raíz que
+ * resolvía el primer proyecto y hacía `redirect()`, y esta.
+ *
+ * Ese redirect costaba **dos cargas completas**: render en el servidor → 307 →
+ * navegación nueva → `loading.tsx` → render de la página de verdad. La ventana
+ * entre las dos es lo que se veía como un parpadeo en negro al entrar en
+ * Análisis, y encima duplicaba todo el trabajo del servidor para acabar en el
+ * mismo sitio.
+ *
+ * `params.id` es un array porque un catch-all puede traer varios segmentos.
+ * Aquí solo importa el primero: no hay ninguna ruta más profunda, y
+ * `/reports/a/b` cae en `notFound()` por el mismo camino que un slug que no
+ * existe.
+ */
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id?: string[] }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id } = await params;
+  const slug = (await params).id?.[0];
+  /* Sin slug no se sabe qué proyecto va a salir sin repetir aquí la resolución
+     entera, y el título de la pestaña no vale ese viaje: se queda el de la
+     sección, que además es el que corresponde a `/reports` a secas. */
+  if (!slug) return { title: 'Análisis' };
+
   try {
-    const project = await createServerApiClient().get<ProjectDetail>(`/projects/${id}`);
+    const project = await createServerApiClient().get<ProjectDetail>(`/projects/${slug}`);
     return { title: `${project.name}` };
   } catch {
     return { title: 'Análisis' };
@@ -91,25 +113,71 @@ interface LienzoGuardado {
  * Eso obliga a **dos viajes en serie** —el lienzo y después sus informes— donde
  * antes había uno. Se acepta: el primero es una lectura por clave primaria de una
  * tabla de preferencias, y lo que ahorra el segundo es de otro orden de magnitud.
+ *
+ * ## Sin proyecto en la URL
+ *
+ * `/reports` a secas abre el **primero al que tengas acceso**, y lo hace aquí
+ * mismo: sin redirect y sin una segunda carga. El proyecto elegido se escribe en
+ * la URL al cambiarlo con el selector, así que a partir de ahí la pantalla es
+ * enlazable y el botón atrás hace lo que se espera.
+ *
+ * ⚠️ **No se recuerda el último proyecto en una cookie**, y se estudió. Habría
+ * hecho falta escribirla desde una Server Action —un Server Component no puede
+ * poner cookies— o sea un gesto de escritura por cada visita para guardar una
+ * preferencia que la URL ya guarda mejor: quien quiera volver a un proyecto
+ * concreto tiene su dirección, y quien no, entra al primero.
  */
-export default async function ProjectReportsPage({ params }: PageProps) {
-  const { id } = await params;
+export default async function ReportsPage({ params }: PageProps) {
+  const segmentos = (await params).id;
+  /* Más de un segmento no es una ruta de esta sección. Se trata como un slug
+     que no existe, que es lo que es. */
+  if (segmentos && segmentos.length > 1) return notFound();
+
+  const slug = segmentos?.[0];
   const api = createServerApiClient();
 
-  const project = await api.get<ProjectDetail>(`/projects/${id}`).catch(() => null);
-  if (!project) return notFound();
+  /**
+   * Los proyectos cuyo informe se puede abrir.
+   *
+   * Se lanza **antes de saber si hace falta esperarla**, a propósito: con slug
+   * en la URL viaja en paralelo con el resto y no cuesta nada, y sin slug es lo
+   * primero que hay que resolver porque decide qué proyecto se abre.
+   *
+   * `permission` filtra en la consulta, así que no hay que preguntar por los
+   * permisos de cada proyecto uno a uno para acabar descartando casi todos.
+   */
+  const listaPromesa = api
+    .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
+    .catch(() => ({ items: [] as Project[], total: 0 }));
+
+  /**
+   * Qué proyecto se abre.
+   *
+   * Con slug hay que traducirlo: **solo `GET /projects/:id` entiende las dos
+   * formas**, y todo lo anidado —informes, permisos, lienzo, asistente— espera
+   * el UUID. Sin slug no hace falta ese viaje: la lista ya trae el `id` y el
+   * `name`, que es todo lo que esta pantalla usa del proyecto.
+   */
+  let project: Project | null;
+  if (slug) {
+    project = await api.get<ProjectDetail>(`/projects/${slug}`).catch(() => null);
+    if (!project) return notFound();
+  } else {
+    const lista = await listaPromesa;
+    project = lista.items[0] ?? null;
+    if (!project) return <SinNingunProyecto api={api} />;
+  }
 
   /**
    * El UUID, resuelto, en una constante propia.
    *
-   * ⚠️ **La ruta puede traer el slug**, y solo `GET /projects/:id` lo traduce:
-   * todo lo anidado —informes, permisos, lienzo, asistente— espera el UUID, y
-   * pasarle el slug no da error de compilación, da un 403.
+   * ⚠️ **La ruta puede traer el slug**, y pasarle el slug a una ruta anidada no
+   * da un error de compilación: da un 403.
    *
    * Va en una constante y no se lee de `project` dentro de la Server Action de
    * abajo porque el `'use server'` corta el estrechamiento de tipos: allí
-   * `project` vuelve a ser `ProjectDetail | null` y haría falta un `!` que
-   * afirma algo que ya se comprobó tres líneas antes.
+   * `project` vuelve a ser `Project | null` y haría falta un `!` que afirma algo
+   * que ya se comprobó más arriba.
    */
   const projectId = project.id;
 
@@ -121,6 +189,10 @@ export default async function ProjectReportsPage({ params }: PageProps) {
    * los `Promise.all` de abajo caerían en cascada a `null` y la pantalla
    * enseñaría tarjetas rotas en vez de decir qué pasa. El guard es la
    * seguridad; esto es la explicación.
+   *
+   * ⚠️ Sigue haciendo falta **aunque el proyecto salga de la lista filtrada**:
+   * sin slug el proyecto viene ya filtrado por `permission`, pero con slug lo ha
+   * elegido quien escribió la URL y puede ser cualquiera.
    */
   const effective = await api.get<EffectivePermissions>(`/projects/${projectId}/permissions/me`);
   if (!effective.permissions.canViewReports) {
@@ -134,8 +206,9 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   /**
    * Primero el lienzo, porque decide todo lo demás.
    *
-   * Va junto con lo que no depende de él: el selector, los miembros, las
-   * etiquetas y la cuota, que hacen falta con lienzo y sin él.
+   * Va junto con lo que no depende de él: los miembros, las etiquetas y la
+   * cuota, que hacen falta con lienzo y sin él. La lista de proyectos ya está
+   * en vuelo desde arriba.
    */
   const [lienzo, proyectos, members, etiquetas, cuota] = await Promise.all([
     api
@@ -143,12 +216,7 @@ export default async function ProjectReportsPage({ params }: PageProps) {
       /* Un lienzo que no se puede leer se trata como vacío, no como un error:
          perder la disposición es molesto, perder la pantalla entera es peor. */
       .catch(() => ({ widgets: [] as Widget[], actualizadoEn: null })),
-    /* El selector solo ofrece lo que se puede abrir. `permission` filtra en la
-       consulta, así que no hace falta preguntar por los permisos de cada
-       proyecto uno a uno para acabar descartando casi todos. */
-    api
-      .get<Paginated<Project>>('/projects?limit=100&permission=canViewReports')
-      .catch(() => ({ items: [] as Project[], total: 0 })),
+    listaPromesa,
     /* Los miembros y el directorio piden solo `canViewProject`: el asistente
        necesita poner nombre a un `userId` para pintar una propuesta. */
     api
@@ -318,14 +386,21 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
               de los proyectos es el activo, y comparando contra el slug de la
               URL no encontraba ninguno. */}
-          <ProjectPicker projects={proyectos.items} activeId={project.id} />
+          <ProjectPicker
+            projects={proyectos.items}
+            activeId={projectId}
+            /* Ruta de esta zona y **sin** el basePath: Next añade `/reports`.
+               El slug va en la URL y el UUID en la API. Ver §16 y `routes.ts`. */
+            pathDe={reportPath}
+            vacio="No tienes ningún proyecto con análisis abierto."
+          />
         </div>
 
         {snapshot && snapshot.eventosSinteticos > 0 && (
           <SyntheticBanner eventos={snapshot.eventosSinteticos} />
         )}
 
-        {/* `project.id` y no el parámetro de la ruta: las acciones del asistente
+        {/* `projectId` y no el parámetro de la ruta: las acciones del asistente
             llaman a `/projects/:projectId/assistant/...`, que espera el UUID.
             Con el slug de la URL respondían 403. */}
         <AnalysisScreen
@@ -337,6 +412,48 @@ export default async function ProjectReportsPage({ params }: PageProps) {
           nombres={nombres}
           etiquetas={nombresDeEtiquetas}
         />
+      </div>
+    </AppHeader>
+  );
+}
+
+/**
+ * No hay ningún proyecto cuyo informe se pueda abrir.
+ *
+ * ⚠️ **Son dos motivos distintos y confundirlos manda a la gestión
+ * equivocada**: no estar en ningún proyecto se arregla pidiendo que te añadan;
+ * estar en varios sin `canViewReports` se arregla pidiendo el permiso a quien
+ * administra el proyecto. La segunda consulta solo se hace en este caso, que es
+ * el raro, y con `limit=1` porque de esa lista únicamente se mira el `total`.
+ */
+async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerApiClient> }) {
+  const todos = await api.get<Paginated<Project>>('/projects?limit=1').catch(() => null);
+
+  return (
+    <AppHeader title="Análisis">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
+            Cómo va el trabajo
+          </h2>
+          <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+            Cuánto hay, cómo se mueve, cuánto tarda y qué cabe esperar.
+          </p>
+        </div>
+
+        {todos && todos.total > 0 ? (
+          <NoReportsAccess />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border px-6 py-12 text-center">
+            <p className="font-display text-lg text-text-primary">
+              Todavía no estás en ningún proyecto
+            </p>
+            <p className="mt-1 font-sans text-sm text-text-secondary">
+              Los reportes se calculan sobre el trabajo de un proyecto, así que necesitas estar en
+              al menos uno.
+            </p>
+          </div>
+        )}
       </div>
     </AppHeader>
   );

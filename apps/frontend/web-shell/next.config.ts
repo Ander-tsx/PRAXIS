@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
     const reportsFrontUrl = process.env.REPORTS_FRONT_URL ?? 'http://localhost:4104';
     const adminFrontUrl = process.env.ADMIN_FRONT_URL ?? 'http://localhost:4105';
     const chatFrontUrl = process.env.CHAT_FRONT_URL ?? 'http://localhost:4106';
+    const assistantFrontUrl = process.env.ASSISTANT_FRONT_URL ?? 'http://localhost:4107';
 
     return [
       {
@@ -85,6 +86,24 @@ const nextConfig: NextConfig = {
       {
         source: '/chat/:path*',
         destination: `${chatFrontUrl}/chat/:path*`,
+      },
+
+      /**
+       * PRAX, el asistente. Séptima zona.
+       *
+       * Salió de dentro de Análisis, donde era un panel al lado de los gráficos:
+       * ahí solo se le podía preguntar por el informe que estabas viendo, y sabe
+       * hacer bastante más. Sigue estando allí —con el proyecto ya puesto— pero
+       * ahora tiene pantalla propia.
+       *
+       * Las **dos** entradas, como todas: sin la primera, `/assistant` a secas
+       * —que es exactamente la ruta a la que lleva el menú— cae en el 404 del
+       * shell.
+       */
+      { source: '/assistant', destination: `${assistantFrontUrl}/assistant` },
+      {
+        source: '/assistant/:path*',
+        destination: `${assistantFrontUrl}/assistant/:path*`,
       },
 
       /**
