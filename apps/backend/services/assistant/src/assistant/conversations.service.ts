@@ -95,6 +95,15 @@ export class ConversationsService {
     return {
       id: conversacion.id,
       title: conversacion.title,
+      /**
+       * ⚠️ **De qué proyecto iba, y sin esto no se podía seguir hablando.**
+       *
+       * Al abrir una conversación vieja desde el historial, la pantalla no tenía
+       * forma de saber su proyecto: se quedaba sin foco y por tanto **sin
+       * compositor**, así que se podía leer el hilo y no continuarlo. Con esto,
+       * abrir una conversación recupera también su foco.
+       */
+      projectId: conversacion.projectId,
       createdAt: conversacion.createdAt,
       updatedAt: conversacion.updatedAt,
       mensajes: conversacion.messages.map((mensaje) => ({

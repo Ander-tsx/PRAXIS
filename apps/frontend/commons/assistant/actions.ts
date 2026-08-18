@@ -2,6 +2,7 @@
 
 import type {
   AssignmentProposal,
+  AssistantAttachment,
   AssistantChatResult,
   AssistantQuota,
   BoardProposal,
@@ -109,6 +110,7 @@ export async function preguntarAction(
   projectId: string,
   message: string,
   conversationId?: string,
+  attachments?: AssistantAttachment[],
 ): Promise<RespuestaChat> {
   const api = await requireApi();
   if (!api) {
@@ -122,7 +124,9 @@ export async function preguntarAction(
   }
 
   const texto = message.trim();
-  if (texto.length === 0) {
+  /* ⚠️ Con archivos, un mensaje vacío es legítimo: «mira esto» es adjuntar y
+     enviar. Sin ellos sigue sin serlo. */
+  if (texto.length === 0 && (attachments ?? []).length === 0) {
     return {
       reply: null,
       proposals: [],
@@ -145,6 +149,8 @@ export async function preguntarAction(
     const resultado = await api.post<AssistantChatResult>(`/projects/${projectId}/assistant/chat`, {
       message: texto,
       ...(conversationId ? { conversationId } : {}),
+      /* Solo si los hay: un campo de más es un 400 (CLAUDE.md). */
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
     });
 
     /* Contra el `data`, no contra el status: un 200 con el cuerpo vacío es la

@@ -1,7 +1,10 @@
 'use client';
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
+  ASSISTANT_ATTACHMENT_ALLOWED_MIME,
+  ASSISTANT_ATTACHMENT_MAX_BYTES,
+  ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
   type AssistantProposal,
   type AssistantQuota,
   formatoReinicio,
@@ -215,6 +218,36 @@ export function AssistantChat({
   /* `projectId` → nombre, para que el historial diga de qué iba cada
      conversación sin abrirla. Se construye aquí y no en la page porque el
      historial es de esta pantalla, no del servidor. */
+  /**
+   * Empezar de cero: mismo proyecto, conversación nueva.
+   *
+   * No navega —el foco no cambia— así que basta con vaciar el estado. El hilo
+   * anterior no se pierde: está guardado y sale en el historial.
+   */
+  const empezarDeCero = useCallback(() => {
+    setConversationId(null);
+    setMensajes([]);
+    setError(null);
+    setVista('chat');
+  }, []);
+
+  /**
+   * Volver a elegir proyecto.
+   *
+   * Deja la pantalla como al entrar —sin foco, con los proyectos como botones—
+   * navegando a la ruta sin `?p=`. Es lo que hace que la insignia del proyecto
+   * sea un control y no un rótulo, y lo que hace verdad lo que PRAX responde
+   * cuando le piden hablar de otro.
+   *
+   * ⚠️ Empieza conversación nueva a propósito: **no se arrastra el hilo**. Un
+   * hilo que hablaba de un proyecto, continuado sobre otro, mezcla dos contextos
+   * en la ventana del modelo — que es justo lo que el foco de uno en uno evita.
+   * El anterior sigue en el historial.
+   */
+  const volverAElegirProyecto = useCallback(() => {
+    onElegirProyecto?.('', null);
+  }, [onElegirProyecto]);
+
   const nombresDeProyecto = useMemo(
     () => Object.fromEntries(proyectos.map((proyecto) => [proyecto.id, proyecto.name])),
     [proyectos],
@@ -225,6 +258,79 @@ export function AssistantChat({
   const dock = useDock();
   const cerrarCajon = dock?.cerrar;
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  /**
+   * Los archivos elegidos, ya leídos a base64.
+   *
+   * ⚠️ **Se leen al elegirlos y no al enviar.** Leer un fichero es asíncrono, y
+   * hacerlo dentro del envío convertiría «pulsar enviar» en una espera muda de
+   * medio segundo con un tamaño de 5 MB. Leídos antes, enviar es inmediato y los
+   * errores de tamaño o de tipo salen **cuando se elige el archivo**, que es
+   * cuando se puede corregir.
+   *
+   * No se guardan en ninguna parte: viajan con el turno y se descartan.
+   */
+  const [adjuntos, setAdjuntos] = useState<AdjuntoElegido[]>([]);
+
+  const quitarAdjunto = useCallback((id: string) => {
+    setAdjuntos((previos) => previos.filter((adjunto) => adjunto.id !== id));
+  }, []);
+
+  /**
+   * Elegir archivos: se validan y se leen aquí mismo.
+   *
+   * Las tres comprobaciones son las mismas que hace el servidor, y se repiten
+   * aquí por el motivo de siempre: **el mensaje llega antes y señala el
+   * archivo**. La que manda sigue siendo la del backend.
+   */
+  const alElegirArchivos = useCallback(
+    async (evento: React.ChangeEvent<HTMLInputElement>) => {
+      const elegidos = Array.from(evento.target.files ?? []);
+      /* El input se vacía siempre: si no, volver a elegir el mismo archivo no
+         dispara `change` y parece que el clip se hubiera roto. */
+      evento.target.value = '';
+      if (elegidos.length === 0) return;
+
+      const problemas: string[] = [];
+      const nuevos: AdjuntoElegido[] = [];
+
+      for (const archivo of elegidos) {
+        if (adjuntos.length + nuevos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE) {
+          problemas.push(
+            `Solo caben ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} archivos por mensaje.`,
+          );
+          break;
+        }
+
+        const mime = mimeDeArchivo(archivo);
+        if (!mime) {
+          problemas.push(`«${archivo.name}»: PRAX solo lee PDF, imágenes, texto y Markdown.`);
+          continue;
+        }
+        if (archivo.size > ASSISTANT_ATTACHMENT_MAX_BYTES) {
+          problemas.push(
+            `«${archivo.name}» pasa de ${enKilobytes(ASSISTANT_ATTACHMENT_MAX_BYTES)}.`,
+          );
+          continue;
+        }
+
+        try {
+          nuevos.push({
+            id: crypto.randomUUID(),
+            name: archivo.name,
+            mime,
+            bytes: archivo.size,
+            data: await aBase64(archivo),
+          });
+        } catch {
+          problemas.push(`«${archivo.name}» no se pudo leer.`);
+        }
+      }
+
+      if (nuevos.length > 0) setAdjuntos((previos) => [...previos, ...nuevos]);
+      setError(problemas.length > 0 ? problemas.join(' ') : null);
+    },
+    [adjuntos.length],
+  );
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
    *
@@ -250,6 +356,7 @@ export function AssistantChat({
   const hiloRef = useRef<HTMLDivElement>(null);
   const seccionRef = useRef<HTMLElement>(null);
   const campoRef = useRef<HTMLTextAreaElement>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   const campoId = useId();
 
   /**
@@ -308,24 +415,59 @@ export function AssistantChat({
         proposals: mensaje.proposals,
       })),
     );
+
+    /**
+     * 🔴 **Recuperar el foco, o el hilo se abre y no se puede continuar.**
+     *
+     * Sin esto, abrir una conversación vieja desde el historial dejaba la
+     * pantalla sin proyecto —y por tanto **sin compositor**: se leía el hilo y no
+     * había dónde escribir. Parecía que el historial fuera de solo lectura.
+     *
+     * Solo se navega si el proyecto **cambia**: si ya se estaba en el suyo, una
+     * navegación de más recargaría la página para dejarla igual, y de paso
+     * perdería el hilo que se acaba de pintar aquí.
+     */
+    if (conversacion.projectId && conversacion.projectId !== projectId) {
+      onElegirProyecto?.(conversacion.projectId, conversacion.id);
+    }
   }
 
   async function enviar(pregunta: string) {
     const limpio = pregunta.trim();
-    if (!limpio || pendiente || agotada) return;
+    /* ⚠️ Con archivos, un mensaje vacío es legítimo: adjuntar y enviar es
+       «mira esto». Sin ellos sigue haciendo falta texto. */
+    if ((!limpio && adjuntos.length === 0) || pendiente || agotada) return;
 
-    const mio: Mensaje = { id: crypto.randomUUID(), role: 'user', text: limpio };
+    /* Sin foco no hay a dónde mandar el turno. No debería llegar aquí —sin él no
+       se pinta el compositor— pero el estrechamiento de tipos lo pide. Va antes
+       de tocar el estado: salir después dejaría el mensaje pintado en el hilo y
+       el campo vacío, o sea la pregunta perdida. */
+    if (!projectId) return;
+
+    /* Lo que se pinta en la burbuja: el texto, y si no lo hay, los nombres de
+       los archivos — una burbuja vacía se lee como un fallo. */
+    const enviados = adjuntos;
+    const textoDeLaBurbuja =
+      limpio || enviados.map((adjunto) => adjunto.name).join(', ') || '(archivo)';
+
+    const mio: Mensaje = { id: crypto.randomUUID(), role: 'user', text: textoDeLaBurbuja };
 
     setMensajes((previos) => [...previos, mio]);
     setTexto('');
+    setAdjuntos([]);
     setError(null);
     setPendiente(true);
 
-    /* Sin foco no hay a dónde mandar el turno. No debería llegar aquí —sin él no
-       se pinta el compositor— pero el estrechamiento de tipos lo pide. */
-    if (!projectId) return;
-
-    const respuesta = await preguntarAction(projectId, limpio, conversationId ?? undefined);
+    const respuesta = await preguntarAction(
+      projectId,
+      limpio,
+      conversationId ?? undefined,
+      enviados.map((adjunto) => ({
+        name: adjunto.name,
+        mime: adjunto.mime,
+        data: adjunto.data,
+      })),
+    );
 
     setPendiente(false);
     if (respuesta.cuota) setCuota(respuesta.cuota);
@@ -338,6 +480,9 @@ export function AssistantChat({
       /* El mensaje se queda escrito en el hilo pero vuelve al campo: si el fallo
          fue de red, reintentarlo no debería obligar a escribirlo otra vez. */
       setTexto(limpio);
+      /* Los archivos vuelven también: obligar a volver a elegirlos tras un fallo
+         de red es el peor momento para pedirle nada a nadie. */
+      setAdjuntos(enviados);
       setMensajes((previos) => previos.filter((mensaje) => mensaje.id !== mio.id));
       return;
     }
@@ -422,35 +567,106 @@ export function AssistantChat({
                   AI
                 </Badge>
               </div>
-              {/* El foco, junto al nombre: en una conversación que puede
-                  cambiar de proyecto, saber de cuál se está hablando no puede
-                  depender de acordarse. */}
-              {projectId && vista === 'chat' && (
-                <span className="font-sans text-xs text-text-disabled">
-                  Hablando de{' '}
-                  <span className="text-text-secondary">
-                    {nombresDeProyecto[projectId] ?? 'este proyecto'}
+              {/**
+               * El proyecto en foco, como insignia **y como botón**.
+               *
+               * ⚠️ Sustituye a la frase que había aquí —«Lee los datos del
+               * proyecto y responde con sus números…»— que era un pie de manual:
+               * decía lo mismo en cada visita y nunca cambiaba, así que se dejaba
+               * de leer a la segunda vez y ocupaba el sitio más visible de la
+               * cabecera.
+               *
+               * Lo que sí hace falta ahí es **de qué se está hablando**, porque
+               * en una conversación con foco cambiable eso no puede depender de
+               * acordarse. Y como se puede cambiar, la insignia es el propio
+               * control: pulsarla vuelve al recibimiento, donde están los
+               * proyectos. Es además lo que hace verdad lo que PRAX dice cuando
+               * le piden otro proyecto — ver la regla del prompt.
+               */}
+              {vista === 'chat' && projectId && (
+                <button
+                  type="button"
+                  onClick={volverAElegirProyecto}
+                  title="Cambiar de proyecto"
+                  className="flex max-w-full items-center gap-1.5 self-start rounded-full py-1 pl-2.5 pr-2 font-sans text-xs transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  style={{
+                    background: alpha(colors.primary, 12),
+                    color: colors.primary,
+                    boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 25)}`,
+                  }}
+                >
+                  <span className="truncate font-medium">
+                    {nombresDeProyecto[projectId] ?? 'Este proyecto'}
                   </span>
-                </span>
+                  <svg
+                    className="h-3 w-3 shrink-0 opacity-70"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               )}
 
-              <p className="font-sans text-sm text-text-secondary">
-                {vista === 'historial'
-                  ? 'Tus conversaciones en este proyecto. Abre una para seguir donde la dejaste.'
-                  : 'Lee los datos del proyecto y responde con sus números. Cuando propone algo, no lo hace: lo deja para que lo revises.'}
-              </p>
+              {vista === 'historial' && (
+                <p className="font-sans text-sm text-text-secondary">
+                  Tus conversaciones. Abre una para seguir donde la dejaste.
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-3">
-            {/* El contador solo en el chat: en el historial no se gasta nada, y un
-              número de cuota sobre una lista de títulos solo distrae. */}
-            {vista === 'chat' && cuota && <ContadorCuota cuota={cuota} />}
+          <div className="flex shrink-0 items-center gap-2">
             {/**
-             * Icono y no texto: la cabecera ya lleva el título, la insignia «AI» y
-             * el contador de cuota, y una palabra más la volvía una fila de cosas
+             * ⚠️ **El contador de mensajes se ha quitado de aquí.**
+             *
+             * Estaba en la esquina, permanente, contando «13 / 250». Y aunque el
+             * número sea generoso, un contador siempre visible convierte cada
+             * pregunta en un gasto: se piensa dos veces antes de escribir, que es
+             * exactamente lo contrario de lo que se quiere de un asistente con el
+             * que hay que conversar para que sirva.
+             *
+             * El límite **no desaparece**: cuando de verdad se agota, el aviso
+             * sustituye al compositor y dice cuándo vuelve. Es el momento en que
+             * esa información sirve para algo, y el único.
+             */}
+            {/**
+             * Iconos y no texto: la cabecera ya lleva el nombre, la insignia «AI»
+             * y la del proyecto, y dos palabras más la volvían una fila de cosas
              * que leer. Lo que se pierde —saber a qué lleva sin pasar por encima—
              * se recupera con el `title`, y el nombre accesible va completo.
              */}
+            {/* Conversación nueva. Solo en el chat: en el historial ya hay un
+                botón para lo mismo, con su texto y sin competir por sitio. */}
+            {vista === 'chat' && (
+              <button
+                type="button"
+                onClick={empezarDeCero}
+                aria-label="Empezar una conversación nueva"
+                title="Conversación nueva"
+                disabled={mensajes.length === 0}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-text-secondary transition-colors enabled:hover:bg-surface-elevated enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                style={{ borderColor: colors.border }}
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M20 11.5c0 3.9-3.6 7-8 7-.9 0-1.8-.1-2.6-.4L5 19.5l1.2-3.1A6.6 6.6 0 014 11.5c0-3.9 3.6-7 8-7s8 3.1 8 7z"
+                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8.8v5.4M9.3 11.5h5.4" />
+                </svg>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
@@ -842,43 +1058,161 @@ export function AssistantChat({
                 <label htmlFor={campoId} className="sr-only">
                   Pregunta al asistente
                 </label>
-                <div className="flex items-stretch gap-2">
+
+                {/* Los adjuntos elegidos, encima del campo. Cada uno con su aspa:
+                    equivocarse de archivo es lo más fácil que hay, y volver a
+                    abrir el selector para corregirlo sería absurdo. */}
+                {adjuntos.length > 0 && (
+                  <ul className="flex flex-wrap gap-2">
+                    {adjuntos.map((adjunto) => (
+                      <li
+                        key={adjunto.id}
+                        className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5"
+                        style={{ background: colors.surfaceElevated }}
+                      >
+                        <span className="max-w-48 truncate font-sans text-xs text-text-primary">
+                          {adjunto.name}
+                        </span>
+                        <span className="shrink-0 font-sans text-[11px] text-text-disabled">
+                          {enKilobytes(adjunto.bytes)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => quitarAdjunto(adjunto.id)}
+                          aria-label={`Quitar ${adjunto.name}`}
+                          className="shrink-0 rounded text-text-disabled transition-colors hover:text-error"
+                        >
+                          <svg
+                            className="h-3.5 w-3.5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            aria-hidden="true"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/**
+                 * El compositor, con la misma forma que el de Mensajes.
+                 *
+                 * ⚠️ **Los botones van DENTRO del campo**, no al lado. Estaba
+                 * fuera, con un «Preguntar» de 70 px de alto pegado a la derecha,
+                 * y eso hacía dos cosas mal: se comía el ancho del campo —que es
+                 * lo que de verdad se usa— y no se parecía en nada al compositor
+                 * del chat de equipo, aunque el gesto sea idéntico.
+                 *
+                 * `items-end` para que, al crecer el textarea, los botones se
+                 * queden abajo con el cursor en vez de subir con el borde.
+                 */}
+                <div
+                  className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
+                  style={{ background: colors.surfaceElevated }}
+                >
                   <textarea
                     ref={campoRef}
                     id={campoId}
-                    rows={2}
+                    rows={1}
                     maxLength={2000}
                     value={texto}
                     disabled={pendiente}
-                    placeholder="¿Quién puede llevar el formulario de login?"
+                    placeholder="Pregúntale a PRAX…"
                     onChange={(evento) => setTexto(evento.target.value)}
                     onKeyDown={(evento) => {
                       /* Enter envía, Mayús+Enter parte la línea: es lo que hace
-                   cualquier chat, y `requestSubmit` respeta la validación del
-                   formulario en vez de saltársela. */
+                         cualquier chat, y `requestSubmit` respeta la validación
+                         del formulario en vez de saltársela. */
                       if (evento.key === 'Enter' && !evento.shiftKey) {
                         evento.preventDefault();
                         evento.currentTarget.form?.requestSubmit();
                       }
                     }}
-                    className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                    /* Crece con el contenido hasta un tope, como el de Mensajes:
+                       una línea para una pregunta corta, y sitio si hace falta. */
+                    onInput={(evento) => {
+                      const area = evento.currentTarget;
+                      area.style.height = 'auto';
+                      area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
+                    }}
+                    className="max-h-40 min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled disabled:cursor-not-allowed"
                   />
-                  {/* `items-stretch` + `style.height` en vez de `items-end`: con dos
-                filas el botón por defecto mide una (`size="md"`, 40px) y quedaba
-                anclado abajo, con un hueco encima que rompía la simetría con el
-                campo. Va por `style` y no por una clase `h-full`: la clase
-                compite con el `h-10` de `sizeClasses.md` en la misma
-                especificidad, y quién gana depende del orden en que Tailwind
-                generó el CSS, no del orden en el `className` — un `style` en
-                línea no tiene esa ambigüedad. */}
-                  <Button
-                    type="submit"
-                    isLoading={pendiente}
-                    disabled={texto.trim().length === 0}
-                    style={{ height: 70 }}
+
+                  <button
+                    type="button"
+                    onClick={() => archivoRef.current?.click()}
+                    disabled={pendiente || adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE}
+                    aria-label="Adjuntar un archivo"
+                    title={
+                      adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE
+                        ? `Máximo ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} archivos`
+                        : 'Adjuntar archivo'
+                    }
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Preguntar
-                  </Button>
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Escondido: lo abre el clip. Las extensiones además de los
+                      tipos, porque el selector de algunos sistemas no reconoce
+                      `text/markdown` y dejaba los `.md` en gris. */}
+                  <input
+                    ref={archivoRef}
+                    type="file"
+                    multiple
+                    accept={`${ASSISTANT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown,.txt`}
+                    onChange={alElegirArchivos}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={pendiente || (texto.trim().length === 0 && adjuntos.length === 0)}
+                    aria-label="Enviar"
+                    title="Enviar"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{ background: alpha(colors.primary, 22), color: colors.primary }}
+                  >
+                    {pendiente ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <svg
+                        className="h-4 w-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 12h14M13 6l6 6-6 6"
+                        />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
                 <p className="font-sans text-xs text-text-disabled">
@@ -996,4 +1330,65 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
       </div>
     </div>
   );
+}
+
+/* ─── Adjuntos ────────────────────────────────────────────────────────────── */
+
+/** Un archivo ya elegido y leído, esperando a enviarse. */
+interface AdjuntoElegido {
+  id: string;
+  name: string;
+  mime: string;
+  /** Tamaño real del archivo, para enseñarlo y para comprobar el tope. */
+  bytes: number;
+  /** Contenido en base64, sin el prefijo `data:`. */
+  data: string;
+}
+
+/**
+ * El tipo del archivo, o `null` si PRAX no sabe leerlo.
+ *
+ * ⚠️ **No basta con `file.type`.** El navegador lo deduce de la extensión con una
+ * tabla que varía entre sistemas, y para `.md` devuelve cadena vacía en Windows y
+ * `text/markdown` en macOS. Sin la caída por extensión, un `.md` se rechazaba en
+ * unas máquinas y en otras no — el peor tipo de fallo, porque no se reproduce.
+ */
+function mimeDeArchivo(archivo: File): string | null {
+  const declarado = archivo.type;
+  if ((ASSISTANT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(declarado)) {
+    return declarado;
+  }
+
+  const nombre = archivo.name.toLowerCase();
+  if (nombre.endsWith('.md') || nombre.endsWith('.markdown')) return 'text/markdown';
+  if (nombre.endsWith('.txt')) return 'text/plain';
+  return null;
+}
+
+/**
+ * De `File` a base64, sin el prefijo `data:`.
+ *
+ * `FileReader` y no `arrayBuffer()` + `btoa`: aquel recorre el búfer byte a byte
+ * en JavaScript y con 5 MB bloquea el hilo principal medio segundo. Este lo hace
+ * el navegador, fuera del hilo.
+ */
+function aBase64(archivo: File): Promise<string> {
+  return new Promise((resolver, rechazar) => {
+    const lector = new FileReader();
+    lector.onerror = () => rechazar(lector.error);
+    lector.onload = () => {
+      const resultado = String(lector.result);
+      /* `readAsDataURL` devuelve `data:<mime>;base64,<datos>`; el servidor espera
+         solo la última parte. */
+      resolver(resultado.slice(resultado.indexOf(',') + 1));
+    };
+    lector.readAsDataURL(archivo);
+  });
+}
+
+/** `1536` → `1,5 kB`. Para que el tamaño de un adjunto se lea de un vistazo. */
+function enKilobytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }

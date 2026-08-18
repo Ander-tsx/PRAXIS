@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
 import {
+  ASSISTANT_ATTACHMENT_MAX_BYTES,
+  ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
+  ASSISTANT_TEXT_MAX_CHARS,
+  ASSISTANT_TEXT_MIME,
   type AssistantChatResult,
   type AssistantPlanName,
   type AssistantProposal,
@@ -48,6 +52,8 @@ interface ChatPayload {
    * reviente el turno.
    */
   chat?: { autor: string; texto: string; cuando: string }[];
+  /** Archivos que acompañan a la pregunta. Ya validados por el DTO del gateway. */
+  attachments?: { name: string; mime: string; data: string }[];
 }
 
 /**
@@ -270,6 +276,21 @@ export class AssistantService {
 
     const herramientas = herramientasPara(payload.permisos);
 
+    /**
+     * Los archivos, repartidos en dos montones.
+     *
+     * ⚠️ **PDF e imágenes van como datos; texto y Markdown, como texto.** No es
+     * una optimización: mandar un `.md` como `inlineData` funciona, pero el
+     * modelo lo trata como un documento adjunto y responde *sobre* él en vez de
+     * *con* él. Pegado en el prompt, con su nombre delante, se lee como parte de
+     * lo que se le está contando — que es lo que se quiere cuando alguien manda
+     * unas notas y pide sacar tareas de ahí.
+     */
+    const { archivos, textos } = this.repartirAdjuntos(payload.attachments ?? []);
+
+    const mensajeConArchivos =
+      textos.length > 0 ? `${payload.message}\n\n${textos}` : payload.message;
+
     const respuesta = await this.gemini.chat({
       system: systemInstruction(
         briefing,
@@ -283,7 +304,8 @@ export class AssistantService {
       ),
       /* Sale de la base, ya recortado a MAX_HISTORIAL. */
       history,
-      message: payload.message,
+      archivos,
+      message: mensajeConArchivos,
       tools: herramientas,
     });
 
@@ -302,6 +324,16 @@ export class AssistantService {
     const proposals = await this.conversaciones.guardarTurno({
       conversationId,
       projectId: payload.projectId,
+      /**
+       * ⚠️ **Se guarda lo que la persona escribió, no el mensaje con los
+       * archivos pegados.** El hilo tiene que leerse como una conversación, y un
+       * turno con cuarenta mil caracteres de un `.md` dentro no se lee: además,
+       * al releerlo se reenviaría entero al modelo en cada turno posterior.
+       *
+       * El precio es que un archivo **no sobrevive al turno** —lo que se le pidió
+       * a PRAX que resuma es lo que queda—, y por eso el prompt le pide contar lo
+       * que leyó en vez de dar por hecho que sigue delante.
+       */
       pregunta: payload.message,
       respuesta: reply,
       proposals: validadas,
@@ -1012,6 +1044,55 @@ export class AssistantService {
     }
 
     return { taskId, tarea };
+  }
+
+  /**
+   * Reparte los adjuntos entre lo que va como datos y lo que va como texto.
+   *
+   * ⚠️ **El tamaño se comprueba aquí, sobre los bytes decodificados.** El DTO ya
+   * validó el tipo, el número y que sea base64 legítimo, pero no puede validar el
+   * peso: base64 abulta un tercio, así que un tope sobre la cadena rechazaría
+   * archivos de 3,8 MB diciendo que pasan de 5. Lo que no cabe **se descarta en
+   * silencio** en vez de tumbar el turno: perder un adjunto es mucho mejor que
+   * perder la pregunta.
+   *
+   * Y los de texto se recortan avisando **dentro del propio prompt**. Un recorte
+   * mudo haría que el modelo hablara con confianza de un documento del que solo
+   * ha visto el principio, que es la peor forma de equivocarse aquí.
+   */
+  private repartirAdjuntos(adjuntos: { name: string; mime: string; data: string }[]) {
+    const archivos: { mimeType: string; data: string }[] = [];
+    const trozos: string[] = [];
+
+    for (const adjunto of adjuntos.slice(0, ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE)) {
+      let bytes: Buffer;
+      try {
+        bytes = Buffer.from(adjunto.data, 'base64');
+      } catch {
+        this.log.warn(`Adjunto "${adjunto.name}" no era base64 valido: se descarta`);
+        continue;
+      }
+
+      if (bytes.byteLength > ASSISTANT_ATTACHMENT_MAX_BYTES) {
+        this.log.warn(`Adjunto "${adjunto.name}" pasa del tope: se descarta`);
+        continue;
+      }
+
+      if (ASSISTANT_TEXT_MIME.includes(adjunto.mime)) {
+        const texto = bytes.toString('utf8');
+        const recortado = texto.slice(0, ASSISTANT_TEXT_MAX_CHARS);
+        const aviso =
+          texto.length > ASSISTANT_TEXT_MAX_CHARS
+            ? `\n[...] (El archivo continua; solo se han incluido los primeros ${ASSISTANT_TEXT_MAX_CHARS} caracteres.)`
+            : '';
+        trozos.push(`--- ARCHIVO ADJUNTO: ${adjunto.name} ---\n${recortado}${aviso}`);
+        continue;
+      }
+
+      archivos.push({ mimeType: adjunto.mime, data: adjunto.data });
+    }
+
+    return { archivos, textos: trozos.join('\n\n') };
   }
 
   /** Se queda con los ids que existen de verdad y descarta el resto. */

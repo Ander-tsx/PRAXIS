@@ -271,6 +271,49 @@ export interface BoardProposal {
   porQue?: string;
 }
 
+/**
+ * Lo que se puede adjuntar a una pregunta, y sus cuatro límites.
+ *
+ * ⚠️ **Espejo de `@praxis/contracts`**, redeclarado aquí por lo mismo que el
+ * resto de este archivo: aquel paquete es de backend —arrastra `class-validator`
+ * y los decoradores de Swagger— y el frontend solo necesita los valores.
+ *
+ * Un archivo entra **entero en el prompt** de cada turno, así que un tope
+ * generoso no cuesta disco: cuesta cuota, latencia y —lo peor— atención del
+ * modelo. Un PDF de trescientas páginas empuja las reglas y el inventario del
+ * proyecto fuera de la ventana, y eso no sale como un error sino como un
+ * asistente que de pronto responde peor sin que nadie sepa por qué.
+ */
+export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
+
+/** 5 MB. Se mide sobre los bytes del archivo, no sobre su base64. */
+export const ASSISTANT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+
+/** Lo que el modelo sabe leer y nosotros sabemos mandarle. */
+export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'text/plain',
+  'text/markdown',
+] as const;
+
+/**
+ * Un archivo que viaja con la pregunta.
+ *
+ * ⚠️ **No se guarda en ninguna parte.** Viaja con el turno y se descarta: no hay
+ * fila, ni almacenamiento, ni política de retención — que es exactamente el
+ * trabajo que habría que hacer para poder guardarlos. El archivo se manda para
+ * que PRAX lo lea **ahora**, y lo que salga de ahí queda en la conversación.
+ */
+export interface AssistantAttachment {
+  name: string;
+  mime: string;
+  /** Contenido en base64, **sin** el prefijo `data:`. */
+  data: string;
+}
+
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
 
 /**
@@ -302,6 +345,15 @@ export interface StoredMessage {
 export interface FullConversation {
   id: string;
   title: string;
+  /**
+   * El proyecto del que iba. `null` si nunca llegó a elegir uno.
+   *
+   * ⚠️ **Sin esto no se podía seguir una conversación vieja.** Al abrirla desde
+   * el historial, la pantalla se quedaba sin foco —y por tanto sin compositor—
+   * así que el hilo se podía leer y no continuar. Abrir una conversación
+   * recupera ahora también su proyecto.
+   */
+  projectId: string | null;
   createdAt: string;
   updatedAt: string;
   mensajes: StoredMessage[];

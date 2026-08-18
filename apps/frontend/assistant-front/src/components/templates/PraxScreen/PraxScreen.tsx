@@ -65,6 +65,16 @@ export function PraxScreen({
 
   const elegirProyecto = useCallback(
     (siguiente: string, conversationId: string | null) => {
+      /* Cadena vacía = «vuelve a preguntarme por cuál». Es lo que hace la
+         insignia del proyecto de la cabecera: deja la pantalla como al entrar,
+         con los proyectos como botones. Va sin `c`, así que empieza conversación
+         nueva a propósito — arrastrar un hilo de un proyecto a otro mezclaría dos
+         contextos en la ventana del modelo. */
+      if (!siguiente) {
+        router.push('/');
+        return;
+      }
+
       const proyecto = proyectos.find((candidato) => candidato.id === siguiente);
       if (!proyecto) return;
 
