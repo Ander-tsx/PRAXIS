@@ -24,12 +24,15 @@ interface PageProps {
  *
  * ## No es tiempo real, y no lo finge
  *
- * El repo no tiene WebSocket ni SSE —la bandeja de avisos reconsulta cada 60 s— y
- * este registro tampoco. Se recarga al navegar y con el botón de la barra. Un
- * refresco automático cada pocos segundos sería fácil de añadir con
- * `AutoRefresh`, pero aquí no aporta: a un registro de auditoría se entra a
- * *buscar* algo que ya pasó, y una tabla que se reordena sola mientras lees es
- * peor que una quieta.
+ * El resto del sistema sí tiene tiempo real —un flujo SSE por persona, abierto
+ * desde el armazón— pero este registro no lo usa, y es a propósito: a un
+ * registro de auditoría se entra a *buscar* algo que ya pasó, y una tabla que se
+ * reordena sola mientras lees es peor que una quieta. Se recarga al navegar y
+ * con el botón de la barra.
+ *
+ * ⚠️ Este párrafo decía «el repo no tiene WebSocket ni SSE» y llevaba tiempo
+ * siendo falso; también citaba un componente `AutoRefresh` que ya no existe
+ * —se retiró al mudar la bandeja al panel (E4.5)—.
  *
  * ## Los filtros son los cuatro ejes, y viven en la URL
  *

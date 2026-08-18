@@ -3,7 +3,7 @@
 import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
-} from '@/app/(private)/notifications/actions';
+} from '@/app/(private)/avisos-actions';
 import { NOTIFICATION_INITIAL_STATE } from '@/lib/action-state';
 import { type GrupoDeAvisos, fechaCompleta, tiempoRelativo } from '@/lib/notifications';
 import {

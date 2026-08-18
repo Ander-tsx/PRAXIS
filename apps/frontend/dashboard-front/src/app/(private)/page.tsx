@@ -3,24 +3,30 @@ import {
   crearProyectoDesdePlantillaAction,
   createProjectAction,
 } from '@/app/actions';
+import { FiltroDeAvisos } from '@/components/molecules/FiltroDeAvisos';
 import { DashboardEmptyState } from '@/components/organisms/DashboardEmptyState';
 import { DashboardMetrics } from '@/components/organisms/DashboardMetrics';
 import { DashboardWelcome } from '@/components/organisms/DashboardWelcome';
 import { MyInvitations } from '@/components/organisms/MyInvitations';
+import { NotificationList } from '@/components/organisms/NotificationList';
 import { ProjectList } from '@/components/organisms/ProjectList';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
 import { VoiceCallout } from '@/components/organisms/VoiceCallout';
+import { agruparPorDia } from '@/lib/notifications';
 import { type VoiceLink, estaActiva } from '@/lib/voice';
 import {
   AppHeader,
   CreateProjectDialog,
   DUE_SOON_DAYS,
   type MyInvitation,
+  type NotificationPage,
   type Paginated,
+  Pagination,
   type Project,
   type Task,
   displayName,
   dueState,
+  resolverPerfiles,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -28,6 +34,47 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Panel',
 };
+
+/**
+ * Cuántos avisos por página en la sección de la bandeja.
+ *
+ * Antes se pedían 50 sin más, y el backend no aceptaba `page`: a partir del 51
+ * no había forma de llegar. Una bandeja crece sola —cada asignación, cada
+ * invitación, cada comentario— así que es de las listas que antes se pasan de
+ * cualquier tope.
+ */
+const AVISOS_POR_PAGINA = 20;
+
+/** El valor del filtro en la URL. Cualquier otra cosa cae en «todas». */
+const SIN_LEER = 'sin-leer';
+
+/**
+ * ⚠️ **Los parámetros de la bandeja van prefijados** (E4.2).
+ *
+ * Al mudarse al panel, la bandeja deja de tener la URL para ella sola: comparte
+ * pantalla con el resto de secciones. Un `?page=` a secas sería de quien
+ * llegara primero, y el día que otra sección pagine, pasar de página en una
+ * movería la otra sin que nadie entienda por qué.
+ *
+ * Hoy el panel no lee ningún otro parámetro, así que no hay choque **todavía**
+ * — que es exactamente cuando sale barato ponerse el prefijo.
+ */
+const PARAM_PAGINA = 'avisos_page';
+const PARAM_FILTRO = 'avisos_filtro';
+
+interface PageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+/** La ruta del panel conservando el estado de la bandeja. La usa `Pagination`. */
+function hrefDelPanel(page: number, soloSinLeer: boolean): string {
+  const params = new URLSearchParams();
+  if (page > 1) params.set(PARAM_PAGINA, String(page));
+  if (soloSinLeer) params.set(PARAM_FILTRO, SIN_LEER);
+
+  const query = params.toString();
+  return query ? `/dashboard?${query}` : '/dashboard';
+}
 
 /**
  * Panel del área privada.
@@ -38,9 +85,13 @@ export const metadata: Metadata = {
  * La ruta la protege `src/proxy.ts`; `loadCurrentUser` vuelve a exigir sesión
  * porque la autorización nunca debe depender de una sola capa.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps) {
   const { userId, profile, roles } = await loadCurrentUser();
   const api = createServerApiClient();
+
+  const params = await searchParams;
+  const paginaAvisos = Math.max(1, Number.parseInt(String(params[PARAM_PAGINA] ?? '1'), 10) || 1);
+  const soloSinLeer = params[PARAM_FILTRO] === SIN_LEER;
 
   /**
    * Ya viene filtrado por el backend: proyectos donde el usuario es **dueño o
@@ -57,7 +108,7 @@ export default async function DashboardPage() {
    */
   const dueBefore = new Date(Date.now() + DUE_SOON_DAYS * 86_400_000).toISOString();
 
-  const [page, invitations, voiceLinks, dueTasks] = await Promise.all([
+  const [page, invitations, voiceLinks, dueTasks, inbox] = await Promise.all([
     api.get<Paginated<Project>>('/projects'),
     /* Si fallan, el panel sigue siendo útil: no se tumba por una insignia. */
     api
@@ -76,6 +127,22 @@ export default async function DashboardPage() {
         `/me/tasks?dueBefore=${encodeURIComponent(dueBefore)}&excludeDone=true&limit=50`,
       )
       .catch(() => ({ items: [] as Task[], total: 0 })),
+    /**
+     * ⚠️ **`null` es «no se pudo leer», no «no hay nada».**
+     *
+     * Con la bandeja vacía, `NotificationList` pinta «Nada por aquí». Si esto
+     * cayera a una página vacía, el panel diría tranquilamente que no tienes
+     * avisos con el gateway caído — y el resto del panel seguiría pintándose,
+     * así que nada delataría el corte. Distinguir los dos casos es lo que
+     * permite decir «no se pudieron cargar» en su sitio y dejar el resto en pie.
+     */
+    api
+      .get<NotificationPage>(
+        `/me/notifications?page=${paginaAvisos}&limit=${AVISOS_POR_PAGINA}${
+          soloSinLeer ? '&unreadOnly=true' : ''
+        }`,
+      )
+      .catch(() => null),
   ]);
   const projects = page.items;
 
@@ -105,6 +172,23 @@ export default async function DashboardPage() {
      revocada o caducada no cuenta: si la única que había se revocó, volver a
      ofrecerlo es justo lo que toca. */
   const sinVoz = !voiceLinks.some(estaActiva);
+
+  /**
+   * Las caras y los nombres de quienes salen en la bandeja.
+   *
+   * Los avisos guardan `actorId`: projects-service no conoce a las personas. Se
+   * piden **en una** petición y solo los de esta página —como mucho, uno por
+   * aviso—. Ver `commons/api/directorio.ts` para el fallo que evita hacerlo de
+   * uno en uno.
+   */
+  const actores = inbox
+    ? [...new Set(inbox.items.map((aviso) => aviso.actorId).filter((id): id is string => !!id))]
+    : [];
+  const avisosPorPersona = (await resolverPerfiles(api, actores)).perfiles;
+
+  /* Agrupar es del servidor: donde ya se resuelve el resto de la fila y donde no
+     hay riesgo de que el reloj del navegador pinte otra cosa que la servida. */
+  const gruposDeAvisos = inbox ? agruparPorDia(inbox.items) : [];
 
   return (
     <AppHeader
@@ -163,6 +247,63 @@ export default async function DashboardPage() {
             <ProjectList projects={projects} currentUserId={userId} />
           </>
         )}
+
+        {/**
+         * La bandeja, **al final y no en medio** (E4.1).
+         *
+         * Era una pantalla propia (`/dashboard/notifications`) y ahora es una
+         * sección de aquí: son una lista y dos botones, y el panel tenía sitio
+         * de sobra.
+         *
+         * Va la última a propósito. Es una lista de veinte filas: puesta arriba
+         * empuja los proyectos —que son el objeto principal de la aplicación—
+         * fuera de la pantalla. Y por orden de urgencia también le toca el
+         * final: las invitaciones esperan una decisión y los avisos de tareas
+         * apremian, mientras que esto es el registro de lo que ya pasó.
+         */}
+        <section className="flex flex-col gap-4" aria-labelledby="titulo-avisos">
+          <h2 id="titulo-avisos" className="font-display text-2xl text-text-primary">
+            Avisos
+          </h2>
+
+          {inbox === null ? (
+            <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+              No se pudieron cargar tus avisos. Vuelve a intentarlo.
+            </p>
+          ) : (
+            <>
+              <NotificationList
+                grupos={gruposDeAvisos}
+                unread={inbox.unread}
+                usersById={avisosPorPersona}
+                soloSinLeer={soloSinLeer}
+                filtroSlot={
+                  <FiltroDeAvisos
+                    unread={inbox.unread}
+                    soloSinLeer={soloSinLeer}
+                    hrefTodas={hrefDelPanel(1, false)}
+                    hrefSinLeer={hrefDelPanel(1, true)}
+                  />
+                }
+              />
+
+              {/* ⚠️ El paginador **conserva el filtro**: perder el parámetro al
+                  pasar de página es el fallo clásico de esto, y aquí saltaría a
+                  la vista — de «sin leer» a «todas» sin tocar el filtro.
+
+                  `total` ya viene filtrado —el backend lo cuenta con el mismo
+                  `where` que la consulta— así que con el filtro puesto pagina
+                  sobre las no leídas, que es lo correcto. */}
+              <Pagination
+                page={paginaAvisos}
+                limit={AVISOS_POR_PAGINA}
+                total={inbox.total}
+                hrefFor={(n) => hrefDelPanel(n, soloSinLeer)}
+                nombre="avisos"
+              />
+            </>
+          )}
+        </section>
       </div>
     </AppHeader>
   );

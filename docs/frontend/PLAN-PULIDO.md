@@ -8,9 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · **E6 ✅ cerrada** |
-| **Última tarea terminada** | E6.5 y E6.6 — bundles y dependencias |
-| **Siguiente** | E4 (la bandeja al panel) · luego E5 (el código a inglés) |
+| **Etapa actual** | E1 ✅ · E2 ✅ · E3 ✅ · E4 ✅ · E6 ✅ · **solo queda E5** |
+| **Última tarea terminada** | E4 entera — la bandeja vive en el panel |
+| **Siguiente** | E5.2 — primer lote de renombrado (`commons/realtime/`) |
 | **Marcador** | 194 ✅ / 0 ❌ · 14 `@security` ✅ · 44 unitarias de gateway ✅ |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
@@ -559,18 +559,76 @@ de ESTADO-ACTUAL §17.7.
 
 ## E4 — Notificaciones dentro de `/dashboard`
 
-- [ ] **E4.1 — Llevar la bandeja al panel.** `NotificationList` pasa a ser una
-      sección de `dashboard-front/src/app/(private)/page.tsx`. El panel tiene
-      poco contenido; la bandeja lo llena sin inventarse una pantalla.
-- [ ] **E4.2 — Conservar el filtro y la paginación**, que hoy viven en
-      `?soloSinLeer=` y `?page=`. Al compartir página con el resto del panel hay
-      que prefijar los parámetros (`?avisos_page=`) para no chocar.
-- [ ] **E4.3 — Quitar la entrada del menú** (`NOTIFICATIONS_HREF` en
-      `commons/auth/nav.ts`) y mover su insignia a donde quede la sección.
-- [ ] **E4.4 — `/dashboard/notifications` redirige a `/dashboard`.** Hay enlaces
-      vivos: los correos y las tarjetas de aviso apuntan ahí.
-- [ ] **E4.5 — Revisar `AutoRefresh`.** Repasa la bandeja cada N segundos; en el
-      panel puede sobrar, porque los avisos ya piden refresco por el flujo.
+- [x] **E4.1 — La bandeja, sección del panel.** `NotificationList` deja de tener
+      pantalla propia y pasa a `/dashboard`. El fetch va **en la page**, como
+      manda CLAUDE.md, y el organismo sigue recibiendo datos por props.
+
+      Va **la última de la columna y no en medio**, por dos razones: es una lista
+      de veinte filas y puesta arriba empuja los proyectos —el objeto principal
+      de la aplicación— fuera de la pantalla; y por urgencia también le toca el
+      final, porque las invitaciones esperan una decisión y los avisos de tareas
+      apremian, mientras que esto es el registro de lo que ya pasó.
+
+      Se conserva la distinción que ya tenía: **`null` es «no se pudo leer», no
+      «no hay nada»**. Aquí importa más que antes — con el resto del panel
+      pintándose alrededor, una bandeja vacía por un corte no la delataría nada.
+
+- [x] **E4.2 — Filtro y paginación, con los parámetros prefijados.**
+      `avisos_page` y `avisos_filtro`. Hoy el panel no lee ningún otro parámetro,
+      así que no hay choque **todavía** — que es exactamente cuando sale barato
+      ponerse el prefijo.
+
+      El filtro se extrajo a `molecules/FiltroDeAvisos`, que **recibe las rutas
+      por props** en vez de construirlas: atarlo a una pantalla concreta es lo que
+      hubo que deshacer para poder moverlo.
+
+      ✅ Verificado **por comportamiento y no por aspecto**: con un aviso marcado
+      como leído, el panel pasa de **4 avisos a 3** al aplicar el filtro. La
+      primera comprobación fue inútil porque las cuatro notificaciones de la
+      cuenta estaban sin leer — el filtro no era observable con ese dato.
+
+- [x] **E4.3 — Fuera la entrada del menú; la insignia se muda al Panel.**
+      ⚠️ El emparejamiento de la insignia es **por igualdad de `href`**, así que
+      `AVISOS_HREF` en `nav.ts` tiene que coincidir exactamente con el `href` de
+      la entrada en `navigation.tsx`. Un desajuste no da error: deja el contador
+      a cero para siempre.
+
+- [x] **E4.4 — `/dashboard/notifications` redirige, con 308 de verdad.**
+
+      🔴 **El primer intento no redirigía, y parecía que sí.** Un `page.tsx` con
+      `permanentRedirect()` devolvía **200 en la URL vieja** sirviendo el panel,
+      sin cabecera `Location`: Next resolvía el destino por dentro. Se veía el
+      panel, así que a simple vista funcionaba — pero la barra de direcciones se
+      quedaba en `/dashboard/notifications`, el marcador de quien lo guardara no
+      se actualizaba nunca y la dirección vieja no moría. Lo destapó un
+      `curl -D -`: sin `Location`, no hay redirección.
+
+      Resuelto con `redirects()` del `next.config`, que sí emite 308. Dos
+      entradas, la del filtro primero, porque **los parámetros cambian de nombre
+      además de la ruta**: dejar `?filtro=sin-leer` llevaría a un parámetro que el
+      panel ignora en silencio.
+
+      ```
+      /dashboard/notifications                 → 308 → /dashboard
+      /dashboard/notifications?filtro=sin-leer → 308 → /dashboard?…avisos_filtro=sin-leer
+      ```
+
+      ⚠️ Next **reenvía la query original además** de la del destino, así que la
+      URL final arrastra el `filtro=sin-leer` viejo. Es inerte y no hay forma de
+      descartarlo desde `redirects()`; queda anotado para que no se lea como un
+      descuido.
+
+- [x] **E4.5 — `AutoRefresh`: sobraba, y se retira.**
+      Su única consumidora era la pantalla que acaba de desaparecer. Y en el
+      panel **costaría más que antes**: un refresco allí no repite una petición,
+      repite **cinco** —proyectos, invitaciones, voz, tareas y bandeja— para
+      recuperar lo que el flujo SSE ya trae solo.
+
+      Se borra en vez de dejarlo sin usar. Está en el historial si hiciera falta.
+
+      De paso se corrigió un comentario de `admin-front/actividad` que lo citaba
+      y que además afirmaba que «el repo no tiene WebSocket ni SSE» — falso desde
+      hace tiempo.
 
 ---
 

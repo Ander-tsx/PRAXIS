@@ -4,8 +4,18 @@ import { APP_NAV_ITEMS, type AppNavItem } from '../organisms/AppLayout/navigatio
 import { type CurrentUser, loadCurrentUser } from './current-user';
 import { createServerApiClient } from './server-client';
 
-/** Href de la bandeja. En un solo sitio para no repetir la cadena. */
-const NOTIFICATIONS_HREF = '/dashboard/notifications';
+/**
+ * Dónde va la insignia de avisos sin leer: **en el Panel** (E4.3).
+ *
+ * La bandeja era una pantalla propia con su entrada de menú. Ahora es una
+ * sección del panel, así que la entrada se ha ido y su insignia se muda a la del
+ * Panel — que es donde lleva ese número si lo pulsas.
+ *
+ * ⚠️ Tiene que coincidir **exactamente** con el `href` de la entrada en
+ * `navigation.tsx`: el emparejamiento es por igualdad de cadena, así que un
+ * desajuste no da error, simplemente deja la insignia a cero para siempre.
+ */
+const AVISOS_HREF = '/dashboard';
 
 /** Href del panel de administración, que solo ven quienes administran. */
 const ADMIN_HREF = '/admin';
@@ -88,7 +98,7 @@ function buildNavItems({
 
   return APP_NAV_ITEMS.filter((item) => item.href !== ADMIN_HREF || puedeAdministrar).map(
     (item) => {
-      if (item.href === NOTIFICATIONS_HREF && unread > 0) return { ...item, badge: unread };
+      if (item.href === AVISOS_HREF && unread > 0) return { ...item, badge: unread };
       /* Los mensajes llevan la suya, y por el mismo criterio: sin nada sin leer no
        hay insignia, porque una que enseña un cero no informa de nada. */
       if (item.href === CHAT_HREF && mensajes > 0) return { ...item, badge: mensajes };
