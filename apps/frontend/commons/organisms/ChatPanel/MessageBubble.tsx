@@ -999,36 +999,7 @@ export function MessageBubble({
            * incompatible con tener respuestas, así que el relleno de aquí es
            * siempre `px-3.5 py-2`.
            */}
-          {mostrarMarcaDeHilo && message._count.replies > 0 && (
-            <button
-              type="button"
-              onClick={() => onAbrirHilo(message)}
-              className="-mx-3.5 -mb-2 mt-2 flex w-[calc(100%+1.75rem)] cursor-pointer items-center gap-2 rounded-b-2xl border-t px-3.5 py-1.5 text-left font-sans text-[11px] font-semibold transition-colors"
-              style={{
-                borderColor: alpha(colors.primary, 28),
-                background: alpha(colors.primary, 9),
-                color: colors.primary,
-              }}
-              title="Ver las respuestas"
-            >
-              <IconoHilo className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                {message._count.replies} {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
-              </span>
-              <svg
-                className="h-3 w-3 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </button>
-          )}
+
 
           {/**
            * El pie de la burbuja: hora, «editado» y los checks de lectura.
@@ -1128,9 +1099,9 @@ export function MessageBubble({
                */}
               {selectorAbierto && (
                 <div
-                  className={`absolute z-30 flex items-center gap-0.5 rounded-full border p-1 ${
+                  className={`absolute z-50 flex items-center gap-0.5 rounded-full border p-1 ${
                     selectorAbajo ? 'top-full mt-2' : 'bottom-full mb-2'
-                  } ${mine ? 'left-0' : 'right-0'}`}
+                  } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
                     background: colors.surfaceElevated,
                     borderColor: colors.borderStrong,
@@ -1174,7 +1145,7 @@ export function MessageBubble({
                 aria-expanded={menuAbierto}
                 aria-haspopup="menu"
                 title="Acciones"
-                className={`flex h-7 w-10 cursor-pointer items-start justify-center pt-0.5 transition-opacity duration-100 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/burbuja:pointer-events-auto group-hover/burbuja:opacity-100 ${
+                className={`flex h-7 w-10 cursor-pointer items-start justify-center pt-1.5 transition-opacity duration-100 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/burbuja:pointer-events-auto group-hover/burbuja:opacity-100 ${
                   menuAbierto ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                 }`}
                 /**
@@ -1373,6 +1344,26 @@ export function MessageBubble({
             </div>
           )}
         </div>
+
+        {mostrarMarcaDeHilo && message._count.replies > 0 && (
+          <div className={`flex items-center gap-2 mt-1 ${mine ? 'flex-row-reverse mr-2' : 'ml-2'}`}>
+            <div
+              className={`w-4 h-5 border-b-2 ${
+                mine ? 'border-r-2 rounded-br-xl -mr-1' : 'border-l-2 rounded-bl-xl -ml-1'
+              } -mt-4`}
+              style={{ borderColor: alpha(colors.textSecondary, 35) }}
+            />
+            <button
+              type="button"
+              onClick={() => onAbrirHilo(message)}
+              className="cursor-pointer font-sans text-[13px] font-semibold transition-opacity hover:opacity-80"
+              style={{ color: colors.textSecondary }}
+              title="Ver las respuestas"
+            >
+              {message._count.replies} {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/**
