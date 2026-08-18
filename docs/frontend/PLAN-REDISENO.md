@@ -9,9 +9,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R4 — Análisis (R4.1 hecho) |
-| **Última tarea terminada** | R4.1 — `/reports` deja de redirigir |
-| **Siguiente** | R4.2 |
+| **Etapa actual** | R4 — Análisis (R4.1 hecho). R3 cerrado |
+| **Última tarea terminada** | R3.14 — los adjuntos de PRAX se guardan y se ven en el hilo |
+| **Siguiente** | R4.2 — un solo viaje para los agregados |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -30,6 +30,9 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | R2.1 – R2.5 | `4211b03` | Administración entera. `DataTable`, `RowActions`, `FilterBar`, `AdminHeader`; tres errores de lint que ya estaban |
 | 2026-08-18 | (ajeno) | `3c34162` | Commit de la cuenta del usuario sobre esta rama. Ver «El incidente de la rama» |
 | 2026-08-18 | R3.1 – R3.7 + R4.1 | `0689295` | Zona `assistant-front`, identidad PRAX, `AssistantChat` y `ProjectPicker` a commons, borrado del asistente, y Análisis sin redirect |
+| 2026-08-18 | R3.8 – R3.12 | `66637af`…`2989b33` | Preguntas con opciones, propuesta de tablero, prompt sin callejones, español de la región, hora falsa fuera |
+| 2026-08-18 | R3.13 | `659f6af`, `8504ba3` | El proyecto pasa a ser un foco y luego se congela: una conversación, un proyecto. Pantalla fija con el hilo desplazándose por dentro |
+| 2026-08-18 | R3.14 | `b05a9db` | **Adjuntos guardados.** Multipart a `/me/assistant/attachments`, borrador + `attachmentIds`, `BlobStorage`, y una burbuja igual para todos los archivos. Dos fallos ajenos por el camino: el proxy de zona corrompía binarios (`request.text()`) y `chat-front` no tenía `bodySizeLimit` |
 
 ---
 
