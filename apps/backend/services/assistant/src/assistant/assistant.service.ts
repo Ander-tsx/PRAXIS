@@ -16,6 +16,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
+import { AttachmentsService } from './attachments.service';
 import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
 import { systemInstruction } from './prompt';
@@ -52,8 +53,16 @@ interface ChatPayload {
    * reviente el turno.
    */
   chat?: { autor: string; texto: string; cuando: string }[];
-  /** Archivos que acompañan a la pregunta. Ya validados por el DTO del gateway. */
-  attachments?: { name: string; mime: string; data: string }[];
+  /**
+   * Los archivos que acompañan a la pregunta, **por id**.
+   *
+   * 🔴 **Antes venían aquí en base64 y no cabían.** La pregunta viaja por una
+   * Server Action, cuyo cuerpo está topado en 1 MB: cualquier foto de teléfono
+   * moría con un «Body exceeded 1 MB limit» de Next, sin traducir y sin decir
+   * qué archivo. Ahora se suben aparte —multipart, por `POST
+   * /me/assistant/attachments`— y aquí solo llegan los ids de los borradores.
+   */
+  attachmentIds?: string[];
 }
 
 /**
@@ -171,6 +180,7 @@ export class AssistantService {
     private readonly quota: QuotaService,
     private readonly gemini: GeminiClient,
     private readonly conversaciones: ConversationsService,
+    private readonly adjuntos: AttachmentsService,
   ) {
     this.reportsClient = ClientProxyFactory.create({
       transport: Transport.TCP,
@@ -286,7 +296,8 @@ export class AssistantService {
      * lo que se le está contando — que es lo que se quiere cuando alguien manda
      * unas notas y pide sacar tareas de ahí.
      */
-    const { archivos, textos } = this.repartirAdjuntos(payload.attachments ?? []);
+    const adjuntos = await this.adjuntos.paraElTurno(payload.userId, payload.attachmentIds ?? []);
+    const { archivos, textos } = this.repartirAdjuntos(adjuntos);
 
     const mensajeConArchivos =
       textos.length > 0 ? `${payload.message}\n\n${textos}` : payload.message;
@@ -337,6 +348,11 @@ export class AssistantService {
       pregunta: payload.message,
       respuesta: reply,
       proposals: validadas,
+      userId: payload.userId,
+      /* Los que de verdad llegaron a leerse: uno cuyo blob se hubiera perdido no
+         sale de `paraElTurno`, y atarlo al mensaje pondría en la burbuja un
+         archivo que no se puede abrir. */
+      attachmentIds: adjuntos.map((adjunto) => adjunto.id),
     });
 
     return {
@@ -1060,7 +1076,7 @@ export class AssistantService {
    * mudo haría que el modelo hablara con confianza de un documento del que solo
    * ha visto el principio, que es la peor forma de equivocarse aquí.
    */
-  private repartirAdjuntos(adjuntos: { name: string; mime: string; data: string }[]) {
+  private repartirAdjuntos(adjuntos: { id: string; name: string; mime: string; data: string }[]) {
     const archivos: { mimeType: string; data: string }[] = [];
     const trozos: string[] = [];
 

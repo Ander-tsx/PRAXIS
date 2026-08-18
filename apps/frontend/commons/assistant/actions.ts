@@ -2,7 +2,6 @@
 
 import type {
   AssignmentProposal,
-  AssistantAttachment,
   AssistantChatResult,
   AssistantQuota,
   BoardProposal,
@@ -110,7 +109,7 @@ export async function preguntarAction(
   projectId: string,
   message: string,
   conversationId?: string,
-  attachments?: AssistantAttachment[],
+  attachmentIds?: string[],
 ): Promise<RespuestaChat> {
   const api = await requireApi();
   if (!api) {
@@ -126,7 +125,7 @@ export async function preguntarAction(
   const texto = message.trim();
   /* ⚠️ Con archivos, un mensaje vacío es legítimo: «mira esto» es adjuntar y
      enviar. Sin ellos sigue sin serlo. */
-  if (texto.length === 0 && (attachments ?? []).length === 0) {
+  if (texto.length === 0 && (attachmentIds ?? []).length === 0) {
     return {
       reply: null,
       proposals: [],
@@ -149,8 +148,13 @@ export async function preguntarAction(
     const resultado = await api.post<AssistantChatResult>(`/projects/${projectId}/assistant/chat`, {
       message: texto,
       ...(conversationId ? { conversationId } : {}),
-      /* Solo si los hay: un campo de más es un 400 (CLAUDE.md). */
-      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
+         cuyo cuerpo está topado en 1 MB: con el archivo dentro, cualquier foto
+         de teléfono moría con un «Body exceeded 1 MB limit» de Next, sin
+         traducir y sin decir qué archivo. Los bytes ya se subieron aparte.
+
+         Y solo si los hay: un campo de más es un 400 (CLAUDE.md). */
+      ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
     });
 
     /* Contra el `data`, no contra el status: un 200 con el cuerpo vacío es la

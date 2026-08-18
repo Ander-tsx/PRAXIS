@@ -100,6 +100,9 @@ export function AnalysisScreen({
       <DockSlot titulo={`${PRAX_NAME}, el asistente`}>
         <AssistantChat
           projectId={projectId}
+          /* El proxy de esta zona: por ahí suben y bajan los adjuntos, que no
+             pueden ir por una Server Action. Ver `AssistantChatProps`. */
+          gatewayPath="/reports/api/gateway"
           cuotaInicial={cuotaInicial}
           nombres={nombres}
           etiquetas={etiquetas}

@@ -145,11 +145,11 @@ export class AssistantController {
           /* `history` ya no viaja: el hilo lo guarda el servicio y lo lee de su
              base. Ver la nota de `AssistantTurnDto`. */
           conversationId: body.conversationId,
-          /* Los archivos viajan tal cual hasta el servicio, que es quien sabe
-             cuáles van al modelo como datos y cuáles se pegan como texto. El
-             DTO ya ha comprobado el tipo, el número y que sea base64 válido;
-             el tamaño lo comprueba el servicio, sobre los bytes decodificados. */
-          attachments: body.attachments,
+          /* Solo los ids: los bytes ya están guardados desde que se subieron,
+             y es assistant-service quien los tiene. Que aquí no viaje ningún
+             archivo es justo lo que quita de encima el tope de 1 MB de la
+             Server Action. Ver `AssistantChatBodyDto.attachmentIds`. */
+          attachmentIds: body.attachmentIds,
           permisos,
           miembros,
           chat,

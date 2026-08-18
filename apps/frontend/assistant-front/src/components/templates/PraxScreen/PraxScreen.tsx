@@ -98,6 +98,9 @@ export function PraxScreen({
     <div className="flex min-h-0 flex-1 flex-col">
       <AssistantChat
         projectId={projectId}
+        /* El proxy de esta zona: por ahí suben y bajan los adjuntos, que no
+           pueden ir por una Server Action. Ver `AssistantChatProps`. */
+        gatewayPath="/assistant/api/gateway"
         proyectos={proyectos.map((proyecto) => ({ id: proyecto.id, name: proyecto.name }))}
         onElegirProyecto={elegirProyecto}
         conversacionInicial={conversacionInicial}

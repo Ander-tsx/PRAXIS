@@ -289,7 +289,14 @@ export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
 /** 5 MB. Se mide sobre los bytes del archivo, no sobre su base64. */
 export const ASSISTANT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
 
-/** Lo que el modelo sabe leer y nosotros sabemos mandarle. */
+/**
+ * Lo que el modelo sabe leer y nosotros sabemos mandarle.
+ *
+ * ⚠️ **Markdown va con sus dos tipos, y no sobra ninguno.** Chrome declara un
+ * `.md` como `text/markdown`; Safari y algunos Linux lo mandan como
+ * `text/x-markdown`, y hay sistemas donde llega vacío. Con solo el primero, el
+ * mismo archivo entraba en un navegador y lo rechazaba otro.
+ */
 export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
   'application/pdf',
   'image/png',
@@ -297,21 +304,61 @@ export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
   'image/webp',
   'text/plain',
   'text/markdown',
+  'text/x-markdown',
 ] as const;
 
 /**
- * Un archivo que viaja con la pregunta.
+ * Lo que se pone en el `accept` del `<input type="file">`.
  *
- * ⚠️ **No se guarda en ninguna parte.** Viaja con el turno y se descarta: no hay
- * fila, ni almacenamiento, ni política de retención — que es exactamente el
- * trabajo que habría que hacer para poder guardarlos. El archivo se manda para
- * que PRAX lo lea **ahora**, y lo que salga de ahí queda en la conversación.
+ * Las extensiones **además** de los tipos: hay sistemas donde un `.md` llega sin
+ * `Content-Type`, y con solo la lista de MIME el selector de archivos lo pinta
+ * en gris y no deja elegirlo.
+ */
+export const ASSISTANT_ATTACHMENT_ACCEPT = `${ASSISTANT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown,.txt`;
+
+/**
+ * Un archivo ya subido, tal y como lo ve el chat.
+ *
+ * 🔴 **Antes esto llevaba los bytes en base64 y era el fallo.** Viajaba dentro
+ * de la pregunta, que va por una Server Action —cuerpo topado en 1 MB—, así que
+ * cualquier foto de teléfono moría con un «Body exceeded 1 MB limit» de Next:
+ * un error sin traducir, que no dice qué archivo, y que ni siquiera llegaba a
+ * nuestro código para poder explicarlo. Y cuando sí entraba, PRAX citaba el
+ * documento y en el hilo no quedaba ni rastro de él.
+ *
+ * Ahora el archivo se sube aparte —multipart, por el proxy de la zona— y de él
+ * solo viaja el id. Los bytes se piden con `assistantAttachmentHref` y solo si
+ * alguien abre el archivo.
  */
 export interface AssistantAttachment {
-  name: string;
-  mime: string;
-  /** Contenido en base64, **sin** el prefijo `data:`. */
-  data: string;
+  id: string;
+  filename: string;
+  mimeType: string;
+  /** Bytes reales. Lo pinta la burbuja junto al nombre. */
+  size: number;
+}
+
+/** Los que la burbuja previsualiza en vez de ofrecer solo la descarga. */
+export function esImagenDeAsistente(mimeType: string): boolean {
+  return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp';
+}
+
+/**
+ * De dónde se bajan los bytes de un adjunto.
+ *
+ * ⚠️ **Pasa por el proxy de la zona, no por el gateway.** El JWT vive en una
+ * cookie `httpOnly` que solo se manda al propio origen: un `src` apuntando a
+ * `localhost:3000` saldría sin sesión y devolvería 401. Ver CLAUDE.md §Auth.
+ */
+export function assistantAttachmentHref(gatewayPath: string, attachmentId: string): string {
+  return `${gatewayPath}/me/assistant/attachments/${attachmentId}/content`;
+}
+
+/** «1,4 MB», «812 kB», «390 B». Lo que va debajo del nombre en la burbuja. */
+export function formatearTamano(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }
 
 export type EstadoPropuesta = 'PENDING' | 'ACCEPTED' | 'DISCARDED';
@@ -340,6 +387,15 @@ export interface StoredMessage {
   text: string;
   createdAt: string;
   proposals: AssistantProposal[];
+  /**
+   * Los archivos que iban con este turno.
+   *
+   * Solo los del usuario los tienen: PRAX responde texto y propuestas, nunca
+   * archivos. Y vienen vacíos en todo lo anterior a que se guardaran — entonces
+   * viajaban con la pregunta y se descartaban, así que hay hilos viejos que
+   * citan documentos de los que ya no queda nada.
+   */
+  attachments?: AssistantAttachment[];
 }
 
 export interface FullConversation {

@@ -114,7 +114,8 @@ model Conversation {
   projectId String?
   /// Las primeras palabras del primer mensaje. Se puede renombrar a mano.
   title     String
-  messages  Message[]
+  messages    Message[]
+  attachments Attachment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -146,6 +147,7 @@ model Message {
   /// de «ahora hablando de X» en el sitio exacto donde ocurrió.
   projectId      String?
   proposals      Proposal[]
+  attachments    Attachment[]
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
@@ -185,4 +187,78 @@ model Proposal {
   @@index([messageId])
   @@schema("assistant")
   @@map("assistant_proposals")
+}
+
+/// Un archivo que alguien le pasó a PRAX.
+///
+/// ## Por qué se guarda, si el modelo solo lo necesita durante el turno
+///
+/// La primera versión no lo guardaba: el archivo viajaba en base64 dentro de la
+/// pregunta y se descartaba. Dos cosas lo tumbaron, y las dos importan:
+///
+/// 1. 🔴 **No cabía.** La pregunta va por una Server Action, y el cuerpo de una
+///    Server Action está topado en 1 MB. Un PNG de teléfono lo pasa de sobra, y
+///    lo que se veía era un «Body exceeded 1 MB limit» de Next en mitad de la
+///    pantalla — un error del framework, sin traducir, que no dice qué archivo
+///    ni qué hacer.
+/// 2. **La conversación quedaba mintiendo.** El modelo respondía citando el
+///    documento y en el hilo no había ni rastro de él: al releerlo una semana
+///    después, la respuesta hablaba de algo que no estaba.
+///
+/// Ahora se sube aparte —multipart, sin pasar por la Server Action— queda como
+/// borrador (`messageId` nulo) y el turno lo reclama con `attachmentIds`. Es
+/// exactamente el mismo patrón que los adjuntos del chat de equipo, y por el
+/// mismo motivo: así se pueden adjuntar varios, verlos como chips y mandarlos de
+/// una vez, sin volver a subirlos en cada intento de enviar.
+///
+/// ## Quién puede verlo
+///
+/// Aquí solo se guarda el hecho. El acceso lo decide la conversación —que es de
+/// una persona— y el permiso del proyecto, igual que con los mensajes.
+model Attachment {
+  id             String   @id @default(uuid())
+  /// ⚠️ **Nulo mientras es un borrador, igual que `messageId`.**
+  ///
+  /// Se sube antes de escribir, y en un chat recién abierto todavía no hay
+  /// conversación: exigirla aquí obligaría a crear una vacía para poder
+  /// adjuntar, y la que se abandona sin enviar nada quedaría en el historial.
+  /// El turno rellena las dos columnas de una vez al reclamarlo.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// Nulo mientras es un borrador. El turno lo reclama al enviarse.
+  messageId      String?
+  message        Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Nombre con el que se subió, saneado. Es lo que se ofrece al descargar.
+  filename       String
+  mimeType       String
+  /// Bytes reales, medidos en el servidor y no declarados por el cliente.
+  size           Int
+  uploadedBy     String
+  createdAt      DateTime @default(now())
+
+  blob AttachmentBlob?
+
+  @@index([conversationId, messageId])
+  @@index([messageId])
+  /// Los borradores de una persona: es la consulta del compositor, y la que usa
+  /// la limpieza de huérfanos.
+  @@index([uploadedBy, messageId])
+  @@schema("assistant")
+  @@map("assistant_attachments")
+}
+
+/// Los bytes de un adjunto del asistente.
+///
+/// Uno a uno con `Attachment`, y **solo cuando el proveedor activo es
+/// Postgres**. Con `STORAGE_DRIVER=gcs` esta tabla queda vacía y los bytes viven
+/// en el bucket: la API no cambia y quien la consume no se entera de dónde está
+/// el archivo. Mismo diseño que `ChatAttachmentBlob` en projects-service.
+model AttachmentBlob {
+  attachmentId String     @id
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  /// `bytea`. Postgres lo saca del bloque principal vía TOAST.
+  data         Bytes
+
+  @@schema("assistant")
+  @@map("assistant_attachment_blobs")
 }

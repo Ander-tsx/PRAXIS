@@ -3,7 +3,6 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
-  IsBase64,
   IsIn,
   IsOptional,
   IsString,
@@ -99,16 +98,33 @@ export const MAX_HISTORIAL = 12;
  *   de llegar al modelo y volver como «no he podido leer el archivo».
  * - **40 000 caracteres** por archivo de texto, avisando de que se recortó.
  *
- * ## Y no se guardan
+ * ## Y sí se guardan
  *
- * Viajan con el turno y se descartan. No hay fila, ni GCS, ni política de
- * retención — que es exactamente el trabajo que habría que hacer para poder
- * guardarlos, y la primera versión no lo necesita: el archivo se manda para que
- * PRAX lo lea **ahora**, y lo que salga de ahí queda en la conversación.
+ * 🔴 **La primera versión no los guardaba, y eso era el fallo, no un atajo.**
+ * Viajaban en base64 dentro de la pregunta y se descartaban después, con dos
+ * consecuencias: la pregunta va por una Server Action —cuerpo topado en 1 MB—
+ * así que cualquier foto de teléfono reventaba con un «Body exceeded 1 MB
+ * limit» de Next, sin traducir y sin decir qué archivo; y cuando sí entraba, el
+ * hilo quedaba **mintiendo**, porque PRAX citaba el documento y en la
+ * conversación no había ni rastro de él.
+ *
+ * Ahora se suben aparte por `POST /me/assistant/attachments` (multipart, que no
+ * pasa por la Server Action), quedan como borrador y el turno los reclama con
+ * `attachmentIds`. Los bytes van a `BlobStorage` —Postgres o GCS según
+ * `STORAGE_DRIVER`—, igual que los del chat de equipo.
  */
 export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
 
-/** 5 MB. En base64 ocupa ~4/3 de eso, y por eso el DTO valida el tamaño ya decodificado. */
+/**
+ * 5 MB por archivo.
+ *
+ * El quinto del chat de equipo (25 MB) a propósito: allí un adjunto se guarda y
+ * se descarga, aquí **entra entero en el prompt de un turno**. Lo que cuesta no
+ * es disco, es cuota, latencia y atención del modelo.
+ *
+ * Lo mide el gateway sobre los bytes recibidos, nunca sobre lo que declare quien
+ * sube: es la única cifra en la que se puede confiar.
+ */
 export const ASSISTANT_ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Lo que Gemini sabe leer y nosotros sabemos mandarle. */
@@ -118,7 +134,12 @@ export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
   'image/jpeg',
   'image/webp',
   'text/plain',
+  /* ⚠️ **Markdown va con sus dos tipos, y no sobra ninguno.** Chrome declara un
+     `.md` como `text/markdown`; Safari y algunos Linux lo mandan como
+     `text/x-markdown`. Con solo el primero, el mismo archivo entraba en un
+     navegador y lo rechazaba otro. Ya mordió en el chat de equipo. */
   'text/markdown',
+  'text/x-markdown',
 ] as const;
 
 /** Los que se pegan como texto en vez de ir como datos binarios. */
@@ -127,28 +148,25 @@ export const ASSISTANT_TEXT_MIME: readonly string[] = ['text/plain', 'text/markd
 /** Tope por archivo de texto. Se recorta y se avisa dentro del propio prompt. */
 export const ASSISTANT_TEXT_MAX_CHARS = 40_000;
 
-export class AssistantAttachmentDto {
-  @ApiProperty({ description: 'Nombre original, solo para nombrarlo en el prompt' })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(200)
-  name: string;
+/**
+ * Un adjunto tal y como lo ve el chat.
+ *
+ * Sin bytes: para pintar la burbuja bastan el nombre, el tipo y el tamaño, y el
+ * contenido se pide aparte —`GET /me/assistant/attachments/:id/content`— solo si
+ * alguien lo abre. Meterlo aquí metería cada archivo de la conversación en la
+ * respuesta de cada turno.
+ */
+export interface AssistantAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  /** Bytes reales. Lo pinta la burbuja junto al nombre. */
+  size: number;
+}
 
-  @ApiProperty({ enum: ASSISTANT_ATTACHMENT_ALLOWED_MIME })
-  @IsIn(ASSISTANT_ATTACHMENT_ALLOWED_MIME as unknown as string[])
-  mime: string;
-
-  /**
-   * El contenido en base64, **sin** el prefijo `data:`.
-   *
-   * ⚠️ El tamaño se valida sobre los bytes decodificados y no sobre la longitud
-   * de esta cadena: base64 abulta un tercio, así que un tope sobre el texto
-   * rechazaría archivos de 3,8 MB diciendo que pasan de 5.
-   */
-  @ApiProperty({ description: 'Contenido en base64, sin el prefijo data:' })
-  @IsString()
-  @IsBase64()
-  data: string;
+/** Los que la burbuja puede previsualizar en vez de ofrecer solo la descarga. */
+export function esImagenDeAsistente(mimeType: string): boolean {
+  return mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp';
 }
 
 export class AssistantChatBodyDto {
@@ -185,14 +203,24 @@ export class AssistantChatBodyDto {
   @Type(() => AssistantTurnDto)
   history?: AssistantTurnDto[];
 
-  /** Archivos que acompañan a la pregunta. Ver `AssistantAttachmentDto`. */
-  @ApiPropertyOptional({ type: [AssistantAttachmentDto] })
+  /**
+   * Los archivos que acompañan a la pregunta, **por id**.
+   *
+   * ⚠️ **Antes viajaban aquí en base64 y no cabían.** La pregunta va por una
+   * Server Action, cuyo cuerpo está topado en 1 MB: cualquier imagen de teléfono
+   * reventaba con un «Body exceeded 1 MB limit» de Next — sin traducir, sin decir
+   * qué archivo y sin ninguna forma de saberlo antes de intentarlo.
+   *
+   * Ahora se suben aparte por `POST /projects/:id/assistant/attachments`
+   * (multipart, que no pasa por la Server Action), quedan como borrador y el
+   * turno los reclama con estos ids. Mismo patrón que los adjuntos del chat.
+   */
+  @ApiPropertyOptional({ type: [String], description: 'Ids de adjuntos ya subidos' })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE)
-  @ValidateNested({ each: true })
-  @Type(() => AssistantAttachmentDto)
-  attachments?: AssistantAttachmentDto[];
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
 }
 
 /** Renombrar una conversación. */
@@ -272,6 +300,15 @@ export interface AssistantStoredMessage {
   text: string;
   createdAt: string;
   proposals: AssistantProposal[];
+  /**
+   * Los archivos que iban con este turno.
+   *
+   * Solo los tienen los del usuario: PRAX responde texto y propuestas, nunca
+   * adjuntos. Vacío en los del modelo, y vacío también en todo lo anterior a que
+   * los adjuntos se guardaran — antes viajaban con la pregunta y se descartaban,
+   * así que el hilo citaba documentos que ya no existen en ninguna parte.
+   */
+  attachments: AssistantAttachment[];
 }
 
 /**

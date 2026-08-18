@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
+  ASSISTANT_ATTACHMENT_ACCEPT,
   ASSISTANT_ATTACHMENT_ALLOWED_MIME,
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
+  type AssistantAttachment,
   type AssistantProposal,
   type AssistantQuota,
+  assistantAttachmentHref,
+  esImagenDeAsistente,
   formatoReinicio,
   isAssignmentProposal,
   isBoardProposal,
@@ -52,6 +56,14 @@ interface Mensaje {
   text: string;
   /** Solo en los del asistente. Cada una se pinta como tarjeta debajo. */
   proposals?: AssistantProposal[];
+  /**
+   * Solo en los del usuario: PRAX responde texto y propuestas, nunca archivos.
+   *
+   * Vienen vacíos en los hilos anteriores a que los adjuntos se guardaran —
+   * entonces viajaban con la pregunta y se descartaban, así que hay
+   * conversaciones viejas donde PRAX comenta un documento del que no queda nada.
+   */
+  attachments?: AssistantAttachment[];
 }
 
 export interface AssistantChatProps {
@@ -64,6 +76,17 @@ export interface AssistantChatProps {
    * no enseña compositor: enseña el recibimiento y los proyectos para elegir.
    */
   projectId: string | null;
+  /**
+   * El proxy del gateway de la zona que monta esto: `/assistant/api/gateway`,
+   * `/reports/api/gateway`.
+   *
+   * ⚠️ **Los adjuntos no pueden ir por una Server Action y por eso hace falta.**
+   * Subir un archivo va por `fetch` multipart desde el navegador, y tiene que
+   * salir hacia el **propio origen**: el JWT vive en una cookie `httpOnly` que
+   * no se manda a `localhost:3000`, así que apuntar al gateway directo daría
+   * 401. Es también de donde cuelgan las descargas de las burbujas.
+   */
+  gatewayPath: string;
   /**
    * Los proyectos entre los que se puede cambiar, ya filtrados por permiso.
    *
@@ -201,6 +224,7 @@ const SUGERENCIAS = [
  */
 export function AssistantChat({
   projectId,
+  gatewayPath,
   cuotaInicial,
   nombres,
   etiquetas,
@@ -247,28 +271,56 @@ export function AssistantChat({
   const cerrarCajon = dock?.cerrar;
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
-   * Los archivos elegidos, ya leídos a base64.
+   * Los archivos del mensaje que se está escribiendo.
    *
-   * ⚠️ **Se leen al elegirlos y no al enviar.** Leer un fichero es asíncrono, y
-   * hacerlo dentro del envío convertiría «pulsar enviar» en una espera muda de
-   * medio segundo con un tamaño de 5 MB. Leídos antes, enviar es inmediato y los
-   * errores de tamaño o de tipo salen **cuando se elige el archivo**, que es
-   * cuando se puede corregir.
+   * ## ⚠️ Se suben al elegirlos, no al enviar
    *
-   * No se guardan en ninguna parte: viajan con el turno y se descartan.
+   * 🔴 **Antes se leían a base64 y viajaban dentro de la pregunta, y eso no
+   * funcionaba.** La pregunta va por una Server Action, cuyo cuerpo está topado
+   * en 1 MB: cualquier foto de teléfono moría con un «Body exceeded 1 MB limit»
+   * de Next —un error sin traducir, que no dice qué archivo y que ni siquiera
+   * llega a nuestro código para poder explicarlo—. Y cuando sí cabía, el archivo
+   * se descartaba después del turno: PRAX citaba el documento y en el hilo no
+   * quedaba ni rastro.
+   *
+   * Ahora cada archivo se sube en cuanto se elige, por `fetch` multipart al
+   * proxy de la zona, y queda como borrador con su id. Enviar solo manda ids, y
+   * es instantáneo. De paso, el error de tipo o de tamaño sale **cuando se elige
+   * el archivo**, que es cuando se puede corregir.
    */
   const [adjuntos, setAdjuntos] = useState<AdjuntoElegido[]>([]);
 
-  const quitarAdjunto = useCallback((id: string) => {
-    setAdjuntos((previos) => previos.filter((adjunto) => adjunto.id !== id));
-  }, []);
+  /** Con alguno a medio subir, enviar mandaría un mensaje sin sus archivos. */
+  const subiendo = adjuntos.some((adjunto) => adjunto.id === null);
+
+  const quitarAdjunto = useCallback(
+    (localId: string) => {
+      setAdjuntos((previos) => {
+        const fuera = previos.find((adjunto) => adjunto.localId === localId);
+        /* El borrador sube ocupando sitio en el servidor: quitarlo del chip sin
+           avisar dejaría el archivo colgando para siempre. No se espera a la
+           respuesta —el chip tiene que desaparecer al pulsar— y si falla, el
+           borrador queda huérfano, que es basura y no un error. */
+        if (fuera?.id) {
+          void fetch(`${gatewayPath}/me/assistant/attachments/${fuera.id}`, { method: 'DELETE' });
+        }
+        return previos.filter((adjunto) => adjunto.localId !== localId);
+      });
+    },
+    [gatewayPath],
+  );
 
   /**
-   * Elegir archivos: se validan y se leen aquí mismo.
+   * Elegir archivos: se validan, se pintan y se suben.
    *
    * Las tres comprobaciones son las mismas que hace el servidor, y se repiten
    * aquí por el motivo de siempre: **el mensaje llega antes y señala el
    * archivo**. La que manda sigue siendo la del backend.
+   *
+   * ⚠️ El chip aparece **antes** de que la subida termine, con su indicador de
+   * progreso. Esperar a la respuesta para pintarlo dejaría un par de segundos en
+   * los que elegir un archivo no hace nada visible, que es como se acaba
+   * pulsando el clip tres veces.
    */
   const alElegirArchivos = useCallback(
     async (evento: React.ChangeEvent<HTMLInputElement>) => {
@@ -279,7 +331,7 @@ export function AssistantChat({
       if (elegidos.length === 0) return;
 
       const problemas: string[] = [];
-      const nuevos: AdjuntoElegido[] = [];
+      const nuevos: { local: AdjuntoElegido; archivo: File }[] = [];
 
       for (const archivo of elegidos) {
         if (adjuntos.length + nuevos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE) {
@@ -300,24 +352,49 @@ export function AssistantChat({
           );
           continue;
         }
+        if (archivo.size === 0) {
+          problemas.push(`«${archivo.name}» está vacío.`);
+          continue;
+        }
 
-        try {
-          nuevos.push({
-            id: crypto.randomUUID(),
+        nuevos.push({
+          local: {
+            localId: crypto.randomUUID(),
+            id: null,
             name: archivo.name,
             mime,
             bytes: archivo.size,
-            data: await aBase64(archivo),
-          });
-        } catch {
-          problemas.push(`«${archivo.name}» no se pudo leer.`);
-        }
+          },
+          archivo,
+        });
       }
 
-      if (nuevos.length > 0) setAdjuntos((previos) => [...previos, ...nuevos]);
       setError(problemas.length > 0 ? problemas.join(' ') : null);
+      if (nuevos.length === 0) return;
+
+      setAdjuntos((previos) => [...previos, ...nuevos.map((nuevo) => nuevo.local)]);
+
+      await Promise.all(
+        nuevos.map(async ({ local, archivo }) => {
+          const subido = await subirAdjunto(gatewayPath, archivo);
+          if (subido.id) {
+            setAdjuntos((previos) =>
+              previos.map((adjunto) =>
+                adjunto.localId === local.localId ? { ...adjunto, id: subido.id } : adjunto,
+              ),
+            );
+            return;
+          }
+
+          /* Sin id no hay archivo, así que el chip se va: dejarlo puesto en rojo
+             invitaría a enviar creyendo que algo va dentro. El motivo se dice
+             arriba, junto al compositor. */
+          setAdjuntos((previos) => previos.filter((adjunto) => adjunto.localId !== local.localId));
+          setError(`«${local.name}»: ${subido.error}`);
+        }),
+      );
     },
-    [adjuntos.length],
+    [adjuntos.length, gatewayPath],
   );
   /**
    * La conversación abierta. `null` significa «la siguiente pregunta abre una».
@@ -401,6 +478,9 @@ export function AssistantChat({
         role: mensaje.role,
         text: mensaje.text,
         proposals: mensaje.proposals,
+        /* Condicional y no `?? []`: con `exactOptionalPropertyTypes`, asignar
+           `undefined` a un campo opcional es un error de tipos. */
+        ...(mensaje.attachments ? { attachments: mensaje.attachments } : {}),
       })),
     );
 
@@ -425,6 +505,9 @@ export function AssistantChat({
     /* ⚠️ Con archivos, un mensaje vacío es legítimo: adjuntar y enviar es
        «mira esto». Sin ellos sigue haciendo falta texto. */
     if ((!limpio && adjuntos.length === 0) || pendiente || agotada) return;
+    /* Con una subida en vuelo, el turno saldría sin ese archivo y PRAX
+       respondería a medias sobre algo que la burbuja sí enseña. */
+    if (subiendo) return;
 
     /* Sin foco no hay a dónde mandar el turno. No debería llegar aquí —sin él no
        se pinta el compositor— pero el estrechamiento de tipos lo pide. Va antes
@@ -432,13 +515,31 @@ export function AssistantChat({
        el campo vacío, o sea la pregunta perdida. */
     if (!projectId) return;
 
-    /* Lo que se pinta en la burbuja: el texto, y si no lo hay, los nombres de
-       los archivos — una burbuja vacía se lee como un fallo. */
-    const enviados = adjuntos;
-    const textoDeLaBurbuja =
-      limpio || enviados.map((adjunto) => adjunto.name).join(', ') || '(archivo)';
+    /**
+     * Los que llegaron a subirse.
+     *
+     * ⚠️ Aquí ya no hay ninguno a medio subir: el botón está deshabilitado
+     * mientras los haya. El filtro es por el estrechamiento de tipos —y por si
+     * alguien llega por `Enter` en una carrera perdida—, no por costumbre.
+     */
+    const enviados = adjuntos.filter(
+      (adjunto): adjunto is AdjuntoElegido & { id: string } => adjunto.id !== null,
+    );
 
-    const mio: Mensaje = { id: crypto.randomUUID(), role: 'user', text: textoDeLaBurbuja };
+    /* La burbuja ya no necesita inventarse un texto cuando solo hay archivos:
+       los archivos **son** la burbuja. Antes ponía sus nombres como texto porque
+       no había forma de pintarlos, y se leía como un mensaje raro. */
+    const mio: Mensaje = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      text: limpio,
+      attachments: enviados.map((adjunto) => ({
+        id: adjunto.id,
+        filename: adjunto.name,
+        mimeType: adjunto.mime,
+        size: adjunto.bytes,
+      })),
+    };
 
     setMensajes((previos) => [...previos, mio]);
     setTexto('');
@@ -450,11 +551,7 @@ export function AssistantChat({
       projectId,
       limpio,
       conversationId ?? undefined,
-      enviados.map((adjunto) => ({
-        name: adjunto.name,
-        mime: adjunto.mime,
-        data: adjunto.data,
-      })),
+      enviados.map((adjunto) => adjunto.id),
     );
 
     setPendiente(false);
@@ -468,8 +565,10 @@ export function AssistantChat({
       /* El mensaje se queda escrito en el hilo pero vuelve al campo: si el fallo
          fue de red, reintentarlo no debería obligar a escribirlo otra vez. */
       setTexto(limpio);
-      /* Los archivos vuelven también: obligar a volver a elegirlos tras un fallo
-         de red es el peor momento para pedirle nada a nadie. */
+      /* Los archivos vuelven también, y ahora sale gratis: siguen subidos y sin
+         reclamar por ningún mensaje, así que reintentar no los vuelve a subir.
+         Obligar a elegirlos otra vez tras un fallo de red es el peor momento
+         para pedirle nada a nadie. */
       setAdjuntos(enviados);
       setMensajes((previos) => previos.filter((mensaje) => mensaje.id !== mio.id));
       return;
@@ -744,7 +843,7 @@ export function AssistantChat({
               >
                 {mensajes.map((mensaje) => (
                   <div key={mensaje.id} className="flex flex-col gap-3">
-                    <Burbuja mensaje={mensaje} />
+                    <Burbuja mensaje={mensaje} gatewayPath={gatewayPath} />
 
                     {(mensaje.proposals ?? []).length > 0 && (
                       /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
@@ -1061,10 +1160,20 @@ export function AssistantChat({
                   <ul className="flex flex-wrap gap-2">
                     {adjuntos.map((adjunto) => (
                       <li
-                        key={adjunto.id}
+                        key={adjunto.localId}
                         className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5"
                         style={{ background: colors.surfaceElevated }}
                       >
+                        {/* Mientras sube, el giro ocupa el sitio del icono: el
+                            chip no cambia de tamaño al terminar. */}
+                        {adjunto.id === null ? (
+                          <span
+                            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-text-disabled"
+                            aria-label="Subiendo"
+                          />
+                        ) : (
+                          <IconoDeArchivo mime={adjunto.mime} className="h-3.5 w-3.5 shrink-0" />
+                        )}
                         <span className="max-w-48 truncate font-sans text-xs text-text-primary">
                           {adjunto.name}
                         </span>
@@ -1073,7 +1182,7 @@ export function AssistantChat({
                         </span>
                         <button
                           type="button"
-                          onClick={() => quitarAdjunto(adjunto.id)}
+                          onClick={() => quitarAdjunto(adjunto.localId)}
                           aria-label={`Quitar ${adjunto.name}`}
                           className="shrink-0 rounded text-text-disabled transition-colors hover:text-error"
                         >
@@ -1176,20 +1285,22 @@ export function AssistantChat({
                     ref={archivoRef}
                     type="file"
                     multiple
-                    accept={`${ASSISTANT_ATTACHMENT_ALLOWED_MIME.join(',')},.md,.markdown,.txt`}
+                    accept={ASSISTANT_ATTACHMENT_ACCEPT}
                     onChange={alElegirArchivos}
                     className="hidden"
                   />
 
                   <button
                     type="submit"
-                    disabled={pendiente || (texto.trim().length === 0 && adjuntos.length === 0)}
+                    disabled={
+                      pendiente || subiendo || (texto.trim().length === 0 && adjuntos.length === 0)
+                    }
                     aria-label="Enviar"
-                    title="Enviar"
+                    title={subiendo ? 'Esperando a que suban los archivos' : 'Enviar'}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
                     style={{ background: alpha(colors.primary, 22), color: colors.primary }}
                   >
-                    {pendiente ? (
+                    {pendiente || subiendo ? (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     ) : (
                       <svg
@@ -1299,8 +1410,12 @@ function Sugerencia({
  * aquí: `StoredMessage` lo trae y el estado del chat lo descarta al construir sus
  * `Mensaje`. Cuando haga falta, el arreglo es propagarlo; mientras tanto, nada.
  */
-function Burbuja({ mensaje }: { mensaje: Mensaje }) {
+function Burbuja({ mensaje, gatewayPath }: { mensaje: Mensaje; gatewayPath: string }) {
   const mio = mensaje.role === 'user';
+  const adjuntos = mensaje.attachments ?? [];
+  /* Adjuntar y enviar sin escribir es legítimo —«mira esto»—, y entonces la
+     burbuja son los archivos y nada más. */
+  const conTexto = mensaje.text.trim().length > 0;
 
   return (
     <div className={`flex flex-col gap-1 ${mio ? 'items-end' : 'items-start'}`}>
@@ -1321,23 +1436,98 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
             : colors.surfaceElevated,
         }}
       >
-        <ModelText texto={mensaje.text} />
+        {adjuntos.map((adjunto) => (
+          <AdjuntoEnLaBurbuja key={adjunto.id} adjunto={adjunto} gatewayPath={gatewayPath} />
+        ))}
+        {conTexto && <ModelText texto={mensaje.text} />}
       </div>
     </div>
   );
 }
 
+/**
+ * Un archivo dentro de una burbuja.
+ *
+ * ## Una sola forma para todos, y a propósito
+ *
+ * Miniatura cuadrada, nombre y tamaño, siempre del mismo alto: un PDF, un `.md`
+ * y un PNG ocupan exactamente lo mismo. La alternativa —la imagen grande y el
+ * resto como una línea de texto— hace que una conversación con tres archivos
+ * mezclados se lea como tres cosas distintas, y obliga a que el hilo salte de
+ * altura cada vez que carga una imagen.
+ *
+ * Lo único que cambia entre tipos es **qué hay dentro del cuadrado**: la vista
+ * previa si es una imagen, el icono del tipo si no.
+ *
+ * ## Y es un enlace, no un botón
+ *
+ * Descargar es navegar a un recurso, así que `<a download>` con la URL real: se
+ * puede abrir en otra pestaña, copiar el enlace y el navegador enseña a dónde
+ * lleva. Un `<button>` con un `fetch` dentro no da ninguna de las tres cosas.
+ *
+ * ⚠️ La URL pasa por el **proxy de la zona** y no por el gateway: el JWT vive en
+ * una cookie `httpOnly` del propio origen. Ver `assistantAttachmentHref`.
+ */
+function AdjuntoEnLaBurbuja({
+  adjunto,
+  gatewayPath,
+}: {
+  adjunto: AssistantAttachment;
+  gatewayPath: string;
+}) {
+  const href = assistantAttachmentHref(gatewayPath, adjunto.id);
+  const esImagen = esImagenDeAsistente(adjunto.mimeType);
+
+  return (
+    <a
+      href={href}
+      download={adjunto.filename}
+      className="flex min-w-0 items-center gap-2.5 rounded-lg border border-border px-2 py-1.5 transition-colors hover:border-border-strong"
+      style={{ background: alpha(colors.background, 45) }}
+    >
+      <span
+        className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md"
+        style={{ background: alpha(colors.textDisabled, 14) }}
+      >
+        {esImagen ? (
+          /* Sin `next/image`: la fuente es una ruta autenticada de este mismo
+             origen, no un archivo del proyecto, y el optimizador tendría que
+             pedirla sin la cookie. */
+          // biome-ignore lint/performance/noImgElement: ruta autenticada, no un asset
+          <img
+            src={href}
+            alt={adjunto.filename}
+            /* `object-cover`: recorta en vez de deformar. Es una miniatura para
+               reconocer el archivo, no para verlo. */
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-text-secondary" />
+        )}
+      </span>
+
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-sans text-xs text-text-primary">{adjunto.filename}</span>
+        <span className="font-sans text-[11px] text-text-disabled">
+          {enKilobytes(adjunto.size)}
+        </span>
+      </span>
+    </a>
+  );
+}
+
 /* ─── Adjuntos ────────────────────────────────────────────────────────────── */
 
-/** Un archivo ya elegido y leído, esperando a enviarse. */
+/** Un archivo del compositor: subiéndose (`id` nulo) o ya listo para enviarse. */
 interface AdjuntoElegido {
-  id: string;
+  /** Clave de React desde el primer instante, cuando todavía no hay id. */
+  localId: string;
+  /** El del servidor. `null` mientras sube; es lo que viaja con el turno. */
+  id: string | null;
   name: string;
   mime: string;
   /** Tamaño real del archivo, para enseñarlo y para comprobar el tope. */
   bytes: number;
-  /** Contenido en base64, sin el prefijo `data:`. */
-  data: string;
 }
 
 /**
@@ -1361,24 +1551,98 @@ function mimeDeArchivo(archivo: File): string | null {
 }
 
 /**
- * De `File` a base64, sin el prefijo `data:`.
+ * Sube un archivo y devuelve su id, o el motivo por el que no.
  *
- * `FileReader` y no `arrayBuffer()` + `btoa`: aquel recorre el búfer byte a byte
- * en JavaScript y con 5 MB bloquea el hilo principal medio segundo. Este lo hace
- * el navegador, fuera del hilo.
+ * ## ⚠️ `fetch` desde el navegador, y **no** una Server Action
+ *
+ * 🔴 Es el arreglo del fallo entero. Una Server Action de Next tiene el cuerpo
+ * topado en 1 MB, así que subir por ahí mataba cualquier foto de teléfono con un
+ * «Body exceeded 1 MB limit» que no se traduce, no dice qué archivo y ni siquiera
+ * llega a nuestro código. Subir el tope en `next.config` lo habría tapado, pero
+ * a costa de leer el archivo entero a base64 —un tercio más de bytes— y de
+ * pasarlo por la serialización de React. Multipart no tiene ninguno de los dos
+ * problemas.
+ *
+ * ## Al proxy de la zona, no al gateway
+ *
+ * El JWT vive en una cookie `httpOnly` que el navegador solo manda al **propio
+ * origen**. Apuntando a `localhost:3000` la petición saldría sin sesión y
+ * devolvería 401. Ver CLAUDE.md §Auth.
+ *
+ * ⚠️ Y **no se pone `Content-Type` a mano**: lo pone el navegador con el
+ * `boundary` del multipart, que es lo único que sabe generar. Ponerlo a pelo deja
+ * el cuerpo sin separador y el servidor no encuentra ningún campo.
  */
-function aBase64(archivo: File): Promise<string> {
-  return new Promise((resolver, rechazar) => {
-    const lector = new FileReader();
-    lector.onerror = () => rechazar(lector.error);
-    lector.onload = () => {
-      const resultado = String(lector.result);
-      /* `readAsDataURL` devuelve `data:<mime>;base64,<datos>`; el servidor espera
-         solo la última parte. */
-      resolver(resultado.slice(resultado.indexOf(',') + 1));
-    };
-    lector.readAsDataURL(archivo);
-  });
+async function subirAdjunto(
+  gatewayPath: string,
+  archivo: File,
+): Promise<{ id: string | null; error: string }> {
+  const cuerpo = new FormData();
+  cuerpo.append('file', archivo);
+
+  try {
+    const respuesta = await fetch(`${gatewayPath}/me/assistant/attachments`, {
+      method: 'POST',
+      body: cuerpo,
+    });
+
+    /* El sobre de siempre: `{ success, data }` o `{ success:false, error }`. Se
+       mira el `data`, no el status — es la regla de la casa, y aquí además el
+       413 de un cuerpo demasiado grande puede no traer JSON. */
+    const sobre = (await respuesta.json().catch(() => null)) as {
+      data?: { id?: string };
+      error?: { message?: string };
+    } | null;
+
+    const id = sobre?.data?.id;
+    if (!id) {
+      return {
+        id: null,
+        error:
+          sobre?.error?.message ??
+          (respuesta.status === 413
+            ? `pasa de ${enKilobytes(ASSISTANT_ATTACHMENT_MAX_BYTES)}.`
+            : 'no se pudo subir.'),
+      };
+    }
+
+    return { id, error: '' };
+  } catch {
+    return { id: null, error: 'no se pudo subir. ¿Sigues conectado?' };
+  }
+}
+
+/**
+ * El icono del tipo de archivo. Tres formas, no una por extensión.
+ *
+ * Documento, imagen y texto es toda la distinción que hace falta para reconocer
+ * un archivo en una lista de tres: el nombre, que está justo al lado, dice el
+ * resto. Un catálogo de iconos por extensión sería más bonito y no ayudaría a
+ * nadie a encontrar nada más rápido.
+ */
+function IconoDeArchivo({ mime, className }: { mime: string; className?: string }) {
+  const trazo =
+    mime === 'application/pdf'
+      ? /* Documento con una esquina doblada. */
+        'M14 3v5h5M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z'
+      : esImagenDeAsistente(mime)
+        ? /* Marco con montaña y sol. */
+          'M4 5h16v14H4zM4 16l4-4 3 3 4-5 5 6M9 9.5a1 1 0 11-2 0 1 1 0 012 0z'
+        : /* Tres renglones: texto y Markdown. */
+          'M5 5h14M5 10h14M5 15h9';
+
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d={trazo} />
+    </svg>
+  );
 }
 
 /** `1536` → `1,5 kB`. Para que el tamaño de un adjunto se lea de un vistazo. */

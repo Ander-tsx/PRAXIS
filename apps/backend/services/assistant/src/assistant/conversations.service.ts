@@ -83,7 +83,13 @@ export class ConversationsService {
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
-          include: { proposals: true },
+          include: {
+            proposals: true,
+            /* Sin bytes: para la burbuja bastan nombre, tipo y tamaño. El
+               contenido se pide aparte, y solo si alguien lo abre — incluirlo
+               aquí metería cada archivo del hilo en cada lectura. */
+            attachments: { select: { id: true, filename: true, mimeType: true, size: true } },
+          },
         },
       },
     });
@@ -117,6 +123,10 @@ export class ConversationsService {
           args: propuesta.args,
           status: propuesta.status,
         })),
+        /* Solo los turnos del usuario tienen: PRAX responde texto y propuestas,
+           nunca archivos. Y los anteriores a que se guardaran vienen vacíos —
+           entonces viajaban con la pregunta y se descartaban. */
+        attachments: mensaje.attachments,
       })),
     };
   }
@@ -231,13 +241,36 @@ export class ConversationsService {
     pregunta: string;
     respuesta: string;
     proposals: { tool: string; args: Record<string, unknown> }[];
+    /** Quién pregunta. Solo se usa para no reclamar borradores de otra persona. */
+    userId: string;
+    /**
+     * Los borradores que este turno se lleva consigo.
+     *
+     * ⚠️ **Se reclaman aquí dentro y no antes, a propósito.** Un adjunto atado a
+     * un mensaje que no llegó a crearse sería una fila colgando; dentro de la
+     * transacción, o hay turno y archivos, o no hay ninguna de las dos cosas.
+     */
+    attachmentIds: string[];
   }) {
     const { conversationId, projectId, pregunta, respuesta, proposals } = params;
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.message.create({
+      const delUsuario = await tx.message.create({
         data: { conversationId, projectId, role: 'USER', text: pregunta },
       });
+
+      if (params.attachmentIds.length > 0) {
+        /* `messageId: null` en el filtro es lo que lo hace idempotente: un
+           reintento no le roba el archivo a un turno que ya lo tenía. */
+        await tx.attachment.updateMany({
+          where: {
+            id: { in: params.attachmentIds },
+            uploadedBy: params.userId,
+            messageId: null,
+          },
+          data: { conversationId, messageId: delUsuario.id },
+        });
+      }
 
       const delModelo = await tx.message.create({
         data: {

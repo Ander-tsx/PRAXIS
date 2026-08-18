@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,11 +12,30 @@ import {
   Patch,
   Post,
   Request,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ProjectDraftBodyDto, RenameConversationBodyDto } from '@praxis/contracts';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  ASSISTANT_ATTACHMENT_ALLOWED_MIME,
+  ASSISTANT_ATTACHMENT_MAX_BYTES,
+  ProjectDraftBodyDto,
+  RenameConversationBodyDto,
+  esImagenDeAsistente,
+  validarFirmaChatAdjunto,
+} from '@praxis/contracts';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 
@@ -124,6 +144,141 @@ export class MyAssistantController {
     );
   }
 
+  /**
+   * Sube un archivo para PRAX y lo deja como **borrador**.
+   *
+   * ## Por qué es una ruta aparte y no va dentro de la pregunta
+   *
+   * 🔴 Los adjuntos viajaban en base64 dentro del cuerpo de
+   * `POST /projects/:id/assistant/chat`, y ese cuerpo lo manda una **Server
+   * Action de Next, topada en 1 MB**. Cualquier foto de teléfono lo pasa, y lo
+   * que se veía era «Body exceeded 1 MB limit»: un error de Next, sin traducir,
+   * que no dice qué archivo ni qué hacer, y que ni siquiera llegaba a nuestro
+   * código para poder explicarlo. Multipart no pasa por esa tubería.
+   *
+   * ## Sin `projectId`, y no es un olvido
+   *
+   * Se adjunta **antes** de escribir, y en un chat recién abierto puede que
+   * todavía no haya ni conversación ni proyecto elegido. El archivo es de quien
+   * lo sube y de nadie más: `uploadedBy` es lo único que lo protege, y sale del
+   * token. El turno lo reclama después con `attachmentIds`.
+   *
+   * ⚠️ El tope va en el propio interceptor **además** de en el servicio: así el
+   * archivo enorme se corta al recibirlo, en vez de cruzar TCP entero para que
+   * lo rechacen al otro lado.
+   */
+  @Post('attachments')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: ASSISTANT_ATTACHMENT_MAX_BYTES, files: 1 } }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube un archivo para el asistente (borrador hasta enviar)' })
+  @ApiResponse({ status: 201, description: 'Metadatos del adjunto' })
+  subirAdjunto(@Request() req: Express.Request, @UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No llegó ningún archivo en el campo «file»');
+    }
+    if (!(ASSISTANT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
+      throw new BadRequestException('PRAX solo puede leer PDF, imágenes, texto y Markdown.');
+    }
+    if (file.size === 0) {
+      throw new BadRequestException('El archivo está vacío');
+    }
+    /**
+     * ⚠️ **El `mimetype` lo declara quien sube el archivo.** Se comprueba la
+     * firma de los primeros bytes contra el tipo declarado, igual que en el chat
+     * de equipo — y se reutiliza esa función tal cual: cubre los cinco tipos que
+     * acepta PRAX y no hay dos formas de mirar un PNG.
+     */
+    if (!validarFirmaChatAdjunto(file.mimetype, file.buffer)) {
+      throw new BadRequestException('Ese archivo no es lo que parece por el nombre.');
+    }
+
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_attachment_create' },
+        {
+          userId: req.user!.userId,
+          filename: sanitizeFilename(file.originalname),
+          mimeType: file.mimetype,
+          content: file.buffer.toString('base64'),
+        },
+      ),
+    );
+  }
+
+  /**
+   * Descarta un borrador. Es la equis del chip, antes de enviar.
+   *
+   * Solo borradores: uno ya enviado forma parte del hilo, y quitarlo dejaría a
+   * PRAX citando un archivo que ya no está. Para eso está borrar la conversación.
+   */
+  @Delete('attachments/:attachmentId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Descartar un adjunto que aún no se ha enviado' })
+  descartarAdjunto(
+    @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    @Request() req: Express.Request,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_attachment_delete' },
+        { userId: req.user!.userId, attachmentId },
+      ),
+    );
+  }
+
+  /**
+   * Los bytes de un adjunto.
+   *
+   * Misma política de entrega que en el chat de equipo: las imágenes en línea
+   * —van a un `<img>`, que no ejecuta nada— y **todo lo demás como descarga**,
+   * con `nosniff`. El PDF aquí no se sirve en línea: no hay visor en esta
+   * pantalla, y una burbuja de archivo se abre para guardarlo.
+   *
+   * El `filename*` va con codificación RFC 5987 para que los acentos y los
+   * espacios sobrevivan a la cabecera.
+   */
+  @Get('attachments/:attachmentId/content')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Descarga el contenido de un adjunto del asistente' })
+  @ApiResponse({ status: 200, description: 'Bytes del archivo' })
+  async contenidoDeAdjunto(
+    @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    @Request() req: Express.Request,
+    @Res() res: Response,
+  ) {
+    const archivo = await firstValueFrom(
+      this.assistantClient.send<{
+        filename: string;
+        mimeType: string;
+        content: string;
+      }>({ cmd: 'assistant_attachment_get_content' }, { userId: req.user!.userId, attachmentId }),
+    );
+
+    const buffer = Buffer.from(archivo.content, 'base64');
+    const entrega = esImagenDeAsistente(archivo.mimeType) ? 'inline' : 'attachment';
+
+    res.setHeader('Content-Type', archivo.mimeType);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+    res.setHeader(
+      'Content-Disposition',
+      `${entrega}; filename*=UTF-8''${encodeURIComponent(archivo.filename)}`,
+    );
+    /* Privada y corta: el archivo es de una persona, y la vista previa de la
+       burbuja lo vuelve a pedir en cada render mientras la conversación está
+       abierta. */
+    res.setHeader('Cache-Control', 'private, max-age=300');
+
+    res.end(buffer);
+  }
+
   @Get('quota')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama, sin proyecto' })
@@ -171,4 +326,21 @@ export class MyAssistantController {
       ),
     );
   }
+}
+
+/**
+ * Deja el nombre en algo que se pueda guardar en disco sin sorpresas.
+ *
+ * Barras fuera —un `../` en el nombre es lo que convierte una descarga en una
+ * escritura donde no toca— y caracteres de control fuera, que son los que rompen
+ * la cabecera `Content-Disposition`. Gemelo del de `project-chat.controller.ts`.
+ */
+function sanitizeFilename(name: string): string {
+  const clean = name
+    .replace(/[/\\]/g, '_')
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: es justo lo que hay que quitar
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .trim();
+
+  return clean.slice(0, 255) || 'archivo';
 }
