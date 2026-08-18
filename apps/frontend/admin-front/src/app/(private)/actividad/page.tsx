@@ -1,6 +1,6 @@
 import { ActivityTable } from '@/components/organisms/ActivityTable';
 import { ActivityToolbar } from '@/components/organisms/ActivityToolbar';
-import { AdminTabs } from '@/components/organisms/AdminTabs';
+import { AdminHeader } from '@/components/organisms/AdminHeader';
 import { type AdminActivityPage, FILAS_POR_PAGINA } from '@/lib/admin';
 import { ADMIN_ACTIONS, type AdminActionName, AppHeader, Pagination } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
@@ -83,14 +83,14 @@ export default async function ActivityPage({ searchParams }: PageProps) {
   return (
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
-        <AdminTabs activo="actividad" />
-
-        <div className="flex flex-col gap-2">
-          <h2 className="font-display text-2xl text-text-primary">Registro de actividad</h2>
-          <p className="font-serif text-sm italic text-text-secondary">
-            Quién hizo qué, sobre quién, cuándo y por qué. No se puede editar ni borrar.
-          </p>
-        </div>
+        {/* Sin cifras: aquí el número que importa es el de la búsqueda en
+            curso, y ese ya lo lleva el paginador. Un «12.480 acciones en total»
+            no cambiaría ninguna decisión. */}
+        <AdminHeader
+          activo="actividad"
+          titulo="Registro de actividad"
+          descripcion="Quién hizo qué, sobre quién, cuándo y por qué. No se puede editar ni borrar."
+        />
 
         <ActivityToolbar accion={accionFiltro} desde={desde} hasta={hasta} />
 

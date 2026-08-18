@@ -1,8 +1,8 @@
-import { AdminTabs } from '@/components/organisms/AdminTabs';
+import { FilterBar } from '@/components/molecules/FilterBar';
+import { AdminHeader } from '@/components/organisms/AdminHeader';
 import { ProjectsTable } from '@/components/organisms/ProjectsTable';
-import { ProjectsToolbar } from '@/components/organisms/ProjectsToolbar';
-import { type AdminProjectPage, FILAS_POR_PAGINA } from '@/lib/admin';
-import { AppHeader, Pagination, type ProjectStatusName } from '@praxis/commons';
+import { type AdminProjectPage, ESTADOS_PROYECTO, FILAS_POR_PAGINA } from '@/lib/admin';
+import { AppHeader, Pagination, type ProjectStatusName, colors } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
@@ -13,6 +13,21 @@ interface PageProps {
 }
 
 const ESTADOS_VALIDOS: readonly string[] = ['ACTIVE', 'SUSPENDED', 'DELETED'];
+
+/**
+ * Las opciones del filtro.
+ *
+ * ⚠️ **«Todos» incluye los archivados**, y es a propósito: este es el único sitio
+ * de la plataforma donde se ven, así que esconderlos tras un filtro que hay que
+ * descubrir haría que un proyecto archivado por error pareciera perdido. En las
+ * pantallas de negocio no salen en ninguna lista.
+ */
+const FILTROS = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'ACTIVE', etiqueta: ESTADOS_PROYECTO.ACTIVE.etiqueta },
+  { id: 'SUSPENDED', etiqueta: ESTADOS_PROYECTO.SUSPENDED.etiqueta },
+  { id: 'DELETED', etiqueta: ESTADOS_PROYECTO.DELETED.etiqueta },
+];
 
 /**
  * Inventario de proyectos de la plataforma: listar, buscar, suspender y archivar.
@@ -53,9 +68,17 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   if (busqueda) params.set('search', busqueda);
   if (estadoFiltro) params.set('status', estadoFiltro);
 
-  const { items, total } = await createServerApiClient().get<AdminProjectPage>(
-    `/admin/projects?${params.toString()}`,
-  );
+  const api = createServerApiClient();
+
+  /* Las tres de contexto salen en paralelo con la principal, con `limit=1`
+     —solo se mira el `total`— y cada una degrada por su cuenta. Ver la nota
+     equivalente en la pantalla de Cuentas. */
+  const [{ items, total }, enTotal, suspendidos, archivados] = await Promise.all([
+    api.get<AdminProjectPage>(`/admin/projects?${params.toString()}`),
+    contar(api, '/admin/projects?limit=1'),
+    contar(api, '/admin/projects?status=SUSPENDED&limit=1'),
+    contar(api, '/admin/projects?status=DELETED&limit=1'),
+  ]);
 
   /** Conserva los filtros al cambiar de página: perderlos es el fallo clásico. */
   const hrefFor = (destino: number) => {
@@ -70,9 +93,28 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   return (
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
-        <AdminTabs activo="proyectos" />
+        <AdminHeader
+          activo="proyectos"
+          titulo="Proyectos"
+          descripcion="El inventario completo, archivados incluidos. Suspender y archivar son reversibles; el borrado de verdad es del dueño y no vive aquí."
+          cifras={[
+            { etiqueta: 'En total', valor: enTotal, tono: colors.primary },
+            { etiqueta: 'Suspendidos', valor: suspendidos, tono: colors.error },
+            { etiqueta: 'Archivados', valor: archivados, tono: colors.warning },
+          ]}
+        />
 
-        <ProjectsToolbar busqueda={busqueda} estado={estadoFiltro} total={total} />
+        <FilterBar
+          basePath="/proyectos"
+          busqueda={busqueda}
+          placeholder="Nombre o descripción del proyecto"
+          filtros={FILTROS}
+          filtroActivo={estadoFiltro}
+          idTodos="todos"
+          total={total}
+          nombreSingular="proyecto"
+          nombrePlural="proyectos"
+        />
 
         {items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
@@ -96,4 +138,15 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
       </div>
     </AppHeader>
   );
+}
+
+/** Cuántas filas hay, sin traérselas. Ver la gemela en la pantalla de Cuentas. */
+function contar(
+  api: ReturnType<typeof createServerApiClient>,
+  ruta: string,
+): Promise<number | null> {
+  return api
+    .get<AdminProjectPage>(ruta)
+    .then((respuesta) => respuesta.total)
+    .catch(() => null);
 }

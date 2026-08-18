@@ -1,3 +1,4 @@
+import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { ACCIONES, fechaYHora } from '@/lib/admin';
 import { type AdminActivityEntry, Badge } from '@praxis/commons';
 
@@ -18,57 +19,85 @@ import { type AdminActivityEntry, Badge } from '@praxis/commons';
  * clic.
  *
  * Es un Server Component: no hay nada que interactuar, así que no se manda al
- * navegador ni un byte de JavaScript por esta tabla.
+ * navegador ni un byte de JavaScript por esta tabla. `DataTable` no tiene estado
+ * ni efectos justamente para poder usarse así, y por eso las columnas se
+ * construyen aquí sin `useMemo` — un hook lo convertiría en cliente.
+ *
+ * ## ⚠️ No tenía `auto`, y aun así podía descuadrar
+ *
+ * Su plantilla era `1fr_1.2fr_1.2fr_2fr`, sin ninguna pista de contenido, y por
+ * eso era la menos rota de las tres. Pero un `1fr` de CSS Grid es en realidad
+ * `minmax(auto, 1fr)`: basta un correo largo sin espacios en una fila para que la
+ * pista crezca **solo en esa rejilla** y la cabecera deje de coincidir. `Track`
+ * lo cierra emitiendo siempre `minmax(0, …)`.
  */
 export function ActivityTable({ entradas }: { entradas: AdminActivityEntry[] }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-border">
-      <div className="hidden border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary md:grid md:grid-cols-[1fr_1.2fr_1.2fr_2fr] md:gap-4">
-        <span>Cuándo</span>
-        <span>Quién</span>
-        <span>Qué, y sobre quién</span>
-        <span>Por qué</span>
-      </div>
+  const columnas: DataColumn<AdminActivityEntry>[] = [
+    {
+      key: 'cuando',
+      header: 'Cuándo',
+      track: { fr: 1 },
+      cell: (entrada) => (
+        <p className="font-sans text-xs text-text-secondary">{fechaYHora(entrada.createdAt)}</p>
+      ),
+    },
+    {
+      key: 'quien',
+      header: 'Quién',
+      track: { fr: 1.2 },
+      cell: (entrada) => (
+        <p className="truncate font-sans text-sm text-text-primary">
+          {entrada.actorLabel || entrada.actorId}
+        </p>
+      ),
+    },
+    {
+      key: 'que',
+      header: 'Qué, y sobre quién',
+      mobileLabel: 'Qué',
+      track: { fr: 1.4 },
+      cell: (entrada) => {
+        const accion = ACCIONES[entrada.action];
+        const rol = typeof entrada.metadata?.role === 'string' ? entrada.metadata.role : null;
 
-      <ul>
-        {entradas.map((entrada) => {
-          const accion = ACCIONES[entrada.action];
-          const rol = typeof entrada.metadata?.role === 'string' ? entrada.metadata.role : null;
-
-          return (
-            <li
-              key={entrada.id}
-              className="flex flex-col gap-2 border-b border-border px-4 py-4 last:border-b-0 md:grid md:grid-cols-[1fr_1.2fr_1.2fr_2fr] md:items-start md:gap-4"
-            >
+        return (
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <Badge variant={accion?.variante ?? 'default'}>
+              {accion?.etiqueta ?? entrada.action}
+            </Badge>
+            <p className="w-full truncate font-sans text-sm text-text-primary">
+              {entrada.targetLabel || entrada.targetId}
+            </p>
+            {rol && (
               <p className="font-sans text-xs text-text-secondary">
-                {fechaYHora(entrada.createdAt)}
+                Rol resultante: <span className="text-text-primary">{rol}</span>
               </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'porque',
+      header: 'Por qué',
+      track: { fr: 2 },
+      cell: (entrada) => (
+        <p className="font-serif text-sm text-text-secondary">
+          {entrada.reason || <span className="text-text-disabled">Sin motivo anotado</span>}
+        </p>
+      ),
+    },
+  ];
 
-              <p className="truncate font-sans text-sm text-text-primary">
-                {entrada.actorLabel || entrada.actorId}
-              </p>
-
-              <div className="flex flex-col gap-1">
-                <Badge variant={accion?.variante ?? 'default'}>
-                  {accion?.etiqueta ?? entrada.action}
-                </Badge>
-                <p className="truncate font-sans text-sm text-text-primary">
-                  {entrada.targetLabel || entrada.targetId}
-                </p>
-                {rol && (
-                  <p className="font-sans text-xs text-text-secondary">
-                    Rol resultante: <span className="text-text-primary">{rol}</span>
-                  </p>
-                )}
-              </div>
-
-              <p className="font-serif text-sm text-text-secondary">
-                {entrada.reason || <span className="text-text-disabled">Sin motivo anotado</span>}
-              </p>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+  return (
+    <DataTable
+      columns={columnas}
+      rows={entradas}
+      rowKey={(entrada) => entrada.id}
+      /* `start`: el motivo puede ocupar tres líneas y la fecha una. Centradas,
+         las otras tres columnas quedarían flotando a media altura. */
+      align="start"
+      ariaLabel="Registro de actividad de administración"
+    />
   );
 }
