@@ -70,6 +70,26 @@ const MAX_OPCIONES = 8;
  * cuenta como cerrada en los informes y deja de avisar aunque esté vencida
  * (`DONE_COLUMN_COLOR`). Por eso solo puede haber una.
  */
+/**
+ * Cómo se llama cada propuesta en la frase de relleno.
+ *
+ * Solo se usa cuando el modelo no escribió nada, que debería ser la excepción.
+ * En minúscula y con artículo porque encaja detrás de «Te propongo…».
+ */
+const NOMBRE_DE_PROPUESTA: Record<string, string> = {
+  proponer_tarea: 'una tarea',
+  proponer_asignacion: 'un cambio de encargados',
+  proponer_edicion: 'unos cambios en la tarea',
+  proponer_movimiento: 'mover la tarea',
+  proponer_checklist: 'unos pasos para la tarea',
+  proponer_marcar_pasos: 'dar unos pasos por hechos',
+  proponer_comentario: 'un comentario',
+  proponer_mensaje: 'un mensaje para el equipo',
+  proponer_grafico: 'un grafico para tu panel',
+  proponer_borrado: 'borrar una tarea',
+  proponer_tablero: 'un tablero con sus columnas',
+};
+
 const MAX_COLUMNAS = 8;
 const COLOR_DE_CIERRE = 'success';
 const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
@@ -440,7 +460,24 @@ export class AssistantService {
       return 'Antes de seguir necesito que me aclares una cosa.';
     }
 
-    if (propuestas.length === 1) return 'Te propongo esto. Revisalo antes de aceptar.';
+    /**
+     * ⚠️ **Esto es un último recurso, no la respuesta normal.**
+     *
+     * La regla 2 bis le pide al modelo escribir siempre una frase antes de
+     * llamar a una herramienta, precisamente porque este texto es lo que se lee
+     * cuando no lo hace — y es idéntico para un tablero, un borrado y un
+     * gráfico: correcto y completamente vacío.
+     *
+     * Se mejora lo que se puede mejorar desde aquí, que es **nombrar qué se
+     * propone** en vez de decir «esto». No sustituye a que el modelo explique de
+     * dónde sale; solo hace que el peor caso sea menos malo.
+     */
+    if (propuestas.length === 1) {
+      const que = NOMBRE_DE_PROPUESTA[propuestas[0].tool];
+      return que
+        ? `Te propongo ${que}. Revisalo antes de aceptar.`
+        : 'Te propongo esto. Revisalo antes de aceptar.';
+    }
     if (propuestas.length > 1) {
       return `Te propongo ${propuestas.length} cambios. Revisa cada uno antes de aceptarlo.`;
     }

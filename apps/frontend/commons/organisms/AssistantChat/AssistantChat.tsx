@@ -847,9 +847,6 @@ function Sugerencia({
   );
 }
 
-/** `14:07`. Solo la hora: la conversación es de hoy o no importa cuándo fue. */
-const HORA = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' });
-
 /**
  * Un turno de la conversación.
  *
@@ -873,14 +870,14 @@ const HORA = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digi
  * - **Las marcas de leído** contestarían a «¿lo ha visto?» sobre alguien que
  *   siempre lo ve.
  *
- * Lo único que se queda es **la hora**, que sí sirve: al releer un hilo de hace
- * días, dice cuándo se dijo cada cosa.
+ * ⚠️ **Y tampoco lleva hora.** La llevó, y estaba mal: se calculaba al pintar
+ * (`new Date()`), así que en un mensaje recién enviado era exacta y al releer una
+ * conversación de hace tres días **enseñaba la hora de ahora** en todas las
+ * burbujas. Un dato que miente es peor que ningún dato.
  *
- * ⚠️ La hora se calcula al pintar y no viene del servidor. En un mensaje recién
- * enviado eso es exacto; al releer una conversación guardada, `createdAt` no
- * viaja hasta esta burbuja y se enseña la del momento en que se cargó. Es la
- * razón por la que la hora va tenue y pequeña, y no como un dato del que fiarse
- * para nada que importe.
+ * Ponerla bien es posible —`createdAt` existe en la base— pero no llega hasta
+ * aquí: `StoredMessage` lo trae y el estado del chat lo descarta al construir sus
+ * `Mensaje`. Cuando haga falta, el arreglo es propagarlo; mientras tanto, nada.
  */
 function Burbuja({ mensaje }: { mensaje: Mensaje }) {
   const mio = mensaje.role === 'user';
@@ -906,10 +903,6 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
       >
         <ModelText texto={mensaje.text} />
       </div>
-
-      <span className="px-1 font-sans text-[11px] tabular-nums text-text-disabled">
-        {HORA.format(new Date())}
-      </span>
     </div>
   );
 }

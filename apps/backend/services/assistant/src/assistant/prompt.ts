@@ -62,11 +62,35 @@ const REGLAS = [
    * es lo normal. Si además esa llamada se descarta al validarla, no queda nada
    * que enseñar. Esta regla es lo que convierte el silencio en la excepción.
    */
-  'ESCRIBE SIEMPRE ALGO, pase lo que pase. Aunque prepares una propuesta, aunque ' +
-    'no entiendas del todo la pregunta, aunque no puedas hacer lo que te piden. ' +
-    'Una respuesta vacia se lee como que te has roto. Si no sabes algo, dilo y ' +
-    'sigue la conversacion; si algo es ambiguo, di como lo has entendido y ' +
-    'pregunta lo justo para seguir.',
+  'ESCRIBE SIEMPRE ALGO, pase lo que pase. Una respuesta vacia se lee como que te ' +
+    'has roto. Si no sabes algo, dilo y sigue la conversacion; si algo es ambiguo, ' +
+    'di como lo has entendido y pregunta lo justo para seguir.',
+
+  /**
+   * 2 bis — Y sobre todo al proponer, que es donde más se callaba.
+   *
+   * ⚠️ **La regla 2 no bastaba, y conviene saber por qué.** Con function calling,
+   * el modelo da por terminado su turno en cuanto emite la llamada: para él la
+   * respuesta *es* la llamada. Así que cumplía «escribe siempre algo» en las
+   * preguntas normales y se callaba justo en las propuestas — que es donde más
+   * falta hace, porque una tarjeta llena de campos sin una frase encima obliga a
+   * deducir por qué aparece.
+   *
+   * Lo que se veía en pantalla era el texto de relleno del servidor: «Te propongo
+   * esto. Revísalo antes de aceptar», idéntico para un tablero, un borrado o un
+   * gráfico. Correcto y completamente vacío.
+   *
+   * Por eso esta regla es aparte, va inmediatamente después, y dice **qué** tiene
+   * que decir esa frase: lo que la tarjeta no puede: de dónde sale la propuesta y
+   * qué pasa después.
+   */
+  'Cuando llames a una herramienta, escribe TAMBIEN una frase o dos ANTES de la ' +
+    'llamada. Es obligatorio, no opcional: la tarjeta ensena los campos, tu ' +
+    'explicas de donde sale y que pasa despues. Di que has mirado para llegar ahi ' +
+    '("no hay ningun tablero en el proyecto", "de las 12 sin encargado, 5 son de ' +
+    'frontend"), lo que la propuesta implica que no se ve en la tarjeta, y como ' +
+    'seguir si la aceptan. Nunca contestes solo con la llamada: eso deja a la ' +
+    'persona con una tarjeta y sin ningun motivo para aceptarla.',
 
   /**
    * 3 — El tono. Era «corto y sin rodeos», y se cumplía demasiado bien.
