@@ -632,8 +632,57 @@ de ESTADO-ACTUAL §17.7.
 
 ## E6 — Optimización y seguridad
 
-- [ ] **E6.1 — Repasar el resto de N+1.** La Fase 1 arregló cinco. Barrer con
-      `rg 'ids.map|\.map\(.*api\.get'` por si queda alguno.
+- [x] **E6.1 — Repasar el resto de N+1.** Barrido sobre frontend y backend.
+      **Quedaban dos**, los dos con la misma forma: pedir por id dentro de un
+      `map`.
+
+      - 🔴 `reports-front/(private)/[id]/page.tsx` — `/users/<id>` **uno por
+        uno**, y lo irónico es que era el arreglo de otro fallo: se cambió
+        `?limit=100` por peticiones individuales para no depender de la primera
+        página del directorio. Un proyecto de veinte personas eran veinte
+        peticiones por carga, todas con la IP del servidor de Next, así que el
+        limitador del gateway las contaba en el mismo cubo que las de todo el
+        mundo; al pasarse, el `.catch(() => null)` se tragaba el 429 y la
+        pantalla escribía **«Alguien que ya no está» sobre gente que estaba
+        perfectamente**. Ahora usa `resolverPerfiles` —el helper que existe justo
+        para esto— y `nombreDePersona`, que distingue «no existe» de «no se pudo
+        preguntar».
+      - `gateway/assistant.controller.miembrosConNombre` — una llamada TCP
+        `user_find_one` **por miembro**, cada vez que el asistente necesita saber
+        quién es quién. Ahora `user_find_by_ids`, que ya existía y usan el panel
+        de administración y alexa-service.
+
+      **No** se tocan dos que lo parecen y no lo son: `plantilla/aplicar.ts`
+      (crear N etiquetas exige N POST, no hay ruta por lotes, y su `catch`
+      **recoge el motivo** en vez de tragárselo) y `mentionables.tareasDe` (una
+      llamada por tablero, y los tableros de un proyecto son pocos).
+
+      ✅ Comprobado que no queda ningún `api.get<UserProfile>` por id suelto en el
+      frontend: los dos aciertos del barrido final son el ejemplo malo *dentro de
+      un comentario* de `directorio.ts` y una petición del perfil **propio** que
+      responde «no se pudo comprobar» en vez de afirmar nada.
+
+- [x] **E6.4 — Repasar los `catch` que se tragan errores.** Hay **105**
+      `.catch(() => …)` en el repositorio, y la conclusión del repaso es que la
+      cuenta no es la métrica: **casi todos son correctos**.
+
+      La regla que los separa, y que conviene aplicar al escribir el siguiente:
+
+      | Clase | Ejemplo | ¿Correcto? |
+      |---|---|---|
+      | Degradar una **sección** | «que falle una lista no puede impedir leer la conversación que ya está abierta» | ✅ Sí |
+      | Recoger el **motivo** | `plantilla/aplicar.ts`, que apunta el fallo por etiqueta en `fallos[]` | ✅ Sí |
+      | Afirmar algo **falso** | tragarse un 429 y escribir «Alguien que ya no está» | 🔴 No |
+
+      Solo la tercera es un fallo, porque convierte «no lo pude preguntar» en «no
+      existe» — y esa afirmación llega al usuario con toda la apariencia de un
+      dato. Era el caso de `reports-front`, y se cierra en E6.1 con
+      `resolverPerfiles` + `nombreDePersona`, que es la pareja que existe para no
+      volver a mezclarlas.
+
+      **Barrido de comprobación:** no queda ningún sitio que pida un perfil por
+      id y se trague el error. Los `.catch` restantes degradan una sección o
+      recogen el motivo, que es lo que deben hacer.
 - [x] **E6.2 — El `EXPLAIN` de `contarSinLeerDeVarios`, y lo que destapó.**
 
       🔴 **No faltaba ningún índice: sobraba un `OR`.** La consulta que cuenta

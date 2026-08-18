@@ -34,7 +34,9 @@ import {
   type ProjectDetail,
   type ProjectMember,
   type UserProfile,
+  nombreDePersona,
   personLabel,
+  resolverPerfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -199,30 +201,38 @@ export default async function ProjectReportsPage({ params }: PageProps) {
   ]);
 
   /**
-   * Los perfiles de quienes salen en esta pantalla, **pedidos por id**.
+   * Los perfiles de quienes salen en esta pantalla, en **una** petición.
    *
    * ⚠️ Esto pedía `/users?limit=100` y cruzaba en memoria — la primera página del
    * directorio de toda la plataforma, con el `limit` topado en 100 por el DTO.
    * Con más de cien cuentas, los miembros de este proyecto dejaban de caber ahí y
    * el asistente pintaba propuestas con el UUID en crudo donde va un nombre.
+   *
+   * ⚠️ **Y el arreglo de aquello dejó un N+1** (E6.1): pasó a pedir
+   * `/users/<id>` **uno por uno**, con un `.catch(() => null)` por medio. Un
+   * proyecto de veinte personas eran veinte peticiones por carga, todas con la
+   * IP del servidor de Next, así que el limitador del gateway las contaba en el
+   * mismo cubo que las de todo el mundo; al pasarse, el 429 se lo tragaba el
+   * `catch` y la pantalla escribía «Alguien que ya no está» sobre gente que
+   * estaba perfectamente. Es exactamente el fallo que documenta
+   * `commons/api/directorio.ts`, que es donde vive el arreglo bueno.
    */
-  const idsDePersonas = [...new Set([...members.map((m) => m.userId), project.ownerId])];
+  const directorio = await resolverPerfiles(api, [
+    ...members.map((m) => m.userId),
+    project.ownerId,
+  ]);
 
-  const personas = await Promise.all(
-    idsDePersonas.map((idDePersona) =>
-      api.get<UserProfile>(`/users/${idDePersona}`).catch(() => null),
-    ),
-  );
+  const usersById = directorio.perfiles;
 
-  const usersById = new Map(
-    personas.filter((u): u is UserProfile => u !== null).map((user) => [user.id, user]),
-  );
-
-  /** `userId` → nombre, para que una propuesta no hable en UUID. */
+  /**
+   * `userId` → nombre, para que una propuesta no hable en UUID.
+   *
+   * Vía `nombreDePersona` y no con un literal: distingue «esta cuenta ya no
+   * existe» de «no se pudo preguntar al directorio», que antes se leían igual.
+   */
   const nombres = Object.fromEntries(
     members.map((miembro) => {
-      const user = usersById.get(miembro.userId);
-      return [miembro.userId, user ? personLabel(user) : 'Alguien que ya no está'];
+      return [miembro.userId, nombreDePersona(directorio, miembro.userId)];
     }),
   );
   const nombresDeEtiquetas = Object.fromEntries(

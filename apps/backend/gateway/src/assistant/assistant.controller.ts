@@ -353,18 +353,35 @@ export class AssistantController {
       this.projectsClient.send<{ userId: string }[]>({ cmd: 'member_find_all' }, { projectId }),
     ).catch(() => [] as { userId: string }[]);
 
-    return Promise.all(
-      (miembros ?? []).map(async (miembro) => {
-        const perfil = await firstValueFrom(
-          this.credentialsClient.send<{ firstName?: string; lastName?: string }>(
-            { cmd: 'user_find_one' },
-            { id: miembro.userId },
-          ),
-        ).catch(() => null);
+    const ids = [...new Set((miembros ?? []).map((miembro) => miembro.userId))];
+    if (ids.length === 0) return [];
 
-        const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
-        return { userId: miembro.userId, nombre: nombre || miembro.userId };
-      }),
-    );
+    /**
+     * ⚠️ **Una llamada, no una por miembro** (E6.1).
+     *
+     * Esto hacía `user_find_one` dentro de un `map`: una llamada TCP a
+     * credentials **por cada persona del proyecto**, cada vez que el asistente
+     * necesita saber quién es quién. Un equipo de veinte eran veinte idas y
+     * vueltas para construir un dato que se usa entero o no se usa.
+     *
+     * `user_find_by_ids` ya existía —lo usan el panel de administración y
+     * alexa-service— y resuelve los mismos perfiles de un golpe.
+     */
+    const perfiles = await firstValueFrom(
+      this.credentialsClient.send<{ id: string; firstName?: string; lastName?: string }[]>(
+        { cmd: 'user_find_by_ids' },
+        { ids },
+      ),
+    ).catch(() => [] as { id: string; firstName?: string; lastName?: string }[]);
+
+    const porId = new Map((perfiles ?? []).map((perfil) => [perfil.id, perfil]));
+
+    /* Sin perfil se cae al `userId`, igual que antes: el asistente prefiere
+       hablar en UUID a no poder nombrar a alguien. */
+    return ids.map((userId) => {
+      const perfil = porId.get(userId);
+      const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
+      return { userId, nombre: nombre || userId };
+    });
   }
 }
