@@ -620,6 +620,19 @@ export function MessageBubble({
     agrupadas.set(reaccion.emoji, actual);
   }
 
+  const miReaccionActual = Array.from(agrupadas.entries()).find(([, meta]) => meta.mia)?.[0];
+
+  const manejarReaccion = (emoji: string, puesta: boolean) => {
+    if (puesta) {
+      onReaccionar(message.id, emoji, false);
+      return;
+    }
+    if (miReaccionActual && miReaccionActual !== emoji) {
+      onReaccionar(message.id, miReaccionActual, false);
+    }
+    onReaccionar(message.id, emoji, true);
+  };
+
   /**
    * El preview se pide de la primera URL del mensaje, una sola vez por burbuja.
    * `previewDeLink` es un server action de la zona: solo se dispara cuando el
@@ -1115,7 +1128,7 @@ export function MessageBubble({
                         key={emoji}
                         type="button"
                         onClick={() => {
-                          onReaccionar(message.id, emoji, !puesta);
+                          manejarReaccion(emoji, puesta);
                           setSelectorAbierto(false);
                         }}
                         aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
@@ -1360,7 +1373,7 @@ export function MessageBubble({
               style={{ color: colors.textSecondary }}
               title="Ver las respuestas"
             >
-              {message._count.replies} {message._count.replies === 1 ? 'respuesta' : 'respuestas'}
+              {message._count.replies} {message._count.replies === 1 ? 'respuesta al hilo' : 'respuestas al hilo'}
             </button>
           </div>
         )}
@@ -1450,7 +1463,7 @@ export function MessageBubble({
                           key={emoji}
                           type="button"
                           onClick={() => {
-                            onReaccionar(message.id, emoji, !puesta);
+                            manejarReaccion(emoji, puesta);
                             cerrarHoja();
                           }}
                           aria-label={puesta ? `Quitar ${emoji}` : `Reaccionar con ${emoji}`}
