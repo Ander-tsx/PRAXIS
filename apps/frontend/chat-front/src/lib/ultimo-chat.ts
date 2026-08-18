@@ -31,17 +31,27 @@ const DURACION_S = 30 * 24 * 60 * 60;
  * reconstruir la URL: `"<peerId>"` en una privada, `"proyecto/<projectId>"` en
  * la de un equipo.
  *
- * ⚠️ Se valida la forma en vez de aceptar cualquier cosa que venga detrás de
- * `/chat/`. El valor acaba en un `redirect()`, así que dejarlo libre sería
- * dejar que una ruta cualquiera decida a dónde se manda al navegador; un
- * `%2F..%2F` o una URL absoluta convertirían el recuerdo en un redirector
- * abierto. Con esto, lo único que cabe en la cookie es un UUID —opcionalmente
- * precedido de `proyecto/`— y nada más.
+ * ⚠️ **El `pathname` que llega aquí NO lleva el basePath**, y eso cambió al
+ * mudar el chat a su propia zona (E3.3). Mientras vivía en dashboard-front
+ * —basePath `/dashboard`— la ruta interna de una conversación era
+ * `/chat/<uuid>`, y estas expresiones empezaban por `/chat/`. Ahora el basePath
+ * **es** `/chat`, así que Next lo recorta y lo que llega es `/<uuid>` a secas.
+ *
+ * Dejar el `/chat/` de antes no habría dado ningún error: simplemente no
+ * casaría nunca, la cookie no se escribiría jamás y «vuelve a donde lo dejaste»
+ * dejaría de funcionar en silencio — que es justo la clase de rotura que esta
+ * mudanza tenía que evitar.
+ *
+ * ⚠️ Se valida la forma en vez de aceptar cualquier cosa. El valor acaba en un
+ * `redirect()`, así que dejarlo libre sería dejar que una ruta cualquiera decida
+ * a dónde se manda al navegador; un `%2F..%2F` o una URL absoluta convertirían
+ * el recuerdo en un redirector abierto. Con esto, lo único que cabe en la cookie
+ * es un UUID —opcionalmente precedido de `proyecto/`— y nada más.
  */
 export function conversacionDeLaRuta(pathname: string): string | null {
-  const directa = /^\/chat\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+  const directa = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
   const deProyecto =
-    /^\/chat\/proyecto\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
+    /^\/proyecto\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i;
 
   const proyecto = deProyecto.exec(pathname);
   if (proyecto) return `proyecto/${proyecto[1]}`;
@@ -83,5 +93,7 @@ export function recordarConversacion(request: NextRequest, response: NextRespons
  */
 export function conversacionRecordada(valor: string | undefined): string | null {
   if (!valor) return null;
-  return conversacionDeLaRuta(`/chat/${valor}`);
+  /* Se reconstruye la ruta **interna** de la zona —sin basePath— porque es lo
+     que `conversacionDeLaRuta` sabe leer. Ver su nota. */
+  return conversacionDeLaRuta(`/${valor}`);
 }

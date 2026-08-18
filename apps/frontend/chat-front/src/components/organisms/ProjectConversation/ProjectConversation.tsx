@@ -1,6 +1,6 @@
 'use client';
 
-import { previewDeEnlaceAction } from '@/app/(private)/chat/actions';
+import { previewDeEnlaceAction } from '@/app/(private)/actions';
 import {
   deleteProjectAttachmentAction,
   deleteProjectMessageAction,
@@ -11,7 +11,7 @@ import {
   reactProjectAction,
   sendProjectMessageAction,
   uploadProjectAttachmentAction,
-} from '@/app/(private)/chat/proyecto-actions';
+} from '@/app/(private)/proyecto-actions';
 import {
   type ChatMessagePage,
   ChatPanel,
@@ -104,7 +104,7 @@ export function ProjectConversation({
       pantallaCompletaEnMovil
       salidaMovil={
         <a
-          href="/dashboard/chat"
+          href="/chat"
           className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg
@@ -124,7 +124,7 @@ export function ProjectConversation({
       directorio={directorio}
       currentUserId={currentUserId}
       acciones={acciones}
-      gatewayPath="/dashboard/api/gateway"
+      gatewayPath="/chat/api/gateway"
       rutaCanal={`/projects/${projectId}/chat`}
       canWrite={canWrite}
       participantes={otrosDelEquipo}
@@ -136,7 +136,7 @@ export function ProjectConversation({
       }
       /* Pulsar sobre quien escribió abre la conversación privada con esa
          persona — aquí ya estamos en su zona, así que es una ruta de la misma. */
-      hrefDePersona={(userId) => `/dashboard/chat/${userId}`}
+      hrefDePersona={(userId) => `/chat/${userId}`}
       /* Las menciones sí: en el chat del equipo hay a quién nombrar. */
       permiteMenciones
       encabezado={

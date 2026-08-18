@@ -8,9 +8,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | E1 ✅ · E2 ✅ · **E3 en curso** |
-| **Última tarea terminada** | E3.2 — la zona está registrada y el shell la sirve |
-| **Siguiente** | E3.3 — mover las pantallas del chat |
+| **Etapa actual** | E1 ✅ · E2 ✅ · **E3 ✅ cerrada** |
+| **Última tarea terminada** | E3.6 — el chat vive en `/chat` y su flujo en vivo está fijado por prueba |
+| **Siguiente** | E4.1 — llevar la bandeja de avisos al panel |
 | **Rama** | `feature/pulido` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-17 |
 
@@ -187,6 +187,37 @@ resumen de la corrida, y se anota **de qué corrida salen**.
 
       Es el mismo patrón que E1.1b: el fallo real está lejos del síntoma, y
       leerlo cuesta treinta segundos si se sabe dónde mirar.
+
+- [!] **E1.9 — Matar el frontend a lo bruto corrompe `.next`, y el síntoma no
+      se parece en nada a la causa.**
+
+      Al reiniciar las zonas durante E3 usé `pkill -f 'next dev'` y
+      `pkill -f 'turbo run dev'`. Dos consecuencias, las dos caras:
+
+      1. **Se llevó por delante el backend.** `dev:backend` también corre bajo
+         turbo, así que el segundo patrón mató los ocho servicios. No es obvio
+         desde el nombre del comando.
+      2. **Dejó las cachés de Next a medias.** Después, `POST /api/signup`
+         respondía **404 en una ruta cuyo archivo existe y que git no había
+         tocado**. Por pantalla eso sale como «Ocurrió un error al crear la
+         cuenta», y en la suite como **las 33 pruebas de interfaz en rojo a la
+         vez** — incluidas las de sesión, que no tienen nada que ver con lo que
+         se estaba tocando.
+
+      ⚠️ **Es exactamente la trampa de E1.1b otra vez**: un rojo masivo y
+      uniforme parece una regresión gorda y casi nunca lo es. Y es la misma
+      forma que ya está documentada en CLAUDE.md para el backend —regenerar
+      Prisma con el vigilante en marcha deja `dist/` a medias—, o sea que el
+      repositorio ya sabía esto de la otra mitad del sistema.
+
+      **Cómo se sale:** parar el frontend por su tarea (no con `pkill`), borrar
+      `apps/frontend/*/.next` y arrancar en frío. Tras eso, la misma ruta
+      respondió 200 sin tocar una línea de código.
+
+      **Cómo se diagnostica rápido:** el log de la zona lo decía en claro
+      (`POST /api/signup 404`). Cuatro comprobaciones se gastaron antes en
+      teorías —el limitador de login, la confirmación de correo, el
+      `JWT_SECRET`— por no haberlo leído primero.
 
 ---
 
@@ -381,12 +412,41 @@ de ESTADO-ACTUAL §17.7.
       comentario del catálogo que anunciaba una función `assertCatalogoSano()`
       que **no existe** — se llama `revisarCatalogo()`.
 
-- [ ] **E3.3 — Mover las pantallas.** De `dashboard-front/src/app/(private)/chat/`
-      a `chat-front/src/app/(private)/`: `layout`, `page`, `[peerId]`,
-      `proyecto/[projectId]`, `actions.ts`, `proyecto-actions.ts`. Y los
-      organismos `ChatDirectory`, `DirectConversation`, `ProjectConversation`.
+- [x] **E3.3 — Mover las pantallas.** Con `git mv`, para no perder el historial:
+      las 6 de `dashboard-front/src/app/(private)/chat/`, los 3 organismos y
+      `lib/ultimo-chat.ts`. ~2.400 líneas. `dashboard-front` se queda **sin una
+      sola referencia** al chat.
 
-- [ ] **E3.4 — Reescribir las rutas.** Todas cambian de `/dashboard/chat/…` a
+      🔴 **Lo que de verdad costó no fue mover archivos: fue que el `basePath`
+      recorta la ruta, y media docena de sitios daban por hecho el prefijo
+      viejo.** Dentro de la zona, `usePathname()`, `revalidatePath()`,
+      `redirect()`, `router.push()` y `<Link href>` trabajan **sin** `/chat`.
+      Todo lo que venía escrito como `/chat/…` pasaba a significar
+      `/chat/chat/…`. Seis sitios, y **ninguno da error de compilación**:
+
+      | Dónde | Qué habría pasado |
+      |---|---|
+      | `ultimo-chat.conversacionDeLaRuta` | La cookie no se escribe jamás: «vuelve a donde lo dejaste» deja de existir, en silencio |
+      | `page.tsx` → `redirect()` | 404 al volver a Mensajes con conversación recordada |
+      | `ChatDirectory.activoDeLaRuta` | Ninguna fila marcada nunca y, en móvil, la lista sin apartarse — el mismo fallo que esas líneas vinieron a arreglar |
+      | `<Link href>` de persona y de proyecto | `/chat/chat/<id>` |
+      | `revalidatePath` (3) | No refresca nada. **Next no se queja de revalidar una ruta que no existe** |
+      | `router.push` al borrar | Lleva a un 404 |
+
+      🔴 **Y una que sí explotó, pero solo en el navegador.** El chat traía su
+      `layout.tsx` —`AppHeader` + la columna— pero **no** el
+      `(private)/layout.tsx` que lo envolvía en dashboard-front, que es quien
+      monta el `AppShell`. `tsc` daba verde en las cinco zonas: un contexto de
+      React no es un tipo. La pantalla respondía **500** con «useAppShell solo
+      funciona dentro de \<AppShell\>» *después* de pintar media página. Se
+      arregla con el layout de zona propio, y por eso las conversaciones cuelgan
+      de un grupo `(conversaciones)`: hacen falta dos layouts encadenados y dos
+      layouts no caben en el mismo nivel.
+
+      ⚠️ **La lección, otra vez: `tsc` verde no es «funciona».** Es literalmente
+      el principio 4 del plan, y aquí se cobró siete sitios de una vez.
+
+- [x] **E3.4 — Reescribir las rutas.** Todas cambian de `/dashboard/chat/…` a
       `/chat/…`. Sitios conocidos (verificar con `rg 'dashboard/chat'` que no
       queda ninguno):
       - `AvisosEnVivo.destinoDeMensaje` (las dos ramas)
@@ -421,13 +481,78 @@ de ESTADO-ACTUAL §17.7.
       (`commons` incluido). Ninguna da error de compilación al quedarse vieja:
       salen como un 404 al pulsar.
 
-- [ ] **E3.5 — Redirecciones de cortesía.** `/dashboard/chat/*` → `/chat/*`
-      permanente, para que no se rompa ningún enlace ya compartido ni las
-      cookies de «último chat» que estén puestas.
+      ✅ **Hecho, y `rg 'dashboard/chat'` está a cero en código** (solo queda un
+      comentario en el `next.config` del shell, que explica la redirección de
+      cortesía). De las 13, cuatro se resolvieron solas al mover el código y las
+      nueve de fuera se repuntaron a mano.
 
-- [ ] **E3.6 — Verificar.** Levantar las **siete** zonas, navegar entre ellas y
-      comprobar que el flujo SSE se abre una vez por zona y que la insignia se
-      mantiene al cruzar de `/dashboard` a `/chat`.
+      ⚠️ **Antes de tocar cada una hubo que mirar si era `<a>` o `<Link>`,** y
+      no es un detalle: las nueve viven en **otras zonas**, así que un `<Link>`
+      con `/chat/x` en projects-front daría `/projects/chat/x`. Resultaron ser
+      todas URLs absolutas del shell —`<a>` planos o constantes que acaban en
+      uno—, que es lo correcto para cruzar de zona, pero la comprobación no era
+      opcional: el resultado de equivocarse es una URL con dos prefijos y un
+      404.
+
+      Sigue pendiente lo que ya decía la nota: la ruta del chat vive en **tres**
+      constantes (`navigation.tsx`, `AppShell.HREF_DE_MENSAJES`, `nav.CHAT_HREF`)
+      y convendría dejar una. No se hace aquí para no mezclarlo con la mudanza.
+
+- [x] **E3.5 — Redirecciones de cortesía.** `/dashboard/chat` y
+      `/dashboard/chat/:path*` → `/chat/…`, con `permanent: true` (308).
+
+      ⚠️ **Van en el `redirects()` del web-shell, no en dashboard-front**, que
+      era el plan inicial. Next evalúa `redirects()` **antes** que `rewrites()`,
+      así que el shell las atiende sin mandar nada a la zona del panel.
+      Resolverlo en dashboard-front obligaría a que esa zona siguiera sabiendo
+      del chat solo para reenviarlo — justo el acoplamiento que E3 viene a
+      quitar.
+
+      Verificado con las tres formas, incluida la URL exacta que tenía abierta
+      el usuario:
+
+      ```
+      /dashboard/chat                     → 308 → /chat
+      /dashboard/chat/ee9c4757-…-308310   → 308 → /chat/ee9c4757-…-308310
+      /dashboard/chat/proyecto/abc        → 308 → /chat/proyecto/abc
+      ```
+
+      La cookie de «último chat» sobrevive sola: va con `path: '/'` y guarda solo
+      el sufijo, sin prefijo de zona.
+
+      ⚠️ Un 308 se **cachea con ganas** en el navegador. Es lo correcto —la
+      dirección se movió para siempre— pero si algún día se revierte la mudanza,
+      esa caché sobrevive al despliegue.
+
+- [x] **E3.6 — Verificar.** Con las siete zonas levantadas, a mano y con una
+      prueba nueva: `e2e/tests/ui/06-chat-zona.spec.ts`, **3 en verde**.
+
+      Comprobado a mano, extremo a extremo: se entra por el menú, el directorio
+      pinta, se abre una conversación con su historial, el flujo SSE se abre por
+      `/chat/api/gateway/me/notifications/stream`, y un mensaje enviado por otra
+      cuenta **llega al flujo** con `mio: false`, `peerId` resuelto y
+      `actorName` puesto —el camino de `conNombre` que blindó E6.7—.
+
+      🔴 **Y aquí está lo que casi se cuela: la primera versión de la prueba de
+      tiempo real no probaba nada.** Enviaba un mensaje y comprobaba que salía
+      sin recargar. Pasaba. También pasaba con el `zonePath` puesto a
+      `/dashboard`… y **también con uno inventado que no existe**. Al caerse el
+      flujo, la reconexión acaba provocando un refresco del árbol de servidor y
+      el mensaje entra igual, por el camino de respaldo.
+
+      Lo que sí distingue una cosa de otra es **contra qué URL se abre el
+      `EventSource`**, y eso es lo que se afirma ahora. Con `zonePath` malo la
+      prueba se pone roja diciendo qué flujos se abrieron.
+
+      ⚠️ **De aquí salen dos cosas que conviene no olvidar:**
+      1. **Una prueba que pasa con el sujeto roto es peor que no tenerla**,
+         porque da por cubierto lo que no lo está. Verificar la prueba rompiendo
+         el código a propósito costó dos minutos y cambió la conclusión entera.
+      2. **Un `zonePath` mal puesto no se ve desde el navegador** mientras las
+         dos zonas estén detrás del shell: `/dashboard/*` se reescribe a la otra
+         zona, que tiene su propio proxy, y todo funciona. Esta zona estaría
+         hablando por la puerta de otra — invisible aquí, roto en cuanto las
+         zonas se sirvan por separado, que es lo que un multi-zone permite.
 
 ---
 
@@ -606,3 +731,4 @@ de ESTADO-ACTUAL §17.7.
 | 2026-08-17 | E6.7 | Cerrada. Las tres promesas sueltas que quedaban, blindadas. Al retomar, una de ellas estaba a medias en el árbol y **no compilaba**: credentials-service llevaba toda la sesión sin arrancar (ver E1.8). |
 | 2026-08-17 | E2 | Regresión completa tras cerrar E6.7: **191 ✅ / 0 ❌** en 23,2 min (158 `api` + 33 `ui`), stack en caliente. Y de paso se corrigió el marcador de E1, que estaba inflado. |
 | 2026-08-17 | E2 | **Cerrada entera.** El `apply` de E2.1 fue a producción a las 22:45 UTC con ~7,4 s de corte de Cloud SQL. Con esto las dos mitades del arreglo de la lentitud están puestas: el techo de conexiones arriba y los pools acotados abajo. |
+| 2026-08-17 | E3 | **Cerrada, con la suite en verde: 194 ✅ / 0 ❌ (26,3 min) + 14 `@security` ✅.** El chat vive en `chat-front` (4106, `basePath: '/chat'`). `rg 'dashboard/chat'` a cero, redirección 308 para las direcciones viejas, y `ui/06-chat-zona.spec.ts` (3 ✅) fijando la zona y **la URL contra la que se abre el flujo en vivo**. Lo que costó no fue mover archivos: fue que el `basePath` recorta la ruta y siete sitios daban por hecho el prefijo viejo, ninguno con error de compilación. |

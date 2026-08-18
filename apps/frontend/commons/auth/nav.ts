@@ -11,7 +11,7 @@ const NOTIFICATIONS_HREF = '/dashboard/notifications';
 const ADMIN_HREF = '/admin';
 
 /** Href de los mensajes directos, que llevan su propia insignia. */
-const CHAT_HREF = '/dashboard/chat';
+const CHAT_HREF = '/chat';
 
 export interface AppNavOptions {
   /**

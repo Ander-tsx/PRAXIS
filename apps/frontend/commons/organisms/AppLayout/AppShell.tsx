@@ -130,7 +130,7 @@ const CUENTA_HREF = '/dashboard/profile';
  * esto es un componente de cliente; importarlo arrastraría `next/headers` al
  * navegador. Mismo caso que `SIDEBAR_COOKIE`, arriba.
  */
-const HREF_DE_MENSAJES = '/dashboard/chat';
+const HREF_DE_MENSAJES = '/chat';
 
 /**
  * El armazón, con las dos fuentes de tiempo real montadas por encima.

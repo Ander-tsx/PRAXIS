@@ -99,7 +99,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * Configuración— son de mirar; esta es de usar, como Proyectos y Análisis.
      */
     label: 'Mensajes',
-    href: '/dashboard/chat',
+    href: '/chat',
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path

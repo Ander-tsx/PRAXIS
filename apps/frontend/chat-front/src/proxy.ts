@@ -1,3 +1,4 @@
+import { recordarConversacion } from '@/lib/ultimo-chat';
 import {
   SESSION_COOKIE,
   createSessionRefreshProxy,
@@ -69,6 +70,19 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
    * o manipulada no puede abrir el área privada.
    */
   if (await hasValidSessionToken(resolveToken(request, response))) {
+    /**
+     * Se anota qué conversación se está abriendo, para poder volver a ella.
+     *
+     * Va **aquí y no en la página** porque por el proxy pasa toda navegación de
+     * la zona: no hay que acordarse en cada pantalla ni gastar una petición.
+     * Y va **después** de validar la sesión: sin ella no hay nada que recordar.
+     *
+     * Vino de `dashboard-front/src/proxy.ts` con la mudanza del chat (E3.3).
+     * ⚠️ Al cambiar de zona cambió también la ruta que ve: sin el basePath, una
+     * conversación es `/<uuid>` y no `/chat/<uuid>`. Ver la nota de
+     * `conversacionDeLaRuta`.
+     */
+    recordarConversacion(request, response);
     return response;
   }
 

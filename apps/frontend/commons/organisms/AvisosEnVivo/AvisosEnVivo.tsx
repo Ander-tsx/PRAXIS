@@ -253,9 +253,9 @@ function textoDeMensaje(evento: EventoMensaje): string {
  */
 function destinoDeMensaje(evento: EventoMensaje): string | null {
   if (evento.channelKind === 'DIRECT') {
-    return evento.peerId ? `/dashboard/chat/${evento.peerId}` : null;
+    return evento.peerId ? `/chat/${evento.peerId}` : null;
   }
-  return evento.projectId ? `/dashboard/chat/proyecto/${evento.projectId}` : null;
+  return evento.projectId ? `/chat/proyecto/${evento.projectId}` : null;
 }
 
 /**

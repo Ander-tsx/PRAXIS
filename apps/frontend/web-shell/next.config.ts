@@ -78,9 +78,8 @@ const nextConfig: NextConfig = {
        * entradas, como todas: sin la primera, `/chat` a secas —que es la
        * pantalla a la que lleva el menú— cae en el 404 del shell.
        *
-       * Las direcciones viejas (`/dashboard/chat/*`) siguen funcionando: las
-       * redirige dashboard-front, no el shell, porque el `basePath` de esa zona
-       * hace que sea ella quien las recibe. Ver E3.5 del plan de pulido.
+       * Las direcciones viejas siguen funcionando: hay una redirección de
+       * cortesía en `redirects()`, más abajo.
        */
       { source: '/chat', destination: `${chatFrontUrl}/chat` },
       {
@@ -115,6 +114,38 @@ const nextConfig: NextConfig = {
     return [
       { source: '/login', destination: '/auth/login', permanent: false },
       { source: '/signup', destination: '/auth/signup', permanent: false },
+
+      /**
+       * El chat se mudó de `/dashboard/chat` a su propia zona (E3), y estas dos
+       * entradas son lo que impide que eso rompa nada por ahí fuera.
+       *
+       * Hay enlaces vivos a las direcciones viejas que no controlamos: los que
+       * alguien haya compartido por privado, los que estén en el historial del
+       * navegador y los que tenga guardados en marcadores. Un 404 en todos ellos
+       * sería el coste de una decisión de arquitectura que a quien pulsa no le
+       * importa.
+       *
+       * Van **aquí y no en dashboard-front**, que era el plan inicial: Next
+       * evalúa `redirects()` antes que `rewrites()`, así que el shell puede
+       * atenderlas antes de mandar nada a la zona del panel. Resolverlo en
+       * dashboard-front obligaría a que esa zona siguiera sabiendo del chat solo
+       * para reenviarlo, que es justo el acoplamiento que E3 viene a quitar.
+       *
+       * ⚠️ **`permanent: true` es un 308 y los navegadores lo cachean con
+       * ganas.** Es lo correcto —la dirección se ha movido para siempre— pero
+       * significa que quien la visite no volverá a preguntar; si algún día se
+       * revierte la mudanza, esa caché sobrevive al despliegue.
+       *
+       * La cookie de «último chat» (`praxis_ultimo_chat`) sobrevive sola: va con
+       * `path: '/'` y guarda solo el sufijo (`<uuid>` o `proyecto/<uuid>`), sin
+       * prefijo de zona.
+       */
+      { source: '/dashboard/chat', destination: '/chat', permanent: true },
+      {
+        source: '/dashboard/chat/:path*',
+        destination: '/chat/:path*',
+        permanent: true,
+      },
     ];
   },
 };

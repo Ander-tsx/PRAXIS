@@ -12,7 +12,7 @@ import {
   reactDirectAction,
   sendDirectMessageAction,
   uploadDirectAttachmentAction,
-} from '@/app/(private)/chat/actions';
+} from '@/app/(private)/actions';
 import {
   Badge,
   type ChatMessagePage,
@@ -94,7 +94,7 @@ export function DirectConversation({
       pantallaCompletaEnMovil
       salidaMovil={
         <a
-          href="/dashboard/chat"
+          href="/chat"
           className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg
@@ -114,7 +114,7 @@ export function DirectConversation({
       directorio={directorio}
       currentUserId={currentUserId}
       acciones={acciones}
-      gatewayPath="/dashboard/api/gateway"
+      gatewayPath="/chat/api/gateway"
       rutaCanal={`/me/chats/${peerId}`}
       /**
        * Puedes escribir mientras compartáis algún proyecto (o si eres admin, o si ya hay mensajes).
@@ -181,7 +181,7 @@ function Encabezado({
 
   const avatarElement = perfil?.avatarUrl ? (
     <img
-      src={`/dashboard/api/gateway${perfil.avatarUrl}`}
+      src={`/chat/api/gateway${perfil.avatarUrl}`}
       alt={nombre}
       className="h-14 w-14 rounded-full object-cover"
     />
@@ -219,7 +219,7 @@ function Encabezado({
             <div className="relative z-10 flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
               {perfil?.avatarUrl ? (
                 <img
-                  src={`/dashboard/api/gateway${perfil.avatarUrl}`}
+                  src={`/chat/api/gateway${perfil.avatarUrl}`}
                   alt={nombre}
                   className="max-h-[70vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
                 />
@@ -348,7 +348,8 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
       setBorrando(false);
       setConfirmandoBorrado(false);
     } else {
-      router.push('/chat');
+      /* Ruta **interna**: el router de Next le antepone el basePath (`/chat`). */
+      router.push('/');
     }
   }
 

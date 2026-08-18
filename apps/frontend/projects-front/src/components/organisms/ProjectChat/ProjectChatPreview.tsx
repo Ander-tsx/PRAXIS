@@ -45,12 +45,12 @@ export function ProjectChatPreview({
      pudo consultar el directorio», que antes se leían las dos como lo primero. */
   const nombreDe = (userId: string) => nombreDePersona(directorio, userId, currentUserId);
 
-  /* Cruza de zona —el centro de mensajes vive en `dashboard`— así que la ruta
-     lleva el prefijo completo y se navega con un `<a>` duro.
+  /* Cruza de zona —el centro de mensajes tiene la suya propia desde E3— así que
+     la ruta lleva el prefijo completo y se navega con un `<a>` duro.
 
      ⚠️ Con el **UUID** y no con el slug: todo lo anidado bajo `/projects/:id`
      en el gateway espera el UUID (CLAUDE.md). */
-  const href = `/dashboard/chat/proyecto/${projectId}`;
+  const href = `/chat/proyecto/${projectId}`;
 
   return (
     <section className="flex flex-col gap-4">

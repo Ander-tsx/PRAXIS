@@ -158,7 +158,7 @@ export function ProjectMembers({
                       </span>
                     ) : (
                       <a
-                        href={`/dashboard/chat/${member.userId}`}
+                        href={`/chat/${member.userId}`}
                         title={`Escribir a ${label} en privado`}
                         className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
                       >

@@ -45,8 +45,13 @@ async function requireApi() {
  * transición del App Router.
  */
 function revalidarChat(peerId: string) {
-  revalidatePath(`/chat/${peerId}`);
-  revalidatePath('/chat');
+  /* Rutas **internas** de la zona, sin el basePath: aquí `/chat` es el
+     basePath, así que la conversación es `/<peerId>` y la bandeja es `/`.
+     Con las de cuando esto vivía en dashboard-front no habría error — Next no
+     se queja de revalidar una ruta que no existe—: simplemente no refrescaría
+     nada. Ver E3.3. */
+  revalidatePath(`/${peerId}`);
+  revalidatePath('/');
 }
 
 function describe(error: unknown, fallback: string): string {
@@ -125,7 +130,7 @@ export async function deleteDirectChatAction(peerId: string): Promise<{ error: s
   }
 
   // Redirigir o revalidar el directorio
-  revalidatePath('/chat');
+  revalidatePath('/');
   return { error: null };
 }
 

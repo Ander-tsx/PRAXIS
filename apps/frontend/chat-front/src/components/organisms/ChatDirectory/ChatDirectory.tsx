@@ -55,14 +55,21 @@ type Pestana = 'directos' | 'proyectos';
  * no se ponían jamás— y en móvil la columna no se apartaba al abrir un chat,
  * porque eso también dependía de `activo`.
  *
- * `usePathname()` en dashboard-front devuelve la ruta **sin el basePath**
- * (`/chat/<id>`), que es justo la forma que hay que reconocer aquí.
+ * ⚠️ **`usePathname()` devuelve la ruta sin el basePath, y eso cambió al mudar
+ * el chat a su propia zona (E3.3).** En dashboard-front —basePath
+ * `/dashboard`— una conversación era `/chat/<id>`; aquí el basePath **es**
+ * `/chat`, así que Next lo recorta y lo que llega es `/<id>` a secas.
+ *
+ * Dejar las expresiones de antes no habría dado ningún error: `activo` volvería
+ * a ser `null` siempre, que es exactamente el fallo que estas líneas vinieron a
+ * arreglar —ninguna fila marcada y, en móvil, la columna sin apartarse al abrir
+ * un chat—. La misma rotura, por una causa distinta.
  */
 function activoDeLaRuta(pathname: string): { tipo: Pestana; id: string } | null {
-  const proyecto = /^\/chat\/proyecto\/([^/]+)/.exec(pathname);
+  const proyecto = /^\/proyecto\/([^/]+)/.exec(pathname);
   if (proyecto?.[1]) return { tipo: 'proyectos', id: proyecto[1] };
 
-  const persona = /^\/chat\/([^/]+)/.exec(pathname);
+  const persona = /^\/([^/]+)/.exec(pathname);
   if (persona?.[1]) return { tipo: 'directos', id: persona[1] };
 
   return null;
@@ -359,8 +366,10 @@ function FilaPersona({
   return (
     <li>
       <Link
-        /* Sin el basePath: dentro de dashboard-front, Next lo añade solo. */
-        href={`/chat/${peerId}`}
+        /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`).
+           Con el `/chat/` de cuando esto vivía en dashboard-front saldría
+           `/chat/chat/<id>`, que es un 404. */
+        href={`/${peerId}`}
         aria-current={activo ? 'page' : undefined}
         className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
           activo ? FILA_ACTIVA : ''
@@ -370,7 +379,7 @@ function FilaPersona({
         <Avatar
           label={nombre}
           size="sm"
-          src={hrefDeAvatar(perfil?.avatarUrl, '/dashboard/api/gateway')}
+          src={hrefDeAvatar(perfil?.avatarUrl, '/chat/api/gateway')}
           /* La del perfil es la del último render; `usePresencia` la pisa si ha
              cambiado desde entonces. Ver `commons/realtime/presencia.tsx`. */
           presence={presencia}
@@ -421,7 +430,7 @@ function FilaProyecto({
        ⚠️ La ruta lleva el **UUID** y no el slug: todo lo anidado bajo
        `/projects/:id` en el gateway espera el UUID (CLAUDE.md). */
     <Link
-      href={`/chat/proyecto/${chat.project.id}`}
+      href={`/proyecto/${chat.project.id}`}
       aria-current={activo ? 'page' : undefined}
       className={`group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated ${
         activo ? FILA_ACTIVA : ''

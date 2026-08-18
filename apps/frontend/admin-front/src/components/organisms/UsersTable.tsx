@@ -96,7 +96,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                         nombreDe(usuario)
                       ) : (
                         <a
-                          href={`/dashboard/chat/${usuario.id}`}
+                          href={`/chat/${usuario.id}`}
                           className="hover:underline transition-colors hover:text-primary"
                           title={`Escribir a ${nombreDe(usuario)}`}
                         >

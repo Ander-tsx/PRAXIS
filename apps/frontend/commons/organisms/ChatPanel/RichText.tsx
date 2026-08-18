@@ -58,7 +58,7 @@ const ICONO_POR_TIPO: Record<ChatRefKind, typeof KanbanIcon | null> = {
 function destinoDe(kind: ChatRefKind, id: string): string | null {
   switch (kind) {
     case 'user':
-      return `/dashboard/chat/${id}`;
+      return `/chat/${id}`;
     case 'task':
       return `/projects/tarea/${id}`;
     case 'board':

@@ -24,7 +24,10 @@ import { redirect } from 'next/navigation';
  */
 export default async function ChatVacioPage() {
   const recordada = conversacionRecordada((await cookies()).get(ULTIMO_CHAT_COOKIE)?.value);
-  if (recordada) redirect(`/chat/${recordada}`);
+  /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`) al
+     redirigir. Con el `/chat/` de cuando esto vivía en dashboard-front saldría
+     `/chat/chat/<uuid>`, que es un 404. */
+  if (recordada) redirect(`/${recordada}`);
 
   return (
     <div className="flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed border-border p-8">

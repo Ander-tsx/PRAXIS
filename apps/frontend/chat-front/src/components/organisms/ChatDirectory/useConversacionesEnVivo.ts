@@ -6,8 +6,16 @@ import { createApiClient } from '@praxis/commons';
 import { useCallback, useEffect, useState } from 'react';
 import type { ChatDeProyecto } from './ChatDirectory';
 
-/** El proxy de esta zona. La lista solo existe en dashboard-front. */
-const GATEWAY = '/dashboard/api/gateway';
+/**
+ * El proxy de **esta** zona, y tiene que serlo.
+ *
+ * Es una ruta del navegador, así que lleva el prefijo público completo y no la
+ * ruta interna: aquí `basePath` no pinta nada. Apuntarla a la de otra zona
+ * seguiría funcionando detrás del shell —cada zona monta su propio proxy— y
+ * eso es justo lo que la vuelve peligrosa: se rompe el día que las zonas se
+ * sirvan por separado, no el día que alguien se equivoque.
+ */
+const GATEWAY = '/chat/api/gateway';
 
 interface Listas {
   directos: DirectConversation[];
