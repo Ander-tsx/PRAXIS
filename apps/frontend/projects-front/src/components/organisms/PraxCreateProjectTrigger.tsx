@@ -7,7 +7,22 @@ interface PraxCreateProjectTriggerProps {
   triggerVariant?: 'boton' | 'tarjeta';
 }
 
-export function PraxCreateProjectTrigger({ triggerVariant = 'boton' }: PraxCreateProjectTriggerProps) {
+/**
+ * ⚠️ **La variante `tarjeta` tenía altura fija (`h-[184px]`) y por eso no
+ * cuadraba.** Una `ProjectCard` no mide 184: mide lo que mida la fila, que
+ * depende de si el proyecto tiene descripción, cuántas etiquetas lleva y si el
+ * nombre parte en dos líneas. Al lado de tarjetas de 210 o 230, esta se quedaba
+ * corta y la rejilla salía con un escalón.
+ *
+ * Ahora estira con la fila (`h-full`, más el `flex` del `li` que la envuelve en
+ * `ProjectGrid`) y conserva el 184 como **mínimo**, que es lo que la sostiene
+ * cuando cae sola en su fila y no hay ninguna tarjeta que le marque la altura.
+ * El `p-5` es el de `ProjectCard`, no el `p-6` de antes: con la misma caja y
+ * distinto acolchado, el texto no se alineaba con el de al lado.
+ */
+export function PraxCreateProjectTrigger({
+  triggerVariant = 'boton',
+}: PraxCreateProjectTriggerProps) {
   const dock = useDock();
 
   const onClick = useCallback(() => {
@@ -21,7 +36,7 @@ export function PraxCreateProjectTrigger({ triggerVariant = 'boton' }: PraxCreat
       <button
         type="button"
         onClick={onClick}
-        className="group relative flex h-[184px] w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed border-border bg-transparent p-6 transition-all hover:border-primary/50 hover:bg-primary/5"
+        className="group relative flex h-full min-h-[184px] w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed border-border bg-transparent p-5 transition-all hover:border-primary/50 hover:bg-primary/5"
       >
         <span
           className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-elevated text-text-secondary transition-colors group-hover:bg-primary/10 group-hover:text-primary"
