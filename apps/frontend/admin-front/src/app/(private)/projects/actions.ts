@@ -61,7 +61,7 @@ export async function setProjectStatusAction(
     };
   }
 
-  revalidatePath('/proyectos');
+  revalidatePath('/projects');
   revalidatePath('/actividad');
   return { error: null, done: actualizado.status };
 }

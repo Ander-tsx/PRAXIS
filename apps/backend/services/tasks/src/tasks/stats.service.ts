@@ -1423,7 +1423,7 @@ export class StatsService {
                SUM(asignaciones)::int               AS asignaciones,
                SUM(desasignaciones)::int            AS desasignaciones
           FROM por_tarea
-         GROUP BY LEAST(manos, ${MAX_MANOS}::int)
+         GROUP BY 1
          ORDER BY 1
       `,
 
@@ -1478,7 +1478,7 @@ export class StatsService {
         SELECT LEAST(cambios, ${MAX_CAMBIOS}::int)::int AS cambios,
                COUNT(*)::int                            AS tareas
           FROM por_tarea
-         GROUP BY LEAST(cambios, ${MAX_CAMBIOS}::int)
+         GROUP BY 1
          ORDER BY 1
       `,
 

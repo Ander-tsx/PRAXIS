@@ -165,9 +165,6 @@ export interface AssistantChatProps {
    * - `cajon` — como `pantalla` pero dentro de la columna lateral del armazón,
    *   con su propia aspa de cerrar. Es la de Análisis, desde que el chat dejó de
    *   ocupar sitio en una página cuyo trabajo es analizar.
-   * - `panel` — una tarjeta con borde y alto acotado. **Ya no la usa nadie**: se
-   *   queda porque es lo que hay que poner si algún día el chat vuelve a
-   *   incrustarse en el cuerpo de una página, y borrarla y reescribirla más
    *   adelante cuesta más que dejarla.
    *
    * Es una prop y no tres componentes porque lo único que cambia es el
@@ -177,6 +174,8 @@ export interface AssistantChatProps {
    * hacerlo cuatro veces.
    */
   variante?: 'panel' | 'pantalla' | 'cajon';
+  /** Oculta el botón de historial, usado cuando no queremos que el usuario recupere conversaciones anteriores en un contexto específico. */
+  sinHistorial?: boolean;
 }
 
 /**
@@ -249,6 +248,7 @@ export function AssistantChat({
   sugerenciaExterna = null,
   alAceptarGrafico,
   variante = 'panel',
+  sinHistorial = false,
   userName,
 }: AssistantChatProps) {
   /* Las dos variantes «altas» comparten toda la mecánica de alto y scroll; lo

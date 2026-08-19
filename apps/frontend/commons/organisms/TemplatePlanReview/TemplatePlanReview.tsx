@@ -104,7 +104,7 @@ export function TemplatePlanReview({
   onCambiarDescripcion: (valor: string) => void;
 }) {
   return (
-    <div className="flex max-h-[58vh] flex-col gap-6 overflow-y-auto pr-1">
+    <div className="flex flex-col gap-6 pr-1">
       {plantilla.porQue && (
         <p
           className="rounded-xl border px-4 py-3 font-sans text-sm leading-relaxed text-text-secondary"

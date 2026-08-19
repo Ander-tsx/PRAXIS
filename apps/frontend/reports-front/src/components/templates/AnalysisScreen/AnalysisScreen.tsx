@@ -133,34 +133,39 @@ export function AnalysisScreen({
 
   return (
     <>
-      <DisparadorDePrax projectSlug={projectSlug} />
+      {!projectSlug && (
+        <>
+          <DisparadorDePrax projectSlug={projectSlug} />
 
-      <DockSlot titulo={`${PRAX_NAME}, el asistente`}>
-        <AssistantChat
-          projectId={projectId}
-          /* El proxy de esta zona: por ahí suben y bajan los adjuntos, que no
-             pueden ir por una Server Action. Ver `AssistantChatProps`. */
-          gatewayPath="/reports/api/gateway"
-          cuotaInicial={cuotaInicial}
-          nombres={nombres}
-          etiquetas={etiquetas}
-          sugerenciaExterna={sugerencia}
-          variante="cajon"
-          /**
-           * La única acción que la conversación no trae de serie.
-           *
-           * `AssistantChat` vive en `commons` desde que PRAX tiene pantalla
-           * propia, y las nueve acciones que llaman a endpoints del tablero se
-           * fueron con él. Esta no: escribe en el **lienzo**, así que necesita el
-           * catálogo de widgets de esta zona y revalida esta página.
-           *
-           * En `assistant-front` no se pasa, y entonces la tarjeta de un gráfico
-           * propuesto explica dónde se coloca en vez de ofrecer un «Aceptar» que
-           * escribiría en una pantalla que no se está viendo.
-           */
-          alAceptarGrafico={aceptarGraficoAction}
-        />
-      </DockSlot>
+          <DockSlot titulo={`${PRAX_NAME}, el asistente`}>
+            <AssistantChat
+              projectId={projectId}
+              /* El proxy de esta zona: por ahí suben y bajan los adjuntos, que no
+                 pueden ir por una Server Action. Ver `AssistantChatProps`. */
+              gatewayPath="/reports/api/gateway"
+              cuotaInicial={cuotaInicial}
+              nombres={nombres}
+              etiquetas={etiquetas}
+              sugerenciaExterna={sugerencia}
+              variante="cajon"
+              sinHistorial={true}
+              /**
+               * La única acción que la conversación no trae de serie.
+               *
+               * `AssistantChat` vive en `commons` desde que PRAX tiene pantalla
+               * propia, y las nueve acciones que llaman a endpoints del tablero se
+               * fueron con él. Esta no: escribe en el **lienzo**, así que necesita el
+               * catálogo de widgets de esta zona y revalida esta página.
+               *
+               * En `assistant-front` no se pasa, y entonces la tarjeta de un gráfico
+               * propuesto explica dónde se coloca en vez de ofrecer un «Aceptar» que
+               * escribiría en una pantalla que no se está viendo.
+               */
+              alAceptarGrafico={aceptarGraficoAction}
+            />
+          </DockSlot>
+        </>
+      )}
 
       <ReportCanvas inicial={lienzoInicial} slots={slots} guardar={guardar} onGenerar={generar} />
     </>

@@ -1731,7 +1731,6 @@ export function TemplateProposalCard({
 }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
-  const [revisando, setRevisando] = useState(false);
   const [plan, setPlan] = useState<ProjectTemplate>(propuesta);
   const [excluido, setExcluido] = useState<Set<string>>(new Set());
   const [resultado, setResultado] = useState<TemplateResult | null>(null);
@@ -1751,9 +1750,6 @@ export function TemplateProposalCard({
 
     const respuesta = await aceptarPlantillaAction(podar(plan, excluido));
 
-    /* Sin proyecto no se creó nada y se puede reintentar. Con proyecto se pasa
-       al resumen **aunque haya fallos**: el proyecto existe, y esconderlo
-       detrás de un error sería mentir sobre lo que hay creado (§36.4). */
     if (!respuesta.proyecto) {
       setError(respuesta.error ?? 'No se pudo crear el proyecto.');
       setEstado('pendiente');
@@ -1765,9 +1761,6 @@ export function TemplateProposalCard({
     if (proposalId) resolverPropuestaAction(projectId, proposalId, 'ACCEPTED');
   }
 
-  const espacios = plan.espacios ?? [];
-  const tableros = espacios.reduce((suma, espacio) => suma + (espacio.tableros?.length ?? 0), 0);
-
   return (
     <Marco
       titulo="Un proyecto entero, propuesto"
@@ -1776,18 +1769,7 @@ export function TemplateProposalCard({
       estado={estado}
       error={error}
       resultado={null}
-      /**
-       * El botón de aceptar no crea: **abre la revisión**. Crear veinte objetos
-       * de golpe desde una tarjeta de chat sería la misma capacidad con el paso
-       * de revisión quitado, que es justo lo que este producto decidió no hacer.
-       *
-       * Y desaparece en cuanto la revisión está abierta: a partir de ahí el
-       * botón que cuenta es el «Crear proyecto» de dentro, y dos botones
-       * primarios en la misma tarjeta —uno de los cuales ya no hace nada— solo
-       * sirven para pulsar el que no era.
-       */
-      onAceptar={estado === 'hecho' || revisando ? undefined : () => setRevisando(true)}
-      etiquetaAceptar="Revisar el plan"
+      onAceptar={undefined}
       onDescartar={() => {
         setEstado('descartada');
         if (proposalId) resolverPropuestaAction(projectId, proposalId, 'DISCARDED');
@@ -1808,42 +1790,28 @@ export function TemplateProposalCard({
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
-            <Campo termino="Proyecto" valor={plan.nombre} />
-            <Campo
-              termino="Estructura"
-              valor={`${espacios.length} ${espacios.length === 1 ? 'espacio' : 'espacios'}, ${tableros} ${tableros === 1 ? 'tablero' : 'tableros'}`}
-            />
-            <Campo termino="Etiquetas" valor={String((plan.etiquetas ?? []).length)} />
-            <Campo termino="Roles" valor={String((plan.roles ?? []).length)} />
-          </dl>
+        <div className="flex flex-col gap-4">
+          <TemplatePlanReview
+            plantilla={plan}
+            excluido={excluido}
+            onAlternar={alternar}
+            onCambiarNombre={(nombre) => setPlan({ ...plan, nombre })}
+            onCambiarDescripcion={(descripcion) => setPlan({ ...plan, descripcion })}
+          />
 
-          {revisando && (
-            <div className="flex flex-col gap-4 border-t border-border pt-4">
-              <TemplatePlanReview
-                plantilla={plan}
-                excluido={excluido}
-                onAlternar={alternar}
-                onCambiarNombre={(nombre) => setPlan({ ...plan, nombre })}
-                onCambiarDescripcion={(descripcion) => setPlan({ ...plan, descripcion })}
-              />
-
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <span className="mr-auto font-sans text-xs text-text-secondary">
-                  Quita lo que no quieras antes de crearlo.
-                </span>
-                <Button
-                  type="button"
-                  onClick={crear}
-                  isLoading={estado === 'enviando'}
-                  disabled={estado === 'enviando'}
-                >
-                  Crear proyecto
-                </Button>
-              </div>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+            <span className="mr-auto font-sans text-xs text-text-secondary">
+              Quita lo que no quieras antes de crearlo.
+            </span>
+            <Button
+              type="button"
+              onClick={crear}
+              isLoading={estado === 'enviando'}
+              disabled={estado === 'enviando'}
+            >
+              Crear proyecto
+            </Button>
+          </div>
         </div>
       )}
     </Marco>
