@@ -81,6 +81,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
      * ⚠️ Al cambiar de zona cambió también la ruta que ve: sin el basePath, una
      * conversación es `/<uuid>` y no `/chat/<uuid>`. Ver la nota de
      * `conversacionDeLaRuta`.
+     *
+     * 🔴 ⚠️ **«Toda navegación» incluye los prefetch, y eso era el fallo.** Por
+     * aquí pasa una petición por cada `<Link>` del directorio que entra en el
+     * viewport, sin que nadie haya pulsado: escribían todas la cookie y ganaba
+     * la última en llegar, así que Mensajes abría una conversación al azar.
+     * `recordarConversacion` los descarta ahora por cabecera; el porqué entero
+     * está en su nota. Si alguna vez se mueve esta llamada a otro sitio, ese
+     * filtro se va con ella.
      */
     recordarConversacion(request, response);
     return response;

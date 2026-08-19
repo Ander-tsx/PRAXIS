@@ -63,14 +63,62 @@ export function conversacionDeLaRuta(pathname: string): string | null {
 }
 
 /**
+ * Cabecera con la que Next marca una petición de **prefetch**.
+ *
+ * Verificado en el propio paquete, no de memoria:
+ * `next/dist/client/components/app-router-headers.js` →
+ * `NEXT_ROUTER_PREFETCH_HEADER = 'next-router-prefetch'`. La de segmento
+ * (`next-router-segment-prefetch`) es otra constante del mismo archivo y viaja
+ * sola en los prefetch parciales de PPR, así que hay que mirar las dos.
+ *
+ * ⚠️ **`rsc` NO sirve para distinguirlas.** Una navegación de verdad del App
+ * Router también es una petición `rsc: 1`; lo que separa el prefetch del
+ * clic es exactamente esta cabecera.
+ */
+const CABECERAS_DE_PREFETCH = ['next-router-prefetch', 'next-router-segment-prefetch'];
+
+/**
+ * ¿Esta petición es un prefetch de Next y no una navegación de verdad?
+ */
+function esPrefetch(request: NextRequest): boolean {
+  return CABECERAS_DE_PREFETCH.some((cabecera) => request.headers.get(cabecera) !== null);
+}
+
+/**
  * Deja anotada la conversación que se está abriendo, si la ruta es una.
  *
  * Se llama desde el proxy de la zona: ahí pasa **toda** navegación, así que no
  * hay que acordarse de anotarlo en cada página ni gastar una petición extra.
  * Si la ruta no es una conversación, no toca nada — volver al índice de
  * Mensajes no debe borrar el recuerdo, que es lo que lo hace útil.
+ *
+ * ## 🔴 «Por el proxy pasa toda navegación» era verdad de más
+ *
+ * Reportado por un usuario con un vídeo: cada vez que entraba en Mensajes se
+ * abría **una conversación al azar** de entre las suyas, no la última. No se
+ * reproducía a voluntad, y por eso el fallo aguantó: depende de cuántas
+ * conversaciones tengas y de en qué orden acaben unas peticiones que nadie ve.
+ *
+ * La causa es que por el proxy no pasan solo las navegaciones. Cada fila del
+ * directorio es un `<Link>`, y el App Router **prefetcha** los que entran en el
+ * viewport: una petición al servidor por conversación visible, sin que nadie
+ * haya pulsado nada. Cada una casaba `/<uuid>`, cada una escribía la cookie, y
+ * la que llegaba la última —orden de red, no de intención— era la que quedaba
+ * recordada. De ahí el «al azar»: es literalmente una carrera.
+ *
+ * Con una o dos conversaciones el síntoma casi no aparece —el prefetch de la que
+ * ya estabas mirando suele ganar—, y por eso se ve en la cuenta de quien tiene
+ * muchas y no en la de quien prueba.
+ *
+ * Y no es un fallo de la cookie: un prefetch es una petición normal, así que su
+ * `Set-Cookie` lo aplica el navegador igual que el de un clic.
+ *
+ * Por eso ahora un prefetch no anota nada. Recordar es una consecuencia de
+ * **abrir** algo, y prefetchar no es abrirlo.
  */
 export function recordarConversacion(request: NextRequest, response: NextResponse): void {
+  if (esPrefetch(request)) return;
+
   const conversacion = conversacionDeLaRuta(request.nextUrl.pathname);
   if (!conversacion) return;
 
