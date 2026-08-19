@@ -26,6 +26,27 @@ const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 const LIMITE_INVENTARIO = 500;
 
 /**
+ * Cuánto de la descripción de una tarea entra en el inventario.
+ *
+ * Es el **único campo sin techo** de todo lo que viaja en cada turno: el título
+ * está acotado por el formulario, los ids miden lo que miden, pero una
+ * descripción puede ser una página entera — y multiplicada por las tareas
+ * abiertas de un proyecto real, es la vía por la que esto se desmadra sin que
+ * nadie lo vea venir.
+ *
+ * 500 caracteres son dos o tres frases: suficiente para saber de qué va la
+ * tarea, que es para lo que el modelo la lee. Lo que se corta **se avisa**, para
+ * que no hable con seguridad de un texto del que solo ha visto el principio.
+ */
+const MAX_DESCRIPCION_INVENTARIO = 500;
+
+/** La descripción, acotada y diciendo que se acotó. */
+function recortar(descripcion: string | null): string | null {
+  if (!descripcion || descripcion.length <= MAX_DESCRIPCION_INVENTARIO) return descripcion;
+  return `${descripcion.slice(0, MAX_DESCRIPCION_INVENTARIO)} […]`;
+}
+
+/**
  * Agregación sobre las tareas y su historial.
  *
  * Vive **aquí y no en reports-service** porque los datos son de este servicio.
@@ -402,32 +423,70 @@ export class StatsService {
       take: LIMITE_INVENTARIO,
     });
 
-    return tareas.map((tarea) => ({
-      id: tarea.id,
-      titulo: tarea.title,
-      descripcion: tarea.description,
-      columna: tarea.status,
-      columnId: tarea.columnId,
-      /* Sin nombre: tasks-service no conoce los tableros, viven en projects.
-         Se lo pone `reports-service`, que es quien cruza las dos mitades. */
-      boardId: tarea.boardId,
-      prioridad: tarea.priority,
-      /* Solo el día: la hora no la usa nadie para decidir y ocupa en cada turno. */
-      vence: tarea.dueDate ? tarea.dueDate.toISOString().slice(0, 10) : null,
-      cerrada: tarea.completedAt !== null,
-      encargados: tarea.assignees.map((a) => a.userId),
-      etiquetas: tarea.labels.map((l) => l.labelId),
-      /* Solo si tiene: una tarea sin checklist no debe gastar dos claves vacías
-         en cada turno de cada conversación. */
-      ...(tarea.checklists.length > 0 && {
-        pasos: tarea.checklists.map((paso) => ({
-          id: paso.id,
-          texto: paso.text,
-          hecho: paso.completed,
-        })),
-      }),
-      ...(tarea._count.comments > 0 && { comentarios: tarea._count.comments }),
-    }));
+    return tareas.map((tarea) => {
+      const cerrada = tarea.completedAt !== null;
+
+      /**
+       * ⚠️ **Una tarea cerrada viaja en versión corta, y esto es la mitad del
+       * coste del asistente.**
+       *
+       * Medido sobre el proyecto de demostración: 186 tareas ocupaban 83 000
+       * caracteres del prompt —el 81 % de todo lo que se le manda al modelo en
+       * **cada turno**— y de los 449 caracteres de una tarea solo 55 eran texto.
+       * El resto son UUIDs y nombres de clave. Con 116 de esas 186 cerradas, la
+       * mayor parte de ese gasto era historia.
+       *
+       * Lo que se conserva es lo que hace falta para **seguir pudiendo
+       * señalarla**: su id, su título, su columna y que está cerrada. Con eso el
+       * modelo puede nombrarla, contarla y proponer borrarla o reabrirla, que es
+       * todo lo que se hace con una tarea terminada.
+       *
+       * Lo que se cae —encargados, etiquetas, prioridad, vencimiento,
+       * descripción, pasos y comentarios— son justo los campos caros, y ninguno
+       * cambia lo que se puede hacer con ella: repartir, clasificar, priorizar o
+       * marcar pasos son gestos sobre trabajo vivo.
+       *
+       * El desglose por persona **no se resiente**: la carga y la experiencia
+       * salen del bloque `personas`, que se calcula en SQL y no de contar aquí.
+       */
+      if (cerrada) {
+        return {
+          id: tarea.id,
+          titulo: tarea.title,
+          columna: tarea.status,
+          columnId: tarea.columnId,
+          boardId: tarea.boardId,
+          cerrada: true,
+        };
+      }
+
+      return {
+        id: tarea.id,
+        titulo: tarea.title,
+        descripcion: recortar(tarea.description),
+        columna: tarea.status,
+        columnId: tarea.columnId,
+        /* Sin nombre: tasks-service no conoce los tableros, viven en projects.
+           Se lo pone `reports-service`, que es quien cruza las dos mitades. */
+        boardId: tarea.boardId,
+        prioridad: tarea.priority,
+        /* Solo el día: la hora no la usa nadie para decidir y ocupa en cada turno. */
+        vence: tarea.dueDate ? tarea.dueDate.toISOString().slice(0, 10) : null,
+        cerrada: false,
+        encargados: tarea.assignees.map((a) => a.userId),
+        etiquetas: tarea.labels.map((l) => l.labelId),
+        /* Solo si tiene: una tarea sin checklist no debe gastar dos claves vacías
+           en cada turno de cada conversación. */
+        ...(tarea.checklists.length > 0 && {
+          pasos: tarea.checklists.map((paso) => ({
+            id: paso.id,
+            texto: paso.text,
+            hecho: paso.completed,
+          })),
+        }),
+        ...(tarea._count.comments > 0 && { comentarios: tarea._count.comments }),
+      };
+    });
   }
 
   /**

@@ -319,11 +319,14 @@ const REGLAS: Regla[] = [
     ambito: 'proyecto',
     texto:
       'Antes de contestar, mira de verdad lo que tienes: "tareas" trae TODAS las del ' +
-      'proyecto con titulo, descripcion, columna, tablero, prioridad, vencimiento, ' +
-      'encargados, etiquetas y pasos del checklist. Cruza esos datos por tu cuenta ' +
-      '—quien tiene mas carga, que lleva parado, que vence esta semana— en vez de ' +
-      'preguntar algo que ya esta ahi. Y no te inventes un id: si una tarea no esta ' +
-      'en esa lista, no existe.',
+      'proyecto. Las ABIERTAS vienen enteras —titulo, descripcion, columna, tablero, ' +
+      'prioridad, vencimiento, encargados, etiquetas y pasos del checklist—; las ' +
+      'CERRADAS vienen abreviadas, solo con id, titulo y columna, porque de una tarea ' +
+      'terminada lo unico que se hace es nombrarla, contarla o reabrirla. Si te ' +
+      'preguntan por el detalle de una cerrada, di que no lo tienes delante en vez de ' +
+      'suponerlo. Cruza los datos por tu cuenta —quien tiene mas carga, que lleva ' +
+      'parado, que vence esta semana— en vez de preguntar algo que ya esta ahi. Y no ' +
+      'te inventes un id: si una tarea no esta en esa lista, no existe.',
   },
 
   /**

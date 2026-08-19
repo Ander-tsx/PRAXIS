@@ -197,16 +197,21 @@ export const ASSISTANT_TEXT_MAX_CHARS = 40_000;
  * turnos = 360 000 caracteres en cada pregunta**.
  *
  * Así que se recorta del más reciente hacia atrás: lo último que se adjuntó
- * entra entero, lo viejo se recorta o se queda en su nombre. ~24 000 caracteres
- * son unos 6 000 tokens, que caben al lado del briefing sin empujar las reglas
- * fuera de la atención del modelo.
+ * entra entero, lo viejo se recorta o se queda en su nombre.
+ *
+ * ⚠️ **Bajó de 24 000 a 12 000, y el motivo es que el primer número se eligió
+ * mirando el peor caso.** Midiendo el prompt de verdad: un proyecto normal —9
+ * tareas— gasta unos 8 500 tokens por turno **entero**, así que 24 000
+ * caracteres de adjuntos (~6 000 tokens) eran más que todo lo demás junto. 12
+ * 000 siguen siendo un documento largo entero, y el dial se sube si en el uso
+ * real PRAX pierde el hilo de algo que sí hacía falta.
  *
  * ⚠️ **No es lo mismo que `ASSISTANT_TEXT_MAX_CHARS`, y confundirlos rompe el
  * diseño.** Ese topa lo que se **guarda** por archivo; este, lo que se **manda**
  * entre todos. Se guarda más de lo que se manda a propósito: subir este número
  * luego no obliga a volver a extraer nada.
  */
-export const ASSISTANT_EXTRACT_BUDGET_CHARS = 24_000;
+export const ASSISTANT_EXTRACT_BUDGET_CHARS = 12_000;
 
 /**
  * Un adjunto tal y como lo ve el chat.

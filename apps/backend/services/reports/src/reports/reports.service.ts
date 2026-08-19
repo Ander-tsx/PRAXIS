@@ -488,14 +488,22 @@ export class ReportsService {
         {
           id: string;
           titulo: string;
-          descripcion: string | null;
           columna: string;
           columnId: string;
-          prioridad: string;
-          vence: string | null;
           cerrada: boolean;
-          encargados: string[];
-          etiquetas: string[];
+          /**
+           * ⚠️ **De aquí abajo, todo opcional: una tarea cerrada no lo trae.**
+           *
+           * `task_inventory` manda las terminadas en versión corta —id, título,
+           * columna y poco más— porque el inventario entero viaja en cada turno
+           * y era el 81 % del prompt. Declararlos obligatorios aquí sería
+           * escribir una forma que el emisor ya no cumple.
+           */
+          descripcion?: string | null;
+          prioridad?: string;
+          vence?: string | null;
+          encargados?: string[];
+          etiquetas?: string[];
           /* El tablero al que pertenece. Lo añade tasks-service; aquí se le
              pone el nombre, que es lo único que le sirve al modelo. */
           boardId: string;
@@ -589,10 +597,22 @@ export class ReportsService {
        * a3f1-…»), y sin el nombre no puede responder a «¿qué hay en el tablero
        * de diseño?» aunque tenga los datos delante.
        */
-      tareas: tareas.map((tarea) => ({
+      /**
+       * ⚠️ **`boardId` no sale de aquí: sale su nombre y nada más.**
+       *
+       * Un UUID por tarea son 47 caracteres —con su clave— que el modelo no usa
+       * para nada: nombra el tablero por su nombre, y para colocar algo dentro
+       * usa el `columnId`, que ya identifica el tablero sin ambigüedad. En un
+       * proyecto de 200 tareas eso son ~9 000 caracteres por turno pagados por
+       * un dato que nadie lee.
+       *
+       * Y la descripción solo se rellena cuando la hay: las cerradas ya no la
+       * traen, y un `""` por tarea es una clave más que no dice nada.
+       */
+      tareas: tareas.map(({ boardId, ...tarea }) => ({
         ...tarea,
-        descripcion: tarea.descripcion ?? '',
-        tablero: nombreDeTablero.get(tarea.boardId) ?? null,
+        ...(tarea.descripcion ? { descripcion: tarea.descripcion } : {}),
+        ...(nombreDeTablero.get(boardId) ? { tablero: nombreDeTablero.get(boardId) } : {}),
       })),
       /**
        * El avance, **ya calculado aquí**.
