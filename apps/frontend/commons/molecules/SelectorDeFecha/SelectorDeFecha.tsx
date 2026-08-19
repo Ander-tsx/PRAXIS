@@ -1,6 +1,6 @@
 'use client';
 
-import { alpha, colors } from '@praxis/commons';
+import { alpha, colors } from '../../tokens';
 import { useEffect, useId, useRef, useState } from 'react';
 
 export interface SelectorDeFechaProps {
