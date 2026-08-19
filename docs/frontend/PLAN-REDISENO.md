@@ -9,10 +9,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R4 — Análisis (R4.1, R4.2, R4.3, R4.6 y R4.7 hechas) |
-| **Última tarea terminada** | R4.3 — filtros de verdad en los siete agregados, y su barra |
-| **Siguiente** | R4.4 — la vista de cartera |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Etapa actual** | **R5 — Cierre.** R4 entera hecha (R4.1 – R4.8) |
+| **Última tarea terminada** | R4.8 — cerrada sin código: ni R4.2 ni R4.4 piden tablas |
+| **Siguiente** | R5.3 — `pnpm e2e:regresion` |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → **R5** → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
 | **Actualizado** | 2026-08-19 |
 
@@ -47,6 +47,12 @@ descartado (con motivo escrito al lado)
 | 2026-08-19 | R4.6 + R4.7 | (este) | El lienzo arranca con los tres gráficos que salen de `snapshot`. R4.7 ya estaba hecha por R3.6 y se cierra verificada |
 | 2026-08-19 | (del usuario) | `c9b6f12`…`408b0f0` | Cambios que estaban sin commitear en el árbol: `SelectorDeFecha` sube a commons y filtra la actividad, la presencia deja de mentir en Administración, PRAX saluda por el nombre, la tarjeta de avisos en tema claro y el salto a PRAX en móvil. Se les quitó un `redirect()` que reintroducía lo que eliminó R4.1, un `useRouter` muerto, tres imports rotos y tres tildes |
 | 2026-08-19 | R4.3 | `fd17e53`, `84061c1` | **Filtros de verdad.** DTO compartido validado en las ocho rutas, filtros hasta el `WHERE` de las siete consultas, y la barra en la pantalla. Cuatro hallazgos: `Task` ya guarda `boardId` —no hay que traducir a columnas—, los filtros tienen que entrar en la clave de Redis y el `from` derivado de `days` **no**, un tramo ancho se rechaza en vez de recortarse, y la barra necesita `key` o «Quitar filtros» no limpia las fechas |
+| 2026-08-19 | R4.3 (verificación) | `a1599df` | **Ejecutadas las siete consultas contra la base real.** Las ocho combinaciones corren, pero filtrar por una persona devolvía un reparto de tres —las relaciones son de muchos a muchos— y por etiqueta, cuatro etiquetas. Se acota también la dimensión filtrada |
+| 2026-08-19 | R4.4 | `1fe0fa8`, `3c9172d` | **La cartera.** `GET /me/reports/portfolio`, dos consultas agrupadas para N proyectos, y su tabla. `DataTable` sube a commons. Probado con el stack levantado |
+| 2026-08-19 | (fuera de plan) | `3348d28` | 🔴 **El lienzo de partida daba 400 al primer arrastre**: sus ids no eran UUID y el DTO los valida. Solo salió ejecutando |
+| 2026-08-19 | R4.5 | `c1a257c` | **El constructor de gráficos.** Diez métricas por cinco formas, sin modelo y sin cuota. Los desplegables no dejan componer lo que el backend rechaza —comprobado contra él— |
+| 2026-08-19 | R4.8 | — | **Cerrada sin código.** Ni R4.2 ni R4.4 piden tablas: la primera agrupa peticiones que ya existían, la segunda agrega donde están los datos |
+| 2026-08-19 | R5.1 | `04a54b8`…`535fe29` | Documentación: ESTADO-ACTUAL §44, CONTRATO-API (filtros y cartera), PENDIENTES-BACKEND §21 (slugs reservados) y CLAUDE.md (puerto 4107 y las tres trampas) |
 
 ---
 
@@ -366,11 +372,17 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
       de fecha no se controlan desde fuera y en una navegación suave no se
       desmontan, así que «Quitar filtros» limpiaba la URL y dejaba la fecha en el
       campo.
-- [ ] **R4.4 — La vista de cartera.** Cruza solo los proyectos donde ya tienes
+- [x] **R4.4 — La vista de cartera.** Cruza solo los proyectos donde ya tienes
       `canViewReports` —la consulta `GET /projects?permission=canViewReports` ya
       existe— y **agrega en el servidor**, no con N llamadas desde el navegador.
-- [ ] **R4.5 — El constructor de gráficos**, determinista, en la propia pantalla.
+- [x] **R4.5 — El constructor de gráficos**, determinista, en la propia pantalla.
       Mismo conjunto cerrado de métricas y formas que ya valida el backend.
+      ⚠️ Los desplegables **no ofrecen lo imposible**: las formas salen de la
+      métrica elegida, y el rango, el top N y «solo vencidas» solo aparecen si
+      esa métrica los acepta. Un conjunto cerrado que deja componer
+      combinaciones inválidas y luego las rechaza es un formulario con trampas.
+      Comprobado contra el backend: `dona` sobre una serie semanal y un rango
+      sobre una foto del momento se rechazan los dos.
 - [x] **R4.6 — El lienzo deja de arrancar vacío**: una disposición por defecto la
       primera vez, que se puede cambiar y se guarda como cualquier otra.
       ⚠️ **Contradecía una decisión escrita en `CanvasVacio`** —«no se rellena con
@@ -388,7 +400,12 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
       asistente que queda en Análisis es el cajón —`AnalysisScreen` → `DockSlot` →
       `AssistantChat variante="cajon"`— y no hay restos del montaje anterior en la
       página. Se cierra sin escribir código, como R6.5.2.
-- [ ] **R4.8 — Tablas propias para `reports-service`** si R4.2/R4.4 las piden.
+- [x] **R4.8 — Tablas propias para `reports-service`** si R4.2/R4.4 las piden.
+      *Resultado:* **no las piden, y se cierra sin código.** R4.2 agrupa
+      peticiones que ya existían y R4.4 agrega en tasks-service, que es donde
+      están los datos. El servicio sigue sin base de datos —lo decidido en §25.6—
+      y el lienzo se queda en `projects-service`, sin migración entre bases. Era
+      justamente el «por defecto» escrito abajo, confirmado al llegar.
       Hoy el servicio **no tiene ninguna** —agrega de tasks y projects por TCP y
       cachea en Redis— así que sería su primera migración, y hay que tocar los
       scripts de Prisma de la raíz, que lo excluyen **a propósito**.
@@ -758,11 +775,14 @@ modelo de negocio, es **cobrar como dos** el mensaje que lleva adjuntos.
 
 ## R5 — Cierre
 
-- [ ] **R5.1 — Documentación.** ESTADO-ACTUAL con una sección por etapa,
+- [x] **R5.1 — Documentación.** ESTADO-ACTUAL con una sección por etapa,
       CONTRATO-API con las rutas y filtros nuevos, PENDIENTES-BACKEND con lo que
       quede fuera, y CLAUDE.md con el puerto y la zona nuevos.
-- [ ] **R5.2 — Formato y tipos.** `pnpm format`, typecheck de las zonas tocadas y
-      `next build`.
+- [x] **R5.2 — Formato y tipos.** `pnpm format`, typecheck de **las ocho zonas y
+      los ocho servicios**, y `next build` de las ocho zonas. Todo en verde.
+      ⚠️ El typecheck de una zona **con su `next dev` en marcha** da un falso
+      positivo: `.next/dev/types/validator.ts` está a medias de regenerarse y
+      falla con `TS1128`. Se para el dev server y desaparece.
 - [ ] **R5.3 — Verificación.** `pnpm e2e:regresion` si el stack levanta en esta
       máquina. Si no levanta, **se dice**: «compila» no es «funciona», y esa
       distinción ya costó seis fallos en producción.
