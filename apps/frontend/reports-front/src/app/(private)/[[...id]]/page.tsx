@@ -11,16 +11,19 @@ import {
   ResumenWidget,
   TiemposWidget,
 } from '@/components/organisms/ReportWidgets';
+import { AnalysisFilters } from '@/components/organisms/AnalysisFilters';
 import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
 import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
-import type {
-  ReportBlocked,
-  ReportCycleTime,
-  ReportFlow,
-  ReportForecast,
-  ReportPerson,
-  ReportSnapshot,
-  ReportWeekly,
+import {
+  type ReportBlocked,
+  type ReportCycleTime,
+  type ReportFlow,
+  type ReportForecast,
+  type ReportPerson,
+  type ReportSnapshot,
+  type ReportWeekly,
+  filtrosAQuery,
+  filtrosDesdeUrl,
 } from '@/lib/reports';
 import { type Informe, type Widget, informesNecesarios, lienzoPorDefecto } from '@/lib/widgets';
 import {
@@ -64,9 +67,18 @@ import { guardarLienzoAction } from './actions';
  */
 interface PageProps {
   params: Promise<{ id?: string[] }>;
+  /**
+   * Los filtros de R4.3, que viven en la URL y no en estado de cliente.
+   *
+   * ⚠️ **Esto convierte la página en dinámica de verdad**, y ya lo era: los siete
+   * agregados salen de una llamada autenticada por cookie. Lo que cambia es que
+   * ahora una navegación con filtros distintos vuelve a pedirlos, que es
+   * exactamente lo que se busca — el filtrado lo hace el backend.
+   */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Pick<PageProps, 'params'>): Promise<Metadata> {
   const slug = (await params).id?.[0];
   /* Sin slug no se sabe qué proyecto va a salir sin repetir aquí la resolución
      entera, y el título de la pestaña no vale ese viaje: se queda el de la
@@ -127,7 +139,7 @@ interface LienzoGuardado {
  * preferencia que la URL ya guarda mejor: quien quiera volver a un proyecto
  * concreto tiene su dirección, y quien no, entra al primero.
  */
-export default async function ReportsPage({ params }: PageProps) {
+export default async function ReportsPage({ params, searchParams }: PageProps) {
   const segmentos = (await params).id;
   /* Más de un segmento no es una ruta de esta sección. Se trata como un slug
      que no existe, que es lo que es. */
@@ -135,6 +147,10 @@ export default async function ReportsPage({ params }: PageProps) {
 
   const slug = segmentos?.[0];
   const api = createServerApiClient();
+
+  /* Los filtros de R4.3. Se leen antes que nada porque entran en la petición de
+     los agregados, que es la más cara de la pantalla. */
+  const filtros = filtrosDesdeUrl(await searchParams);
 
   /**
    * Los proyectos cuyo informe se puede abrir.
@@ -210,7 +226,7 @@ export default async function ReportsPage({ params }: PageProps) {
    * cuota, que hacen falta con lienzo y sin él. La lista de proyectos ya está
    * en vuelo desde arriba.
    */
-  const [lienzo, proyectos, members, etiquetas, cuota] = await Promise.all([
+  const [lienzo, proyectos, members, etiquetas, cuota, detalle] = await Promise.all([
     api
       .get<LienzoGuardado>(`/projects/${projectId}/reports/layout`)
       /**
@@ -242,7 +258,33 @@ export default async function ReportsPage({ params }: PageProps) {
     api
       .get<AssistantQuota>(`/projects/${projectId}/assistant/quota`)
       .catch(() => null),
+    /**
+     * El árbol del proyecto, solo por los **tableros** del filtro.
+     *
+     * ⚠️ **Con slug en la URL ya lo tenemos y no se vuelve a pedir.** Aquella
+     * rama resolvió el slug con `GET /projects/:id`, que devuelve un
+     * `ProjectDetail` entero; sin slug, el proyecto sale del listado y ese no
+     * trae `workspaces`. Así que el viaje extra lo paga solo `/reports` a secas,
+     * y viaja aquí dentro —en paralelo con los otros cuatro— en vez de
+     * encadenarse.
+     *
+     * Degrada a `null`: sin tableros, el desplegable no se pinta y los otros
+     * cinco filtros siguen funcionando. Ver invariante 6.
+     */
+    'workspaces' in project
+      ? Promise.resolve(project as ProjectDetail)
+      : api.get<ProjectDetail>(`/projects/${projectId}`).catch(() => null),
   ]);
+
+  /* Cada tablero con su espacio delante cuando hay más de uno: dos proyectos
+     pueden tener un «Desarrollo» cada uno, igual que pasaba con las columnas. */
+  const espacios = detalle?.workspaces ?? [];
+  const tableros = espacios.flatMap((espacio) =>
+    (espacio.boards ?? []).map((tablero) => ({
+      id: tablero.id,
+      name: espacios.length > 1 ? `${tablero.name} · ${espacio.name}` : tablero.name,
+    })),
+  );
 
   /**
    * El lienzo, o el de partida si nunca se guardó ninguno.
@@ -302,7 +344,7 @@ export default async function ReportsPage({ params }: PageProps) {
      servidor sin llevarse a los demás. */
   const informes = await api
     .get<Partial<Record<string, unknown>>>(
-      `/projects/${projectId}/reports?include=${partes.join(',')}`,
+      `/projects/${projectId}/reports?include=${partes.join(',')}${filtrosAQuery(filtros)}`,
     )
     .catch(() => ({}) as Partial<Record<string, unknown>>);
 
@@ -446,6 +488,34 @@ export default async function ReportsPage({ params }: PageProps) {
             vacio="No tienes ningún proyecto con análisis abierto."
           />
         </div>
+
+        {/**
+         * ⚠️ **La `key` no es decorativa: sin ella «Quitar filtros» no limpia.**
+         *
+         * Los dos selectores de fecha llevan su valor por dentro
+         * (`defaultValue`, sin controlar) y en una navegación **suave** del App
+         * Router el componente no se desmonta: la URL se queda sin `from` y el
+         * campo sigue enseñando la fecha. Atándola a los filtros puestos, cada
+         * combinación es una instancia distinta y el estado interno se rehace.
+         *
+         * La alternativa era controlar el selector desde fuera, que cambia su
+         * contrato —y el del diálogo de tarea, que lo usa sin controlar— por un
+         * caso solo de aquí.
+         */}
+        <AnalysisFilters
+          key={filtrosAQuery(filtros)}
+          basePath={reportPath(project)}
+          puestos={filtros}
+          tableros={tableros}
+          personas={members.map((miembro) => ({
+            id: miembro.userId,
+            nombre: personName(directorio, miembro.userId),
+          }))}
+          etiquetas={etiquetas.map((etiqueta) => ({
+            id: etiqueta.id,
+            nombre: etiqueta.name,
+          }))}
+        />
 
         {snapshot && snapshot.eventosSinteticos > 0 && (
           <SyntheticBanner eventos={snapshot.eventosSinteticos} />

@@ -185,3 +185,76 @@ export function etiquetaDeColumna(
 export function cuentaTableros(filas: { board?: string | null }[]): number {
   return new Set(filas.map((fila) => fila.board).filter(Boolean)).size;
 }
+
+/**
+ * ─── Los filtros de Análisis, entre la URL y la API ───────────────────────
+ *
+ * Viven en la URL —ver `AnalysisFilters`— así que hay que leerlos de
+ * `searchParams` y volver a escribirlos en la query del paquete. Las dos
+ * conversiones van juntas aquí para que no puedan divergir: si una supiera de un
+ * filtro que la otra no, el control lo enseñaría puesto y el gráfico no lo
+ * aplicaría, sin ningún error por medio.
+ *
+ * Los nombres son **los mismos** que los del DTO del backend
+ * (`ReportFiltersQueryDto`). Traducirlos aquí solo habría añadido un sitio donde
+ * equivocarse.
+ */
+export const CLAVES_DE_FILTRO = [
+  'from',
+  'to',
+  'boardId',
+  'assigneeId',
+  'labelId',
+  'priority',
+] as const;
+
+export type ClaveDeFiltro = (typeof CLAVES_DE_FILTRO)[number];
+export type FiltrosDeAnalisis = Partial<Record<ClaveDeFiltro, string>>;
+
+/**
+ * Lo que trae la URL, quedándose solo con lo que significa algo.
+ *
+ * ⚠️ **La prioridad se comprueba contra el conjunto cerrado y las demás no.** No
+ * es incoherencia: un valor inventado en `priority` haría que el gateway
+ * respondiera 400 al **paquete entero**, y el `.catch` de la página lo degrada a
+ * `{}` — o sea, las siete tarjetas diciendo «no disponible» por una letra de más
+ * en la barra de direcciones. Eso se lee como «este proyecto no tiene datos». Un
+ * UUID o una fecha mal escritos también dan 400, pero ahí no hay conjunto
+ * cerrado contra el que comprobar sin duplicar la validación del backend, que es
+ * lo que no se hace.
+ *
+ * Un `to` sin `from` se descarta: el backend lo ignora, y dejarlo aquí haría que
+ * el control lo enseñara puesto sin estarlo.
+ */
+export function filtrosDesdeUrl(
+  searchParams: Record<string, string | string[] | undefined>,
+): FiltrosDeAnalisis {
+  const filtros: FiltrosDeAnalisis = {};
+
+  for (const clave of CLAVES_DE_FILTRO) {
+    const valor = searchParams[clave];
+    /* Un parámetro repetido (`?priority=HIGH&priority=LOW`) llega como array.
+       Se toma el primero en vez de descartarlo: es lo que hace el navegador al
+       enviar un formulario dos veces, no un intento de nada raro. */
+    const texto = Array.isArray(valor) ? valor[0] : valor;
+    if (typeof texto === 'string' && texto.length > 0) filtros[clave] = texto;
+  }
+
+  if (filtros.priority && !PRIORITY_ORDER.includes(filtros.priority as never)) {
+    filtros.priority = undefined;
+  }
+  if (!filtros.from) filtros.to = undefined;
+
+  return filtros;
+}
+
+/** Los filtros como trozo de query, ya con el `&` delante. Vacío si no hay ninguno. */
+export function filtrosAQuery(filtros: FiltrosDeAnalisis): string {
+  const params = new URLSearchParams();
+  for (const clave of CLAVES_DE_FILTRO) {
+    const valor = filtros[clave];
+    if (valor) params.set(clave, valor);
+  }
+  const qs = params.toString();
+  return qs ? `&${qs}` : '';
+}
