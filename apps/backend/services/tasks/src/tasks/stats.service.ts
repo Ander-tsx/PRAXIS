@@ -275,6 +275,60 @@ function andDeEvento(filtros: ReportFilters | undefined, alias: string): Prisma.
 }
 
 /**
+ * Las dimensiones por las que se puede cruzar el trabajo.
+ *
+ * Conjunto **cerrado**, y por el mismo motivo que el de los gráficos: cada una
+ * es un trozo de SQL escrito a mano en este archivo. Un eje libre habría sido
+ * más cómodo y habría dejado que el nombre de una columna llegara desde una
+ * petición hasta un `Prisma.raw`.
+ */
+export type DimensionCruce = 'columna' | 'prioridad' | 'etiqueta' | 'persona';
+
+export const DIMENSIONES_CRUCE: DimensionCruce[] = [
+  'columna',
+  'prioridad',
+  'etiqueta',
+  'persona',
+];
+
+/**
+ * El `SELECT`, el `JOIN` y el nombre legible de cada dimensión.
+ *
+ * `sufijo` desambigua los alias: las dos dimensiones de un cruce pueden
+ * necesitar la misma tabla —etiqueta contra etiqueta está prohibido, pero
+ * etiqueta contra persona usa dos puentes distintos— y sin sufijo el segundo
+ * `JOIN` chocaría con el primero.
+ *
+ * ⚠️ **`LEFT JOIN` y no `JOIN` en las dos de muchos a muchos.** Con un `JOIN` a
+ * secas, una tarea sin etiqueta desaparece del cruce entero: el total del
+ * gráfico dejaría de cuadrar con el del proyecto y no habría nada que lo
+ * explicara. Sin etiqueta es una categoría, no una ausencia de fila.
+ */
+function dimension(dim: DimensionCruce, sufijo: string): { valor: Prisma.Sql; join: Prisma.Sql } {
+  const l = Prisma.raw(`dl${sufijo}`);
+  const tl = Prisma.raw(`dtl${sufijo}`);
+  const a = Prisma.raw(`da${sufijo}`);
+
+  switch (dim) {
+    case 'columna':
+      return { valor: Prisma.sql`t."columnId"`, join: Prisma.empty };
+    case 'prioridad':
+      return { valor: Prisma.sql`t."priority"::text`, join: Prisma.empty };
+    case 'etiqueta':
+      return {
+        valor: Prisma.sql`${l}.name`,
+        join: Prisma.sql`LEFT JOIN tasks.task_labels ${tl} ON ${tl}."taskId" = t.id
+                         LEFT JOIN tasks.labels ${l}      ON ${l}.id = ${tl}."labelId"`,
+      };
+    case 'persona':
+      return {
+        valor: Prisma.sql`${a}."userId"`,
+        join: Prisma.sql`LEFT JOIN tasks.task_assignees ${a} ON ${a}."taskId" = t.id`,
+      };
+  }
+}
+
+/**
  * Agregación sobre las tareas y su historial.
  *
  * Vive **aquí y no en reports-service** porque los datos son de este servicio.
@@ -996,6 +1050,76 @@ export class StatsService {
        GROUP BY a."userId", l.id, l.name
        ORDER BY cerradas DESC
     `;
+  }
+
+  /**
+   * **Dos dimensiones a la vez**: el cruce que R4.3 dejó fuera a propósito.
+   *
+   * «De lo de frontend, cuánto es urgente» es una pregunta de dos dimensiones, y
+   * todos los gráficos de la sección tienen una. El reparto por etiqueta ya se
+   * topó con esto —filtrar por una etiqueta devolvía las tareas correctas
+   * repartidas entre todas las etiquetas que además llevaran— y allí se resolvió
+   * acotando la dimensión filtrada, con la nota de que el cruce, cuando hiciera
+   * falta, sería un informe nuevo. Este es ese informe.
+   *
+   * Devuelve una fila por celda: `{ a, b, count }`. Quien lo pinte decide si es
+   * un mapa de calor o unas barras apiladas — son la misma tabla con dos
+   * lecturas.
+   *
+   * ## 🔴 Las celdas NO suman el total del proyecto, y hay que decirlo
+   *
+   * `etiqueta` y `persona` son relaciones de muchos a muchos: una tarea con tres
+   * etiquetas está en tres celdas. Eso no es un error del cruce —es la respuesta
+   * correcta a «cuántas tareas de frontend son urgentes»— pero un total al pie
+   * que no cuadra con el del proyecto se lee como una avería. Por eso la
+   * respuesta trae `tareas` (las distintas que entran) además de la suma de las
+   * celdas: con los dos números, la pantalla puede explicarlo en vez de
+   * disimularlo.
+   *
+   * ## ⚠️ `COUNT(DISTINCT t.id)` y no `COUNT(*)`
+   *
+   * Cruzando etiqueta con persona, una tarea con dos etiquetas y dos
+   * responsables produce **cuatro filas** en el producto de los dos `LEFT JOIN`.
+   * Cada celda debe contarla una vez, no las veces que el join la duplicó.
+   *
+   * ## ⚠️ Las dos dimensiones tienen que ser distintas
+   *
+   * Cruzar etiqueta contra etiqueta da la diagonal y nada más. Se rechaza aquí
+   * además de en el DTO porque este comando también es alcanzable por TCP.
+   */
+  async matrix(
+    projectId: string,
+    agruparPor: DimensionCruce,
+    partirPor: DimensionCruce,
+    filtros?: ReportFilters,
+  ) {
+    if (!DIMENSIONES_CRUCE.includes(agruparPor) || !DIMENSIONES_CRUCE.includes(partirPor)) {
+      return { agruparPor, partirPor, celdas: [], tareas: 0 };
+    }
+    if (agruparPor === partirPor) {
+      return { agruparPor, partirPor, celdas: [], tareas: 0 };
+    }
+
+    const a = dimension(agruparPor, 'a');
+    const b = dimension(partirPor, 'b');
+
+    const [celdas, distintas] = await Promise.all([
+      this.prisma.$queryRaw<{ a: string | null; b: string | null; count: number }[]>`
+        SELECT ${a.valor} AS a,
+               ${b.valor} AS b,
+               COUNT(DISTINCT t.id)::int AS count
+          FROM tasks.tasks t
+          ${a.join}
+          ${b.join}
+         WHERE t."projectId" = ${projectId}::text
+           ${andDeTarea(filtros, { alias: 't', fecha: 'createdAt' })}
+         GROUP BY 1, 2
+         ORDER BY count DESC
+      `,
+      this.prisma.task.count({ where: { projectId, ...whereDeTarea(filtros) } }),
+    ]);
+
+    return { agruparPor, partirPor, celdas, tareas: distintas };
   }
 
   /**

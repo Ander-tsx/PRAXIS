@@ -102,6 +102,33 @@ export interface ReportWeekly {
 }
 
 /**
+ * El cruce de dos dimensiones: una tabla de contingencia.
+ *
+ * 🔴 **La suma de las celdas NO es el total del proyecto** cuando alguna
+ * dimensión es de muchos a muchos: una tarea con tres etiquetas está en tres
+ * celdas. Por eso viaja `tareas` —las distintas que entran— al lado. Quien lo
+ * pinte tiene que poder decirlo: un total al pie que no cuadra con el del
+ * proyecto se lee como una avería, no como una propiedad del cruce.
+ *
+ * `aNombre`/`bNombre` vienen resueltos **solo** para las dimensiones que el
+ * backend sabe nombrar —columna y etiqueta—. `persona` llega como `userId` y la
+ * resuelve la pantalla, que ya tiene el directorio del proyecto cargado.
+ */
+export interface ReportMatrix {
+  agruparPor: string;
+  partirPor: string;
+  celdas: {
+    a: string | null;
+    b: string | null;
+    count: number;
+    aNombre: string | null;
+    bNombre: string | null;
+  }[];
+  /** Tareas distintas que entran en el cruce. */
+  tareas: number;
+}
+
+/**
  * **Dónde espera el trabajo**: tiempo por columna.
  *
  * Dos medidas por columna que se leen juntas y **no se suman**:

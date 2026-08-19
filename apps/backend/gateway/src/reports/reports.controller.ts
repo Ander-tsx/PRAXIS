@@ -12,8 +12,10 @@ import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   ProjectPermission,
+  REPORT_CROSS_DIMENSIONS,
   ReportBundleQueryDto,
   type ReportFiltersQueryDto,
+  ReportMatrixQueryDto,
   ReportWeeklyQueryDto,
   ReportWindowQueryDto,
 } from '@praxis/contracts';
@@ -371,6 +373,54 @@ export class ReportsController {
       this.reportsClient.send(
         { cmd: 'report_dynamics' },
         { projectId, filtros: this.filtros(query) },
+      ),
+    );
+  }
+
+  /**
+   * **Dos dimensiones a la vez**: el cruce que la sección no podía pedir.
+   *
+   * «De lo de frontend, cuánto es urgente» es una pregunta de dos dimensiones, y
+   * hasta aquí todos los gráficos tenían una. `groupBy` y `splitBy` salen de un
+   * conjunto cerrado de cuatro —columna, prioridad, etiqueta, persona— porque
+   * cada una es un trozo de SQL escrito a mano al otro lado.
+   *
+   * ⚠️ **Las celdas no suman el total del proyecto** cuando alguna dimensión es
+   * de muchos a muchos: una tarea con tres etiquetas está en tres celdas. La
+   * respuesta trae `tareas` —las distintas que entran— para que la pantalla
+   * pueda decirlo. Un total al pie que no cuadra se lee como una avería.
+   *
+   * ⚠️ Cruzar una dimensión consigo misma da la diagonal y nada más: se rechaza.
+   *
+   * Existe además como parte del paquete (`include=matrix:etiqueta:prioridad`),
+   * porque un lienzo con tres cruces distintos no puede costar tres peticiones
+   * más — que es el coste que quitó R4.2.
+   */
+  @Get('matrix')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Cruce de dos dimensiones: una tabla de contingencia' })
+  @ApiQuery({ name: 'groupBy', required: true, enum: REPORT_CROSS_DIMENSIONS })
+  @ApiQuery({ name: 'splitBy', required: true, enum: REPORT_CROSS_DIMENSIONS })
+  @ApiResponse({
+    status: 200,
+    description: '`tareas` son las distintas que entran; la suma de las celdas puede ser mayor',
+  })
+  matrix(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: ReportMatrixQueryDto,
+  ) {
+    if (query.groupBy === query.splitBy) {
+      throw new BadRequestException('Las dos dimensiones del cruce tienen que ser distintas.');
+    }
+    return firstValueFrom(
+      this.reportsClient.send(
+        { cmd: 'report_matrix' },
+        {
+          projectId,
+          agruparPor: query.groupBy,
+          partirPor: query.splitBy,
+          filtros: this.filtros(query),
+        },
       ),
     );
   }

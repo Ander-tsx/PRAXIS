@@ -46,7 +46,35 @@ export const TIPOS_WIDGET = [
 export type TipoWidget = (typeof TIPOS_WIDGET)[number];
 
 /** Espejo de `ReportChartShape`. */
-export type FormaGrafico = 'barras' | 'barras_horizontales' | 'dona' | 'lineas' | 'area_apilada';
+export type FormaGrafico =
+  | 'barras'
+  | 'barras_horizontales'
+  | 'dona'
+  | 'lineas'
+  | 'area_apilada'
+  | 'histograma'
+  | 'barras_apiladas'
+  | 'barras_divergentes'
+  | 'mapa_calor';
+
+/**
+ * Las dimensiones de un cruce. Espejo de `REPORT_CROSS_DIMENSIONS`.
+ *
+ * ⚠️ Las cadenas **no pueden desviarse**: son las que viajan en el `include` del
+ * paquete (`matrix:etiqueta:prioridad`) y las que valida el DTO. Una que no
+ * exista allí vuelve como 400, no como error de compilación.
+ */
+export type DimensionCruce = 'columna' | 'prioridad' | 'etiqueta' | 'persona';
+
+export const DIMENSIONES_CRUCE: DimensionCruce[] = ['columna', 'prioridad', 'etiqueta', 'persona'];
+
+/** Cómo se llama cada dimensión en la pantalla. */
+export const DIMENSIONES: Record<DimensionCruce, string> = {
+  columna: 'Columna',
+  prioridad: 'Prioridad',
+  etiqueta: 'Etiqueta',
+  persona: 'Persona',
+};
 
 /** Espejo de `ReportMetric`. */
 export type Metrica =
@@ -65,7 +93,10 @@ export type Metrica =
   | 'volatilidad_por_tarea'
   | 'cambios_de_prioridad'
   | 'tiempo_en_columna'
-  | 'espera_actual_por_columna';
+  | 'espera_actual_por_columna'
+  | 'distribucion_de_entrega'
+  | 'entradas_contra_cierres'
+  | 'cruce';
 
 /** La parametrización de un gráfico a medida. Espejo de `ReportChartSpec`. */
 export interface EspecificacionGrafico {
@@ -74,6 +105,9 @@ export interface EspecificacionGrafico {
   dias?: number;
   soloVencidas?: boolean;
   topN?: number;
+  /** Solo en `cruce`, y ahí las dos son obligatorias. */
+  agruparPor?: DimensionCruce;
+  partirPor?: DimensionCruce;
   titulo: string;
 }
 
@@ -274,7 +308,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
  * qué agregado come, y ese mapa es la garantía de que **ninguno necesita una
  * consulta que no exista**. Si una métrica no está aquí, no se puede pintar.
  */
-export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
+export const INFORME_DE_METRICA: Record<Metrica, Informe | null> = {
   tareas_por_columna: 'snapshot',
   tareas_por_prioridad: 'snapshot',
   tareas_por_etiqueta: 'snapshot',
@@ -291,6 +325,15 @@ export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
   cambios_de_prioridad: 'dynamics',
   tiempo_en_columna: 'columnTime',
   espera_actual_por_columna: 'columnTime',
+  distribucion_de_entrega: 'cycle',
+  entradas_contra_cierres: 'weekly',
+  /**
+   * ⚠️ **El cruce no come de un informe fijo**, y por eso vale `null`: su parte
+   * del paquete lleva las dos dimensiones dentro del nombre
+   * (`matrix:etiqueta:prioridad`), así que dos cruces distintos son dos partes
+   * distintas. Lo resuelve `partesNecesarias`, no este mapa.
+   */
+  cruce: null,
 };
 
 export function informesNecesarios(widgets: Widget[]): Set<Informe> {
@@ -303,6 +346,65 @@ export function informesNecesarios(widgets: Widget[]): Set<Informe> {
     }
   }
   return necesarios;
+}
+
+/**
+ * El nombre interno de un informe → la clave que entiende el endpoint.
+ *
+ * Difieren en dos, y por eso el mapa existe: dentro se llaman `cycle` y
+ * `columnTime`, y las rutas los exponen como `cycle-time` y `column-time`. Sin
+ * esta traducción, pedir los tiempos devolvía una clave que nadie leía y la
+ * tarjeta salía vacía **sin ningún error**.
+ */
+export const PARTE_DE_INFORME: Record<Informe, string> = {
+  snapshot: 'snapshot',
+  flow: 'flow',
+  cycle: 'cycle-time',
+  forecast: 'forecast',
+  people: 'people',
+  blocked: 'blocked',
+  weekly: 'weekly',
+  dynamics: 'dynamics',
+  columnTime: 'column-time',
+};
+
+/** La clave del paquete que corresponde a un cruce. */
+export function parteDeCruce(grafico: EspecificacionGrafico): string | null {
+  if (grafico.metrica !== 'cruce' || !grafico.agruparPor || !grafico.partirPor) return null;
+  return `matrix:${grafico.agruparPor}:${grafico.partirPor}`;
+}
+
+/**
+ * Las claves del paquete que hay que pedir para pintar este lienzo.
+ *
+ * ## Por qué no basta con `informesNecesarios`
+ *
+ * Porque desde el cruce, **una métrica puede necesitar una parte distinta según
+ * cómo esté parametrizada**: dos cruces con dimensiones distintas son dos
+ * agregados distintos, y los dos se llaman «cruce». El `include` los distingue
+ * metiéndoles las dimensiones dentro del nombre, así que la parte no se puede
+ * deducir de la métrica sola — hace falta el widget entero.
+ *
+ * La instantánea entra siempre y va la primera: es la única que sabe si el
+ * historial de este proyecto está fabricado, y ese aviso no puede depender de
+ * qué gráficos tenga puesto cada cual. Es además la más barata.
+ *
+ * ⚠️ **Se deduplica**, y hace falta: dos gráficos del mismo cruce en el mismo
+ * lienzo pedirían dos veces el mismo agregado, y el `include` repetido lo
+ * calcularía dos veces al otro lado.
+ */
+export function partesNecesarias(widgets: Widget[]): string[] {
+  const partes = new Set<string>(['snapshot']);
+
+  for (const informe of informesNecesarios(widgets)) {
+    partes.add(PARTE_DE_INFORME[informe] ?? informe);
+  }
+  for (const widget of widgets) {
+    const cruce = widget.grafico ? parteDeCruce(widget.grafico) : null;
+    if (cruce) partes.add(cruce);
+  }
+
+  return [...partes];
 }
 
 /**
@@ -458,6 +560,15 @@ export interface EspecificacionDeMetrica {
 
 const CATEGORICA: FormaGrafico[] = ['barras', 'barras_horizontales', 'dona'];
 const TEMPORAL: FormaGrafico[] = ['lineas', 'area_apilada'];
+/**
+ * Una distribución admite el histograma **además** de las barras normales.
+ *
+ * No la dona ni las horizontales: una distribución sin eje pierde el orden, y
+ * en una distribución el orden **es** el dato.
+ */
+const DISTRIBUCION: FormaGrafico[] = ['histograma', 'barras'];
+/** Las dos que saben dibujar dos dimensiones a la vez. */
+const CRUZADA: FormaGrafico[] = ['mapa_calor', 'barras_apiladas'];
 
 export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
   tareas_por_columna: {
@@ -550,7 +661,7 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     descripcion: 'A dónde vuelve lo que se dio por cerrado.',
   },
   rotacion_por_tarea: {
-    formas: CATEGORICA,
+    formas: DISTRIBUCION,
     aceptaRango: false,
     aceptaSoloVencidas: false,
     aceptaTopN: false,
@@ -558,7 +669,7 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     descripcion: 'Cuántas tareas pasaron por una persona, por dos, por tres…',
   },
   volatilidad_por_tarea: {
-    formas: CATEGORICA,
+    formas: DISTRIBUCION,
     aceptaRango: false,
     aceptaSoloVencidas: false,
     aceptaTopN: false,
@@ -566,7 +677,7 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     descripcion: 'Cuántas veces se le cambia la prioridad a una misma tarea.',
   },
   cambios_de_prioridad: {
-    formas: CATEGORICA,
+    formas: [...CATEGORICA, 'barras_divergentes'],
     aceptaRango: false,
     aceptaSoloVencidas: false,
     aceptaTopN: false,
@@ -590,6 +701,31 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     etiqueta: 'Espera actual en cada columna',
     descripcion: 'Lo que llevan ahora mismo las tareas abiertas donde están.',
   },
+  /* ─── R9.3: las formas que faltaban ───────────────────────────────────── */
+  distribucion_de_entrega: {
+    formas: DISTRIBUCION,
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Distribución del tiempo de entrega',
+    descripcion: 'Un p50 y un p85 esconden si hay dos poblaciones. Esto no.',
+  },
+  entradas_contra_cierres: {
+    formas: ['barras_divergentes'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Entradas contra cierres',
+    descripcion: 'Lo que entra arriba y lo que sale abajo, semana a semana.',
+  },
+  cruce: {
+    formas: CRUZADA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cruce de dos dimensiones',
+    descripcion: 'De lo de frontend, cuánto es urgente. Dos ejes en vez de uno.',
+  },
 };
 
 /** Cómo se llama cada forma en la pantalla. */
@@ -599,6 +735,10 @@ export const FORMAS: Record<FormaGrafico, string> = {
   dona: 'Dona',
   lineas: 'Líneas',
   area_apilada: 'Área apilada',
+  histograma: 'Histograma',
+  barras_apiladas: 'Barras apiladas',
+  barras_divergentes: 'Barras divergentes',
+  mapa_calor: 'Mapa de calor',
 };
 
 /**
@@ -639,6 +779,19 @@ export function validarGrafico(grafico: EspecificacionGrafico): string | null {
       return 'El top N va de 2 a 20';
     }
   }
+  /* El cruce, en los dos sentidos: que lo traiga quien lo necesita y que no lo
+     traiga nadie más. Espejo exacto del contrato. */
+  if (grafico.metrica === 'cruce') {
+    if (!grafico.agruparPor || !grafico.partirPor) {
+      return 'Un cruce necesita las dos dimensiones';
+    }
+    if (grafico.agruparPor === grafico.partirPor) {
+      return 'Las dos dimensiones del cruce tienen que ser distintas';
+    }
+  } else if (grafico.agruparPor !== undefined || grafico.partirPor !== undefined) {
+    return `«${spec.etiqueta}» tiene una sola dimensión: no admite un cruce`;
+  }
+
   if (!grafico.titulo?.trim()) return 'Falta el título del grafo';
   if (grafico.titulo.length > 80) return 'El título no puede superar 80 caracteres';
 

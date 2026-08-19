@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
-import { type ReportFilters, claveDeFiltros } from '@praxis/contracts';
+import { type ReportFilters, claveDeFiltros, leerCruce } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
 import { RedisService } from '../redis/redis.service';
@@ -434,6 +434,70 @@ export class ReportsService {
   }
 
   /**
+   * **Dos dimensiones a la vez.** El cruce que la sección no podía pedir.
+   *
+   * Todo lo demás de esta pantalla agrupa por una cosa. «De lo de frontend,
+   * cuánto es urgente» necesita dos, y hasta ahora la única respuesta era poner
+   * dos gráficos al lado y compararlos a ojo.
+   *
+   * Aquí solo se le pone **nombre** a lo que devolvió tasks-service: las
+   * columnas viven en projects-service, así que un cruce por columna llega con
+   * `columnId` y saldría como un UUID en el eje. Las personas las resuelve la
+   * pantalla, que ya tiene el directorio del proyecto cargado.
+   *
+   * ⚠️ La suma de las celdas **no** es el total del proyecto cuando alguna
+   * dimensión es de muchos a muchos. Viaja `tareas` al lado para que se pueda
+   * decir en vez de disimularlo. Ver `StatsService.matrix`.
+   */
+  async matrix(
+    projectId: string,
+    agruparPor: string,
+    partirPor: string,
+    filtros?: ReportFilters,
+  ) {
+    return this.cached(
+      `reports:${projectId}:matrix:${agruparPor}:${partirPor}${claveDeFiltros(filtros)}`,
+      async () => {
+        const necesitaColumnas = agruparPor === 'columna' || partirPor === 'columna';
+
+        const [crudo, columns] = await Promise.all([
+          this.ask<{
+            agruparPor: string;
+            partirPor: string;
+            celdas: { a: string | null; b: string | null; count: number }[];
+            tareas: number;
+          }>(this.tasksClient, 'task_stats_matrix', {
+            projectId,
+            agruparPor,
+            partirPor,
+            filtros,
+          }),
+          /* Solo se pide el árbol del proyecto si alguna dimensión lo necesita:
+             un cruce de etiqueta contra prioridad no tiene por qué pagar un
+             salto a projects-service. */
+          necesitaColumnas ? this.columnas(projectId) : Promise.resolve([]),
+        ]);
+
+        const porId = new Map(columns.map((c) => [c.id, c]));
+        const nombrar = (dim: string, valor: string | null): string | null => {
+          if (valor === null) return null;
+          if (dim !== 'columna') return valor;
+          return porId.get(valor)?.name ?? 'Columna eliminada';
+        };
+
+        return {
+          ...crudo,
+          celdas: crudo.celdas.map((celda) => ({
+            ...celda,
+            aNombre: nombrar(crudo.agruparPor, celda.a),
+            bNombre: nombrar(crudo.partirPor, celda.b),
+          })),
+        };
+      },
+    );
+  }
+
+  /**
    * **Dónde espera el trabajo**: tiempo por columna.
    *
    * El informe de tiempos dice cuánto tarda una tarea de principio a fin. Este
@@ -671,6 +735,22 @@ export class ReportsService {
       dynamics: () => this.dynamics(projectId, filtros),
       'column-time': () => this.columnTime(projectId, filtros),
     };
+
+    /**
+     * Los cruces no están en el mapa: llevan sus dos dimensiones dentro del
+     * nombre (`matrix:etiqueta:prioridad`), así que se resuelven aparte.
+     *
+     * ⚠️ `leerCruce` **vuelve a validar** las dos dimensiones contra el conjunto
+     * cerrado, aunque el DTO del gateway ya lo hiciera: este comando es
+     * alcanzable por TCP sin pasar por él, igual que `incluir`.
+     */
+    for (const parte of incluir) {
+      const cruce = leerCruce(parte);
+      if (cruce) {
+        calculos[parte] = () =>
+          this.matrix(projectId, cruce.agruparPor, cruce.partirPor, filtros);
+      }
+    }
 
     const pedidos = incluir.filter((parte) => parte in calculos);
 

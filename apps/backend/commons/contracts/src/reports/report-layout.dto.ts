@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -19,6 +20,7 @@ import {
   registerDecorator,
 } from 'class-validator';
 
+import { REPORT_CROSS_DIMENSIONS, type ReportCrossDimension } from './report-bundle.dto';
 import {
   MAX_REPORT_WIDGETS,
   REPORT_GRID_COLS,
@@ -64,6 +66,26 @@ export class ReportChartSpecDto implements ReportChartSpec {
   @Min(2)
   @Max(20)
   topN?: number;
+
+  /**
+   * Las dos dimensiones del cruce.
+   *
+   * 🔴 **Tienen que estar declaradas aquí aunque `validarGrafico` ya las
+   * compruebe.** El gateway valida con `forbidNonWhitelisted`: un campo que el
+   * DTO no declare no se ignora, responde **400**. Sin estas dos líneas,
+   * guardar un cruce en el lienzo fallaría con «property agruparPor should not
+   * exist» y el gráfico volvería atrás solo. Es la misma trampa que ya mordió
+   * con `days` en las rutas de filtros.
+   */
+  @ApiPropertyOptional({ enum: REPORT_CROSS_DIMENSIONS })
+  @IsOptional()
+  @IsIn(REPORT_CROSS_DIMENSIONS as unknown as string[])
+  agruparPor?: ReportCrossDimension;
+
+  @ApiPropertyOptional({ enum: REPORT_CROSS_DIMENSIONS })
+  @IsOptional()
+  @IsIn(REPORT_CROSS_DIMENSIONS as unknown as string[])
+  partirPor?: ReportCrossDimension;
 
   @ApiProperty({ maxLength: 80 })
   @IsString()

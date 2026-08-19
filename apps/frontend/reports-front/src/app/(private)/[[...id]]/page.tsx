@@ -28,7 +28,12 @@ import {
   filtrosAQuery,
   filtrosDesdeUrl,
 } from '@/lib/reports';
-import { type Informe, type Widget, informesNecesarios, lienzoPorDefecto } from '@/lib/widgets';
+import {
+  type Widget,
+  lienzoPorDefecto,
+  parteDeCruce,
+  partesNecesarias,
+} from '@/lib/widgets';
 import {
   AppHeader,
   type AssistantQuota,
@@ -307,7 +312,7 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
      lienzo nuevo. Ver el `catch` de arriba. */
   const primeraVez = lienzo !== null && lienzo.actualizadoEn === null;
   const widgets = primeraVez && guardado.length === 0 ? lienzoPorDefecto() : guardado;
-  const necesarios = informesNecesarios(widgets);
+  const partes = partesNecesarias(widgets);
 
   /**
    * La instantánea se pide **siempre**, aunque el lienzo no la use.
@@ -338,10 +343,6 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
    * moverse** en «bloqueadas». Un `days` global convertía este último en otra
    * pregunta distinta con el mismo nombre.
    */
-  const partes = ['snapshot', ...[...necesarios].filter((informe) => informe !== 'snapshot')].map(
-    (informe) => PARTE_DE_INFORME[informe as Informe] ?? informe,
-  );
-
   /* Si el paquete entero falla, se degrada a vacío y cada tarjeta enseña su
      «no disponible», que es lo que hacía cada `.catch(() => null)` por su
      cuenta. Un fallo de un informe suelto ya vuelve como `null` desde el
@@ -613,28 +614,6 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
     </AppHeader>
   );
 }
-
-/**
- * El nombre interno de un informe → la clave que entiende el endpoint.
- *
- * Solo difiere en uno, y por eso el mapa existe: dentro se llama `cycle` y la
- * ruta lo expone como `cycle-time`. Sin esta traducción, pedir los tiempos
- * devolvía una clave que nadie leía y la tarjeta salía vacía **sin ningún
- * error** — que es exactamente la clase de fallo que este repositorio ya conoce.
- */
-const PARTE_DE_INFORME: Record<Informe, string> = {
-  snapshot: 'snapshot',
-  flow: 'flow',
-  cycle: 'cycle-time',
-  forecast: 'forecast',
-  people: 'people',
-  blocked: 'blocked',
-  weekly: 'weekly',
-  dynamics: 'dynamics',
-  /* Dentro se llama `columnTime` y la ruta lo expone como `column-time`, igual
-     que `cycle`. Es exactamente para esto que existe este mapa. */
-  columnTime: 'column-time',
-};
 
 /** El informe de este gráfico no se pudo leer. Los demás siguen en pie. */
 function NoDisponible() {

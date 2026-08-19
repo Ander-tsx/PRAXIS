@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsIn, IsOptional } from 'class-validator';
+import { IsArray, IsOptional, Matches } from 'class-validator';
 import { ReportFiltersQueryDto } from './report-filters.dto';
 
 /**
@@ -44,6 +44,60 @@ export const REPORT_BUNDLE_PARTS = [
 ] as const;
 
 export type ReportBundlePart = (typeof REPORT_BUNDLE_PARTS)[number];
+
+/**
+ * Las dimensiones por las que se puede cruzar el trabajo.
+ *
+ * Espejo de `DimensionCruce` en `tasks/stats.service.ts`, que es donde cada una
+ * es un trozo de SQL escrito a mano. Conjunto cerrado por el mismo motivo que
+ * `include`: un eje libre dejaría que el nombre de una columna llegara desde
+ * una petición hasta la consulta.
+ */
+export const REPORT_CROSS_DIMENSIONS = ['columna', 'prioridad', 'etiqueta', 'persona'] as const;
+
+export type ReportCrossDimension = (typeof REPORT_CROSS_DIMENSIONS)[number];
+
+/**
+ * Un cruce pedido dentro del paquete: `matrix:<agruparPor>:<partirPor>`.
+ *
+ * ## Por qué el cruce viaja en el `include` y no en una ruta aparte
+ *
+ * Porque un lienzo puede tener **varios** cruces distintos —etiqueta contra
+ * prioridad en uno, persona contra columna en otro— y cada uno lleva sus dos
+ * dimensiones. Con una ruta suelta, pintar un lienzo con tres cruces serían tres
+ * peticiones más, o sea tres resoluciones de permisos más, que es exactamente el
+ * coste que R4.2 quitó.
+ *
+ * La ruta suelta existe igualmente (`GET /reports/matrix`), como las otras
+ * siete: un cliente que quiere un cruce concreto no tiene por qué saber que hay
+ * un paquete.
+ */
+export const REPORT_MATRIX_PREFIX = 'matrix';
+
+/**
+ * Lo que puede aparecer en `include`, como expresión regular.
+ *
+ * Se construye **desde las dos constantes** y no a mano: una lista escrita en un
+ * literal se desincroniza el día que se añada un informe, y el síntoma sería un
+ * 400 sobre un informe que sí existe.
+ */
+export const REPORT_BUNDLE_PART_PATTERN = new RegExp(
+  `^(?:${REPORT_BUNDLE_PARTS.join('|')}|${REPORT_MATRIX_PREFIX}:(?:${REPORT_CROSS_DIMENSIONS.join(
+    '|',
+  )}):(?:${REPORT_CROSS_DIMENSIONS.join('|')}))$`,
+);
+
+/** Las dos dimensiones de un `matrix:a:b`, o `null` si no lo es. */
+export function leerCruce(parte: string): { agruparPor: string; partirPor: string } | null {
+  const trozos = parte.split(':');
+  if (trozos.length !== 3 || trozos[0] !== REPORT_MATRIX_PREFIX) return null;
+  const [, agruparPor, partirPor] = trozos as [string, string, string];
+  if (!(REPORT_CROSS_DIMENSIONS as readonly string[]).includes(agruparPor)) return null;
+  if (!(REPORT_CROSS_DIMENSIONS as readonly string[]).includes(partirPor)) return null;
+  /* Cruzar una dimensión consigo misma da la diagonal y nada más. */
+  if (agruparPor === partirPor) return null;
+  return { agruparPor, partirPor };
+}
 
 /**
  * Lo que devuelve el viaje único.
@@ -90,8 +144,15 @@ export class ReportBundleQueryDto extends ReportFiltersQueryDto {
       : value,
   )
   @IsArray()
-  @IsIn(REPORT_BUNDLE_PARTS as unknown as string[], { each: true })
-  include?: ReportBundlePart[];
+  /* `@Matches` y no `@IsIn`: desde el cruce, una parte válida puede ser
+     `matrix:etiqueta:prioridad`, que no cabe en una lista de literales. El
+     patrón sale de las mismas constantes, así que sigue siendo un conjunto
+     cerrado — solo que expresado de otra forma. */
+  @Matches(REPORT_BUNDLE_PART_PATTERN, {
+    each: true,
+    message: 'Ese informe no existe. Revisa `include`.',
+  })
+  include?: string[];
 
   /** Ventana en días, para los que la aceptan. El gateway la acota a 1–365. */
   @ApiPropertyOptional({ description: 'Días de historial (1–365)' })

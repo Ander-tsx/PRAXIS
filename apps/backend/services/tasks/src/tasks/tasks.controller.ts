@@ -34,7 +34,7 @@ import {
 import { AttachmentsService } from './attachments.service';
 import { CommentsService } from './comments.service';
 import { LabelsService } from './labels.service';
-import { StatsService } from './stats.service';
+import { type DimensionCruce, StatsService } from './stats.service';
 import { TasksService } from './tasks.service';
 
 @Controller()
@@ -262,6 +262,26 @@ export class TasksController {
   @MessagePattern({ cmd: 'task_stats_portfolio' })
   statsPortfolio(@Payload() dto: { projectIds: string[]; dias?: number }) {
     return this.statsService.portfolio(dto.projectIds ?? [], dto.dias);
+  }
+
+  /**
+   * El cruce de dos dimensiones. Ver `StatsService.matrix`.
+   *
+   * ⚠️ Las dos dimensiones llegan **ya validadas** contra el conjunto cerrado
+   * por el DTO del gateway; el servicio las vuelve a comprobar porque este
+   * comando también es alcanzable por TCP sin pasar por él.
+   */
+  @MessagePattern({ cmd: 'task_stats_matrix' })
+  statsMatrix(
+    @Payload()
+    dto: {
+      projectId: string;
+      agruparPor: DimensionCruce;
+      partirPor: DimensionCruce;
+      filtros?: ReportFilters;
+    },
+  ) {
+    return this.statsService.matrix(dto.projectId, dto.agruparPor, dto.partirPor, dto.filtros);
   }
 
   /**

@@ -1,6 +1,7 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsISO8601, IsIn, IsOptional, IsUUID } from 'class-validator';
 import { Priority } from '../tasks/priority.enum';
+import { REPORT_CROSS_DIMENSIONS, type ReportCrossDimension } from './report-bundle.dto';
 
 /**
  * Los filtros de la sección de Análisis, definidos **una sola vez**.
@@ -179,4 +180,21 @@ export class ReportWeeklyQueryDto extends ReportFiltersQueryDto {
   @ApiPropertyOptional({ description: 'Semanas de la serie (2–52)' })
   @IsOptional()
   weeks?: string;
+}
+
+/**
+ * Los filtros más las dos dimensiones del cruce. Solo lo usa `GET /reports/matrix`.
+ *
+ * ⚠️ Los dos son **obligatorios**: un cruce con una sola dimensión es cualquiera
+ * de los gráficos que ya existen, y aceptarlo aquí habría duplicado el catálogo
+ * con una ruta que responde peor.
+ */
+export class ReportMatrixQueryDto extends ReportFiltersQueryDto {
+  @ApiProperty({ enum: REPORT_CROSS_DIMENSIONS })
+  @IsIn(REPORT_CROSS_DIMENSIONS as unknown as string[])
+  groupBy!: ReportCrossDimension;
+
+  @ApiProperty({ enum: REPORT_CROSS_DIMENSIONS })
+  @IsIn(REPORT_CROSS_DIMENSIONS as unknown as string[])
+  splitBy!: ReportCrossDimension;
 }

@@ -59,6 +59,15 @@ export class ReportsController {
     return this.reports.blocked(dto.projectId, dto.days, dto.filtros);
   }
 
+  /** El cruce de dos dimensiones. Ver `ReportsService.matrix`. */
+  @MessagePattern({ cmd: 'report_matrix' })
+  matrix(
+    @Payload()
+    dto: { projectId: string; agruparPor: string; partirPor: string; filtros?: ReportFilters },
+  ) {
+    return this.reports.matrix(dto.projectId, dto.agruparPor, dto.partirPor, dto.filtros);
+  }
+
   /** Tiempo por columna. Ver `ReportsService.columnTime`. */
   @MessagePattern({ cmd: 'report_column_time' })
   columnTime(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
