@@ -4653,3 +4653,169 @@ barato.
 No se hizo **a ciegas**: exige conocer los mínimos y el ciclo de vida del
 proveedor para el modelo concreto, y no se puede verificar nada con la clave sin
 presupuesto. Queda como R7 en el plan de rediseño, con lo que habría que hacer.
+
+---
+
+## 44. Análisis: filtros, cartera y un constructor que no necesita a PRAX
+
+La etapa R4 del [plan de rediseño](PLAN-REDISENO.md), cerrada. Cuatro cosas que
+la sección no tenía y una que tenía mal.
+
+### 44.1 Los filtros, en las ocho rutas y en el `WHERE`
+
+`from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`. Un solo DTO
+—`ReportFiltersQueryDto`— validado por el gateway en las siete rutas sueltas y
+en el paquete, y aplicado en las siete consultas agregadas de `StatsService`.
+
+**Por qué un DTO compartido y no un parámetro por ruta.** Con los filtros metidos
+ruta a ruta, la pantalla acabaría pudiendo filtrar el flujo acumulado por tablero
+pero no la instantánea, sin nada que explicara la diferencia. Un filtro que está
+en unos gráficos y no en otros no se lee como una limitación técnica: se lee como
+que el gráfico que no filtra está mal.
+
+**El tablero no hubo que traducirlo a columnas.** Parecía que sí —los tableros
+viven en projects-service y aquí se agregan tareas— pero `Task` guarda `boardId`
+además de `columnId`, y `TaskEvent` también. Comprobarlo antes ahorró un cruce
+contra projects-service en la ruta más pedida de la sección.
+
+#### 🔴 Los filtros van en la clave de Redis, y el `from` derivado de `days` no
+
+Las dos mitades hacen falta y las dos fallan en silencio:
+
+- **Sin los filtros en la clave**, quien mira el flujo de un tablero concreto deja
+  su resultado guardado bajo la clave del proyecto entero, y el siguiente en
+  entrar —filtre o no— ve el gráfico de otro durante los 60 s de la caché. No hay
+  error: hay un gráfico plausible y equivocado.
+- **Con el `from` derivado de `days` dentro**, la clave cambia cada milisegundo
+  —es «ahora menos sesenta días»— y ningún informe vuelve a acertar en caché
+  jamás. Se ve como que la caché dejó de funcionar.
+
+`claveDeFiltros` vive en el mismo archivo que el DTO para que un filtro nuevo se
+añada a los dos sitios a la vez.
+
+#### ⚠️ Un tramo demasiado ancho se rechaza; `days` se recorta
+
+Son dos formas de pedir la misma ventana y se tratan distinto a propósito. Quien
+escribe `?days=100000` está pidiendo «todo», y devolverle 365 días es lo que
+quería. Dos fechas son una pregunta concreta —«del 1 de enero al 30 de junio»— y
+estrecharla por detrás devuelve un gráfico que se lee como su respuesta sin
+serlo. Es la regla de §43: **un recorte mudo es peor que no recortar**.
+
+#### ⚠️ `from`/`to` no acota lo mismo en todos los informes
+
+Y no puede, porque no miden lo mismo:
+
+| Informe | El tramo acota | Por qué |
+|---|---|---|
+| `snapshot`, `blocked`, `people` | `createdAt` | Miden **estado de ahora**. Un tramo solo puede querer decir «de lo que entró en él» |
+| `cycle-time`, `forecast` | `completedAt` | Miden lo que se cerró |
+| `flow` | `occurredAt` | Mide movimientos |
+| `weekly` | **es el eje** | Qué semanas salen, no qué tareas cuentan |
+
+Los cuatro devuelven un gráfico plausible con cualquier criterio, que es la razón
+de que la tabla esté escrita en `StatsService`.
+
+#### ⚠️ Y el reparto se acota a la dimensión filtrada
+
+Filtrar por una responsable devolvía un reparto **por persona** con tres: la suya
+y las de quien compartiera tarea con ella, con un 1 al lado. Medido:
+`22222222:62` junto a `11111111:1` y `33333333:1`. Lo mismo por etiqueta —pedir
+«frontend» daba 45 de frontend y otras tres etiquetas con 1, 6 y 2—.
+
+Las tareas seleccionadas estaban bien; el problema era la dimensión del reparto:
+las dos relaciones son de muchos a muchos. En la pantalla eso se lee como que el
+filtro **no se aplicó**, y un filtro que funciona pareciendo roto es peor que uno
+que no está. Lo que se pierde es el cruce —«de lo de frontend, cuánto es
+urgente»— y se pierde a propósito: es una pregunta de dos dimensiones sobre un
+gráfico que tiene una.
+
+#### La barra, y su `key`
+
+Los filtros viven en la URL, como en Administración: «las urgentes del tablero de
+diseño» es un enlace que se pega en un mensaje. Sin botón «Aplicar», porque desde
+R4.2 un cambio de filtro cuesta **una** petición —la misma que abrir la pantalla—
+y un botón aparte solo crea el estado en el que la pantalla enseña unos números y
+los controles dicen otra cosa.
+
+⚠️ **`AnalysisFilters` lleva una `key` atada a los filtros puestos.** Los dos
+selectores de fecha no se controlan desde fuera y en una navegación suave del App
+Router no se desmontan: «Quitar filtros» dejaba la URL limpia y el campo seguía
+enseñando la fecha.
+
+### 44.2 La cartera — `GET /me/reports/portfolio`
+
+Una fila por proyecto con lo que hace entrar: abiertas, vencidas, sin asignar,
+paradas y el ritmo de esta semana contra la anterior. Cuelga de `/me` porque no
+hay proyecto en la ruta contra el que comprobar nada, y **la línea de acceso es
+la lista**: el gateway pide los proyectos con `canViewReports` y agrega solo
+esos.
+
+**Dos consultas, no dos por proyecto.** Llamar a `snapshot` y `sinMovimiento` por
+cada uno habría hecho que quien lleva doce pagara veinticuatro agregaciones para
+pintar una tabla que se lee en cinco segundos. Es el cálculo de R4.2
+multiplicado por cuántos proyectos lleve cada cual.
+
+⚠️ **Se recorre `projectIds`, no el resultado del `GROUP BY`**: un proyecto sin
+ninguna tarea no sale de una agrupación, y desaparecer de la cartera se lee como
+que no tienes acceso.
+
+⚠️ **No se calcula ninguna variación del ritmo**, solo los dos números. La semana
+en curso está a medias y un lunes cualquier comparación con siete días completos
+da un «−80 %» falso dicho con seguridad. En el informe semanal de un proyecto eso
+se resuelve mandando también el ritmo diario de las dos; aquí no cabe.
+
+⚠️ **`/reports/cartera` puede quedar oculta por un proyecto con ese slug.** Es una
+ruta estática hermana de `[[...id]]` y Next da prioridad a la estática. Es el
+patrón que ya usa `projects-front` con `tablero` y `tarea`; el arreglo de verdad
+—reservar esos slugs— está en PENDIENTES-BACKEND §21.
+
+### 44.3 El constructor de gráficos
+
+Diez métricas por cinco formas estaban **enteras detrás de una conversación**.
+Ahora se eligen de dos desplegables, sin modelo y sin cuota. Los dos caminos se
+quedan: PRAX sigue siendo el atajo para quien ya sabe qué preguntar.
+
+**Produce exactamente lo mismo que la propuesta del asistente** —el mismo
+`ReportChartSpec`, la misma validación, la misma ruta de guardado—. Si
+divergieran, un gráfico hecho a mano y otro pedido hablando podrían dibujar
+cosas distintas bajo el mismo título.
+
+**Los desplegables no ofrecen lo imposible.** Las formas salen de
+`METRICAS[metrica].formas`, y el rango, el top N y «solo vencidas» solo aparecen
+si esa métrica los acepta. Un conjunto cerrado que deja componer combinaciones
+inválidas y luego las rechaza es un formulario con trampas.
+
+⚠️ **Cambiar de métrica rehace la forma y el título.** Si no, queda puesta una
+forma que la métrica nueva no acepta y el error solo sale al pulsar «Añadir»; y
+un gráfico de cierres semanales rotulado «Tareas por columna» se lee mal y nadie
+lo revisa.
+
+### 44.4 🔴 El lienzo de partida no se podía tocar
+
+`lienzoPorDefecto()` nacía con los ids `defecto-resumen`, `defecto-columna` y
+`defecto-prioridad`, y `ReportLayoutDto` valida cada `id` con `@IsUUID`. El
+lienzo de R4.6 se pintaba bien y **el primer arrastre respondía 400**: la
+disposición volvía atrás sola y la pantalla decía «Validation failed».
+
+No aparecía al abrir —el lienzo de partida se pinta sin guardar nada— sino al
+mover algo, que es el gesto siguiente. Y ni el typecheck ni `next build` podían
+verlo: los dos lados son `string`. Salió al ejecutarlo contra el backend
+levantado, que es la moraleja entera de este apartado.
+
+Ahora son tres UUID constantes, y constantes a propósito: `lienzoPorDefecto()`
+corre en el servidor en cada carga, y con `crypto.randomUUID()` dos pestañas del
+mismo proyecto guardarían dos lienzos distintos y ganaría el último.
+
+### 44.5 Lo que sube a `commons` en esta etapa
+
+`SelectorDeFecha` y `DataTable`, las dos con la regla de siempre: las usan dos
+zonas. Mudanzas sin cambios de lógica y con sus comentarios intactos —los de
+`DataTable` sobre la pista `auto` y el `minmax(0, Nfr)` son media razón de que
+ese componente exista—.
+
+### 44.6 R4.8: no hacen falta tablas para `reports-service`
+
+Estaba escrito como «si R4.2 o R4.4 las piden». No las piden: R4.2 agrupa
+peticiones que ya existían y R4.4 agrega en tasks-service, donde están los datos.
+El servicio sigue **sin base de datos**, que es lo que se decidió en §25.6, y el
+lienzo sigue en `projects-service` sin migración entre bases.
