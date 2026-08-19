@@ -4,6 +4,7 @@ import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestj
 import {
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
+  ASSISTANT_PDF_MAX_INLINE_PAGES,
   ASSISTANT_TEXT_MAX_CHARS,
   ASSISTANT_TEXT_MIME,
   type AssistantChatResult,
@@ -1223,7 +1224,16 @@ export class AssistantService {
    * mudo haría que el modelo hablara con confianza de un documento del que solo
    * ha visto el principio, que es la peor forma de equivocarse aquí.
    */
-  private repartirAdjuntos(adjuntos: { id: string; name: string; mime: string; data: string }[]) {
+  private repartirAdjuntos(
+    adjuntos: {
+      id: string;
+      name: string;
+      mime: string;
+      data: string;
+      pages?: number | null;
+      extract?: string | null;
+    }[],
+  ) {
     const archivos: { mimeType: string; data: string }[] = [];
     const trozos: string[] = [];
 
@@ -1253,6 +1263,48 @@ export class AssistantService {
             texto.length > ASSISTANT_TEXT_MAX_CHARS,
           ),
         );
+        continue;
+      }
+
+      /**
+       * 🔴 **Un PDF largo NO viaja nativo, y este era el peor caso del sistema.**
+       *
+       * Va como `inlineData` para que el modelo lo lea con su maquetación, y eso
+       * está bien para un documento de trabajo. Pero Gemini tokeniza un PDF **por
+       * páginas** —del orden de 250 cada una— y el único tope que había eran 5 MB,
+       * que un informe de 500 páginas cumple de sobra: **130 000 tokens en un solo
+       * turno**, tres por mensaje, y contando como *un* mensaje de la cuota.
+       *
+       * Ningún plan por peticiones sobrevive a eso, y lo peor es que no hace falta
+       * mala fe: basta con adjuntar un manual.
+       *
+       * A partir del tope va su **texto**, que se extrajo al subirlo y sí está
+       * acotado. Se pierde la maquetación —se dice, para que el modelo no hable de
+       * tablas que no ha visto— y se gana que el coste de un turno sea una cifra
+       * que se puede escribir en un contrato.
+       */
+      if (
+        adjunto.mime === 'application/pdf' &&
+        (adjunto.pages ?? 0) > ASSISTANT_PDF_MAX_INLINE_PAGES
+      ) {
+        if (adjunto.extract) {
+          trozos.push(
+            bloqueDeArchivo(
+              `${adjunto.name} (${adjunto.pages} paginas; solo el texto, sin maquetacion ni figuras)`,
+              adjunto.extract,
+              /* Solo si de verdad se cortó. Decir «el archivo continúa» sobre un
+                 texto completo es mentirle al modelo en la única frase que está
+                 ahí para que no se fíe de más. */
+              adjunto.extract.length >= ASSISTANT_TEXT_MAX_CHARS,
+            ),
+          );
+        } else {
+          /* Un escaneado largo no tiene texto que mandar y no cabe nativo: se
+             nombra y se dice por qué, en vez de callarlo. */
+          trozos.push(
+            `--- ARCHIVO ADJUNTO: ${adjunto.name} (${adjunto.pages} paginas, escaneado: no se ha podido leer su texto y es demasiado largo para verlo entero) ---`,
+          );
+        }
         continue;
       }
 

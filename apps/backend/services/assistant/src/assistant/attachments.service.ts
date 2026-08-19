@@ -121,7 +121,7 @@ export class AttachmentsService {
      * `null` es un resultado válido —una imagen, un PDF escaneado— y no impide
      * guardar: ese archivo se comporta como todos antes de que esto existiera.
      */
-    const extract = await extractoDe({
+    const { extract, pages } = await extractoDe({
       filename: datos.filename,
       mimeType: datos.mimeType,
       bytes,
@@ -134,6 +134,9 @@ export class AttachmentsService {
         size: bytes.byteLength,
         uploadedBy: datos.userId,
         extract,
+        /* Solo los PDF lo traen. Decide si el archivo viaja nativo al modelo o
+           como texto: ver `ASSISTANT_PDF_MAX_INLINE_PAGES`. */
+        pages,
       },
       select: CAMPOS_PUBLICOS,
     });
@@ -233,7 +236,9 @@ export class AttachmentsService {
 
     const adjuntos = await this.prisma.attachment.findMany({
       where: { id: { in: ids }, uploadedBy: userId, messageId: null },
-      select: { id: true, filename: true, mimeType: true },
+      /* `pages` y `extract` viajan con el turno porque de los dos depende **cómo**
+         se le manda el archivo al modelo: un PDF largo va como texto, no nativo. */
+      select: { id: true, filename: true, mimeType: true, pages: true, extract: true },
       take: ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
     });
 
@@ -252,6 +257,8 @@ export class AttachmentsService {
           name: adjunto.filename,
           mime: adjunto.mimeType,
           data: bytes.toString('base64'),
+          pages: adjunto.pages,
+          extract: adjunto.extract,
         };
       }),
     );

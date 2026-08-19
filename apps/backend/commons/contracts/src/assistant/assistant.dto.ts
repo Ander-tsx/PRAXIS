@@ -139,6 +139,32 @@ export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
 export const ASSISTANT_DRAFT_TTL_MS = 60 * 60 * 1000;
 
 /**
+ * Hasta cuántas páginas se le manda un PDF **nativo** al modelo.
+ *
+ * ## 🔴 El agujero que tapa, que era el peor caso de todo el sistema
+ *
+ * Un PDF va como `inlineData` para que el modelo lo lea con su maquetación, sus
+ * tablas y sus figuras — que es mejor que el texto pelado y por eso se hace. Pero
+ * **el tope era de 5 MB y no había ninguno de páginas**, y Gemini tokeniza un PDF
+ * por páginas: del orden de 250 tokens cada una. Un documento de 500 páginas que
+ * pese menos de 5 MB —cualquier informe corporativo lo es— entraba entero:
+ * **~130 000 tokens en un solo turno**, y caben tres por mensaje.
+ *
+ * O sea que el peor caso del sistema no era un proyecto grande (19 300 tokens,
+ * ya con techo): era alguien adjuntando un manual, sin mala intención, y
+ * gastando cien veces lo previsto **contando como un mensaje de su cuota**. Eso
+ * es lo que hace inviable cualquier plan por peticiones.
+ *
+ * A partir de aquí el PDF viaja **como texto**, que ya se extrae al subirlo y sí
+ * tiene tope (`ASSISTANT_TEXT_MAX_CHARS`). Se pierde la maquetación y se gana
+ * que el coste de un turno sea una cifra que se puede escribir en un contrato.
+ *
+ * 25 páginas son ~6 500 tokens: un documento de trabajo normal entra nativo, y
+ * lo que no entra es justo lo que no debería haber entrado nunca.
+ */
+export const ASSISTANT_PDF_MAX_INLINE_PAGES = 25;
+
+/**
  * 5 MB por archivo.
  *
  * El quinto del chat de equipo (25 MB) a propósito: allí un adjunto se guarda y

@@ -51,12 +51,15 @@ export async function extractoDe(datos: {
   filename: string;
   mimeType: string;
   bytes: Buffer;
-}): Promise<string | null> {
+}): Promise<{ extract: string | null; pages: number | null }> {
   const { filename, mimeType, bytes } = datos;
 
   if (ASSISTANT_TEXT_MIME.includes(mimeType)) {
     const texto = bytes.toString('utf8').trim();
-    return texto.length > 0 ? texto.slice(0, ASSISTANT_TEXT_MAX_CHARS) : null;
+    return {
+      extract: texto.length > 0 ? texto.slice(0, ASSISTANT_TEXT_MAX_CHARS) : null,
+      pages: null,
+    };
   }
 
   if (mimeType === 'application/pdf') {
@@ -75,14 +78,22 @@ export async function extractoDe(datos: {
        */
       const { extractText, getDocumentProxy } = await import('unpdf');
       const documento = await getDocumentProxy(new Uint8Array(bytes));
-      const { text } = await extractText(documento, { mergePages: true });
+      /* `totalPages` sale de la misma lectura: contar páginas aparte sería abrir
+         el documento dos veces para un dato que ya está delante. */
+      const { text, totalPages } = await extractText(documento, { mergePages: true });
       const limpio = text.trim();
       /* Un PDF escaneado devuelve la cadena vacía: no es un error, es que ahí no
          hay texto que sacar. Se trata como una imagen. */
-      return limpio.length > 0 ? limpio.slice(0, ASSISTANT_TEXT_MAX_CHARS) : null;
+      return {
+        extract: limpio.length > 0 ? limpio.slice(0, ASSISTANT_TEXT_MAX_CHARS) : null,
+        pages: totalPages,
+      };
     } catch (error) {
       log.warn(`No se pudo leer el PDF "${filename}": ${(error as Error).message}`);
-      return null;
+      /* Sin páginas contadas se trata como corto y viaja nativo: es lo que hacía
+         antes de que existiera el tope, y un PDF que ni se deja abrir tampoco va
+         a tener quinientas páginas legibles. */
+      return { extract: null, pages: null };
     }
   }
 
@@ -101,7 +112,7 @@ export async function extractoDe(datos: {
    * columna con un dato que se puede componer de dos que ya existen es una
    * columna que se va a quedar desincronizada.
    */
-  return null;
+  return { extract: null, pages: null };
 }
 
 /** El archivo, con su contenido, tal y como lo lee el modelo. */

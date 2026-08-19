@@ -257,6 +257,17 @@ model Attachment {
   /// nombre, tipo y tamaño; meter esto ahí metería cada documento del hilo en
   /// cada lectura de la pantalla. Lo lee solo quien arma el historial del modelo.
   extract        String?
+  /// Cuántas páginas tiene, **solo en los PDF**.
+  ///
+  /// Se cuenta al subirlo, en el mismo momento en que ya se abre para sacarle el
+  /// texto, así que no cuesta nada. Y decide una cosa concreta: si el PDF viaja
+  /// **nativo** —con su maquetación, que es como se lee mejor— o solo como
+  /// texto. Ver `ASSISTANT_PDF_MAX_INLINE_PAGES`: sin ese tope, un manual de 500
+  /// páginas entraba entero en un turno y costaba cien veces lo previsto.
+  ///
+  /// `null` en todo lo que no sea un PDF, y en los anteriores a esta columna —
+  /// que se tratan como cortos, que es como se comportaban.
+  pages          Int?
   uploadedBy     String
   createdAt      DateTime @default(now())
 
