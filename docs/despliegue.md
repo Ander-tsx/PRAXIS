@@ -90,6 +90,64 @@ gcloud compute ssh "$VM" --tunnel-through-iap --zone "$ZONA" \
 Si la migración **borra o renombra** algo, no hay atajo: hay que parar el
 tráfico, migrar y desplegar, en ese orden.
 
+### 🔴 Pero `migrar.sh` no puede aplicar una migración que todavía no existe
+
+El párrafo de arriba dice «migrar primero, desplegar después», y con el comando
+de arriba **eso es imposible para una migración nueva**: `migrar.sh` corre
+*dentro de la imagen desplegada*, y una migración recién escrita solo está en la
+imagen que aún no se ha construido. El comando se ejecuta, dice que todo está al
+día, y no aplica nada.
+
+Se descubrió desplegando: la imagen en producción tenía 3 migraciones del
+asistente y la rama traía 8.
+
+Para cumplir el orden de verdad hay que llegar a Cloud SQL **desde el
+repositorio**, y para eso está el túnel por IAP a través de la VM del backend:
+
+```bash
+IP_SQL=$(gcloud sql instances list --filter="name~praxis-postgres" \
+  --format="value(ipAddresses[0].ipAddress)")
+VM=$(gcloud compute instances list --filter="name~praxis-backend" --format="value(name)" | head -1)
+ZONA=$(gcloud compute instances list --filter="name~praxis-backend" --format="value(zone)" | head -1)
+
+# En una terminal aparte: el túnel se queda abierto.
+gcloud compute ssh "$VM" --tunnel-through-iap --zone "$ZONA" -- -N -L "5433:$IP_SQL:5432"
+```
+
+Y con el túnel abierto, desde la raíz del repositorio:
+
+```bash
+CLAVE=$(gcloud secrets versions access latest --secret=praxis-password-sql)
+CLAVE_URL=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$CLAVE")
+
+for s in permissions credentials projects tasks assistant alexa; do
+  DATABASE_URL="postgresql://praxis:${CLAVE_URL}@localhost:5433/praxis?schema=${s}" \
+    npx --prefix apps/backend/services/$s prisma migrate deploy \
+    --schema apps/backend/services/$s/prisma/schema.prisma
+done
+```
+
+⚠️ **`?schema=<servicio>` no es opcional.** Cada microservicio tiene su propio
+schema y su propia tabla `_prisma_migrations` dentro de él — es lo mismo que hace
+`url_para()` en `migrar.sh`. Con `?schema=public` los seis fallan con
+
+```
+Error: Invariant violation: migration persistence is not initialized.
+```
+
+que no dice absolutamente nada de lo que está pasando. Se tarda más en entender
+ese mensaje que en arreglarlo.
+
+⚠️ Y el orden de la lista importa: es el mismo de `migrar.sh` —permissions y
+credentials antes que projects y tasks— porque los seeds de los segundos
+referencian lo que crean los primeros.
+
+Para comprobar antes o después, `prisma migrate status` con la misma URL: dice
+«Database schema is up to date!» o enumera lo que falta.
+
+`migrar.sh` sigue siendo lo correcto para **volver a aplicar** algo que ya está
+en la imagen, o para el arranque limpio de aquí abajo.
+
 ---
 
 ## Arrancar una instalación de cero
