@@ -9,8 +9,8 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R4 — Análisis (R4.1 y R4.2 hechas) |
-| **Última tarea terminada** | R4.2 — un solo viaje para los agregados |
+| **Etapa actual** | R4 — Análisis (R4.1, R4.2, R4.6 y R4.7 hechas) |
+| **Última tarea terminada** | R4.6 y R4.7 — lienzo de partida, y el asistente ya solo vive en el cajón |
 | **Siguiente** | R4.3 — filtros de verdad en los siete agregados |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
@@ -44,6 +44,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-19 | (fuera de plan) | `519c40d`, `9d5f9e2` | **El prompt, medido y recortado.** De 29 300 a 19 300 tokens por turno, y con techo: el inventario deja de crecer con el proyecto. Con `tareasOmitidas` para que el recorte no sea mudo. ESTADO-ACTUAL §43 |
 | 2026-08-19 | (fuera de plan) | `940acf2` | **El tope de páginas del PDF.** Era el peor caso real: 5 MB sin límite de páginas son ~130 000 tokens en un turno. A partir de 25 páginas viaja como texto. R7 y R8 quedan escritas |
 | 2026-08-19 | R4.2 | (este) | Un viaje para los agregados. De siete peticiones —y siete resoluciones de permisos— a una. Con `allSettled` para no agrupar los fallos, y `blocked` fuera del `days` compartido |
+| 2026-08-19 | R4.6 + R4.7 | (este) | El lienzo arranca con los tres gráficos que salen de `snapshot`. R4.7 ya estaba hecha por R3.6 y se cierra verificada |
 
 ---
 
@@ -343,9 +344,23 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
       existe— y **agrega en el servidor**, no con N llamadas desde el navegador.
 - [ ] **R4.5 — El constructor de gráficos**, determinista, en la propia pantalla.
       Mismo conjunto cerrado de métricas y formas que ya valida el backend.
-- [ ] **R4.6 — El lienzo deja de arrancar vacío**: una disposición por defecto la
+- [x] **R4.6 — El lienzo deja de arrancar vacío**: una disposición por defecto la
       primera vez, que se puede cambiar y se guarda como cualquier otra.
-- [ ] **R4.7 — Fuera el asistente**, y en su lugar el cajón contextual de R3.6.
+      ⚠️ **Contradecía una decisión escrita en `CanvasVacio`** —«no se rellena con
+      un lienzo por defecto»— y el argumento de allí era bueno: los cinco de antes
+      dejaban tres tarjetas disculpándose por falta de datos. Se resuelve haciendo
+      falsas las dos objeciones: el de partida son **solo los tres que salen de
+      `snapshot`**, el único informe que no necesita historial y que ya viajaba en
+      el paquete. Ninguno puede disculparse, y no cuesta una petición más.
+      ⚠️ Y la condición es `actualizadoEn === null`, **no** que la lista esté
+      vacía: un lienzo vaciado a propósito también llega vacío. Un fallo de
+      lectura tampoco cuenta como primera vez — pintarlo habría hecho que el
+      siguiente arrastre guardara los tres de partida encima del lienzo real.
+- [x] **R4.7 — Fuera el asistente**, y en su lugar el cajón contextual de R3.6.
+      *Resultado:* **ya estaba hecha**, por R3.6 (`6c14adf`). Verificado: el único
+      asistente que queda en Análisis es el cajón —`AnalysisScreen` → `DockSlot` →
+      `AssistantChat variante="cajon"`— y no hay restos del montaje anterior en la
+      página. Se cierra sin escribir código, como R6.5.2.
 - [ ] **R4.8 — Tablas propias para `reports-service`** si R4.2/R4.4 las piden.
       Hoy el servicio **no tiene ninguna** —agrega de tasks y projects por TCP y
       cachea en Redis— así que sería su primera migración, y hay que tocar los

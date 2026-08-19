@@ -237,6 +237,61 @@ export function informesNecesarios(widgets: Widget[]): Set<Informe> {
   return necesarios;
 }
 
+/**
+ * La disposición con la que arranca un lienzo que **nunca se ha guardado**.
+ *
+ * ## ⚠️ Esto contradice una decisión escrita, y por eso se explica entera
+ *
+ * `CanvasVacio` dice, con razón, que **no se rellena con un lienzo por
+ * defecto**: poner los cinco gráficos de antes «para que no esté vacío»
+ * devolvía el problema que el lienzo vino a resolver — tres tarjetas
+ * disculpándose («no hay suficientes datos», «faltan 10 tareas cerradas») en la
+ * primera pantalla que ve alguien.
+ *
+ * Ese argumento sigue siendo cierto **para aquellos cinco**. Lo que no se
+ * sostiene es la conclusión de que entonces no haya ninguno: un proyecto con 186
+ * tareas y dos meses de historial abría en blanco, y una pantalla en blanco con
+ * un catálogo al lado tampoco es una buena primera impresión.
+ *
+ * La salida es la que hace falsas las dos objeciones a la vez: **solo entran los
+ * gráficos que salen de `snapshot`**, que es el único informe que no necesita
+ * historial —es una foto del momento— y el único que se pide siempre. Ninguno de
+ * los tres puede disculparse por falta de datos, porque si el proyecto tiene
+ * tareas, los tres tienen algo que enseñar.
+ *
+ * Y no cuesta ni una petición más: `snapshot` ya viajaba en el paquete.
+ *
+ * ## Sigue siendo tuyo
+ *
+ * No se guarda al pintarlo. Es lo que se ve la primera vez; en cuanto alguien
+ * mueve, quita o añade algo, se guarda su versión y esto no vuelve a aparecer —
+ * incluida la versión vacía, que es por qué el `actualizadoEn` del lienzo importa
+ * más que su número de widgets.
+ */
+export function lienzoPorDefecto(): Widget[] {
+  const alto = (tipo: TipoWidget) => CATALOGO[tipo].h;
+
+  return [
+    { id: 'defecto-resumen', tipo: 'resumen', x: 0, y: 0, w: 12, h: alto('resumen') },
+    {
+      id: 'defecto-columna',
+      tipo: 'por_columna',
+      x: 0,
+      y: alto('resumen'),
+      w: 6,
+      h: alto('por_columna'),
+    },
+    {
+      id: 'defecto-prioridad',
+      tipo: 'por_prioridad',
+      x: 6,
+      y: alto('resumen'),
+      w: 6,
+      h: alto('por_prioridad'),
+    },
+  ];
+}
+
 /** Los tipos fijos que ya están puestos, para no ofrecerlos otra vez. */
 export function tiposYaPuestos(widgets: Widget[]): Set<TipoWidget> {
   return new Set(widgets.filter((w) => !CATALOGO[w.tipo]?.repetible).map((w) => w.tipo));

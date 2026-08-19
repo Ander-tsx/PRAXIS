@@ -22,7 +22,7 @@ import type {
   ReportSnapshot,
   ReportWeekly,
 } from '@/lib/reports';
-import { type Informe, type Widget, informesNecesarios } from '@/lib/widgets';
+import { type Informe, type Widget, informesNecesarios, lienzoPorDefecto } from '@/lib/widgets';
 import {
   AppHeader,
   type AssistantQuota,
@@ -213,9 +213,19 @@ export default async function ReportsPage({ params }: PageProps) {
   const [lienzo, proyectos, members, etiquetas, cuota] = await Promise.all([
     api
       .get<LienzoGuardado>(`/projects/${projectId}/reports/layout`)
-      /* Un lienzo que no se puede leer se trata como vacío, no como un error:
-         perder la disposición es molesto, perder la pantalla entera es peor. */
-      .catch(() => ({ widgets: [] as Widget[], actualizadoEn: null })),
+      /**
+       * Un lienzo que no se puede leer no tumba la pantalla: perder la
+       * disposición es molesto, perder Análisis entero es peor.
+       *
+       * ⚠️ **Pero `null` es «no se pudo leer», no «no hay ninguno»** (invariante
+       * 6), y desde que existe un lienzo por defecto la diferencia tiene
+       * consecuencias: devolver aquí un `{ widgets: [], actualizadoEn: null }`
+       * haría que un fallo pasajero se leyera como «primera vez» y pintara los
+       * tres de partida encima del lienzo de alguien. Y como el lienzo se guarda
+       * al mover un gráfico, **el siguiente arrastre habría borrado su
+       * disposición de verdad**.
+       */
+      .catch(() => null),
     listaPromesa,
     /* Los miembros y el directorio piden solo `canViewProject`: el asistente
        necesita poner nombre a un `userId` para pintar una propuesta. */
@@ -234,7 +244,23 @@ export default async function ReportsPage({ params }: PageProps) {
       .catch(() => null),
   ]);
 
-  const widgets = lienzo.widgets;
+  /**
+   * El lienzo, o el de partida si nunca se guardó ninguno.
+   *
+   * ⚠️ **La condición es `actualizadoEn`, no que la lista esté vacía.** Un lienzo
+   * guardado *a propósito* sin ningún gráfico también llega con `widgets: []`, y
+   * volver a rellenárselo sería devolverle cada vez lo que acaba de quitar.
+   * `actualizadoEn` es lo único que distingue «nunca ha tocado esto» de «lo dejó
+   * así».
+   *
+   * El de partida son los tres que salen de `snapshot` — ver `lienzoPorDefecto`,
+   * donde está el porqué de que sean esos tres y no los cinco de antes.
+   */
+  const guardado = lienzo?.widgets ?? [];
+  /* `lienzo !== null` es lo que impide que un fallo de lectura se disfrace de
+     lienzo nuevo. Ver el `catch` de arriba. */
+  const primeraVez = lienzo !== null && lienzo.actualizadoEn === null;
+  const widgets = primeraVez && guardado.length === 0 ? lienzoPorDefecto() : guardado;
   const necesarios = informesNecesarios(widgets);
 
   /**
