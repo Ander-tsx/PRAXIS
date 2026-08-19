@@ -26,6 +26,40 @@ const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 const LIMITE_INVENTARIO = 500;
 
 /**
+ * El techo **real** del inventario, en caracteres de JSON.
+ *
+ * ## Por qué un presupuesto y no un número de tareas
+ *
+ * `LIMITE_INVENTARIO` topa filas, y una fila no cuesta lo mismo que otra: una
+ * tarea abierta con tres encargados y un checklist ocupa el doble que una
+ * cerrada. Topar por filas deja el coste real oscilando según qué haya dentro,
+ * que es justo lo que no se quiere acotar a ojo.
+ *
+ * ## Lo que arregla, que no es el precio de hoy
+ *
+ * Esto viaja **entero, en cada turno**, dentro de la instrucción de sistema. Sin
+ * techo, el prompt crecía con el proyecto y nada lo paraba: 186 tareas eran
+ * ~14 000 tokens; mil serían ~75 000. El problema no es solo la factura —a
+ * tarifa de gama Flash son céntimos— son las otras dos consecuencias: **el turno
+ * tarda más** y, sobre todo, **las reglas se ahogan**. Un modelo con setenta mil
+ * tokens de inventario delante deja de prestar atención a las diez líneas que le
+ * dicen cómo comportarse, así que el asistente empeoraría precisamente en los
+ * proyectos grandes, que es donde más falta hace.
+ *
+ * 45 000 caracteres son ~11 000 tokens: cabe entero cualquier proyecto de hasta
+ * un centenar largo de tareas, y a partir de ahí el coste **deja de crecer**.
+ *
+ * ## Lo que se corta primero
+ *
+ * El `orderBy` ya pone las abiertas delante y, dentro de las cerradas, las más
+ * antiguas al final. Así que lo que cae es lo que menos falta hace: trabajo
+ * terminado hace tiempo. **Y se dice cuántas faltan** —`omitidas` en la
+ * respuesta— porque un recorte mudo hace que el modelo responda «no hay ninguna
+ * más» con total seguridad sobre una lista que alguien le cortó.
+ */
+const INVENTARIO_MAX_CHARS = 45_000;
+
+/**
  * Cuánto de la descripción de una tarea entra en el inventario.
  *
  * Es el **único campo sin techo** de todo lo que viaja en cada turno: el título
@@ -423,7 +457,7 @@ export class StatsService {
       take: LIMITE_INVENTARIO,
     });
 
-    return tareas.map((tarea) => {
+    const armadas = tareas.map((tarea) => {
       const cerrada = tarea.completedAt !== null;
 
       /**
@@ -487,6 +521,33 @@ export class StatsService {
         ...(tarea._count.comments > 0 && { comentarios: tarea._count.comments }),
       };
     });
+
+    /**
+     * El presupuesto, gastado en el orden en que vienen.
+     *
+     * Abiertas primero, y dentro de las cerradas las más recientes antes, así
+     * que lo que se cae es lo que menos falta hace. Se mide sobre el JSON de
+     * cada tarea porque es exactamente lo que va a ocupar en el prompt: contar
+     * filas dejaría el coste oscilando según lleven checklist y encargados o no.
+     */
+    const dentro: typeof armadas = [];
+    let gastado = 0;
+    for (const tarea of armadas) {
+      const cuesta = JSON.stringify(tarea).length;
+      if (gastado + cuesta > INVENTARIO_MAX_CHARS) break;
+      gastado += cuesta;
+      dentro.push(tarea);
+    }
+
+    /**
+     * ⚠️ **La forma cambia: antes era un array y ahora es un objeto.**
+     *
+     * Es lo que permite decir **cuántas faltan** sin que el modelo tenga que
+     * deducirlo. Un recorte mudo es peor que no recortar: contestaría «no hay
+     * ninguna más» con total seguridad sobre una lista que alguien le cortó por
+     * detrás. Con `omitidas` puede decir que no las tiene todas delante.
+     */
+    return { tareas: dentro, omitidas: armadas.length - dentro.length };
   }
 
   /**

@@ -484,8 +484,16 @@ export class ReportsService {
       /* El inventario: sin él, «asigna a las que no tienen responsable» era
          irresoluble — el briefing solo llevaba el número, y con un número no
          hay a qué tarea apuntar. */
-      this.ask<
-        {
+      /**
+       * ⚠️ **Ya no devuelve un array, devuelve `{ tareas, omitidas }`.**
+       *
+       * El inventario tiene un presupuesto en caracteres —viaja entero en cada
+       * turno del asistente— y `omitidas` es cuántas se quedaron fuera. Sin ese
+       * número el recorte sería mudo, y un modelo al que le cortan la lista por
+       * detrás responde «no hay ninguna más» con total seguridad.
+       */
+      this.ask<{
+        tareas: {
           id: string;
           titulo: string;
           columna: string;
@@ -507,8 +515,9 @@ export class ReportsService {
           /* El tablero al que pertenece. Lo añade tasks-service; aquí se le
              pone el nombre, que es lo único que le sirve al modelo. */
           boardId: string;
-        }[]
-      >(this.tasksClient, 'task_inventory', { projectId }),
+        }[];
+        omitidas: number;
+      }>(this.tasksClient, 'task_inventory', { projectId }),
     ]);
 
     const ordenadas = [...columnas].sort((a, b) => a.order - b.order);
@@ -609,11 +618,21 @@ export class ReportsService {
        * Y la descripción solo se rellena cuando la hay: las cerradas ya no la
        * traen, y un `""` por tarea es una clave más que no dice nada.
        */
-      tareas: tareas.map(({ boardId, ...tarea }) => ({
+      tareas: (tareas?.tareas ?? []).map(({ boardId, ...tarea }) => ({
         ...tarea,
         ...(tarea.descripcion ? { descripcion: tarea.descripcion } : {}),
         ...(nombreDeTablero.get(boardId) ? { tablero: nombreDeTablero.get(boardId) } : {}),
       })),
+      /**
+       * Cuántas tareas no caben en el inventario.
+       *
+       * Solo viaja **cuando hay alguna**: una clave a cero en cada turno de cada
+       * conversación es exactamente el tipo de dato que este briefing lleva
+       * evitando desde que se escribió. Y el prompt tiene una regla para leerla:
+       * con esto encima de la mesa, «esas son todas» deja de ser una afirmación
+       * que el modelo pueda hacer a ciegas.
+       */
+      ...((tareas?.omitidas ?? 0) > 0 ? { tareasOmitidas: tareas.omitidas } : {}),
       /**
        * El avance, **ya calculado aquí**.
        *

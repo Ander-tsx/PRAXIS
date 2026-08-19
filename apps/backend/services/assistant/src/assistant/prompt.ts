@@ -326,7 +326,10 @@ const REGLAS: Regla[] = [
       'preguntan por el detalle de una cerrada, di que no lo tienes delante en vez de ' +
       'suponerlo. Cruza los datos por tu cuenta —quien tiene mas carga, que lleva ' +
       'parado, que vence esta semana— en vez de preguntar algo que ya esta ahi. Y no ' +
-      'te inventes un id: si una tarea no esta en esa lista, no existe.',
+      'te inventes un id: si una tarea no esta en esa lista, no existe. ⚠️ SALVO ' +
+      'que el contexto traiga "tareasOmitidas" mayor que 0: entonces la lista esta ' +
+      'RECORTADA en ese numero de tareas —las cerradas mas antiguas— y NO puedes ' +
+      'decir "esas son todas". Dilo cuando te pidan algo sobre el total.',
   },
 
   /**
