@@ -1,4 +1,5 @@
 export * from './admin';
+export * from './automation';
 export * from './alexa';
 export * from './assistant';
 export * from './auth';

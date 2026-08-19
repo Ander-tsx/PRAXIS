@@ -10,6 +10,8 @@ export const automationEnvValidationSchema = Joi.object({
   DOMAIN_EVENTS_POLL_INTERVAL_MS: Joi.number().integer().min(100).max(60000).default(1000),
   DOMAIN_EVENTS_CLAIM_IDLE_MS: Joi.number().integer().min(1000).max(3600000).default(30000),
   TCP_PORT: Joi.number().valid(3008).required(),
+  PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
+  PROJECTS_SERVICE_PORT: Joi.number().default(3003),
   LOG_LEVEL: Joi.string().valid('trace', 'debug', 'info', 'warn', 'error', 'fatal').default('info'),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
 });

@@ -6,6 +6,7 @@ import { DomainEventsModule } from './domain-events/domain-events.module';
 import { AutomationHealthModule } from './health/automation-health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
+import { RulesModule } from './rules/rules.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { RedisModule } from './redis/redis.module';
     PrismaModule,
     RedisModule,
     DomainEventsModule,
+    RulesModule,
     AutomationHealthModule,
   ],
 })

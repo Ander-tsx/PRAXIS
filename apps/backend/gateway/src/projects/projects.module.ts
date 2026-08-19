@@ -18,6 +18,7 @@ import { ProjectPermissionsController } from './project-permissions.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectsController } from './projects.controller';
 import { TaskPurgeService } from './task-purge.service';
+import { AutomationPurgeService } from './automation-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
@@ -66,6 +67,18 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
           },
         }),
       },
+      {
+        name: 'AUTOMATION_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('AUTOMATION_SERVICE_HOST'),
+            port: config.get<number>('AUTOMATION_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [
@@ -84,6 +97,11 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     ProjectChatController,
     DirectChatController,
   ],
-  providers: [ColumnStatusSyncService, TaskPurgeService, MentionablesService],
+  providers: [
+    ColumnStatusSyncService,
+    TaskPurgeService,
+    AutomationPurgeService,
+    MentionablesService,
+  ],
 })
 export class ProjectsModule {}

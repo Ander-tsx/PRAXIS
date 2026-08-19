@@ -15,6 +15,15 @@ enum InboundEventStatus {
   @@schema("automation")
 }
 
+enum AutomationRuleStatus {
+  ENABLED
+  DISABLED
+  PAUSED_SYSTEM
+  INVALID
+
+  @@schema("automation")
+}
+
 /// Copia durable e idempotente de un hecho recibido por Redis Streams.
 ///
 /// `eventId` identifica el hecho de dominio y `dedupeKey` es un hash canónico
@@ -42,4 +51,64 @@ model InboundEvent {
   @@index([status, receivedAt])
   @@schema("automation")
   @@map("inbound_events")
+}
+
+model AutomationRule {
+  id              String               @id @default(uuid())
+  projectId       String
+  name            String
+  description     String?
+  createdBy       String
+  version         Int                  @default(1)
+  status          AutomationRuleStatus @default(DISABLED)
+  pausedAt        DateTime?
+  pauseReason     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  trigger         AutomationTrigger?
+  conditions      AutomationCondition[]
+  actions         AutomationAction[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@schema("automation")
+  @@map("automation_rules")
+}
+
+model AutomationTrigger {
+  id        String         @id @default(uuid())
+  ruleId    String         @unique
+  type      String
+  config    Json
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@schema("automation")
+  @@map("automation_triggers")
+}
+
+model AutomationCondition {
+  id        String         @id @default(uuid())
+  ruleId    String
+  field     String
+  operator  String
+  value     Json
+  position  Int
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, position])
+  @@schema("automation")
+  @@map("automation_conditions")
+}
+
+model AutomationAction {
+  id        String         @id @default(uuid())
+  ruleId    String
+  type      String
+  config    Json
+  position  Int
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, position])
+  @@schema("automation")
+  @@map("automation_actions")
 }
