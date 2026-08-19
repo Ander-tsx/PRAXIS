@@ -26,4 +26,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async del(key: string): Promise<void> {
     await this.client.del(key);
   }
+
+  async xadd(stream: string, fields: Record<string, string>): Promise<string | null> {
+    return this.client.xadd(stream, '*', ...Object.entries(fields).flat());
+  }
 }

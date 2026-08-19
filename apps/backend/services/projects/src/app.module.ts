@@ -6,6 +6,7 @@ import { ObservabilityModule } from '@praxis/observability';
 import { BoardsModule } from './boards/boards.module';
 import { ChatModule } from './chat/chat.module';
 import { ColumnsModule } from './columns/columns.module';
+import { DomainEventsModule } from './domain-events/domain-events.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { MembersModule } from './members/members.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -24,6 +25,11 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         REDIS_URL: Joi.string().default('redis://localhost:6379'),
+        DOMAIN_OUTBOX_STREAM: Joi.string().default('praxis:domain-events'),
+        DOMAIN_OUTBOX_BATCH_SIZE: Joi.number().integer().min(1).max(500).default(100),
+        DOMAIN_OUTBOX_RETRY_ATTEMPTS: Joi.number().integer().min(1).max(10).default(3),
+        DOMAIN_OUTBOX_RETRY_DELAY_MS: Joi.number().integer().min(0).max(10000).default(50),
+        DOMAIN_OUTBOX_POLL_INTERVAL_MS: Joi.number().integer().min(100).max(60000).default(5000),
         TCP_PORT: Joi.number().required(),
         LOG_LEVEL: Joi.string()
           .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
@@ -39,6 +45,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     }),
     PrismaModule,
     RedisModule,
+    DomainEventsModule,
     ProjectsModule,
     WorkspacesModule,
     BoardsModule,
