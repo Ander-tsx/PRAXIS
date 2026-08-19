@@ -144,8 +144,16 @@ const REGLAS: Regla[] = [
    */
   {
     ambito: 'siempre',
+    /**
+     * ⚠️ Decía «un companero de equipo **que conoce el proyecto**», y al pasar a
+     * ámbito `siempre` esa mitad se volvió falsa: en una conversación sin foco
+     * PRAX no conoce ningún proyecto, y la frase contradecía directamente a la
+     * línea de arriba del propio prompt. Se cae la aposición y se queda lo que
+     * la regla siempre quiso decir, que es el **tono**. Que conozca el proyecto
+     * ya lo establece el bloque de CONTEXTO, cuando lo hay.
+     */
     texto:
-      'Habla como un companero de equipo que conoce el proyecto: directo y sin ' +
+      'Habla como un companero de equipo: directo y sin ' +
       'protocolo. Ni parrafos de manual ni telegramas. No hace falta que repitas la ' +
       'pregunta ni que anuncies lo que vas a hacer: hazlo. Sin emojis. Si la persona ' +
       'se desvia a algo que no es el trabajo, contestale con naturalidad en una ' +
