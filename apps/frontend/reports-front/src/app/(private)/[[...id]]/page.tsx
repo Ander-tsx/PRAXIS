@@ -456,6 +456,7 @@ export default async function ReportsPage({ params }: PageProps) {
             Con el slug de la URL respondían 403. */}
         <AnalysisScreen
           projectId={projectId}
+          projectSlug={project.slug}
           lienzoInicial={widgets}
           slots={slots}
           guardar={guardar}

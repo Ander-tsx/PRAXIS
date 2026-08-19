@@ -56,7 +56,36 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
  * El mismo organismo, tercera carcasa: `pantalla` en su zona, `cajon` aquí. En
  * cuanto haya una cuarta implementación del chat empezarán a divergir.
  */
+/**
+ * Ancho por debajo del cual el cajón no cabe y se manda a la zona del asistente.
+ *
+ * Es el `md` de Tailwind, y coincide a propósito con el `md:` del propio botón.
+ */
+const ANCHO_MINIMO_DEL_CAJON = 768;
+
+/**
+ * Llevar a PRAX a pantalla completa, con este proyecto ya enfocado.
+ *
+ * ⚠️ **`window.location`, y no el router de Next.** `/assistant` es **otra
+ * zona**: `router.push('/assistant')` le pega el `basePath` de esta —`/reports`—
+ * y sale `/reports/assistant`, que no existe. Es la invariante de siempre —
+ * `next/link` dentro de la zona, navegación del navegador para cruzar— y el
+ * síntoma no es un error de compilación, es un 404 solo en móvil.
+ *
+ * Va el **slug**, que es lo que `assistant-front` casa contra su lista de
+ * proyectos: allí el UUID se resuelve una vez y es lo que viaja a la API.
+ */
+function irAPraxAPantallaCompleta(projectSlug: string) {
+  window.location.assign(`/assistant?p=${encodeURIComponent(projectSlug)}`);
+}
+
+/** Si el cajón cabe o no. Se mira al pulsar, no al pintar: no hay hidratación que desajustar. */
+function cabeElCajon(): boolean {
+  return window.innerWidth >= ANCHO_MINIMO_DEL_CAJON;
+}
+
 export function AnalysisScreen({
+  projectSlug,
   projectId,
   lienzoInicial,
   slots,
@@ -66,6 +95,7 @@ export function AnalysisScreen({
   etiquetas,
 }: {
   projectId: string;
+  projectSlug: string;
   lienzoInicial: Widget[];
   slots: Record<string, ReactNode>;
   guardar: (widgets: Widget[]) => Promise<{ ok: true } | { ok: false; error: string }>;
@@ -89,13 +119,21 @@ export function AnalysisScreen({
    * sería un botón que aparentemente no hace nada.
    */
   const generar = useCallback(() => {
+    /* Sin sitio para el cajón, la frase de ejemplo no se pierde: se va a
+       escribir a la pantalla entera del asistente. Aquí no se le puede dejar
+       puesta —cruzar de zona es recargar—, así que allí PRAX recibe el foco y
+       quien pregunta escribe lo suyo. */
+    if (!cabeElCajon()) {
+      irAPraxAPantallaCompleta(projectSlug);
+      return;
+    }
     dock?.abrir();
     setSugerencia({ texto: FRASE_DE_EJEMPLO, sello: Date.now() });
-  }, [dock]);
+  }, [dock, projectSlug]);
 
   return (
     <>
-      <DisparadorDePrax />
+      <DisparadorDePrax projectSlug={projectSlug} />
 
       <DockSlot titulo={`${PRAX_NAME}, el asistente`}>
         <AssistantChat
@@ -146,7 +184,7 @@ export function AnalysisScreen({
  * que ser un interruptor — con dos estados que explicar. El panel ya trae su
  * propia aspa, que es donde se busca cerrar algo.
  */
-function DisparadorDePrax() {
+function DisparadorDePrax({ projectSlug }: { projectSlug: string }) {
   const dock = useDock();
 
   /* Sin cajón —fuera del armazón privado— no hay nada que abrir. No debería
@@ -156,13 +194,13 @@ function DisparadorDePrax() {
   return (
     <button
       type="button"
-      onClick={dock.abrir}
+      onClick={() => (cabeElCajon() ? dock.abrir() : irAPraxAPantallaCompleta(projectSlug))}
       aria-label={`Preguntar a ${PRAX_NAME}`}
       className="fixed bottom-5 right-5 z-30 flex items-center gap-2.5 rounded-full py-2 pl-2 pr-4 font-sans text-sm font-semibold transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:bottom-6 md:right-6"
       style={{
         background: colors.surface,
         color: colors.textPrimary,
-        boxShadow: `0 10px 30px ${alpha(colors.overlay, 30)}, 0 0 0 1px ${alpha(colors.border, 90)}`,
+        boxShadow: `0 10px 30px ${alpha(colors.textPrimary, 10)}, 0 0 0 1px ${alpha(colors.border, 90)}`,
       }}
     >
       <PraxAvatar mood="idle" size="sm" />
