@@ -140,6 +140,21 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     decorador —`@Throttle`, por ejemplo—, no vale leerlo así: parece que
     funciona y silenciosamente coge el valor por defecto.
 
+**Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
+`from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —
+las siete sueltas y el paquete—. Antes de tocarlos, ESTADO-ACTUAL §44:
+
+1. 🔴 **Los filtros van en la clave de Redis; el `from` derivado de `days`, no.**
+   Lo primero, o quien filtra deja su gráfico bajo la clave de quien no filtra —un
+   minuto de gráfico plausible y equivocado, sin un error—. Lo segundo, o la
+   clave cambia cada milisegundo y ningún informe vuelve a acertar en caché.
+2. ⚠️ **`from`/`to` acota una columna distinta en cada informe** —`createdAt` en
+   los que miden estado, `completedAt` en los tiempos, `occurredAt` en el flujo, y
+   en la serie semanal **es el eje**—. Los cuatro salen plausibles con el criterio
+   equivocado.
+3. ⚠️ **Un tramo de más de 365 días se rechaza con 400**, al revés que `days`, que
+   sí se recorta en silencio. Misma regla que el inventario del asistente.
+
 **Para enlazar a un proyecto usa los helpers, nunca la plantilla a mano.**
 `projectHref` / `projectPath` / `reportHref` / `reportPath`, en
 `commons/api/routes.ts`. El slug va en la URL y el UUID en la API, los dos son
@@ -219,7 +234,7 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · 4107+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
