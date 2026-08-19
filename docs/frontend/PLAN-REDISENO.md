@@ -9,10 +9,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | **R5 — Cierre.** R4 entera hecha (R4.1 – R4.8) |
-| **Última tarea terminada** | R4.8 — cerrada sin código: ni R4.2 ni R4.4 piden tablas |
-| **Siguiente** | R5.3 — `pnpm e2e:regresion` |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → **R5** → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Etapa actual** | **Cerrado.** R1–R6 hechas; R7 bloqueada y R8 es futuro |
+| **Última tarea terminada** | R5 — cierre. El plan queda hecho salvo R7 (bloqueada) y R8 (futuro) |
+| **Siguiente** | R7, en cuanto la clave de Gemini tenga presupuesto |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → R5 ✅ → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
 | **Actualizado** | 2026-08-19 |
 
@@ -52,6 +52,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-19 | (fuera de plan) | `3348d28` | 🔴 **El lienzo de partida daba 400 al primer arrastre**: sus ids no eran UUID y el DTO los valida. Solo salió ejecutando |
 | 2026-08-19 | R4.5 | `c1a257c` | **El constructor de gráficos.** Diez métricas por cinco formas, sin modelo y sin cuota. Los desplegables no dejan componer lo que el backend rechaza —comprobado contra él— |
 | 2026-08-19 | R4.8 | — | **Cerrada sin código.** Ni R4.2 ni R4.4 piden tablas: la primera agrupa peticiones que ya existían, la segunda agrega donde están los datos |
+| 2026-08-19 | R5.2 – R5.3 | `1c3feae`, `b927585` | Ocho zonas y ocho servicios en verde, `next build` de las ocho. Y la suite terminada por primera vez: 190 pasan, 5 caían por una línea de la fixture desfasada desde `dc06673` |
 | 2026-08-19 | R5.1 | `04a54b8`…`535fe29` | Documentación: ESTADO-ACTUAL §44, CONTRATO-API (filtros y cartera), PENDIENTES-BACKEND §21 (slugs reservados) y CLAUDE.md (puerto 4107 y las tres trampas) |
 
 ---
@@ -783,9 +784,17 @@ modelo de negocio, es **cobrar como dos** el mensaje que lleva adjuntos.
       ⚠️ El typecheck de una zona **con su `next dev` en marcha** da un falso
       positivo: `.next/dev/types/validator.ts` está a medias de regenerarse y
       falla con `TS1128`. Se para el dev server y desaparece.
-- [ ] **R5.3 — Verificación.** `pnpm e2e:regresion` si el stack levanta en esta
-      máquina. Si no levanta, **se dice**: «compila» no es «funciona», y esa
-      distinción ya costó seis fallos en producción.
+- [x] **R5.3 — Verificación.** Corrida con el stack levantado, y es la
+      **primera vez que la suite termina entera**: `190 passed, 5 failed` en
+      32,5 min.
+      Los cinco fallos eran **uno**, y preexistente: `crearProyectoEnLaInterfaz`
+      buscaba el campo `{ name: 'Nombre', exact: true }` y el diálogo de nuevo
+      proyecto se rediseñó en `dc06673` —el campo pasó a «Nombre del proyecto»—.
+      Arreglado en `b927585` y verificados los tres ficheros afectados: 14 de 14.
+      ⚠️ **No hay una corrida completa en verde de una sola pieza.** Lo que hay
+      son 190 verdes de la primera y 14 verdes de la segunda, que cubren las 195.
+      Volver a lanzarla entera son otros 32 min y se decidió no gastarlos. Queda
+      dicho por lo de siempre: «pasa» no es lo mismo que «pasó junto».
 
 ---
 
@@ -828,15 +837,15 @@ nada. Y no dar por perdido lo que no esté en `git log`.
 |---|---|
 | R1 Panel · R2 Administración · R3 Asistente | Cerradas |
 | **R6** PRAX sin proyecto + adjuntos con memoria | Cerrada |
-| **R4** Análisis | R4.1, R4.2, R4.3, R4.6 y R4.7 hechas. **Faltan R4.4, R4.5 y R4.8** |
-| R5 Cierre | Pendiente |
+| **R4** Análisis | Cerrada entera (R4.1 – R4.8) |
+| R5 Cierre | Cerrada |
 | R7 Caché de contexto | **Bloqueada**: la clave de Gemini está sin presupuesto |
 | R8 Que el contexto deje de ser «todo» | Futuro, cuando exista un proyecto grande de verdad |
 
-**Por dónde seguir:** R4.4 (la vista de cartera). R4.5 ya está desbloqueada —el
-constructor necesitaba los filtros de R4.3, y el conjunto que valida el backend
-es el mismo que pinta `AnalysisFilters`— pero la cartera va antes porque es la
-que falta para cerrar el alcance que se cerró al empezar.
+**Por dónde seguir:** nada de este plan. R7 espera a que la clave de Gemini
+tenga presupuesto y R8 a que exista un proyecto grande de verdad. Lo que sí queda
+suelto y no es de aquí: PENDIENTES-BACKEND §21 —los slugs reservados— que afecta
+a `projects-front` y a `reports-front`.
 
 ### Cinco cosas que costaron encontrarse
 
@@ -870,9 +879,15 @@ los recortes del prompt están comprobados en todo lo que no depende de Gemini
 `next build`, y el turno llegando hasta la llamada al modelo), pero **la
 respuesta del modelo no se ha visto ni una vez**.
 
-Y `pnpm e2e:regresion` **no se ha pasado**: se lanzó y se cortó a mitad porque
-estaba gastando el limitador de login de quien usaba la aplicación. Es lo primero
-que hay que hacer cuando la máquina esté libre.
+~~Y `pnpm e2e:regresion` **no se ha pasado**~~ — **hecho el 2026-08-19**, con la
+máquina libre. Terminó entera por primera vez: `190 passed, 5 failed` en 32,5
+min, y los cinco fallos eran uno solo y preexistente (el campo «Nombre» del
+diálogo de proyecto, arreglado en `b927585` y reverificado). Sigue sin haber una
+corrida completa en verde **de una sola pieza**: son 190 de la primera más 14 de
+la segunda.
+
+Lo que sigue sin verificarse contra el modelo es todo lo del asistente, que
+depende de la clave de Gemini.
 
 ---
 
