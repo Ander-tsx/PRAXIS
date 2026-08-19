@@ -291,20 +291,42 @@ export class StatsService {
         where: deLaTarea,
         _count: { _all: true },
       }),
-      /* Las etiquetas cuelgan de la tarea por una tabla puente, así que se
-         agrupan sobre ella acotando por las tareas del proyecto.
-
-         ⚠️ Con `labelId` puesto esto devuelve **una sola fila**, y es correcto:
-         se preguntó por una etiqueta. Lo que no puede hacer quien lo pinte es
-         leerlo como «el proyecto solo tiene una etiqueta». */
+      /**
+       * Las etiquetas cuelgan de la tarea por una tabla puente, así que se
+       * agrupan sobre ella acotando por las tareas del proyecto.
+       *
+       * ⚠️ **Con `labelId` puesto, el reparto se acota además a esa etiqueta**, y
+       * hace falta decir por qué: sin ese segundo filtro, pedir «etiqueta:
+       * frontend» devolvía las tareas correctas pero repartidas entre **todas**
+       * las etiquetas que además llevaran —medido: 45 de frontend y otras tres
+       * etiquetas con 1, 6 y 2—. La relación es de muchos a muchos, así que una
+       * tarea de frontend que también sea urgente cuenta en las dos.
+       *
+       * Y eso, en la pantalla, se lee como que el filtro **no se aplicó**: el
+       * control dice «frontend» y el gráfico enseña cuatro etiquetas. Un filtro
+       * que funciona pareciendo roto es peor que uno que no está.
+       *
+       * Lo que se pierde es el cruce —«de lo de frontend, cuánto es urgente»— y
+       * se pierde a propósito: esa es una pregunta de dos dimensiones, y este
+       * gráfico tiene una. Cuando haga falta, es un informe nuevo.
+       */
       this.prisma.taskLabel.groupBy({
         by: ['labelId'],
-        where: { task: deLaTarea },
+        where: {
+          task: deLaTarea,
+          ...(filtros?.labelId ? { labelId: filtros.labelId } : {}),
+        },
         _count: { _all: true },
       }),
+      /* Lo mismo con los responsables, y por lo mismo: una tarea con tres
+         personas cuenta en las tres, así que filtrar por una enseñaba a sus dos
+         compañeros con un 1 al lado. */
       this.prisma.taskAssignee.groupBy({
         by: ['userId'],
-        where: { task: deLaTarea },
+        where: {
+          task: deLaTarea,
+          ...(filtros?.assigneeId ? { userId: filtros.assigneeId } : {}),
+        },
         _count: { _all: true },
       }),
       this.totals(projectId, filtros),
@@ -782,6 +804,16 @@ export class StatsService {
         JOIN tasks.tasks t ON t.id = a."taskId"
        WHERE t."projectId" = ${projectId}::text
          ${andDeTarea(filtros, { alias: 't', fecha: 'createdAt' })}
+         -- Con un responsable filtrado, SOLO su fila. Sin esto, una tarea
+         -- compartida traía también a sus companeros: filtrar por una persona
+         -- devolvía un reparto de tres, que se lee como que el filtro falló. Es
+         -- la misma corrección que en el reparto por etiqueta de snapshot.
+         -- (Sin acentos graves aquí: cerrarían el template literal.)
+         ${
+           filtros?.assigneeId
+             ? Prisma.sql`AND a."userId" = ${filtros.assigneeId}::text`
+             : Prisma.empty
+         }
        GROUP BY a."userId"
     `;
   }
