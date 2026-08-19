@@ -1,9 +1,14 @@
 'use client';
 
-import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
-import { type AdminProject, Badge, type ProjectStatusName } from '@praxis/commons';
+import {
+  type AdminProject,
+  Badge,
+  type DataColumn,
+  DataTable,
+  type ProjectStatusName,
+} from '@praxis/commons';
 import { useMemo, useState } from 'react';
 import { ProjectStatusDialog } from './ProjectStatusDialog';
 

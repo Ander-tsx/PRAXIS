@@ -258,3 +258,31 @@ export function filtrosAQuery(filtros: FiltrosDeAnalisis): string {
   const qs = params.toString();
   return qs ? `&${qs}` : '';
 }
+
+/**
+ * Una fila de la cartera. Espejo de `ReportPortfolioRow` en `@praxis/contracts`.
+ *
+ * Se redeclara aquí, como el resto de formas de esta zona, porque el frontend no
+ * depende de los contratos del backend: aquel es un paquete de servidor con
+ * `class-validator` dentro, y arrastrarlo al navegador metería los decoradores y
+ * el reflect-metadata en el bundle de una pantalla que solo lee números.
+ */
+export interface PortfolioRow {
+  projectId: string;
+  name?: string;
+  slug?: string;
+  total: number;
+  abiertas: number;
+  cerradas: number;
+  vencidas: number;
+  sinAsignar: number;
+  /**
+   * ⚠️ Aquí **no** se distingue la que no tiene historial de la que sí, al revés
+   * que en el informe de un proyecto. En una tabla de una línea por proyecto no
+   * cabe el matiz: quien quiera saber cuáles son entra, que es lo que esta vista
+   * intenta que haga.
+   */
+  paradas: number;
+  cerradasSemana: number;
+  cerradasSemanaAnterior: number;
+}

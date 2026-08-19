@@ -1,9 +1,16 @@
 'use client';
 
-import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
-import { type AdminUser, Avatar, Badge, avatarHref, globalRoleLevelOf } from '@praxis/commons';
+import {
+  type AdminUser,
+  Avatar,
+  avatarHref,
+  Badge,
+  type DataColumn,
+  DataTable,
+  globalRoleLevelOf,
+} from '@praxis/commons';
 import { useMemo, useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';

@@ -42,6 +42,7 @@ import {
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
@@ -469,6 +470,17 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
               Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
+            {/* La cartera, solo con más de un proyecto: con uno, «todos tus
+                proyectos» lleva al que ya se está mirando.
+                `next/link` sin el `/reports` delante — lo añade Next. */}
+            {proyectos.items.length > 1 && (
+              <Link
+                href="/cartera"
+                className="font-sans text-sm font-semibold text-primary underline-offset-2 hover:underline"
+              >
+                Ver los {proyectos.items.length} proyectos de un vistazo →
+              </Link>
+            )}
           </div>
 
           {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál

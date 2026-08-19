@@ -1,6 +1,5 @@
-import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { ACCIONES, fechaYHora } from '@/lib/admin';
-import { type AdminActivityEntry, Badge } from '@praxis/commons';
+import { type AdminActivityEntry, Badge, type DataColumn, DataTable } from '@praxis/commons';
 
 /**
  * El registro, una fila por acción.
