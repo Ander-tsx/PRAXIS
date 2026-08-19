@@ -134,6 +134,19 @@ export async function crearProyectoEnLaInterfaz(page: Page, nombre: string): Pro
     .getByRole('button', { name: /Nuevo proyecto|Crear mi primer proyecto/ })
     .first()
     .click();
-  await page.getByRole('textbox', { name: 'Nombre', exact: true }).fill(nombre);
+  /**
+   * ⚠️ **El campo se llama «Nombre del proyecto», no «Nombre».**
+   *
+   * Esto buscaba `{ name: 'Nombre', exact: true }` y con `exact` puesto dejó de
+   * casar cuando el diálogo se rediseñó (`dc06673`). Las cinco pruebas que crean
+   * un proyecto por la interfaz caían aquí con un timeout de dos minutos cada
+   * una, y el mensaje —«waiting for getByRole textbox Nombre»— no dice que el
+   * campo exista con otro rótulo: parece que el diálogo no abre.
+   *
+   * Sigue `exact` a propósito: sin él, «Nombre del proyecto» casaría también con
+   * cualquier otro campo que empiece igual, y el fallo pasaría de un timeout
+   * claro a un `strict mode violation` que cuesta más de leer.
+   */
+  await page.getByRole('textbox', { name: 'Nombre del proyecto', exact: true }).fill(nombre);
   await page.getByRole('button', { name: 'Crear proyecto' }).click();
 }
