@@ -11,6 +11,7 @@ export * from './AssistantChat';
 export * from './LiveNotices';
 export * from './ChatPanel';
 export * from './CreateProjectSlideOver';
+export * from './TemplatePlanReview';
 export * from './LogoutButton';
 export * from './NotFound';
 export * from './ProjectCard';
