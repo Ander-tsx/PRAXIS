@@ -8,6 +8,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { BLOB_STORAGE, type BlobStorage } from '../storage/blob-storage';
+import { extractoDe } from './attachment-text';
 
 /** Lo que se devuelve de un adjunto en cualquier respuesta: nunca sus bytes. */
 const CAMPOS_PUBLICOS = {
@@ -99,12 +100,30 @@ export class AttachmentsService {
       });
     }
 
+    /**
+     * El texto se saca **aquí, una vez**, y no en cada turno.
+     *
+     * Es lo que hace que el archivo sobreviva a la pregunta en la que se
+     * adjuntó: los bytes viajan con ese turno y no vuelven, pero el texto queda
+     * y el historial lo reinyecta. Recalcularlo por turno significaría leer el
+     * blob entero en cada pregunta de la conversación.
+     *
+     * `null` es un resultado válido —una imagen, un PDF escaneado— y no impide
+     * guardar: ese archivo se comporta como todos antes de que esto existiera.
+     */
+    const extract = await extractoDe({
+      filename: datos.filename,
+      mimeType: datos.mimeType,
+      bytes,
+    });
+
     const adjunto = await this.prisma.attachment.create({
       data: {
         filename: datos.filename.slice(0, 200),
         mimeType: datos.mimeType,
         size: bytes.byteLength,
         uploadedBy: datos.userId,
+        extract,
       },
       select: CAMPOS_PUBLICOS,
     });

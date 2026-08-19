@@ -10,8 +10,8 @@
 | | |
 |---|---|
 | **Etapa actual** | R6 — PRAX sin proyecto y con memoria de lo que le das |
-| **Última tarea terminada** | R6 escrito. Antes: R3.14 — los adjuntos de PRAX se guardan y se ven en el hilo |
-| **Siguiente** | R6.1 — el extracto persistente |
+| **Última tarea terminada** | R6.1 — el extracto persistente: un adjunto ya no muere en su turno |
+| **Siguiente** | R6.2 — hablar sin proyecto |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → **R6** → R4 → R5. ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
@@ -37,6 +37,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | (del usuario) | `77187ed`, `ce8b024` | Cambios propios que estaban sin commitear en el árbol: el cajón se pliega con un botón en el borde, su historial se filtra por el proyecto que se mira, y el compositor de la demo crece. Se les añadió `aria-label` y `tabIndex` al botón nuevo |
 | 2026-08-18 | (fuera de plan) | `797250d` | La cara de PRAX en la barra lateral, a 8px y con el trazo engordado por `-webkit-text-stroke`. `font-weight` no servía: la mono no está autoalojada |
 | 2026-08-18 | R6 escrito | — | Etapa nueva: adjuntos con memoria y conversación sin proyecto |
+| 2026-08-18 | R6.1 | (este) | **El extracto persistente.** Columna `extract`, extracción al subir (`unpdf` para el PDF), reinyección con presupuesto en `historial()` y la regla 17 del prompt. `text/x-markdown` entraba como binario en Safari. El marcador de imagen se cayó por el camino: era un dato derivado de dos que ya existen |
 
 ---
 
@@ -427,9 +428,13 @@ que el prompt le exija a PRAX contar lo que ve cuando el turno lleva imágenes: 
 descripción queda en su propio mensaje y se reinyecta por el camino que ya
 existe. Cero llamadas nuevas, cero coste nuevo.
 
-Como red de seguridad, el `extract` de una imagen es un **marcador de hecho**
-—`[imagen adjunta: captura.png]`— sin descripción: así PRAX nunca niega que hubo
-una imagen ahí, aunque aquel turno no la narrara bien.
+Como red de seguridad se planeó guardar un **marcador de hecho** —`[imagen
+adjunta: captura.png]`— para que PRAX no negara después que hubo una imagen ahí.
+⚠️ **Al implementarlo se cayó también**, y el motivo consta aquí: ese marcador se
+compone de `filename` y `mimeType`, que están siempre, así que guardarlo era una
+columna con un dato derivado de otras dos —lo que acaba desincronizado— y el
+bloque que se pinta en el hilo (`bloqueSinContenido`) además explica *por qué* ya
+no la tiene delante, que el marcador no decía. Una imagen guarda `extract: null`.
 
 Matarlas del todo —que se consideró— habría costado uno de los mejores casos de
 uso que tiene esto: pegar la captura de un error y decir «crea una tarea con
@@ -472,20 +477,20 @@ se hizo y se espera antes de seguir.
 
 #### R6.1 — El extracto persistente
 
-- [ ] **R6.1.1 — `text/x-markdown` en `ASSISTANT_TEXT_MIME`.** 🐛 Está en la
+- [x] **R6.1.1 — `text/x-markdown` en `ASSISTANT_TEXT_MIME`.** 🐛 Está en la
       lista de permitidos con un comentario explicando que Safari y algunos Linux
       mandan así los `.md`, pero **no** en la de los que se pegan como texto: el
       mismo archivo entra como texto en Chrome y como binario en Safari.
-- [ ] **R6.1.2 — La columna `extract` y su migración.** Nullable, sin backfill.
+- [x] **R6.1.2 — La columna `extract` y su migración.** Nullable, sin backfill.
       ⚠️ Y **`detalle()` no la selecciona**: si lo hiciera, metería cada documento
       del hilo en cada lectura de la pantalla.
-- [ ] **R6.1.3 — Extraer al subir.** Texto/Markdown por decodificación; PDF con
+- [x] **R6.1.3 — Extraer al subir.** Texto/Markdown por decodificación; PDF con
       capa de texto; imagen con su marcador. Un PDF escaneado —sin capa— se queda
       sin extracto y cae en el mismo trato que la imagen.
-- [ ] **R6.1.4 — Reinyectar en `historial()`**, con el presupuesto y el mismo
+- [x] **R6.1.4 — Reinyectar en `historial()`**, con el presupuesto y el mismo
       formato `--- ARCHIVO ADJUNTO: nombre ---` que ya usa `repartirAdjuntos`,
       para que el prompt no tenga que aprender un segundo formato.
-- [ ] **R6.1.5 — El prompt**: narrar lo que se ve cuando el turno lleva
+- [x] **R6.1.5 — El prompt**: narrar lo que se ve cuando el turno lleva
       imágenes, y no dar por hecho que un archivo de hace tres turnos sigue
       delante en su forma original.
 

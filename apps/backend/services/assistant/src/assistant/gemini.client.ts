@@ -116,15 +116,16 @@ export class GeminiClient {
     /**
      * ⚠️ **Los archivos solo van en el turno actual, nunca en el historial.**
      *
-     * El hilo se lee de la base y allí solo hay texto: los archivos no se
-     * guardan. Así que una pregunta sobre un PDF de hace tres turnos ya no lo
-     * tiene delante, y eso hay que saberlo — el prompt le pide a PRAX que
-     * resuma lo que leyó, que es lo que convierte el contenido del archivo en
-     * algo que sí sobrevive en el hilo.
+     * El hilo se lee de la base y allí solo hay **texto**. La alternativa
+     * —reenviar todos los archivos de la conversación en cada turno— multiplica
+     * el coste por la longitud del hilo y acaba comiéndose la ventana entera.
      *
-     * La alternativa —reenviar todos los archivos de la conversación en cada
-     * turno— multiplica el coste por la longitud del hilo y acaba comiéndose la
-     * ventana entera.
+     * ⚠️ Eso **no** quiere decir que un documento se pierda: desde
+     * `Attachment.extract`, el texto de un `.md` o de un PDF se guarda al
+     * subirlo y `historial()` lo vuelve a poner en cada turno, con presupuesto.
+     * Lo que de verdad no vuelve es una **imagen**, que no tiene texto que
+     * guardar — y por eso el prompt (regla 17) le pide a PRAX contar qué ve en
+     * ella mientras la tiene delante.
      */
     const partesDelTurno: GeminiPart[] = [
       { text: params.message },

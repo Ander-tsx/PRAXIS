@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { MAX_HISTORIAL } from '@praxis/contracts';
+import { ASSISTANT_EXTRACT_BUDGET_CHARS, MAX_HISTORIAL } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { textoConAdjuntos } from './attachment-text';
 
 /** Lo que cabe en un título antes de dejar de leerse de un vistazo. */
 const MAX_TITULO = 60;
@@ -140,18 +141,51 @@ export class ConversationsService {
    *
    * Se recorta a los últimos `MAX_HISTORIAL` turnos, que es el mismo tope de
    * siempre — la ventana del modelo no ha crecido porque ahora guardemos más.
+   *
+   * ## Y aquí es donde los archivos vuelven a existir
+   *
+   * El texto de un mensaje se guarda **tal y como se escribió**, sin los
+   * archivos pegados: un turno con cuarenta mil caracteres de un `.md` dentro no
+   * se lee como conversación. Así que el archivo se recompone al armar el hilo,
+   * a partir del `extract` que se calculó al subirlo.
+   *
+   * Sin esto, PRAX olvidaba el documento en cuanto contestaba: los bytes viajan
+   * con su turno y no se reenvían nunca más. Con esto —y con el presupuesto de
+   * `ASSISTANT_EXTRACT_BUDGET_CHARS`— sigue delante mientras la conversación
+   * quepa.
    */
   async historial(conversationId: string) {
     const mensajes = await this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
       take: MAX_HISTORIAL,
-      select: { role: true, text: true },
+      select: {
+        role: true,
+        text: true,
+        /* Solo aquí. `detalle()` no los pide: la burbuja no necesita el
+           contenido y traerlo metería cada documento del hilo en cada lectura
+           de la pantalla. */
+        attachments: { select: { filename: true, mimeType: true, extract: true } },
+      },
     });
 
-    return mensajes
-      .reverse()
-      .map((mensaje) => ({ role: mensaje.role === 'USER' ? 'user' : 'model', text: mensaje.text }));
+    /**
+     * ⚠️ **El presupuesto se gasta del más reciente hacia atrás**, y por eso se
+     * recorre la lista tal cual viene —ordenada `desc`— y se le da la vuelta al
+     * final. Lo último que se adjuntó es lo que se está usando; lo de hace ocho
+     * turnos es lo que se puede recortar sin que nadie lo note.
+     *
+     * Sin tope esto sería una factura garantizada: 3 adjuntos por mensaje ×
+     * 40 000 caracteres × 12 turnos son 360 000 caracteres **en cada pregunta**.
+     */
+    let presupuesto: number = ASSISTANT_EXTRACT_BUDGET_CHARS;
+    const conArchivos = mensajes.map((mensaje) => {
+      const compuesto = textoConAdjuntos(mensaje.text, mensaje.attachments, presupuesto);
+      presupuesto = compuesto.presupuesto;
+      return { role: mensaje.role === 'USER' ? 'user' : 'model', text: compuesto.texto };
+    });
+
+    return conArchivos.reverse();
   }
 
   /**

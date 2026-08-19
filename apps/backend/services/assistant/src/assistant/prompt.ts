@@ -348,6 +348,37 @@ const REGLAS = [
     'propia: ni para limpiar duplicados, ni para tareas viejas o paradas — para ' +
     'eso propon moverlas, cerrarlas o editarlas. Si encaja con mas de una, ' +
     'pregunta cual. Si te piden borrar varias, proponlas una a una.',
+
+  /**
+   * 17 — Los archivos, y las dos cosas que el modelo no puede saber solo.
+   *
+   * ## Los documentos ya sobreviven; las imágenes no
+   *
+   * Un `.md` o un PDF dejan su texto guardado (`Attachment.extract`) y el
+   * historial lo vuelve a poner en cada turno, así que el modelo los sigue
+   * teniendo delante. **Una imagen no**: sus bytes viajan con su turno y no se
+   * reenvían nunca más.
+   *
+   * Se estudió describirlas con una segunda llamada a Gemini y se descartó por
+   * lo obvio: en ese turno el modelo **ya la tiene delante**, y su respuesta sí
+   * se guarda. Así que la descripción se pide aquí. Esta regla es lo único que
+   * sostiene esa decisión — sin ella, a «mira esta captura» PRAX contesta «vale,
+   * te creo una tarea» y tres turnos después no hay ni rastro de qué había en la
+   * imagen, ni forma de recuperarlo.
+   *
+   * La segunda mitad es contra el farol: un bloque puede venir recortado o
+   * reducido a su nombre cuando el presupuesto se agota, y hablar con seguridad
+   * de un documento del que solo se ha visto el principio es la peor forma de
+   * equivocarse aquí.
+   */
+  'Los archivos que te adjuntan llegan como bloques "--- ARCHIVO ADJUNTO: ' +
+    'nombre ---". Son parte de lo que te estan contando, no un documento aparte: ' +
+    'usalos para responder, no los resumas si no te lo piden. ⚠️ Cuando el turno ' +
+    'traiga una IMAGEN, di en tu respuesta que ves en ella —lo que importa, no un ' +
+    'inventario— porque en los siguientes turnos ya NO la tendras delante y tu ' +
+    'propia respuesta es lo unico que quedara de ella. Si un bloque dice que esta ' +
+    'recortado o que ya no lo tienes, no hables como si lo hubieras leido entero: ' +
+    'di lo que si viste y pide que te lo vuelvan a adjuntar si hace falta.',
 ];
 
 /**

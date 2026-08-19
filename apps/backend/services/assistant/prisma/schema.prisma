@@ -233,6 +233,30 @@ model Attachment {
   mimeType       String
   /// Bytes reales, medidos en el servidor y no declarados por el cliente.
   size           Int
+  /// **Lo que sobrevive al turno.** Sin esto, PRAX olvidaba el archivo en cuanto
+  /// contestaba: los bytes viajan con la pregunta y no se reenvían nunca más, así
+  /// que dos turnos después la conversación hablaba de un documento que el modelo
+  /// ya no tenía delante.
+  ///
+  /// Se calcula **una vez, al subir**, y depende del tipo:
+  ///
+  /// - Texto y Markdown → el UTF-8 decodificado.
+  /// - PDF → su capa de texto. ⚠️ Y el PDF **sigue viajando nativo** en el turno
+  ///   en el que se adjunta: pasarlo a texto plano *ahí* perdería maquetación,
+  ///   tablas y figuras que Gemini sí sabe leer. Esto es para *después*.
+  /// - Imagen → **nada**. La descripción la pone PRAX en su propia respuesta,
+  ///   que ya se guarda: una segunda llamada al modelo para describirla sería
+  ///   pagar dos veces por algo que en ese turno tiene delante.
+  ///
+  /// `null` es «no hay contenido que reinyectar» —una imagen, un PDF escaneado,
+  /// una extracción fallida, o un adjunto anterior a esta columna—. En el hilo
+  /// se nombra igual, con el motivo dentro, y no se finge haberlo leído:
+  /// callarlo dejaría a PRAX negando que alguna vez le pasaran esa captura.
+  ///
+  /// ⚠️ **No se selecciona al leer una conversación.** La burbuja necesita
+  /// nombre, tipo y tamaño; meter esto ahí metería cada documento del hilo en
+  /// cada lectura de la pantalla. Lo lee solo quien arma el historial del modelo.
+  extract        String?
   uploadedBy     String
   createdAt      DateTime @default(now())
 

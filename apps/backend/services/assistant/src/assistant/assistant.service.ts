@@ -16,6 +16,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
+import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
@@ -341,9 +342,13 @@ export class AssistantService {
        * turno con cuarenta mil caracteres de un `.md` dentro no se lee: además,
        * al releerlo se reenviaría entero al modelo en cada turno posterior.
        *
-       * El precio es que un archivo **no sobrevive al turno** —lo que se le pidió
-       * a PRAX que resuma es lo que queda—, y por eso el prompt le pide contar lo
-       * que leyó en vez de dar por hecho que sigue delante.
+       * ⚠️ **Y ya no es el precio que era.** Cuando esto se escribió, el archivo
+       * no sobrevivía al turno: lo que quedaba era lo que PRAX hubiera dicho de
+       * él. Desde `Attachment.extract`, el texto se guarda con el adjunto y
+       * `historial()` lo vuelve a poner, así que un documento sigue delante
+       * mientras el presupuesto lo permita. Lo que sigue sin sobrevivir es una
+       * **imagen** —sus bytes viajan con este turno y no se reenvían— y por eso
+       * la regla 17 le pide a PRAX contar qué ve en ella.
        */
       pregunta: payload.message,
       respuesta: reply,
@@ -1096,12 +1101,16 @@ export class AssistantService {
 
       if (ASSISTANT_TEXT_MIME.includes(adjunto.mime)) {
         const texto = bytes.toString('utf8');
-        const recortado = texto.slice(0, ASSISTANT_TEXT_MAX_CHARS);
-        const aviso =
-          texto.length > ASSISTANT_TEXT_MAX_CHARS
-            ? `\n[...] (El archivo continua; solo se han incluido los primeros ${ASSISTANT_TEXT_MAX_CHARS} caracteres.)`
-            : '';
-        trozos.push(`--- ARCHIVO ADJUNTO: ${adjunto.name} ---\n${recortado}${aviso}`);
+        /* El mismo formato que el historial (`bloqueDeArchivo`), y a propósito:
+           con dos, el turno en el que se adjunta un archivo se leería distinto
+           del turno siguiente. */
+        trozos.push(
+          bloqueDeArchivo(
+            adjunto.name,
+            texto.slice(0, ASSISTANT_TEXT_MAX_CHARS),
+            texto.length > ASSISTANT_TEXT_MAX_CHARS,
+          ),
+        );
         continue;
       }
 

@@ -142,11 +142,48 @@ export const ASSISTANT_ATTACHMENT_ALLOWED_MIME = [
   'text/x-markdown',
 ] as const;
 
-/** Los que se pegan como texto en vez de ir como datos binarios. */
-export const ASSISTANT_TEXT_MIME: readonly string[] = ['text/plain', 'text/markdown'];
+/**
+ * Los que se pegan como texto en vez de ir como datos binarios.
+ *
+ * 🐛 **`text/x-markdown` faltaba aquí, y estaba dos listas más arriba.** La de
+ * permitidos lo lleva desde el chat de equipo, con su comentario explicando que
+ * Safari y algunos Linux declaran así un `.md`; esta no. Efecto: **el mismo
+ * archivo entraba como texto en Chrome y como binario en Safari**, y el modelo
+ * lo trataba como un documento adjunto en vez de como parte de lo que se le
+ * está contando. Sin error en ninguna consola, claro.
+ */
+export const ASSISTANT_TEXT_MIME: readonly string[] = [
+  'text/plain',
+  'text/markdown',
+  'text/x-markdown',
+];
 
 /** Tope por archivo de texto. Se recorta y se avisa dentro del propio prompt. */
 export const ASSISTANT_TEXT_MAX_CHARS = 40_000;
+
+/**
+ * Cuántos caracteres de adjuntos entran, **en total**, en el hilo que se le
+ * reenvía al modelo.
+ *
+ * ## Por qué existe, con los números delante
+ *
+ * Desde que un adjunto deja su texto guardado (`Attachment.extract`), el
+ * historial lo vuelve a poner en cada turno — que es justo el punto: sin eso,
+ * PRAX olvidaba el documento en cuanto contestaba. Pero reinyectarlo sin tope
+ * es una factura garantizada: **3 adjuntos por mensaje × 40 000 caracteres × 12
+ * turnos = 360 000 caracteres en cada pregunta**.
+ *
+ * Así que se recorta del más reciente hacia atrás: lo último que se adjuntó
+ * entra entero, lo viejo se recorta o se queda en su nombre. ~24 000 caracteres
+ * son unos 6 000 tokens, que caben al lado del briefing sin empujar las reglas
+ * fuera de la atención del modelo.
+ *
+ * ⚠️ **No es lo mismo que `ASSISTANT_TEXT_MAX_CHARS`, y confundirlos rompe el
+ * diseño.** Ese topa lo que se **guarda** por archivo; este, lo que se **manda**
+ * entre todos. Se guarda más de lo que se manda a propósito: subir este número
+ * luego no obliga a volver a extraer nada.
+ */
+export const ASSISTANT_EXTRACT_BUDGET_CHARS = 24_000;
 
 /**
  * Un adjunto tal y como lo ve el chat.
