@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsArray, IsIn, IsOptional } from 'class-validator';
+import { ReportFiltersQueryDto } from './report-filters.dto';
 
 /**
  * Los agregados que se pueden pedir en un solo viaje.
@@ -51,8 +52,15 @@ export type ReportBundlePart = (typeof REPORT_BUNDLE_PARTS)[number];
  */
 export type ReportBundle = Partial<Record<ReportBundlePart, unknown>>;
 
-/** Qué se pide, y con qué ventana. */
-export class ReportBundleQueryDto {
+/**
+ * Qué se pide, con qué ventana y con qué filtros.
+ *
+ * Hereda de `ReportFiltersQueryDto` para que el paquete acepte exactamente los
+ * mismos filtros que las siete rutas sueltas. Si divergieran, la pantalla —que
+ * pide por aquí— filtraría distinto que la skill de voz o el asistente, que
+ * piden un informe suelto.
+ */
+export class ReportBundleQueryDto extends ReportFiltersQueryDto {
   /**
    * Los informes que hacen falta, separados por comas.
    *

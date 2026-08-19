@@ -23,6 +23,7 @@ import {
   GetAttachmentDto,
   MoveTaskDto,
   PurgeTasksDto,
+  type ReportFilters,
   RestatusTasksDto,
   ToggleChecklistDto,
   UpdateCommentDto,
@@ -200,24 +201,31 @@ export class TasksController {
 
   // ─── Estadísticas ─────────────────────────────────────────────────────────
 
+  /**
+   * ⚠️ **`filtros` llega ya resuelto y ya validado.** El gateway comprobó las
+   * formas contra `ReportFiltersQueryDto` y que el tramo tenga sentido;
+   * reports-service metió dentro la ventana en días, de modo que `from` siempre
+   * viene puesto en los informes con historial. Aquí no se vuelve a mirar: es el
+   * mismo trato que tiene el resto de comandos internos.
+   */
   @MessagePattern({ cmd: 'task_stats_snapshot' })
-  statsSnapshot(@Payload() dto: { projectId: string }) {
-    return this.statsService.snapshot(dto.projectId);
+  statsSnapshot(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.snapshot(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_cycle' })
-  statsCycle(@Payload() dto: { projectId: string; from?: string }) {
-    return this.statsService.cycleTimes(dto.projectId, dto.from ? new Date(dto.from) : undefined);
+  statsCycle(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.cycleTimes(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_flow' })
-  statsFlow(@Payload() dto: { projectId: string; from: string }) {
-    return this.statsService.dailyFlow(dto.projectId, new Date(dto.from));
+  statsFlow(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.dailyFlow(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_people' })
-  statsPeople(@Payload() dto: { projectId: string }) {
-    return this.statsService.byPerson(dto.projectId);
+  statsPeople(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.byPerson(dto.projectId, dto.filtros);
   }
 
   /** El inventario de tareas para el contexto del asistente. */
@@ -237,8 +245,8 @@ export class TasksController {
 
   /** Entradas y cierres por semana, para «¿cómo estuvo la semana?». */
   @MessagePattern({ cmd: 'task_stats_weekly' })
-  statsWeekly(@Payload() dto: { projectId: string; semanas?: number }) {
-    return this.statsService.weeklyThroughput(dto.projectId, dto.semanas);
+  statsWeekly(@Payload() dto: { projectId: string; semanas?: number; filtros?: ReportFilters }) {
+    return this.statsService.weeklyThroughput(dto.projectId, dto.semanas, dto.filtros);
   }
 
   /**
@@ -246,7 +254,9 @@ export class TasksController {
    * «bloqueada» en el modelo: se deduce del historial.
    */
   @MessagePattern({ cmd: 'task_stats_stale' })
-  statsStale(@Payload() dto: { projectId: string; dias?: number; limite?: number }) {
-    return this.statsService.sinMovimiento(dto.projectId, dto.dias, dto.limite);
+  statsStale(
+    @Payload() dto: { projectId: string; dias?: number; limite?: number; filtros?: ReportFilters },
+  ) {
+    return this.statsService.sinMovimiento(dto.projectId, dto.dias, dto.limite, dto.filtros);
   }
 }

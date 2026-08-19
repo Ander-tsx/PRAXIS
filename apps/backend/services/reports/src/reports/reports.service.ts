@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { type ReportFilters, claveDeFiltros } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
 import { RedisService } from '../redis/redis.service';
@@ -58,6 +59,28 @@ export class ReportsService {
   }
 
   /**
+   * Los filtros con la ventana ya metida dentro, que es lo que viaja a tasks.
+   *
+   * `days` y `from` son dos formas de decir «desde cuándo», y tasks-service no
+   * tiene por qué conocer las dos: aquí se resuelven en una. **Manda `from`** —
+   * quien escribió dos fechas hizo una pregunta concreta— y si no viene, se
+   * calcula desde `dias`, que es el caso normal.
+   *
+   * 🔴 **Y esto NO puede entrar en la clave de caché.** El `from` que sale de
+   * `dias` es «ahora menos sesenta días», o sea un instante distinto en cada
+   * llamada: metido en la clave, ningún informe volvería a acertar en Redis
+   * jamás, y el fallo se vería como que la caché «no funciona» sin que nada
+   * fallara. La clave lleva `dias` —que sí es estable— y `claveDeFiltros` sobre
+   * los filtros **tal como llegaron**.
+   */
+  private conVentana(dias: number, filtros?: ReportFilters): ReportFilters {
+    return {
+      ...filtros,
+      from: filtros?.from ?? new Date(Date.now() - dias * 86_400_000).toISOString(),
+    };
+  }
+
+  /**
    * Las columnas del proyecto, con su nombre y su color.
    *
    * Hacen falta en casi todos los informes: los datos de tasks vienen con
@@ -111,10 +134,10 @@ export class ReportsService {
    * **El único informe que no necesita historial**, y por eso el que enseña algo
    * real desde el primer día mientras el resto se acumula.
    */
-  async snapshot(projectId: string) {
-    return this.cached(`reports:${projectId}:snapshot`, async () => {
+  async snapshot(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:snapshot${claveDeFiltros(filtros)}`, async () => {
       const [stats, columns] = await Promise.all([
-        this.ask<any>(this.tasksClient, 'task_stats_snapshot', { projectId }),
+        this.ask<any>(this.tasksClient, 'task_stats_snapshot', { projectId, filtros }),
         this.columnas(projectId),
       ]);
 
@@ -163,13 +186,14 @@ export class ReportsService {
    * pintar la nube de puntos: un percentil solo dice dónde está la línea, y la
    * nube enseña la dispersión, que suele ser la información útil.
    */
-  async cycleTime(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:cycle:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
-
+  async cycleTime(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:cycle:${dias}${claveDeFiltros(filtros)}`, async () => {
       const muestras = await this.ask<
         { taskId: string; completedAt: string; leadHours: number; cycleHours: number | null }[]
-      >(this.tasksClient, 'task_stats_cycle', { projectId, from: desde.toISOString() });
+      >(this.tasksClient, 'task_stats_cycle', {
+        projectId,
+        filtros: this.conVentana(dias, filtros),
+      });
 
       const lead = muestras.map((m) => m.leadHours);
       const cycle = muestras.map((m) => m.cycleHours).filter((h): h is number => h !== null);
@@ -196,15 +220,13 @@ export class ReportsService {
   /**
    * Diagrama de flujo acumulado: cuántas tareas hay en cada columna cada día.
    */
-  async flow(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:flow:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
-
+  async flow(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:flow:${dias}${claveDeFiltros(filtros)}`, async () => {
       const [filas, columns] = await Promise.all([
         this.ask<{ day: string; columnId: string | null; entradas: number; salidas: number }[]>(
           this.tasksClient,
           'task_stats_flow',
-          { projectId, from: desde.toISOString() },
+          { projectId, filtros: this.conVentana(dias, filtros) },
         ),
         this.columnas(projectId),
       ]);
@@ -237,51 +259,63 @@ export class ReportsService {
    * Si no hay historial suficiente **no devuelve una predicción**: devuelve
    * cuánto falta para poder hacerla. Ver `evaluarSuficiencia`.
    */
-  async forecast(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:forecast:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
+  async forecast(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:forecast:${dias}${claveDeFiltros(filtros)}`,
+      async () => {
+        const conVentana = this.conVentana(dias, filtros);
+        /* El principio de la ventana, ya resuelto: hace falta aquí abajo para
+         rellenar los días de cero, y tiene que ser **el mismo** que el que se
+         mandó a tasks o el ritmo saldría dividido entre otro número de días. */
+        const desde = new Date(conVentana.from as string);
 
-      const [muestras, snapshot] = await Promise.all([
-        this.ask<{ completedAt: string }[]>(this.tasksClient, 'task_stats_cycle', {
-          projectId,
-          from: desde.toISOString(),
-        }),
-        this.ask<{ total: number; completed: number }>(this.tasksClient, 'task_stats_snapshot', {
-          projectId,
-        }),
-      ]);
+        const [muestras, snapshot] = await Promise.all([
+          this.ask<{ completedAt: string }[]>(this.tasksClient, 'task_stats_cycle', {
+            projectId,
+            filtros: conVentana,
+          }),
+          /* ⚠️ Aquí van los filtros **sin** la ventana: `pendientes` es cuánto
+           queda por hacer ahora, no cuánto entró en la ventana. Con la ventana
+           puesta, un proyecto viejo con trabajo antiguo pendiente predeciría que
+           está a punto de terminar. */
+          this.ask<{ total: number; completed: number }>(this.tasksClient, 'task_stats_snapshot', {
+            projectId,
+            filtros,
+          }),
+        ]);
 
-      const suficiencia = evaluarSuficiencia(muestras.length, dias);
-      const pendientes = snapshot.total - snapshot.completed;
+        const suficiencia = evaluarSuficiencia(muestras.length, dias);
+        const pendientes = snapshot.total - snapshot.completed;
 
-      if (!suficiencia.suficiente) {
-        return { suficiencia, pendientes, prediccion: null };
-      }
+        if (!suficiencia.suficiente) {
+          return { suficiencia, pendientes, prediccion: null };
+        }
 
-      /* Cierres por día, incluidos **los días de cero**: si se omitieran, el
+        /* Cierres por día, incluidos **los días de cero**: si se omitieran, el
          ritmo saldría inflado —solo se promediarían los días buenos— y la
          predicción sería sistemáticamente optimista. */
-      const porDia = new Map<string, number>();
-      for (let i = 0; i < dias; i++) {
-        porDia.set(new Date(desde.getTime() + i * 86_400_000).toISOString().slice(0, 10), 0);
-      }
-      for (const muestra of muestras) {
-        const dia = muestra.completedAt.slice(0, 10);
-        if (porDia.has(dia)) porDia.set(dia, porDia.get(dia)! + 1);
-      }
+        const porDia = new Map<string, number>();
+        for (let i = 0; i < dias; i++) {
+          porDia.set(new Date(desde.getTime() + i * 86_400_000).toISOString().slice(0, 10), 0);
+        }
+        for (const muestra of muestras) {
+          const dia = muestra.completedAt.slice(0, 10);
+          if (porDia.has(dia)) porDia.set(dia, porDia.get(dia)! + 1);
+        }
 
-      return {
-        suficiencia,
-        pendientes,
-        throughputDiario: {
-          media: [...porDia.values()].reduce((a, b) => a + b, 0) / porDia.size,
-        },
-        prediccion: simularEntrega({
-          throughputDiario: [...porDia.values()],
+        return {
+          suficiencia,
           pendientes,
-        }),
-      };
-    });
+          throughputDiario: {
+            media: [...porDia.values()].reduce((a, b) => a + b, 0) / porDia.size,
+          },
+          prediccion: simularEntrega({
+            throughputDiario: [...porDia.values()],
+            pendientes,
+          }),
+        };
+      },
+    );
   }
 
   /**
@@ -301,43 +335,49 @@ export class ReportsService {
    * `variacion` es `null` cuando la semana pasada fue de cero: dividir entre cero
    * daría «infinito por ciento», y «se pasó de 0 a 3» ya se dice con los totales.
    */
-  async weekly(projectId: string, semanas = 8) {
-    return this.cached(`reports:${projectId}:weekly:${semanas}`, async () => {
-      const filas = await this.ask<{ semana: string; cerradas: number; creadas: number }[]>(
-        this.tasksClient,
-        'task_stats_weekly',
-        { projectId, semanas },
-      );
+  async weekly(projectId: string, semanas = 8, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:weekly:${semanas}${claveDeFiltros(filtros)}`,
+      async () => {
+        /* Sin `conVentana`: aquí el tramo **es el eje** —qué semanas salen— y no
+         una ventana de historial que haya que rellenar desde `semanas`. Ver
+         `weeklyThroughput`. */
+        const filas = await this.ask<{ semana: string; cerradas: number; creadas: number }[]>(
+          this.tasksClient,
+          'task_stats_weekly',
+          { projectId, semanas, filtros },
+        );
 
-      const serie = filas.map((fila) => ({
-        semana: new Date(fila.semana).toISOString().slice(0, 10),
-        cerradas: fila.cerradas,
-        creadas: fila.creadas,
-      }));
+        const serie = filas.map((fila) => ({
+          semana: new Date(fila.semana).toISOString().slice(0, 10),
+          cerradas: fila.cerradas,
+          creadas: fila.creadas,
+        }));
 
-      const actual = serie[serie.length - 1] ?? { semana: '', cerradas: 0, creadas: 0 };
-      const anterior = serie[serie.length - 2] ?? { semana: '', cerradas: 0, creadas: 0 };
+        const actual = serie[serie.length - 1] ?? { semana: '', cerradas: 0, creadas: 0 };
+        const anterior = serie[serie.length - 2] ?? { semana: '', cerradas: 0, creadas: 0 };
 
-      /* Lunes = 1 … domingo = 7, como la semana de Postgres. */
-      const hoy = new Date();
-      const diasTranscurridos = ((hoy.getDay() + 6) % 7) + 1;
+        /* Lunes = 1 … domingo = 7, como la semana de Postgres. */
+        const hoy = new Date();
+        const diasTranscurridos = ((hoy.getDay() + 6) % 7) + 1;
 
-      return {
-        semana: { ...actual, diasTranscurridos },
-        anterior,
-        variacion:
-          anterior.cerradas > 0
-            ? Math.round(((actual.cerradas - anterior.cerradas) / anterior.cerradas) * 100)
-            : null,
-        /* Ritmo por día transcurrido, que es lo que se puede comparar con una
+        return {
+          semana: { ...actual, diasTranscurridos },
+          anterior,
+          variacion:
+            anterior.cerradas > 0
+              ? Math.round(((actual.cerradas - anterior.cerradas) / anterior.cerradas) * 100)
+              : null,
+          /* Ritmo por día transcurrido, que es lo que se puede comparar con una
            semana entera sin que la comparación mienta. */
-        ritmoDiario: {
-          semana: Number((actual.cerradas / diasTranscurridos).toFixed(2)),
-          anterior: Number((anterior.cerradas / 7).toFixed(2)),
-        },
-        serie,
-      };
-    });
+          ritmoDiario: {
+            semana: Number((actual.cerradas / diasTranscurridos).toFixed(2)),
+            anterior: Number((anterior.cerradas / 7).toFixed(2)),
+          },
+          serie,
+        };
+      },
+    );
   }
 
   /**
@@ -356,36 +396,41 @@ export class ReportsService {
    * no su parón. Se marcan para poder decirlo en vez de acusarlas de estar
    * paradas.
    */
-  async blocked(projectId: string, dias = 7) {
-    return this.cached(`reports:${projectId}:blocked:${dias}`, async () => {
-      const [tareas, columns] = await Promise.all([
-        this.ask<
-          {
-            taskId: string;
-            titulo: string;
-            columna: string;
-            columnId: string;
-            diasParada: number;
-            sinHistorial: boolean;
-            vencida: boolean;
-          }[]
-        >(this.tasksClient, 'task_stats_stale', { projectId, dias }),
-        this.columnas(projectId),
-      ]);
+  async blocked(projectId: string, dias = 7, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:blocked:${dias}${claveDeFiltros(filtros)}`,
+      async () => {
+        const [tareas, columns] = await Promise.all([
+          this.ask<
+            {
+              taskId: string;
+              titulo: string;
+              columna: string;
+              columnId: string;
+              diasParada: number;
+              sinHistorial: boolean;
+              vencida: boolean;
+            }[]
+            /* Los filtros **tal cual**, sin ventana: el `dias` de este informe es el
+           umbral de parón, no desde cuándo se mira. */
+          >(this.tasksClient, 'task_stats_stale', { projectId, dias, filtros }),
+          this.columnas(projectId),
+        ]);
 
-      const porId = new Map(columns.map((c) => [c.id, c]));
+        const porId = new Map(columns.map((c) => [c.id, c]));
 
-      return {
-        dias,
-        total: tareas.length,
-        /* Con el nombre actual de la columna, no con el `status` congelado en la
+        return {
+          dias,
+          total: tareas.length,
+          /* Con el nombre actual de la columna, no con el `status` congelado en la
            tarea: si alguien renombró la columna, el nombre viejo despistaría. */
-        tareas: tareas.map((tarea) => ({
-          ...tarea,
-          columna: porId.get(tarea.columnId)?.name ?? tarea.columna,
-        })),
-      };
-    });
+          tareas: tareas.map((tarea) => ({
+            ...tarea,
+            columna: porId.get(tarea.columnId)?.name ?? tarea.columna,
+          })),
+        };
+      },
+    );
   }
 
   /**
@@ -415,18 +460,18 @@ export class ReportsService {
   async bundle(
     projectId: string,
     incluir: string[],
-    opciones: { days?: number; weeks?: number } = {},
+    opciones: { days?: number; weeks?: number; filtros?: ReportFilters } = {},
   ): Promise<Record<string, unknown>> {
-    const { days, weeks } = opciones;
+    const { days, weeks, filtros } = opciones;
 
     /* El mapa vive aquí y no en el gateway: es este servicio el que sabe qué
        argumentos acepta cada informe. */
     const calculos: Record<string, () => Promise<unknown>> = {
-      snapshot: () => this.snapshot(projectId),
-      flow: () => this.flow(projectId, days),
-      'cycle-time': () => this.cycleTime(projectId, days),
-      forecast: () => this.forecast(projectId, days),
-      people: () => this.people(projectId),
+      snapshot: () => this.snapshot(projectId, filtros),
+      flow: () => this.flow(projectId, days, filtros),
+      'cycle-time': () => this.cycleTime(projectId, days, filtros),
+      forecast: () => this.forecast(projectId, days, filtros),
+      people: () => this.people(projectId, filtros),
       /**
        * ⚠️ **`blocked` NO recibe el `days` del paquete, y no es un olvido.**
        *
@@ -439,8 +484,8 @@ export class ReportsService {
        *
        * Quien necesite otra ventana de estancamiento tiene su ruta suelta.
        */
-      blocked: () => this.blocked(projectId),
-      weekly: () => this.weekly(projectId, weeks),
+      blocked: () => this.blocked(projectId, undefined, filtros),
+      weekly: () => this.weekly(projectId, weeks, filtros),
     };
 
     const pedidos = incluir.filter((parte) => parte in calculos);
@@ -853,8 +898,8 @@ export class ReportsService {
   }
 
   /** Carga y flujo por persona. La ruta que lo expone pide `canViewReports`. */
-  async people(projectId: string) {
-    return this.cached(`reports:${projectId}:people`, async () => {
+  async people(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:people${claveDeFiltros(filtros)}`, async () => {
       return this.ask<
         {
           userId: string;
@@ -863,7 +908,7 @@ export class ReportsService {
           vencidas: number;
           medianaHoras: number | null;
         }[]
-      >(this.tasksClient, 'task_stats_people', { projectId });
+      >(this.tasksClient, 'task_stats_people', { projectId, filtros });
     });
   }
 }

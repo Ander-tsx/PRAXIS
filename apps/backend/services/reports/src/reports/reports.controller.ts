@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
+import type { ReportFilters } from '@praxis/contracts';
 
 import { ReportsService } from './reports.service';
 
@@ -12,41 +13,50 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 
+  /**
+   * ⚠️ **`filtros` viaja igual en los ocho comandos y llega ya validado.** El
+   * gateway comprobó las formas y que el tramo no sea infinito; aquí no se
+   * vuelve a mirar, como con todo lo demás que entra por TCP.
+   *
+   * Lo que sí pasa aquí es que **entra en la clave de caché**: sin eso, quien
+   * filtra dejaría su resultado guardado bajo la clave de quien no filtra. Ver
+   * `claveDeFiltros`.
+   */
   @MessagePattern({ cmd: 'report_snapshot' })
-  snapshot(@Payload() dto: { projectId: string }) {
-    return this.reports.snapshot(dto.projectId);
+  snapshot(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.reports.snapshot(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'report_cycle_time' })
-  cycleTime(@Payload() dto: { projectId: string; days?: number }) {
-    return this.reports.cycleTime(dto.projectId, dto.days);
+  cycleTime(@Payload() dto: { projectId: string; days?: number; filtros?: ReportFilters }) {
+    return this.reports.cycleTime(dto.projectId, dto.days, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'report_flow' })
-  flow(@Payload() dto: { projectId: string; days?: number }) {
-    return this.reports.flow(dto.projectId, dto.days);
+  flow(@Payload() dto: { projectId: string; days?: number; filtros?: ReportFilters }) {
+    return this.reports.flow(dto.projectId, dto.days, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'report_forecast' })
-  forecast(@Payload() dto: { projectId: string; days?: number }) {
-    return this.reports.forecast(dto.projectId, dto.days);
+  forecast(@Payload() dto: { projectId: string; days?: number; filtros?: ReportFilters }) {
+    return this.reports.forecast(dto.projectId, dto.days, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'report_people' })
-  people(@Payload() dto: { projectId: string }) {
-    return this.reports.people(dto.projectId);
+  people(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.reports.people(dto.projectId, dto.filtros);
   }
 
   /** Cierres y entradas de esta semana, con la anterior al lado. */
   @MessagePattern({ cmd: 'report_weekly' })
-  weekly(@Payload() dto: { projectId: string; weeks?: number }) {
-    return this.reports.weekly(dto.projectId, dto.weeks);
+  weekly(@Payload() dto: { projectId: string; weeks?: number; filtros?: ReportFilters }) {
+    return this.reports.weekly(dto.projectId, dto.weeks, dto.filtros);
   }
 
   /** Abiertas que llevan `days` sin cambiar de columna. */
   @MessagePattern({ cmd: 'report_blocked' })
-  blocked(@Payload() dto: { projectId: string; days?: number }) {
-    return this.reports.blocked(dto.projectId, dto.days);
+  blocked(@Payload() dto: { projectId: string; days?: number; filtros?: ReportFilters }) {
+    return this.reports.blocked(dto.projectId, dto.days, dto.filtros);
   }
 
   /**
@@ -57,10 +67,20 @@ export class ReportsController {
    * comando también es alcanzable por TCP sin pasar por él.
    */
   @MessagePattern({ cmd: 'report_bundle' })
-  bundle(@Payload() dto: { projectId: string; incluir: string[]; days?: number; weeks?: number }) {
+  bundle(
+    @Payload()
+    dto: {
+      projectId: string;
+      incluir: string[];
+      days?: number;
+      weeks?: number;
+      filtros?: ReportFilters;
+    },
+  ) {
     return this.reports.bundle(dto.projectId, dto.incluir ?? [], {
       days: dto.days,
       weeks: dto.weeks,
+      filtros: dto.filtros,
     });
   }
 

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import type { ReportFilters } from '@praxis/contracts';
 
+import { Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -81,6 +83,175 @@ function recortar(descripcion: string | null): string | null {
 }
 
 /**
+ * ─── Los filtros de Análisis ──────────────────────────────────────────────
+ *
+ * Cinco campos —`from`, `to`, `boardId`, `assigneeId`, `labelId`, `priority`—
+ * que el gateway valida una vez y llegan hasta aquí sin cambiar de forma. Los
+ * cinco existen en el esquema de tareas, así que no hay nada que traducir: ni
+ * siquiera el tablero, porque `Task` guarda `boardId` además de `columnId`.
+ *
+ * ## ⚠️ Qué acota `from`/`to`, que no es lo mismo en todos los informes
+ *
+ * Y no puede serlo, porque los informes no miden lo mismo:
+ *
+ * | Informe | El tramo acota | Por qué |
+ * |---|---|---|
+ * | `snapshot`, `sinMovimiento`, `byPerson` | `createdAt` | Miden **estado de ahora**. Un tramo aquí solo puede querer decir «de las tareas que entraron en él» |
+ * | `cycleTimes` | `completedAt` | Mide lo que se cerró |
+ * | `dailyFlow` | `occurredAt` | Mide movimientos |
+ * | `weeklyThroughput` | la serie de semanas | El tramo **es** el eje |
+ *
+ * Se escribe aquí porque es la clase de diferencia que no da ningún error: los
+ * cuatro devuelven un gráfico plausible con cualquier criterio.
+ */
+
+/**
+ * Los filtros como `where` de Prisma, para las consultas que no van en SQL crudo.
+ *
+ * ⚠️ **El campo de fecha es `createdAt` y no se parametriza**, aunque
+ * `sqlDeTarea` sí lo haga. Los tres informes que pasan por aquí miden estado
+ * actual y ya usan `completedAt` para otra cosa —`completed`, `overdue`—:
+ * dejarlo elegir habría permitido pedir un `where` con dos condiciones
+ * incompatibles sobre la misma columna, que Prisma resuelve quedándose con una y
+ * sin decir cuál.
+ */
+function whereDeTarea(filtros?: ReportFilters): Prisma.TaskWhereInput {
+  if (!filtros) return {};
+
+  const where: Prisma.TaskWhereInput = {};
+
+  if (filtros.from || filtros.to) {
+    where.createdAt = {
+      ...(filtros.from ? { gte: new Date(filtros.from) } : {}),
+      ...(filtros.to ? { lte: new Date(filtros.to) } : {}),
+    };
+  }
+  if (filtros.boardId) where.boardId = filtros.boardId;
+  if (filtros.priority) where.priority = filtros.priority;
+  /* `some` y no una igualdad: las dos son relaciones de muchos a muchos, y una
+     tarea con tres responsables entra si **alguno** es el pedido. */
+  if (filtros.assigneeId) where.assignees = { some: { userId: filtros.assigneeId } };
+  if (filtros.labelId) where.labels = { some: { labelId: filtros.labelId } };
+
+  return where;
+}
+
+/**
+ * Las condiciones de los filtros sobre un alias de `tasks.tasks`, para el SQL
+ * crudo. Devuelve una lista para que cada consulta las una donde le toque.
+ *
+ * ⚠️ **`Prisma.raw` con el alias, y aquí es seguro**: el alias es un literal
+ * escrito en este archivo, nunca algo que venga de una petición. Los **valores**
+ * van todos por interpolación normal, o sea como parámetros del prepared
+ * statement. Si algún día el alias saliera de fuera, esto sería inyección.
+ *
+ * `fecha` es la columna que acota `from`/`to`, y va explícita porque no es la
+ * misma en todos los informes (ver la tabla de arriba). Con `null`, el tramo no
+ * se aplica: lo usa el flujo diario, que acota por la fecha del evento y no por
+ * ninguna de la tarea.
+ */
+function condicionesDeTarea(
+  filtros: ReportFilters | undefined,
+  opciones: { alias: string; fecha: 'createdAt' | 'completedAt' | null },
+): Prisma.Sql[] {
+  if (!filtros) return [];
+
+  const tabla = Prisma.raw(`"${opciones.alias}"`);
+  const condiciones: Prisma.Sql[] = [];
+
+  if (opciones.fecha) {
+    const columna = Prisma.raw(`"${opciones.alias}"."${opciones.fecha}"`);
+    if (filtros.from) condiciones.push(Prisma.sql`${columna} >= ${filtros.from}::timestamptz`);
+    if (filtros.to) condiciones.push(Prisma.sql`${columna} <= ${filtros.to}::timestamptz`);
+  }
+
+  if (filtros.boardId) {
+    condiciones.push(Prisma.sql`${tabla}."boardId" = ${filtros.boardId}::text`);
+  }
+  if (filtros.priority) {
+    /* A texto los dos lados: `priority` es un enum de Postgres y comparar un
+       enum con un parámetro de texto da «operator does not exist». */
+    condiciones.push(Prisma.sql`${tabla}."priority"::text = ${filtros.priority}::text`);
+  }
+  if (filtros.assigneeId) {
+    condiciones.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM tasks.task_assignees fa
+                          WHERE fa."taskId" = ${tabla}.id
+                            AND fa."userId" = ${filtros.assigneeId}::text)`,
+    );
+  }
+  if (filtros.labelId) {
+    condiciones.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM tasks.task_labels fl
+                          WHERE fl."taskId" = ${tabla}.id
+                            AND fl."labelId" = ${filtros.labelId}::text)`,
+    );
+  }
+
+  return condiciones;
+}
+
+/**
+ * Las condiciones, ya pegadas a un `WHERE` que siempre tiene algo antes.
+ *
+ * Las ocho consultas empiezan por `WHERE t."projectId" = …`, así que lo que hace
+ * falta es un `AND …` o nada. Sale de aquí y no de un `if` en cada sitio.
+ */
+function andDeTarea(
+  filtros: ReportFilters | undefined,
+  opciones: { alias: string; fecha: 'createdAt' | 'completedAt' | null },
+): Prisma.Sql {
+  const condiciones = condicionesDeTarea(filtros, opciones);
+  if (condiciones.length === 0) return Prisma.empty;
+  return Prisma.sql` AND ${Prisma.join(condiciones, ' AND ')}`;
+}
+
+/**
+ * Lo mismo para el historial, donde la fila **es un evento y no una tarea**.
+ *
+ * Dos cosas se resuelven sin salir de `task_events`: el tramo, que allí acota
+ * por `occurredAt` —cuándo pasó, que es lo que mide este informe— y el tablero,
+ * porque el evento también guarda `boardId`.
+ *
+ * El resto —responsable, etiqueta, prioridad— son propiedades de la **tarea
+ * actual**, no del evento, así que van por un `EXISTS` contra `tasks.tasks`.
+ *
+ * ⚠️ Y eso significa que filtrar el flujo por responsable enseña el historial de
+ * las tareas que **hoy** tiene esa persona, no el de lo que era suyo entonces.
+ * No hay otra lectura posible: `task_events` no guarda los responsables de cada
+ * momento. Es la misma limitación que tiene la prioridad, y se dice aquí porque
+ * el gráfico no puede decirla.
+ */
+function andDeEvento(filtros: ReportFilters | undefined, alias: string): Prisma.Sql {
+  if (!filtros) return Prisma.empty;
+
+  const evento = Prisma.raw(`"${alias}"`);
+  const condiciones: Prisma.Sql[] = [];
+
+  if (filtros.from)
+    condiciones.push(Prisma.sql`${evento}."occurredAt" >= ${filtros.from}::timestamptz`);
+  if (filtros.to)
+    condiciones.push(Prisma.sql`${evento}."occurredAt" <= ${filtros.to}::timestamptz`);
+  if (filtros.boardId) condiciones.push(Prisma.sql`${evento}."boardId" = ${filtros.boardId}::text`);
+
+  /* Sin el tramo ni el tablero, que ya se resolvieron sobre el evento. */
+  const deLaTarea = condicionesDeTarea(
+    { assigneeId: filtros.assigneeId, labelId: filtros.labelId, priority: filtros.priority },
+    { alias: 'ft', fecha: null },
+  );
+  if (deLaTarea.length > 0) {
+    condiciones.push(
+      Prisma.sql`EXISTS (SELECT 1 FROM tasks.tasks ft
+                          WHERE ft.id = ${evento}."taskId"
+                            AND ${Prisma.join(deLaTarea, ' AND ')})`,
+    );
+  }
+
+  if (condiciones.length === 0) return Prisma.empty;
+  return Prisma.sql` AND ${Prisma.join(condiciones, ' AND ')}`;
+}
+
+/**
  * Agregación sobre las tareas y su historial.
  *
  * Vive **aquí y no en reports-service** porque los datos son de este servicio.
@@ -105,31 +276,38 @@ export class StatsService {
    * Es el único informe que no necesita historial, así que es el que funciona
    * desde el primer día. Todo sale de la tabla `tasks`, sin tocar los eventos.
    */
-  async snapshot(projectId: string) {
+  async snapshot(projectId: string, filtros?: ReportFilters) {
+    /* Una sola vez: los cinco `where` de abajo son el mismo más el proyecto. */
+    const deLaTarea = { projectId, ...whereDeTarea(filtros) };
+
     const [byPriority, byColumn, byLabel, byAssignee, totals] = await Promise.all([
       this.prisma.task.groupBy({
         by: ['priority'],
-        where: { projectId },
+        where: deLaTarea,
         _count: { _all: true },
       }),
       this.prisma.task.groupBy({
         by: ['columnId'],
-        where: { projectId },
+        where: deLaTarea,
         _count: { _all: true },
       }),
       /* Las etiquetas cuelgan de la tarea por una tabla puente, así que se
-         agrupan sobre ella acotando por las tareas del proyecto. */
+         agrupan sobre ella acotando por las tareas del proyecto.
+
+         ⚠️ Con `labelId` puesto esto devuelve **una sola fila**, y es correcto:
+         se preguntó por una etiqueta. Lo que no puede hacer quien lo pinte es
+         leerlo como «el proyecto solo tiene una etiqueta». */
       this.prisma.taskLabel.groupBy({
         by: ['labelId'],
-        where: { task: { projectId } },
+        where: { task: deLaTarea },
         _count: { _all: true },
       }),
       this.prisma.taskAssignee.groupBy({
         by: ['userId'],
-        where: { task: { projectId } },
+        where: { task: deLaTarea },
         _count: { _all: true },
       }),
-      this.totals(projectId),
+      this.totals(projectId, filtros),
     ]);
 
     return {
@@ -149,8 +327,14 @@ export class StatsService {
    * cuenta como abierto: no hay forma de saber cuándo llegó a su columna. Quien
    * pinte esto tiene que decirlo, no disimularlo.
    */
-  private async totals(projectId: string) {
+  private async totals(projectId: string, filtros?: ReportFilters) {
     const ahora = new Date();
+
+    /* ⚠️ Los filtros acotan por `createdAt`, nunca por `completedAt`: tres de
+       los siete contadores de aquí abajo ya usan esa columna para distinguir
+       cerrada de abierta, y un filtro sobre ella los dejaría contando otra cosa
+       —sin error, con un número plausible—. Ver `whereDeTarea`. */
+    const deLaTarea = { projectId, ...whereDeTarea(filtros) };
 
     const [
       total,
@@ -161,17 +345,22 @@ export class StatsService {
       checklistDone,
       eventosSinteticos,
     ] = await Promise.all([
-      this.prisma.task.count({ where: { projectId } }),
-      this.prisma.task.count({ where: { projectId, completedAt: { not: null } } }),
+      this.prisma.task.count({ where: deLaTarea }),
+      this.prisma.task.count({ where: { ...deLaTarea, completedAt: { not: null } } }),
       /* Vencidas: con fecha pasada y **sin cerrar**. Una tarea entregada no
          vence, que es la misma regla que ya aplica la tarjeta del tablero. */
       this.prisma.task.count({
-        where: { projectId, completedAt: null, dueDate: { lt: ahora } },
+        where: { ...deLaTarea, completedAt: null, dueDate: { lt: ahora } },
       }),
-      this.prisma.task.count({ where: { projectId, assignees: { none: {} } } }),
-      this.prisma.checklist.count({ where: { task: { projectId } } }),
-      this.prisma.checklist.count({ where: { task: { projectId }, completed: true } }),
-      /* Para que la pantalla pueda decir «esto es historial fabricado». */
+      /* ⚠️ `assignees: { none: {} }` pisa el `some` que pondría un filtro por
+         responsable, y tiene que pisarlo: «sin asignar» y «de fulano» son
+         incompatibles, y la respuesta correcta a las dos a la vez es cero. Lo
+         es: `none` gana y el conteo sale vacío. */
+      this.prisma.task.count({ where: { ...deLaTarea, assignees: { none: {} } } }),
+      this.prisma.checklist.count({ where: { task: deLaTarea } }),
+      this.prisma.checklist.count({ where: { task: deLaTarea, completed: true } }),
+      /* Para que la pantalla pueda decir «esto es historial fabricado». No se
+         filtra: es una propiedad del proyecto, no de las tareas que se miren. */
       this.prisma.taskEvent.count({ where: { projectId, actorId: ACTOR_SINTETICO } }),
     ]);
 
@@ -199,7 +388,7 @@ export class StatsService {
    *   una vez empieza. Si nunca se movió antes de cerrarse, es `null`: no se
    *   inventa un cero.
    */
-  async cycleTimes(projectId: string, from?: Date) {
+  async cycleTimes(projectId: string, filtros?: ReportFilters) {
     const rows = await this.prisma.$queryRaw<
       { taskId: string; completedAt: Date; createdAt: Date; firstMovedAt: Date | null }[]
     >`
@@ -211,7 +400,7 @@ export class StatsService {
         LEFT JOIN tasks.task_events e ON e."taskId" = t.id
        WHERE t."projectId" = ${projectId}::text
          AND t."completedAt" IS NOT NULL
-         AND (${from ?? null}::timestamp IS NULL OR t."completedAt" >= ${from ?? null}::timestamp)
+         ${andDeTarea(filtros, { alias: 't', fecha: 'completedAt' })}
        GROUP BY t.id, t."completedAt", t."createdAt"
        ORDER BY t."completedAt"
     `;
@@ -242,18 +431,18 @@ export class StatsService {
    * no aparece hasta que se mueve. El acumulado arranca del `CREATED`, que
    * también se cuenta como entrada.
    */
-  async dailyFlow(projectId: string, from: Date) {
+  async dailyFlow(projectId: string, filtros?: ReportFilters) {
     return this.prisma.$queryRaw<
       { day: Date; columnId: string | null; entradas: number; salidas: number }[]
     >`
       WITH movimientos AS (
-        SELECT date_trunc('day', "occurredAt") AS day,
-               "toColumnId"   AS entra,
-               "fromColumnId" AS sale
-          FROM tasks.task_events
-         WHERE "projectId" = ${projectId}::text
-           AND "occurredAt" >= ${from}::timestamp
-           AND type IN ('CREATED', 'MOVED', 'DELETED')
+        SELECT date_trunc('day', e."occurredAt") AS day,
+               e."toColumnId"   AS entra,
+               e."fromColumnId" AS sale
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type IN ('CREATED', 'MOVED', 'DELETED')
+           ${andDeEvento(filtros, 'e')}
       )
       SELECT day,
              col AS "columnId",
@@ -295,12 +484,18 @@ export class StatsService {
    * porque los dos agregados miran **columnas de fecha distintas**: unirlos
    * obligaría a un `FULL OUTER JOIN` por semana para ganar nada a esta escala.
    */
-  async weeklyThroughput(projectId: string, semanas = 8) {
+  async weeklyThroughput(projectId: string, semanas = 8, filtros?: ReportFilters) {
     return this.prisma.$queryRaw<{ semana: Date; cerradas: number; creadas: number }[]>`
       WITH s AS (
         SELECT generate_series(
-                 date_trunc('week', now()) - make_interval(weeks => ${semanas - 1}::int),
-                 date_trunc('week', now()),
+                 /* ⚠️ El tramo, si viene, **es el eje** de este informe: aquí no
+                    acota qué tareas se cuentan —eso lo hacen los otros filtros—
+                    sino qué semanas salen. Sin él manda \`semanas\`, que sigue
+                    siendo el caso normal. */
+                 COALESCE(date_trunc('week', ${filtros?.from ?? null}::timestamptz),
+                          date_trunc('week', now()) - make_interval(weeks => ${semanas - 1}::int)),
+                 COALESCE(date_trunc('week', ${filtros?.to ?? null}::timestamptz),
+                          date_trunc('week', now())),
                  interval '1 week'
                ) AS semana
       )
@@ -311,12 +506,14 @@ export class StatsService {
                 FROM tasks.tasks t
                WHERE t."projectId" = ${projectId}::text
                  AND t."completedAt" >= s.semana
-                 AND t."completedAt" <  s.semana + interval '1 week') AS cerradas,
+                 AND t."completedAt" <  s.semana + interval '1 week'
+                 ${andDeTarea(filtros, { alias: 't', fecha: null })}) AS cerradas,
              (SELECT COUNT(*)::int
                 FROM tasks.tasks t
                WHERE t."projectId" = ${projectId}::text
                  AND t."createdAt" >= s.semana
-                 AND t."createdAt" <  s.semana + interval '1 week') AS creadas
+                 AND t."createdAt" <  s.semana + interval '1 week'
+                 ${andDeTarea(filtros, { alias: 't', fecha: null })}) AS creadas
         FROM s
        ORDER BY s.semana
     `;
@@ -344,7 +541,7 @@ export class StatsService {
    * `columna` sale de `status`, que es el **nombre** de la columna donde está: se
    * puede leer en voz alta sin cruzarlo con projects-service.
    */
-  async sinMovimiento(projectId: string, dias = 7, limite = 20) {
+  async sinMovimiento(projectId: string, dias = 7, limite = 20, filtros?: ReportFilters) {
     return this.prisma.$queryRaw<
       {
         taskId: string;
@@ -371,6 +568,7 @@ export class StatsService {
               AND e.type IN ('CREATED', 'MOVED')
        WHERE t."projectId" = ${projectId}::text
          AND t."completedAt" IS NULL
+         ${andDeTarea(filtros, { alias: 't', fecha: 'createdAt' })}
        GROUP BY t.id, t.title, t.status, t."columnId", t."createdAt", t."dueDate"
       HAVING floor(
                EXTRACT(EPOCH FROM (now() - COALESCE(MAX(e."occurredAt"), t."createdAt"))) / 86400
@@ -560,7 +758,7 @@ export class StatsService {
    *
    * La ruta que lo expone pide `canViewReports`, no `canViewProject`.
    */
-  async byPerson(projectId: string) {
+  async byPerson(projectId: string, filtros?: ReportFilters) {
     return this.prisma.$queryRaw<
       {
         userId: string;
@@ -583,6 +781,7 @@ export class StatsService {
         FROM tasks.task_assignees a
         JOIN tasks.tasks t ON t.id = a."taskId"
        WHERE t."projectId" = ${projectId}::text
+         ${andDeTarea(filtros, { alias: 't', fecha: 'createdAt' })}
        GROUP BY a."userId"
     `;
   }
