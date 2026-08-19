@@ -29,6 +29,7 @@ import { MessageBubble } from './MessageBubble';
 import { PinnedBar } from './PinnedBar';
 import { ThreadPanel } from './ThreadPanel';
 import { fieldFromBody } from './tagging';
+import { useHilosNoLeidos } from './useHilosNoLeidos';
 
 /** Cuántos mensajes trae cada tirón del historial. */
 const PAGINA = 50;
@@ -473,6 +474,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   const [respuestasExtra, setRespuestasExtra] = useState<Map<string, number>>(new Map());
 
+  /**
+   * Qué hilos tienen respuestas sin mirar.
+   *
+   * Se apoya en `_count.replies`, que ya viaja con cada raíz, y recuerda en el
+   * navegador cuántas había la última vez. El porqué de que no lo conteste el
+   * servidor —y por qué entrar al chat borraría la marca aunque lo hiciera—
+   * está entero en `useHilosNoLeidos`.
+   */
+  const {
+    tieneNovedad: hiloTieneNovedad,
+    marcarVisto: marcarHiloVisto,
+    sembrar: sembrarHilos,
+    listo: hilosListos,
+  } = useHilosNoLeidos(page.channelId);
+
   // Limpiar el estado local de respuestas extra si la página servida cambia
   // (por ejemplo, tras una revalidación, la base de datos ya trae los contadores actualizados)
   useEffect(() => {
@@ -537,6 +553,53 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     };
   });
   const ultimoId = mensajes.at(-1)?.id;
+
+  /**
+   * Los hilos que se ven ahora, con su número de respuestas.
+   *
+   * Es una cadena y no un array a propósito: `mensajes` se reconstruye en cada
+   * render —es un `.map`, no un `useMemo`— así que como dependencia de efecto
+   * dispararía siempre. Esta firma solo cambia cuando cambia algún contador,
+   * que es justo cuando hay algo que sembrar.
+   */
+  const firmaDeHilos = mensajes
+    .filter((mensaje) => mensaje._count.replies > 0)
+    .map((mensaje) => `${mensaje.id}:${mensaje._count.replies}`)
+    .join('|');
+
+  /**
+   * Un hilo que se ve por primera vez nace **visto**.
+   *
+   * Si no, la primera visita a una conversación con historial encendería todos
+   * sus hilos a la vez. Ver la nota 2 de `useHilosNoLeidos`.
+   */
+  useEffect(() => {
+    if (!hilosListos || !firmaDeHilos) return;
+    const conteos = new Map<string, number>();
+    for (const par of firmaDeHilos.split('|')) {
+      const corte = par.lastIndexOf(':');
+      conteos.set(par.slice(0, corte), Number(par.slice(corte + 1)));
+    }
+    sembrarHilos(conteos);
+  }, [firmaDeHilos, hilosListos, sembrarHilos]);
+
+  /**
+   * Con el hilo abierto, lo que hay dentro se está viendo.
+   *
+   * Una sola fuente para la marca, igual que el contador de «N respuestas»: se
+   * apunta aquí y en ningún otro sitio. Cubre los tres casos con la misma
+   * línea —abrirlo, recibir una respuesta con él delante y escribir tú una— sin
+   * que ninguno tenga que acordarse.
+   *
+   * ⚠️ Mientras carga, `hiloReplies` está vacío y esto apunta un 0. Es la
+   * dirección segura: si la carga falla, el recuerdo se queda por debajo del
+   * contador real y el punto **sigue encendido**, que es lo correcto cuando el
+   * hilo no ha llegado a verse.
+   */
+  useEffect(() => {
+    if (!hiloRaiz || !hilosListos) return;
+    marcarHiloVisto(hiloRaiz.id, hiloReplies.length);
+  }, [hiloRaiz, hiloReplies.length, hilosListos, marcarHiloVisto]);
 
   /**
    * Lo último que ha llegado al canal, **contando también los hilos**.
@@ -1690,6 +1753,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         editandose={editando?.id === mensaje.id}
                         onBorrar={borrar}
                         onAbrirHilo={(mensaje) => void abrirHilo(mensaje)}
+                        hiloConNovedad={hiloTieneNovedad(mensaje.id, mensaje._count.replies)}
                         nombreDeAutor={nombreDeAutor}
                         isProjectChat={rutaCanal.includes('/projects')}
                         {...(acciones.previewDeLink

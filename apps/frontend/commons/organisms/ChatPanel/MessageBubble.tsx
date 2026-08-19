@@ -74,6 +74,14 @@ export interface MessageBubbleProps {
    */
   mostrarMarcaDeHilo?: boolean;
   /**
+   * El hilo de este mensaje tiene respuestas sin mirar.
+   *
+   * Pinta un punto a la derecha de «N respuestas al hilo». Lo decide
+   * `useHilosNoLeidos`, que es quien explica por qué esto se recuerda en el
+   * navegador y no lo contesta el servidor.
+   */
+  hiloConNovedad?: boolean;
+  /**
    * Si puede abrirse un hilo desde este mensaje.
    *
    * Apagado dentro del propio panel del hilo: un hilo no tiene hilo, y sin
@@ -212,6 +220,7 @@ export function MessageBubble({
   onBorrar,
   onAbrirHilo,
   mostrarMarcaDeHilo = true,
+  hiloConNovedad = false,
   permiteAbrirHilo = true,
   permiteResponder = true,
   ocultarCitaSiApuntaA,
@@ -1379,12 +1388,41 @@ export function MessageBubble({
               type="button"
               onClick={() => onAbrirHilo(message)}
               className="cursor-pointer font-sans text-[13px] font-semibold transition-opacity hover:opacity-80"
-              style={{ color: colors.textSecondary }}
+              style={{ color: hiloConNovedad ? colors.primary : colors.textSecondary }}
               title="Ver las respuestas"
             >
               {message._count.replies}{' '}
               {message._count.replies === 1 ? 'respuesta al hilo' : 'respuestas al hilo'}
             </button>
+
+            {/**
+             * El punto de «aquí dentro hay algo sin leer».
+             *
+             * Va **a la derecha del texto** y dentro del mismo `flex`, así que
+             * en un mensaje propio —que invierte la fila con
+             * `flex-row-reverse`— acaba a la izquierda, o sea igual de pegado
+             * a la marca. Es lo que se quiere: acompaña al texto, no al borde.
+             *
+             * ⚠️ **No lleva número.** El dato de que dispone el cliente es
+             * «cuántas respuestas hay ahora» menos «cuántas había la última vez
+             * que miré», y esa resta no es «cuántas sin leer» en cuanto alguien
+             * borre una. Un punto dice lo que sí se sabe; un número diría de
+             * más y a veces mentiría.
+             *
+             * `aria-hidden` y el texto para lector de pantalla aparte: un punto
+             * de color no lo anuncia nadie, y quien no lo ve necesita que se lo
+             * digan con palabras.
+             */}
+            {hiloConNovedad && (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: colors.primary }}
+                />
+                <span className="sr-only">Hay respuestas nuevas en este hilo</span>
+              </>
+            )}
           </div>
         )}
       </div>
