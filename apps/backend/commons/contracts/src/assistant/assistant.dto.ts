@@ -116,6 +116,29 @@ export const MAX_HISTORIAL = 12;
 export const ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE = 3;
 
 /**
+ * Cuánto vive un borrador que nadie llegó a enviar.
+ *
+ * 🔴 **Sin esto, el compositor se bloqueaba para siempre.** El tope de arriba se
+ * cuenta sobre los borradores —`messageId: null`— y un borrador solo deja de
+ * serlo cuando su turno se guarda. Si el turno **falla** —Gemini caído, cuota
+ * agotada, la red— los archivos se quedan ahí; el cliente los devuelve al
+ * compositor para poder reintentar, pero quien recargue la página o se rinda los
+ * deja huérfanos, invisibles y contando. Tres fallos seguidos y esa persona no
+ * puede volver a adjuntar nada **nunca**, con un mensaje que habla de un
+ * mensaje que no existe.
+ *
+ * Pasó de verdad, probando el modo sin proyecto contra una clave de Gemini con
+ * el presupuesto agotado: tres 502 seguidos y el compositor muerto.
+ *
+ * Una hora, y el número importa en los dos sentidos. **Más corto es peligroso**:
+ * alguien adjunta un PDF, escribe quince minutos y al enviar el archivo ya no
+ * está — el turno saldría sin él y PRAX respondería sin decir por qué. **Más
+ * largo alarga el bloqueo** de quien ya lo sufrió. Una hora no alcanza a ninguna
+ * sesión de compositor real y desbloquea el mismo día.
+ */
+export const ASSISTANT_DRAFT_TTL_MS = 60 * 60 * 1000;
+
+/**
  * 5 MB por archivo.
  *
  * El quinto del chat de equipo (25 MB) a propósito: allí un adjunto se guarda y

@@ -4,6 +4,7 @@ import {
   ASSISTANT_ATTACHMENT_ALLOWED_MIME,
   ASSISTANT_ATTACHMENT_MAX_BYTES,
   ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE,
+  ASSISTANT_DRAFT_TTL_MS,
 } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -85,6 +86,10 @@ export class AttachmentsService {
       });
     }
 
+    /* Antes de contar: lo que lleva ahí una hora no es un mensaje a medio
+       escribir, es basura de un turno que falló. Ver `purgarHuerfanos`. */
+    await this.purgarHuerfanos(datos.userId);
+
     /**
      * ⚠️ El tope por mensaje se cuenta sobre los **borradores**, no sobre los ya
      * enviados: lo que limita es cuántos van en un turno. Una conversación de
@@ -94,9 +99,14 @@ export class AttachmentsService {
       where: { uploadedBy: datos.userId, messageId: null },
     });
     if (borradores >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE) {
+      /* Dice el **estado**, no la regla. «Solo caben 3 archivos por mensaje»
+         era desconcertante para quien tenía el compositor vacío delante: la
+         frase habla de un mensaje que esa persona no está viendo. */
       throw new RpcException({
         statusCode: 400,
-        message: `Solo caben ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} archivos por mensaje.`,
+        message:
+          `Ya tienes ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} archivos sin enviar. ` +
+          'Mándalos o quítalos antes de adjuntar otro.',
       });
     }
 
@@ -139,6 +149,52 @@ export class AttachmentsService {
     }
 
     return adjunto;
+  }
+
+  /**
+   * Tira los borradores que ya no puede estar usando nadie.
+   *
+   * 🔴 **Esta es la limpieza que el esquema daba por hecha y no existía.** Un
+   * borrador solo deja de serlo cuando su turno se guarda; si el turno falla
+   * —Gemini caído, la red, la cuota— los archivos se quedan. El cliente los
+   * devuelve al compositor para poder reintentar, así que borrarlos en el
+   * momento sería quitarle a alguien lo que acaba de adjuntar. Pero quien
+   * recarga la página o se rinde los deja ahí, **invisibles y contando para el
+   * tope**: tres fallos seguidos y esa persona no vuelve a adjuntar nada.
+   *
+   * Pasó de verdad, con una clave de Gemini sin presupuesto: tres 502 y el
+   * compositor muerto para siempre.
+   *
+   * Se hace **al subir** y no con una tarea programada porque es justo el
+   * momento en que importa y el único en que alguien lo va a notar. Cuesta una
+   * consulta por subida sobre un índice que ya existe (`uploadedBy`,
+   * `messageId`).
+   *
+   * ⚠️ Y no se atrapa el fallo de la base a propósito: si esto revienta, la
+   * subida revienta con ello. Lo que sí se traga es el fallo del blob, como en
+   * `descartar`: un huérfano en el bucket es basura; una fila sin bytes es un
+   * error.
+   */
+  private async purgarHuerfanos(userId: string) {
+    const limite = new Date(Date.now() - ASSISTANT_DRAFT_TTL_MS);
+
+    const viejos = await this.prisma.attachment.findMany({
+      where: { uploadedBy: userId, messageId: null, createdAt: { lt: limite } },
+      select: { id: true },
+    });
+    if (viejos.length === 0) return;
+
+    const ids = viejos.map((viejo) => viejo.id);
+    await this.prisma.attachment.deleteMany({ where: { id: { in: ids } } });
+    this.log.log(`Purgados ${ids.length} borradores huerfanos de ${userId}`);
+
+    await Promise.all(
+      ids.map((id) =>
+        this.blobs.delete(id).catch((error: Error) => {
+          this.log.warn(`Borrador ${id} purgado, su blob no: ${error.message}`);
+        }),
+      ),
+    );
   }
 
   /**
