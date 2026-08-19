@@ -9,9 +9,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | **Cerrado.** R1–R6 hechas; R7 bloqueada y R8 es futuro |
+| **Etapa actual** | R1–R6 cerradas. **R9 en cola**; R7 bloqueada y R8 es futuro |
 | **Última tarea terminada** | R5 — cierre. El plan queda hecho salvo R7 (bloqueada) y R8 (futuro) |
-| **Siguiente** | R7, en cuanto la clave de Gemini tenga presupuesto |
+| **Siguiente** | **R9** — que el análisis no se le escape nada. Encargada el 2026-08-19 y escrita con el diseño hecho. R7 sigue esperando presupuesto en la clave de Gemini |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → R5 ✅ → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
 | **Actualizado** | 2026-08-19 |
@@ -771,6 +771,100 @@ cuesta entre 8 000 y ~25 000 tokens **pase lo que pase**. Esa es la propiedad qu
 hace honesto un plan por mensajes: el peor caso se puede calcular y ponerle
 precio. Si algún día hace falta más justicia, el paso natural no es cambiar de
 modelo de negocio, es **cobrar como dos** el mensaje que lleva adjuntos.
+
+---
+
+## R9 — Que el análisis no se le escape nada (en cola, 2026-08-19)
+
+> **Encargado y sin empezar.** Se escribe con el diseño hecho para que se pueda
+> retomar sin volver a pensarlo, no como recordatorio.
+
+### El hueco, dicho en una línea
+
+**Se guarda mucho más de lo que se mide.** `TaskEvent` tiene ocho tipos y los
+informes usan tres; `dueDate` solo se cruza con «ahora» y nunca con
+`completedAt`; los checklists, los comentarios y las subtareas no entran en
+ningún agregado. No hace falta capturar nada nuevo para responder el doble de
+preguntas — hace falta cruzar lo que ya está.
+
+### 9.1 — Lo que ya está guardado y nadie mira
+
+| Dato | Pregunta que contesta | Hoy |
+|---|---|---|
+| `REOPENED` | **Retrabajo**: qué porcentaje de lo cerrado se vuelve a abrir | Nada |
+| `PRIORITY_CHANGED` | **Volatilidad**: tareas cuya prioridad baila = requisitos poco claros | Nada |
+| `ASSIGNED` / `UNASSIGNED` | **Rotación**: una tarea que pasó por cuatro manos | Nada |
+| `createdAt` → primer `ASSIGNED` | **Tiempo hasta que alguien la coge** | Nada |
+| `dueDate` × `completedAt` | **Cumplimiento**: qué porcentaje llegó a tiempo, y con cuánto retraso | Solo `overdue`, que mira las **abiertas** de ahora |
+| `MOVED` consecutivos | **Tiempo por columna**: dónde se va el tiempo, no solo cuánto | Solo el total (`cycle-time`) |
+| `Checklist` | Avance interno como indicador **adelantado** del cierre | Solo dos totales en el resumen |
+| `TaskComment` | Tareas con mucha conversación = fricción o ambigüedad | Nada |
+| `parentTaskId` | Profundidad de descomposición | Nada |
+
+⚠️ **El más valioso de la tabla es «tiempo por columna».** El tiempo de ciclo
+dice cuánto tarda una tarea; no dice **dónde** espera. Un equipo que tarda doce
+días de los que nueve son «En revisión» tiene un problema concreto y accionable;
+el número de hoy solo dice «doce».
+
+### 9.2 — Cruces que hoy no se pueden pedir
+
+- **WIP contra throughput** (ley de Little). Con los dos en la misma serie se ve
+  venir el atasco: cuando el trabajo en curso crece más rápido que el ritmo de
+  cierre, el tiempo de ciclo va a subir **antes de que suba**.
+- **Envejecimiento del trabajo en curso.** Para cada tarea abierta, días en su
+  columna actual contra la distribución histórica de esa columna. Es
+  estrictamente mejor que `blocked`, que usa un umbral fijo igual para todas.
+- **Mezcla de trabajo en el tiempo**: qué proporción del esfuerzo va a cada
+  etiqueta, semana a semana.
+- **Dos dimensiones a la vez.** R4.3 lo dejó fuera a propósito —«de lo de
+  frontend, cuánto es urgente» es una pregunta de dos dimensiones sobre un
+  gráfico que tiene una— y es justo lo que hay que resolver aquí: un eje de
+  **agrupar por** y otro de **partir por**.
+
+### 9.3 — Formas de dibujo que faltan
+
+Hoy son cinco y todas sirven para «una categoría, un número» o «una serie».
+Faltan las que responden a otra clase de pregunta:
+
+| Forma | Para qué |
+|---|---|
+| **Histograma** | La distribución del tiempo de ciclo. Un p50 y un p85 esconden si hay dos poblaciones |
+| **Barras apiladas** | La mezcla, sin pasar por el área acumulada |
+| **Barras divergentes** | Entradas contra cierres en el mismo eje |
+| **Mapa de calor** | Persona × etiqueta, o día × hora de cierre |
+| **Dispersión con percentiles** | Ya existe en `tiempos`, pero atada a ese informe y no al constructor |
+| **Sparkline** | Dentro de las cifras del resumen: un número sin su tendencia no dice si va bien |
+
+### 9.4 — Lo que el constructor debería aceptar y no acepta
+
+`agruparPor` + `partirPor`, comparación con el periodo anterior, una línea de
+objetivo, y acumulado contra por periodo. Cada uno multiplica el catálogo sin
+añadir ni una consulta nueva.
+
+### ⚠️ Cuatro trampas que ya se ven desde aquí
+
+1. **El día natural miente.** Todo se cuenta en días de calendario, así que una
+   tarea abierta un viernes por la tarde arrastra el fin de semana. Con
+   distribuciones y percentiles eso deja de ser ruido y pasa a mover la mediana.
+   Hay que decidir —y **decirlo en la pantalla**— si se cuentan días laborables.
+2. **Esto sí puede pedir tablas en `reports-service`.** R4.8 se cerró sin ellas
+   porque R4.2 y R4.4 agregan sobre lo que tasks ya tiene. «Tiempo por columna»
+   por tarea y por día es una reconstrucción del historial entero en cada
+   petición: ahí sí compensa materializar, y sería la primera migración de ese
+   servicio (§25.6).
+3. **`completedAt` solo existe desde que se captura el historial** (§25). Todo lo
+   que se añada aquí hereda ese límite, y el que lo pinte tiene que decirlo — es
+   la misma regla del recorte mudo.
+4. **Más métricas es más prompt.** Cada una que entre en el briefing del
+   asistente se paga en **cada turno** de **cada conversación**. Antes y después:
+   `pnpm --filter @praxis/assistant-service medir-prompt <projectId>` (§43).
+
+### Orden sugerido
+
+R9.1 los eventos que ya están (retrabajo, rotación, volatilidad) → R9.2 tiempo
+por columna, que es el que probablemente pide tabla → R9.3 las formas nuevas →
+R9.4 las dos dimensiones en el constructor. Los tres primeros son valor por
+separado; el cuarto solo luce con los anteriores puestos.
 
 ---
 
