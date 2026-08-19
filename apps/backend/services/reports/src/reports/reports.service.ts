@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
@@ -17,6 +17,7 @@ const REPORT_TTL = 60;
 
 @Injectable()
 export class ReportsService {
+  private readonly log = new Logger(ReportsService.name);
   private readonly tasksClient: ClientProxy;
   private readonly projectsClient: ClientProxy;
 
@@ -385,6 +386,85 @@ export class ReportsService {
         })),
       };
     });
+  }
+
+  /**
+   * Varios agregados en una sola respuesta.
+   *
+   * ## Lo que se ahorra no es el cálculo, es el andamiaje
+   *
+   * Cada informe sigue calculándose igual y conservando su caché de 60 s: aquí
+   * solo se lanzan juntos. Lo que desaparece son **seis viajes HTTP** desde el
+   * servidor de Next hasta el gateway y —lo que de verdad pesaba— **seis
+   * resoluciones de permisos idénticas**, porque `ProjectPermissionGuard`
+   * pregunta a projects-service por TCP en cada petición que entra.
+   *
+   * ## ⚠️ Un informe que falla no se lleva a los demás
+   *
+   * `allSettled` y no `all`, y es la decisión de fondo de este método. La
+   * pantalla pedía los siete con un `.catch(() => null)` cada uno, así que un
+   * fallo en el cálculo de tiempos dejaba esa tarjeta vacía y las otras seis
+   * intactas. Con `all`, agrupar las peticiones habría significado **agrupar los
+   * fallos**: cambiar siete degradaciones independientes por un todo o nada, que
+   * es peor de lo que había.
+   *
+   * Lo que falla vuelve como `null` —«se pidió y no se pudo»— y se registra,
+   * porque un `null` silencioso en producción no se distingue de un proyecto sin
+   * datos.
+   */
+  async bundle(
+    projectId: string,
+    incluir: string[],
+    opciones: { days?: number; weeks?: number } = {},
+  ): Promise<Record<string, unknown>> {
+    const { days, weeks } = opciones;
+
+    /* El mapa vive aquí y no en el gateway: es este servicio el que sabe qué
+       argumentos acepta cada informe. */
+    const calculos: Record<string, () => Promise<unknown>> = {
+      snapshot: () => this.snapshot(projectId),
+      flow: () => this.flow(projectId, days),
+      'cycle-time': () => this.cycleTime(projectId, days),
+      forecast: () => this.forecast(projectId, days),
+      people: () => this.people(projectId),
+      /**
+       * ⚠️ **`blocked` NO recibe el `days` del paquete, y no es un olvido.**
+       *
+       * En los demás informes `days` es la **ventana de historial** que se mira
+       * —60 por defecto—; en este es **cuántos días lleva parada** una tarea para
+       * considerarla bloqueada, y su defecto son 7. Pasarle el mismo número
+       * convertiría «lo que lleva una semana sin moverse» en «lo que lleva dos
+       * meses», con el mismo nombre y sin que nadie lo notara: el informe seguiría
+       * saliendo, solo que contestando a otra pregunta.
+       *
+       * Quien necesite otra ventana de estancamiento tiene su ruta suelta.
+       */
+      blocked: () => this.blocked(projectId),
+      weekly: () => this.weekly(projectId, weeks),
+    };
+
+    const pedidos = incluir.filter((parte) => parte in calculos);
+
+    const resultados = await Promise.allSettled(
+      pedidos.map((parte) => (calculos[parte] as () => Promise<unknown>)()),
+    );
+
+    const paquete: Record<string, unknown> = {};
+    pedidos.forEach((parte, i) => {
+      const resultado = resultados[i];
+      if (resultado?.status === 'fulfilled') {
+        paquete[parte] = resultado.value;
+        return;
+      }
+      this.log.warn(
+        `El informe "${parte}" de ${projectId} fallo: ${
+          (resultado as PromiseRejectedResult | undefined)?.reason
+        }`,
+      );
+      paquete[parte] = null;
+    });
+
+    return paquete;
   }
 
   /**

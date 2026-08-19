@@ -22,7 +22,7 @@ import type {
   ReportSnapshot,
   ReportWeekly,
 } from '@/lib/reports';
-import { type Widget, informesNecesarios } from '@/lib/widgets';
+import { type Informe, type Widget, informesNecesarios } from '@/lib/widgets';
 import {
   AppHeader,
   type AssistantQuota,
@@ -246,27 +246,47 @@ export default async function ReportsPage({ params }: PageProps) {
    * se llevará una conclusión falsa sobre gente real. Es además la más barata:
    * es una foto del momento y no recorre el historial.
    */
-  const [snapshot, flow, cycle, forecast, people, blocked, weekly] = await Promise.all([
-    api.get<ReportSnapshot>(`/projects/${projectId}/reports/snapshot`).catch(() => null),
-    pedirSi(necesarios.has('flow'), () =>
-      api.get<ReportFlow>(`/projects/${projectId}/reports/flow?days=60`),
-    ),
-    pedirSi(necesarios.has('cycle'), () =>
-      api.get<ReportCycleTime>(`/projects/${projectId}/reports/cycle-time`),
-    ),
-    pedirSi(necesarios.has('forecast'), () =>
-      api.get<ReportForecast>(`/projects/${projectId}/reports/forecast`),
-    ),
-    pedirSi(necesarios.has('people'), () =>
-      api.get<ReportPerson[]>(`/projects/${projectId}/reports/people`),
-    ),
-    pedirSi(necesarios.has('blocked'), () =>
-      api.get<ReportBlocked>(`/projects/${projectId}/reports/blocked`),
-    ),
-    pedirSi(necesarios.has('weekly'), () =>
-      api.get<ReportWeekly>(`/projects/${projectId}/reports/weekly`),
-    ),
-  ]);
+  /**
+   * Los informes del lienzo, en **una** petición.
+   *
+   * ## Eran siete, y el coste no era el ida y vuelta
+   *
+   * Cada una de aquellas siete peticiones pasaba por `ProjectPermissionGuard`,
+   * que resuelve los permisos efectivos **preguntando a projects-service por
+   * TCP**. Pintar esta pantalla costaba siete resoluciones de permisos idénticas
+   * y siete travesías del proxy de la zona, para siete cálculos que ya iban en
+   * paralelo al otro lado.
+   *
+   * ⚠️ **Se piden solo los que el lienzo necesita**, igual que antes: quien tenga
+   * dos gráficos no paga los siete cálculos. Lo que cambia es cuántas peticiones
+   * hacen falta para traerlos, no cuáles.
+   *
+   * ⚠️ **Y `days` no viaja.** Cada informe tiene su propio defecto y no
+   * significan lo mismo: 60 días de historial en el flujo, pero 7 días **sin
+   * moverse** en «bloqueadas». Un `days` global convertía este último en otra
+   * pregunta distinta con el mismo nombre.
+   */
+  const partes = ['snapshot', ...[...necesarios].filter((informe) => informe !== 'snapshot')].map(
+    (informe) => PARTE_DE_INFORME[informe as Informe] ?? informe,
+  );
+
+  /* Si el paquete entero falla, se degrada a vacío y cada tarjeta enseña su
+     «no disponible», que es lo que hacía cada `.catch(() => null)` por su
+     cuenta. Un fallo de un informe suelto ya vuelve como `null` desde el
+     servidor sin llevarse a los demás. */
+  const informes = await api
+    .get<Partial<Record<string, unknown>>>(
+      `/projects/${projectId}/reports?include=${partes.join(',')}`,
+    )
+    .catch(() => ({}) as Partial<Record<string, unknown>>);
+
+  const snapshot = (informes.snapshot ?? null) as ReportSnapshot | null;
+  const flow = (informes.flow ?? null) as ReportFlow | null;
+  const cycle = (informes['cycle-time'] ?? null) as ReportCycleTime | null;
+  const forecast = (informes.forecast ?? null) as ReportForecast | null;
+  const people = (informes.people ?? null) as ReportPerson[] | null;
+  const blocked = (informes.blocked ?? null) as ReportBlocked | null;
+  const weekly = (informes.weekly ?? null) as ReportWeekly | null;
 
   /**
    * Los perfiles de quienes salen en esta pantalla, en **una** petición.
@@ -465,16 +485,22 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
 }
 
 /**
- * Pide un informe **solo si el lienzo lo necesita**.
+ * El nombre interno de un informe → la clave que entiende el endpoint.
  *
- * Devuelve `null` sin llamar a nadie cuando no hace falta, y también cuando la
- * llamada falla: perder un gráfico es mucho mejor que perder el informe
- * completo, que es el mismo criterio que ya usaba el tablero con sus tareas.
+ * Solo difiere en uno, y por eso el mapa existe: dentro se llama `cycle` y la
+ * ruta lo expone como `cycle-time`. Sin esta traducción, pedir los tiempos
+ * devolvía una clave que nadie leía y la tarjeta salía vacía **sin ningún
+ * error** — que es exactamente la clase de fallo que este repositorio ya conoce.
  */
-function pedirSi<T>(necesario: boolean, pedir: () => Promise<T>): Promise<T | null> {
-  if (!necesario) return Promise.resolve(null);
-  return pedir().catch(() => null);
-}
+const PARTE_DE_INFORME: Record<Informe, string> = {
+  snapshot: 'snapshot',
+  flow: 'flow',
+  cycle: 'cycle-time',
+  forecast: 'forecast',
+  people: 'people',
+  blocked: 'blocked',
+  weekly: 'weekly',
+};
 
 /** El informe de este gráfico no se pudo leer. Los demás siguen en pie. */
 function NoDisponible() {

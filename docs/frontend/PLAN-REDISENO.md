@@ -9,9 +9,9 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R6 cerrada + optimización del prompt. Siguiente: R4 — Análisis (R4.1 hecho) |
-| **Última tarea terminada** | R6 entera — adjuntos con memoria, conversación sin proyecto, plantilla desde el chat |
-| **Siguiente** | R4.2 — un solo viaje para los agregados |
+| **Etapa actual** | R4 — Análisis (R4.1 y R4.2 hechas) |
+| **Última tarea terminada** | R4.2 — un solo viaje para los agregados |
+| **Siguiente** | R4.3 — filtros de verdad en los siete agregados |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
@@ -43,6 +43,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | R6.6 | (este) | Documentación (ESTADO-ACTUAL §42, CONTRATO-API, CLAUDE.md), formato y build |
 | 2026-08-19 | (fuera de plan) | `519c40d`, `9d5f9e2` | **El prompt, medido y recortado.** De 29 300 a 19 300 tokens por turno, y con techo: el inventario deja de crecer con el proyecto. Con `tareasOmitidas` para que el recorte no sea mudo. ESTADO-ACTUAL §43 |
 | 2026-08-19 | (fuera de plan) | `940acf2` | **El tope de páginas del PDF.** Era el peor caso real: 5 MB sin límite de páginas son ~130 000 tokens en un turno. A partir de 25 páginas viaja como texto. R7 y R8 quedan escritas |
+| 2026-08-19 | R4.2 | (este) | Un viaje para los agregados. De siete peticiones —y siete resoluciones de permisos— a una. Con `allSettled` para no agrupar los fallos, y `blocked` fuera del `days` compartido |
 
 ---
 
@@ -323,8 +324,18 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
       pantalla real. El proyecto activo sale de una cookie
       (`praxis_reports_project`), con caída al primero con `canViewReports`.
       `/reports/[id]` se queda para enlaces directos y **escribe la cookie**.
-- [ ] **R4.2 — Un solo viaje para los agregados.** Endpoint que devuelve los que
-      se pidan en una respuesta, para que la pantalla deje de encadenar rondas.
+- [x] **R4.2 — Un solo viaje para los agregados.** `GET
+      /projects/:id/reports?include=…`, con el conjunto cerrado validado por DTO.
+      El ahorro de verdad no era el ida y vuelta: **cada una de las siete
+      peticiones pasaba por `ProjectPermissionGuard`**, que resuelve permisos
+      preguntando a projects-service por TCP. Siete informes eran siete
+      resoluciones idénticas para pintar una pantalla.
+      ⚠️ `allSettled` y no `all`: un informe que falla vuelve como `null` y no se
+      lleva a los demás — agrupar las peticiones no puede significar agrupar los
+      fallos.
+      ⚠️ Y **`blocked` no recibe el `days` del paquete**: ahí `days` significa
+      «lleva sin moverse», no «ventana de historial», y su defecto son 7 frente a
+      60. Un `days` global lo convertía en otra pregunta con el mismo nombre.
 - [ ] **R4.3 — Filtros de verdad, con DTO compartido y validado**: `from`/`to`,
       `boardId`, `assigneeId`, `labelId`, `priority`, en los siete agregados.
 - [ ] **R4.4 — La vista de cartera.** Cruza solo los proyectos donde ya tienes

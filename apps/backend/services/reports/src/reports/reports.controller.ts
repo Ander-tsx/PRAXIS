@@ -50,6 +50,21 @@ export class ReportsController {
   }
 
   /**
+   * Varios informes en una respuesta. Ver `ReportsService.bundle`.
+   *
+   * ⚠️ `incluir` llega **ya validado** contra el conjunto cerrado por el DTO del
+   * gateway; aquí se vuelve a filtrar contra el mapa de cálculos porque este
+   * comando también es alcanzable por TCP sin pasar por él.
+   */
+  @MessagePattern({ cmd: 'report_bundle' })
+  bundle(@Payload() dto: { projectId: string; incluir: string[]; days?: number; weeks?: number }) {
+    return this.reports.bundle(dto.projectId, dto.incluir ?? [], {
+      days: dto.days,
+      weeks: dto.weeks,
+    });
+  }
+
+  /**
    * El contexto que lee el asistente. Lo consume `assistant-service`.
    *
    * ⚠️ `incluirPersonas` **no es una opción de formato**: es la línea de
