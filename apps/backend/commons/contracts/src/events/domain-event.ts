@@ -40,12 +40,20 @@ export interface DomainEvent<TType extends DomainEventType = DomainEventType, TP
 
 export type TaskCreatedPayload = { taskId: string; boardId: string; columnId: string };
 export type TaskMovedPayload = { taskId: string; fromColumnId: string; toColumnId: string };
-export type TaskDueDateChangedPayload = { taskId: string; previousDueDate: string | null; dueDate: string | null };
+export type TaskDueDateChangedPayload = {
+  taskId: string;
+  previousDueDate: string | null;
+  dueDate: string | null;
+};
 export type TaskCompletedPayload = { taskId: string; completedAt: string };
 export type TaskReopenedPayload = { taskId: string };
 export type TaskDeletedPayload = { taskId: string };
 export type TaskAssigneesChangedPayload = { taskId: string; assigneeIds: string[] };
-export type ProjectStatusChangedPayload = { previousStatus: string; status: string; reason?: string | null };
+export type ProjectStatusChangedPayload = {
+  previousStatus: string;
+  status: string;
+  reason?: string | null;
+};
 export type ProjectMemberRemovedPayload = { userId: string };
 export type ProjectRoleDeletedPayload = { roleId: string };
 
@@ -66,18 +74,120 @@ export type ProjectDomainEvent =
 export type InitialDomainEvent = TaskDomainEvent | ProjectDomainEvent;
 
 export function isInitialDomainEvent(value: unknown): value is InitialDomainEvent {
-  if (!value || typeof value !== 'object') return false;
+  if (!isRecord(value)) return false;
   const event = value as Partial<DomainEvent>;
+  if (
+    !hasString(event.id) ||
+    !hasString(event.type) ||
+    !(DOMAIN_EVENT_TYPES as readonly string[]).includes(event.type) ||
+    !hasString(event.projectId) ||
+    !hasString(event.correlationId) ||
+    !hasIsoDate(event.occurredAt) ||
+    !isSubject(event.subject) ||
+    !isActor(event.actor) ||
+    (event.causationId !== undefined && !hasString(event.causationId)) ||
+    !isRecord(event.payload)
+  ) {
+    return false;
+  }
+
+  const payload = event.payload;
+  switch (event.type) {
+    case 'task.created.v1':
+      return isTaskEvent(event, payload) && hasStrings(payload, 'taskId', 'boardId', 'columnId');
+    case 'task.moved.v1':
+      return (
+        isTaskEvent(event, payload) && hasStrings(payload, 'taskId', 'fromColumnId', 'toColumnId')
+      );
+    case 'task.due-date-changed.v1':
+      return (
+        isTaskEvent(event, payload) &&
+        hasStrings(payload, 'taskId') &&
+        isNullableIsoDate(payload.previousDueDate) &&
+        isNullableIsoDate(payload.dueDate)
+      );
+    case 'task.completed.v1':
+      return (
+        isTaskEvent(event, payload) &&
+        hasStrings(payload, 'taskId') &&
+        hasIsoDate(payload.completedAt)
+      );
+    case 'task.reopened.v1':
+    case 'task.deleted.v1':
+      return isTaskEvent(event, payload) && hasStrings(payload, 'taskId');
+    case 'task.assignees-changed.v1':
+      return (
+        isTaskEvent(event, payload) &&
+        hasStrings(payload, 'taskId') &&
+        Array.isArray(payload.assigneeIds) &&
+        payload.assigneeIds.every(hasString)
+      );
+    case 'project.status-changed.v1':
+      return (
+        isProjectEvent(event, 'PROJECT') &&
+        event.subject.id === event.projectId &&
+        hasStrings(payload, 'previousStatus', 'status') &&
+        (payload.reason === undefined || payload.reason === null || hasString(payload.reason))
+      );
+    case 'project.member-removed.v1':
+      return isProjectEvent(event, 'PROJECT_MEMBER') && hasStrings(payload, 'userId');
+    case 'project.role-deleted.v1':
+      return (
+        isProjectEvent(event, 'PROJECT_ROLE') &&
+        hasStrings(payload, 'roleId') &&
+        payload.roleId === event.subject.id
+      );
+  }
+}
+
+function isTaskEvent(event: Partial<DomainEvent>, payload: Record<string, unknown>): boolean {
   return (
-    typeof event.id === 'string' &&
-    typeof event.type === 'string' &&
-    (DOMAIN_EVENT_TYPES as readonly string[]).includes(event.type) &&
-    typeof event.source === 'string' &&
-    typeof event.occurredAt === 'string' &&
-    typeof event.projectId === 'string' &&
-    typeof event.subject?.id === 'string' &&
-    typeof event.subject?.type === 'string' &&
-    typeof event.actor?.type === 'string' &&
-    typeof event.correlationId === 'string'
+    event.source === 'tasks-service' &&
+    event.subject?.type === 'TASK' &&
+    hasString(payload.taskId) &&
+    payload.taskId === event.subject.id
   );
+}
+
+function isProjectEvent(
+  event: Partial<DomainEvent>,
+  subjectType: DomainEventSubject['type'],
+): boolean {
+  return event.source === 'projects-service' && event.subject?.type === subjectType;
+}
+
+function isActor(value: unknown): value is DomainEventActor {
+  return (
+    isRecord(value) &&
+    ['USER', 'AUTOMATION', 'EXTERNAL', 'SYSTEM'].includes(value.type as string) &&
+    (value.id === undefined || hasString(value.id))
+  );
+}
+
+function isSubject(value: unknown): value is DomainEventSubject {
+  return (
+    isRecord(value) &&
+    ['TASK', 'PROJECT', 'PROJECT_MEMBER', 'PROJECT_ROLE'].includes(value.type as string) &&
+    hasString(value.id)
+  );
+}
+
+function isNullableIsoDate(value: unknown): boolean {
+  return value === null || hasIsoDate(value);
+}
+
+function hasIsoDate(value: unknown): value is string {
+  return hasString(value) && !Number.isNaN(Date.parse(value));
+}
+
+function hasStrings(record: Record<string, unknown>, ...keys: string[]): boolean {
+  return keys.every((key) => hasString(record[key]));
+}
+
+function hasString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

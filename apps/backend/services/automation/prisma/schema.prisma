@@ -8,3 +8,38 @@ datasource db {
   schemas  = ["automation"]
   url      = env("DATABASE_URL")
 }
+
+enum InboundEventStatus {
+  ACCEPTED
+
+  @@schema("automation")
+}
+
+/// Copia durable e idempotente de un hecho recibido por Redis Streams.
+///
+/// `eventId` identifica el hecho de dominio y `dedupeKey` es un hash canónico
+/// estable que permite absorber sobres distintos de la misma causa.
+model InboundEvent {
+  id            String             @id @default(uuid())
+  eventId       String             @unique
+  dedupeKey     String             @unique
+  streamId      String
+  type          String
+  source        String
+  occurredAt    DateTime
+  projectId     String
+  subjectType   String
+  subjectId     String
+  actorType     String
+  actorId       String?
+  correlationId String
+  causationId   String?
+  payload       Json
+  status        InboundEventStatus @default(ACCEPTED)
+  receivedAt    DateTime           @default(now())
+
+  @@index([projectId, receivedAt])
+  @@index([status, receivedAt])
+  @@schema("automation")
+  @@map("inbound_events")
+}
