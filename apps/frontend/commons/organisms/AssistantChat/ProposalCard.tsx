@@ -187,7 +187,24 @@ export function TaskProposalCard({
   }
 
   const encargados = (propuesta.assigneeIds ?? []).map((id) => nombres[id] ?? id.slice(0, 8));
-  const marcas = (propuesta.labelIds ?? []).map((id) => etiquetas[id] ?? 'etiqueta');
+  /**
+   * ⚠️ **El `id` viaja con el nombre, y es lo que sirve de clave.**
+   *
+   * Esto era una lista de nombres a secas, con el `<Badge>` keyed por el nombre.
+   * Y el nombre **no es único**: una etiqueta que no esté en el mapa cae a
+   * «etiqueta», así que dos desconocidas daban dos hijos con la misma clave y
+   * React avisaba en consola —«two children with the same key, `etiqueta`»— con
+   * el riesgo real de duplicar u omitir una insignia. El `id` sí es único por
+   * construcción, y ya estaba a mano.
+   *
+   * Que una etiqueta no esté en el mapa es normal, no un fallo: el mapa lo
+   * resuelve el servidor por proyecto, y el modelo puede proponer una de una
+   * conversación anterior.
+   */
+  const marcas = (propuesta.labelIds ?? []).map((id) => ({
+    id,
+    nombre: etiquetas[id] ?? 'etiqueta',
+  }));
 
   return (
     <Marco
@@ -226,9 +243,9 @@ export function TaskProposalCard({
 
       {marcas.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {marcas.map((nombre) => (
-            <Badge key={nombre} variant="primary">
-              {nombre}
+          {marcas.map((marca) => (
+            <Badge key={marca.id} variant="primary">
+              {marca.nombre}
             </Badge>
           ))}
         </div>
@@ -411,7 +428,24 @@ export function EditProposalCard({
   propuesta,
   etiquetas,
 }: ProposalCardProps & { propuesta: EditProposal }) {
-  const marcas = (propuesta.labelIds ?? []).map((id) => etiquetas[id] ?? 'etiqueta');
+  /**
+   * ⚠️ **El `id` viaja con el nombre, y es lo que sirve de clave.**
+   *
+   * Esto era una lista de nombres a secas, con el `<Badge>` keyed por el nombre.
+   * Y el nombre **no es único**: una etiqueta que no esté en el mapa cae a
+   * «etiqueta», así que dos desconocidas daban dos hijos con la misma clave y
+   * React avisaba en consola —«two children with the same key, `etiqueta`»— con
+   * el riesgo real de duplicar u omitir una insignia. El `id` sí es único por
+   * construcción, y ya estaba a mano.
+   *
+   * Que una etiqueta no esté en el mapa es normal, no un fallo: el mapa lo
+   * resuelve el servidor por proyecto, y el modelo puede proponer una de una
+   * conversación anterior.
+   */
+  const marcas = (propuesta.labelIds ?? []).map((id) => ({
+    id,
+    nombre: etiquetas[id] ?? 'etiqueta',
+  }));
 
   return (
     <CambioSobreTarea
@@ -448,9 +482,9 @@ export function EditProposalCard({
       {propuesta.labelIds !== undefined &&
         (marcas.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">
-            {marcas.map((nombre) => (
-              <Badge key={nombre} variant="primary">
-                {nombre}
+            {marcas.map((marca) => (
+              <Badge key={marca.id} variant="primary">
+                {marca.nombre}
               </Badge>
             ))}
           </div>
