@@ -1260,6 +1260,42 @@ volvería a abrir el agujero.
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
+### Filtros — los mismos seis en las ocho rutas
+
+Las siete de arriba **y el paquete** aceptan además:
+
+| Parámetro | Forma | Qué acota |
+|---|---|---|
+| `from` / `to` | ISO 8601 | El tramo. **Manda sobre `days`** |
+| `boardId` | UUID | Las tareas de ese tablero |
+| `assigneeId` | UUID | Las de esa persona |
+| `labelId` | UUID | Las de esa etiqueta |
+| `priority` | `LOW` · `MEDIUM` · `HIGH` · `URGENT` | |
+
+⚠️ **Un tramo de más de 365 días responde 400**, no se recorta —al revés que
+`days`, que sí se acota en silencio—. Dos fechas son una pregunta concreta y
+estrecharla por detrás devolvería un gráfico que se lee como su respuesta.
+
+⚠️ **Un `to` sin `from` se ignora**, y no da error: es la ventana por defecto
+acabando antes, que no es ninguna pregunta.
+
+⚠️ **`from`/`to` no acota lo mismo en todos los informes**, y no puede:
+
+| Informe | El tramo acota |
+|---|---|
+| `snapshot`, `blocked`, `people` | `createdAt` — miden estado de ahora |
+| `cycle-time`, `forecast` | `completedAt` — miden lo que se cerró |
+| `flow` | `occurredAt` — mide movimientos |
+| `weekly` | **es el eje**: qué semanas salen, no qué tareas cuentan |
+
+⚠️ **Y el `days` de `blocked` sigue significando «lleva sin moverse»**, no una
+ventana de historial. Los filtros le aplican; su `days` no cambia de sentido.
+
+Un valor mal formado —un UUID que no lo es, una prioridad inventada— responde
+**400 al paquete entero**, así que las ocho tarjetas se quedan sin datos por un
+parámetro. Si construyes la query desde algo que puede venir de la barra de
+direcciones, comprueba al menos `priority`, que es conjunto cerrado.
+
 ### ⚠️ Las siete piden `canViewReports`. Antes solo la última.
 
 Seis de las siete pedían `canViewProject`, con la idea de que la línea fuese de
