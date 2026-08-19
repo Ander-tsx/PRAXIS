@@ -4,7 +4,7 @@ import { useCallback, useRef } from 'react';
 import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
 import { useCurrentTheme, useRefrescoAgrupado } from '../../hooks';
-import { useLiveEvent, useReconnection } from '../../realtime';
+import { marcarHiloPendiente, useLiveEvent, useReconnection } from '../../realtime';
 import type { ChatMessageEvent, NoticeEvent } from '../../realtime';
 import {
   PRESENTACION_DE_MENSAJE,
@@ -149,6 +149,29 @@ export function LiveNotices() {
        —lo necesitan tus otras pestañas y el panel para reconciliar— pero sin
        ruido. `mio` lo resuelve el servidor, que sabe a quién manda cada copia. */
     if (evento.mio) return;
+
+    /**
+     * 🔴 **Una respuesta de hilo se anota aquí, y aquí es el único sitio donde
+     * se puede.**
+     *
+     * Un mensaje escrito dentro de un hilo no aparece en la conversación: lo
+     * único que cambia allí es el contador «N respuestas» de un mensaje que
+     * puede estar muy arriba. Sin esta anotación, quien pulsa el aviso llega a
+     * la conversación y no ve nada — que es el fallo reportado.
+     *
+     * Va **antes** de las dos salidas de abajo a propósito. Silenciado es «sin
+     * tarjeta ni sonido», no «sin enterarse»; y estar mirando la conversación
+     * quita la tarjeta, pero el hilo sigue cerrado y su punto sigue haciendo
+     * falta.
+     *
+     * `visibleEnChat === false` es lo que distingue una respuesta **de hilo** de
+     * una cita normal escrita desde el compositor principal: las dos llevan
+     * `replyTo`, pero la segunda ya se ve en la conversación y no necesita que
+     * nadie la señale.
+     */
+    const raizDelHilo =
+      evento.mensaje.visibleEnChat === false ? evento.mensaje.replyTo?.id : undefined;
+    if (raizDelHilo) marcarHiloPendiente(evento.channelId, raizDelHilo);
 
     /* Silenciado es «sin tarjeta ni sonido», no «sin enterarse». */
     if (evento.silenciado) return;

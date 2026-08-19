@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { EVENTO_HILOS_PENDIENTES, leerHilosPendientes, olvidarHiloPendiente } from '../../realtime';
 
 /**
  * Qué hilos tienen respuestas que esta persona no ha visto.
@@ -41,6 +42,16 @@ import { useCallback, useEffect, useState } from 'react';
  *    alternativa —darlo por nuevo— encendería de golpe todos los hilos que ya
  *    existían la primera vez que alguien abre la conversación, y un aviso que
  *    aparece cien veces el primer día enseña a ignorarlo.
+ *
+ *    ⚠️ Esa siembra se comió el caso principal y hubo que taparlo por otro
+ *    lado: quien pulsaba el aviso llegaba a una conversación que abría por
+ *    primera vez en ese navegador, el hilo nacía visto en el mismo instante en
+ *    que se pintaba y el punto no salía **nunca** — mientras que llegando a
+ *    mano, con una marca anterior ya guardada, sí salía. Dos caminos a la misma
+ *    pantalla y dos resultados. Lo resuelve `hilosPendientes`, que anota el hilo
+ *    cuando llega el aviso en vez de deducirlo al pintar; ahí está el porqué
+ *    entero. Esto de aquí sigue siendo lo que cubre lo que pasó con la
+ *    aplicación cerrada.
  *
  * ⚠️ Y como el contador es el de respuestas vivas, **borrar una respuesta baja
  * el número**: un hilo con una respuesta nueva y otra borrada a la vez empata y
@@ -105,12 +116,46 @@ export function useHilosNoLeidos(channelId: string): HilosNoLeidos {
   /* `null` = todavía no se ha leído del disco. Ver `listo`. */
   const [vistos, setVistos] = useState<Vistos | null>(null);
 
+  /**
+   * Los hilos de los que ya avisó el flujo en vivo.
+   *
+   * Es la otra mitad, y la que cubre el caso de llegar pulsando el aviso: no
+   * depende de que hubiera una marca anterior con la que comparar. Ver
+   * `hilosPendientes`.
+   */
+  const [pendientes, setPendientes] = useState<Set<string>>(() => new Set());
+
   useEffect(() => {
     setVistos(leer(channelId));
   }, [channelId]);
 
+  /**
+   * Los pendientes, al montar y cada vez que cambien.
+   *
+   * ⚠️ El evento hace falta además de la lectura inicial: `LiveNotices` puede
+   * anotar un hilo **con la conversación ya pintada** —estás dentro, alguien
+   * responde en un hilo cerrado— y `localStorage` no avisa a nadie dentro de la
+   * misma pestaña. Sin esto el punto esperaría a la siguiente carga.
+   */
+  useEffect(() => {
+    setPendientes(leerHilosPendientes(channelId));
+
+    function alCambiar(evento: Event) {
+      const detalle = (evento as CustomEvent<{ channelId: string }>).detail;
+      if (detalle?.channelId !== channelId) return;
+      setPendientes(leerHilosPendientes(channelId));
+    }
+
+    window.addEventListener(EVENTO_HILOS_PENDIENTES, alCambiar);
+    return () => window.removeEventListener(EVENTO_HILOS_PENDIENTES, alCambiar);
+  }, [channelId]);
+
   const marcarVisto = useCallback(
     (rootId: string, respuestas: number) => {
+      /* Fuera del `setVistos`: un actualizador de estado puede ejecutarse dos
+         veces, y esto escribe en `localStorage` y lanza un evento. */
+      olvidarHiloPendiente(channelId, rootId);
+
       setVistos((previos) => {
         const base = previos ?? {};
         if (base[rootId] === respuestas) return previos;
@@ -150,13 +195,18 @@ export function useHilosNoLeidos(channelId: string): HilosNoLeidos {
 
   const tieneNovedad = useCallback(
     (rootId: string, respuestas: number) => {
+      /* Si el flujo ya avisó de este hilo, no hay nada que deducir: se sabe.
+         Va primero porque es la única señal que funciona sobre una conversación
+         que se abre por primera vez en este navegador. */
+      if (pendientes.has(rootId)) return true;
+
       if (vistos === null) return false;
       const visto = vistos[rootId];
       /* Desconocido = recién sembrado o a punto de serlo: no se enciende. */
       if (visto === undefined) return false;
       return respuestas > visto;
     },
-    [vistos],
+    [vistos, pendientes],
   );
 
   return { tieneNovedad, marcarVisto, sembrar, listo: vistos !== null };
