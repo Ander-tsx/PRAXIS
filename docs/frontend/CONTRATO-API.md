@@ -1260,6 +1260,42 @@ volvería a abrir el agujero.
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
+### La cartera 🔒 — `GET /me/reports/portfolio`
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/me/reports/portfolio?dias` | Solo sesión |
+
+Cuelga de `/me` porque no hay proyecto en la ruta contra el que comprobar nada,
+igual que `/me/tasks`. **La línea de acceso es la lista**: el gateway pide los
+proyectos con `canViewReports` y agrega solo esos, así que sin ninguno devuelve
+`[]` — que no es un error.
+
+```ts
+[{
+  projectId, name, slug,
+  total, abiertas, cerradas,
+  vencidas,      // abiertas con la fecha pasada. Una entregada no vence
+  sinAsignar,    // abiertas sin nadie
+  paradas,       // abiertas sin cambiar de columna desde hace `dias` (por defecto 7)
+  cerradasSemana, cerradasSemanaAnterior,
+}]
+```
+
+⚠️ **Salen todos los proyectos, incluidos los que no tienen ni una tarea**, con
+ceros. Un `GROUP BY` los habría dejado fuera, y desaparecer de la cartera se lee
+como que no tienes acceso.
+
+⚠️ **`paradas` aquí no distingue las que no tienen historial**, al contrario que
+`/reports/blocked`. En una fila por proyecto no cabe el matiz.
+
+⚠️ **No acepta los filtros de abajo.** `boardId`, `assigneeId` y `labelId` son
+ids de **un** proyecto, así que cruzarlos con una lista no significa nada.
+
+⚠️ **Y no devuelve ninguna variación del ritmo**, solo los dos números. La semana
+en curso está a medias: un lunes, comparar contra siete días completos da un
+«−80 %» falso con toda la apariencia de un dato exacto.
+
 ### Filtros — los mismos seis en las ocho rutas
 
 Las siete de arriba **y el paquete** aceptan además:
