@@ -268,13 +268,34 @@ export function informesNecesarios(widgets: Widget[]): Set<Informe> {
  * incluida la versión vacía, que es por qué el `actualizadoEn` del lienzo importa
  * más que su número de widgets.
  */
+/**
+ * 🔴 **Los ids del lienzo de partida son UUID, y tienen que serlo.**
+ *
+ * Eran `defecto-resumen`, `defecto-columna` y `defecto-prioridad`, que se leen
+ * mejor y **rompían el guardado**: `ReportLayoutDto` valida cada `id` con
+ * `@IsUUID`, así que el primer arrastre sobre un lienzo de partida respondía
+ * `400 widgets.0.id must be a UUID`, la disposición volvía atrás sola y la
+ * pantalla decía «Validation failed». No aparecía al abrir —el lienzo se pinta
+ * sin guardar nada— sino al mover el primer gráfico.
+ *
+ * Se descubrió ejecutándolo contra el backend real; ni el typecheck ni
+ * `next build` pueden ver esto, porque los dos lados son `string`.
+ *
+ * Son constantes y no `crypto.randomUUID()` a propósito: esto se ejecuta en el
+ * servidor en cada carga, y con ids nuevos cada vez, dos pestañas abiertas del
+ * mismo proyecto guardarían dos lienzos distintos y el último ganaría.
+ */
+const ID_RESUMEN = '00000000-0000-4000-8000-000000000001';
+const ID_COLUMNA = '00000000-0000-4000-8000-000000000002';
+const ID_PRIORIDAD = '00000000-0000-4000-8000-000000000003';
+
 export function lienzoPorDefecto(): Widget[] {
   const alto = (tipo: TipoWidget) => CATALOGO[tipo].h;
 
   return [
-    { id: 'defecto-resumen', tipo: 'resumen', x: 0, y: 0, w: 12, h: alto('resumen') },
+    { id: ID_RESUMEN, tipo: 'resumen', x: 0, y: 0, w: 12, h: alto('resumen') },
     {
-      id: 'defecto-columna',
+      id: ID_COLUMNA,
       tipo: 'por_columna',
       x: 0,
       y: alto('resumen'),
@@ -282,7 +303,7 @@ export function lienzoPorDefecto(): Widget[] {
       h: alto('por_columna'),
     },
     {
-      id: 'defecto-prioridad',
+      id: ID_PRIORIDAD,
       tipo: 'por_prioridad',
       x: 6,
       y: alto('resumen'),
