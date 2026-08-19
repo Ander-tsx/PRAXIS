@@ -1406,7 +1406,10 @@ una consulta agregada nueva, hazlo también.
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
+| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds? }` | ninguno propio, solo `JwtGuard` |
 | POST | `/me/assistant/project-draft` | `{ brief }` | ninguno propio, solo `JwtGuard` |
+| POST | `/projects/:projectId/assistant/proposals/:id/resolve` | `{ status }` | `canViewReports` |
+| POST | `/me/assistant/proposals/:id/resolve` | `{ status }` | ninguno propio, solo `JwtGuard` |
 
 Las dos primeras cuelgan de `/projects/:projectId` para que el guard resuelva el
 proyecto desde la ruta, igual que los reportes. La cuota es **del usuario**, no
@@ -1426,6 +1429,82 @@ preguntarle por él: dejarlo abierto habría sido una puerta trasera al contenid
 que la pantalla ya no enseña. `/me/assistant/quota` **no** cambia — es la cuota
 del usuario, no de ningún proyecto, y Configuración la sigue leyendo sin
 permisos de proyecto.
+
+### `POST /me/assistant/chat` — hablar sin ningún proyecto
+
+Misma entrada y misma salida que la de proyecto. Lo que cambia es todo lo demás:
+**no hay proyecto, así que no hay contexto**. Sin briefing, sin miembros, sin
+chat de equipo y sin permisos que filtrar.
+
+Existe porque la otra cuelga de `/projects/:projectId` y exige `canViewReports`
+sobre ese proyecto: para hablar de uno que **todavía no existe** habría que
+inventarse un id que satisficiera al guard.
+
+Las herramientas que se le declaran al modelo son **tres**, y ninguna sale de un
+permiso porque ninguna toca datos de ningún proyecto:
+
+| Herramienta | Qué propone |
+|---|---|
+| `proponer_pregunta` | Lo mismo que en el otro modo: desambiguar con opciones |
+| `proponer_abrir_proyecto` | Cargar uno de **tus** proyectos en esta conversación |
+| `proponer_plantilla` | La estructura de arranque de un proyecto nuevo |
+
+⚠️ **`proponer_abrir_proyecto` se valida contra la lista que resuelve el
+gateway** —`GET /projects?permission=canViewReports` con la sesión de quien
+pregunta—, no contra lo que diga el modelo. Un id inventado, o el de un proyecto
+ajeno, se descarta antes de llegar al navegador. Y aceptar no da acceso a nada:
+carga el proyecto por el camino de siempre, con los guards de siempre.
+
+⚠️ **Una conversación sin foco puede adoptar un proyecto; una con foco no lo
+cambia.** El turno siguiente va por la ruta del proyecto con el mismo
+`conversationId` y el servicio fija el foco ahí. Al revés —mandar un turno sin
+proyecto a una conversación que ya lo tiene— responde **409**: se respondería sin
+briefing, así que PRAX diría que no tiene datos de un proyecto que la pantalla
+enseña como cargado.
+
+### Los adjuntos de PRAX
+
+| Método | Ruta | Entrada |
+|---|---|---|
+| POST | `/me/assistant/attachments` | **multipart**, campo `file` → 201 |
+| GET | `/me/assistant/attachments/:id/content` | — |
+| DELETE | `/me/assistant/attachments/:id` | — · **solo borradores propios** |
+
+**Se sube antes de enviar el mensaje** y queda como borrador; el turno lo reclama
+con `attachmentIds`. No es una preferencia de diseño: la pregunta viaja por una
+Server Action, cuyo cuerpo está topado en 1 MB, y con el archivo dentro
+cualquier foto de teléfono moría con un «Body exceeded 1 MB limit» de Next — sin
+traducir y sin decir qué archivo.
+
+Tres por mensaje, 5 MB cada uno, y solo PDF, PNG/JPEG/WebP, texto y Markdown.
+⚠️ `text/x-markdown` **también**: Safari y algunos Linux declaran así un `.md`.
+
+**Qué sobrevive al turno**, que es lo que hay que saber para escribir la pantalla:
+
+| Tipo | En el turno que lo lleva | En los siguientes |
+|---|---|---|
+| `.txt`, `.md` | pegado como texto en el prompt | **sí**, su texto se guardó al subirlo |
+| PDF | nativo, con su maquetación | **sí**, su capa de texto |
+| PDF escaneado | nativo | no: no tiene capa de texto que guardar |
+| Imagen | nativa, el modelo la ve | **no** — lo que queda es lo que PRAX dijo de ella |
+
+Por eso el prompt le pide a PRAX **contar qué ve** cuando el turno lleva una
+imagen: su propia respuesta es lo único que quedará. Y lo reinyectado tiene
+presupuesto (`ASSISTANT_EXTRACT_BUDGET_CHARS`, 24 000 caracteres en total, del
+más reciente hacia atrás), así que un bloque puede llegar recortado o reducido a
+su nombre — el prompt le prohíbe hablar como si lo hubiera leído entero.
+
+### `POST …/assistant/proposals/:id/resolve` — anotar lo que se decidió
+
+**No aplica nada.** Solo deja escrito si una propuesta se aceptó o se descartó,
+para que al releer el hilo dentro de una semana no vuelva a ofrecer un botón que
+ya se pulsó. Aplicarla es otra petición, al endpoint de siempre y con su permiso;
+el cliente llama aquí **después** de que aquella haya salido bien.
+
+🔴 **La versión de `/me` existe porque la de proyecto respondía 404** a cualquier
+tarjeta de una conversación sin foco: no hay `projectId` que poner en la ruta. Lo
+que protege a las dos es que el `userId` sale del token y assistant-service
+comprueba que la propuesta cuelga de una conversación de esa persona.
 
 ### `POST /me/assistant/project-draft` — la plantilla de un proyecto nuevo
 

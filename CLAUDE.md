@@ -170,12 +170,31 @@ refresco entra en esa misma cola, y tenerla ocupada es lo que destapa el fallo d
 arriba.
 
 **El asistente propone; nunca ejecuta.** Vale para todo lo que se le añada,
-incluida la plantilla de arranque de un proyecto (`POST
-/me/assistant/project-draft`): devuelve parámetros para funciones que ya existen,
-y quien las llama es el frontend, una a una, con la sesión de quien acepta y por
-los endpoints de siempre. Si una capacidad nueva necesita una ruta de escritura
-nueva, está mal planteada. Y **no hay herramienta de borrado**, a propósito y por
-triplicado: detalle en ESTADO-ACTUAL §26.1, §30.3 y §36.2.
+incluida la plantilla de arranque de un proyecto: devuelve parámetros para
+funciones que ya existen, y quien las llama es el frontend, una a una, con la
+sesión de quien acepta y por los endpoints de siempre. Si una capacidad nueva
+necesita una ruta de escritura nueva, está mal planteada. Detalle en
+ESTADO-ACTUAL §26.1, §30.3, §36.2 y §42.6.
+
+⚠️ **Se puede hablar con PRAX sin proyecto, y es otro modo, no un caso
+degradado.** `POST /me/assistant/chat` (solo `JwtGuard`) frente a `POST
+/projects/:id/assistant/chat` (`canViewReports`). Sin foco no hay briefing, ni
+miembros, ni chat de equipo, y las herramientas son **tres** en vez de doce.
+Tres cosas que muerden si se olvidan:
+
+- Las reglas del prompt llevan `ambito` y se filtran por modo. **No hay dos
+  listas**: la mitad valen en los dos, y duplicarlas es garantizar que PRAX hable
+  distinto según hayas elegido proyecto.
+- **Resolver una propuesta también tiene dos rutas.** La de proyecto responde
+  404 a una tarjeta de conversación sin foco.
+- Una conversación **adopta** un proyecto (una vez) pero no lo cambia ni vuelve
+  a quedarse sin él: lo segundo responde 409.
+
+⚠️ **Un adjunto sobrevive a su turno, pero solo su texto.** `Attachment.extract`
+se calcula al subir —`.md`/`.txt` decodificando, PDF por su capa de texto— y
+`historial()` lo reinyecta con presupuesto (`ASSISTANT_EXTRACT_BUDGET_CHARS`). De
+una **imagen no se guarda nada**: lo que queda de ella es lo que PRAX contó en su
+respuesta, y por eso el prompt se lo exige (regla 17). §42.
 
 ## Estado
 

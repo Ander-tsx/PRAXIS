@@ -9,10 +9,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R6 — PRAX sin proyecto y con memoria de lo que le das |
-| **Última tarea terminada** | R6.1 — el extracto persistente: un adjunto ya no muere en su turno |
-| **Siguiente** | R6.2 — hablar sin proyecto |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → **R6** → R4 → R5. ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Etapa actual** | R6 **cerrada**. Siguiente etapa: R4 — Análisis (R4.1 hecho) |
+| **Última tarea terminada** | R6 entera — adjuntos con memoria, conversación sin proyecto, plantilla desde el chat |
+| **Siguiente** | R4.2 — un solo viaje para los agregados |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5. ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -38,6 +38,9 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | (fuera de plan) | `797250d` | La cara de PRAX en la barra lateral, a 8px y con el trazo engordado por `-webkit-text-stroke`. `font-weight` no servía: la mono no está autoalojada |
 | 2026-08-18 | R6 escrito | — | Etapa nueva: adjuntos con memoria y conversación sin proyecto |
 | 2026-08-18 | R6.1 | (este) | **El extracto persistente.** Columna `extract`, extracción al subir (`unpdf` para el PDF), reinyección con presupuesto en `historial()` y la regla 17 del prompt. `text/x-markdown` entraba como binario en Safari. El marcador de imagen se cayó por el camino: era un dato derivado de dos que ya existen |
+| 2026-08-18 | R6.5.1 | `95aa727` | `TemplatePlanReview` sube a commons entero —árbol EDT, roles, poda y resumen—. Mudanza sin cambios de lógica: el chat y el diálogo enseñan lo mismo |
+| 2026-08-18 | R6.2 – R6.4 | `bdbef7f` | **Conversación sin proyecto.** `POST /me/assistant/chat`, reglas del prompt con ámbito, tres herramientas, adopción de foco y la plantilla desde el chat. Cuatro hallazgos: el resolve daba 404 sin foco, `maxOutputTokens` cortaba la plantilla, la tarjeta que navega tiene que anotar ella misma, y el proyecto recién creado no está en la lista de la pantalla |
+| 2026-08-18 | R6.6 | (este) | Documentación (ESTADO-ACTUAL §42, CONTRATO-API, CLAUDE.md), formato y build |
 
 ---
 
@@ -496,69 +499,77 @@ se hizo y se espera antes de seguir.
 
 #### R6.2 — Hablar sin proyecto
 
-- [ ] **R6.2.1 — `POST /me/assistant/chat`**, solo `JwtGuard`. El controlador
+- [x] **R6.2.1 — `POST /me/assistant/chat`**, solo `JwtGuard`. El controlador
       `/me/assistant` ya existe y ya aloja cuota, conversaciones, adjuntos y el
       borrador de plantilla, precisamente por «esto no tiene proyecto detrás».
-- [ ] **R6.2.2 — `AssistantService.chat()` con `projectId` nulo**: sin briefing,
+- [x] **R6.2.2 — `AssistantService.chat()` con `projectId` nulo**: sin briefing,
       sin miembros, sin chat de equipo, y con su propia instrucción de sistema.
-- [ ] **R6.2.3 — 🔴 El resolve de propuestas, en `/me`.** Hoy es
+- [x] **R6.2.3 — 🔴 El resolve de propuestas, en `/me`.** Hoy es
       `POST /projects/:projectId/assistant/proposals/:id/resolve`: en una
       conversación sin foco **aceptar o descartar cualquier tarjeta daría 404**.
       Hermana en `/me/assistant`, con el `userId` del token como llave, igual que
       se hizo con las conversaciones.
-- [ ] **R6.2.4 — El compositor sin la reja del `projectId`** y el recibimiento
+- [x] **R6.2.4 — El compositor sin la reja del `projectId`** y el recibimiento
       reescrito: sin foco ya no es «elige un proyecto», es «pregúntame lo que
       quieras, y si quieres que mire un proyecto, elígelo».
 
 #### R6.3 — Adoptar un proyecto a mitad
 
-- [ ] **R6.3.1 — El gateway le pasa la lista.** Para los turnos sin foco,
+- [x] **R6.3.1 — El gateway le pasa la lista.** Para los turnos sin foco,
       `id` + `nombre` de los proyectos con `canViewReports` —la consulta
       `GET /projects?permission=canViewReports` ya existe (§29.2)—. Sin esto el
       modelo no puede nombrar un proyecto tuyo.
-- [ ] **R6.3.2 — `proponer_abrir_proyecto(projectId, porQue)`**, validada contra
+- [x] **R6.3.2 — `proponer_abrir_proyecto(projectId, porQue)`**, validada contra
       esa lista. Nada de fiarse de un id que se invente el modelo.
-- [ ] **R6.3.3 — La tarjeta y la adopción.** Aceptar navega a
+- [x] **R6.3.3 — La tarjeta y la adopción.** Aceptar navega a
       `?p=<slug>&c=<conversación>` y a partir de ahí la conversación es de ese
       proyecto, con briefing y con las doce herramientas. Rechazar no hace nada:
       se sigue hablando sin foco.
 
 #### R6.4 — La plantilla, desde la conversación
 
-- [ ] **R6.4.1 — La herramienta en el conjunto sin foco.** ⚠️ Sigue **fuera** de
+- [x] **R6.4.1 — La herramienta en el conjunto sin foco.** ⚠️ Sigue **fuera** de
       `herramientasPara()`, y el motivo de §36.1 no cambia: en una conversación
       *con* proyecto, declararla dejaría que a mitad de una charla sobre tareas el
       modelo propusiera rehacer el proyecto entero. Sin foco ese argumento
       desaparece —no hay proyecto que rehacer— y por eso vive ahí y solo ahí.
-- [ ] **R6.4.2 — Se guarda como `Proposal`**, con `tool` y `args`, y su
+- [x] **R6.4.2 — Se guarda como `Proposal`**, con `tool` y `args`, y su
       `status`. §36.1 decía que no se podía porque una propuesta cuelga de una
       conversación y no la había; ahora sí la hay.
-- [ ] **R6.4.3 — Aceptar llama a `commons/template/apply.ts`**, que ya existe y
+- [x] **R6.4.3 — Aceptar llama a `commons/template/apply.ts`**, que ya existe y
       crea el proyecto una llamada a la vez con la sesión de quien acepta.
-      **Ninguna ruta de escritura nueva.** Y al terminar, la conversación adopta
-      el proyecto recién creado.
+      **Ninguna ruta de escritura nueva.**
+      ⚠️ *Desviación:* la adopción del proyecto recién creado **no es
+      automática**, es un botón en el resumen. Adoptarlo exige navegar —la
+      pantalla resuelve el contexto en el servidor— y navegar se lleva por
+      delante el resumen de lo que se creó, que es justo donde salen **los fallos
+      uno a uno** (§36.4). Crear un proyecto y que la pantalla salte antes de
+      poder leer qué no se pudo crear era peor que un clic de más.
 
 #### R6.5 — La revisión del plan, compartida y con árbol
 
-- [ ] **R6.5.1 — Extraer el paso «revisar» de `AssistedTemplate`** a un
+- [x] **R6.5.1 — Extraer el paso «revisar» de `AssistedTemplate`** a un
       componente compartido que consuman el diálogo de proyecto nuevo y la
       tarjeta del chat. Dibujar el plan de una segunda manera en el chat sería el
       pecado que documenta R1.4 con `ProjectList` como copia pobre de
       `ProjectCard` — y el componente pobre sería el nuevo.
-- [ ] **R6.5.2 — El árbol EDT**: espacios → tableros → columnas con su color,
-      más etiquetas y roles con sus permisos, y el `porQué` de PRAX. Mejora los
-      dos sitios a la vez.
-- [ ] **R6.5.3 — En el hilo, tarjeta compacta.** Un árbol dentro de una burbuja
+- [x] **R6.5.2 — El árbol EDT**: espacios → tableros → columnas con su color,
+      más etiquetas y roles con sus permisos, y el `porQué` de PRAX.
+      *Resultado:* **ya existía**. `Revision` lo dibujaba desde el diálogo, con su
+      comentario explicando por qué es un EDT y no una lista con sangría —«si no
+      entiende la jerarquía, no está revisando: está confiando»—. Con R6.5.1 el
+      chat lo hereda tal cual, así que esta tarea se cierra sin escribir nada.
+- [x] **R6.5.3 — En el hilo, tarjeta compacta.** Un árbol dentro de una burbuja
       de chat no se lee: la tarjeta resume («3 espacios, 5 tableros, 12
       etiquetas, 4 roles») y abre la revisión a pantalla ancha.
 
 #### R6.6 — Cierre de etapa
 
-- [ ] **R6.6.1 — Documentación**: sección propia en ESTADO-ACTUAL, las rutas
+- [x] **R6.6.1 — Documentación**: sección propia en ESTADO-ACTUAL, las rutas
       nuevas en CONTRATO-API, y las trampas de aquí abajo en CLAUDE.md.
-- [ ] **R6.6.2 — Formato y tipos**: `pnpm format`, typecheck de las zonas
+- [x] **R6.6.2 — Formato y tipos**: `pnpm format`, typecheck de las zonas
       tocadas y `next build`.
-- [ ] **R6.6.3 — Verificación** con el stack levantado. Si no levanta en esta
+- [x] **R6.6.3 — Verificación** con el stack levantado. Si no levanta en esta
       máquina, **se dice**.
 
 ### Trampas conocidas de esta etapa

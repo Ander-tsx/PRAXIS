@@ -4397,3 +4397,175 @@ leen `@praxis/contracts` desde `dist/`) y comprobar en el navegador
 4. que la rejilla de proyectos hace dos peticiones y las caras salen igual.
 
 Y recordar que al desplegarlo **hay que volver a entrar una vez** (§41.2).
+
+---
+
+## 42. PRAX sin proyecto, y con memoria de lo que le das
+
+> Etapa **R6** del plan de rediseño. Dos capacidades que se pidieron juntas
+> porque la segunda sin la primera sale coja: contarle un proyecto con tres PDF
+> y que dos turnos después no se acuerde de nada es exactamente el caso que
+> venía a cubrir.
+
+### 42.1 Un adjunto se moría en su turno
+
+Los bytes de un archivo viajan con la pregunta y **no se reenvían nunca más** —
+hacerlo multiplicaría el coste por la longitud del hilo y acabaría comiéndose la
+ventana entera—. Así que dos preguntas después PRAX hablaba de un documento que
+ya no tenía delante, y la conversación quedaba mintiendo.
+
+Estaba escrito como decisión consciente en `assistant.service.ts` (`pregunta:
+payload.message`, «se guarda lo que la persona escribió, no el mensaje con los
+archivos pegados») y el motivo era bueno: un turno con cuarenta mil caracteres de
+un `.md` dentro no se lee como conversación.
+
+**La salida es guardar el texto, no el archivo.** Una columna `extract` en
+`Attachment`, calculada **una sola vez al subir**, y `historial()` la vuelve a
+poner al armar el hilo. El mensaje sigue guardando lo que la persona escribió, la
+burbuja se sigue leyendo, y el modelo vuelve a tener el documento delante.
+
+| Tipo | Extracto | Cuándo |
+|---|---|---|
+| `.txt`, `.md` | el UTF-8 decodificado | al subir. Gratis y determinista |
+| PDF | su capa de texto (`unpdf`) | al subir |
+| PDF escaneado | ninguno | no tiene capa que sacar; no es un error |
+| Imagen | **ninguno** | ver abajo |
+
+⚠️ **El PDF sigue viajando nativo en el turno en el que se adjunta.** Pasarlo a
+texto plano *ahí* sería perder maquetación, tablas y figuras que Gemini sí lee.
+El extracto es para *después*.
+
+### 42.2 Las imágenes se quedan, y la llamada para describirlas se murió
+
+El primer diseño las describía con una **segunda llamada a Gemini** cuyo
+resultado se guardaba. Se descartó entero: era una llamada más, un modo de fallo
+más, una columna con estados y una pregunta abierta sobre si eso gastaba cuota.
+
+Lo que la sustituye no cuesta nada. **En el turno en el que se adjunta una imagen
+el modelo ya la tiene delante, y su respuesta sí se guarda**, así que basta con
+que el prompt le exija contar lo que ve (regla 17). La descripción queda en su
+propio mensaje y se reinyecta por el camino que ya existe.
+
+⚠️ Y el marcador de hecho que iba a guardarse —`[imagen adjunta: captura.png]`,
+como red de seguridad para que PRAX no negara después que hubo una imagen—
+**también se cayó, al implementarlo**: se compone de `filename` y `mimeType`, que
+están siempre. Una columna con un dato derivado de otras dos es una columna que
+se va a quedar desincronizada.
+
+### 42.3 El presupuesto no es un ajuste fino
+
+Con los topes de hoy —3 adjuntos por mensaje, 40 000 caracteres por archivo— un
+hilo de 12 turnos reinyectaría hasta **360 000 caracteres en cada pregunta**. Eso
+no es un riesgo: es una certeza de reventar la ventana y la factura.
+
+- Se **almacena** hasta 40 000 caracteres por archivo.
+- Se **inyecta** hasta **24 000 en total** (`ASSISTANT_EXTRACT_BUDGET_CHARS`),
+  del mensaje más reciente hacia atrás.
+- Lo que se recorta **se avisa dentro del propio prompt**. Un recorte mudo hace
+  que el modelo hable con confianza de un documento del que solo ha visto el
+  principio, que es la peor forma de equivocarse aquí.
+
+**Guardar más de lo que se inyecta es a propósito**: subir el dial luego no
+obliga a volver a extraer nada.
+
+⚠️ Y el orden de las comprobaciones importa: primero «¿cabe entero?», después el
+mínimo útil. Al revés —que es como se escribió— un extracto corto se descartaba
+«por espacio» teniendo sitio de sobra.
+
+### 42.4 Hablar sin ningún proyecto
+
+`AssistantChat` era literalmente `{!projectId ? null : …}`: sin proyecto no había
+compositor. El argumento era correcto para lo que había —el turno iba a
+`POST /projects/:id/assistant/chat` y sin proyecto no había a dónde mandarlo— y
+lo que cambió no es el criterio, es que **ahora sí hay dónde**.
+
+`POST /me/assistant/chat`, solo con `JwtGuard`. Sin proyecto no hay briefing, ni
+miembros, ni chat de equipo, ni permisos que filtrar — no porque se ahorren, sino
+porque no existen.
+
+#### Las reglas del prompt llevan ámbito, y no hay dos listas
+
+Decirle a una conversación sin datos que «los numeros salen del CONTEXTO» es peor
+que no decir nada: le hace buscar un bloque que no existe. Pero la mitad de las
+reglas —el tono, el español de la región, escribir siempre algo, no dejar
+callejones sin salida, que las herramientas no ejecutan— vale igual en los dos
+modos.
+
+⚠️ **Duplicarlas habría sido garantizar que PRAX hablara distinto según hubieras
+elegido proyecto o no.** Así que la lista es una y cada regla dice dónde aplica
+(`ambito: 'siempre' | 'proyecto' | 'sin-proyecto'`). El número que ve el modelo se
+calcula **después de filtrar**, así que en cada modo salen del 1 al N sin huecos.
+
+#### Tres herramientas donde había doce
+
+Ninguna sale de un permiso, porque ninguna toca datos de ningún proyecto:
+`proponer_pregunta`, `proponer_abrir_proyecto` y `proponer_plantilla`.
+
+⚠️ **La plantilla sigue fuera de `herramientasPara`**, y el motivo de §36.1 no ha
+cambiado: declarársela en una conversación sobre un proyecto existente dejaría
+que a mitad de una charla sobre tareas propusiera rehacerlo entero. Sin foco ese
+riesgo no existe —no hay nada que rehacer— y es justo la conversación para la que
+se escribió.
+
+### 42.5 Adoptar un proyecto a mitad
+
+Dos caminos, y los dos conservan el hilo:
+
+1. **PRAX propone abrir uno de los tuyos.** La tarjeta es un sí/no; aceptar
+   navega a `?p=<slug>&c=<conversación>` y a partir de ahí la conversación es de
+   ese proyecto, con briefing y con las doce herramientas.
+2. **Se crea uno desde una plantilla.** Al terminar, el resumen ofrece seguir ahí
+   mismo con el proyecto recién creado.
+
+Lo que impide que el modelo se invente un proyecto no es el prompt: el gateway
+resuelve la lista con la sesión de quien pregunta —`GET
+/projects?permission=canViewReports`, la misma consulta que ya pinta el selector—
+y la propuesta **se valida contra ella**.
+
+⚠️ **Una conversación con foco no vuelve a no tenerlo.** Un turno sin proyecto
+sobre una conversación que ya lo tiene responde **409**: solo puede venir de una
+pestaña descolocada, y aceptarlo en silencio se respondería sin briefing — PRAX
+diría que no tiene datos de un proyecto que la pantalla enseña como cargado, y no
+habría forma de entender por qué.
+
+### 42.6 La invariante de §26.1, otra vez intacta
+
+Aceptar la plantilla llama a `commons/template/apply.ts`, que ya existía para el
+diálogo de proyecto nuevo: `POST /projects` y después las rutas de etiquetas,
+roles, espacios, tableros y columnas, **una a una, con la sesión de quien pulsa**.
+Ninguna ruta de escritura nueva.
+
+Y la tarjeta del chat **no crea de un clic**: su botón abre la revisión del plan,
+que es el mismo componente que usa el diálogo. Un «Aceptar» que montara veinte
+objetos de golpe sería la misma capacidad con el paso de revisión quitado.
+
+### 42.7 Cuatro cosas que solo se vieron construyéndolo
+
+| Qué | Por qué importa |
+|---|---|
+| 🔴 El resolve de propuestas es **una ruta de proyecto** | Aceptar o descartar cualquier tarjeta sin foco daba **404**. Hermana en `/me/assistant/proposals/:id/resolve` |
+| 🔴 `maxOutputTokens: 2048` era **global** | Por ahí pasa la plantilla: un plan grande llegaba cortado, con `finishReason: MAX_TOKENS` y el JSON a medias. Por fuera, «no he sabido responder» |
+| La tarjeta de abrir proyecto **anota su decisión ella misma** | Las demás lo dejan en un efecto de `Marco`; aquí aceptar navega, y una petición lanzada desde un componente que se desmonta a la vez es una carrera que se pierde la mitad de las veces |
+| El proyecto recién creado **no está en la lista de la pantalla** | Se renderizó antes de existir, así que adoptarlo se quedaba en un `return` silencioso. Por eso el `slug` viaja con la propuesta aceptada |
+
+Y un 🐛 que ya estaba: `text/x-markdown` estaba en la lista de tipos permitidos
+—con un comentario explicando que Safari y algunos Linux declaran así un `.md`—
+pero **no** en la de los que se pegan como texto. El mismo archivo entraba como
+texto en Chrome y como binario en Safari.
+
+### 42.8 Lo que **no** está verificado
+
+🔴 **Nada de esto se ha probado contra el modelo**: la clave de Gemini está sin
+crédito. Lo que sí está comprobado:
+
+- la migración, aplicada sobre la base real;
+- la extracción, con un PDF de verdad (2300 caracteres), un `.md`, una imagen y
+  un PDF corrupto —que registra el aviso y devuelve `null` sin tumbar la subida—;
+- el reparto del presupuesto, con dos mensajes y tres adjuntos;
+- typecheck de las siete zonas y de los dos servicios, y `next build` de
+  `assistant-front`.
+
+Lo que falta por ver en vivo es lo que solo dice el modelo: si con la regla 17
+narra de verdad las imágenes, si sin foco propone abrir el proyecto correcto, y
+si una plantilla pedida en mitad de una conversación sale tan buena como la que
+sale del formulario, donde el brief se escribe de una sentada.
