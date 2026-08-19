@@ -220,4 +220,4 @@ function DisparadorDePrax({ projectSlug }: { projectSlug: string }) {
  * en el backend, donde se puede garantizar; aquí solo hay una sugerencia.
  */
 const FRASE_DE_EJEMPLO =
-  'Añádeme un gráfico de ... para ver ... (por ejemplo: las tareas paradas por columna, o lo que cierra el equipo cada semana)';
+  'Añádeme un grafo de ... para ver ... (por ejemplo: las tareas paradas por columna, o lo que cierra el equipo cada semana)';

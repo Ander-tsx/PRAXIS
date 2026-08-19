@@ -101,7 +101,7 @@ export function WidgetShell({
 
       {!entrada && (
         <p className="px-5 pb-4 font-sans text-xs text-text-disabled">
-          Este gráfico ya no existe en el catálogo. Quítalo del lienzo.
+          Este grafo ya no existe en el catálogo. Quítalo del lienzo.
         </p>
       )}
     </section>

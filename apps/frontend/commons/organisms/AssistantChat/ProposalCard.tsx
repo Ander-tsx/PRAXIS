@@ -1229,7 +1229,7 @@ export function ChartProposalCard({
     const respuesta = await aceptarGrafico(projectId, propuesta);
 
     if (respuesta.error || !respuesta.anadido) {
-      setError(respuesta.error ?? 'No se pudo añadir el gráfico.');
+      setError(respuesta.error ?? 'No se pudo añadir el grafo.');
       setEstado('pendiente');
       return;
     }
@@ -1284,7 +1284,7 @@ export function ChartProposalCard({
 
       {!aceptarGrafico && (
         <p className="font-sans text-xs text-text-secondary">
-          Los gráficos se colocan desde{' '}
+          Los grafos se colocan desde{' '}
           {/* Cruza de zona → `<a>` duro, nunca `next/link`. Ver §16. */}
           <a
             href="/reports"

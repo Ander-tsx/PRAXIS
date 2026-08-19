@@ -50,7 +50,7 @@ export function CanvasVacio({
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button variant="primary" size="lg" onClick={onAnadir}>
-          Añadir un gráfico
+          Añadir un grafo
         </Button>
         {/* ⚠️ Dos botones y no tres, aunque los caminos a un gráfico sean tres.
             PRAX tiene su botón flotante permanente en esta pantalla, así que no

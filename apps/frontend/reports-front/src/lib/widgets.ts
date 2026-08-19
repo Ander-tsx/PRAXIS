@@ -24,6 +24,8 @@
  * no se añade: un 400 sin explicación al aceptar una propuesta del asistente se
  * lee como que el asistente falló.
  */
+import type { VistaMini } from '@/components/molecules/MiniGrafo';
+
 export const MAX_WIDGETS = 30;
 
 /** Los gráficos que se pueden poner en el lienzo. Espejo de `ReportWidgetKind`. */
@@ -92,6 +94,16 @@ export type Informe = 'snapshot' | 'flow' | 'cycle' | 'forecast' | 'people' | 'b
 
 export interface EntradaDelCatalogo {
   titulo: string;
+  /**
+   * La forma con la que se reconoce en el catálogo.
+   *
+   * ⚠️ **No es la forma con la que se dibuja**, aunque casi siempre coincida: es
+   * lo que hace que la tarjeta se identifique de un vistazo. `resumen` y `ciclo`
+   * son cifras, `tiempos` es una nube de puntos y `personas` una lista — ninguna
+   * de las tres cabe en `FormaGrafico`, que es el conjunto cerrado del
+   * constructor. Ver `MiniGrafo`.
+   */
+  vista: VistaMini;
   /** La frase que dice qué mide. Obligatoria, como en `ChartCard`. */
   descripcion: string;
   informes: Informe[];
@@ -115,6 +127,7 @@ export interface EntradaDelCatalogo {
 export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   resumen: {
     titulo: 'Resumen',
+    vista: 'cifras',
     descripcion: 'Tareas, abiertas, vencidas y avance del checklist, en cuatro cifras.',
     informes: ['snapshot'],
     w: 12,
@@ -125,6 +138,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   por_columna: {
     titulo: 'Dónde está el trabajo',
+    vista: 'barras',
     descripcion: 'Cuántas tareas hay ahora mismo en cada columna del tablero.',
     informes: ['snapshot'],
     w: 6,
@@ -135,6 +149,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   por_prioridad: {
     titulo: 'Reparto por prioridad',
+    vista: 'dona',
     descripcion: 'Si casi todo es urgente, en la práctica no hay prioridades.',
     informes: ['snapshot'],
     w: 6,
@@ -145,6 +160,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   flujo: {
     titulo: 'Flujo acumulado',
+    vista: 'area_apilada',
     descripcion: 'Cuántas tareas hay en cada columna, día a día.',
     informes: ['flow'],
     w: 12,
@@ -155,6 +171,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   tiempos: {
     titulo: 'Cuánto tarda una tarea',
+    vista: 'dispersion',
     descripcion: 'De crear a cerrar. Cada punto es una tarea; las líneas, la mediana y el p85.',
     informes: ['cycle'],
     w: 12,
@@ -165,6 +182,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   ciclo: {
     titulo: 'Tiempo de ciclo',
+    vista: 'cifras',
     descripcion: 'Del primer movimiento a cerrar: lo que tarda el trabajo una vez empieza.',
     informes: ['cycle'],
     w: 6,
@@ -175,6 +193,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   prediccion: {
     titulo: 'Cuándo estaría vacío el tablero',
+    vista: 'lineas',
     descripcion: 'Simulación sobre el ritmo de las últimas semanas, no sobre estimaciones.',
     informes: ['forecast'],
     w: 6,
@@ -185,6 +204,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   personas: {
     titulo: 'Cómo está repartido el trabajo',
+    vista: 'lista',
     descripcion: 'Carga y flujo de cada persona.',
     informes: ['people'],
     w: 12,
@@ -194,8 +214,9 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
     repetible: false,
   },
   generado: {
-    titulo: 'Gráfico a medida',
-    descripcion: 'El que pediste al asistente.',
+    titulo: 'Grafo a medida',
+    vista: 'barras',
+    descripcion: 'El que montaste tú o te propuso PRAX.',
     informes: [],
     w: 6,
     h: 7,
@@ -349,7 +370,7 @@ export function nuevoWidget(
 
 /** Qué se pinta en la cabecera de un `generado`, que no tiene título fijo. */
 export function tituloDe(widget: Widget): string {
-  return widget.grafico?.titulo ?? CATALOGO[widget.tipo]?.titulo ?? 'Gráfico';
+  return widget.grafico?.titulo ?? CATALOGO[widget.tipo]?.titulo ?? 'Grafo';
 }
 
 /* ─── El conjunto cerrado de los gráficos a medida ─────────────────────────
@@ -521,7 +542,7 @@ export function validarGrafico(grafico: EspecificacionGrafico): string | null {
       return 'El top N va de 2 a 20';
     }
   }
-  if (!grafico.titulo?.trim()) return 'Falta el título del gráfico';
+  if (!grafico.titulo?.trim()) return 'Falta el título del grafo';
   if (grafico.titulo.length > 80) return 'El título no puede superar 80 caracteres';
 
   return null;

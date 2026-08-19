@@ -1,5 +1,6 @@
 'use client';
 
+import { Desplegable } from '@/components/molecules/Desplegable';
 import { PRIORITY_ORDER, fechaCorta } from '@/lib/reports';
 import { PRIORITY_LABELS, Select, SelectorDeFecha, alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
@@ -276,77 +277,86 @@ export function AnalysisFilters({
         )}
       </div>
 
-      {abierto && (
-        /* `-mt-3` porque ahora es hijo directo del `gap-6` de la página, y esos
-           24 px lo separaban de la barra como si fueran dos cosas distintas. */
-        <div className="-mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <SelectorDeFecha
-            name="from"
-            label="Desde"
-            defaultValue={puestos.from ?? ''}
-            placeholder="Cualquier fecha"
-            onValueChange={(valor) => navegar({ from: valor })}
-          />
+      {/* `-mt-3` porque es hijo directo del `gap-6` de la página, y esos 24 px lo
+          separaban de la barra como si fueran dos cosas distintas. El `pb-1` deja
+          respirar al último campo dentro del recorte del desplegable. */}
+      <div className="-mt-3">
+        <Desplegable abierto={abierto}>
+          <div className="grid grid-cols-1 gap-3 pb-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {/* ⚠️ La `key` con el valor puesto: sin ella, «Quitar todo» limpia la
+              URL y el campo sigue enseñando la fecha —lleva su valor por dentro y
+              en una navegación suave no se desmonta—. Aquí y no en el organismo
+              entero, que es donde estaba y cerraba el panel en cada cambio. */}
+            <SelectorDeFecha
+              key={`from-${puestos.from ?? ''}`}
+              name="from"
+              label="Desde"
+              defaultValue={puestos.from ?? ''}
+              placeholder="Cualquier fecha"
+              onValueChange={(valor) => navegar({ from: valor })}
+            />
 
-          <SelectorDeFecha
-            name="to"
-            label="Hasta"
-            defaultValue={puestos.to ?? ''}
-            placeholder="Cualquier fecha"
-            disabled={!puestos.from}
-            onValueChange={(valor) => navegar({ to: valor })}
-          />
+            <SelectorDeFecha
+              key={`to-${puestos.to ?? ''}`}
+              name="to"
+              label="Hasta"
+              defaultValue={puestos.to ?? ''}
+              placeholder="Cualquier fecha"
+              disabled={!puestos.from}
+              onValueChange={(valor) => navegar({ to: valor })}
+            />
 
-          {/* El tablero solo cuando hay más de uno: con uno, el desplegable
+            {/* El tablero solo cuando hay más de uno: con uno, el desplegable
               tendría una opción y «todos», que es elegir entre lo mismo. */}
-          {tableros.length > 1 && (
-            <Select
-              label="Tablero"
-              fullWidth
-              options={opciones('Todos los tableros', tablerosComoFilas)}
-              value={puestos.boardId ?? TODOS}
-              onValueChange={(valor) => navegar({ boardId: valor })}
-            />
-          )}
+            {tableros.length > 1 && (
+              <Select
+                label="Tablero"
+                fullWidth
+                options={opciones('Todos los tableros', tablerosComoFilas)}
+                value={puestos.boardId ?? TODOS}
+                onValueChange={(valor) => navegar({ boardId: valor })}
+              />
+            )}
 
-          {personas.length > 0 && (
-            <Select
-              label="Responsable"
-              fullWidth
-              options={opciones('Cualquiera', personas)}
-              value={puestos.assigneeId ?? TODOS}
-              onValueChange={(valor) => navegar({ assigneeId: valor })}
-            />
-          )}
+            {personas.length > 0 && (
+              <Select
+                label="Responsable"
+                fullWidth
+                options={opciones('Cualquiera', personas)}
+                value={puestos.assigneeId ?? TODOS}
+                onValueChange={(valor) => navegar({ assigneeId: valor })}
+              />
+            )}
 
-          {etiquetas.length > 0 && (
-            <Select
-              label="Etiqueta"
-              fullWidth
-              options={opciones('Cualquiera', etiquetas)}
-              value={puestos.labelId ?? TODOS}
-              onValueChange={(valor) => navegar({ labelId: valor })}
-            />
-          )}
+            {etiquetas.length > 0 && (
+              <Select
+                label="Etiqueta"
+                fullWidth
+                options={opciones('Cualquiera', etiquetas)}
+                value={puestos.labelId ?? TODOS}
+                onValueChange={(valor) => navegar({ labelId: valor })}
+              />
+            )}
 
-          <Select
-            label="Prioridad"
-            fullWidth
-            options={[
-              { value: TODOS, label: 'Cualquiera' },
-              /* De urgente a baja, que es como se lee una prioridad. `PRIORITIES`
+            <Select
+              label="Prioridad"
+              fullWidth
+              options={[
+                { value: TODOS, label: 'Cualquiera' },
+                /* De urgente a baja, que es como se lee una prioridad. `PRIORITIES`
                  de commons va al revés porque allí ordena un desplegable de
                  edición, donde el defecto queda en medio. */
-              ...PRIORITY_ORDER.map((prioridad) => ({
-                value: prioridad,
-                label: PRIORITY_LABELS[prioridad],
-              })),
-            ]}
-            value={puestos.priority ?? TODOS}
-            onValueChange={(valor) => navegar({ priority: valor })}
-          />
-        </div>
-      )}
+                ...PRIORITY_ORDER.map((prioridad) => ({
+                  value: prioridad,
+                  label: PRIORITY_LABELS[prioridad],
+                })),
+              ]}
+              value={puestos.priority ?? TODOS}
+              onValueChange={(valor) => navegar({ priority: valor })}
+            />
+          </div>
+        </Desplegable>
+      </div>
     </>
   );
 }

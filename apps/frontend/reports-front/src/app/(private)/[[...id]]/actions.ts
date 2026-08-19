@@ -112,7 +112,7 @@ export async function aceptarGraficoAction(
     if (widgets.length >= MAX_WIDGETS) {
       return {
         anadido: false,
-        error: `Tu lienzo ya tiene ${MAX_WIDGETS} gráficos. Quita alguno para añadir este.`,
+        error: `Tu lienzo ya tiene ${MAX_WIDGETS} grafos. Quita alguno para añadir este.`,
       };
     }
 
@@ -157,6 +157,6 @@ export async function aceptarGraficoAction(
     revalidatePath('/[[...id]]', 'page');
     return { anadido: true, error: null };
   } catch (error) {
-    return { anadido: false, error: describe(error, 'No se pudo añadir el gráfico.') };
+    return { anadido: false, error: describe(error, 'No se pudo añadir el grafo.') };
   }
 }

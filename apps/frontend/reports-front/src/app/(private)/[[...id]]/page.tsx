@@ -517,20 +517,20 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
         </div>
 
         {/**
-         * ⚠️ **La `key` no es decorativa: sin ella «Quitar filtros» no limpia.**
+         * ⚠️ **Aquí había una `key` atada a los filtros, y hacía daño.**
          *
-         * Los dos selectores de fecha llevan su valor por dentro
-         * (`defaultValue`, sin controlar) y en una navegación **suave** del App
-         * Router el componente no se desmonta: la URL se queda sin `from` y el
-         * campo sigue enseñando la fecha. Atándola a los filtros puestos, cada
-         * combinación es una instancia distinta y el estado interno se rehace.
+         * La puse para que «Quitar filtros» limpiara los dos selectores de fecha,
+         * que llevan su valor por dentro (`defaultValue`, sin controlar) y en una
+         * navegación **suave** del App Router no se desmontan. Funcionaba, y de
+         * paso remontaba el organismo entero en **cada** cambio de filtro: el
+         * panel desplegado se cerraba solo después de elegir cada cosa, así que
+         * acumular tres filtros eran tres viajes de abrir y volver a abrir.
          *
-         * La alternativa era controlar el selector desde fuera, que cambia su
-         * contrato —y el del diálogo de tarea, que lo usa sin controlar— por un
-         * caso solo de aquí.
+         * La `key` se mudó a los dos `SelectorDeFecha`, que es lo único que la
+         * necesitaba. El estado de «abierto» vive donde tiene que vivir y ya no
+         * lo pisa nadie.
          */}
         <AnalysisFilters
-          key={filtrosAQuery(filtros)}
           basePath={reportPath(project)}
           puestos={filtros}
           tableros={tableros}
