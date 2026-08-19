@@ -112,7 +112,7 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
       {
         key: 'acciones',
         header: 'Acciones',
-        track: { rem: 3 },
+        track: { rem: 5 },
         align: 'end',
         mobileLabel: false,
         cell: (proyecto) => {

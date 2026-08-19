@@ -87,7 +87,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
     if (estadoFiltro) otros.set('estado', estadoFiltro);
     if (destino > 1) otros.set('page', String(destino));
     const qs = otros.toString();
-    return qs ? `/admin/proyectos?${qs}` : '/admin/proyectos';
+    return qs ? `/admin/projects?${qs}` : '/admin/projects';
   };
 
   return (
@@ -105,7 +105,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         />
 
         <FilterBar
-          basePath="/proyectos"
+          basePath="/projects"
           busqueda={busqueda}
           placeholder="Nombre o descripción del proyecto"
           filtros={FILTROS}
