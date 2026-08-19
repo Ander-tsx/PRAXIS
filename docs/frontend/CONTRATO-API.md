@@ -1396,6 +1396,27 @@ una consulta agregada nueva, hazlo también.
 
 ---
 
+## Automatizaciones académicas 🔒
+
+Todas exigen `canManageAutomations` y usan el `projectId` resuelto por la ruta.
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/projects/:projectId/automations` | Lista reglas |
+| POST | `/projects/:projectId/automations` | Crea una regla |
+| GET | `/projects/:projectId/automations/:id` | Obtiene una regla |
+| PATCH | `/projects/:projectId/automations/:id` | Sustituye definición y estado |
+| DELETE | `/projects/:projectId/automations/:id` | Elimina una regla |
+| POST | `/projects/:projectId/automations/review` | Ejecuta la revisión manual de la demo |
+| GET | `/projects/:projectId/automations/executions` | Últimas 20 evaluaciones |
+
+El MVP admite solo `TASK_DUE_SOON` con `{ leadTimeMinutes }` y `TASK_STALE` con
+`{ days }`. Ambos ejecutan `CREATE_NOTIFICATION`: el primero usa
+`recipientSelector: 'ASSIGNEES'`; el segundo, `'PROJECT_OWNER'`. Las condiciones
+se combinan por `AND`, hay un máximo de cinco acciones secuenciales y cada acción
+se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofrece
+“Revisar ahora” para que la demostración no dependa del reloj ni de una cola.
+
 ## Asistente 🔒
 
 | Método | Ruta | Entrada | Permiso |

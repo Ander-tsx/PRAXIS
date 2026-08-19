@@ -6,11 +6,15 @@ import {
   PurgeAutomationProjectDto,
   UpdateAutomationRuleDto,
 } from '@praxis/contracts';
+import { AutomationEngineService } from '../executions/direct-execution';
 import { RulesService } from './rules.service';
 
 @Controller()
 export class RulesController {
-  constructor(private readonly rules: RulesService) {}
+  constructor(
+    private readonly rules: RulesService,
+    private readonly engine: AutomationEngineService,
+  ) {}
 
   @MessagePattern({ cmd: 'automation_rule_list' })
   list(@Payload() dto: { projectId: string }) {
@@ -40,5 +44,15 @@ export class RulesController {
   @MessagePattern({ cmd: 'automation_project_purge' })
   purge(@Payload() dto: PurgeAutomationProjectDto) {
     return this.rules.purgeProject(dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'automation_project_review' })
+  review(@Payload() dto: { projectId: string }) {
+    return this.engine.reviewProject(dto.projectId);
+  }
+
+  @MessagePattern({ cmd: 'automation_execution_list' })
+  executions(@Payload() dto: { projectId: string; limit?: number }) {
+    return this.engine.recent(dto.projectId, dto.limit);
   }
 }

@@ -252,6 +252,10 @@ enum NotificationType {
   TASK_ASSIGNED
   /// Te quitaron de una tarea.
   TASK_UNASSIGNED
+  /// Una automatización detectó que una tarea vencerá pronto.
+  AUTOMATION_TASK_DUE_SOON
+  /// Una automatización detectó una tarea sin movimiento.
+  AUTOMATION_TASK_STALE
 
   @@schema("projects")
 }

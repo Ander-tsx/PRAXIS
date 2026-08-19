@@ -1,6 +1,13 @@
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 
-export class LogoutDto {
+export class LogoutBodyDto {
+  /** Token opcional de la sesión concreta que se quiere cerrar. */
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
+}
+
+export class LogoutDto extends LogoutBodyDto {
   /**
    * ⚠️ Sale **del token de la petición**, nunca del cuerpo. En el gateway lo
    * pone `req.user.userId`; aquí se declara porque el microservicio lo recibe
@@ -21,7 +28,4 @@ export class LogoutDto {
    * tiene que verificar la firma para sacar el `jti`. Un token ilegible cierra
    * todas — quien pide salir, sale.
    */
-  @IsOptional()
-  @IsString()
-  refreshToken?: string;
 }

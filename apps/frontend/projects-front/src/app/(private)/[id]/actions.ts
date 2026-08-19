@@ -84,6 +84,64 @@ function revalidateProject(projectId: string) {
   revalidatePath(`/${projectId}`);
 }
 
+export async function createAcademicAutomationAction(projectId: string, formData: FormData) {
+  const api = await requireApi();
+  if (!api) return;
+  const trigger = String(formData.get('trigger'));
+  const isDue = trigger === 'TASK_DUE_SOON';
+  const threshold = Math.max(1, Number(formData.get('threshold')) || (isDue ? 1440 : 7));
+
+  await api.post(`/projects/${projectId}/automations`, {
+    name: String(formData.get('name')).trim(),
+    status: formData.get('enabled') === 'on' ? 'ENABLED' : 'DISABLED',
+    trigger: {
+      type: isDue ? 'TASK_DUE_SOON' : 'TASK_STALE',
+      config: isDue ? { leadTimeMinutes: threshold } : { days: threshold },
+    },
+    conditions: [],
+    actions: [
+      {
+        type: 'CREATE_NOTIFICATION',
+        config: { recipientSelector: isDue ? 'ASSIGNEES' : 'PROJECT_OWNER' },
+      },
+    ],
+  });
+  revalidateProject(projectId);
+}
+
+export async function reviewAcademicAutomationsAction(projectId: string) {
+  const api = await requireApi();
+  if (!api) return;
+  await api.post(`/projects/${projectId}/automations/review`, {});
+  revalidateProject(projectId);
+}
+
+export async function setAcademicAutomationStatusAction(
+  projectId: string,
+  ruleId: string,
+  status: 'ENABLED' | 'DISABLED',
+) {
+  const api = await requireApi();
+  if (!api) return;
+  const rule = await api.get<{
+    name: string;
+    description?: string | null;
+    trigger: { id: string; ruleId: string; type: string; config: Record<string, unknown> };
+    conditions: Array<{ field: string; operator: string; value: unknown }>;
+    actions: Array<{ type: string; config: Record<string, unknown> }>;
+  }>(`/projects/${projectId}/automations/${ruleId}`);
+
+  await api.patch(`/projects/${projectId}/automations/${ruleId}`, {
+    name: rule.name,
+    ...(rule.description != null && { description: rule.description }),
+    status,
+    trigger: { type: rule.trigger.type, config: rule.trigger.config },
+    conditions: rule.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
+    actions: rule.actions.map(({ type, config }) => ({ type, config })),
+  });
+  revalidateProject(projectId);
+}
+
 /**
  * El detalle **y** la lista.
  *
@@ -170,7 +228,9 @@ export async function projectInventoryAction(projectId: string): Promise<Project
 
   return {
     // Si algún tablero falló no se puede sumar: el total sería más bajo del real.
-    tasks: taskTotals.includes(null) ? null : taskTotals.reduce((a, b) => a! + b!, 0),
+    tasks: taskTotals.every((total): total is number => total !== null)
+      ? taskTotals.reduce((sum, total) => sum + total, 0)
+      : null,
     pendingInvitations: invitations,
   };
 }

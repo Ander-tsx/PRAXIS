@@ -61,6 +61,31 @@ export class ProjectAutomationsController {
     );
   }
 
+  @Post('review')
+  @HttpCode(HttpStatus.OK)
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
+  @ApiOperation({ summary: 'Revisa ahora vencimientos y tareas estancadas del proyecto' })
+  review(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.automationClient.send(
+        { cmd: 'automation_project_review' },
+        { projectId: req.projectId },
+      ),
+    );
+  }
+
+  @Get('executions')
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
+  @ApiOperation({ summary: 'Lista las ejecuciones recientes de automatización' })
+  executions(@Request() req: Express.Request) {
+    return firstValueFrom(
+      this.automationClient.send(
+        { cmd: 'automation_execution_list' },
+        { projectId: req.projectId, limit: 20 },
+      ),
+    );
+  }
+
   @Get(':id')
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
   @ApiOperation({ summary: 'Obtiene una regla del proyecto' })

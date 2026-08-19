@@ -1,11 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import {
-  AutomationActionType,
-  AutomationRuleStatus,
   CreateAutomationRuleDto,
   PROJECT_SUSPENDED_CODE,
-  ProjectPermission,
   UpdateAutomationRuleDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
@@ -45,7 +42,7 @@ export class RulesService {
 
   async create(dto: CreateAutomationRuleDto) {
     const definition = this.validate(dto);
-    await this.assertTrustedReferences(dto.projectId, dto.createdBy, definition.actions);
+    await this.assertProjectActive(dto.projectId);
     return this.prisma.automationRule.create({
       data: {
         projectId: dto.projectId,
@@ -78,7 +75,7 @@ export class RulesService {
   async update(dto: UpdateAutomationRuleDto) {
     const existing = await this.find(dto.projectId, dto.id);
     const definition = this.validate(dto);
-    await this.assertTrustedReferences(dto.projectId, existing.createdBy, definition.actions);
+    await this.assertProjectActive(dto.projectId);
     return this.prisma.$transaction(async (tx) => {
       await tx.automationCondition.deleteMany({ where: { ruleId: dto.id } });
       await tx.automationAction.deleteMany({ where: { ruleId: dto.id } });
@@ -123,11 +120,7 @@ export class RulesService {
     return { deleted: result.count };
   }
 
-  private async assertTrustedReferences(
-    projectId: string,
-    principalId: string,
-    actions: Array<{ type: AutomationActionType; config: Record<string, unknown> }>,
-  ) {
+  private async assertProjectActive(projectId: string) {
     const project = await firstValueFrom(
       this.projectsClient.send({ cmd: 'project_find_one' }, { id: projectId }),
     );
@@ -138,36 +131,6 @@ export class RulesService {
         code: PROJECT_SUSPENDED_CODE,
         message: 'El proyecto no está activo para administrar automatizaciones',
       });
-    }
-
-    for (const action of actions) {
-      if (action.type !== AutomationActionType.MOVE_TASK) continue;
-      const permission = await firstValueFrom(
-        this.projectsClient.send(
-          { cmd: 'project_check_permission' },
-          { userId: principalId, projectId, permission: ProjectPermission.CAN_MOVE_TASK },
-        ),
-      );
-      if (project.ownerId !== principalId && !permission?.allowed) {
-        throw new RpcException({
-          statusCode: 400,
-          message: 'El principal delegado no puede mover tareas en este proyecto',
-        });
-      }
-      const columnId = action.config.targetColumnId as string;
-      const [column] = await firstValueFrom(
-        this.projectsClient.send({ cmd: 'column_find_by_ids' }, { ids: [columnId] }),
-      );
-      if (!column)
-        throw new RpcException({ statusCode: 400, message: 'Columna objetivo no encontrada' });
-      const resource = await firstValueFrom(
-        this.projectsClient.send({ cmd: 'project_resolve_resource' }, { boardId: column.boardId }),
-      );
-      if (resource?.projectId !== projectId)
-        throw new RpcException({
-          statusCode: 400,
-          message: 'La columna objetivo pertenece a otro proyecto',
-        });
     }
   }
 

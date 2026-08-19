@@ -509,6 +509,18 @@ function Descripcion({ notification, who }: { notification: AppNotification; who
           {quien} te quitó de {tarea} en {proyecto}.
         </>
       );
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return (
+        <>
+          {tarea} vencerá pronto en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_STALE':
+      return (
+        <>
+          {tarea} lleva varios días sin movimiento en {proyecto}.
+        </>
+      );
   }
 }
 
@@ -536,6 +548,10 @@ function describirTexto(notification: AppNotification, who: string): string {
       return `${who} te asignó ${task} en ${project}`;
     case 'TASK_UNASSIGNED':
       return `${who} te quitó de ${task} en ${project}`;
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return `${task} vencerá pronto en ${project}`;
+    case 'AUTOMATION_TASK_STALE':
+      return `${task} lleva varios días sin movimiento en ${project}`;
   }
 }
 
@@ -571,6 +587,8 @@ const TYPE_TONE: Record<NotificationType, string> = {
   MEMBER_REMOVED: colors.error,
   TASK_ASSIGNED: colors.primary,
   TASK_UNASSIGNED: colors.textSecondary,
+  AUTOMATION_TASK_DUE_SOON: colors.warning,
+  AUTOMATION_TASK_STALE: colors.error,
 };
 
 function TypeIcon({ type, pequeno = false }: { type: NotificationType; pequeno?: boolean }) {

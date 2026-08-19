@@ -776,6 +776,8 @@ export const NOTIFICATION_TYPES = [
   'MEMBER_REMOVED',
   'TASK_ASSIGNED',
   'TASK_UNASSIGNED',
+  'AUTOMATION_TASK_DUE_SOON',
+  'AUTOMATION_TASK_STALE',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

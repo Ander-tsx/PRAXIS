@@ -3,17 +3,16 @@ import { RulesService } from './rules.service';
 
 const projectId = '00000000-0000-4000-8000-000000000010';
 const userId = '00000000-0000-4000-8000-000000000011';
-const columnId = '00000000-0000-4000-8000-000000000012';
 const dto = {
   projectId,
   createdBy: userId,
-  name: 'Mover PR',
-  trigger: { type: 'GITHUB_PULL_REQUEST_OPENED' as const, config: {} },
+  name: 'Avisar vencimiento',
+  trigger: { type: 'TASK_DUE_SOON' as const, config: { leadTimeMinutes: 120 } },
   conditions: [],
-  actions: [{ type: 'MOVE_TASK' as const, config: { targetColumnId: columnId } }],
+  actions: [{ type: 'CREATE_NOTIFICATION' as const, config: { recipientSelector: 'ASSIGNEES' } }],
 };
 
-const serviceFor = (columnProjectId = projectId, projectStatus = 'ACTIVE') => {
+const serviceFor = (projectStatus = 'ACTIVE') => {
   const tx = {
     automationCondition: { deleteMany: jest.fn() },
     automationAction: { deleteMany: jest.fn() },
@@ -39,9 +38,6 @@ const serviceFor = (columnProjectId = projectId, projectStatus = 'ACTIVE') => {
     send: ({ cmd }: { cmd: string }) => {
       if (cmd === 'project_find_one')
         return of({ id: projectId, ownerId: userId, status: projectStatus });
-      if (cmd === 'project_check_permission') return of({ allowed: true });
-      if (cmd === 'column_find_by_ids') return of([{ id: columnId, boardId: 'board-a' }]);
-      if (cmd === 'project_resolve_resource') return of({ projectId: columnProjectId });
       throw new Error(`Comando inesperado: ${cmd}`);
     },
   };
@@ -61,16 +57,8 @@ describe('RulesService', () => {
     );
   });
 
-  it('rechaza una columna de otro proyecto antes de persistir', async () => {
-    const { service, prisma } = serviceFor('00000000-0000-4000-8000-000000000099');
-
-    await expect(service.create(dto)).rejects.toThrow('otro proyecto');
-
-    expect(prisma.automationRule.create).not.toHaveBeenCalled();
-  });
-
   it('rechaza crear reglas en un proyecto suspendido antes de persistir', async () => {
-    const { service, prisma } = serviceFor(projectId, 'SUSPENDED');
+    const { service, prisma } = serviceFor('SUSPENDED');
 
     await expect(service.create(dto)).rejects.toMatchObject({
       error: expect.objectContaining({ statusCode: 403 }),

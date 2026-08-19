@@ -364,6 +364,10 @@ function describir(aviso: AvisoRecibido): string {
       return quien
         ? `${quien} te ha quitado de «${tarea}»${donde}.`
         : `Te han quitado de «${tarea}»${donde}.`;
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return `«${tarea}» vencerá pronto${donde}.`;
+    case 'AUTOMATION_TASK_STALE':
+      return `«${tarea}» lleva varios días sin movimiento${donde}.`;
     default:
       return 'Tienes un aviso nuevo.';
   }
@@ -481,6 +485,8 @@ const TONO_POR_TIPO: Record<NotificationType, string> = {
   MEMBER_REMOVED: colors.error,
   TASK_ASSIGNED: colors.primary,
   TASK_UNASSIGNED: colors.textSecondary,
+  AUTOMATION_TASK_DUE_SOON: colors.warning,
+  AUTOMATION_TASK_STALE: colors.error,
 };
 
 /**

@@ -12,6 +12,8 @@ export const automationEnvValidationSchema = Joi.object({
   TCP_PORT: Joi.number().valid(3008).required(),
   PROJECTS_SERVICE_HOST: Joi.string().default('localhost'),
   PROJECTS_SERVICE_PORT: Joi.number().default(3003),
+  TASKS_SERVICE_HOST: Joi.string().default('localhost'),
+  TASKS_SERVICE_PORT: Joi.number().default(3004),
   LOG_LEVEL: Joi.string().valid('trace', 'debug', 'info', 'warn', 'error', 'fatal').default('info'),
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
 });

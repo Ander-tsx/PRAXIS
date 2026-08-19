@@ -24,6 +24,15 @@ enum AutomationRuleStatus {
   @@schema("automation")
 }
 
+enum RuleExecutionStatus {
+  RUNNING
+  SUCCEEDED
+  SKIPPED
+  FAILED
+
+  @@schema("automation")
+}
+
 /// Copia durable e idempotente de un hecho recibido por Redis Streams.
 ///
 /// `eventId` identifica el hecho de dominio y `dedupeKey` es un hash canónico
@@ -68,11 +77,36 @@ model AutomationRule {
   trigger         AutomationTrigger?
   conditions      AutomationCondition[]
   actions         AutomationAction[]
+  executions      RuleExecution[]
 
   @@index([projectId, createdAt])
   @@index([projectId, status])
   @@schema("automation")
   @@map("automation_rules")
+}
+
+/// Auditoría mínima de una evaluación directa del MVP académico.
+model RuleExecution {
+  id              String              @id @default(uuid())
+  ruleId          String
+  ruleVersion     Int
+  causeKey        String
+  ruleSnapshot    Json
+  conditionResult Json
+  actionResults   Json?
+  status          RuleExecutionStatus @default(RUNNING)
+  error           Json?
+  startedAt       DateTime            @default(now())
+  finishedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  rule            AutomationRule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, causeKey])
+  @@index([ruleId, createdAt])
+  @@index([status, createdAt])
+  @@schema("automation")
+  @@map("rule_executions")
 }
 
 model AutomationTrigger {

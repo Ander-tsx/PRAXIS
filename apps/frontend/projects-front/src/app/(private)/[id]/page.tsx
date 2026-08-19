@@ -25,6 +25,11 @@ import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import {
+  createAcademicAutomationAction,
+  reviewAcademicAutomationsAction,
+  setAcademicAutomationStatusAction,
+} from './actions';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -63,6 +68,7 @@ const TABS = [
   { id: 'espacios', label: 'Espacios' },
   { id: 'equipo', label: 'Equipo' },
   { id: 'roles', label: 'Roles' },
+  { id: 'automatizaciones', label: 'Automatizaciones' },
   { id: 'chat', label: 'Chat' },
 ] as const;
 
@@ -167,6 +173,31 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   ]);
 
   const can = effective.permissions;
+
+  type AcademicRule = {
+    id: string;
+    name: string;
+    status: 'ENABLED' | 'DISABLED';
+    trigger: { type: 'TASK_DUE_SOON' | 'TASK_STALE'; config: Record<string, number> };
+  };
+  type AcademicExecution = {
+    id: string;
+    status: 'SUCCEEDED' | 'SKIPPED' | 'FAILED' | 'RUNNING';
+    createdAt: string;
+    conditionResult: { context?: { taskTitle?: string } };
+    rule: { name: string };
+  };
+  const [automationRules, automationExecutions] =
+    activeTab === 'automatizaciones' && can.canManageAutomations
+      ? await Promise.all([
+          api
+            .get<AcademicRule[]>(`/projects/${project.id}/automations`)
+            .catch(() => [] as AcademicRule[]),
+          api
+            .get<AcademicExecution[]>(`/projects/${project.id}/automations/executions`)
+            .catch(() => [] as AcademicExecution[]),
+        ])
+      : [[], []];
 
   /**
    * ¿Está suspendido?
@@ -371,6 +402,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     espacios: project.workspaces.length,
     equipo: members.length,
     roles: project.roles.length,
+    automatizaciones: automationRules.length,
     chat: chat.unread,
   };
 
@@ -552,6 +584,154 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             members={members}
             canManage={can.canManageRoles}
           />
+        )}
+
+        {activeTab === 'automatizaciones' && can.canManageAutomations && (
+          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+            <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+              <div>
+                <h2 className="font-display text-lg font-semibold text-text-primary">
+                  Reglas académicas
+                </h2>
+                <p className="mt-1 font-sans text-sm text-text-secondary">
+                  Dos plantillas concretas para la demo, sin colas ni integraciones externas.
+                </p>
+              </div>
+              <form
+                action={createAcademicAutomationAction.bind(null, project.id)}
+                className="grid gap-3 rounded-xl border border-border p-4"
+              >
+                <label className="grid gap-1 font-sans text-sm text-text-secondary">
+                  Nombre
+                  <input
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    name="name"
+                    defaultValue="Avisar tareas próximas a vencer"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
+                  />
+                </label>
+                <label className="grid gap-1 font-sans text-sm text-text-secondary">
+                  Tipo
+                  <select
+                    name="trigger"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
+                  >
+                    <option value="TASK_DUE_SOON">Vencimiento próximo → responsables</option>
+                    <option value="TASK_STALE">Tarea estancada → dueño del proyecto</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 font-sans text-sm text-text-secondary">
+                  Umbral (minutos para vencimiento; días para estancamiento)
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    name="threshold"
+                    defaultValue={1440}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
+                  />
+                </label>
+                <label className="flex items-center gap-2 font-sans text-sm text-text-primary">
+                  <input type="checkbox" name="enabled" defaultChecked /> Activar al crear
+                </label>
+                <button
+                  type="submit"
+                  className="w-fit rounded-lg bg-primary px-4 py-2 font-sans text-sm font-medium text-primary-foreground"
+                >
+                  Crear regla
+                </button>
+              </form>
+              <div className="space-y-2">
+                {automationRules.length === 0 && (
+                  <p className="font-sans text-sm text-text-secondary">Aún no hay reglas.</p>
+                )}
+                {automationRules.map((rule) => (
+                  <article key={rule.id} className="rounded-xl border border-border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-sans text-sm font-medium text-text-primary">
+                        {rule.name}
+                      </h3>
+                      <span className="rounded-full bg-surface-elevated px-2 py-1 font-sans text-xs text-text-secondary">
+                        {rule.status === 'ENABLED' ? 'Activa' : 'Inactiva'}
+                      </span>
+                    </div>
+                    <p className="mt-1 font-sans text-xs text-text-secondary">
+                      {rule.trigger.type === 'TASK_DUE_SOON'
+                        ? `${rule.trigger.config.leadTimeMinutes} min antes del vencimiento`
+                        : `${rule.trigger.config.days} días sin movimiento`}
+                    </p>
+                    <form
+                      action={setAcademicAutomationStatusAction.bind(
+                        null,
+                        project.id,
+                        rule.id,
+                        rule.status === 'ENABLED' ? 'DISABLED' : 'ENABLED',
+                      )}
+                      className="mt-3"
+                    >
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-border px-3 py-1.5 font-sans text-xs font-medium text-text-primary"
+                      >
+                        {rule.status === 'ENABLED' ? 'Desactivar' : 'Activar'}
+                      </button>
+                    </form>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display text-lg font-semibold text-text-primary">
+                    Ejecuciones
+                  </h2>
+                  <p className="mt-1 font-sans text-sm text-text-secondary">
+                    La revisión es manual para que la demo sea determinista.
+                  </p>
+                </div>
+                <form action={reviewAcademicAutomationsAction.bind(null, project.id)}>
+                  <button
+                    type="submit"
+                    className="rounded-lg border border-primary px-3 py-2 font-sans text-sm font-medium text-primary"
+                  >
+                    Revisar ahora
+                  </button>
+                </form>
+              </div>
+              <div className="space-y-2">
+                {automationExecutions.length === 0 && (
+                  <p className="font-sans text-sm text-text-secondary">
+                    Sin ejecuciones recientes.
+                  </p>
+                )}
+                {automationExecutions.map((execution) => (
+                  <article key={execution.id} className="rounded-xl border border-border p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-sans text-sm font-medium text-text-primary">
+                        {execution.rule.name}
+                      </p>
+                      <span className="font-sans text-xs text-text-secondary">
+                        {execution.status}
+                      </span>
+                    </div>
+                    <time className="mt-1 block font-sans text-xs text-text-secondary">
+                      {new Date(execution.createdAt).toLocaleString('es-MX')}
+                    </time>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === 'automatizaciones' && !can.canManageAutomations && (
+          <p className="rounded-xl border border-border bg-surface p-5 font-sans text-sm text-text-secondary">
+            No tienes permiso para administrar automatizaciones en este proyecto.
+          </p>
         )}
       </div>
     </AppHeader>

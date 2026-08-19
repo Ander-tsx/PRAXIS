@@ -24,39 +24,34 @@ describe('RulesService integration', () => {
     const projectB = randomUUID();
     const ownerA = randomUUID();
     const ownerB = randomUUID();
-    const columnA = randomUUID();
-    const columnB = randomUUID();
     const projectsClient = {
       send: ({ cmd }: { cmd: string }, payload?: Record<string, unknown>) => {
         if (cmd === 'project_find_one') {
           return of({ id: payload?.id, ownerId: payload?.id === projectA ? ownerA : ownerB });
         }
-        if (cmd === 'project_check_permission') return of({ allowed: true });
-        if (cmd === 'column_find_by_ids') {
-          const id = (payload?.ids as string[])[0];
-          return of([{ id, boardId: id === columnA ? 'board-a' : 'board-b' }]);
-        }
-        if (cmd === 'project_resolve_resource') {
-          return of({ projectId: payload?.boardId === 'board-a' ? projectA : projectB });
-        }
         throw new Error(`Comando inesperado: ${cmd}`);
       },
     };
     const service = new RulesService(prisma, projectsClient as never);
-    const rule = (projectId: string, ownerId: string, columnId: string, name: string) => ({
+    const rule = (projectId: string, ownerId: string, name: string) => ({
       projectId,
       createdBy: ownerId,
       name,
-      trigger: { type: 'GITHUB_PULL_REQUEST_OPENED' as const, config: {} },
-      conditions: [{ field: 'repositoryId', operator: 'EQUALS', value: 'repo' }],
-      actions: [{ type: 'MOVE_TASK' as const, config: { targetColumnId: columnId } }],
+      trigger: { type: 'TASK_STALE' as const, config: { days: 7 } },
+      conditions: [],
+      actions: [
+        {
+          type: 'CREATE_NOTIFICATION' as const,
+          config: { recipientSelector: 'PROJECT_OWNER' },
+        },
+      ],
     });
 
     try {
-      const createdA = await service.create(rule(projectA, ownerA, columnA, 'A'));
-      const createdB = await service.create(rule(projectB, ownerB, columnB, 'B'));
+      const createdA = await service.create(rule(projectA, ownerA, 'A'));
+      const createdB = await service.create(rule(projectB, ownerB, 'B'));
       const updatedA = await service.update({
-        ...rule(projectA, ownerA, columnA, 'A editada'),
+        ...rule(projectA, ownerA, 'A editada'),
         id: createdA.id,
       });
 
