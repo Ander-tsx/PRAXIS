@@ -1,6 +1,5 @@
 import { GlobalRoleBadges, alpha, colors } from '@praxis/commons';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 
 export interface DashboardHeroProps {
   /** Nombre completo. Vacío en cuentas recién creadas. */
@@ -10,8 +9,6 @@ export interface DashboardHeroProps {
   roles: string[];
   /** La frase de estado, ya construida. Ver `resumenDelDia`. */
   resumen: string;
-  /** La acción principal de la pantalla: crear un proyecto. */
-  accionSlot?: ReactNode;
 }
 
 /**
@@ -35,7 +32,7 @@ export interface DashboardHeroProps {
  * lo que cuesta. El saludo se queda sin reloj y el sitio que iba a ocupar lo
  * usa `resumen`, que dice algo que sí depende de datos.
  */
-export function DashboardHero({ name, email, roles, resumen, accionSlot }: DashboardHeroProps) {
+export function DashboardHero({ name, email, roles, resumen }: DashboardHeroProps) {
   const tieneNombre = name.trim().length > 0;
 
   return (
@@ -52,8 +49,6 @@ export function DashboardHero({ name, email, roles, resumen, accionSlot }: Dashb
 
           <p className="font-serif text-lg italic text-text-secondary">{resumen}</p>
         </div>
-
-        {accionSlot && <div className="flex shrink-0 items-center gap-3">{accionSlot}</div>}
       </div>
 
       {!tieneNombre && (

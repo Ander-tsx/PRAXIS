@@ -299,19 +299,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
             invitaciones: invitations.length,
             proyectos: projects.length,
           })}
-          /* La acción principal solo cuando ya hay algo: sin proyectos, quien
-             invita a crear el primero es `DashboardEmptyState`, con su botón
-             grande y su explicación. Dos botones de crear en la misma pantalla
-             vacía compiten entre sí. */
-          accionSlot={
-            projects.length > 0 ? (
-              <CreateProjectSlideOver
-                action={createProjectAction}
-                borradorAction={borradorDePlantillaAction}
-                aplicarAction={crearProyectoDesdePlantillaAction}
-              />
-            ) : undefined
-          }
         />
 
         {/* Antes que nada: es lo único que espera una decisión, y el único
