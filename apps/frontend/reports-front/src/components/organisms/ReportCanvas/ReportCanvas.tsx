@@ -1,5 +1,6 @@
 'use client';
 
+import { Desplegable } from '@/components/molecules/Desplegable';
 import {
   CATALOGO,
   type EspecificacionGrafico,
@@ -8,7 +9,6 @@ import {
   nuevoWidget,
   tiposYaPuestos,
 } from '@/lib/widgets';
-import { Desplegable } from '@/components/molecules/Desplegable';
 import { Button, alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';

@@ -102,6 +102,54 @@ export interface ReportWeekly {
 }
 
 /**
+ * Retrabajo, rotación de responsable y volatilidad de prioridad.
+ *
+ * Los tres salen de eventos que ya se guardaban y ningún informe miraba
+ * (`REOPENED`, `ASSIGNED`/`UNASSIGNED`, `PRIORITY_CHANGED`).
+ *
+ * ⚠️ **`desde` no es decorativo.** Es el primer evento capturado del proyecto, y
+ * sin él un 3 % de retrabajo se lee como una medida del proyecto entero cuando
+ * puede ser la de tres semanas. Quien pinte cualquiera de los tres tiene que
+ * poder decir desde cuándo se mide.
+ */
+export interface ReportDynamics {
+  desde: string | null;
+  retrabajo: {
+    cierres: number;
+    reaperturas: number;
+    tareasCerradas: number;
+    tareasReabiertas: number;
+    /** Tareas reabiertas sobre tareas cerradas. `null` si no se cerró ninguna. */
+    porcentaje: number | null;
+    porColumna: {
+      columnId: string | null;
+      count: number;
+      name: string;
+      color: string | null;
+      board?: string | null;
+    }[];
+    top: { taskId: string; titulo: string; veces: number }[];
+  };
+  rotacion: {
+    asignaciones: number;
+    desasignaciones: number;
+    /** Tareas que pasaron por **más de una** mano. */
+    tareasQueRotan: number;
+    /** Histograma. La última fila acumula «N o más». */
+    distribucion: { manos: number; tareas: number }[];
+    top: { taskId: string; titulo: string; manos: number; movimientos: number }[];
+  };
+  volatilidad: {
+    cambios: number;
+    tareasVolatiles: number;
+    distribucion: { cambios: number; tareas: number }[];
+    /** De qué prioridad a cuál. Como mucho 4×4 filas. */
+    matriz: { desde: string; hasta: string; count: number }[];
+    top: { taskId: string; titulo: string; cambios: number }[];
+  };
+}
+
+/**
  * Del token de color del sistema al color real.
  *
  * Las columnas y las etiquetas guardan un token (`primary`, `success`…), no un

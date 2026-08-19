@@ -60,6 +60,17 @@ export class ReportsController {
   }
 
   /**
+   * Retrabajo, rotación de responsable y volatilidad de prioridad.
+   *
+   * Sin `days`: acota con `from`/`to` como el resto, y su defecto es todo el
+   * historial capturado. Ver `ReportsService.dynamics`.
+   */
+  @MessagePattern({ cmd: 'report_dynamics' })
+  dynamics(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.reports.dynamics(dto.projectId, dto.filtros);
+  }
+
+  /**
    * Varios informes en una respuesta. Ver `ReportsService.bundle`.
    *
    * ⚠️ `incluir` llega **ya validado** contra el conjunto cerrado por el DTO del

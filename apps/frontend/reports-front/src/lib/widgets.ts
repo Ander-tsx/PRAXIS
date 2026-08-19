@@ -38,6 +38,7 @@ export const TIPOS_WIDGET = [
   'ciclo',
   'prediccion',
   'personas',
+  'dinamica',
   'generado',
 ] as const;
 
@@ -57,7 +58,11 @@ export type Metrica =
   | 'paradas_por_columna'
   | 'flujo_por_columna'
   | 'cierres_por_semana'
-  | 'creadas_por_semana';
+  | 'creadas_por_semana'
+  | 'reaperturas_por_columna'
+  | 'rotacion_por_tarea'
+  | 'volatilidad_por_tarea'
+  | 'cambios_de_prioridad';
 
 /** La parametrización de un gráfico a medida. Espejo de `ReportChartSpec`. */
 export interface EspecificacionGrafico {
@@ -90,7 +95,15 @@ export interface Widget {
  * eso. Quien tenga puesta la instantánea y nada más no paga el recorrido del
  * historial que necesitan los tiempos y la predicción.
  */
-export type Informe = 'snapshot' | 'flow' | 'cycle' | 'forecast' | 'people' | 'blocked' | 'weekly';
+export type Informe =
+  | 'snapshot'
+  | 'flow'
+  | 'cycle'
+  | 'forecast'
+  | 'people'
+  | 'blocked'
+  | 'weekly'
+  | 'dynamics';
 
 export interface EntradaDelCatalogo {
   titulo: string;
@@ -213,6 +226,18 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
     minH: 6,
     repetible: false,
   },
+  dinamica: {
+    titulo: 'Retrabajo, rotación y volatilidad',
+    vista: 'cifras',
+    descripcion:
+      'Cuánto de lo cerrado se vuelve a abrir, por cuántas manos pasa una tarea y cuánto baila su prioridad.',
+    informes: ['dynamics'],
+    w: 12,
+    h: 6,
+    minW: 6,
+    minH: 5,
+    repetible: false,
+  },
   generado: {
     titulo: 'Grafo a medida',
     vista: 'barras',
@@ -244,6 +269,10 @@ export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
   flujo_por_columna: 'flow',
   cierres_por_semana: 'weekly',
   creadas_por_semana: 'weekly',
+  reaperturas_por_columna: 'dynamics',
+  rotacion_por_tarea: 'dynamics',
+  volatilidad_por_tarea: 'dynamics',
+  cambios_de_prioridad: 'dynamics',
 };
 
 export function informesNecesarios(widgets: Widget[]): Set<Informe> {
@@ -492,6 +521,39 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     aceptaTopN: false,
     etiqueta: 'Tareas creadas por semana',
     descripcion: 'Cuánto trabajo entra. Con lo anterior, si el tablero crece.',
+  },
+  /* ─── Los tres de R9.1: eventos que ya se guardaban y nadie miraba ────── */
+  reaperturas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Reaperturas por columna',
+    descripcion: 'A dónde vuelve lo que se dio por cerrado.',
+  },
+  rotacion_por_tarea: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Manos por las que pasa una tarea',
+    descripcion: 'Cuántas tareas pasaron por una persona, por dos, por tres…',
+  },
+  volatilidad_por_tarea: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cambios de prioridad por tarea',
+    descripcion: 'Cuántas veces se le cambia la prioridad a una misma tarea.',
+  },
+  cambios_de_prioridad: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Hacia qué prioridad se mueve el trabajo',
+    descripcion: 'A qué prioridad acaban llegando las tareas cuando se les cambia.',
   },
 };
 

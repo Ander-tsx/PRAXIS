@@ -4,6 +4,7 @@ import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
   type ReportCycleTime,
+  type ReportDynamics,
   type ReportFlow,
   type ReportForecast,
   type ReportPerson,
@@ -398,6 +399,153 @@ export function PersonasWidget({
           columna «cerradas».
         </p>
       </HowToRead>
+    </div>
+  );
+}
+
+/* ─── Retrabajo, rotación y volatilidad ────────────────────────────────── */
+
+/**
+ * Los tres números que salían de eventos que ya se guardaban y **no miraba
+ * nadie**: `REOPENED`, `ASSIGNED`/`UNASSIGNED` y `PRIORITY_CHANGED`.
+ *
+ * ## Por qué los tres en una tarjeta
+ *
+ * Porque contestan a la misma pregunta desde tres sitios: **cuánto de este
+ * trabajo es volver sobre lo hecho**. Una tarea que se reabre, otra que pasa por
+ * cuatro manos y otra a la que le cambian la prioridad tres veces son el mismo
+ * síntoma —algo no estaba definido cuando se empezó— y separarlas en tres
+ * tarjetas obligaría a ponerlas juntas a mano para poder leerlo.
+ *
+ * ## ⚠️ Y por qué cada cifra lleva su lista de tareas debajo
+ *
+ * Un «12 % de retrabajo» no se puede accionar. «Estas tres tareas se han
+ * reabierto cuatro veces» sí. Es la misma decisión que ya tomó el inventario del
+ * asistente: un número agregado sin los objetos que lo componen obliga a
+ * adivinar dónde mirar.
+ *
+ * ## ⚠️ El aviso de «desde cuándo» no es opcional
+ *
+ * Todo esto empieza donde empieza la captura del historial (§25). Un 0 % de
+ * retrabajo puede ser un equipo impecable o dos semanas de datos, y el número no
+ * distingue. Por eso `desde` se pinta siempre que existe.
+ */
+export function DinamicaWidget({ dynamics }: { dynamics: ReportDynamics }) {
+  const { retrabajo, rotacion, volatilidad } = dynamics;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <BloqueDinamica
+          value={retrabajo.porcentaje === null ? '—' : `${Math.round(retrabajo.porcentaje)}%`}
+          label="Retrabajo"
+          tone={retrabajo.porcentaje !== null && retrabajo.porcentaje >= 15 ? 'warning' : 'muted'}
+          detalle={
+            retrabajo.tareasCerradas === 0
+              ? 'Todavía no se ha cerrado ninguna tarea con historial.'
+              : `${retrabajo.tareasReabiertas} de ${retrabajo.tareasCerradas} tareas cerradas se volvieron a abrir.`
+          }
+          filas={retrabajo.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.veces}×`,
+          }))}
+        />
+
+        <BloqueDinamica
+          value={rotacion.tareasQueRotan}
+          label="Tareas que rotan"
+          tone={rotacion.tareasQueRotan > 0 ? 'warning' : 'muted'}
+          detalle={`Pasaron por más de una persona. ${rotacion.asignaciones} asignaciones y ${rotacion.desasignaciones} retiradas en total.`}
+          filas={rotacion.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.manos} personas`,
+          }))}
+        />
+
+        <BloqueDinamica
+          value={volatilidad.tareasVolatiles}
+          label="Prioridad inestable"
+          tone={volatilidad.tareasVolatiles > 0 ? 'warning' : 'muted'}
+          detalle={`Tareas con más de un cambio de prioridad, sobre ${volatilidad.cambios} cambios registrados.`}
+          filas={volatilidad.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.cambios} cambios`,
+          }))}
+        />
+      </div>
+
+      {dynamics.desde && (
+        <p className="font-sans text-xs text-text-disabled">
+          Se mide desde el {new Date(dynamics.desde).toLocaleDateString('es-ES')}, que es cuando
+          empieza el historial de este proyecto. Lo anterior no está registrado y no se puede
+          reconstruir.
+        </p>
+      )}
+
+      <HowToRead>
+        <p>
+          <strong>Retrabajo</strong> es qué porcentaje de las tareas cerradas se volvió a abrir. No
+          es un error en sí: significa que lo que se dio por terminado no lo estaba, y suele apuntar
+          a que falta acordar cuándo algo está hecho.
+        </p>
+        <p>
+          <strong>Rotación</strong> cuenta personas distintas, no veces: asignar y quitar a la misma
+          persona tres veces sigue siendo una. Una tarea que pasa por cuatro manos casi nunca es un
+          problema de personas, es una tarea mal definida.
+        </p>
+        <p>
+          <strong>Prioridad inestable</strong> son las tareas a las que se les cambió la prioridad
+          más de una vez. Con muchas, la prioridad ha dejado de ser una decisión y se ha convertido
+          en una reacción.
+        </p>
+        <p>
+          Los tres se calculan sobre <strong>eventos que ya se guardaban</strong>: no se ha empezado
+          a registrar nada nuevo para esto, así que llegan hasta donde llegue el historial.
+        </p>
+      </HowToRead>
+    </div>
+  );
+}
+
+/** Una de las tres columnas: la cifra, la frase y hasta tres tareas. */
+function BloqueDinamica({
+  value,
+  label,
+  tone,
+  detalle,
+  filas,
+}: {
+  value: number | string;
+  label: string;
+  tone: 'warning' | 'muted';
+  detalle: string;
+  filas: { id: string; titulo: string; cifra: string }[];
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Stat value={value} label={label} tone={tone} />
+      <p className="font-sans text-xs leading-relaxed text-text-secondary">{detalle}</p>
+      {filas.length > 0 && (
+        /* Tres y no diez: la tarjeta tiene que caber en su celda de la
+           cuadrícula, y quien quiera la lista entera la tiene en el tablero.
+           El servidor devuelve diez porque el mismo agregado alimenta al
+           asistente, que sí las usa todas. */
+        <ul className="flex flex-col gap-1">
+          {filas.slice(0, 3).map((fila) => (
+            <li key={fila.id} className="flex items-baseline justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate font-sans text-text-secondary" title={fila.titulo}>
+                {fila.titulo}
+              </span>
+              <span className="shrink-0 tabular-nums font-sans text-text-disabled">
+                {fila.cifra}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -264,6 +264,17 @@ export class TasksController {
     return this.statsService.portfolio(dto.projectIds ?? [], dto.dias);
   }
 
+  /**
+   * Retrabajo, rotación de responsable y volatilidad de prioridad.
+   *
+   * Los tres salen de `task_events` y de nada más: no se captura ningún evento
+   * nuevo para esto. Ver `StatsService.dynamics`.
+   */
+  @MessagePattern({ cmd: 'task_stats_dynamics' })
+  statsDynamics(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.dynamics(dto.projectId, dto.filtros);
+  }
+
   @MessagePattern({ cmd: 'task_stats_stale' })
   statsStale(
     @Payload() dto: { projectId: string; dias?: number; limite?: number; filtros?: ReportFilters },

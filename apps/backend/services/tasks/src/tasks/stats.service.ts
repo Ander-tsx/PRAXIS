@@ -28,6 +28,27 @@ const ACTOR_SINTETICO = '00000000-0000-0000-0000-000000000000';
 const LIMITE_INVENTARIO = 500;
 
 /**
+ * Cuántas tareas salen en los `top` de la dinámica del trabajo.
+ *
+ * Son listas para leer, no un listado: diez caben en una tarjeta y se repasan
+ * de un vistazo. Quien quiera las demás tiene el tablero, que es donde se
+ * actúa sobre una tarea.
+ */
+const TOP_DINAMICA = 10;
+
+/**
+ * Dónde se corta el histograma de manos por tarea.
+ *
+ * La última barra acumula «5 o más». Sin tope, una tarea que pasó por doce
+ * personas estira el eje hasta hacer ilegible el resto de la distribución, que
+ * es donde está la información.
+ */
+const MAX_MANOS = 5;
+
+/** Lo mismo para los cambios de prioridad de una misma tarea. */
+const MAX_CAMBIOS = 5;
+
+/**
  * El techo **real** del inventario, en caracteres de JSON.
  *
  * ## Por qué un presupuesto y no un número de tareas
@@ -973,5 +994,275 @@ export class StatsService {
        GROUP BY a."userId", l.id, l.name
        ORDER BY cerradas DESC
     `;
+  }
+
+  /**
+   * Lo que el historial ya guardaba y ningún informe miraba: **retrabajo,
+   * rotación de responsable y volatilidad de prioridad**.
+   *
+   * ## Por qué los tres juntos y no tres informes
+   *
+   * Los tres salen de `task_events` acotando por `type`, con el mismo `WHERE` de
+   * proyecto y los mismos filtros. Separarlos habría multiplicado por tres el
+   * andamiaje —tres comandos, tres rutas, tres entradas de caché, tres
+   * resoluciones de permisos si alguien los pide sueltos— para tres agregados
+   * que se leen juntos: los tres contestan a «¿cuánto de este trabajo es volver
+   * sobre lo hecho?».
+   *
+   * Y es el mismo argumento del paquete de R4.2, aplicado un nivel más abajo.
+   *
+   * ## ⚠️ Ninguno mide gente, y el desglose por persona no está aquí a propósito
+   *
+   * «Quién reabre más» y «a quién le cambian más la prioridad» son dos números
+   * que se leen como una nota, y este servicio ya tiene la decisión tomada para
+   * el reparto por persona: se enseña como reparto, nunca como clasificación.
+   * Los `top` de aquí abajo son **de tareas**, que es donde está lo accionable —
+   * una tarea que ha pasado por cuatro manos tiene un problema de definición, no
+   * de personas.
+   *
+   * ## ⚠️ Todo esto empieza donde empieza el historial
+   *
+   * Lo anterior a `task_events` no existe y no se puede reconstruir (§25). Un
+   * porcentaje de retrabajo calculado sobre dos semanas de captura en un
+   * proyecto de un año no es «bajo»: es que no se estaba mirando. Quien lo pinte
+   * tiene que decirlo, y por eso la respuesta trae `desde` —el primer evento del
+   * proyecto— en vez de dejar que la pantalla lo suponga.
+   */
+  async dynamics(projectId: string, filtros?: ReportFilters) {
+    const [
+      retrabajo,
+      reaperturasPorColumna,
+      topReabiertas,
+      rotacion,
+      topRotacion,
+      matrizPrioridad,
+      volatilidad,
+      topVolatilidad,
+      desde,
+    ] = await Promise.all([
+      /* Cierres y reaperturas en el mismo recorrido: es un `FILTER` sobre el
+         mismo índice `(projectId, type, occurredAt)`, no dos consultas. */
+      this.prisma.$queryRaw<
+        {
+          cierres: number;
+          reaperturas: number;
+          tareasCerradas: number;
+          tareasReabiertas: number;
+        }[]
+      >`
+        SELECT COUNT(*) FILTER (WHERE e.type = 'COMPLETED')::int                  AS cierres,
+               COUNT(*) FILTER (WHERE e.type = 'REOPENED')::int                   AS reaperturas,
+               COUNT(DISTINCT e."taskId") FILTER (WHERE e.type = 'COMPLETED')::int AS "tareasCerradas",
+               COUNT(DISTINCT e."taskId") FILTER (WHERE e.type = 'REOPENED')::int  AS "tareasReabiertas"
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type IN ('COMPLETED', 'REOPENED')
+           ${andDeEvento(filtros, 'e')}
+      `,
+
+      /* A dónde vuelve lo reabierto. `toColumnId` y no `fromColumnId`: el
+         origen de un REOPENED es siempre una columna de cierre —es la
+         definición del evento— así que agrupar por él daría una sola barra. */
+      this.prisma.$queryRaw<{ columnId: string | null; count: number }[]>`
+        SELECT e."toColumnId" AS "columnId",
+               COUNT(*)::int  AS count
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type = 'REOPENED'
+           ${andDeEvento(filtros, 'e')}
+         GROUP BY e."toColumnId"
+         ORDER BY count DESC
+      `,
+
+      this.prisma.$queryRaw<{ taskId: string; titulo: string; veces: number }[]>`
+        SELECT e."taskId",
+               MAX(e."taskTitle") AS titulo,
+               COUNT(*)::int      AS veces
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type = 'REOPENED'
+           ${andDeEvento(filtros, 'e')}
+         GROUP BY e."taskId"
+         ORDER BY veces DESC, titulo ASC
+         LIMIT ${TOP_DINAMICA}::int
+      `,
+
+      /**
+       * Rotación: cuántas **manos distintas** ha tocado cada tarea.
+       *
+       * ⚠️ `manos` cuenta `subjectId` distintos de los `ASSIGNED`, no eventos:
+       * asignar y desasignar a la misma persona tres veces es una mano, no seis.
+       * Los movimientos se cuentan aparte porque miden otra cosa —el trasiego—
+       * y las dos preguntas son legítimas.
+       *
+       * El histograma se agrupa **en SQL y con tope**: sin el `LEAST` esto
+       * devolvería una fila por tarea del proyecto, que es justo el recorrido
+       * que estos informes evitan.
+       */
+      this.prisma.$queryRaw<
+        { manos: number; tareas: number; asignaciones: number; desasignaciones: number }[]
+      >`
+        WITH por_tarea AS (
+          SELECT e."taskId",
+                 COUNT(*) FILTER (WHERE e.type = 'ASSIGNED')::int            AS asignaciones,
+                 COUNT(*) FILTER (WHERE e.type = 'UNASSIGNED')::int          AS desasignaciones,
+                 COUNT(DISTINCT e."subjectId")
+                   FILTER (WHERE e.type = 'ASSIGNED')::int                   AS manos
+            FROM tasks.task_events e
+           WHERE e."projectId" = ${projectId}::text
+             AND e.type IN ('ASSIGNED', 'UNASSIGNED')
+             ${andDeEvento(filtros, 'e')}
+           GROUP BY e."taskId"
+        )
+        SELECT LEAST(manos, ${MAX_MANOS}::int)::int AS manos,
+               COUNT(*)::int                        AS tareas,
+               SUM(asignaciones)::int               AS asignaciones,
+               SUM(desasignaciones)::int            AS desasignaciones
+          FROM por_tarea
+         GROUP BY LEAST(manos, ${MAX_MANOS}::int)
+         ORDER BY 1
+      `,
+
+      this.prisma.$queryRaw<
+        { taskId: string; titulo: string; manos: number; movimientos: number }[]
+      >`
+        SELECT e."taskId",
+               MAX(e."taskTitle") AS titulo,
+               COUNT(DISTINCT e."subjectId") FILTER (WHERE e.type = 'ASSIGNED')::int AS manos,
+               COUNT(*)::int                                                          AS movimientos
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type IN ('ASSIGNED', 'UNASSIGNED')
+           ${andDeEvento(filtros, 'e')}
+         GROUP BY e."taskId"
+        HAVING COUNT(DISTINCT e."subjectId") FILTER (WHERE e.type = 'ASSIGNED') > 1
+         ORDER BY manos DESC, movimientos DESC, titulo ASC
+         LIMIT ${TOP_DINAMICA}::int
+      `,
+
+      /**
+       * La matriz de prioridad: de qué a qué.
+       *
+       * Son 16 filas como mucho —cuatro prioridades por cuatro— así que sale
+       * entera y quien la pinte decide si la enseña como mapa de calor o la
+       * suma en subidas y bajadas. Agregarla aquí a «subidas/bajadas» habría
+       * tirado la información que hace útil el dato: pasar de BAJA a URGENTE no
+       * es lo mismo que de ALTA a URGENTE, y las dos son «una subida».
+       */
+      this.prisma.$queryRaw<{ desde: string; hasta: string; count: number }[]>`
+        SELECT e."fromPriority"::text AS desde,
+               e."toPriority"::text   AS hasta,
+               COUNT(*)::int          AS count
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type = 'PRIORITY_CHANGED'
+           AND e."fromPriority" IS NOT NULL
+           AND e."toPriority" IS NOT NULL
+           ${andDeEvento(filtros, 'e')}
+         GROUP BY 1, 2
+      `,
+
+      this.prisma.$queryRaw<{ cambios: number; tareas: number }[]>`
+        WITH por_tarea AS (
+          SELECT e."taskId", COUNT(*)::int AS cambios
+            FROM tasks.task_events e
+           WHERE e."projectId" = ${projectId}::text
+             AND e.type = 'PRIORITY_CHANGED'
+             ${andDeEvento(filtros, 'e')}
+           GROUP BY e."taskId"
+        )
+        SELECT LEAST(cambios, ${MAX_CAMBIOS}::int)::int AS cambios,
+               COUNT(*)::int                            AS tareas
+          FROM por_tarea
+         GROUP BY LEAST(cambios, ${MAX_CAMBIOS}::int)
+         ORDER BY 1
+      `,
+
+      this.prisma.$queryRaw<{ taskId: string; titulo: string; cambios: number }[]>`
+        SELECT e."taskId",
+               MAX(e."taskTitle") AS titulo,
+               COUNT(*)::int      AS cambios
+          FROM tasks.task_events e
+         WHERE e."projectId" = ${projectId}::text
+           AND e.type = 'PRIORITY_CHANGED'
+           ${andDeEvento(filtros, 'e')}
+         GROUP BY e."taskId"
+        HAVING COUNT(*) > 1
+         ORDER BY cambios DESC, titulo ASC
+         LIMIT ${TOP_DINAMICA}::int
+      `,
+
+      /* El primer evento del proyecto, **sin filtros**: es una propiedad de la
+         captura, no de las tareas que se estén mirando. Con los filtros puestos
+         diría «desde el martes» solo porque el tramo empieza el martes, que es
+         exactamente el aviso al revés. */
+      this.prisma.taskEvent.findFirst({
+        where: { projectId },
+        orderBy: { occurredAt: 'asc' },
+        select: { occurredAt: true },
+      }),
+    ]);
+
+    const cifras = retrabajo[0] ?? {
+      cierres: 0,
+      reaperturas: 0,
+      tareasCerradas: 0,
+      tareasReabiertas: 0,
+    };
+
+    const asignaciones = rotacion.reduce((suma, fila) => suma + fila.asignaciones, 0);
+    const desasignaciones = rotacion.reduce((suma, fila) => suma + fila.desasignaciones, 0);
+    /* «Rotación» es haber pasado por más de una mano. Una tarea asignada una vez
+       y nunca más no rota: es el caso normal, y meterla en el número lo dejaría
+       diciendo «cuántas tareas se asignaron alguna vez». */
+    const tareasQueRotan = rotacion
+      .filter((fila) => fila.manos > 1)
+      .reduce((suma, fila) => suma + fila.tareas, 0);
+
+    const cambios = volatilidad.reduce((suma, fila) => suma + fila.cambios * fila.tareas, 0);
+    const tareasVolatiles = volatilidad
+      .filter((fila) => fila.cambios > 1)
+      .reduce((suma, fila) => suma + fila.tareas, 0);
+
+    return {
+      /** Cuándo empieza lo que se puede medir. `null` = no hay ni un evento. */
+      desde: desde?.occurredAt ?? null,
+
+      retrabajo: {
+        ...cifras,
+        /**
+         * Sobre **tareas**, no sobre eventos: reabrir tres veces la misma tarea
+         * es un problema de una tarea, y dividir reaperturas entre cierres podría
+         * pasar del 100 % sin que nada esté mal, que es la clase de número que
+         * se lee como un fallo del informe.
+         *
+         * `null` y no cero cuando no hay nada cerrado: un 0 % de retrabajo sobre
+         * cero cierres se lee como «vamos perfectos».
+         */
+        porcentaje:
+          cifras.tareasCerradas > 0
+            ? (cifras.tareasReabiertas / cifras.tareasCerradas) * 100
+            : null,
+        porColumna: reaperturasPorColumna,
+        top: topReabiertas,
+      },
+
+      rotacion: {
+        asignaciones,
+        desasignaciones,
+        tareasQueRotan,
+        /* Una fila por número de manos, con la última acumulando «N o más». */
+        distribucion: rotacion.map((fila) => ({ manos: fila.manos, tareas: fila.tareas })),
+        top: topRotacion,
+      },
+
+      volatilidad: {
+        cambios,
+        tareasVolatiles,
+        distribucion: volatilidad,
+        matriz: matrizPrioridad,
+        top: topVolatilidad,
+      },
+    };
   }
 }

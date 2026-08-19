@@ -1,7 +1,9 @@
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
+import { AnalysisFilters } from '@/components/organisms/AnalysisFilters';
 import { GeneratedChart } from '@/components/organisms/Charts';
 import {
   CicloWidget,
+  DinamicaWidget,
   FlujoWidget,
   PersonasWidget,
   PorColumnaWidget,
@@ -10,12 +12,12 @@ import {
   ResumenWidget,
   TiemposWidget,
 } from '@/components/organisms/ReportWidgets';
-import { AnalysisFilters } from '@/components/organisms/AnalysisFilters';
 import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
 import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
 import {
   type ReportBlocked,
   type ReportCycleTime,
+  type ReportDynamics,
   type ReportFlow,
   type ReportForecast,
   type ReportPerson,
@@ -355,6 +357,7 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
   const people = (informes.people ?? null) as ReportPerson[] | null;
   const blocked = (informes.blocked ?? null) as ReportBlocked | null;
   const weekly = (informes.weekly ?? null) as ReportWeekly | null;
+  const dynamics = (informes.dynamics ?? null) as ReportDynamics | null;
 
   /**
    * Los perfiles de quienes salen en esta pantalla, en **una** petición.
@@ -427,11 +430,13 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
         ) : (
           <NoDisponible />
         );
+      case 'dinamica':
+        return dynamics ? <DinamicaWidget dynamics={dynamics} /> : <NoDisponible />;
       case 'generado': {
         if (!widget.grafico) return <NoDisponible />;
         const datos = construirDatos(
           widget.grafico,
-          { snapshot, people, blocked, flow, weekly },
+          { snapshot, people, blocked, flow, weekly, dynamics },
           { personas: nombres, etiquetas: nombresDeEtiquetas },
         );
         /* El aviso de la semana a medias viaja con el gráfico, no dentro de
@@ -620,6 +625,7 @@ const PARTE_DE_INFORME: Record<Informe, string> = {
   people: 'people',
   blocked: 'blocked',
   weekly: 'weekly',
+  dynamics: 'dynamics',
 };
 
 /** El informe de este gráfico no se pudo leer. Los demás siguen en pie. */

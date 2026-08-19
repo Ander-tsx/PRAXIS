@@ -305,6 +305,43 @@ export class ReportsController {
   }
 
   /**
+   * Retrabajo, rotación de responsable y volatilidad de prioridad.
+   *
+   * ## Los tres salen de eventos que ya se guardaban
+   *
+   * `TaskEvent` tiene ocho tipos y los informes usaban tres. Aquí se leen
+   * `REOPENED`, `ASSIGNED`/`UNASSIGNED` y `PRIORITY_CHANGED`, que estaban
+   * capturados desde el principio y no los miraba nadie. **No se captura nada
+   * nuevo**: es la misma tabla con otra pregunta.
+   *
+   * ⚠️ **Sin `days`, y no es un olvido.** Los otros lo usan como ventana móvil
+   * —«los últimos 60 días»— y aquí la pregunta no es esa: el retrabajo de un
+   * proyecto es el de todo lo que se ha podido medir. Quien quiera acotar un
+   * sprint tiene `from`/`to`, que es lo que sirve para eso.
+   *
+   * ⚠️ Pide `canViewReports` como el resto. Los `top` nombran **tareas**, nunca
+   * personas: ver `StatsService.dynamics`, donde está por qué.
+   */
+  @Get('dynamics')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Retrabajo, rotación de responsable y volatilidad de prioridad' })
+  @ApiResponse({
+    status: 200,
+    description: '`desde` es el primer evento capturado: antes de eso no hay nada que medir',
+  })
+  dynamics(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: ReportFiltersQueryDto,
+  ) {
+    return firstValueFrom(
+      this.reportsClient.send(
+        { cmd: 'report_dynamics' },
+        { projectId, filtros: this.filtros(query) },
+      ),
+    );
+  }
+
+  /**
    * Carga y flujo por persona.
    *
    * El único que pide `canViewReports`. Se enseña como reparto, no como

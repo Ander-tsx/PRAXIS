@@ -434,6 +434,84 @@ export class ReportsService {
   }
 
   /**
+   * Retrabajo, rotación y volatilidad: **lo que ya estaba guardado y no se
+   * miraba**.
+   *
+   * `TaskEvent` tiene ocho tipos y los informes usaban tres —`CREATED`, `MOVED`,
+   * `COMPLETED`—. Este agrega los otros tres que dicen algo: `REOPENED` (volver
+   * sobre lo hecho), `ASSIGNED`/`UNASSIGNED` (por cuántas manos pasa una tarea)
+   * y `PRIORITY_CHANGED` (cuánto baila lo que se pide). **No captura nada
+   * nuevo**: es la misma tabla leída con otra pregunta.
+   *
+   * ## ⚠️ Los tres empiezan donde empieza la captura, y hay que decirlo
+   *
+   * Un 4 % de retrabajo sobre dos semanas de historial en un proyecto de un año
+   * no es un 4 %: es lo que se ha podido ver. La respuesta trae `desde` —el
+   * primer evento del proyecto, sin filtrar— justo para que la pantalla lo diga
+   * en vez de dejar que se lea como una medida completa. Es la misma regla del
+   * recorte mudo, aplicada al principio de la serie en vez de al final.
+   *
+   * ## Y `porColumna` se cruza aquí, como en todos los demás
+   *
+   * tasks-service devuelve `columnId` y nada más: las columnas viven en
+   * projects-service, y ponerles nombre y color es literalmente para lo que
+   * existe este servicio.
+   */
+  async dynamics(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:dynamics${claveDeFiltros(filtros)}`, async () => {
+      const [crudo, columns] = await Promise.all([
+        this.ask<{
+          desde: string | null;
+          retrabajo: {
+            cierres: number;
+            reaperturas: number;
+            tareasCerradas: number;
+            tareasReabiertas: number;
+            porcentaje: number | null;
+            porColumna: { columnId: string | null; count: number }[];
+            top: { taskId: string; titulo: string; veces: number }[];
+          };
+          rotacion: {
+            asignaciones: number;
+            desasignaciones: number;
+            tareasQueRotan: number;
+            distribucion: { manos: number; tareas: number }[];
+            top: { taskId: string; titulo: string; manos: number; movimientos: number }[];
+          };
+          volatilidad: {
+            cambios: number;
+            tareasVolatiles: number;
+            distribucion: { cambios: number; tareas: number }[];
+            matriz: { desde: string; hasta: string; count: number }[];
+            top: { taskId: string; titulo: string; cambios: number }[];
+          };
+        }>(this.tasksClient, 'task_stats_dynamics', { projectId, filtros }),
+        this.columnas(projectId),
+      ]);
+
+      const porId = new Map(columns.map((c) => [c.id, c]));
+
+      return {
+        ...crudo,
+        retrabajo: {
+          ...crudo.retrabajo,
+          porColumna: crudo.retrabajo.porColumna.map((fila) => ({
+            ...fila,
+            /* Una reapertura hacia una columna que ya no existe sigue siendo una
+               reapertura: se nombra y no se descarta, igual que en la
+               instantánea. */
+            name: fila.columnId
+              ? (porId.get(fila.columnId)?.name ?? 'Columna eliminada')
+              : 'Sin columna',
+            color: fila.columnId ? (porId.get(fila.columnId)?.color ?? null) : null,
+            board: fila.columnId ? (porId.get(fila.columnId)?.boardName ?? null) : null,
+          })),
+        },
+      };
+    });
+  }
+
+  /**
    * Varios agregados en una sola respuesta.
    *
    * ## Lo que se ahorra no es el cálculo, es el andamiaje
@@ -486,6 +564,9 @@ export class ReportsService {
        */
       blocked: () => this.blocked(projectId, undefined, filtros),
       weekly: () => this.weekly(projectId, weeks, filtros),
+      /* Sin `days`: no mira una ventana móvil sino todo el historial capturado,
+         y quien quiera acotarlo tiene `from`/`to` como en el resto. */
+      dynamics: () => this.dynamics(projectId, filtros),
     };
 
     const pedidos = incluir.filter((parte) => parte in calculos);

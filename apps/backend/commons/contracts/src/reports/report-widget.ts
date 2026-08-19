@@ -54,6 +54,8 @@ export enum ReportWidgetKind {
   PREDICCION = 'prediccion',
   /** Cómo está repartido el trabajo, por persona. */
   PERSONAS = 'personas',
+  /** Retrabajo, rotación de responsable y volatilidad de prioridad. */
+  DINAMICA = 'dinamica',
   /** El que elige y parametriza el asistente. Lleva `grafico`. */
   GENERADO = 'generado',
 }
@@ -95,6 +97,14 @@ export enum ReportMetric {
   CIERRES_POR_SEMANA = 'cierres_por_semana',
   /** `weekly.serie.creadas` — entradas por semana. */
   CREADAS_POR_SEMANA = 'creadas_por_semana',
+  /** `dynamics.retrabajo.porColumna` — a dónde vuelve lo que se dio por cerrado. */
+  REAPERTURAS_POR_COLUMNA = 'reaperturas_por_columna',
+  /** `dynamics.rotacion.distribucion` — por cuántas manos pasa una tarea. */
+  ROTACION_POR_TAREA = 'rotacion_por_tarea',
+  /** `dynamics.volatilidad.distribucion` — cuántas veces le cambian la prioridad. */
+  VOLATILIDAD_POR_TAREA = 'volatilidad_por_tarea',
+  /** `dynamics.volatilidad.matriz` — hacia qué prioridad se mueve el trabajo. */
+  CAMBIOS_DE_PRIORIDAD = 'cambios_de_prioridad',
 }
 
 /** Qué admite cada métrica. Lo aplica `validarGrafico`, no la buena voluntad. */
@@ -195,6 +205,37 @@ export const REPORT_METRICS: Record<ReportMetric, ReportMetricSpec> = {
     aceptaTopN: false,
     etiqueta: 'Tareas creadas por semana',
   },
+  /* ─── Los eventos que ya se guardaban y nadie miraba (R9.1) ───────────── */
+  [ReportMetric.REAPERTURAS_POR_COLUMNA]: {
+    formas: CATEGORICA,
+    /* El informe no mira una ventana móvil: acota con `from`/`to` como el
+       resto, y su defecto es todo el historial capturado. */
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Reaperturas por columna',
+  },
+  [ReportMetric.ROTACION_POR_TAREA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Manos por las que pasa una tarea',
+  },
+  [ReportMetric.VOLATILIDAD_POR_TAREA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cambios de prioridad por tarea',
+  },
+  [ReportMetric.CAMBIOS_DE_PRIORIDAD]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Hacia qué prioridad se mueve el trabajo',
+  },
 };
 
 /** La parametrización de un gráfico a medida. Solo la lleva `GENERADO`. */
@@ -240,6 +281,7 @@ export const REPORT_WIDGET_MIN: Record<ReportWidgetKind, { w: number; h: number 
   [ReportWidgetKind.CICLO]: { w: 3, h: 4 },
   [ReportWidgetKind.PREDICCION]: { w: 4, h: 5 },
   [ReportWidgetKind.PERSONAS]: { w: 6, h: 6 },
+  [ReportWidgetKind.DINAMICA]: { w: 6, h: 5 },
   [ReportWidgetKind.GENERADO]: { w: 3, h: 6 },
 };
 

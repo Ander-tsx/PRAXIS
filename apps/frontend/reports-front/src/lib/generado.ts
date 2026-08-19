@@ -3,6 +3,7 @@ import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
   type ReportBlocked,
+  type ReportDynamics,
   type ReportFlow,
   type ReportPerson,
   type ReportSnapshot,
@@ -69,6 +70,7 @@ export interface FuentesGeneradas {
   blocked?: ReportBlocked | null;
   flow?: ReportFlow | null;
   weekly?: ReportWeekly | null;
+  dynamics?: ReportDynamics | null;
 }
 
 /** `userId`/`labelId` → nombre. Lo resuelve la page, que es quien los pide. */
@@ -95,7 +97,29 @@ function construirCategorias(
   nombres: Nombres,
 ): DatosGenerados | null {
   const { metrica, topN } = grafico;
-  const conColorPropio = new Set<Metrica>(['tareas_por_columna', 'tareas_por_prioridad']);
+  /**
+   * Las que traen el color de la entidad: una columna del tablero y una
+   * prioridad se pintan del suyo o el gráfico deja de leerse como el tablero.
+   */
+  const conColorPropio = new Set<Metrica>([
+    'tareas_por_columna',
+    'tareas_por_prioridad',
+    'reaperturas_por_columna',
+    'cambios_de_prioridad',
+  ]);
+  /**
+   * Las que **no** se ordenan de mayor a menor.
+   *
+   * ⚠️ Antes esto era el mismo conjunto que el de arriba, y confundirlos rompe
+   * los histogramas: «1 mano, 2 manos, 3 manos» ordenado por tamaño sale
+   * «2, 1, 3» y deja de ser una distribución — pasa a ser un ranking de barras
+   * que se parece mucho a un histograma y no lo es. El orden **es** el dato.
+   */
+  const ordenNatural = new Set<Metrica>([
+    ...conColorPropio,
+    'rotacion_por_tarea',
+    'volatilidad_por_tarea',
+  ]);
 
   let crudas: Categoria[] | null = null;
   let unidad = 'tareas';
@@ -174,6 +198,62 @@ function construirCategorias(
       break;
     }
 
+    /* ─── Los tres de R9.1, todos sobre `dynamics` ────────────────────── */
+
+    case 'reaperturas_por_columna': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.retrabajo.porColumna.map((fila) => ({
+        name: fila.name,
+        value: fila.count,
+        color: tokenColor(fila.color),
+      }));
+      unidad = 'reaperturas';
+      break;
+    }
+
+    case 'rotacion_por_tarea': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.rotacion.distribucion.map((fila) => ({
+        name: etiquetaDeManos(fila.manos),
+        value: fila.tareas,
+        color: '',
+      }));
+      break;
+    }
+
+    case 'volatilidad_por_tarea': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.volatilidad.distribucion.map((fila) => ({
+        name: etiquetaDeCambios(fila.cambios),
+        value: fila.tareas,
+        color: '',
+      }));
+      break;
+    }
+
+    case 'cambios_de_prioridad': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      /* La matriz completa se suma por destino: «a qué prioridad acaba
+         llegando el trabajo». El origen no se pierde —viaja entero en
+         `matriz`— pero una barra por celda serían dieciséis barras para
+         contestar una pregunta de cuatro. */
+      const porDestino = new Map<string, number>();
+      for (const celda of dynamics.volatilidad.matriz) {
+        porDestino.set(celda.hasta, (porDestino.get(celda.hasta) ?? 0) + celda.count);
+      }
+      crudas = PRIORITY_ORDER.map((prioridad) => ({
+        name: ETIQUETA_PRIORIDAD[prioridad] ?? prioridad,
+        value: porDestino.get(prioridad) ?? 0,
+        color: PRIORITY_COLOR[prioridad] ?? '',
+      })).filter((fila) => fila.value > 0);
+      unidad = 'cambios';
+      break;
+    }
+
     default:
       return null;
   }
@@ -185,7 +265,7 @@ function construirCategorias(
   /* Las que traen color propio conservan su orden natural —el del tablero, el de
      la prioridad—; las demás se ordenan de mayor a menor, que es lo único que
      ordena una lista de nombres. */
-  const ordenadas = conColorPropio.has(metrica)
+  const ordenadas = ordenNatural.has(metrica)
     ? crudas
     : [...crudas].sort((a, b) => b.value - a.value);
 
@@ -235,6 +315,35 @@ function pintarPorOrden(categorias: Categoria[]): Categoria[] {
 }
 
 const COLOR_OTRAS = 'var(--color-text-disabled)';
+
+/**
+ * El rótulo de un tramo del histograma de manos.
+ *
+ * La última barra acumula «5 o más» (`MAX_MANOS` en tasks-service), y decirlo es
+ * obligatorio: una barra rotulada «5» sobre un tramo que también contiene las de
+ * doce manos es un recorte mudo, que es lo que este repositorio no hace.
+ */
+function etiquetaDeManos(manos: number): string {
+  if (manos === 0) return 'Sin responsable';
+  if (manos >= TOPE_HISTOGRAMA) return `${TOPE_HISTOGRAMA} o más`;
+  return manos === 1 ? '1 persona' : `${manos} personas`;
+}
+
+/** Lo mismo para los cambios de prioridad de una misma tarea. */
+function etiquetaDeCambios(cambios: number): string {
+  if (cambios >= TOPE_HISTOGRAMA) return `${TOPE_HISTOGRAMA} o más`;
+  return cambios === 1 ? '1 cambio' : `${cambios} cambios`;
+}
+
+/**
+ * Dónde corta el histograma. Espejo de `MAX_MANOS` y `MAX_CAMBIOS` en
+ * `tasks/stats.service.ts`, que son el mismo número por ahora.
+ *
+ * ⚠️ Si allí cambia y aquí no, el rótulo dice «5 o más» sobre un tramo que ya
+ * no es ese. No da ningún error: da una etiqueta equivocada sobre una barra
+ * correcta.
+ */
+const TOPE_HISTOGRAMA = 5;
 
 const ETIQUETA_PRIORIDAD: Record<string, string> = {
   URGENT: 'Urgente',

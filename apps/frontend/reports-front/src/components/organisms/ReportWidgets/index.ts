@@ -1,5 +1,6 @@
 export {
   CicloWidget,
+  DinamicaWidget,
   FlujoWidget,
   PersonasWidget,
   PorColumnaWidget,

@@ -33,6 +33,12 @@ export const REPORT_BUNDLE_PARTS = [
   'people',
   'blocked',
   'weekly',
+  /**
+   * Retrabajo, rotación y volatilidad. Entra en el paquete como los demás: es
+   * un informe más del lienzo y pedirlo aparte habría costado otra resolución
+   * de permisos para pintar la misma pantalla.
+   */
+  'dynamics',
 ] as const;
 
 export type ReportBundlePart = (typeof REPORT_BUNDLE_PARTS)[number];
