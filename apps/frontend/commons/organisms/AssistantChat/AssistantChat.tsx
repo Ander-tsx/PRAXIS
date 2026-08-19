@@ -472,15 +472,25 @@ export function AssistantChat({
   const agotada = cuota !== null && cuota.usados >= cuota.limite;
 
   /**
-   * Al fondo con cada turno: en un hilo, lo último es lo que importa.
+   * Al fondo: en un hilo, lo último es lo que importa.
    *
+   * Suelto de su `useEffect` porque tiene **dos disparadores** y ninguno sabe
+   * del otro: cada turno, y cada paso que descubre `FlujoDePensamiento`. Los
+   * pasos crecen hacia abajo mientras el hilo está quieto, así que sin esto el
+   * tercero acaba escrito por debajo del borde y parece que no pasa nada.
+   */
+  const irAlFondo = useCallback(() => {
+    hiloRef.current?.scrollTo({ top: hiloRef.current.scrollHeight, behavior: 'smooth' });
+  }, []);
+
+  /**
    * Depende de la **longitud** y no del array: las tarjetas de propuesta guardan
    * su propio estado, y reaccionar al contenido volvería a bajar el hilo cada
    * vez que alguien acepta una, justo cuando está leyendo el resultado.
    */
   useEffect(() => {
-    hiloRef.current?.scrollTo({ top: hiloRef.current.scrollHeight, behavior: 'smooth' });
-  }, [mensajes.length, pendiente]);
+    irAlFondo();
+  }, [mensajes.length, pendiente, irAlFondo]);
 
   /**
    * Abre una conversación guardada, con sus propuestas y su estado.
@@ -611,12 +621,36 @@ export function AssistantChat({
     setError(null);
     setPendiente(true);
 
-    const respuesta = await preguntarAction(
-      projectId,
-      limpio,
-      conversationId ?? undefined,
-      enviados.map((adjunto) => adjunto.id),
-    );
+    /**
+     * ⚠️ **El `try` no es por si acaso: sin él la cara se queda pensando para
+     * siempre.**
+     *
+     * `preguntarAction` traduce a `{ error }` todo lo que pasa **dentro** del
+     * servidor, y por eso parecía que no hacía falta. Pero una Server Action
+     * también puede fallar **antes de llegar ahí** —`UnrecognizedActionError`
+     * cuando el servidor de desarrollo se recarga y el id de la acción deja de
+     * existir, o la petición que no sale—, y eso llega aquí como una excepción,
+     * no como un valor. La promesa se rechazaba, `setPendiente(false)` no se
+     * ejecutaba nunca y el chat se quedaba con el girador puesto y el ánimo en
+     * `thinking`: ni respuesta, ni `oops`, ni forma de reintentar sin recargar.
+     */
+    let respuesta: Awaited<ReturnType<typeof preguntarAction>>;
+    try {
+      respuesta = await preguntarAction(
+        projectId,
+        limpio,
+        conversationId ?? undefined,
+        enviados.map((adjunto) => adjunto.id),
+      );
+    } catch {
+      respuesta = {
+        reply: null,
+        proposals: [],
+        cuota: null,
+        conversationId: null,
+        error: 'Se ha perdido la conexión con el servidor. Inténtalo otra vez.',
+      };
+    }
 
     setPendiente(false);
     if (respuesta.cuota) setCuota(respuesta.cuota);
@@ -700,7 +734,7 @@ export function AssistantChat({
             {/* La cara, a la izquierda del título: es lo que convierte esto en
               «hablar con alguien» y no en «usar un cuadro de texto». Y mientras
               el modelo tarda es la única señal de que sigue vivo. */}
-            <PraxAvatar mood={animo} size="md" />
+            <PraxAvatar mood={animo} size="lg" />
 
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
@@ -1151,7 +1185,7 @@ export function AssistantChat({
                   </div>
                 ))}
 
-                {pendiente && <FlujoDePensamiento />}
+                {pendiente && <FlujoDePensamiento alAvanzar={irAlFondo} />}
               </div>
             )}
 
@@ -1173,7 +1207,7 @@ export function AssistantChat({
                  * dentro y una pantalla que **es** un chat.
                  */
                 <div className="flex flex-1 flex-col items-center justify-center gap-5 py-8 text-center">
-                  <PraxAvatar mood="idle" size="lg" />
+                  <PraxAvatar mood="idle" size="xl" />
 
                   <div className="flex max-w-lg flex-col gap-2">
                     <p className="font-display text-2xl text-text-primary">

@@ -15,6 +15,11 @@ interface Paso {
   icono: ReactNode;
 }
 
+interface FlujoDePensamientoProps {
+  /** Se llama al descubrir cada paso, para que el hilo lo siga hacia abajo. */
+  alAvanzar?: () => void;
+}
+
 /**
  * Las fases por las que pasa de verdad una pregunta.
  *
@@ -26,7 +31,7 @@ interface Paso {
 const PASOS: Paso[] = [
   { texto: 'Leyendo el estado del proyecto', icono: <IconoDatos /> },
   { texto: 'Consultando al modelo', icono: <IconoModelo /> },
-  { texto: 'Revisando lo que propone', icono: <IconoRevision /> },
+  { texto: 'Revisando propuesta', icono: <IconoRevision /> },
 ];
 
 /**
@@ -50,13 +55,27 @@ const PASOS: Paso[] = [
  * El último paso se queda encendido hasta que llega la respuesta, en vez de dar
  * la vuelta: una lista que se reinicia sugiere que algo se atascó.
  */
-export function FlujoDePensamiento() {
+export function FlujoDePensamiento({ alAvanzar }: FlujoDePensamientoProps) {
   const [activo, setActivo] = useState(0);
 
   useEffect(() => {
     if (activo >= PASOS.length - 1) return;
     const temporizador = window.setTimeout(() => setActivo((actual) => actual + 1), PASO_MS);
     return () => window.clearTimeout(temporizador);
+  }, [activo]);
+
+  /**
+   * Cada paso nuevo empuja el hilo hacia abajo, y quien lo desplaza está fuera.
+   *
+   * ⚠️ **En su propio efecto, no dentro del temporizador.** Ese sale por la
+   * puerta de arriba en el último paso —ya no hay siguiente que programar—, así
+   * que el aviso metido ahí no llegaría justo en el paso que más lo necesita:
+   * el tercero es el que se queda escrito debajo del borde mientras se espera
+   * la respuesta.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: el aviso es por `activo`, no por la función
+  useEffect(() => {
+    alAvanzar?.();
   }, [activo]);
 
   return (
