@@ -253,6 +253,17 @@ export class TasksController {
    * Abiertas que llevan `dias` sin cambiar de columna. No hay estado
    * «bloqueada» en el modelo: se deduce del historial.
    */
+  /**
+   * Una fila por proyecto para la cartera. Ver `StatsService.portfolio`.
+   *
+   * ⚠️ `projectIds` llega **ya filtrado por `canViewReports`** desde el gateway,
+   * y es la única línea de acceso de esa vista: aquí no se comprueba nada.
+   */
+  @MessagePattern({ cmd: 'task_stats_portfolio' })
+  statsPortfolio(@Payload() dto: { projectIds: string[]; dias?: number }) {
+    return this.statsService.portfolio(dto.projectIds ?? [], dto.dias);
+  }
+
   @MessagePattern({ cmd: 'task_stats_stale' })
   statsStale(
     @Payload() dto: { projectId: string; dias?: number; limite?: number; filtros?: ReportFilters },

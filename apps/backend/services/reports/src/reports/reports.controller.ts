@@ -85,6 +85,14 @@ export class ReportsController {
   }
 
   /**
+   * La cartera. `projectIds` llega ya filtrado por `canViewReports`.
+   */
+  @MessagePattern({ cmd: 'report_portfolio' })
+  portfolio(@Payload() dto: { projectIds: string[]; dias?: number }) {
+    return this.reports.portfolio(dto.projectIds ?? [], dto.dias);
+  }
+
+  /**
    * El contexto que lee el asistente. Lo consume `assistant-service`.
    *
    * ⚠️ `incluirPersonas` **no es una opción de formato**: es la línea de

@@ -898,6 +898,33 @@ export class ReportsService {
   }
 
   /** Carga y flujo por persona. La ruta que lo expone pide `canViewReports`. */
+  /**
+   * La cartera: una fila por proyecto, para saber en cuál entrar.
+   *
+   * Este servicio no hace aquí más que orquestar y cachear —el cálculo entero
+   * son las dos consultas agrupadas de tasks-service— y aun así pasa por él en
+   * vez de que el gateway hable directamente con tasks. Por dos motivos: la
+   * caché de 60 s vive aquí y la aprovechan los siete informes ya, y el día que
+   * la cartera necesite algo de projects-service —el estado administrativo del
+   * proyecto, por ejemplo— este es el único de los tres que ve las dos mitades.
+   *
+   * ⚠️ **La clave lleva los proyectos ordenados.** El gateway los devuelve en el
+   * orden del listado, que depende de `sortBy`: sin ordenarlos, la misma cartera
+   * pedida dos veces generaría dos claves y la caché no acertaría nunca. Es el
+   * mismo cuidado que en `claveDeFiltros`.
+   *
+   * ⚠️ Y **no** lleva el usuario: la respuesta depende solo del conjunto de
+   * proyectos, no de quién pregunta. Dos personas con la misma cartera comparten
+   * el resultado, que es correcto —lo que decide qué proyectos entran en la lista
+   * ya pasó por el guard del gateway— y evita una entrada de caché por persona.
+   */
+  async portfolio(projectIds: string[], dias = 7) {
+    const clave = `reports:portfolio:${[...projectIds].sort().join('.')}:${dias}`;
+    return this.cached(clave, () =>
+      this.ask<unknown[]>(this.tasksClient, 'task_stats_portfolio', { projectIds, dias }),
+    );
+  }
+
   async people(projectId: string, filtros?: ReportFilters) {
     return this.cached(`reports:${projectId}:people${claveDeFiltros(filtros)}`, async () => {
       return this.ask<

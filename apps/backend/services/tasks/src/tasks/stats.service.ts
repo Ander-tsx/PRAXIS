@@ -819,6 +819,110 @@ export class StatsService {
   }
 
   /**
+   * Una fila por proyecto, para la vista de cartera.
+   *
+   * ## Dos consultas, no dos por proyecto
+   *
+   * Es la decisión entera de este método. Lo natural habría sido llamar a
+   * `snapshot` y a `sinMovimiento` por cada proyecto —ya existen y devuelven de
+   * más lo que hace falta— y quien lleve doce proyectos habría pagado
+   * **veinticuatro** agregaciones para pintar una tabla que se lee en cinco
+   * segundos. Aquí van dos consultas agrupadas por `projectId`, cueste uno o
+   * cincuenta: es lo que pedía el plan al escribir «agrega en el servidor».
+   *
+   * Los dos siguen separados porque miden cosas distintas: la primera solo toca
+   * `tasks`, y la segunda tiene que recorrer el historial para saber cuándo se
+   * movió cada tarea por última vez. Unirlas habría metido el `LEFT JOIN` del
+   * historial en los seis contadores de la primera.
+   *
+   * ⚠️ **`projectIds` viene del gateway, ya filtrado por `canViewReports`.** Aquí
+   * no se comprueba nada —como en el resto del servicio— así que esta lista
+   * **es** la línea de acceso de toda la vista. Si algún día alguien la
+   * construye desde otro sitio, ese sitio tiene que filtrarla igual.
+   */
+  async portfolio(projectIds: string[], dias = 7) {
+    /* `IN ()` no es SQL válido, y sin proyectos no hay nada que agregar. Sale
+       antes de tocar la base en vez de dar un error de sintaxis. */
+    if (projectIds.length === 0) return [];
+
+    const ids = Prisma.join(projectIds.map((id) => Prisma.sql`${id}::text`));
+
+    const [cifras, paradas] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          projectId: string;
+          total: number;
+          abiertas: number;
+          cerradas: number;
+          vencidas: number;
+          sinAsignar: number;
+          cerradasSemana: number;
+          cerradasSemanaAnterior: number;
+        }[]
+      >`
+        SELECT t."projectId"                                                       AS "projectId",
+               -- ::int en los siete: COUNT(*) es bigint y un BigInt no cruza el TCP.
+               COUNT(*)::int                                                       AS total,
+               COUNT(*) FILTER (WHERE t."completedAt" IS NULL)::int                AS abiertas,
+               COUNT(*) FILTER (WHERE t."completedAt" IS NOT NULL)::int            AS cerradas,
+               COUNT(*) FILTER (WHERE t."completedAt" IS NULL
+                                  AND t."dueDate" IS NOT NULL
+                                  AND t."dueDate" < now())::int                    AS vencidas,
+               COUNT(*) FILTER (WHERE t."completedAt" IS NULL
+                                  AND NOT EXISTS (SELECT 1
+                                                    FROM tasks.task_assignees a
+                                                   WHERE a."taskId" = t.id))::int  AS "sinAsignar",
+               COUNT(*) FILTER (WHERE t."completedAt" >= date_trunc('week', now()))::int
+                                                                                   AS "cerradasSemana",
+               COUNT(*) FILTER (WHERE t."completedAt" >= date_trunc('week', now()) - interval '1 week'
+                                  AND t."completedAt" <  date_trunc('week', now()))::int
+                                                                                   AS "cerradasSemanaAnterior"
+          FROM tasks.tasks t
+         WHERE t."projectId" IN (${ids})
+         GROUP BY t."projectId"
+      `,
+      this.prisma.$queryRaw<{ projectId: string; paradas: number }[]>`
+        SELECT u."projectId" AS "projectId",
+               COUNT(*)::int AS paradas
+          FROM (
+            SELECT t.id,
+                   t."projectId",
+                   COALESCE(MAX(e."occurredAt"), t."createdAt") AS ultimo
+              FROM tasks.tasks t
+              LEFT JOIN tasks.task_events e
+                     ON e."taskId" = t.id
+                    AND e.type IN ('CREATED', 'MOVED')
+             WHERE t."projectId" IN (${ids})
+               AND t."completedAt" IS NULL
+             GROUP BY t.id, t."projectId", t."createdAt"
+          ) u
+         WHERE u.ultimo < now() - make_interval(days => ${dias}::int)
+         GROUP BY u."projectId"
+      `,
+    ]);
+
+    const paradasPorProyecto = new Map(paradas.map((fila) => [fila.projectId, fila.paradas]));
+
+    /* Se recorre `projectIds` y no `cifras`: un proyecto **sin ninguna tarea** no
+       sale de un `GROUP BY`, y desaparecer de la cartera se lee como que no
+       tienes acceso. Sale con ceros, que es lo que es. */
+    return projectIds.map((projectId) => {
+      const fila = cifras.find((c) => c.projectId === projectId);
+      return {
+        projectId,
+        total: fila?.total ?? 0,
+        abiertas: fila?.abiertas ?? 0,
+        cerradas: fila?.cerradas ?? 0,
+        vencidas: fila?.vencidas ?? 0,
+        sinAsignar: fila?.sinAsignar ?? 0,
+        paradas: paradasPorProyecto.get(projectId) ?? 0,
+        cerradasSemana: fila?.cerradasSemana ?? 0,
+        cerradasSemanaAnterior: fila?.cerradasSemanaAnterior ?? 0,
+      };
+    });
+  }
+
+  /**
    * Qué ha hecho cada persona, **desglosado por etiqueta**.
    *
    * Es lo que le falta a `byPerson` para poder recomendar a alguien: aquella
