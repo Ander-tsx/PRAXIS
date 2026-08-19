@@ -38,7 +38,7 @@ const PRAX_LABELS: Record<PraxMood, string> = {
   oops: `${PRAX_NAME} no ha podido`,
 };
 
-/** ASCII fallback — conservado para `PraxSidebarIcon` y aria. */
+/** ASCII fallback — conservado para aria y para `PraxSidebarIcon`. */
 export const PRAX_FACES: Record<PraxMood, string> = {
   idle: '^-^',
   thinking: 'o_o',
@@ -48,13 +48,6 @@ export const PRAX_FACES: Record<PraxMood, string> = {
 
 export type PraxSize = 'xs' | 'sm' | 'md' | 'lg';
 
-/**
- * Dimensiones en píxeles para el SVG viewBox scaling.
- *
- * No son clases de Tailwind porque el SVG necesita números reales para
- * calcular proporciones internas. La caja CSS sí usa las clases para que
- * encaje en el layout de Tailwind sin conflictos.
- */
 const MEDIDAS: Record<PraxSize, { px: number; caja: string }> = {
   xs: { px: 20, caja: 'h-5 w-5' },
   sm: { px: 28, caja: 'h-7 w-7' },
@@ -66,62 +59,44 @@ export interface PraxAvatarProps {
   mood?: PraxMood;
   size?: PraxSize;
   className?: string;
-  /** Desactiva las animaciones de parpadeo y mirada. `true` por defecto. */
+  /** Desactiva las animaciones de parpadeo y mirada. */
   animate?: boolean;
 }
 
-/* ─── Geometría de los ojos ───────────────────────────────────────────────── */
+/* ─── Geometría ───────────────────────────────────────────────────────────
+ *
+ * Todo es cuadrado. Los ojos son rectángulos. Las expresiones se hacen
+ * cambiando la forma de esos rectángulos o sustituyéndolos por chevrones.
+ * Estilo pixel-art / Claude Code crab: blocky, geométrico, sin curvas
+ * orgánicas.
+ *
+ * viewBox = 100×100. El cuerpo es un rect redondeado que ocupa casi todo.
+ * ──────────────────────────────────────────────────────────────────────── */
 
-/** Ojo izquierdo y derecho, en un viewBox de 100×100. */
-const LEFT_EYE_CX = 35;
-const RIGHT_EYE_CX = 65;
-const EYE_CY = 44;
-const EYE_RX = 7;
-const EYE_RY = 8;
+const LEFT_EYE_X = 27;
+const RIGHT_EYE_X = 59;
+const EYE_Y = 38;
+const EYE_W = 14;
+const EYE_H = 14;
 
-/** Pupila. */
-const PUPIL_R = 3.5;
+/* ─── Tipos de mirada ─────────────────────────────────────────────────── */
 
-/** Cuánto se desplaza la pupila al mirar a un lado. */
-const LOOK_OFFSET = 3;
-
-/** Brillo del ojo — un círculo blanco pequeño. */
-const GLINT_R = 1.6;
-const GLINT_OFFSET_X = -2;
-const GLINT_OFFSET_Y = -2.5;
-
-/* ─── Boca ────────────────────────────────────────────────────────────────── */
-
-/** Una curvita centrada debajo de los ojos. */
-const MOUTH_Y = 60;
-
-/* ─── Animaciones ─────────────────────────────────────────────────────────── */
-
-type LookDir = 'center' | 'left' | 'right' | 'up';
+type LookDir = 'center' | 'left' | 'right';
 
 /**
- * La cara de PRAX.
+ * La cara de PRAX — versión pixel-art.
  *
- * ## Rediseño: de ASCII a mascota animada
+ * Un cuadrado redondeado con el degradado de la marca y dos ojos geométricos
+ * que cambian de forma según el mood:
  *
- * La versión anterior era un cuadrado redondeado con tres caracteres ASCII
- * (`^-^`, `o_o`, etc.). Cumplía su función de señal de estado, pero carecía
- * de la personalidad que un asistente con nombre propio merece.
+ * - **idle**: dos cuadrados negros, mirada relajada
+ * - **thinking**: ojos entrecerrados (rectángulos horizontales estrechos),
+ *   con un ligero vaivén
+ * - **happy**: chevrones `^ ^` apuntando arriba, ojos sonrientes
+ * - **oops**: chevrones `> <` apretados, estilo >_<
  *
- * Esta versión es un SVG con la misma forma exterior —cuadrado redondeado con
- * el degradado de la marca— pero con ojos y boca dibujados que:
- *
- * 1. **Parpadean** a intervalos semi-aleatorios (2–5s), con doble parpadeo
- *    ocasional para darle naturalidad.
- * 2. **Miran alrededor** de vez en cuando (izquierda, derecha, arriba),
- *    como si estuvieran pensando o curioseando.
- * 3. **Reaccionan al mood**: los ojos se achican felices (`happy`), giran
- *    buscando (`thinking`), o se aprietan incómodos (`oops`).
- * 4. **Flotan suavemente** con un `translateY` sinusoidal en idle.
- *
- * Es un componente **de cliente** porque necesita `useEffect` para los
- * temporizadores de parpadeo y mirada. El coste es mínimo: un SVG inline
- * sin dependencias externas.
+ * Los ojos parpadean (se aplanan a una línea horizontal) y miran a los lados
+ * de vez en cuando. Todo es recto, blocky, sin redondeces orgánicas.
  */
 export function PraxAvatar({
   mood = 'idle',
@@ -132,41 +107,28 @@ export function PraxAvatar({
   const medidas = MEDIDAS[size];
   const canAnimate = animate && size !== 'xs';
 
-  /* ── Estado de la cara ──────────────────────────────────────────────── */
+  /* ── Estado de animación ────────────────────────────────────────────── */
   const [blinking, setBlinking] = useState(false);
   const [lookDir, setLookDir] = useState<LookDir>('center');
   const blinkTimeout = useRef<ReturnType<typeof setTimeout>>(null);
   const lookTimeout = useRef<ReturnType<typeof setTimeout>>(null);
-  const prevMoodRef = useRef<PraxMood>(mood);
-  const [reacting, setReacting] = useState(false);
-
-  /* Flash de reacción al cambiar de mood. */
-  useEffect(() => {
-    if (prevMoodRef.current !== mood) {
-      prevMoodRef.current = mood;
-      setReacting(true);
-      const t = setTimeout(() => setReacting(false), 600);
-      return () => clearTimeout(t);
-    }
-  }, [mood]);
 
   /* ── Parpadeo ───────────────────────────────────────────────────────── */
   const scheduleBlink = useCallback(() => {
     if (!canAnimate) return;
-    const delay = 2000 + Math.random() * 3500;
+    const delay = 2200 + Math.random() * 3800;
     blinkTimeout.current = setTimeout(() => {
       setBlinking(true);
-      /* Duración del parpadeo: ~120ms. */
       setTimeout(() => {
         setBlinking(false);
-        /* Doble parpadeo 25% del tiempo. */
-        if (Math.random() < 0.25) {
+        /* Doble parpadeo ocasional. */
+        if (Math.random() < 0.2) {
           setTimeout(() => {
             setBlinking(true);
-            setTimeout(() => setBlinking(false), 100);
-          }, 180);
+            setTimeout(() => setBlinking(false), 90);
+          }, 160);
         }
-      }, 120);
+      }, 100);
       scheduleBlink();
     }, delay);
   }, [canAnimate]);
@@ -179,15 +141,12 @@ export function PraxAvatar({
   /* ── Mirada ─────────────────────────────────────────────────────────── */
   const scheduleLook = useCallback(() => {
     if (!canAnimate) return;
-    const delay = 3000 + Math.random() * 5000;
+    const delay = 3500 + Math.random() * 5000;
     lookTimeout.current = setTimeout(() => {
-      const dirs: LookDir[] = ['left', 'right', 'up'];
+      const dirs: LookDir[] = ['left', 'right'];
       const picked = dirs[Math.floor(Math.random() * dirs.length)] ?? 'left';
       setLookDir(picked);
-      /* Mantiene la mirada 0.6–1.4s y vuelve al centro. */
-      setTimeout(() => {
-        setLookDir('center');
-      }, 600 + Math.random() * 800);
+      setTimeout(() => setLookDir('center'), 500 + Math.random() * 700);
       scheduleLook();
     }, delay);
   }, [canAnimate]);
@@ -197,19 +156,130 @@ export function PraxAvatar({
     return () => { if (lookTimeout.current) clearTimeout(lookTimeout.current); };
   }, [scheduleLook]);
 
-  /* ── Cálculos derivados ─────────────────────────────────────────────── */
+  /* ── Offset de mirada (desplaza los ojos lateralmente) ──────────────── */
+  const lookOffset = mood === 'thinking' ? 0 : lookDir === 'left' ? -3 : lookDir === 'right' ? 3 : 0;
 
-  const pupilOffset = (() => {
-    if (mood === 'thinking') return { x: 0, y: -1 };
-    switch (lookDir) {
-      case 'left': return { x: -LOOK_OFFSET, y: 0 };
-      case 'right': return { x: LOOK_OFFSET, y: 0 };
-      case 'up': return { x: 0, y: -LOOK_OFFSET };
-      default: return { x: 0, y: 0 };
+  /* ── Renderizar ojos según mood ─────────────────────────────────────── */
+  const renderEyes = () => {
+    const lx = LEFT_EYE_X + lookOffset;
+    const rx = RIGHT_EYE_X + lookOffset;
+    const transition = 'all 200ms ease-out';
+
+    /* Parpadeo: aplana los ojos a una línea horizontal delgada. */
+    if (blinking && (mood === 'idle' || mood === 'thinking')) {
+      return (
+        <g>
+          <rect x={lx} y={EYE_Y + 5} width={EYE_W} height={3} fill={colors.primaryForeground} style={{ transition }} />
+          <rect x={rx} y={EYE_Y + 5} width={EYE_W} height={3} fill={colors.primaryForeground} style={{ transition }} />
+        </g>
+      );
     }
-  })();
 
-  const isSmall = size === 'xs' || size === 'sm';
+    switch (mood) {
+      /* ── Idle: dos cuadrados sólidos ──────────────────────────────── */
+      case 'idle':
+        return (
+          <g>
+            <rect x={lx} y={EYE_Y} width={EYE_W} height={EYE_H} fill={colors.primaryForeground} style={{ transition }} />
+            <rect x={rx} y={EYE_Y} width={EYE_W} height={EYE_H} fill={colors.primaryForeground} style={{ transition }} />
+          </g>
+        );
+
+      /* ── Thinking: rectángulos estrechos horizontales (entrecerrados) ── */
+      case 'thinking':
+        return (
+          <g>
+            <rect x={lx} y={EYE_Y + 3} width={EYE_W} height={7} fill={colors.primaryForeground} style={{ transition }}>
+              {canAnimate && (
+                <animate attributeName="y" values={`${EYE_Y + 3};${EYE_Y + 5};${EYE_Y + 3}`} dur="2s" repeatCount="indefinite" />
+              )}
+            </rect>
+            <rect x={rx} y={EYE_Y + 3} width={EYE_W} height={7} fill={colors.primaryForeground} style={{ transition }}>
+              {canAnimate && (
+                <animate attributeName="y" values={`${EYE_Y + 3};${EYE_Y + 5};${EYE_Y + 3}`} dur="2s" repeatCount="indefinite" />
+              )}
+            </rect>
+          </g>
+        );
+
+      /* ── Happy: chevrones ^ ^ apuntando arriba ───────────────────── */
+      case 'happy': {
+        const lCx = LEFT_EYE_X + EYE_W / 2;
+        const rCx = RIGHT_EYE_X + EYE_W / 2;
+        const cy = EYE_Y + EYE_H / 2;
+        const half = 7;
+        return (
+          <g
+            stroke={colors.primaryForeground}
+            strokeWidth="3.5"
+            strokeLinecap="square"
+            fill="none"
+          >
+            {/* ^ izquierdo */}
+            <polyline points={`${lCx - half},${cy + 3} ${lCx},${cy - 4} ${lCx + half},${cy + 3}`} />
+            {/* ^ derecho */}
+            <polyline points={`${rCx - half},${cy + 3} ${rCx},${cy - 4} ${rCx + half},${cy + 3}`} />
+          </g>
+        );
+      }
+
+      /* ── Oops: chevrones > < apretados ───────────────────────────── */
+      case 'oops': {
+        const lCx = LEFT_EYE_X + EYE_W / 2;
+        const rCx = RIGHT_EYE_X + EYE_W / 2;
+        const cy = EYE_Y + EYE_H / 2;
+        const half = 6;
+        return (
+          <g
+            stroke={colors.primaryForeground}
+            strokeWidth="3.5"
+            strokeLinecap="square"
+            fill="none"
+          >
+            {/* > izquierdo */}
+            <polyline points={`${lCx - half},${cy - half} ${lCx + half},${cy} ${lCx - half},${cy + half}`} />
+            {/* < derecho */}
+            <polyline points={`${rCx + half},${cy - half} ${rCx - half},${cy} ${rCx + half},${cy + half}`} />
+          </g>
+        );
+      }
+    }
+  };
+
+  /* ── Boca (solo en md y lg, y solo para algunos moods) ──────────────── */
+  const renderMouth = () => {
+    if (size === 'xs' || size === 'sm') return null;
+
+    switch (mood) {
+      case 'idle':
+        /* Sin boca en idle: la expresión la llevan los ojos. */
+        return null;
+
+      case 'thinking':
+        /* Punto pequeño de concentración. */
+        return (
+          <rect x={46} y={62} width={8} height={4} rx={0} fill={colors.primaryForeground} opacity={0.6} />
+        );
+
+      case 'happy':
+        /* Línea ancha de sonrisa. */
+        return (
+          <rect x={38} y={62} width={24} height={3} fill={colors.primaryForeground} opacity={0.7} />
+        );
+
+      case 'oops':
+        /* Boquita cuadrada pequeña. */
+        return (
+          <rect
+            x={44} y={60} width={12} height={8}
+            fill="none"
+            stroke={colors.primaryForeground}
+            strokeWidth="2.5"
+            opacity={0.7}
+          />
+        );
+    }
+  };
 
   return (
     <span
@@ -218,7 +288,6 @@ export function PraxAvatar({
       title={PRAX_LABELS[mood]}
       className={`inline-flex shrink-0 select-none items-center justify-center ${medidas.caja} ${className}`}
       style={{
-        /* Flotación suave en idle/happy, solo en tamaños grandes. */
         animation: canAnimate && (mood === 'idle' || mood === 'happy')
           ? 'prax-float 3s ease-in-out infinite'
           : undefined,
@@ -237,275 +306,62 @@ export function PraxAvatar({
             <stop offset="0%" stopColor={colors.primary} />
             <stop offset="100%" stopColor={colors.primaryHover} />
           </linearGradient>
-          <linearGradient id="prax-shine" x1="0.3" y1="0" x2="0.7" y2="1">
-            <stop offset="0%" stopColor="white" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="white" stopOpacity="0" />
-          </linearGradient>
         </defs>
 
         {/* ── Cuerpo ────────────────────────────────────────────────── */}
         <rect
           x="4" y="4" width="92" height="92"
-          rx="28" ry="28"
+          rx="22" ry="22"
           fill="url(#prax-grad)"
           stroke={alpha(colors.primary, 30)}
           strokeWidth="1.5"
         />
-        {/* Brillo sutil en la esquina superior izquierda. */}
-        <rect
-          x="4" y="4" width="92" height="92"
-          rx="28" ry="28"
-          fill="url(#prax-shine)"
-        />
 
         {/* ── Ojos ──────────────────────────────────────────────────── */}
-        {mood === 'oops' ? (
-          /* Ojos apretados: dos X */
-          <g
-            stroke={colors.primaryForeground}
-            strokeWidth="3"
-            strokeLinecap="round"
-            opacity={0.9}
-          >
-            {/* X izquierda */}
-            <line x1={LEFT_EYE_CX - 5} y1={EYE_CY - 5} x2={LEFT_EYE_CX + 5} y2={EYE_CY + 5} />
-            <line x1={LEFT_EYE_CX + 5} y1={EYE_CY - 5} x2={LEFT_EYE_CX - 5} y2={EYE_CY + 5} />
-            {/* X derecha */}
-            <line x1={RIGHT_EYE_CX - 5} y1={EYE_CY - 5} x2={RIGHT_EYE_CX + 5} y2={EYE_CY + 5} />
-            <line x1={RIGHT_EYE_CX + 5} y1={EYE_CY - 5} x2={RIGHT_EYE_CX - 5} y2={EYE_CY + 5} />
-          </g>
-        ) : mood === 'happy' ? (
-          /* Ojos felices: arcos hacia arriba (ojos cerrados sonrientes) */
-          <g
-            stroke={colors.primaryForeground}
-            strokeWidth="3"
-            strokeLinecap="round"
-            fill="none"
-          >
-            <path d={`M ${LEFT_EYE_CX - 7} ${EYE_CY + 2} Q ${LEFT_EYE_CX} ${EYE_CY - 9} ${LEFT_EYE_CX + 7} ${EYE_CY + 2}`} />
-            <path d={`M ${RIGHT_EYE_CX - 7} ${EYE_CY + 2} Q ${RIGHT_EYE_CX} ${EYE_CY - 9} ${RIGHT_EYE_CX + 7} ${EYE_CY + 2}`} />
-          </g>
-        ) : (
-          /* Ojos normales (idle / thinking) */
-          <g>
-            {[LEFT_EYE_CX, RIGHT_EYE_CX].map((cx) => (
-              <g key={cx}>
-                {/* Esclerótica (blanco del ojo) */}
-                <ellipse
-                  cx={cx} cy={EYE_CY}
-                  rx={EYE_RX} ry={blinking ? 1 : EYE_RY}
-                  fill={colors.primaryForeground}
-                  style={{
-                    transition: 'ry 100ms ease-in-out',
-                  }}
-                />
-                {/* Pupila */}
-                {!blinking && (
-                  <circle
-                    cx={cx + pupilOffset.x}
-                    cy={EYE_CY + pupilOffset.y}
-                    r={PUPIL_R}
-                    fill={colors.primary}
-                    style={{
-                      transition: 'cx 250ms ease-out, cy 250ms ease-out',
-                    }}
-                  >
-                    {mood === 'thinking' && canAnimate && (
-                      <animateTransform
-                        attributeName="transform"
-                        type="translate"
-                        values={`0,0; ${LOOK_OFFSET},0; 0,-${LOOK_OFFSET}; -${LOOK_OFFSET},0; 0,0`}
-                        dur="2s"
-                        repeatCount="indefinite"
-                        additive="sum"
-                      />
-                    )}
-                  </circle>
-                )}
-                {/* Brillo del ojo */}
-                {!blinking && (
-                  <circle
-                    cx={cx + GLINT_OFFSET_X + pupilOffset.x * 0.3}
-                    cy={EYE_CY + GLINT_OFFSET_Y + pupilOffset.y * 0.3}
-                    r={GLINT_R}
-                    fill={colors.primaryForeground}
-                    opacity={0.8}
-                    style={{
-                      transition: 'cx 250ms ease-out, cy 250ms ease-out',
-                    }}
-                  />
-                )}
-              </g>
-            ))}
-          </g>
-        )}
+        {renderEyes()}
 
         {/* ── Boca ──────────────────────────────────────────────────── */}
-        {!isSmall && (
-          mood === 'happy' ? (
-            /* Sonrisa amplia con forma de D */
-            <path
-              d={`M 40 ${MOUTH_Y} Q 50 ${MOUTH_Y + 12} 60 ${MOUTH_Y}`}
-              stroke={colors.primaryForeground}
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              fill="none"
-            />
-          ) : mood === 'oops' ? (
-            /* Boca de preocupación: línea recta ondulada */
-            <path
-              d={`M 40 ${MOUTH_Y + 3} Q 45 ${MOUTH_Y} 50 ${MOUTH_Y + 3} Q 55 ${MOUTH_Y + 6} 60 ${MOUTH_Y + 3}`}
-              stroke={colors.primaryForeground}
-              strokeWidth="2"
-              strokeLinecap="round"
-              fill="none"
-              opacity={0.8}
-            />
-          ) : mood === 'thinking' ? (
-            /* Boquita pensativa: un circulito abierto */
-            <ellipse
-              cx={50} cy={MOUTH_Y + 2}
-              rx={4} ry={5}
-              stroke={colors.primaryForeground}
-              strokeWidth="2"
-              fill="none"
-              opacity={0.7}
-            />
-          ) : (
-            /* Sonrisa suave por defecto */
-            <path
-              d={`M 42 ${MOUTH_Y} Q 50 ${MOUTH_Y + 8} 58 ${MOUTH_Y}`}
-              stroke={colors.primaryForeground}
-              strokeWidth="2"
-              strokeLinecap="round"
-              fill="none"
-              opacity={0.85}
-            />
-          )
-        )}
+        {renderMouth()}
 
-        {/* ── Accesorios reactivos ──────────────────────────────────── */}
+        {/* ── Accesorios reactivos (solo md/lg) ─────────────────────── */}
 
-        {/* Thinking: espiral/engranaje giratorio arriba a la derecha */}
-        {mood === 'thinking' && canAnimate && !isSmall && (
-          <g>
-            <circle
-              cx={78} cy={18} r={6}
-              stroke={colors.primaryForeground}
-              strokeWidth="1.5"
-              fill="none"
-              opacity={0.5}
-            >
-              <animateTransform
-                attributeName="transform"
-                type="rotate"
-                from="0 78 18"
-                to="360 78 18"
-                dur="3s"
-                repeatCount="indefinite"
-              />
-            </circle>
-            {/* Tres dientes del engranaje */}
-            {[0, 120, 240].map((deg) => (
-              <line
-                key={deg}
-                x1={78} y1={10}
-                x2={78} y2={7}
-                stroke={colors.primaryForeground}
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                opacity={0.4}
-                transform={`rotate(${deg} 78 18)`}
-              >
-                <animateTransform
-                  attributeName="transform"
-                  type="rotate"
-                  from={`${deg} 78 18`}
-                  to={`${deg + 360} 78 18`}
-                  dur="3s"
+        {/* Thinking: tres puntos parpadeantes debajo */}
+        {mood === 'thinking' && canAnimate && size !== 'sm' && (
+          <g fill={colors.primaryForeground} opacity={0.4}>
+            {[0, 1, 2].map((i) => (
+              <rect key={i} x={40 + i * 10} y={78} width={4} height={4}>
+                <animate
+                  attributeName="opacity"
+                  values="0.2;0.8;0.2"
+                  dur="1.2s"
+                  begin={`${i * 0.3}s`}
                   repeatCount="indefinite"
                 />
-              </line>
+              </rect>
             ))}
           </g>
         )}
 
-        {/* Happy: sparkle ✦ arriba a la derecha, aparece con la reacción */}
-        {mood === 'happy' && reacting && canAnimate && !isSmall && (
-          <g opacity={0.9}>
-            {/* Estrellita de cuatro puntas */}
-            <path
-              d="M 80 12 L 82 17 L 87 19 L 82 21 L 80 26 L 78 21 L 73 19 L 78 17 Z"
-              fill={colors.primaryForeground}
-            >
+        {/* Oops: gota cuadrada (pixel-art) */}
+        {mood === 'oops' && size !== 'xs' && size !== 'sm' && (
+          <g fill={colors.primaryForeground} opacity={0.5}>
+            <rect x={82} y={24} width={4} height={4} />
+            <rect x={80} y={28} width={8} height={4} />
+            <rect x={80} y={32} width={8} height={4} />
+            <rect x={82} y={36} width={4} height={4} />
+            {canAnimate && (
               <animateTransform
                 attributeName="transform"
-                type="scale"
-                values="0;1.2;1"
-                dur="0.4s"
-                repeatCount="1"
-                additive="replace"
-                fill="freeze"
+                type="translate"
+                values="0,0; 0,4; 0,0"
+                dur="1.5s"
+                repeatCount="indefinite"
               />
-              <animate
-                attributeName="opacity"
-                values="0;1;0.9"
-                dur="0.5s"
-                repeatCount="1"
-                fill="freeze"
-              />
-            </path>
-            {/* Segunda estrellita más pequeña */}
-            <path
-              d="M 18 16 L 19.5 19 L 22.5 20.5 L 19.5 22 L 18 25 L 16.5 22 L 13.5 20.5 L 16.5 19 Z"
-              fill={colors.primaryForeground}
-              opacity={0.6}
-            >
-              <animateTransform
-                attributeName="transform"
-                type="scale"
-                values="0;1.1;0.9"
-                dur="0.5s"
-                begin="0.15s"
-                repeatCount="1"
-                additive="replace"
-                fill="freeze"
-              />
-            </path>
-          </g>
-        )}
-
-        {/* Oops: gota de sudor */}
-        {mood === 'oops' && !isSmall && (
-          <g>
-            <path
-              d="M 80 25 Q 82 30 80 35 Q 77 32 80 25"
-              fill={colors.primaryForeground}
-              opacity={0.5}
-            >
-              {canAnimate && (
-                <animateTransform
-                  attributeName="transform"
-                  type="translate"
-                  values="0,0; 0,3; 0,0"
-                  dur="1.5s"
-                  repeatCount="indefinite"
-                />
-              )}
-            </path>
-          </g>
-        )}
-
-        {/* ── Mejillas (rubor sutil, solo en lg) ────────────────────── */}
-        {size === 'lg' && mood !== 'oops' && (
-          <g opacity={0.12}>
-            <circle cx={22} cy={54} r={8} fill={colors.primaryForeground} />
-            <circle cx={78} cy={54} r={8} fill={colors.primaryForeground} />
+            )}
           </g>
         )}
       </svg>
 
-      {/* ── CSS para la animación de flotación ─────────────────────── */}
       <style>{`
         @keyframes prax-float {
           0%, 100% { transform: translateY(0); }
