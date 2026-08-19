@@ -8,6 +8,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { alpha, colors } from '../../tokens';
@@ -236,10 +237,18 @@ export interface DockSlotProps {
  */
 export function DockSlot({ titulo, children }: DockSlotProps) {
   const dock = useDock();
+  const cerrarRef = useRef(dock?.cerrar);
+  cerrarRef.current = dock?.cerrar;
 
   useEffect(() => {
     dock?.ponerTitulo(titulo);
   }, [dock, titulo]);
+
+  useEffect(() => {
+    return () => {
+      cerrarRef.current?.();
+    };
+  }, []);
 
   if (!dock?.hueco) return null;
   return createPortal(children, dock.hueco);
