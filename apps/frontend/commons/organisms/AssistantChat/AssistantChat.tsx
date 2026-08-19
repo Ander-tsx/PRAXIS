@@ -739,7 +739,7 @@ export function AssistantChat({
                */}
               {vista === 'chat' &&
                 projectId &&
-                (enBlanco ? (
+                (enBlanco && !enCajon ? (
                   <button
                     type="button"
                     onClick={() => onElegirProyecto?.('', null)}
@@ -904,6 +904,7 @@ export function AssistantChat({
               setConversationId(null);
               setMensajes([]);
             }}
+            filtroProyectoId={enCajon ? projectId : null}
           />
         ) : (
           /* En pantalla completa esto tiene que ser una columna que crezca: el

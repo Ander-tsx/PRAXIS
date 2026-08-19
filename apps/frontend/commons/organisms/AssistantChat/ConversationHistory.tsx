@@ -30,6 +30,7 @@ export function ConversationHistory({
   onElegir,
   onNueva,
   onBorrarActiva,
+  filtroProyectoId,
 }: {
   /**
    * `projectId` → nombre, para poder decir de qué iba cada conversación.
@@ -47,6 +48,8 @@ export function ConversationHistory({
   onNueva: () => void;
   /** Si se borra la que estaba abierta, el chat tiene que vaciarse. */
   onBorrarActiva: () => void;
+  /** Si se provee, oculta las conversaciones que no son de este proyecto. */
+  filtroProyectoId?: string | null;
 }) {
   const [lista, setLista] = useState<ConversationSummary[] | null>(null);
   const [editando, setEditando] = useState<string | null>(null);
@@ -93,6 +96,12 @@ export function ConversationHistory({
     await borrarConversacionAction(id);
   }
 
+  const listaFiltrada = lista
+    ? filtroProyectoId
+      ? lista.filter((c) => c.projectId === filtroProyectoId)
+      : lista
+    : null;
+
   return (
     /* `gap-1.5` entre filas y no `gap-4`: son elementos de una lista, no
        tarjetas sueltas. Con el hueco de antes, seis conversaciones ya no cabían
@@ -103,11 +112,11 @@ export function ConversationHistory({
           mismo en la misma pantalla, y el de aquí además empujaba la lista —que
           es lo que se viene a leer— una fila hacia abajo. */}
       <div className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
-        {lista === null && (
+        {listaFiltrada === null && (
           <p className="py-8 text-center font-sans text-sm text-text-disabled">Cargando…</p>
         )}
 
-        {lista !== null && lista.length === 0 && (
+        {listaFiltrada !== null && listaFiltrada.length === 0 && (
           <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
             <p className="font-display text-base text-text-primary">
               Todavía no has hablado con el asistente
@@ -118,7 +127,7 @@ export function ConversationHistory({
           </div>
         )}
 
-        {(lista ?? []).map((conversacion) => {
+        {(listaFiltrada ?? []).map((conversacion) => {
           const activa = conversacion.id === activaId;
           return (
             <div
@@ -229,7 +238,9 @@ export function ConversationHistory({
                       }
                     >
                       {conversacion.projectId
-                        ? (nombresDeProyecto[conversacion.projectId] ?? 'otro proyecto')
+                        ? conversacion.projectId === filtroProyectoId
+                          ? 'Este proyecto'
+                          : (nombresDeProyecto[conversacion.projectId] ?? 'otro proyecto')
                         : 'sin proyecto'}
                     </span>
                     <span className="truncate font-sans text-xs text-text-disabled">

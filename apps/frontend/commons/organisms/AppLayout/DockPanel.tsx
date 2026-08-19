@@ -164,24 +164,59 @@ export function DockColumn() {
         aria-hidden={!abierto}
         aria-label={titulo || 'Panel lateral'}
         className={[
-          'flex shrink-0 flex-col overflow-hidden bg-surface',
+          'relative flex shrink-0 flex-col',
           /* Móvil: hoja fija por encima de todo. Escritorio: columna que empuja. */
-          'fixed inset-y-0 right-0 z-40 w-[min(26rem,92vw)] border-l border-border md:static md:z-auto md:w-auto',
+          'fixed inset-y-0 right-0 z-40 w-[min(26rem,92vw)] md:static md:z-auto',
           abierto
-            ? 'translate-x-0 md:w-[26rem] md:border-l lg:w-[28rem]'
-            : 'translate-x-full md:w-0 md:translate-x-0 md:border-l-0',
+            ? 'translate-x-0 md:w-[26rem] lg:w-[28rem]'
+            : 'translate-x-full md:w-0 md:translate-x-0',
           'transition-[width,transform] duration-[240ms] ease-out motion-reduce:transition-none',
         ].join(' ')}
       >
-        {/**
-         * ⚠️ El hueco se registra **siempre**, esté abierto o cerrado.
-         *
-         * Es lo que mantiene el contenido montado detrás de una columna de ancho
-         * cero, que es toda la razón de ser del portal: cerrar el cajón no puede
-         * perder la conversación. Si esto solo existiera con `abierto`, el
-         * portal se desmontaría al cerrar y el hilo se iría con él.
-         */}
-        <div ref={registrarHueco} className="flex min-h-0 min-w-0 flex-1 flex-col" />
+        <div
+          className={[
+            'absolute inset-0 flex flex-col overflow-hidden bg-surface border-l border-border',
+            abierto ? 'md:border-l' : 'md:border-l-0',
+          ].join(' ')}
+        >
+          {/**
+           * ⚠️ El hueco se registra **siempre**, esté abierto o cerrado.
+           *
+           * Es lo que mantiene el contenido montado detrás de una columna de ancho
+           * cero, que es toda la razón de ser del portal: cerrar el cajón no puede
+           * perder la conversación. Si esto solo existiera con `abierto`, el
+           * portal se desmontaría al cerrar y el hilo se iría con él.
+           */}
+          <div ref={registrarHueco} className="flex min-h-0 min-w-0 flex-1 flex-col" />
+        </div>
+
+        {/* El botón de plegar, asomando en el borde izquierdo. Solo se muestra en desktop. */}
+        <button
+          type="button"
+          onClick={cerrar}
+          title="Plegar asistente"
+          aria-label="Plegar asistente"
+          /* Cerrado sigue montado —solo invisible— así que sin esto el tabulador
+             se para en un botón que no se ve. */
+          tabIndex={abierto ? 0 : -1}
+          className={[
+            'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10',
+            'hidden md:flex h-8 w-8 items-center justify-center rounded-full bg-surface border border-border text-text-secondary shadow-sm transition-all hover:text-text-primary hover:bg-hover hover:scale-105',
+            abierto ? 'opacity-100 scale-100 delay-100' : 'opacity-0 scale-75 pointer-events-none',
+          ].join(' ')}
+          style={{ boxShadow: `0 4px 12px ${alpha(colors.overlay, 15)}` }}
+        >
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </aside>
     </>
   );
