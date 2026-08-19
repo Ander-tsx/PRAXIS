@@ -9,10 +9,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R6 **cerrada**. Siguiente etapa: R4 — Análisis (R4.1 hecho) |
+| **Etapa actual** | R6 cerrada + optimización del prompt. Siguiente: R4 — Análisis (R4.1 hecho) |
 | **Última tarea terminada** | R6 entera — adjuntos con memoria, conversación sin proyecto, plantilla desde el chat |
 | **Siguiente** | R4.2 — un solo viaje para los agregados |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5. ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -41,6 +41,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | R6.5.1 | `95aa727` | `TemplatePlanReview` sube a commons entero —árbol EDT, roles, poda y resumen—. Mudanza sin cambios de lógica: el chat y el diálogo enseñan lo mismo |
 | 2026-08-18 | R6.2 – R6.4 | `bdbef7f` | **Conversación sin proyecto.** `POST /me/assistant/chat`, reglas del prompt con ámbito, tres herramientas, adopción de foco y la plantilla desde el chat. Cuatro hallazgos: el resolve daba 404 sin foco, `maxOutputTokens` cortaba la plantilla, la tarjeta que navega tiene que anotar ella misma, y el proyecto recién creado no está en la lista de la pantalla |
 | 2026-08-18 | R6.6 | (este) | Documentación (ESTADO-ACTUAL §42, CONTRATO-API, CLAUDE.md), formato y build |
+| 2026-08-19 | (fuera de plan) | `519c40d`, `9d5f9e2` | **El prompt, medido y recortado.** De 29 300 a 19 300 tokens por turno, y con techo: el inventario deja de crecer con el proyecto. Con `tareasOmitidas` para que el recorte no sea mudo. ESTADO-ACTUAL §43 |
 
 ---
 
@@ -594,6 +595,47 @@ se hizo y se espera antes de seguir.
   ese orden: es lo que evita cobrar por un error que no es del usuario.
 
 ---
+## R7 — La caché de contexto (pendiente, y a propósito)
+
+> Sale de medir el coste real de un turno (ESTADO-ACTUAL §43). Los recortes ya
+> están hechos —el prompt bajó de 29 300 a 19 300 tokens y dejó de crecer con el
+> proyecto—; esto es el lever que queda.
+
+### El hecho de partida, que conviene entender antes de decidir nada
+
+**Los modelos son sin estado.** No hay una sesión abierta donde el modelo
+recuerde: cada petición es la primera vez que ve la conversación, así que el hilo
+entero viaja en cada turno. Lo hacen igual ChatGPT, Claude y Gemini.
+
+Lo que sí existe es que el proveedor tenga **cacheado el trabajo de procesar** un
+prefijo idéntico, y lo cobre mucho más barato. Eso convierte esto en una cuestión
+de **orden**: lo estable delante, lo volátil detrás.
+
+### Qué habría que hacer
+
+- [ ] **R7.1 — Comprobar qué ofrece el modelo en uso**: si hay caché implícita,
+      desde cuántos tokens, y qué cuesta la explícita con su TTL. Sin ese dato
+      todo lo demás son suposiciones.
+- [ ] **R7.2 — Partir el bloque `CONTEXTO` por volatilidad.** Hoy es un único
+      JSON: la estructura (tableros, etiquetas, gente) cambia de mes en mes y los
+      números cambian cada vez que alguien mueve una tarea, pero van pegados, así
+      que **un movimiento invalida el prefijo entero**.
+- [ ] **R7.3 — Caché explícita por conversación**, si compensa: subir una vez lo
+      estable y reutilizarlo mientras dure el hilo. Con su ciclo de vida —crear,
+      caducar, invalidar cuando el proyecto cambia—, que es lo que hace que esto
+      sea una tarea y no un ajuste.
+
+### ⚠️ Por qué está pendiente y no hecho
+
+**No se hace a ciegas.** Depende de números del proveedor que hay que verificar
+—mínimos, TTL, tarifa— y **no se puede probar nada**: la clave de Gemini está sin
+presupuesto. Implementar un ciclo de vida de cachés sin poder ejecutarlo una sola
+vez es la mejor forma de dejar puesto algo peor que lo que había.
+
+Se retoma cuando la clave responda.
+
+---
+
 ## R5 — Cierre
 
 - [ ] **R5.1 — Documentación.** ESTADO-ACTUAL con una sección por etapa,

@@ -4569,3 +4569,87 @@ Lo que falta por ver en vivo es lo que solo dice el modelo: si con la regla 17
 narra de verdad las imágenes, si sin foco propone abrir el proyecto correcto, y
 si una plantilla pedida en mitad de una conversación sale tan buena como la que
 sale del formulario, donde el brief se escribe de una sentada.
+
+---
+
+## 43. Lo que cuesta un turno del asistente, medido
+
+> Sale de una pregunta buena: «1,6 M de tokens de entrada en 56 peticiones,
+> ¿está bien o mal?». No había forma de responderla sin medir, así que se midió
+> el prompt real contra la base real.
+
+### 43.1 La vara de medir, que es lo que faltaba
+
+| Tipo de sistema | Tokens de entrada por mensaje |
+|---|---|
+| Chatbot sin contexto | 500 – 2 000 |
+| Asistente con búsqueda (RAG) | 3 000 – 8 000 |
+| **Agente con inventario de trabajo — este** | **10 000 – 30 000** |
+| Agente de programación | 50 000 – 200 000 |
+
+A tarifa de gama Flash eso son **céntimos por conversación**. El gasto nunca fue
+el problema; el problema era que **no tenía techo**.
+
+### 43.2 Dónde iba cada token, antes de tocar nada
+
+Sobre el proyecto de demostración —186 tareas, el caso malo—:
+
+| Bloque | Tokens |
+|---|---|
+| Reglas + andamiaje | 2 500 |
+| Briefing | 23 100 |
+| — de ellos, `tareas` | **20 900** |
+| Declaración de herramientas | 3 700 |
+| **Total por turno** | **29 300** |
+
+El dato que lo decidió todo: **de los 449 caracteres que ocupaba una tarea, solo
+55 eran texto**. El resto, UUIDs y nombres de clave. Y 116 de las 186 estaban
+cerradas, viajando enteras en cada mensaje.
+
+### 43.3 Los cuatro recortes
+
+1. **Una tarea cerrada viaja en versión corta** —id, título, columna—. Se la
+   puede seguir nombrando, contando, reabriendo y borrando, que es todo lo que se
+   hace con trabajo terminado. Repartir, clasificar, priorizar o marcar pasos son
+   gestos sobre trabajo vivo.
+2. **`boardId` no sale del briefing.** El modelo nombra el tablero por su nombre
+   y coloca por `columnId`, que ya lo identifica: eran 47 caracteres por tarea
+   pagados por un dato que nadie lee.
+3. **La descripción se acota a 500 caracteres**, avisando del corte. Era el único
+   campo sin techo de todo lo que viaja en cada turno.
+4. **El inventario entero tiene presupuesto** (`INVENTARIO_MAX_CHARS`, 45 000
+   caracteres). En caracteres y no en filas por lo mismo que en los adjuntos: una
+   tarea abierta con encargados y checklist cuesta el doble que una cerrada.
+
+| | inicio | tras 1–3 | con techo |
+|---|---|---|---|
+| `tareas` | 20 900 | 13 900 | **10 700** |
+| **Total por turno** | **29 300** | 22 500 | **19 300** |
+
+Y lo que de verdad cambia: **a partir de aquí un proyecto de mil tareas cuesta lo
+mismo que uno de doscientas**.
+
+### 43.4 ⚠️ Un recorte mudo es peor que no recortar
+
+`task_inventory` devuelve `{ tareas, omitidas }` y el briefing propaga
+`tareasOmitidas` cuando hay alguna. La regla 5 del prompt le prohíbe entonces
+decir «esas son todas».
+
+Sin eso, el modelo respondería con total seguridad sobre una lista que alguien le
+cortó por detrás — y esa es la clase de error que nadie detecta, porque la
+respuesta suena igual de bien.
+
+Lo mismo vale para las cerradas abreviadas: el prompt dice que vienen sin detalle
+y que, si se lo piden, **diga que no lo tiene delante en vez de suponerlo**.
+
+### 43.5 Lo que NO se hizo, y por qué
+
+**La caché de contexto.** Es el siguiente lever y el único que queda grande: los
+modelos son sin estado, así que toda conversación se reenvía entera en cada
+turno —eso lo hacen ChatGPT, Claude y Gemini por igual— pero el proveedor puede
+tener cacheado el trabajo de procesar un prefijo idéntico y cobrarlo mucho más
+barato.
+
+No se hizo **a ciegas**: exige conocer los mínimos y el ciclo de vida del
+proveedor para el modelo concreto, y no se puede verificar nada con la clave sin
+presupuesto. Queda como R7 en el plan de rediseño, con lo que habría que hacer.
