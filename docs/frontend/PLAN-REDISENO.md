@@ -9,9 +9,10 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R4 — Análisis (R4.1 hecho). R3 cerrado |
-| **Última tarea terminada** | R3.14 — los adjuntos de PRAX se guardan y se ven en el hilo |
-| **Siguiente** | R4.2 — un solo viaje para los agregados |
+| **Etapa actual** | R6 — PRAX sin proyecto y con memoria de lo que le das |
+| **Última tarea terminada** | R6 escrito. Antes: R3.14 — los adjuntos de PRAX se guardan y se ven en el hilo |
+| **Siguiente** | R6.1 — el extracto persistente |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → **R6** → R4 → R5. ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -33,6 +34,9 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | R3.8 – R3.12 | `66637af`…`2989b33` | Preguntas con opciones, propuesta de tablero, prompt sin callejones, español de la región, hora falsa fuera |
 | 2026-08-18 | R3.13 | `659f6af`, `8504ba3` | El proyecto pasa a ser un foco y luego se congela: una conversación, un proyecto. Pantalla fija con el hilo desplazándose por dentro |
 | 2026-08-18 | R3.14 | `b05a9db` | **Adjuntos guardados.** Multipart a `/me/assistant/attachments`, borrador + `attachmentIds`, `BlobStorage`, y una burbuja igual para todos los archivos. Dos fallos ajenos por el camino: el proxy de zona corrompía binarios (`request.text()`) y `chat-front` no tenía `bodySizeLimit` |
+| 2026-08-18 | (del usuario) | `77187ed`, `ce8b024` | Cambios propios que estaban sin commitear en el árbol: el cajón se pliega con un botón en el borde, su historial se filtra por el proyecto que se mira, y el compositor de la demo crece. Se les añadió `aria-label` y `tabIndex` al botón nuevo |
+| 2026-08-18 | (fuera de plan) | `797250d` | La cara de PRAX en la barra lateral, a 8px y con el trazo engordado por `-webkit-text-stroke`. `font-weight` no servía: la mono no está autoalojada |
+| 2026-08-18 | R6 escrito | — | Etapa nueva: adjuntos con memoria y conversación sin proyecto |
 
 ---
 
@@ -354,6 +358,226 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
 
 ---
 
+## R6 — PRAX sin proyecto, y con memoria de lo que le das
+
+> **Se ejecuta antes que R4**, aunque vaya después en este documento. R4.7 mueve
+> el asistente dentro de Análisis; llegar allí con el organismo ya en su forma
+> final ahorra tocarlo dos veces.
+
+### El encargo, en una línea
+
+Que se pueda hablar con PRAX **sin haber elegido proyecto** —contándole uno que
+todavía no existe, con su documentación adjunta— y que de esa conversación salga
+la **plantilla de arranque** del proyecto. Para que eso funcione, antes hace
+falta que **lo que se le adjunta sobreviva al turno**.
+
+Las dos mitades se piden juntas porque la segunda sin la primera sale coja:
+contarle tu proyecto con tres PDF y que dos turnos después no se acuerde de nada
+es exactamente el caso que esto viene a cubrir.
+
+### Qué falla hoy
+
+1. 🔴 **Un archivo no sobrevive al turno en el que se adjunta.** Está escrito
+   como decisión consciente en `assistant.service.ts` (`pregunta:
+   payload.message`, «se guarda lo que la persona escribió, no el mensaje con
+   los archivos pegados») y el motivo es bueno: un turno con 40 000 caracteres
+   de un `.md` dentro no se lee como conversación, y al releerlo se reenviaría
+   entero en cada turno posterior. Pero la consecuencia es que **PRAX olvida el
+   documento en cuanto contesta**.
+2. **Sin proyecto no hay compositor.** `AssistantChat.tsx` es literalmente
+   `{!projectId ? null : …}`: entrar sin `?p=` enseña el recibimiento y unos
+   botones de proyecto, y **no se puede escribir**. No hay forma de usar a PRAX
+   como se usa cualquier otro asistente.
+3. **La plantilla de arranque vive fuera de la conversación.** `POST
+   /me/assistant/project-draft` pide un `brief` de 20–4000 caracteres escrito de
+   una sentada en un diálogo, cuando la forma natural de dar ese contexto es
+   contarlo por partes y adjuntar lo que ya tienes escrito.
+4. **Una conversación sin foco es un estado de paso, no un sitio donde estar.**
+   El esquema ya admite `projectId: null` en `Conversation` y en `Message`, y
+   `resolver()` fija el foco en el primer turno. Media pieza puesta, sin nadie
+   que la use.
+
+### Decisiones cerradas (2026-08-18)
+
+Se discutieron y están respondidas. **No se vuelven a abrir.**
+
+| Decisión | Respuesta |
+|---|---|
+| Qué se guarda de un adjunto | **Una columna `extract` en `Attachment`**, nada más. Ni tabla aparte, ni enum de estados, ni resumen de segundo nivel. `null` significa «no hay contenido que reinyectar» |
+| Texto y Markdown | El UTF-8 decodificado, **al subir**. Gratis y determinista |
+| PDF | La capa de texto, **al subir**. Y **sigue viajando nativo** (`inlineData`) en el turno en el que se adjunta: convertirlo a texto plano *para ese turno* sería perder maquetación, tablas y figuras que Gemini sí lee |
+| Imágenes | **Se quedan, y sin llamada de descripción.** Ver abajo |
+| Dónde se reinyecta | En `historial()`, **no** dentro del texto del mensaje. La burbuja sigue leyéndose como conversación y la base no miente |
+| Cuánto se reinyecta | Presupuesto global, del más reciente hacia atrás. Se **almacena** más de lo que se **inyecta** |
+| Cuota | **Un turno, una unidad**, lleve archivos o no |
+| Chat sin proyecto | Ruta hermana `POST /me/assistant/chat`, solo `JwtGuard`. Sin briefing, sin miembros, sin chat de equipo |
+| Herramientas sin foco | Exactamente tres: `proponer_plantilla_de_proyecto`, `proponer_abrir_proyecto` y `proponer_pregunta` |
+| Adoptar proyecto | **Sí, en dos casos**: al aceptar una plantilla (el proyecto recién creado se adopta sin preguntar) y cuando PRAX propone abrir uno tuyo y se acepta |
+| La revisión del plan | **Componente compartido** entre el diálogo de proyecto nuevo y el chat, no una segunda forma de dibujar lo mismo |
+
+#### Las imágenes se quedan, y la llamada de descripción se muere
+
+La primera propuesta era describirlas con una segunda llamada a Gemini para
+guardar esa descripción. Se descarta entera: era una llamada más, un modo de
+fallo más, una columna con estados y una pregunta abierta sobre la cuota.
+
+Lo que la sustituye no cuesta nada. **En el turno en el que se adjunta una
+imagen el modelo ya la tiene delante, y su respuesta sí se guarda.** Basta con
+que el prompt le exija a PRAX contar lo que ve cuando el turno lleva imágenes: la
+descripción queda en su propio mensaje y se reinyecta por el camino que ya
+existe. Cero llamadas nuevas, cero coste nuevo.
+
+Como red de seguridad, el `extract` de una imagen es un **marcador de hecho**
+—`[imagen adjunta: captura.png]`— sin descripción: así PRAX nunca niega que hubo
+una imagen ahí, aunque aquel turno no la narrara bien.
+
+Matarlas del todo —que se consideró— habría costado uno de los mejores casos de
+uso que tiene esto: pegar la captura de un error y decir «crea una tarea con
+esto».
+
+#### El presupuesto es obligatorio, no un ajuste fino
+
+Con los topes de hoy —3 adjuntos por mensaje, 40 000 caracteres por archivo— un
+hilo de 12 turnos reinyectaría hasta **360 000 caracteres en cada turno**. Eso no
+es un riesgo: es una certeza de reventar la ventana y la factura.
+
+- Se **almacena** hasta 40 000 caracteres por archivo (el tope de hoy).
+- Se **inyecta** hasta **24 000 caracteres en total** por historial (~6 000
+  tokens), del más reciente hacia atrás.
+- Lo que se recorta **se avisa dentro del propio prompt**, como ya se hace con
+  los archivos de texto. Un recorte mudo hace que el modelo hable con confianza
+  de un documento del que solo ha visto el principio, que es la peor forma de
+  equivocarse aquí.
+
+Guardar más de lo que se inyecta es a propósito: **subir el dial luego no obliga
+a reextraer nada.**
+
+#### Lo que se decide NO hacer
+
+- **Una herramienta `leer_adjunto`.** Resolvería el presupuesto sola y es
+  elegante, pero exige un bucle de tool-calling **ejecutado en el backend**, y
+  hoy aquí no se ejecuta ninguna llamada a función: se devuelven como propuestas.
+  Aunque una lectura no viole la letra de la invariante 1, borra la línea que la
+  hace fácil de razonar.
+- **Backfill de los adjuntos que ya existen.** Son datos de desarrollo. Se quedan
+  sin extracto y se comportan como hoy.
+- **Multiproyecto en una conversación.** Sigue vetado por lo de siempre (§ del
+  esquema de `Conversation`): los permisos son por proyecto y una sola lista de
+  herramientas no puede expresar dos.
+
+### Los stacks
+
+Cada stack termina en algo que se puede entrar a ver. Al cerrar uno se dice qué
+se hizo y se espera antes de seguir.
+
+#### R6.1 — El extracto persistente
+
+- [ ] **R6.1.1 — `text/x-markdown` en `ASSISTANT_TEXT_MIME`.** 🐛 Está en la
+      lista de permitidos con un comentario explicando que Safari y algunos Linux
+      mandan así los `.md`, pero **no** en la de los que se pegan como texto: el
+      mismo archivo entra como texto en Chrome y como binario en Safari.
+- [ ] **R6.1.2 — La columna `extract` y su migración.** Nullable, sin backfill.
+      ⚠️ Y **`detalle()` no la selecciona**: si lo hiciera, metería cada documento
+      del hilo en cada lectura de la pantalla.
+- [ ] **R6.1.3 — Extraer al subir.** Texto/Markdown por decodificación; PDF con
+      capa de texto; imagen con su marcador. Un PDF escaneado —sin capa— se queda
+      sin extracto y cae en el mismo trato que la imagen.
+- [ ] **R6.1.4 — Reinyectar en `historial()`**, con el presupuesto y el mismo
+      formato `--- ARCHIVO ADJUNTO: nombre ---` que ya usa `repartirAdjuntos`,
+      para que el prompt no tenga que aprender un segundo formato.
+- [ ] **R6.1.5 — El prompt**: narrar lo que se ve cuando el turno lleva
+      imágenes, y no dar por hecho que un archivo de hace tres turnos sigue
+      delante en su forma original.
+
+#### R6.2 — Hablar sin proyecto
+
+- [ ] **R6.2.1 — `POST /me/assistant/chat`**, solo `JwtGuard`. El controlador
+      `/me/assistant` ya existe y ya aloja cuota, conversaciones, adjuntos y el
+      borrador de plantilla, precisamente por «esto no tiene proyecto detrás».
+- [ ] **R6.2.2 — `AssistantService.chat()` con `projectId` nulo**: sin briefing,
+      sin miembros, sin chat de equipo, y con su propia instrucción de sistema.
+- [ ] **R6.2.3 — 🔴 El resolve de propuestas, en `/me`.** Hoy es
+      `POST /projects/:projectId/assistant/proposals/:id/resolve`: en una
+      conversación sin foco **aceptar o descartar cualquier tarjeta daría 404**.
+      Hermana en `/me/assistant`, con el `userId` del token como llave, igual que
+      se hizo con las conversaciones.
+- [ ] **R6.2.4 — El compositor sin la reja del `projectId`** y el recibimiento
+      reescrito: sin foco ya no es «elige un proyecto», es «pregúntame lo que
+      quieras, y si quieres que mire un proyecto, elígelo».
+
+#### R6.3 — Adoptar un proyecto a mitad
+
+- [ ] **R6.3.1 — El gateway le pasa la lista.** Para los turnos sin foco,
+      `id` + `nombre` de los proyectos con `canViewReports` —la consulta
+      `GET /projects?permission=canViewReports` ya existe (§29.2)—. Sin esto el
+      modelo no puede nombrar un proyecto tuyo.
+- [ ] **R6.3.2 — `proponer_abrir_proyecto(projectId, porQue)`**, validada contra
+      esa lista. Nada de fiarse de un id que se invente el modelo.
+- [ ] **R6.3.3 — La tarjeta y la adopción.** Aceptar navega a
+      `?p=<slug>&c=<conversación>` y a partir de ahí la conversación es de ese
+      proyecto, con briefing y con las doce herramientas. Rechazar no hace nada:
+      se sigue hablando sin foco.
+
+#### R6.4 — La plantilla, desde la conversación
+
+- [ ] **R6.4.1 — La herramienta en el conjunto sin foco.** ⚠️ Sigue **fuera** de
+      `herramientasPara()`, y el motivo de §36.1 no cambia: en una conversación
+      *con* proyecto, declararla dejaría que a mitad de una charla sobre tareas el
+      modelo propusiera rehacer el proyecto entero. Sin foco ese argumento
+      desaparece —no hay proyecto que rehacer— y por eso vive ahí y solo ahí.
+- [ ] **R6.4.2 — Se guarda como `Proposal`**, con `tool` y `args`, y su
+      `status`. §36.1 decía que no se podía porque una propuesta cuelga de una
+      conversación y no la había; ahora sí la hay.
+- [ ] **R6.4.3 — Aceptar llama a `commons/template/apply.ts`**, que ya existe y
+      crea el proyecto una llamada a la vez con la sesión de quien acepta.
+      **Ninguna ruta de escritura nueva.** Y al terminar, la conversación adopta
+      el proyecto recién creado.
+
+#### R6.5 — La revisión del plan, compartida y con árbol
+
+- [ ] **R6.5.1 — Extraer el paso «revisar» de `AssistedTemplate`** a un
+      componente compartido que consuman el diálogo de proyecto nuevo y la
+      tarjeta del chat. Dibujar el plan de una segunda manera en el chat sería el
+      pecado que documenta R1.4 con `ProjectList` como copia pobre de
+      `ProjectCard` — y el componente pobre sería el nuevo.
+- [ ] **R6.5.2 — El árbol EDT**: espacios → tableros → columnas con su color,
+      más etiquetas y roles con sus permisos, y el `porQué` de PRAX. Mejora los
+      dos sitios a la vez.
+- [ ] **R6.5.3 — En el hilo, tarjeta compacta.** Un árbol dentro de una burbuja
+      de chat no se lee: la tarjeta resume («3 espacios, 5 tableros, 12
+      etiquetas, 4 roles») y abre la revisión a pantalla ancha.
+
+#### R6.6 — Cierre de etapa
+
+- [ ] **R6.6.1 — Documentación**: sección propia en ESTADO-ACTUAL, las rutas
+      nuevas en CONTRATO-API, y las trampas de aquí abajo en CLAUDE.md.
+- [ ] **R6.6.2 — Formato y tipos**: `pnpm format`, typecheck de las zonas
+      tocadas y `next build`.
+- [ ] **R6.6.3 — Verificación** con el stack levantado. Si no levanta en esta
+      máquina, **se dice**.
+
+### Trampas conocidas de esta etapa
+
+- 🔴 **`maxOutputTokens: 2048` es global en `gemini.client.ts`**, y por ahí pasa
+  también la plantilla. Un plan de 4 espacios × 4 tableros × 8 columnas + 6 roles
+  con su diccionario de permisos + 12 etiquetas + `porQué` se pasa de ahí, y
+  cuando eso ocurre `finishReason` queda en `MAX_TOKENS` y **el JSON llega
+  cortado, sin un solo error**. Hoy es latente; con R6.4 se vuelve probable.
+- ⚠️ **El resolve de propuestas es una ruta de proyecto.** Ver R6.2.3.
+- ⚠️ **Un adjunto en borrador no tiene conversación todavía** (`conversationId`
+  *y* `messageId` nulos): lo que protege el borrador es `uploadedBy`. Cualquier
+  consulta nueva sobre extractos tiene que filtrar por ahí.
+- ⚠️ **El extracto se calcula una vez, al subir.** Recalcularlo por turno sería
+  leer el blob entero en cada pregunta.
+- ⚠️ **`ASSISTANT_TEXT_MAX_CHARS` y el presupuesto son dos números distintos** y
+  hacen dos cosas distintas: el primero topa lo que se guarda por archivo, el
+  segundo lo que se manda en total. Igualarlos parece limpio y rompe el motivo
+  por el que se guarda más de lo que se inyecta.
+- ⚠️ **La cuota se comprueba antes de llamar a Gemini y se consume después**, y
+  solo si respondió bien. La ruta nueva de `/me/assistant/chat` tiene que repetir
+  ese orden: es lo que evita cobrar por un error que no es del usuario.
+
+---
 ## R5 — Cierre
 
 - [ ] **R5.1 — Documentación.** ESTADO-ACTUAL con una sección por etapa,
@@ -400,6 +624,7 @@ nada. Y no dar por perdido lo que no esté en `git log`.
 1. Leer «Dónde estamos», «Decisiones cerradas» e «Invariantes».
 2. `git log --oneline` en `feature/rediseno-panel-admin-analisis`: hay un commit
    por tarea y el mensaje lleva el código (`R1.4`, `R2.1`…).
-3. Seguir por la primera casilla sin marcar, en orden.
+3. Seguir por la primera casilla sin marcar **en el orden de ejecución de la
+   tabla de arriba**, que no es el orden del documento: R6 va antes que R4.
 4. Al terminar una tarea: marcarla, añadir la fila al registro de avance y
    commitear.
