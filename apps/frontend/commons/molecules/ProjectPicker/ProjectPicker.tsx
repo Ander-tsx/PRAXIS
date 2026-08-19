@@ -58,6 +58,19 @@ export interface ProjectPickerProps {
  * proyecto son los gráficos y el otro de qué proyecto se habla. Lo único que
  * cambia entre ellos es a dónde lleva elegir, y eso entra por `pathDe`.
  */
+/**
+ * ⚠️ **El ancho tiene suelo y techo, y los dos hacen falta.**
+ *
+ * `max-w-md` estaba desde el principio. El **mínimo** se añadió porque en la
+ * cabecera de Análisis este selector es hijo de una columna que se dimensiona
+ * por su contenido: sin suelo, la caja medía lo que midiera el nombre del
+ * proyecto de dentro, así que **cambiaba de tamaño al cambiar de proyecto** y
+ * con un nombre corto quedaba una pastilla diminuta al lado de un titular
+ * grande.
+ *
+ * Va con `sm:` a propósito. Un `min-width` sin condición desborda un teléfono
+ * estrecho, que es justo donde `w-full` tiene que poder encoger.
+ */
 export function ProjectPicker({
   projects,
   activeId,
@@ -104,7 +117,7 @@ export function ProjectPicker({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="relative w-full max-w-md sm:min-w-72">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
