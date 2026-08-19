@@ -10,6 +10,18 @@ export const metadata: Metadata = { title: 'Cartera' };
 /**
  * La cartera: todos tus proyectos en una tabla.
  *
+ * ## ⚠️ La URL dice `overview` y la pantalla dice «Cartera»
+ *
+ * No es un descuido: es la convención del repo —URL en inglés, pantalla en
+ * español— y ya se aplicó igual en «Tu cuenta», que vive en `/profile` (§37).
+ *
+ * Y `overview` en vez de `portfolio`, que sería la traducción directa:
+ * «portfolio» arrastra el sentido financiero —una cartera de inversión— y en una
+ * herramienta que también habla de facturación eso es una pista falsa. Lo que
+ * hace esta pantalla es dar una vista general de lo que llevas, y eso es lo que
+ * dice `overview`. El tipo del backend sigue llamándose `ReportPortfolioRow`
+ * porque allí no hay ambigüedad posible.
+ *
  * ## Para qué existe
  *
  * Quien lleva cinco proyectos tenía que entrar a los cinco para saber en cuál
@@ -30,9 +42,9 @@ export const metadata: Metadata = { title: 'Cartera' };
  *
  * ## ⚠️ Esta ruta puede chocar con el slug de un proyecto
  *
- * `/reports/cartera` es una ruta estática hermana de `[[...id]]`, que es la que
+ * `/reports/overview` es una ruta estática hermana de `[[...id]]`, que es la que
  * resuelve `/reports/<slug>`. Next da prioridad a la estática, así que un
- * proyecto cuyo slug fuera exactamente `cartera` **quedaría oculto**: su enlace
+ * proyecto cuyo slug fuera exactamente `overview` **quedaría oculto**: su enlace
  * abriría esta tabla. Los slugs son únicos globales y nada los reserva.
  *
  * Se acepta porque es el patrón que ya usa `projects-front` con `tablero` y

@@ -278,54 +278,56 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {mounted && esAnchoGrande ? (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setCatalogoAbierto((abierto) => !abierto)}
-                aria-expanded={catalogoAbierto}
-              >
-                {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
-              </Button>
+      {/**
+       * La barra de acciones del lienzo.
+       *
+       * ## ⚠️ Elegir qué ver se puede en cualquier ancho; **colocarlo, no**
+       *
+       * Antes los dos botones desaparecían por debajo de `lg` y en su lugar salía
+       * una insignia que decía «Desktop only». Eran dos problemas: el rótulo
+       * estaba en inglés en un producto que habla español, y —lo de fondo— dejaba
+       * a quien entra desde el teléfono **sin poder hacer absolutamente nada**,
+       * ni siquiera añadir la instantánea a un lienzo vacío.
+       *
+       * Y no hacía falta: añadir un gráfico llama a `guardar()` con la
+       * disposición en celdas del ancho grande, que es la única que se persiste;
+       * lo que sí había que acotar —y sigue acotado— es `onLayoutChange`, porque
+       * la cuadrícula deriva los anchos pequeños compactando el grande y
+       * guardarlos convertiría la composición en una columna apilada.
+       *
+       * Así que la línea real no es «móvil sí / móvil no», es **elegir vs.
+       * colocar**. Se dice con esas palabras, debajo del lienzo y no como un
+       * cartel de error.
+       */}
+      <div className="flex flex-wrap items-center gap-2">
+        {mounted && (
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setCatalogoAbierto((abierto) => !abierto);
+                setConstructorAbierto(false);
+              }}
+              aria-expanded={catalogoAbierto}
+            >
+              {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
+            </Button>
 
-              {/* Abre el constructor, que antes llevaba al chat. Los dos
-                  caminos siguen: PRAX está en el catálogo y en su botón
-                  flotante, y el que no depende de la cuota es este. */}
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setConstructorAbierto((abierto) => !abierto);
-                  setCatalogoAbierto(false);
-                }}
-                aria-expanded={constructorAbierto}
-              >
-                {constructorAbierto ? 'Cerrar el constructor' : 'Uno a medida'}
-              </Button>
-            </>
-          ) : (
-            mounted && (
-              <span className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-1.5 font-sans text-sm text-text-secondary">
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-                Desktop only
-              </span>
-            )
-          )}
-        </div>
+            {/* Abre el constructor, que antes llevaba al chat. Los dos caminos
+                siguen: PRAX está en el catálogo y en su botón flotante, y el que
+                no depende de la cuota es este. */}
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConstructorAbierto((abierto) => !abierto);
+                setCatalogoAbierto(false);
+              }}
+              aria-expanded={constructorAbierto}
+            >
+              {constructorAbierto ? 'Cerrar el constructor' : 'Uno a medida'}
+            </Button>
+          </>
+        )}
       </div>
 
       {catalogoAbierto && (
@@ -353,7 +355,10 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
         </p>
       )}
 
-      <div ref={containerRef}>
+      {/* ⚠️ El `pb-20` deja sitio al botón flotante de PRAX, que va fijo en la
+          esquina inferior derecha y tapaba el pie de la última tarjeta — el
+          «Cómo se lee esto», que es justo lo que hay que poder pulsar. */}
+      <div ref={containerRef} className="pb-20">
         {widgets.length === 0 ? (
           <CanvasVacio
             onAnadir={() => setCatalogoAbierto(true)}
@@ -363,7 +368,40 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
           /* Hasta que se mide el contenedor no se dibuja: la librería asume
              1280 px por defecto y la cuadrícula aparecería con el ancho
              equivocado y saltaría al medirse. */
-          mounted && (
+          mounted &&
+          /**
+           * ## ⚠️ Por debajo de `lg` no hay cuadrícula, hay una lista
+           *
+           * Y no es una simplificación visual: es lo que arregla que las
+           * tarjetas se cortaran en un teléfono. La cuadrícula conserva el alto
+           * **en filas** al cambiar de ancho, así que una tarjeta que en
+           * escritorio cabe de sobra reflowa al doble de alto en 390 px y se
+           * queda con la mitad del contenido detrás de un `overflow-hidden`.
+           * «Resumen» perdía dos de sus cuatro cifras, a medio pintar.
+           *
+           * Aquí no se pierde nada por soltar la cuadrícula: por debajo de `lg`
+           * ya estaban desactivados el arrastre, el redimensionado y el guardado
+           * de la disposición, así que lo único que aportaba era el recorte. El
+           * orden es el de la composición guardada —por fila y luego por
+           * columna— para que la lista se lea como se ve en grande.
+           */
+          (!esAnchoGrande ? (
+            <div className="flex flex-col gap-4">
+              {[...widgets]
+                .sort((a, b) => a.y - b.y || a.x - b.x)
+                .map((widget) => (
+                  <WidgetShell
+                    key={widget.id}
+                    widget={widget}
+                    onQuitar={() => quitar(widget.id)}
+                    movible={false}
+                    altoFijo={false}
+                  >
+                    {slots[widget.id]}
+                  </WidgetShell>
+                ))}
+            </div>
+          ) : (
             <ResponsiveGridLayout
               width={width}
               layouts={{ lg: disposicion }}
@@ -392,9 +430,19 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
                 </div>
               ))}
             </ResponsiveGridLayout>
-          )
+          ))
         )}
       </div>
+
+      {/* Al pie y no arriba: quien entra desde el teléfono viene a leer, y el
+          aviso de que aquí no se arrastra solo hace falta cuando ya ha visto lo
+          que hay. Arriba era un cartel pidiendo perdón antes de enseñar nada. */}
+      {mounted && !esAnchoGrande && widgets.length > 0 && (
+        <p className="font-sans text-xs leading-relaxed text-text-disabled">
+          Los gráficos se apilan para que quepan. Para moverlos y cambiarles el tamaño hace falta
+          una pantalla más ancha; tu composición se queda como la dejaste allí.
+        </p>
+      )}
     </div>
   );
 }

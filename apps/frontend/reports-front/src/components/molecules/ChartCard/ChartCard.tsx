@@ -112,31 +112,6 @@ export function Stat({
 }
 
 /**
- * Aviso de que el historial de este proyecto **está fabricado**.
- *
- * Va arriba del todo y no se puede cerrar. Un gráfico inventado sin etiquetar es
- * el peor resultado posible de esta sección: durante una demostración nadie
- * distingue un dato medido de uno generado, y el que lo ve se lleva una
- * conclusión falsa sobre gente real.
- */
-export function SyntheticBanner({ eventos }: { eventos: number }) {
-  return (
-    <p
-      role="note"
-      className="rounded-xl border px-4 py-3 font-sans text-sm text-warning"
-      style={{
-        background: alpha(colors.warning, 8),
-        borderColor: alpha(colors.warning, 30),
-      }}
-    >
-      <strong>Historial de demostración.</strong> Los {eventos.toLocaleString('es-MX')} eventos de
-      este proyecto los fabricó un script para poder enseñar la sección. No miden trabajo real de
-      nadie.
-    </p>
-  );
-}
-
-/**
  * Lo que se enseña cuando **no hay datos suficientes para predecir**.
  *
  * Es la pieza que más importa de toda la sección. Una predicción sacada de

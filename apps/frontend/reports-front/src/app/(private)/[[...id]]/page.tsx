@@ -1,4 +1,3 @@
-import { SyntheticBanner } from '@/components/molecules/ChartCard';
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
 import { GeneratedChart } from '@/components/organisms/Charts';
 import {
@@ -462,43 +461,59 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
        Aquí va el nombre de la sección, el mismo que en la barra lateral. */
     <AppHeader title="Análisis">
       <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+        {/**
+         * La cabecera, en dos columnas desde `lg`.
+         *
+         * ⚠️ **El selector de proyecto sube a la misma línea que el titular**, y
+         * antes iba debajo del bloque de texto. En una pantalla cuyo primer
+         * trabajo es contestar «¿de qué proyecto son estos números?», el control
+         * que lo cambia estaba por debajo del titular y de una frase de dos
+         * líneas: había que leer para encontrarlo. Ahora los dos están a la misma
+         * altura, que es donde se busca el contexto.
+         *
+         * En móvil se apila, y el orden es el mismo: primero de qué se habla,
+         * después la explicación.
+         */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-2">
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
               Cómo va el trabajo
             </h2>
             <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
               Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
-            {/* La cartera, solo con más de un proyecto: con uno, «todos tus
+          </div>
+
+          <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
+            {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
+                de los proyectos es el activo, y comparando contra el slug de la
+                URL no encontraba ninguno. */}
+            {/* ⚠️ Un **diccionario**, no la función `reportPath`. Esta page es un
+                Server Component y el selector es de cliente: una función no cruza
+                esa frontera, y el síntoma no es un error de compilación sino la
+                pantalla de «no pudimos cargar esta página» **después** de que la
+                página ya se haya pintado. Ver `ProjectPicker`. */}
+            <ProjectPicker
+              projects={proyectos.items}
+              activeId={projectId}
+              paths={Object.fromEntries(
+                proyectos.items.map((proyecto) => [proyecto.id, reportPath(proyecto)]),
+              )}
+              vacio="No tienes ningún proyecto con análisis abierto."
+            />
+
+            {/* La vista general, solo con más de un proyecto: con uno, «todos tus
                 proyectos» lleva al que ya se está mirando.
                 `next/link` sin el `/reports` delante — lo añade Next. */}
             {proyectos.items.length > 1 && (
               <Link
-                href="/cartera"
+                href="/overview"
                 className="font-sans text-sm font-semibold text-primary underline-offset-2 hover:underline"
               >
-                Ver los {proyectos.items.length} proyectos de un vistazo →
+                Ver los {proyectos.items.length} de un vistazo →
               </Link>
             )}
           </div>
-
-          {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
-              de los proyectos es el activo, y comparando contra el slug de la
-              URL no encontraba ninguno. */}
-          {/* ⚠️ Un **diccionario**, no la función `reportPath`. Esta page es un
-              Server Component y el selector es de cliente: una función no cruza
-              esa frontera, y el síntoma no es un error de compilación sino la
-              pantalla de «no pudimos cargar esta página» **después** de que la
-              página ya se haya pintado. Ver `ProjectPicker`. */}
-          <ProjectPicker
-            projects={proyectos.items}
-            activeId={projectId}
-            paths={Object.fromEntries(
-              proyectos.items.map((proyecto) => [proyecto.id, reportPath(proyecto)]),
-            )}
-            vacio="No tienes ningún proyecto con análisis abierto."
-          />
         </div>
 
         {/**
@@ -528,10 +543,6 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             nombre: etiqueta.name,
           }))}
         />
-
-        {snapshot && snapshot.eventosSinteticos > 0 && (
-          <SyntheticBanner eventos={snapshot.eventosSinteticos} />
-        )}
 
         {/* `projectId` y no el parámetro de la ruta: las acciones del asistente
             llaman a `/projects/:projectId/assistant/...`, que espera el UUID.

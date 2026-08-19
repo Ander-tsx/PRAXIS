@@ -45,7 +45,7 @@ Ninguno de la lista vieja. El punto 18 es un hueco nuevo, de escalado, no de
 seguridad: los adjuntos guardan en Postgres y el código ya está listo para GCS.
 
 El **21** es de 2026-08-19 y tampoco es de seguridad: un proyecto cuyo slug sea
-`cartera`, `tablero` o `tarea` queda oculto tras una ruta estática del frontend.
+`overview`, `tablero` o `tarea` queda oculto tras una ruta estática del frontend.
 Tres palabras de espacio de colisión, y ningún proyecto afectado hoy.
 
 ### Resueltos
@@ -1084,7 +1084,7 @@ es donde vive `threadRootId`.
 ## 🟡 21. Los slugs de proyecto no tienen palabras reservadas
 
 `Project.slug` es único global y es lo que va en la URL. Nada impide que un
-proyecto se llame «Cartera» y se quede con el slug `cartera` — ni que otro se
+proyecto se llame «Overview» y se quede con el slug `overview` — ni que otro se
 quede con `tablero` o `tarea`.
 
 **Por qué importa en el frontend.** Dos zonas tienen rutas estáticas hermanas de
@@ -1093,7 +1093,7 @@ la dinámica que resuelve el slug:
 | Zona | Ruta dinámica | Hermanas estáticas |
 |---|---|---|
 | `projects-front` | `/projects/[id]` | `/projects/tablero`, `/projects/tarea` |
-| `reports-front` | `/reports/[[...id]]` | `/reports/cartera` |
+| `reports-front` | `/reports/[[...id]]` | `/reports/overview` |
 
 Next da prioridad a la estática, así que un proyecto con uno de esos tres slugs
 **queda oculto**: su enlace abre la otra pantalla. No da ningún error —la ruta
@@ -1102,12 +1102,12 @@ existe y responde 200— así que se ve como un proyecto que «no se abre».
 **Qué haría falta.** Una lista de reservados en `generarSlugUnico`
 (`projects-service/src/projects/slug.util.ts`), que ya recibe el comprobador de
 unicidad: bastaría con tratar los reservados como colisión y dejar que el sufijo
-aleatorio haga lo suyo — «Cartera» pasaría a `cartera-rjv6`. Y una migración
+aleatorio haga lo suyo — «Overview» pasaría a `overview-rjv6`. Y una migración
 para los que ya existan, si los hay.
 
 **Severidad 🟡 y no naranja** porque hoy no hay ningún proyecto afectado y el
 espacio de colisión son tres palabras. Pero es exactamente la clase de fallo que
-aparece el día de una demostración, con un proyecto llamado «Cartera» hecho para
+aparece el día de una demostración, con un proyecto llamado «Overview» hecho para
 la ocasión.
 
 Mientras tanto el frontend **no hace nada**: comprobarlo en el cliente exigiría

@@ -11,6 +11,16 @@ export interface SelectorDeFechaProps {
   defaultValue?: string;
   disabled?: boolean;
   /**
+   * Qué se lee cuando no hay fecha puesta.
+   *
+   * ⚠️ **Por defecto dice «Sin fecha límite», y eso solo vale donde nació.** Este
+   * componente se escribió para la fecha de entrega de una tarea, donde vacío
+   * significa exactamente eso. En un **filtro** significa lo contrario —«no
+   * acotes por fecha»— y dejar el texto de origen ahí decía que las tareas no
+   * tienen fecha, que es una afirmación sobre los datos y no sobre el filtro.
+   */
+  placeholder?: string;
+  /**
    * Avisa de cada cambio, con el valor ya nuevo.
    *
    * El campo sigue sin controlarse desde fuera —el valor lo lleva este
@@ -105,6 +115,7 @@ export function SelectorDeFecha({
   label,
   defaultValue = '',
   disabled = false,
+  placeholder = 'Sin fecha límite',
   onValueChange,
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
@@ -200,7 +211,7 @@ export function SelectorDeFecha({
           <span className={seleccionada ? 'text-text-primary' : 'text-text-disabled'}>
             {seleccionada
               ? `${seleccionada.getDate()} de ${MESES[seleccionada.getMonth()]} de ${seleccionada.getFullYear()}`
-              : 'Sin fecha límite'}
+              : placeholder}
           </span>
 
           {seleccionada && !disabled && (

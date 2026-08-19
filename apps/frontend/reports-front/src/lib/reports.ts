@@ -154,6 +154,39 @@ export function formatDay(iso: string): string {
   return `${Number(dia)} ${meses[Number(mes) - 1]}`;
 }
 
+/**
+ * `2026-07-21` → `21 jul`, y `2024-07-21` → `21 jul 2024`.
+ *
+ * ⚠️ **El año aparece solo cuando no es el corriente**, y esa es toda la gracia.
+ * Ponerlo siempre alarga cada etiqueta de filtro con un dato que casi nunca
+ * aporta; no ponerlo nunca hace que «Desde 21 jul» sobre un rango de 2024 se lea
+ * como de este año, que es una lectura falsa de una pantalla de datos.
+ *
+ * ⚠️ Y se parte la cadena a mano, sin `new Date(iso)`: esa construcción es
+ * medianoche **UTC**, y al oeste de Greenwich cae el día anterior en hora local.
+ * Es la misma trampa que documenta `SelectorDeFecha`, y aquí el síntoma sería
+ * una etiqueta que dice un día distinto del que se eligió en el calendario.
+ */
+export function fechaCorta(iso: string): string {
+  const [anio, mes, dia] = iso.split('-');
+  const meses = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  const texto = `${Number(dia)} ${meses[Number(mes) - 1]}`;
+  return Number(anio) === new Date().getFullYear() ? texto : `${texto} ${anio}`;
+}
+
 export const PRIORITY_ORDER = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const;
 
 export const PRIORITY_COLOR: Record<string, string> = {
