@@ -72,6 +72,12 @@ interface Mensaje {
 
 export interface AssistantChatProps {
   /**
+   * El nombre de pila de quien pregunta, solo para el saludo de la pantalla
+   * vacía. **Opcional a propósito**: el cajón de Análisis no lo pasa, y ahí el
+   * saludo no se ve nunca porque la conversación abre con el proyecto puesto.
+   */
+  userName?: string;
+  /**
    * El proyecto del que se está hablando. **`null` mientras no se ha elegido.**
    *
    * ⚠️ Sin foco no se puede preguntar nada: el turno va a
@@ -243,6 +249,7 @@ export function AssistantChat({
   sugerenciaExterna = null,
   alAceptarGrafico,
   variante = 'panel',
+  userName,
 }: AssistantChatProps) {
   /* Las dos variantes «altas» comparten toda la mecánica de alto y scroll; lo
      único propio del cajón es su cabecera con el aspa. */
@@ -702,7 +709,7 @@ export function AssistantChat({
                 </h3>
                 <Badge
                   variant="accent"
-                  className="inline-flex items-center gap-1 uppercase"
+                  className="inline-flex items-center gap-1 uppercase text-sm"
                   style={{
                     borderRadius: 4,
                     background: alpha(colors.accent, 15),
@@ -1170,7 +1177,11 @@ export function AssistantChat({
 
                   <div className="flex max-w-lg flex-col gap-2">
                     <p className="font-display text-2xl text-text-primary">
-                      {projectId ? 'Pregúntame por este proyecto' : `Hola, soy ${PRAX_NAME}`}
+                      {projectId
+                        ? 'Pregúntame por este proyecto'
+                        : userName
+                          ? `Hola ${userName}, ¿qué tal todo?`
+                          : 'Hola, ¿qué tal todo?'}
                     </p>
                     {/**
                      * ⚠️ **Sin foco esto decía «elige un proyecto», y era una
@@ -1182,8 +1193,8 @@ export function AssistantChat({
                      */}
                     <p className="font-serif text-base italic text-text-secondary">
                       {projectId
-                        ? 'Sé qué hay en cada tablero, quién lleva qué y cómo va el ritmo. Puedo responder con esos números, y también preparar el trabajo que salga de hablarlo.'
-                        : 'Pregúntame lo que quieras. Si me cuentas un proyecto que aún no existe —y me pasas lo que tengas escrito— te propongo cómo montarlo; y si quieres que mire uno de los tuyos, elígelo y te cuento cómo va.'}
+                        ? 'Dime lo que necesitas de este proyecto y yo te lo facilito.'
+                        : 'Pregúntame lo que quieras, o empecemos hablando de alguno de tus proyectos.'}
                     </p>
                   </div>
 

@@ -757,6 +757,21 @@ export function personLabel(user: UserProfile): string {
 }
 
 /**
+ * Con qué llamar a alguien cuando se le saluda.
+ *
+ * El nombre de pila, o la parte local del correo si la cuenta aún no tiene
+ * nombre —que es lo normal, porque el registro no lo pide—. Sale de
+ * `personLabel` justamente para heredar esa caída: un «Hola, » a secas es peor
+ * que un «Hola, andres».
+ *
+ * ⚠️ **Solo la primera palabra.** Un saludo con nombre y dos apellidos no suena
+ * a saludo, suena a citación.
+ */
+export function firstNameOf(user: UserProfile): string {
+  return personLabel(user).trim().split(' ')[0] ?? '';
+}
+
+/**
  * Tipos de aviso. Espejo de `NotificationType` en `@praxis/contracts`.
  *
  * Todos describen **algo que ya pasó**. Las invitaciones sin responder no están

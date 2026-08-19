@@ -7,6 +7,8 @@ import {
   type Paginated,
   type Project,
   type ProjectMember,
+  type UserProfile,
+  firstNameOf,
   personName,
   resolveProfiles,
 } from '@praxis/commons';
@@ -82,9 +84,24 @@ export default async function AssistantPage({ searchParams }: PageProps) {
    * gestión equivocada. Que lance y lo recoja `error.tsx`, que dice que fue un
    * corte y ofrece reintentar. Mismo criterio que la puerta de Análisis.
    */
-  const conAcceso = await api.get<Paginated<Project>>(
-    '/projects?limit=100&permission=canViewReports',
-  );
+  const listaPromesa = api.get<Paginated<Project>>('/projects?limit=100&permission=canViewReports');
+
+  /**
+   * Con qué saludar.
+   *
+   * ⚠️ **`/users/me` suelto y no `loadCurrentUser()`**, que es lo que pedía el
+   * cuerpo. Aquel trae además los roles globales —otra petición— y aquí lo único
+   * que se usa es el nombre de pila. El armazón ya resolvió el usuario en su
+   * `layout.tsx`, pero nada lo deduplica entre layout y page, así que lo barato
+   * es pedir solo lo que hace falta y que viaje **en paralelo** con la lista.
+   *
+   * Degrada: sin nombre, PRAX saluda sin nombre. No poder decir «Andrés» no es
+   * motivo para dejar a nadie sin pantalla.
+   */
+  const perfilPromesa = api.get<UserProfile>('/users/me').catch(() => null);
+
+  const [conAcceso, perfil] = await Promise.all([listaPromesa, perfilPromesa]);
+  const nombreCorto = perfil ? firstNameOf(perfil) : undefined;
 
   const proyectos = conAcceso.items;
 
@@ -166,6 +183,7 @@ export default async function AssistantPage({ searchParams }: PageProps) {
           cuotaInicial={cuota}
           nombres={nombres}
           etiquetas={nombresDeEtiquetas}
+          userName={nombreCorto}
         />
       </div>
     </AppHeader>

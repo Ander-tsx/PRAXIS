@@ -13,6 +13,8 @@ export interface PraxScreenProps {
   cuotaInicial: AssistantQuota | null;
   nombres: Record<string, string>;
   etiquetas: Record<string, string>;
+  /** El nombre de pila, para el saludo de la pantalla vacía. Ver `AssistantChatProps`. */
+  userName?: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export function PraxScreen({
   cuotaInicial,
   nombres,
   etiquetas,
+  userName,
 }: PraxScreenProps) {
   const router = useRouter();
 
@@ -118,6 +121,7 @@ export function PraxScreen({
         cuotaInicial={cuotaInicial}
         nombres={nombres}
         etiquetas={etiquetas}
+        userName={userName}
         /* Aquí la conversación **es** la pantalla: sin tarjeta, ocupando el alto
            disponible y con el compositor abajo del todo. En Análisis el mismo
            organismo va en modo `cajon`. */
