@@ -16,7 +16,11 @@ export type VistaMini =
   | 'area_apilada'
   | 'cifras'
   | 'dispersion'
-  | 'lista';
+  | 'lista'
+  | 'histograma'
+  | 'barras_apiladas'
+  | 'barras_divergentes'
+  | 'mapa_calor';
 
 /**
  * La forma de un grafo, en 56×36 píxeles.

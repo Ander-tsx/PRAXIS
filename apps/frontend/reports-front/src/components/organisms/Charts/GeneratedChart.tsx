@@ -14,6 +14,7 @@ import {
   LineChart,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -61,8 +62,12 @@ export function GeneratedChart({
       <div className="min-h-0 flex-1">
         {datos.forma === 'categorias' ? (
           <Categorico datos={datos} forma={forma} />
-        ) : (
+        ) : datos.forma === 'serie' ? (
           <Temporal datos={datos} forma={forma} />
+        ) : datos.forma === 'distribucion' ? (
+          <Distribucion datos={datos} forma={forma} />
+        ) : (
+          <Matriz datos={datos} />
         )}
       </div>
     </div>
@@ -238,11 +243,12 @@ function Temporal({
             tramo cerrado, no un instante, y la barra lo dice mejor que un punto
             unido al siguiente. El flujo acumulado no las admite, y por eso el
             contrato no deja pedirlas. */}
-        {forma === 'barras' ? (
+        {forma === 'barras' || forma === 'barras_apiladas' || forma === 'barras_divergentes' ? (
           <BarChart data={puntos} margin={{ left: -16, right: 8, top: 8 }}>
             <CartesianGrid stroke={colors.border} strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="x" {...ejes} minTickGap={16} />
             <YAxis {...ejes} allowDecimals={false} />
+            {forma === 'barras_divergentes' && <ReferenceLine y={0} stroke={colors.border} />}
             <Tooltip {...tooltipStyle} cursor={{ fill: alpha(colors.primary, 8) }} />
             {series.map((serie) => (
               <Bar
@@ -250,7 +256,8 @@ function Temporal({
                 dataKey={serie.clave}
                 name={serie.nombre}
                 fill={serie.color}
-                radius={[4, 4, 0, 0]}
+                stackId={forma === 'barras_apiladas' ? 'apilado' : undefined}
+                radius={forma === 'barras_apiladas' ? 0 : [4, 4, 0, 0]}
                 isAnimationActive={false}
               />
             ))}
@@ -297,6 +304,108 @@ function Temporal({
           </LineChart>
         )}
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+function Distribucion({
+  datos,
+  forma,
+}: {
+  datos: Extract<DatosGenerados, { forma: 'distribucion' }>;
+  forma: FormaGrafico;
+}) {
+  const { tramos, unidadX, unidadY } = datos;
+  
+  return (
+    <ResponsiveContainer width="100%" height="100%" minHeight={160}>
+      <BarChart data={tramos} margin={{ left: -16, right: 8, top: 8 }}>
+        <CartesianGrid stroke={colors.border} strokeDasharray="3 3" vertical={false} />
+        <XAxis 
+          dataKey="min" 
+          {...ejes} 
+          tickFormatter={(val, index) => {
+             const tramo = tramos[index];
+             if (!tramo) return val;
+             return `${tramo.min}-${tramo.max}`;
+          }} 
+        />
+        <YAxis {...ejes} allowDecimals={false} />
+        <Tooltip
+          {...tooltipStyle}
+          cursor={{ fill: alpha(colors.primary, 8) }}
+          formatter={(valor) => [`${valor} ${unidadY}`, '']}
+          labelFormatter={(label, payload) => {
+            if (payload.length === 0) return label;
+            const tramo = payload[0].payload;
+            return `De ${tramo.min} a ${tramo.max} ${unidadX}`;
+          }}
+        />
+        <Bar
+          dataKey="count"
+          fill={colors.primary}
+          radius={[4, 4, 0, 0]}
+          isAnimationActive={false}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }> }) {
+  const { filas, columnas, valores } = datos;
+  
+  // Find max value for heatmap color intensity
+  let max = 0;
+  for (const fila of filas) {
+    for (const col of columnas) {
+       const val = valores[fila.clave]?.[col.clave] ?? 0;
+       if (val > max) max = val;
+    }
+  }
+  
+  if (filas.length === 0 || columnas.length === 0) {
+     return (
+       <div className="flex h-full min-h-32 items-center justify-center px-4 text-center">
+         <p className="font-sans text-sm text-text-disabled">No hay datos en el cruce.</p>
+       </div>
+     );
+  }
+
+  return (
+    <div className="overflow-x-auto h-full w-full flex flex-col items-start justify-start">
+      <table className="min-w-full border-collapse text-sm">
+        <thead>
+          <tr>
+            <th className="p-2 border border-border bg-surface-elevated text-left font-sans text-text-secondary font-medium sticky top-0 left-0 z-20"></th>
+            {columnas.map((col) => (
+              <th key={col.clave} className="p-2 border border-border bg-surface-elevated text-center font-sans text-text-secondary font-medium min-w-[80px] max-w-[120px] truncate sticky top-0 z-10" title={col.nombre}>
+                {col.nombre}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((fila) => (
+            <tr key={fila.clave}>
+              <th className="p-2 border border-border bg-surface text-left font-sans text-text-secondary font-medium sticky left-0 z-10 max-w-[150px] truncate" title={fila.nombre}>
+                {fila.nombre}
+              </th>
+              {columnas.map((col) => {
+                const val = valores[fila.clave]?.[col.clave] ?? 0;
+                const opacity = max > 0 ? (val / max) * 0.8 + 0.1 : 0;
+                const color = val > 0 ? alpha(colors.primary, opacity * 100) : 'transparent';
+                
+                return (
+                  <td key={col.clave} className="p-2 border border-border text-center font-sans tabular-nums" style={{ backgroundColor: color }}>
+                    {val > 0 ? <span className={opacity > 0.5 ? 'text-surface' : 'text-text-primary'}>{val}</span> : <span className="text-border-subtle">-</span>}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

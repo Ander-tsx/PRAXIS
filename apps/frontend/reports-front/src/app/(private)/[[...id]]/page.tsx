@@ -440,9 +440,15 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
         return <TiempoPorColumnaWidget columnTime={columnTime} />;
       case 'generado': {
         if (!widget.grafico) return <NoDisponible />;
+        const matrices: Record<string, any> = {};
+        for (const [key, val] of Object.entries(informes)) {
+          if (key.startsWith('matrix:') && val) {
+            matrices[key] = val;
+          }
+        }
         const datos = construirDatos(
           widget.grafico,
-          { snapshot, people, blocked, flow, weekly, dynamics, columnTime },
+          { snapshot, people, blocked, flow, weekly, dynamics, columnTime, matrices, cycle },
           { personas: nombres, etiquetas: nombresDeEtiquetas },
         );
         /* El aviso de la semana a medias viaja con el gráfico, no dentro de
