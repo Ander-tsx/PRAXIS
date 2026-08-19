@@ -15,7 +15,17 @@ import type {
   MoveProposal,
   TaskProposal,
 } from '../api/assistant';
-import type { Board, Column, ProjectDetail, Task, Workspace } from '../api/domain';
+import type {
+  Board,
+  Column,
+  ProjectDetail,
+  ProjectTemplate,
+  Task,
+  TemplateResult,
+  Workspace,
+} from '../api/domain';
+import { getSession } from '../auth/session';
+import { aplicarPlantilla } from '../template/apply';
 import { cuotaDelError, describe, requireApi } from './helpers';
 
 /**
@@ -106,7 +116,16 @@ export interface RespuestaChat {
  * continúe el mismo hilo.
  */
 export async function preguntarAction(
-  projectId: string,
+  /**
+   * De qué proyecto se habla, o **`null` para hablar sin ninguno**.
+   *
+   * ⚠️ Es lo que elige la ruta, y las dos existen por un motivo distinto: la de
+   * proyecto pasa por `ProjectPermissionGuard` y trae briefing, gente y las doce
+   * herramientas; la de `/me` no tiene contra qué comprobar permisos y trae tres.
+   * Mandar `null` a la primera sería `/projects/null/assistant/chat`, que es un
+   * 400 con un mensaje sobre UUIDs que no dice nada de lo que pasó.
+   */
+  projectId: string | null,
   message: string,
   conversationId?: string,
   attachmentIds?: string[],
@@ -154,7 +173,9 @@ export async function preguntarAction(
   }
 
   try {
-    const resultado = await api.post<AssistantChatResult>(`/projects/${projectId}/assistant/chat`, {
+    const ruta = projectId ? `/projects/${projectId}/assistant/chat` : '/me/assistant/chat';
+
+    const resultado = await api.post<AssistantChatResult>(ruta, {
       message: texto,
       ...(conversationId ? { conversationId } : {}),
       /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
@@ -277,15 +298,17 @@ export async function borrarConversacionAction(
  * por el gateway con sus permisos.
  */
 export async function resolverPropuestaAction(
-  projectId: string,
+  /** `null` en una conversación sin foco: la ruta de proyecto daría 404. */
+  projectId: string | null,
   proposalId: string,
   status: 'ACCEPTED' | 'DISCARDED',
 ): Promise<void> {
   const api = await requireApi();
   if (!api) return;
-  await api
-    .post(`/projects/${projectId}/assistant/proposals/${proposalId}/resolve`, { status })
-    .catch(() => null);
+  const ruta = projectId
+    ? `/projects/${projectId}/assistant/proposals/${proposalId}/resolve`
+    : `/me/assistant/proposals/${proposalId}/resolve`;
+  await api.post(ruta, { status }).catch(() => null);
 }
 
 /** Cuánta cuota queda. La pide la página al cargar, antes de escribir nada. */
@@ -931,6 +954,34 @@ export async function aceptarMensajeAction(
   } catch (error) {
     return { error: describe(error, 'No se pudo enviar el mensaje.'), enviado: false };
   }
+}
+
+/**
+ * Crea el proyecto de una plantilla propuesta en la conversación.
+ *
+ * ## No hay ninguna ruta nueva, y ese es todo el asunto
+ *
+ * Delega en `aplicarPlantilla`, que ya existía para el diálogo de proyecto
+ * nuevo: `POST /projects`, y después las rutas de etiquetas, roles, espacios,
+ * tableros y columnas, una a una, con la sesión de quien pulsa. **Lo que
+ * propone PRAX se materializa exactamente por donde lo haría una persona.**
+ *
+ * ⚠️ Y por eso esta acción es de tres líneas: si hubiera que escribir aquí la
+ * orquestación, sería la segunda copia de un orden que ya tiene un bug
+ * arreglado dentro (§36.4 — las columnas van en secuencia, no en paralelo).
+ */
+export async function aceptarPlantillaAction(plantilla: ProjectTemplate): Promise<TemplateResult> {
+  const session = await getSession();
+  if (!session) {
+    return {
+      proyecto: null,
+      creado: { etiquetas: 0, roles: 0, espacios: 0, tableros: 0, columnas: 0 },
+      fallos: [],
+      error: 'Tu sesión ha caducado.',
+    };
+  }
+
+  return aplicarPlantilla(plantilla);
 }
 
 /**

@@ -22,8 +22,10 @@ import {
   isEditProposal,
   isMessageProposal,
   isMoveProposal,
+  isOpenProjectProposal,
   isQuestionProposal,
   isTaskProposal,
+  isTemplateProposal,
 } from '../../api/assistant';
 import { cargarConversacionAction, preguntarAction } from '../../assistant/actions';
 import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
@@ -45,8 +47,10 @@ import {
   MarkStepsProposalCard,
   MessageProposalCard,
   MoveProposalCard,
+  OpenProjectProposalCard,
   QuestionProposalCard,
   TaskProposalCard,
+  TemplateProposalCard,
 } from './ProposalCard';
 import { ProposalGroup } from './ProposalGroup';
 
@@ -106,7 +110,12 @@ export interface AssistantChatProps {
    * Y el hilo **no se pierde al navegar** porque vive en la base: se recupera con
    * el `conversationId`, que por eso viaja de vuelta.
    */
-  onElegirProyecto?: (projectId: string, conversationId: string | null) => void;
+  onElegirProyecto?: (
+    projectId: string,
+    conversationId: string | null,
+    /** El slug, cuando el proyecto es tan nuevo que la pantalla no lo conoce. */
+    slug?: string,
+  ) => void;
   /** La conversación a recuperar al montar. Viene de la URL. */
   conversacionInicial?: string | null;
   /** La cuota al cargar la página, antes de escribir nada. */
@@ -562,12 +571,6 @@ export function AssistantChat({
     /* Con una subida en vuelo, el turno saldría sin ese archivo y PRAX
        respondería a medias sobre algo que la burbuja sí enseña. */
     if (subiendo) return;
-
-    /* Sin foco no hay a dónde mandar el turno. No debería llegar aquí —sin él no
-       se pinta el compositor— pero el estrechamiento de tipos lo pide. Va antes
-       de tocar el estado: salir después dejaría el mensaje pintado en el hilo y
-       el campo vacío, o sea la pregunta perdida. */
-    if (!projectId) return;
 
     /**
      * Los que llegaron a subirse.
@@ -1057,6 +1060,39 @@ export function AssistantChat({
                               />
                             );
                           }
+                          /**
+                           * Las dos de una conversación **sin proyecto**.
+                           *
+                           * Van antes que las demás porque son las únicas que
+                           * pueden llegar sin foco, y las dos acaban en el mismo
+                           * gesto: cargar un proyecto en esta misma conversación
+                           * —uno que ya existía, o el que se acaba de crear— sin
+                           * perder lo que se lleva hablado.
+                           */
+                          if (isOpenProjectProposal(propuesta)) {
+                            return (
+                              <OpenProjectProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                onAbrir={(elegido) => onElegirProyecto?.(elegido, conversationId)}
+                              />
+                            );
+                          }
+                          if (isTemplateProposal(propuesta)) {
+                            return (
+                              <TemplateProposalCard
+                                key={propuesta.id ?? `${mensaje.id}-${indice}`}
+                                projectId={projectId}
+                                proposalId={propuesta.id}
+                                estadoGuardado={propuesta.status}
+                                propuesta={propuesta.args}
+                                onAbrir={(creado) => onElegirProyecto?.(creado, conversationId)}
+                              />
+                            );
+                          }
                           if (isQuestionProposal(propuesta)) {
                             return (
                               <QuestionProposalCard
@@ -1136,10 +1172,18 @@ export function AssistantChat({
                     <p className="font-display text-2xl text-text-primary">
                       {projectId ? 'Pregúntame por este proyecto' : `Hola, soy ${PRAX_NAME}`}
                     </p>
+                    {/**
+                     * ⚠️ **Sin foco esto decía «elige un proyecto», y era una
+                     * puerta cerrada.** Con el compositor detrás de esa
+                     * elección, el saludo no daba la bienvenida: daba un
+                     * requisito. Ahora dice lo que de verdad se puede hacer
+                     * aquí, que es hablar — y elegir proyecto pasa a ser una de
+                     * las opciones, no el peaje.
+                     */}
                     <p className="font-serif text-base italic text-text-secondary">
                       {projectId
                         ? 'Sé qué hay en cada tablero, quién lleva qué y cómo va el ritmo. Puedo responder con esos números, y también preparar el trabajo que salga de hablarlo.'
-                        : '¿Hay algún proyecto en concreto sobre el que quieras que miremos? Elige uno y te cuento cómo va.'}
+                        : 'Pregúntame lo que quieras. Si me cuentas un proyecto que aún no existe —y me pasas lo que tengas escrito— te propongo cómo montarlo; y si quieres que mire uno de los tuyos, elígelo y te cuento cómo va.'}
                     </p>
                   </div>
 
@@ -1173,12 +1217,20 @@ export function AssistantChat({
                         ))}
                   </div>
 
-                  {/* Sin proyectos que ofrecer, decirlo: unos botones que no
-                      salen dejan la pantalla con un saludo y nada debajo. */}
+                  {/**
+                   * Sin proyectos que ofrecer, decirlo.
+                   *
+                   * ⚠️ Y decir **otra cosa** que antes: la frase era «todavía no
+                   * tengo datos de los que hablar», que con el compositor
+                   * apagado describía una pantalla inútil. Ahora se puede
+                   * escribir, así que lo que falta no es con quién hablar sino
+                   * qué mirar — y montar el primer proyecto es justo lo que PRAX
+                   * sabe hacer sin ninguno.
+                   */}
                   {!projectId && proyectos.length === 0 && (
                     <p className="max-w-md font-sans text-sm text-text-disabled">
-                      No hay ningún proyecto cuyo análisis puedas abrir, así que todavía no tengo
-                      datos de los que hablar.
+                      No tienes ningún proyecto cuyo análisis puedas abrir. Cuéntame en qué estás
+                      trabajando y te propongo cómo montarlo.
                     </p>
                   )}
                 </div>
@@ -1199,13 +1251,21 @@ export function AssistantChat({
               ))}
 
             {/**
-             * ⚠️ **Sin foco no hay compositor**, y no es una restricción
-             * cosmética: el turno va a `POST /projects/:id/assistant/chat`, que
-             * es donde el gateway comprueba el permiso y de donde sale el
-             * contexto. Un campo de texto que no puede mandar nada es peor que
-             * ninguno — invita a escribir para después decir que no.
+             * ⚠️ **Antes esto era `!projectId ? null : …` y esa era la reja.**
+             *
+             * El argumento de entonces era correcto para lo que había: el turno
+             * iba a `POST /projects/:id/assistant/chat`, así que sin proyecto el
+             * campo no podía mandar nada e invitaba a escribir para después
+             * decir que no.
+             *
+             * Lo que cambió no es el criterio, es que **ahora sí hay dónde
+             * mandarlo**: `POST /me/assistant/chat`, sin proyecto y sin permisos
+             * de proyecto que comprobar. Una conversación sin foco dejó de ser
+             * una sala de espera y pasó a ser un sitio donde se trabaja: se le
+             * cuenta un proyecto que todavía no existe, se le adjunta lo que hay
+             * escrito, y de ahí sale la propuesta de montarlo.
              */}
-            {!projectId ? null : agotada && cuota ? (
+            {agotada && cuota ? (
               <p
                 role="note"
                 className="mt-auto shrink-0 rounded-xl border px-4 py-3 font-sans text-sm text-warning"

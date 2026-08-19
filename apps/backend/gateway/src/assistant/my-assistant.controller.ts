@@ -30,8 +30,10 @@ import {
 import {
   ASSISTANT_ATTACHMENT_ALLOWED_MIME,
   ASSISTANT_ATTACHMENT_MAX_BYTES,
+  AssistantChatBodyDto,
   ProjectDraftBodyDto,
   RenameConversationBodyDto,
+  ResolveProposalBodyDto,
   esImagenDeAsistente,
   validarFirmaChatAdjunto,
 } from '@praxis/contracts';
@@ -72,13 +74,169 @@ import { JwtGuard } from '../auth/jwt.guard';
  * El permiso se sigue exigiendo donde de verdad hace falta: en
  * `POST /projects/:projectId/assistant/chat`, que es lo único que **lee datos
  * del proyecto**.
+ *
+ * ## Y desde que se puede hablar sin proyecto, el turno también
+ *
+ * `POST /me/assistant/chat` es el tercer inquilino, y el que más deja claro para
+ * qué sirve este controlador: una conversación sin foco no tiene proyecto contra
+ * el que comprobar nada, así que la ruta con guard no le vale — habría que
+ * inventarse un `projectId` para satisfacerlo.
+ *
+ * Con él viene `POST /me/assistant/proposals/:id/resolve`, que existe por un
+ * motivo mucho más terco: **la de proyecto respondía 404** a cualquier tarjeta de
+ * una conversación sin foco, así que no había forma de anotar que se aceptó.
  */
 @ApiTags('Assistant')
 @ApiBearerAuth()
 @UseGuards(JwtGuard)
 @Controller('me/assistant')
 export class MyAssistantController {
-  constructor(@Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy) {}
+  constructor(
+    @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+  ) {}
+
+  /**
+   * Un turno de conversación **sin ningún proyecto cargado**.
+   *
+   * ## Por qué existe, si ya hay una ruta de chat
+   *
+   * La otra cuelga de `/projects/:projectId` y exige `canViewReports` sobre ese
+   * proyecto. Aquí no hay proyecto: se está hablando de uno que **todavía no
+   * existe**, o simplemente se está conversando. Meterlo en la otra ruta habría
+   * exigido inventarse un `projectId` de mentira para satisfacer al guard.
+   *
+   * ## Lo que NO viaja, que es casi todo
+   *
+   * Sin proyecto no hay permisos que resolver, ni miembros, ni chat de equipo, ni
+   * briefing. El servicio lo detecta por `projectId: null` y usa su otro juego de
+   * reglas y de herramientas.
+   *
+   * Lo único que se resuelve aquí son dos cosas, y las dos con **la sesión de
+   * quien llama**:
+   *
+   * - **su nombre**, para que PRAX no le hable en UUID;
+   * - **sus proyectos**, los que ya podría abrir en la pantalla, para que
+   *   `proponer_abrir_proyecto` tenga contra qué validarse. Que la lista salga de
+   *   aquí y no del navegador es lo que impide que alguien se ofrezca a sí mismo
+   *   un proyecto ajeno.
+   *
+   * ⚠️ **Y ninguna de las dos tumba el turno si falla**: sin nombre se omite el
+   * bloque, sin proyectos PRAX se queda sin poder ofrecer abrir ninguno. Perder
+   * eso empeora la respuesta; perder el turno la borra.
+   */
+  @Post('chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Un turno de conversación con PRAX, sin proyecto' })
+  @ApiResponse({ status: 200, description: 'Respuesta, propuestas y cuota' })
+  @ApiResponse({ status: 429, description: 'Cuota mensual agotada' })
+  @ApiResponse({ status: 502, description: 'Gemini no respondió. No se ha consumido cuota' })
+  async chat(@Request() req: Express.Request, @Body() body: AssistantChatBodyDto) {
+    const userId = req.user!.userId;
+
+    const [proyectos, quien] = await Promise.all([
+      this.proyectosQuePuedeAbrir(userId),
+      this.nombreDe(userId),
+    ]);
+
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_chat' },
+        {
+          /* La marca del modo. El servicio no lo deduce de nada más. */
+          projectId: null,
+          userId,
+          message: body.message,
+          conversationId: body.conversationId,
+          attachmentIds: body.attachmentIds,
+          /* Vacío y no «los de algún proyecto»: no hay proyecto del que sacar
+             miembros, y el mapa de permisos de un proyecto que no existe no
+             significa nada. */
+          permisos: {},
+          /* Solo quien pregunta: es lo único que se puede saber sin proyecto, y
+             es lo que el prompt necesita para llamarle por su nombre. */
+          miembros: quien ? [quien] : [],
+          proyectos,
+        },
+      ),
+    );
+  }
+
+  /**
+   * Marcar una propuesta como aplicada o descartada, **sin proyecto**.
+   *
+   * 🔴 **Sin esto, aceptar cualquier tarjeta de una conversación sin foco daba
+   * 404.** La otra ruta de resolver cuelga de `/projects/:projectId`, y en este
+   * modo no hay ninguno que poner: la propuesta existe, la conversación existe, y
+   * la única forma de anotar la decisión respondía que no.
+   *
+   * ⚠️ Y **esto no aplica nada**, igual que su hermana: solo anota lo que se
+   * decidió para que al releer el hilo no se ofrezca otra vez un botón que ya se
+   * pulsó. Quien crea el proyecto de una plantilla es el frontend, llamando a las
+   * rutas de siempre con la sesión de quien acepta.
+   *
+   * Lo que protege esto no es un permiso de proyecto —no hay— sino que el
+   * `userId` sale del token y assistant-service comprueba que la propuesta cuelga
+   * de una conversación suya.
+   */
+  @Post('proposals/:proposalId/resolve')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Anotar si una propuesta se aceptó o se descartó' })
+  resolverPropuesta(
+    @Param('proposalId', ParseUUIDPipe) proposalId: string,
+    @Request() req: Express.Request,
+    @Body() body: ResolveProposalBodyDto,
+  ) {
+    return firstValueFrom(
+      this.assistantClient.send(
+        { cmd: 'assistant_proposal_resolve' },
+        { userId: req.user!.userId, proposalId, status: body.status },
+      ),
+    );
+  }
+
+  /**
+   * Los proyectos que esta persona podría abrir desde la conversación.
+   *
+   * **`canViewReports` y no `canViewProject`**, y no es arbitrario: aceptar la
+   * propuesta lleva a la ruta de chat del proyecto, que exige exactamente ese
+   * permiso. Ofrecer uno sin él sería ofrecer una conversación que responde 403 a
+   * la primera pregunta — la misma consulta que ya hace la pantalla al pintar el
+   * selector.
+   */
+  private async proyectosQuePuedeAbrir(userId: string): Promise<{ id: string; nombre: string }[]> {
+    const pagina = await firstValueFrom(
+      this.projectsClient.send<{ items?: { id: string; name: string }[] }>(
+        { cmd: 'project_find_all' },
+        {
+          userId,
+          permission: 'canViewReports',
+          /* Cien es de sobra para nombrarlos y es el mismo tope que usa la
+             pantalla. Lo que no cabe aquí tampoco cabría en el prompt. */
+          query: { limit: 100 },
+        },
+      ),
+    ).catch(() => null);
+
+    return (pagina?.items ?? []).map((proyecto) => ({ id: proyecto.id, nombre: proyecto.name }));
+  }
+
+  /** Quién pregunta, para que PRAX no le hable en UUID. */
+  private async nombreDe(userId: string): Promise<{ userId: string; nombre: string } | null> {
+    const perfiles = await firstValueFrom(
+      this.credentialsClient.send<{ id: string; firstName?: string; lastName?: string }[]>(
+        { cmd: 'user_find_by_ids' },
+        { ids: [userId] },
+      ),
+    ).catch(() => null);
+
+    const perfil = (perfiles ?? [])[0];
+    const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
+    /* Sin nombre no se manda el id como si lo fuera: el prompt omite el bloque
+       entero, que es mejor que «QUIEN TE ESCRIBE: 7f3a-…». */
+    return nombre ? { userId, nombre } : null;
+  }
 
   @Get('conversations')
   @HttpCode(HttpStatus.OK)

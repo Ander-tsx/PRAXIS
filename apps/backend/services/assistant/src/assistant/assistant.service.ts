@@ -20,14 +20,23 @@ import { bloqueDeArchivo } from './attachment-text';
 import { AttachmentsService } from './attachments.service';
 import { ConversationsService } from './conversations.service';
 import { GeminiClient, GeminiError } from './gemini.client';
-import { systemInstruction } from './prompt';
+import { instruccionSinProyecto, systemInstruction } from './prompt';
 import { QuotaService } from './quota.service';
 import { PROPONER_PLANTILLA, instruccionDePlantilla, validarPlantilla } from './template';
-import { herramientasPara } from './tools';
+import { herramientasPara, herramientasSinProyecto } from './tools';
 
 /** Lo que el gateway manda en cada turno. Todo lo de permisos llega resuelto. */
 interface ChatPayload {
-  projectId: string;
+  /**
+   * De qué proyecto se habla. **`null` en una conversación sin foco.**
+   *
+   * ⚠️ No es «todavía no elegido»: es un modo. Sin foco no hay briefing que
+   * pedir, ni permisos que resolver, ni miembros a los que nombrar — no porque
+   * se ahorren, sino porque no existen. Lo que hay es PRAX conversando, leyendo
+   * lo que le adjunten, y con dos salidas hacia un proyecto: abrir uno de los de
+   * esa persona o montar la estructura de uno que aún no existe.
+   */
+  projectId: string | null;
   userId: string;
   message: string;
   /**
@@ -64,6 +73,16 @@ interface ChatPayload {
    * /me/assistant/attachments`— y aquí solo llegan los ids de los borradores.
    */
   attachmentIds?: string[];
+  /**
+   * Los proyectos que esta persona puede abrir. **Solo en el modo sin foco.**
+   *
+   * Los resuelve el gateway con su sesión (`GET /projects?permission=
+   * canViewReports`, la misma consulta que usa la pantalla) y sirven para dos
+   * cosas: que el modelo pueda nombrarlos, y —lo que de verdad importa— que
+   * `proponer_abrir_proyecto` se valide contra esta lista. Un id que no esté
+   * aquí se descarta antes de llegar a la pantalla.
+   */
+  proyectos?: { id: string; nombre: string }[];
 }
 
 /**
@@ -104,7 +123,20 @@ const NOMBRE_DE_PROPUESTA: Record<string, string> = {
   proponer_grafico: 'un grafico para tu panel',
   proponer_borrado: 'borrar una tarea',
   proponer_tablero: 'un tablero con sus columnas',
+  proponer_abrir_proyecto: 'abrir uno de tus proyectos',
+  proponer_plantilla: 'la estructura de un proyecto nuevo',
 };
+
+/**
+ * El techo de salida cuando el turno puede traer una plantilla de proyecto.
+ *
+ * 🔴 Con los 2048 de siempre, un plan grande —cuatro espacios, sus tableros, sus
+ * columnas, seis roles con permisos y doce etiquetas— llega **cortado**: la API
+ * marca `finishReason: MAX_TOKENS`, el JSON de la llamada a función queda a
+ * medias y la validación lo descarta. Por fuera se ve como un asistente que no
+ * ha sabido responder, sin un solo error en ninguna consola.
+ */
+const MAX_TOKENS_PLANTILLA = 8192;
 
 const MAX_COLUMNAS = 8;
 const COLOR_DE_CIERRE = 'success';
@@ -273,19 +305,34 @@ export class AssistantService {
     );
     const history = await this.conversaciones.historial(conversationId);
 
-    const briefing = await firstValueFrom(
-      this.reportsClient.send<Briefing>(
-        { cmd: 'report_briefing' },
-        {
-          projectId: payload.projectId,
-          /* La línea de `canViewReports`, resuelta por el gateway. Lo que no se
-             trae no se puede filtrar mal más adelante. */
-          incluirPersonas: payload.permisos.canViewReports === true,
-        },
-      ),
-    );
+    /**
+     * ⚠️ **Sin foco no se pide briefing, y no es una optimización.**
+     *
+     * `report_briefing` cuelga de un `projectId`: llamarlo con `null` sería
+     * pedirle a reports-service el inventario de nada. Todo lo que se deriva de
+     * él —las cifras, las tareas, la gente, las etiquetas— tampoco existe en
+     * este modo, y esa es exactamente la diferencia que la regla 18 del prompt
+     * le tiene que dejar clara al modelo.
+     */
+    const briefing = payload.projectId
+      ? await firstValueFrom(
+          this.reportsClient.send<Briefing>(
+            { cmd: 'report_briefing' },
+            {
+              projectId: payload.projectId,
+              /* La línea de `canViewReports`, resuelta por el gateway. Lo que no se
+                 trae no se puede filtrar mal más adelante. */
+              incluirPersonas: payload.permisos.canViewReports === true,
+            },
+          ),
+        )
+      : null;
 
-    const herramientas = herramientasPara(payload.permisos);
+    /**
+     * Sin proyecto no hay permisos que filtrar: las tres de este modo no tocan
+     * datos de ninguno. Ver `herramientasSinProyecto`.
+     */
+    const herramientas = briefing ? herramientasPara(payload.permisos) : herramientasSinProyecto();
 
     /**
      * Los archivos, repartidos en dos montones.
@@ -303,22 +350,34 @@ export class AssistantService {
     const mensajeConArchivos =
       textos.length > 0 ? `${payload.message}\n\n${textos}` : payload.message;
 
+    /* Quién pregunta sale de la lista de miembros que ya llega resuelta: no hace
+       falta ninguna consulta más. Sin foco el gateway manda ahí a esa persona
+       sola, que es lo único que se puede saber sin proyecto. Si no estuviera
+       —no debería pasar— el prompt omite el bloque en vez de mentir con un id. */
+    const quienPregunta = payload.miembros.find((miembro) => miembro.userId === payload.userId);
+
     const respuesta = await this.gemini.chat({
-      system: systemInstruction(
-        briefing,
-        payload.miembros,
-        herramientas.map((herramienta) => herramienta.name),
-        payload.chat ?? [],
-        /* Quién pregunta sale de la lista de miembros que ya llega resuelta: no
-           hace falta ninguna consulta más. Si no estuviera —no debería pasar—
-           el prompt simplemente omite el bloque en vez de mentir con un id. */
-        payload.miembros.find((miembro) => miembro.userId === payload.userId),
-      ),
+      system: briefing
+        ? systemInstruction(
+            briefing,
+            payload.miembros,
+            herramientas.map((herramienta) => herramienta.name),
+            payload.chat ?? [],
+            quienPregunta,
+          )
+        : instruccionSinProyecto(
+            payload.proyectos ?? [],
+            herramientas.map((herramienta) => herramienta.name),
+            quienPregunta,
+          ),
       /* Sale de la base, ya recortado a MAX_HISTORIAL. */
       history,
       archivos,
       message: mensajeConArchivos,
       tools: herramientas,
+      /* Sin foco, PRAX puede devolver una plantilla entera en la llamada, y eso
+         no cabe en el techo de siempre. Ver `MAX_TOKENS_PLANTILLA`. */
+      ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
     });
 
     /* Si Gemini falló, `chat` ya lanzó y no se llega aquí: la cuota no se toca.
@@ -326,7 +385,11 @@ export class AssistantService {
     const cuota = await this.quota.consumir(payload.userId);
 
     const validadas = respuesta.calls
-      .map((call) => this.validarPropuesta(call, briefing, payload))
+      .map((call) =>
+        briefing
+          ? this.validarPropuesta(call, briefing, payload)
+          : this.validarSinProyecto(call, payload),
+      )
       .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
 
     const reply = respuesta.text || this.textoPorDefecto(validadas);
@@ -430,6 +493,7 @@ export class AssistantService {
         : [],
       message: ajustando ? (payload.ajuste as string) : payload.brief,
       tools: [PROPONER_PLANTILLA],
+      maxOutputTokens: MAX_TOKENS_PLANTILLA,
     });
 
     /* Si Gemini falló, `chat` ya lanzó: la cuota no se toca. Ver `GeminiError`. */
@@ -579,6 +643,127 @@ export class AssistantService {
    * vuelve a comprobar permisos y a validar el DTO como con cualquier
    * formulario. Esto solo evita enseñar una propuesta rota.
    */
+  /**
+   * Lo que se acepta de una conversación **sin proyecto**.
+   *
+   * Aparte de `validarPropuesta` porque aquella valida **contra el briefing**
+   * —columnas, tareas, etiquetas, miembros— y aquí no hay ninguno: no es una
+   * versión recortada de lo mismo, es que no hay nada contra qué comprobar salvo
+   * la lista de proyectos.
+   *
+   * Las tres que caben, y qué se comprueba de cada una:
+   *
+   * | Herramienta | Qué la valida |
+   * |---|---|
+   * | `proponer_pregunta` | Lo mismo que en el otro modo — el método es el mismo |
+   * | `proponer_abrir_proyecto` | Que el id esté en **la lista del gateway** |
+   * | `proponer_plantilla` | `validarPlantilla`, que ya existía para el diálogo |
+   */
+  private validarSinProyecto(
+    call: { name: string; args: Record<string, unknown> },
+    payload: ChatPayload,
+  ): AssistantProposal | null {
+    if (call.name === 'proponer_pregunta') return this.validarPregunta(call);
+
+    if (call.name === 'proponer_abrir_proyecto') {
+      const pedido = String(call.args.projectId ?? '');
+      const proyecto = (payload.proyectos ?? []).find((candidato) => candidato.id === pedido);
+
+      /**
+       * ⚠️ **Aquí es donde se cae un id inventado**, y es la única capa que hace
+       * falta razonar: la lista la resolvió el gateway con la sesión de quien
+       * pregunta, así que lo que no esté en ella o no existe o no es suyo. En
+       * los dos casos la propuesta se descarta sin decirle al modelo cuál de los
+       * dos era.
+       */
+      if (!proyecto) {
+        this.log.warn(
+          `El modelo propuso abrir ${pedido}, que no esta en los proyectos de la persona`,
+        );
+        return null;
+      }
+
+      return {
+        tool: call.name,
+        /* El nombre viaja con la propuesta para que la tarjeta no dependa de que
+           el cliente tenga la lista cargada: al releer el hilo dentro de una
+           semana, la tarjeta sigue diciendo de qué proyecto hablaba. */
+        args: {
+          projectId: proyecto.id,
+          nombre: proyecto.nombre,
+          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+        },
+      };
+    }
+
+    if (call.name === PROPONER_PLANTILLA.name) {
+      const plantilla = validarPlantilla(call);
+      if (!plantilla) {
+        this.log.warn('El modelo propuso una plantilla que no paso la validacion: se descarta');
+        return null;
+      }
+      return { tool: call.name, args: plantilla as unknown as Record<string, unknown> };
+    }
+
+    this.log.warn(`El modelo llamo a ${call.name}, que no se le habia declarado sin proyecto`);
+    return null;
+  }
+
+  /**
+   * Las preguntas con opciones, que valen en los dos modos.
+   *
+   * Estaba dentro de `validarPropuesta` y se saca aquí porque el modo sin
+   * proyecto la necesita igual. Es la única herramienta que no depende de nada
+   * del contexto: solo pide un dato.
+   */
+  private validarPregunta(call: {
+    name: string;
+    args: Record<string, unknown>;
+  }): AssistantProposal | null {
+    const crudas = Array.isArray(call.args.preguntas) ? call.args.preguntas : [];
+
+    const preguntas = crudas
+      .slice(0, MAX_PREGUNTAS)
+      .map((cruda: unknown, indice: number) => {
+        const pregunta = (cruda ?? {}) as Record<string, unknown>;
+        const texto = String(pregunta.texto ?? '').trim();
+
+        const opciones = (Array.isArray(pregunta.opciones) ? pregunta.opciones : [])
+          .map((opcion: unknown) => String(opcion ?? '').trim())
+          .filter((opcion: string) => opcion.length > 0)
+          .slice(0, MAX_OPCIONES);
+
+        if (!texto || opciones.length < 2) return null;
+
+        return {
+          /* El id lo pone el servidor y no el modelo: es lo que la tarjeta usa
+             como clave de formulario, y un id repetido —o vacío— rompería el
+             marcado sin que se note hasta que dos casillas se marcan a la vez. */
+          id: `p${indice}`,
+          texto: texto.slice(0, 200),
+          tipo: pregunta.tipo === 'varias' ? 'varias' : 'una',
+          opciones: opciones.map((opcion: string, i: number) => ({
+            id: `o${i}`,
+            texto: opcion.slice(0, 120),
+          })),
+        };
+      })
+      .filter(Boolean);
+
+    if (preguntas.length === 0) {
+      this.log.warn('El modelo propuso preguntas sin opciones suficientes: se descarta');
+      return null;
+    }
+
+    return {
+      tool: call.name,
+      args: {
+        preguntas,
+        ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
+      },
+    };
+  }
+
   private validarPropuesta(
     call: { name: string; args: Record<string, unknown> },
     briefing: Briefing,
@@ -762,50 +947,7 @@ export class AssistantService {
      * la propuesta entera y el texto del modelo se queda solo — que es
      * exactamente lo que habría pasado si no hubiera llamado a la herramienta.
      */
-    if (call.name === 'proponer_pregunta') {
-      const crudas = Array.isArray(call.args.preguntas) ? call.args.preguntas : [];
-
-      const preguntas = crudas
-        .slice(0, MAX_PREGUNTAS)
-        .map((cruda: unknown, indice: number) => {
-          const pregunta = (cruda ?? {}) as Record<string, unknown>;
-          const texto = String(pregunta.texto ?? '').trim();
-
-          const opciones = (Array.isArray(pregunta.opciones) ? pregunta.opciones : [])
-            .map((opcion: unknown) => String(opcion ?? '').trim())
-            .filter((opcion: string) => opcion.length > 0)
-            .slice(0, MAX_OPCIONES);
-
-          if (!texto || opciones.length < 2) return null;
-
-          return {
-            /* El id lo pone el servidor y no el modelo: es lo que la tarjeta usa
-               como clave de formulario, y un id repetido —o vacío— rompería el
-               marcado sin que se note hasta que dos casillas se marcan a la vez. */
-            id: `p${indice}`,
-            texto: texto.slice(0, 200),
-            tipo: pregunta.tipo === 'varias' ? 'varias' : 'una',
-            opciones: opciones.map((opcion: string, i: number) => ({
-              id: `o${i}`,
-              texto: opcion.slice(0, 120),
-            })),
-          };
-        })
-        .filter(Boolean);
-
-      if (preguntas.length === 0) {
-        this.log.warn('El modelo propuso preguntas sin opciones suficientes: se descarta');
-        return null;
-      }
-
-      return {
-        tool: call.name,
-        args: {
-          preguntas,
-          ...(call.args.porQue ? { porQue: String(call.args.porQue) } : {}),
-        },
-      };
-    }
+    if (call.name === 'proponer_pregunta') return this.validarPregunta(call);
 
     /**
      * Un mensaje para el chat del equipo.

@@ -195,7 +195,12 @@ export class ConversationsService {
    * pedírselo a Gemini: sería una llamada más —y una unidad más de cuota— para
    * algo que se resuelve cortando una cadena, y que además se puede renombrar.
    */
-  async resolver(userId: string, projectId: string, mensaje: string, conversationId?: string) {
+  async resolver(
+    userId: string,
+    projectId: string | null,
+    mensaje: string,
+    conversationId?: string,
+  ) {
     if (conversationId) {
       const existente = await this.prisma.conversation.findFirst({
         /* Sin `projectId` en el `where`: **una conversación puede cambiar de
@@ -226,15 +231,41 @@ export class ConversationsService {
        * lo que no encaja es el proyecto—, y un 404 mandaría a buscar un id que
        * está perfectamente.
        */
-      if (existente.projectId && existente.projectId !== projectId) {
+      if (existente.projectId && projectId && existente.projectId !== projectId) {
         throw new RpcException({
           statusCode: 409,
           message: 'Esta conversación es de otro proyecto. Empieza una nueva para hablar de este.',
         });
       }
 
-      /* La primera pregunta de una conversación sin foco es la que lo fija. */
-      if (!existente.projectId) {
+      /**
+       * ⚠️ **Y al revés tampoco: una conversación con proyecto no vuelve a no
+       * tenerlo.**
+       *
+       * Este caso solo puede llegar de un cliente descolocado —una pestaña
+       * abierta desde antes de adoptar el proyecto, que sigue mandando el turno
+       * por la ruta sin foco—. Aceptarlo silenciosamente sería peor que
+       * rechazarlo: ese turno se respondería **sin el briefing**, así que PRAX
+       * diría que no tiene datos de un proyecto que la pantalla está enseñando
+       * como cargado, y no habría forma de entender por qué.
+       */
+      if (existente.projectId && !projectId) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Esta conversación ya es de un proyecto. Vuelve a abrirla para seguir.',
+        });
+      }
+
+      /**
+       * La primera pregunta de una conversación sin foco es la que lo fija.
+       *
+       * Es también **el momento en que una conversación sin proyecto lo
+       * adopta**: se acepta `proponer_abrir_proyecto` —o se crea uno desde una
+       * plantilla—, la pantalla vuelve por la ruta del proyecto con el mismo
+       * `conversationId`, y el hilo entero sigue ahí. Sin esto habría que
+       * empezar de cero justo después de haberle contado todo.
+       */
+      if (!existente.projectId && projectId) {
         await this.prisma.conversation.update({
           where: { id: existente.id },
           data: { projectId },
@@ -270,8 +301,12 @@ export class ConversationsService {
      * cambia a mitad, y sin esto un hilo que pasó por dos proyectos parecería
      * entero del último al releerlo — con sus propuestas apuntando al proyecto
      * equivocado a ojos de quien lo lee.
+     *
+     * `null` en los turnos de una conversación sin foco, que es lo que permite
+     * distinguir después **dónde se dejó de hablar en abstracto**: los mensajes
+     * anteriores a adoptar un proyecto no eran sobre él.
      */
-    projectId: string;
+    projectId: string | null;
     pregunta: string;
     respuesta: string;
     proposals: { tool: string; args: Record<string, unknown> }[];

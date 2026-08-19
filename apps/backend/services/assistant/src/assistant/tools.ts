@@ -20,6 +20,8 @@
  * modelo **no puede ni sugerirlo**.
  */
 
+import { PROPONER_PLANTILLA } from './template';
+
 export interface FunctionDeclaration {
   name: string;
   description: string;
@@ -673,6 +675,80 @@ const PROPONER_PREGUNTA: FunctionDeclaration = {
     required: ['preguntas'],
   },
 };
+
+/**
+ * Abrir uno de los proyectos de quien habla, desde una conversación sin foco.
+ *
+ * ## Por qué es una herramienta y no una frase
+ *
+ * Sin proyecto, a «hablemos del rediseño» lo único que PRAX podía hacer era
+ * describir dónde está el selector. Con esto propone **el proyecto concreto**, y
+ * aceptar lo carga con su briefing sin salir de la conversación ni volver a
+ * contar de qué se estaba hablando.
+ *
+ * ## Lo que la sostiene, que no es el modelo
+ *
+ * El `projectId` sale de la lista que el gateway resolvió con la sesión de quien
+ * pregunta —los proyectos donde ya tiene `canViewReports`— y **se valida contra
+ * esa misma lista** antes de salir. Un id inventado, o el de un proyecto ajeno,
+ * se descarta antes de llegar a la pantalla.
+ *
+ * ⚠️ Y aceptar no da acceso a nada: carga el proyecto por el camino de siempre,
+ * con los guards de siempre. Es el mismo gesto que elegirlo en el selector.
+ *
+ * ## Una conversación no cambia de proyecto, y esto no lo contradice
+ *
+ * Lo que está vetado es **cambiar** de foco a mitad —dos briefings en la misma
+ * ventana, con sus tareas y su gente mezcladas—. Aquí no hay nada que mezclar:
+ * la conversación no tenía ninguno. Pasar de «sin proyecto» a «este proyecto»
+ * ocurre una vez y es definitivo, exactamente como cuando se elige en la
+ * pantalla de arranque.
+ */
+const PROPONER_ABRIR_PROYECTO: FunctionDeclaration = {
+  name: 'proponer_abrir_proyecto',
+  description:
+    'Ofrece cargar uno de los proyectos de la persona para poder hablar de el con ' +
+    'sus datos delante. Usalo cuando te nombren uno de la lista, o cuando quede ' +
+    'claro que quieren trabajar sobre algo que ya existe. NO lo abre: la persona ' +
+    'acepta o no. Solo ids de la lista que tienes; si lo que describen no esta en ' +
+    'ella, no es un proyecto suyo y no lo propongas.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      projectId: {
+        type: 'STRING',
+        description: 'El id EXACTO de la lista de proyectos. No lo inventes ni lo compongas.',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'OBLIGATORIO. Por que ese y no otro, en una frase, atado a lo que acaban de ' +
+          'decirte ("has dicho que el rediseno va con retraso").',
+      },
+    },
+    required: ['projectId', 'porQue'],
+  },
+};
+
+/**
+ * Las herramientas de una conversación **sin proyecto**.
+ *
+ * Tres, y ninguna sale de un permiso: no hay proyecto contra el que resolver
+ * permisos, y ninguna de las tres toca datos de ninguno.
+ *
+ * - **Preguntar**, que ya no dependía de permisos en el otro modo tampoco.
+ * - **Abrir un proyecto**, que es la salida hacia el modo con datos.
+ * - **La plantilla**, que es la salida hacia un proyecto que todavía no existe.
+ *
+ * ⚠️ **La plantilla vive aquí y NO en `herramientasPara`**, y el motivo de
+ * `template.ts` no ha cambiado: declarársela en una conversación sobre un
+ * proyecto existente dejaría que a mitad de una charla sobre tareas propusiera
+ * rehacerlo entero. Sin foco ese riesgo no existe, porque no hay nada que
+ * rehacer — es justo la conversación para la que se escribió.
+ */
+export function herramientasSinProyecto(): FunctionDeclaration[] {
+  return [PROPONER_PREGUNTA, PROPONER_ABRIR_PROYECTO, PROPONER_PLANTILLA];
+}
 
 /**
  * Las herramientas que le tocan a esta persona.

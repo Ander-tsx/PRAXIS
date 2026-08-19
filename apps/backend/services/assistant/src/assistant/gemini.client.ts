@@ -112,6 +112,20 @@ export class GeminiClient {
     tools: FunctionDeclaration[];
     /** Archivos del turno actual. Los anteriores no se reenvían: ver abajo. */
     archivos?: GeminiArchivo[];
+    /**
+     * Cuánto puede escribir, cuando 2048 no basta.
+     *
+     * 🔴 **Lo pide la plantilla de proyecto, y era un fallo silencioso
+     * esperando.** Un plan de 4 espacios × 4 tableros × 8 columnas, más 6 roles
+     * con su diccionario de permisos y 12 etiquetas, se pasa del techo por
+     * defecto — y cuando eso ocurre `finishReason` queda en `MAX_TOKENS` y **la
+     * llamada a función llega cortada**: JSON inválido, propuesta descartada al
+     * validarla, y por fuera un asistente que «no ha sabido responder».
+     *
+     * No se sube para todos: el techo también protege de una respuesta que se
+     * va por las ramas, y las conversaciones normales no lo rozan.
+     */
+    maxOutputTokens?: number;
   }): Promise<GeminiReply> {
     /**
      * ⚠️ **Los archivos solo van en el turno actual, nunca en el historial.**
@@ -145,7 +159,11 @@ export class GeminiClient {
     const body: Record<string, unknown> = {
       systemInstruction: { parts: [{ text: params.system }] },
       contents,
-      generationConfig: { temperature: 0.6, topP: 0.95, maxOutputTokens: 2048 },
+      generationConfig: {
+        temperature: 0.6,
+        topP: 0.95,
+        maxOutputTokens: params.maxOutputTokens ?? 2048,
+      },
     };
 
     /* Un `tools: [{ functionDeclarations: [] }]` vacío es un error de la API, no

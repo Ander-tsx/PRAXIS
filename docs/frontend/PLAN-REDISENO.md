@@ -412,7 +412,7 @@ Se discutieron y están respondidas. **No se vuelven a abrir.**
 | Cuánto se reinyecta | Presupuesto global, del más reciente hacia atrás. Se **almacena** más de lo que se **inyecta** |
 | Cuota | **Un turno, una unidad**, lleve archivos o no |
 | Chat sin proyecto | Ruta hermana `POST /me/assistant/chat`, solo `JwtGuard`. Sin briefing, sin miembros, sin chat de equipo |
-| Herramientas sin foco | Exactamente tres: `proponer_plantilla_de_proyecto`, `proponer_abrir_proyecto` y `proponer_pregunta` |
+| Herramientas sin foco | Exactamente tres: `proponer_plantilla`, `proponer_abrir_proyecto` y `proponer_pregunta` |
 | Adoptar proyecto | **Sí, en dos casos**: al aceptar una plantilla (el proyecto recién creado se adopta sin preguntar) y cuando PRAX propone abrir uno tuyo y se acepta |
 | La revisión del plan | **Componente compartido** entre el diálogo de proyecto nuevo y el chat, no una segunda forma de dibujar lo mismo |
 

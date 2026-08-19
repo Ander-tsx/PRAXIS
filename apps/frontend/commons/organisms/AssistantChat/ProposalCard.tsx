@@ -14,10 +14,17 @@ import type {
   EstadoPropuesta,
   MessageProposal,
   MoveProposal,
+  OpenProjectProposal,
   QuestionProposal,
   TaskProposal,
+  TemplateProposal,
 } from '../../api/assistant';
-import { PRIORITY_LABELS, type Priority } from '../../api/domain';
+import {
+  PRIORITY_LABELS,
+  type Priority,
+  type ProjectTemplate,
+  type TemplateResult,
+} from '../../api/domain';
 import {
   type AceptarSobreTareaState,
   aceptarAsignacionAction,
@@ -28,12 +35,14 @@ import {
   aceptarMarcarPasosAction,
   aceptarMensajeAction,
   aceptarMovimientoAction,
+  aceptarPlantillaAction,
   aceptarTableroAction,
   aceptarTareaAction,
   resolverPropuestaAction,
 } from '../../assistant/actions';
 import { Badge, Button } from '../../atoms';
 import { alpha, colors } from '../../tokens';
+import { TemplatePlanReview, TemplateResultSummary, podar } from '../TemplatePlanReview';
 import { ModelText } from './ModelText';
 
 /**
@@ -1352,6 +1361,7 @@ function Marco({
   estadoGuardado,
   tono = 'normal',
   etiquetaDescartar = 'Descartar',
+  etiquetaAceptar,
   children,
 }: {
   titulo: string;
@@ -1388,7 +1398,21 @@ function Marco({
    * pasa al pulsarlo.
    */
   etiquetaDescartar?: string;
-  projectId: string;
+  /**
+   * Qué dice el botón de aceptar.
+   *
+   * Por defecto «Aceptar», que es lo correcto cuando pulsarlo **hace** lo que la
+   * tarjeta propone. La plantilla lo cambia porque ahí no hace nada todavía: abre
+   * la revisión del plan, y llamar «Aceptar» a eso prometería un proyecto creado
+   * de un clic — que es justo lo que el paso de revisión existe para evitar.
+   */
+  etiquetaAceptar?: string;
+  /**
+   * El foco de la conversación. **`null` en una sin proyecto**, y con él la
+   * decisión se anota por `/me/assistant/proposals/:id/resolve` en vez de por la
+   * ruta del proyecto — que respondería 404, porque no hay ninguno.
+   */
+  projectId: string | null;
   proposalId?: string;
   estadoGuardado?: EstadoPropuesta;
   /**
@@ -1531,18 +1555,24 @@ function Marco({
         </div>
       )}
 
-      {estado === 'hecho' && resultado ? (
-        <p className="font-sans text-sm text-success">
-          {resultado.texto}{' '}
-          {resultado.href && (
-            <a
-              href={resultado.href}
-              className="underline underline-offset-2 hover:text-text-primary"
-            >
-              Verla en el tablero
-            </a>
-          )}
-        </p>
+      {/* ⚠️ **`hecho` sin `resultado` no cae en los botones.** La plantilla
+          enseña su resumen dentro de `children` en vez de en una línea, así que
+          sin esta partición volvía a pintar «Descartar» debajo de un proyecto
+          que ya existe. */}
+      {estado === 'hecho' ? (
+        resultado && (
+          <p className="font-sans text-sm text-success">
+            {resultado.texto}{' '}
+            {resultado.href && (
+              <a
+                href={resultado.href}
+                className="underline underline-offset-2 hover:text-text-primary"
+              >
+                Verla en el tablero
+              </a>
+            )}
+          </p>
+        )
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {/* Sin acción no hay «Aceptar»: un botón que no puede cumplir lo que
@@ -1555,7 +1585,7 @@ function Marco({
               onClick={onAceptar}
               isLoading={estado === 'enviando'}
             >
-              {tono === 'destructivo' ? 'Borrar definitivamente' : 'Aceptar'}
+              {etiquetaAceptar ?? (tono === 'destructivo' ? 'Borrar definitivamente' : 'Aceptar')}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onDescartar} disabled={estado === 'enviando'}>
@@ -1589,4 +1619,226 @@ function formatoFecha(iso: string): string {
     month: 'long',
     ...(mismoAno ? {} : { year: 'numeric' }),
   }).format(fecha);
+}
+
+/**
+ * Abrir uno de tus proyectos, propuesto desde una conversación sin foco.
+ *
+ * ## Por qué esta tarjeta anota su decisión ella misma
+ *
+ * ⚠️ Las demás dejan que lo haga `Marco` en un efecto, después de pintar. Aquí
+ * no vale: aceptar **navega**, y una petición lanzada en un efecto que se
+ * desmonta a la vez es una carrera que se pierde la mitad de las veces. La
+ * consecuencia sería una tarjeta que al releer el hilo vuelve a ofrecer su
+ * botón como si nadie lo hubiera pulsado.
+ *
+ * Por eso se llama a `resolverPropuestaAction` **antes de navegar y esperando su
+ * vuelta**, y a `Marco` no se le pasa `proposalId`: sin él no intenta anotar
+ * nada y no hay dos peticiones para lo mismo.
+ */
+export function OpenProjectProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+  onAbrir,
+}: {
+  /** El foco actual, que en este modo es `null`. Lo necesita `Marco`. */
+  projectId: string | null;
+  proposalId?: string;
+  estadoGuardado?: EstadoPropuesta;
+  propuesta: OpenProjectProposal;
+  /** Cargar el proyecto sin perder el hilo. Lo resuelve la pantalla. */
+  onAbrir?: (projectId: string) => void;
+}) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+
+  async function aceptar() {
+    setEstado('enviando');
+    if (proposalId) await resolverPropuestaAction(projectId, proposalId, 'ACCEPTED');
+    setEstado('hecho');
+    onAbrir?.(propuesta.projectId);
+  }
+
+  return (
+    <Marco
+      titulo="Abrir un proyecto"
+      sinAplicar="Todavía estamos hablando sin ningún proyecto cargado."
+      porQue={propuesta.porQue}
+      estado={estado}
+      error={null}
+      resultado={
+        estado === 'hecho' ? { texto: `Cargando «${propuesta.nombre}»…`, href: null } : null
+      }
+      onAceptar={onAbrir ? aceptar : undefined}
+      onDescartar={() => {
+        setEstado('descartada');
+        if (proposalId) resolverPropuestaAction(projectId, proposalId, 'DISCARDED');
+      }}
+      projectId={projectId}
+      estadoGuardado={estadoGuardado}
+      etiquetaDescartar="Ahora no"
+    >
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-2">
+        <Campo termino="Proyecto" valor={propuesta.nombre} />
+      </dl>
+
+      <p className="font-sans text-xs text-text-secondary">
+        Seguimos en esta misma conversación, pero con sus tareas, sus tableros y su gente delante.{' '}
+        <strong className="text-text-primary">A partir de ahí es su conversación</strong>: para
+        hablar de otro proyecto se empieza una nueva.
+      </p>
+    </Marco>
+  );
+}
+
+/**
+ * La estructura de un proyecto que todavía no existe.
+ *
+ * ## La tarjeta resume; la revisión se despliega
+ *
+ * Un árbol de espacios, tableros y columnas —más los roles con sus permisos y
+ * las etiquetas— no cabe en una burbuja de chat, y meterlo a la fuerza haría que
+ * nadie lo leyera. Así que la tarjeta dice **cuánto** hay y por qué, y el plan
+ * entero se abre debajo cuando alguien va a decidir de verdad.
+ *
+ * ⚠️ Y lo que se despliega es **el mismo componente** que usa el diálogo de
+ * proyecto nuevo (`TemplatePlanReview`), no una versión para el chat. Dibujarlo
+ * dos veces habría duplicado la poda, que tiene dentro un bug ya arreglado —el
+ * orden de `map` y `filter`— y que en una copia nueva volvería el primer día.
+ */
+export function TemplateProposalCard({
+  projectId,
+  proposalId,
+  estadoGuardado,
+  propuesta,
+  onAbrir,
+}: {
+  projectId: string | null;
+  proposalId?: string;
+  estadoGuardado?: EstadoPropuesta;
+  propuesta: TemplateProposal;
+  /**
+   * Adoptar el proyecto recién creado, sin perder el hilo.
+   *
+   * ⚠️ **Se entrega también el `slug`, y sin él esto no funcionaba.** La
+   * pantalla resuelve el destino buscando el proyecto en la lista que le sirvió
+   * el servidor, y un proyecto que se acaba de crear **no está en ella**: se
+   * renderizó antes de que existiera. El resultado era un botón que no hacía
+   * absolutamente nada.
+   */
+  onAbrir?: (projectId: string, slug?: string) => void;
+}) {
+  const [estado, setEstado] = useState<Estado>('pendiente');
+  const [error, setError] = useState<string | null>(null);
+  const [revisando, setRevisando] = useState(false);
+  const [plan, setPlan] = useState<ProjectTemplate>(propuesta);
+  const [excluido, setExcluido] = useState<Set<string>>(new Set());
+  const [resultado, setResultado] = useState<TemplateResult | null>(null);
+
+  function alternar(clave: string) {
+    setExcluido((antes) => {
+      const ahora = new Set(antes);
+      if (ahora.has(clave)) ahora.delete(clave);
+      else ahora.add(clave);
+      return ahora;
+    });
+  }
+
+  async function crear() {
+    setEstado('enviando');
+    setError(null);
+
+    const respuesta = await aceptarPlantillaAction(podar(plan, excluido));
+
+    /* Sin proyecto no se creó nada y se puede reintentar. Con proyecto se pasa
+       al resumen **aunque haya fallos**: el proyecto existe, y esconderlo
+       detrás de un error sería mentir sobre lo que hay creado (§36.4). */
+    if (!respuesta.proyecto) {
+      setError(respuesta.error ?? 'No se pudo crear el proyecto.');
+      setEstado('pendiente');
+      return;
+    }
+
+    setResultado(respuesta);
+    setEstado('hecho');
+    if (proposalId) resolverPropuestaAction(projectId, proposalId, 'ACCEPTED');
+  }
+
+  const espacios = plan.espacios ?? [];
+  const tableros = espacios.reduce((suma, espacio) => suma + (espacio.tableros?.length ?? 0), 0);
+
+  return (
+    <Marco
+      titulo="Un proyecto entero, propuesto"
+      sinAplicar="Nada de esto existe todavía."
+      porQue={plan.porQue}
+      estado={estado}
+      error={error}
+      resultado={null}
+      /* El botón de aceptar no crea: abre la revisión. Crear veinte objetos de
+         golpe desde una tarjeta de chat sería la misma capacidad con el paso de
+         revisión quitado, que es justo lo que este producto decidió no hacer. */
+      onAceptar={estado === 'hecho' ? undefined : () => setRevisando(true)}
+      etiquetaAceptar="Revisar el plan"
+      onDescartar={() => {
+        setEstado('descartada');
+        if (proposalId) resolverPropuestaAction(projectId, proposalId, 'DISCARDED');
+      }}
+      projectId={projectId}
+      estadoGuardado={estadoGuardado}
+    >
+      {resultado ? (
+        <div className="flex flex-col gap-3">
+          <TemplateResultSummary resultado={resultado} />
+          {onAbrir && resultado.proyecto && (
+            <Button
+              type="button"
+              onClick={() => onAbrir(resultado.proyecto!.id, resultado.proyecto!.slug)}
+            >
+              Seguir aquí con {resultado.proyecto.name}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <Campo termino="Proyecto" valor={plan.nombre} />
+            <Campo
+              termino="Estructura"
+              valor={`${espacios.length} ${espacios.length === 1 ? 'espacio' : 'espacios'}, ${tableros} ${tableros === 1 ? 'tablero' : 'tableros'}`}
+            />
+            <Campo termino="Etiquetas" valor={String((plan.etiquetas ?? []).length)} />
+            <Campo termino="Roles" valor={String((plan.roles ?? []).length)} />
+          </dl>
+
+          {revisando && (
+            <div className="flex flex-col gap-4 border-t border-border pt-4">
+              <TemplatePlanReview
+                plantilla={plan}
+                excluido={excluido}
+                onAlternar={alternar}
+                onCambiarNombre={(nombre) => setPlan({ ...plan, nombre })}
+                onCambiarDescripcion={(descripcion) => setPlan({ ...plan, descripcion })}
+              />
+
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <span className="mr-auto font-sans text-xs text-text-secondary">
+                  Quita lo que no quieras antes de crearlo.
+                </span>
+                <Button
+                  type="button"
+                  onClick={crear}
+                  isLoading={estado === 'enviando'}
+                  disabled={estado === 'enviando'}
+                >
+                  Crear proyecto
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Marco>
+  );
 }

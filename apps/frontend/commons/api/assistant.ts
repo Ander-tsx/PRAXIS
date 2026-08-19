@@ -16,6 +16,8 @@
  * el servidor rechaza el siguiente es peor que no enseñar contador.
  */
 
+import type { ProjectTemplate } from './domain';
+
 export interface AssistantQuota {
   plan: 'FREE' | 'PRO';
   usados: number;
@@ -262,6 +264,30 @@ export interface QuestionProposal {
  * si no, lo crea. Es el mismo criterio que ya aplica la tarea con su columna —
  * nada de lo que llega del chat se toma por bueno sin volver a mirarlo.
  */
+/**
+ * Abrir uno de los proyectos de quien habla, desde una conversación sin foco.
+ *
+ * ⚠️ **`nombre` viaja con la propuesta y no se busca en una lista.** Al releer
+ * el hilo dentro de una semana la tarjeta tiene que seguir diciendo de qué
+ * proyecto hablaba, y la pantalla que la pinta puede no tener cargada ninguna
+ * lista de proyectos — el cajón de Análisis, por ejemplo, solo conoce el suyo.
+ */
+export interface OpenProjectProposal {
+  projectId: string;
+  nombre: string;
+  porQue?: string;
+}
+
+/**
+ * La estructura de arranque de un proyecto que **todavía no existe**.
+ *
+ * Es `ProjectTemplate` tal cual —el mismo objeto que devuelve
+ * `POST /me/assistant/project-draft` y que sabe aplicar `commons/template`— y
+ * por eso no se redeclara aquí: la tarjeta del chat y el diálogo de proyecto
+ * nuevo enseñan y crean exactamente lo mismo.
+ */
+export type TemplateProposal = ProjectTemplate;
+
 export interface BoardProposal {
   /** Nombre del espacio de trabajo. Se resuelve o se crea al aceptar. */
   espacio: string;
@@ -473,6 +499,20 @@ export function isBoardProposal(
   propuesta: AssistantProposal,
 ): propuesta is AssistantProposal & { args: BoardProposal } {
   return propuesta.tool === 'proponer_tablero' && Array.isArray(propuesta.args.columnas);
+}
+
+export function isOpenProjectProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: OpenProjectProposal } {
+  return (
+    propuesta.tool === 'proponer_abrir_proyecto' && typeof propuesta.args.projectId === 'string'
+  );
+}
+
+export function isTemplateProposal(
+  propuesta: AssistantProposal,
+): propuesta is AssistantProposal & { args: TemplateProposal } {
+  return propuesta.tool === 'proponer_plantilla' && Array.isArray(propuesta.args.espacios);
 }
 
 export function isQuestionProposal(

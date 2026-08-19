@@ -64,7 +64,7 @@ export function PraxScreen({
   const router = useRouter();
 
   const elegirProyecto = useCallback(
-    (siguiente: string, conversationId: string | null) => {
+    (siguiente: string, conversationId: string | null, slug?: string) => {
       /* Cadena vacía = «vuelve a preguntarme por cuál». Es lo que hace la
          insignia del proyecto de la cabecera: deja la pantalla como al entrar,
          con los proyectos como botones. Va sin `c`, así que empieza conversación
@@ -75,10 +75,21 @@ export function PraxScreen({
         return;
       }
 
+      /**
+       * ⚠️ **El `slug` de fuera es para un proyecto que aún no está en la
+       * lista.** `proyectos` lo sirvió el servidor al renderizar esta pantalla,
+       * así que un proyecto **recién creado desde la conversación** no aparece
+       * en él y esto se quedaba en un `return` silencioso: el botón de «seguir
+       * aquí con este proyecto» no hacía nada.
+       *
+       * Navegar sí lo arregla del todo, porque la página vuelve a pedir la
+       * lista en el servidor y esta vez el proyecto ya existe.
+       */
       const proyecto = proyectos.find((candidato) => candidato.id === siguiente);
-      if (!proyecto) return;
+      const destino = proyecto?.slug ?? slug;
+      if (!destino) return;
 
-      const params = new URLSearchParams({ p: proyecto.slug });
+      const params = new URLSearchParams({ p: destino });
       /* El hilo se lleva en la URL para que sobreviva a la navegación. Sin esto,
          cambiar de proyecto empezaría conversación nueva y se perdería lo
          hablado — que es exactamente lo que el foco cambiable viene a evitar. */
