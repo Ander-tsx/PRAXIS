@@ -312,7 +312,10 @@ function PraxRasgo({
               width={w}
               height={h}
               rx={rx}
-              fill={colors.primaryForeground}
+              /* ⚠️ `praxFace`, no `primaryForeground`: los rasgos giran con el
+                 tema y aquel se queda blanco en los dos. Ver su nota en
+                 `commons/tokens/colors.ts`. */
+              fill={colors.praxFace}
               opacity={opacity}
               style={{
                 transform: transformarBarra(barra),
@@ -509,7 +512,7 @@ export function PraxAvatar({
 
         {/* Thinking: tres puntos parpadeantes bajo los ojos */}
         {mood === 'thinking' && canAnimate && size !== 'sm' && (
-          <g fill={colors.primaryForeground} opacity={0.4}>
+          <g fill={colors.praxFace} opacity={0.4}>
             {[0, 1, 2].map((i) => (
               <rect key={i} x={38 + i * 10} y={71} width={4} height={4} rx={1.2}>
                 <animate
@@ -526,7 +529,7 @@ export function PraxAvatar({
 
         {/* Oops: gota pixelada en la frente — a la altura de la sien se salía del cuerpo */}
         {mood === 'oops' && size !== 'xs' && size !== 'sm' && (
-          <g fill={colors.primaryForeground} opacity={0.5}>
+          <g fill={colors.praxFace} opacity={0.5}>
             {/*
               Un solo trazo, no cuatro rects apilados.
 

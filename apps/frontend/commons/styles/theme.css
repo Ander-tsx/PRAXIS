@@ -58,6 +58,16 @@
   --color-primary-muted: rgba(108, 99, 255, 0.12); /* Fondo sutil primary */
   --color-primary-foreground: #ffffff; /* Texto sobre primary */
 
+  /* ── LA CARA DE PRAX ────────────────────────────────────── */
+  /* Los rasgos del asistente: ojos y boca.
+     ⚠️ **No es `--color-primary-foreground`, aunque se pinten sobre primary.**
+     Ese token es para texto y se queda blanco en los dos temas, que es lo
+     correcto para una etiqueta dentro de un botón. La cara es otra cosa: sobre
+     la aplicación oscura, unos rasgos blancos sobre el morado son el punto más
+     brillante de la pantalla y la cara se lee antes que el mensaje que está
+     leyendo. Este sí gira con el tema. */
+  --color-prax-face: #0d0f14; /* Rasgos oscuros sobre la cara, en tema oscuro */
+
   /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
   --color-accent: #d4a843; /* Badges, highlights, detalles premium */
   --color-accent-hover: #b8902f; /* Hover de accent */
@@ -168,6 +178,11 @@
   --color-primary-hover: #4740bd;
   --color-primary-muted: rgba(91, 82, 224, 0.1);
   --color-primary-foreground: #ffffff;
+
+  /* ── LA CARA DE PRAX ────────────────────────────────────── */
+  /* Claros en tema claro: el resto de la pantalla es luminoso, así que la cara
+     morada ya destaca sola y unos rasgos oscuros la endurecen. */
+  --color-prax-face: #ffffff;
 
   /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
   --color-accent: #93670f;
