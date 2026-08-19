@@ -193,12 +193,7 @@ export class GeminiClient {
     if (!response.ok) {
       const detalle = await response.text().catch(() => '');
       this.log.warn(`Gemini ${response.status}: ${detalle.slice(0, 500)}`);
-      throw new GeminiError(
-        response.status === 429
-          ? 'El asistente ha llegado a su limite de uso. Prueba en unos minutos.'
-          : 'El asistente no ha podido responder. Vuelve a intentarlo.',
-        response.status,
-      );
+      throw new GeminiError(this.mensajeDelFallo(response.status, detalle), response.status);
     }
 
     const json = (await response.json()) as {
@@ -236,5 +231,36 @@ export class GeminiClient {
           args: part.functionCall!.args ?? {},
         })),
     };
+  }
+
+  /**
+   * Qué se le dice a quien preguntó, según por qué falló Gemini.
+   *
+   * ## ⚠️ Dos 429 que no se arreglan igual
+   *
+   * Esto decía «llegado a su limite de uso, prueba en unos minutos» para
+   * **cualquier** 429, y con uno de los dos casos eso es sencillamente falso:
+   *
+   * - **Límite por minuto**: sí, se pasa solo. Reintentar funciona.
+   * - **Tope de gasto del proyecto** (`monthly spending cap`, el de AI Studio):
+   *   no se pasa en unos minutos ni en unas horas. Hasta que alguien lo suba,
+   *   ninguna respuesta va a salir — y mandar a la gente a reintentar cada cinco
+   *   minutos contra un muro es peor que decirle que hoy no.
+   *
+   * Se distingue por el cuerpo del error porque la API devuelve **429 en los
+   * dos**: no hay código que los separe.
+   *
+   * El mensaje del segundo no le pide nada a quien lo lee, y es a propósito:
+   * quien usa PRAXIS no puede arreglar el presupuesto de la plataforma. Lo que
+   * necesita saber es que no es culpa suya y que no gane tiempo reintentando.
+   */
+  private mensajeDelFallo(status: number, detalle: string): string {
+    if (status !== 429) return 'El asistente no ha podido responder. Vuelve a intentarlo.';
+
+    const texto = detalle.toLowerCase();
+    if (texto.includes('spending cap') || texto.includes('spend cap')) {
+      return 'El asistente esta fuera de servicio: la plataforma ha agotado su presupuesto de este mes.';
+    }
+    return 'El asistente ha llegado a su limite de uso. Prueba en unos minutos.';
   }
 }
