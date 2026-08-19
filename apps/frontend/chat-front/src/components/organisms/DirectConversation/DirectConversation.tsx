@@ -235,7 +235,7 @@ function Encabezado({
                 <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
                 {proyectos.length > 0 && (
                   <p className="font-sans text-sm text-white/70 drop-shadow-md">
-                    Coincidís en {proyectos.length}{' '}
+                    Coinciden en {proyectos.length}{' '}
                     {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
                   </p>
                 )}
@@ -250,10 +250,10 @@ function Encabezado({
           {proyectos.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
               {isAdmin
-                ? 'No compartís ningún proyecto, pero como administrador puedes chatear.'
+                ? 'No comparten ningún proyecto, pero como administrador puedes chatear.'
                 : hasMessages
-                  ? 'No compartís proyecto, pero podéis continuar esta conversación.'
-                  : 'Ya no compartís ningún proyecto. Puedes leer lo que os dijisteis, pero no escribir.'}
+                  ? 'No comparten proyecto, pero pueden continuar esta conversación.'
+                  : 'Ya no comparten ningún proyecto. Puedes leer el chat, pero no escribir.'}
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">
