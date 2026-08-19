@@ -311,7 +311,9 @@ test.describe('Chat — paginación', () => {
 });
 
 test.describe('Chat — borrado suave', () => {
-  test('borrar deja la lápida: la fila se queda, vacía y sin nada colgando', async ({ request }) => {
+  test('borrar deja la lápida: la fila se queda, vacía y sin nada colgando', async ({
+    request,
+  }) => {
     const otra = await nuevoInterlocutor(request);
 
     const mensaje = await escribir(request, duenno, otra, 'esto se va a borrar');
@@ -324,16 +326,15 @@ test.describe('Chat — borrado suave', () => {
     );
     expect(reaccion.status()).toBe(200);
 
-    const fijar = await request.post(
-      conversacionDe(duenno, otra, `/messages/${mensaje.id}/pin`),
-      { headers: comoBearer(duenno.accessToken), data: { on: true } },
-    );
+    const fijar = await request.post(conversacionDe(duenno, otra, `/messages/${mensaje.id}/pin`), {
+      headers: comoBearer(duenno.accessToken),
+      data: { on: true },
+    });
     expect(fijar.status()).toBe(200);
 
-    const borrado = await request.delete(
-      conversacionDe(duenno, otra, `/messages/${mensaje.id}`),
-      { headers: comoBearer(duenno.accessToken) },
-    );
+    const borrado = await request.delete(conversacionDe(duenno, otra, `/messages/${mensaje.id}`), {
+      headers: comoBearer(duenno.accessToken),
+    });
     expect(borrado.status()).toBe(200);
 
     const pagina = await leer(request, duenno, otra);
@@ -359,10 +360,9 @@ test.describe('Chat — borrado suave', () => {
     const otra = await nuevoInterlocutor(request);
 
     const mensaje = await escribir(request, duenno, otra, 'adiós');
-    const borrado = await request.delete(
-      conversacionDe(duenno, otra, `/messages/${mensaje.id}`),
-      { headers: comoBearer(duenno.accessToken) },
-    );
+    const borrado = await request.delete(conversacionDe(duenno, otra, `/messages/${mensaje.id}`), {
+      headers: comoBearer(duenno.accessToken),
+    });
     expect(borrado.status()).toBe(200);
 
     const editar = await request.patch(conversacionDe(duenno, otra, `/messages/${mensaje.id}`), {
@@ -504,10 +504,9 @@ test.describe('Chat — hilos', () => {
       enHilo: true,
     });
 
-    const hilo = await request.get(
-      conversacionDe(duenno, otra, `/messages/${raiz.id}/thread`),
-      { headers: comoBearer(duenno.accessToken) },
-    );
+    const hilo = await request.get(conversacionDe(duenno, otra, `/messages/${raiz.id}/thread`), {
+      headers: comoBearer(duenno.accessToken),
+    });
     expect(hilo.status()).toBe(200);
 
     const contenido = await data<{ root: Mensaje; replies: Mensaje[] }>(hilo);

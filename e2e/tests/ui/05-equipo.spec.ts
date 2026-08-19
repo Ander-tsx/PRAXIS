@@ -33,11 +33,7 @@ test.describe('Equipo del proyecto', () => {
        antes con el propio campo del diálogo que se está cerrando —el clic caía
        en la nada y la página se quedaba en `/projects`—. Buscar el enlace hace
        que Playwright espere a que la rejilla se haya refrescado. */
-    await page
-      .getByRole('link')
-      .filter({ hasText: nombre })
-      .first()
-      .click();
+    await page.getByRole('link').filter({ hasText: nombre }).first().click();
     await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
 
     /* Un error de frontera servidor/cliente sale como una excepción sin

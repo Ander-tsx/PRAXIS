@@ -52,7 +52,7 @@ interface ChatDeProyecto {
 export default async function ChatVacioPage() {
   const { get: getCookie } = await cookies();
   const { get: getHeader } = await headers();
-  
+
   const recordada = conversacionRecordada(getCookie(ULTIMO_CHAT_COOKIE)?.value);
   const userAgent = getHeader('user-agent') || '';
   const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);

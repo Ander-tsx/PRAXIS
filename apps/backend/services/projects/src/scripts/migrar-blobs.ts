@@ -152,7 +152,9 @@ async function main(): Promise<void> {
 
     console.log(`Listo: ${migrados} migrados, ${saltados} sin metadatos (saltados).`);
     if (!borrarOrigen) {
-      console.log('Los bytes siguen en Postgres. Comprueba el bucket y repite con --borrar-origen.');
+      console.log(
+        'Los bytes siguen en Postgres. Comprueba el bucket y repite con --borrar-origen.',
+      );
     }
   } finally {
     await prisma.$disconnect();
