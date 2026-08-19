@@ -140,7 +140,7 @@ export class MembersController {
       this.projectsClient.send(
         { cmd: 'member_remove' },
         // `requesterId` solo para poder decir en el aviso quién la sacó.
-        { projectId: req.projectId, ...body, requesterId: req.user!.userId },
+        { projectId: req.projectId, userId: body.userId, requesterId: req.user!.userId },
       ),
     );
   }

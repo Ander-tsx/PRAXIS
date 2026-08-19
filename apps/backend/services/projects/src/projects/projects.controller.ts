@@ -65,6 +65,8 @@ export class ProjectsController {
       status: dto.status,
       reason: dto.reason,
       actorId: dto.actorId,
+      correlationId: dto.correlationId,
+      causationId: dto.causationId,
     });
   }
 

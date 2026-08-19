@@ -79,6 +79,15 @@ export class RemoveMemberDto extends RemoveMemberBodyDto {
   @IsOptional()
   @IsUUID('4')
   requesterId?: string;
+
+  /** Contexto interno confiable; nunca forma parte del cuerpo HTTP. */
+  @IsOptional()
+  @IsUUID('4')
+  correlationId?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  causationId?: string;
 }
 
 export class CheckPermissionDto {

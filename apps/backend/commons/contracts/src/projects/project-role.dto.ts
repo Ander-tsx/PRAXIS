@@ -64,6 +64,15 @@ export class DeleteProjectRoleDto {
 
   @IsUUID('4')
   projectId: string;
+
+  /** Contexto interno confiable; gateway HTTP nunca lo toma del cliente. */
+  @IsOptional()
+  @IsUUID('4')
+  correlationId?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  causationId?: string;
 }
 
 export class CheckProjectPermissionDto {

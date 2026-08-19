@@ -1,10 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { randomUUID } from 'node:crypto';
 
+import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 
 import {
   CreateProjectDto,
@@ -477,17 +477,14 @@ export class ProjectsService {
     status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
     reason?: string;
     actorId?: string;
+    correlationId?: string;
+    causationId?: string;
   }) {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.id },
       select: {
         id: true,
         ownerId: true,
-        /* El estado **anterior** viaja de vuelta al gateway: es lo único que
-           distingue reactivar un suspendido de recuperar un archivado, y son dos
-           entradas distintas del registro de actividad. El estado nuevo no basta,
-           los dos terminan en ACTIVE. */
-        status: true,
         members: { select: { userId: true } },
       },
     });
@@ -500,8 +497,20 @@ export class ProjectsService {
     }
 
     const volviendoAActivo = dto.status === 'ACTIVE';
-    const correlationId = randomUUID();
+    const correlationId = dto.correlationId ?? randomUUID();
     const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.project.findUnique({
+        where: { id: dto.id },
+        select: { status: true },
+      });
+      if (!current) throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+      if (current.status === dto.status) {
+        const saved = await tx.project.findUniqueOrThrow({
+          where: { id: dto.id },
+          include: { _count: { select: { members: true, workspaces: true } } },
+        });
+        return { saved, previousStatus: current.status };
+      }
       const saved = await tx.project.update({
         where: { id: dto.id },
         data: {
@@ -512,23 +521,32 @@ export class ProjectsService {
         },
         include: { _count: { select: { members: true, workspaces: true } } },
       });
-      if (project.status !== saved.status) {
-        await this.domainOutbox.persist(tx, {
-          projectId: saved.id, subject: { type: 'PROJECT', id: saved.id },
-          actor: { type: 'USER', id: dto.actorId }, correlationId,
-        }, {
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: saved.id,
+          subject: { type: 'PROJECT', id: saved.id },
+          actor: { type: 'USER', id: dto.actorId },
+          correlationId,
+          causationId: dto.causationId,
+        },
+        {
           type: 'project.status-changed.v1',
-          payload: { previousStatus: project.status, status: saved.status, reason: dto.reason ?? null },
-        });
-      }
-      return saved;
+          payload: {
+            previousStatus: current.status,
+            status: saved.status,
+            reason: dto.reason ?? null,
+          },
+        },
+      );
+      return { saved, previousStatus: current.status };
     });
 
     await this.redis.del(`project:${dto.id}`);
 
     await this.invalidarListasDe([project.ownerId, ...project.members.map((m) => m.userId)]);
 
-    return { ...updated, previousStatus: project.status };
+    return { ...updated.saved, previousStatus: updated.previousStatus };
   }
 
   /**
