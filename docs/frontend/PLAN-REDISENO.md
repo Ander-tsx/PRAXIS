@@ -12,7 +12,7 @@
 | **Etapa actual** | R6 cerrada + optimización del prompt. Siguiente: R4 — Análisis (R4.1 hecho) |
 | **Última tarea terminada** | R6 entera — adjuntos con memoria, conversación sin proyecto, plantilla desde el chat |
 | **Siguiente** | R4.2 — un solo viaje para los agregados |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
 | **Actualizado** | 2026-08-18 |
 
@@ -42,6 +42,7 @@ descartado (con motivo escrito al lado)
 | 2026-08-18 | R6.2 – R6.4 | `bdbef7f` | **Conversación sin proyecto.** `POST /me/assistant/chat`, reglas del prompt con ámbito, tres herramientas, adopción de foco y la plantilla desde el chat. Cuatro hallazgos: el resolve daba 404 sin foco, `maxOutputTokens` cortaba la plantilla, la tarjeta que navega tiene que anotar ella misma, y el proyecto recién creado no está en la lista de la pantalla |
 | 2026-08-18 | R6.6 | (este) | Documentación (ESTADO-ACTUAL §42, CONTRATO-API, CLAUDE.md), formato y build |
 | 2026-08-19 | (fuera de plan) | `519c40d`, `9d5f9e2` | **El prompt, medido y recortado.** De 29 300 a 19 300 tokens por turno, y con techo: el inventario deja de crecer con el proyecto. Con `tareasOmitidas` para que el recorte no sea mudo. ESTADO-ACTUAL §43 |
+| 2026-08-19 | (fuera de plan) | `940acf2` | **El tope de páginas del PDF.** Era el peor caso real: 5 MB sin límite de páginas son ~130 000 tokens en un turno. A partir de 25 páginas viaja como texto. R7 y R8 quedan escritas |
 
 ---
 
@@ -633,6 +634,72 @@ presupuesto. Implementar un ciclo de vida de cachés sin poder ejecutarlo una so
 vez es la mejor forma de dejar puesto algo peor que lo que había.
 
 Se retoma cuando la clave responda.
+
+---
+
+## R8 — Que el contexto deje de ser «todo» (futuro, iteración de optimización)
+
+> No es una tarea pendiente: es **la dirección** en la que hay que crecer el día
+> que alguien traiga un proyecto de miles de tareas. Se escribe ahora porque la
+> decisión se toma mejor con las medidas de §43 delante que dentro de un año.
+
+### El problema, dicho una vez
+
+Hoy el contexto es «mándaselo todo»: el inventario entero del proyecto en cada
+turno. Eso escala hasta unos cientos de tareas y ahí se acaba. El techo de
+`INVENTARIO_MAX_CHARS` **acota el coste** —un proyecto de 50 000 tareas cuesta lo
+mismo que uno de 200— pero convierte un problema de dinero en uno de ceguera: de
+50 000 tareas, PRAX vería un centenar.
+
+⚠️ **Y esto NO se arregla «migrando a agentes».** Un agente de Bedrock, de
+LangGraph o de donde sea es por dentro lo mismo que hay aquí: un bucle que arma
+un prompt, lo manda y lee la respuesta. **Ninguna arquitectura evita reenviar el
+contexto**, porque el modelo no tiene memoria. Lo único que cambia entre un
+sistema y otro es **quién decide qué entra en ese prompt**, y eso es exactamente
+lo que hay debajo.
+
+### La progresión, en orden
+
+- [ ] **R8.1 — Conjunto de trabajo en vez de inventario.** El briefing lleva los
+      números —ya calculados, ocupan nada— más las tareas que importan: las de
+      quien pregunta, las vencidas, las del tablero que está mirando. Nadie
+      pregunta por sus 50 000 tareas; pregunta por las suyas.
+- [ ] **R8.2 — Búsqueda como herramienta** (`buscar_tareas`). El salto de verdad:
+      convierte «cabe o no cabe» en «pide lo que necesites». Cuesta un viaje extra
+      al modelo en los turnos que la usen.
+      ⚠️ Rompe la regla de «aquí no se ejecuta ninguna llamada a función», y hay
+      que decir por qué se puede: esa regla es sobre **escrituras**. Una búsqueda
+      con la sesión de quien pregunta no abre ninguna puerta nueva — la invariante
+      1 sigue intacta, y conviene escribirlo al hacerlo para que no parezca un
+      descuido.
+- [ ] **R8.3 — Búsqueda semántica**, solo si un cliente la pide. «Las tareas que
+      hablan de facturación» no se resuelve con un `LIKE`, pero es un índice más
+      que mantener y no se mete antes de que haga falta.
+
+### Lo que NO se hace, y por qué
+
+**Migrar a un framework de agentes gestionado** (Bedrock y compañía). Resolvería
+el alojamiento del modelo y daría orquestación hecha, a cambio de atar el
+producto a un proveedor y —lo que de verdad importa— **quitar el control sobre lo
+que se envía**. Todo lo que se ganó en §43 salió de poder medir el prompt y
+recortarlo; con un agente gestionado no se sabe qué viaja.
+
+Y **el asistente sigue sin ejecutar nada**. Eso, que parece una limitación, es lo
+que hace vendible esto a una empresa: un agente con permisos de escritura sobre
+el gestor de proyectos de un cliente es una conversación de seguridad de seis
+meses; «propone y una persona con sus permisos acepta» se audita en una tarde.
+
+Lo que sí conviene llevarse de ese mundo el día de la venta: **poder elegir el
+modelo**, para que un cliente use su proveedor y su clave. Es un cambio pequeño
+porque toda la superficie vive en `gemini.client.ts`.
+
+### Y una consecuencia para los planes de pago
+
+Con los tres topes puestos —inventario, extractos y páginas de PDF— un mensaje
+cuesta entre 8 000 y ~25 000 tokens **pase lo que pase**. Esa es la propiedad que
+hace honesto un plan por mensajes: el peor caso se puede calcular y ponerle
+precio. Si algún día hace falta más justicia, el paso natural no es cambiar de
+modelo de negocio, es **cobrar como dos** el mensaje que lleva adjuntos.
 
 ---
 
