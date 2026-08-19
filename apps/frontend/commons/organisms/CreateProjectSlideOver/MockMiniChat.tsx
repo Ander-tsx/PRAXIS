@@ -228,14 +228,25 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
       <div className="p-4 bg-surface shrink-0">
         <form
           onSubmit={handleSend}
-          className="flex items-center gap-2 bg-[#F0F2F6] border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 rounded-[20px] pl-5 pr-2 py-2 transition-shadow"
+          className="flex items-end gap-2 bg-[#F0F2F6] border border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 rounded-[20px] pl-5 pr-2 py-2 transition-shadow"
         >
-          <input
-            type="text"
+          <textarea
+            rows={1}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            onInput={(e) => {
+              const area = e.currentTarget;
+              area.style.height = 'auto';
+              area.style.height = `${Math.min(area.scrollHeight, 60)}px`;
+            }}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-text-secondary py-1.5"
+            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-text-secondary py-1.5 resize-none"
             disabled={isTyping}
           />
 
