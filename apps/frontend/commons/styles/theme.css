@@ -511,16 +511,38 @@ button:disabled,
 
 /* 3. La descripción, legible sobre la píldora de PRAXIS.
  *
- * `sileo` la pinta al 50 % de opacidad sobre su blanco y negro casi puros. Sobre
- * los tonos de la paleta —ver `RELLENO_POR_TEMA`— ese 50 % se queda corto, así
- * que se sube y se ata a los colores del tema contrario, que es el de la
- * píldora.
- *
- * ⚠️ El `data-theme` aquí es **el de la aplicación**, no el de la tarjeta: con la
- * aplicación en oscuro la píldora es clara, y por eso el texto va oscuro. */
-[data-sileo-viewport][data-position][data-theme="dark"] [data-sileo-description] {
-  color: rgb(13 15 20 / 0.78);
+ * Un token del tema, y por eso **una sola regla para los dos**. Antes había dos,
+ * con colores literales cruzados —texto oscuro en tema oscuro— porque la píldora
+ * se pintaba con el blanco y negro de `sileo` y salía invertida respecto a la
+ * aplicación. Desde que el punto 4 la ata a `surface`, la píldora es del mismo
+ * tema que todo lo demás y el texto secundario del tema ya es el color correcto:
+ * separarlo por `data-theme` era escribir dos veces lo mismo. */
+[data-sileo-viewport][data-position] [data-sileo-description] {
+  color: var(--color-text-secondary);
 }
-[data-sileo-viewport][data-position][data-theme="light"] [data-sileo-description] {
-  color: rgb(232 234 240 / 0.82);
+
+/* 4. La tarjeta, con los colores de la aplicación en tema claro.
+ *
+ * `sileo` pinta el cuerpo y la píldora con su propio blanco casi puro, que sobre
+ * el fondo claro de PRAXIS no se distingue del lienzo. Se atan a `surface` y el
+ * relieve lo pone una sombra sobre el SVG entero —no sobre el contenedor— porque
+ * la tarjeta no es un rectángulo: es una forma con muesca, y una `box-shadow`
+ * dibujaría la caja que la contiene en vez de su silueta.
+ *
+ * ⚠️ **El `!important` no sobra.** `fill` viaja como atributo de presentación en
+ * el propio SVG, y el truco de especificidad de arriba no gana contra eso; con
+ * `!important` sí. En tema oscuro no hace falta ninguna de las tres: los tonos
+ * de `sileo` ya son los del fondo. */
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-pill],
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-body] {
+  fill: var(--color-surface) !important;
+}
+
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-svg] {
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.08))
+    drop-shadow(0 0 1px var(--color-border-subtle));
+}
+
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title] {
+  color: var(--color-text-primary);
 }
