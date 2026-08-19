@@ -9,6 +9,9 @@ import {
   type Metrica,
   etiquetaDelRango,
   validarGrafico,
+  type DimensionCruce,
+  DIMENSIONES_CRUCE,
+  DIMENSIONES,
 } from '@/lib/widgets';
 import { Button, Input, Select, alpha, colors } from '@praxis/commons';
 import { useState } from 'react';
@@ -75,6 +78,8 @@ export function ChartBuilder({
   const [dias, setDias] = useState(String(DIAS_POR_DEFECTO));
   const [topN, setTopN] = useState('');
   const [soloVencidas, setSoloVencidas] = useState(false);
+  const [agruparPor, setAgruparPor] = useState<DimensionCruce>('columna');
+  const [partirPor, setPartirPor] = useState<DimensionCruce>('prioridad');
   const [titulo, setTitulo] = useState(METRICAS.tareas_por_columna.etiqueta);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +120,7 @@ export function ChartBuilder({
       ...(spec.aceptaRango && dias ? { dias: Number(dias) } : {}),
       ...(spec.aceptaTopN && topN ? { topN: Number(topN) } : {}),
       ...(spec.aceptaSoloVencidas && soloVencidas ? { soloVencidas: true } : {}),
+      ...(metrica === 'cruce' ? { agruparPor, partirPor } : {}),
     };
 
     const motivo = validarGrafico(grafico);
@@ -221,6 +227,25 @@ export function ChartBuilder({
                 Solo las vencidas
               </label>
             )}
+          </div>
+        )}
+        
+        {metrica === 'cruce' && (
+          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+            <Select
+              label="Agrupar por"
+              fullWidth
+              options={DIMENSIONES_CRUCE.map(d => ({ value: d, label: DIMENSIONES[d] }))}
+              value={agruparPor}
+              onValueChange={(valor) => setAgruparPor(valor as DimensionCruce)}
+            />
+            <Select
+              label="Partir por"
+              fullWidth
+              options={DIMENSIONES_CRUCE.map(d => ({ value: d, label: DIMENSIONES[d] }))}
+              value={partirPor}
+              onValueChange={(valor) => setPartirPor(valor as DimensionCruce)}
+            />
           </div>
         )}
 
