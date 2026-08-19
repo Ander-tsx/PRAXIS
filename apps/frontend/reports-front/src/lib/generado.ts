@@ -3,6 +3,7 @@ import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
   type ReportBlocked,
+  type ReportColumnTime,
   type ReportDynamics,
   type ReportFlow,
   type ReportPerson,
@@ -71,6 +72,7 @@ export interface FuentesGeneradas {
   flow?: ReportFlow | null;
   weekly?: ReportWeekly | null;
   dynamics?: ReportDynamics | null;
+  columnTime?: ReportColumnTime | null;
 }
 
 /** `userId`/`labelId` → nombre. Lo resuelve la page, que es quien los pide. */
@@ -106,6 +108,8 @@ function construirCategorias(
     'tareas_por_prioridad',
     'reaperturas_por_columna',
     'cambios_de_prioridad',
+    'tiempo_en_columna',
+    'espera_actual_por_columna',
   ]);
   /**
    * Las que **no** se ordenan de mayor a menor.
@@ -254,6 +258,27 @@ function construirCategorias(
       break;
     }
 
+    /* ─── R9.2: dónde espera el trabajo ───────────────────────────────── */
+
+    case 'tiempo_en_columna':
+    case 'espera_actual_por_columna': {
+      const columnTime = fuentes.columnTime;
+      if (!columnTime) return sinDatos('No se pudo leer el tiempo por columna.');
+      const actual = metrica === 'espera_actual_por_columna';
+      crudas = columnTime.columnas
+        .map((columna) => ({
+          name: columna.name,
+          /* En horas y con un decimal: el eje necesita un número, y la unidad
+             va en el rótulo. Redondear aquí y no al pintar evita que el
+             tooltip y la barra digan cosas distintas. */
+          value: redondear(actual ? columna.enCursoP50Horas : columna.p50Horas),
+          color: tokenColor(columna.color),
+        }))
+        .filter((fila) => fila.value > 0);
+      unidad = 'h (mediana)';
+      break;
+    }
+
     default:
       return null;
   }
@@ -344,6 +369,11 @@ function etiquetaDeCambios(cambios: number): string {
  * correcta.
  */
 const TOPE_HISTOGRAMA = 5;
+
+/** Horas con un decimal, o 0 si no hay medida. El filtro de después lo quita. */
+function redondear(horas: number | null): number {
+  return horas === null ? 0 : Math.round(horas * 10) / 10;
+}
 
 const ETIQUETA_PRIORIDAD: Record<string, string> = {
   URGENT: 'Urgente',

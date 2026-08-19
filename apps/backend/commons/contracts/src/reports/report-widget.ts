@@ -56,6 +56,8 @@ export enum ReportWidgetKind {
   PERSONAS = 'personas',
   /** Retrabajo, rotación de responsable y volatilidad de prioridad. */
   DINAMICA = 'dinamica',
+  /** Tiempo por columna: dónde espera el trabajo. */
+  TIEMPO_POR_COLUMNA = 'tiempo_por_columna',
   /** El que elige y parametriza el asistente. Lleva `grafico`. */
   GENERADO = 'generado',
 }
@@ -105,6 +107,10 @@ export enum ReportMetric {
   VOLATILIDAD_POR_TAREA = 'volatilidad_por_tarea',
   /** `dynamics.volatilidad.matriz` — hacia qué prioridad se mueve el trabajo. */
   CAMBIOS_DE_PRIORIDAD = 'cambios_de_prioridad',
+  /** `column-time.columnas.p50Horas` — cuánto se espera en cada columna. */
+  TIEMPO_EN_COLUMNA = 'tiempo_en_columna',
+  /** `column-time.columnas.enCursoP50Horas` — lo que llevan ahora las abiertas. */
+  ESPERA_ACTUAL_POR_COLUMNA = 'espera_actual_por_columna',
 }
 
 /** Qué admite cada métrica. Lo aplica `validarGrafico`, no la buena voluntad. */
@@ -236,6 +242,21 @@ export const REPORT_METRICS: Record<ReportMetric, ReportMetricSpec> = {
     aceptaTopN: false,
     etiqueta: 'Hacia qué prioridad se mueve el trabajo',
   },
+  /* ─── Dónde espera el trabajo (R9.2) ──────────────────────────────────── */
+  [ReportMetric.TIEMPO_EN_COLUMNA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tiempo mediano en cada columna',
+  },
+  [ReportMetric.ESPERA_ACTUAL_POR_COLUMNA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Espera actual en cada columna',
+  },
 };
 
 /** La parametrización de un gráfico a medida. Solo la lleva `GENERADO`. */
@@ -282,6 +303,7 @@ export const REPORT_WIDGET_MIN: Record<ReportWidgetKind, { w: number; h: number 
   [ReportWidgetKind.PREDICCION]: { w: 4, h: 5 },
   [ReportWidgetKind.PERSONAS]: { w: 6, h: 6 },
   [ReportWidgetKind.DINAMICA]: { w: 6, h: 5 },
+  [ReportWidgetKind.TIEMPO_POR_COLUMNA]: { w: 6, h: 6 },
   [ReportWidgetKind.GENERADO]: { w: 3, h: 6 },
 };
 

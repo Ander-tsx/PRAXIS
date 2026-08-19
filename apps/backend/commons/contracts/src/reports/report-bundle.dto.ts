@@ -39,6 +39,8 @@ export const REPORT_BUNDLE_PARTS = [
    * de permisos para pintar la misma pantalla.
    */
   'dynamics',
+  /** Tiempo por columna: dónde espera el trabajo, no solo cuánto tarda. */
+  'column-time',
 ] as const;
 
 export type ReportBundlePart = (typeof REPORT_BUNDLE_PARTS)[number];

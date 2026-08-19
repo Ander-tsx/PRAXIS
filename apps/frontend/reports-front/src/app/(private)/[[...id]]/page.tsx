@@ -10,12 +10,14 @@ import {
   PorPrioridadWidget,
   PrediccionWidget,
   ResumenWidget,
+  TiempoPorColumnaWidget,
   TiemposWidget,
 } from '@/components/organisms/ReportWidgets';
 import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
 import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
 import {
   type ReportBlocked,
+  type ReportColumnTime,
   type ReportCycleTime,
   type ReportDynamics,
   type ReportFlow,
@@ -358,6 +360,7 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
   const blocked = (informes.blocked ?? null) as ReportBlocked | null;
   const weekly = (informes.weekly ?? null) as ReportWeekly | null;
   const dynamics = (informes.dynamics ?? null) as ReportDynamics | null;
+  const columnTime = (informes['column-time'] ?? null) as ReportColumnTime | null;
 
   /**
    * Los perfiles de quienes salen en esta pantalla, en **una** petición.
@@ -432,11 +435,13 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
         );
       case 'dinamica':
         return dynamics ? <DinamicaWidget dynamics={dynamics} /> : <NoDisponible />;
+      case 'tiempo_por_columna':
+        return <TiempoPorColumnaWidget columnTime={columnTime} />;
       case 'generado': {
         if (!widget.grafico) return <NoDisponible />;
         const datos = construirDatos(
           widget.grafico,
-          { snapshot, people, blocked, flow, weekly, dynamics },
+          { snapshot, people, blocked, flow, weekly, dynamics, columnTime },
           { personas: nombres, etiquetas: nombresDeEtiquetas },
         );
         /* El aviso de la semana a medias viaja con el gráfico, no dentro de
@@ -626,6 +631,9 @@ const PARTE_DE_INFORME: Record<Informe, string> = {
   blocked: 'blocked',
   weekly: 'weekly',
   dynamics: 'dynamics',
+  /* Dentro se llama `columnTime` y la ruta lo expone como `column-time`, igual
+     que `cycle`. Es exactamente para esto que existe este mapa. */
+  columnTime: 'column-time',
 };
 
 /** El informe de este gráfico no se pudo leer. Los demás siguen en pie. */

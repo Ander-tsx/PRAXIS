@@ -59,6 +59,12 @@ export class ReportsController {
     return this.reports.blocked(dto.projectId, dto.days, dto.filtros);
   }
 
+  /** Tiempo por columna. Ver `ReportsService.columnTime`. */
+  @MessagePattern({ cmd: 'report_column_time' })
+  columnTime(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.reports.columnTime(dto.projectId, dto.filtros);
+  }
+
   /**
    * Retrabajo, rotación de responsable y volatilidad de prioridad.
    *

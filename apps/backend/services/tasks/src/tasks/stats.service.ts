@@ -121,6 +121,8 @@ function recortar(descripcion: string | null): string | null {
  * | `cycleTimes` | `completedAt` | Mide lo que se cerró |
  * | `dailyFlow` | `occurredAt` | Mide movimientos |
  * | `weeklyThroughput` | la serie de semanas | El tramo **es** el eje |
+ * | `columnTime` | el **final de la estancia** | Mide esperas que ya terminaron |
+ * | `dynamics` | `occurredAt` | Mide eventos |
  *
  * Se escribe aquí porque es la clase de diferencia que no da ningún error: los
  * cuatro devuelven un gráfico plausible con cualquier criterio.
@@ -994,6 +996,184 @@ export class StatsService {
        GROUP BY a."userId", l.id, l.name
        ORDER BY cerradas DESC
     `;
+  }
+
+  /**
+   * **Cuánto tiempo pasa una tarea en cada columna.**
+   *
+   * El tiempo de ciclo dice cuánto tarda; esto dice **dónde espera**. Un equipo
+   * que tarda doce días de los que nueve son «En revisión» tiene un problema
+   * concreto y accionable; el número de ciclo solo dice «doce».
+   *
+   * ## Cómo se reconstruye
+   *
+   * Una estancia es «desde que entró en una columna hasta que salió». El
+   * historial no la guarda: guarda entradas. Así que se saca con `LEAD` sobre
+   * los eventos de cada tarea ordenados en el tiempo — el siguiente evento de
+   * esa tarea **es** el final de la estancia actual.
+   *
+   * ## 🔴 Solo `CREATED` y `MOVED`, y esto es la trampa entera
+   *
+   * `moveTask` emite `COMPLETED` (o `REOPENED`) **además** de `MOVED` para la
+   * misma transición, con el mismo instante y el mismo `toColumnId`. Metidos en
+   * la cadena, cada cierre fabricaría una estancia de duración cero y **partiría
+   * en dos** la estancia real de la columna anterior: el resultado sale
+   * plausible, con todas las columnas y todos los percentiles, y con la mitad
+   * del tiempo de la columna que precede al cierre desaparecido.
+   *
+   * Es la misma lista que ya usa `sinMovimiento`, y por el mismo motivo.
+   *
+   * ## ⚠️ La última estancia de una tarea cerrada no se cuenta
+   *
+   * Una tarea terminada se queda en la columna de cierre para siempre, así que
+   * su estancia «en curso» crecería un día por día indefinidamente y arrastraría
+   * la mediana de esa columna hasta hacerla ilegible. «Cuánto lleva hecha» no es
+   * una espera. Lo que sí se cuenta es la estancia en curso de las **abiertas**,
+   * que es exactamente el envejecimiento del trabajo en vuelo.
+   *
+   * ## ⚠️ `from`/`to` acota **cuándo terminó la estancia**
+   *
+   * Es la columna que corresponde —igual que `cycleTimes` acota por
+   * `completedAt`— y no puede aplicarse dentro de la ventana: recortar los
+   * eventos por fecha antes del `LEAD` haría que la última estancia del tramo
+   * pareciera abierta y que la primera empezara donde empieza el tramo. El
+   * filtro va **fuera**, sobre la estancia ya calculada.
+   *
+   * ## ⚠️ Por qué esto NO materializa una tabla, y cuándo habría que hacerlo
+   *
+   * El plan preveía que este fuera el informe que pidiera la primera tabla de
+   * `reports-service`. No la pide, y conviene dejar escrito por qué:
+   *
+   * 1. **`reports-service` no tiene Prisma a propósito** —no tiene tablas, solo
+   *    agrega lo que le sirven los demás— y los scripts de Prisma lo excluyen
+   *    explícitamente. Meterle un esquema es meterle migraciones, `generate`,
+   *    `deploy` y el filtro de los scripts.
+   * 2. Y aunque la tuviera, **no podría mantenerla al día**: los eventos los
+   *    escribe tasks-service. Una tabla materializada tiene que vivir donde vive
+   *    quien la invalida, o nace desincronizada.
+   *
+   * Así que se calcula en vuelo, con la caché de 60 s de siempre. El coste es un
+   * recorrido de los eventos del proyecto por petición, con el índice
+   * `(projectId, occurredAt)` haciendo el trabajo.
+   *
+   * **Cuándo cambiar de idea:** cuando un proyecto real pase de ~100 000
+   * eventos, o cuando este informe aparezca en el briefing del asistente (que se
+   * pide en cada turno). El sitio sería una tabla en **tasks-service**
+   * —`task_column_stays`, una fila por estancia cerrada, escrita en la misma
+   * transacción que el evento— y este método pasaría a leerla sin cambiar ni su
+   * firma ni su respuesta.
+   */
+  async columnTime(projectId: string, filtros?: ReportFilters) {
+    /* Sin la fecha: dentro de la ventana no puede ir, y los otros cuatro
+       filtros son propiedades de la tarea, así que valen igual. */
+    const deLaTarea = condicionesDeTarea(
+      {
+        boardId: filtros?.boardId,
+        assigneeId: filtros?.assigneeId,
+        labelId: filtros?.labelId,
+        priority: filtros?.priority,
+      },
+      { alias: 'ft', fecha: null },
+    );
+    const dondeLaTarea =
+      deLaTarea.length > 0
+        ? Prisma.sql`AND EXISTS (SELECT 1 FROM tasks.tasks ft
+                                  WHERE ft.id = e."taskId"
+                                    AND ${Prisma.join(deLaTarea, ' AND ')})`
+        : Prisma.empty;
+
+    const [terminadas, enCurso] = await Promise.all([
+      this.prisma.$queryRaw<
+        {
+          columnId: string;
+          estancias: number;
+          tareas: number;
+          p50Horas: number | null;
+          p85Horas: number | null;
+          totalHoras: number | null;
+        }[]
+      >`
+        WITH pasos AS (
+          SELECT e."taskId",
+                 e."toColumnId" AS "columnId",
+                 e."occurredAt" AS entrada,
+                 LEAD(e."occurredAt") OVER (
+                   PARTITION BY e."taskId" ORDER BY e."occurredAt", e.id
+                 )              AS salida
+            FROM tasks.task_events e
+           WHERE e."projectId" = ${projectId}::text
+             AND e."toColumnId" IS NOT NULL
+             -- Solo estos dos: ver el bloque de arriba. COMPLETED y REOPENED
+             -- acompanan al MOVED de la misma transicion y partirian la
+             -- estancia anterior en dos. (Sin acentos graves aqui dentro:
+             -- cerrarian el template literal.)
+             AND e.type IN ('CREATED', 'MOVED')
+             ${dondeLaTarea}
+        )
+        SELECT "columnId",
+               COUNT(*)::int                  AS estancias,
+               COUNT(DISTINCT "taskId")::int  AS tareas,
+               percentile_cont(0.5) WITHIN GROUP (
+                 ORDER BY EXTRACT(EPOCH FROM (salida - entrada)) / 3600
+               )                              AS "p50Horas",
+               percentile_cont(0.85) WITHIN GROUP (
+                 ORDER BY EXTRACT(EPOCH FROM (salida - entrada)) / 3600
+               )                              AS "p85Horas",
+               SUM(EXTRACT(EPOCH FROM (salida - entrada)) / 3600)::float8 AS "totalHoras"
+          FROM pasos
+         WHERE salida IS NOT NULL
+           ${filtros?.from ? Prisma.sql`AND salida >= ${filtros.from}::timestamptz` : Prisma.empty}
+           ${filtros?.to ? Prisma.sql`AND salida <= ${filtros.to}::timestamptz` : Prisma.empty}
+         GROUP BY "columnId"
+      `,
+
+      /**
+       * El envejecimiento del trabajo en curso: cuánto llevan **ahora** las
+       * abiertas en la columna donde están.
+       *
+       * Es estrictamente mejor que el umbral fijo de `sinMovimiento`, que trata
+       * igual una columna donde lo normal son dos horas y otra donde lo normal
+       * son cinco días. Con la mediana histórica de la misma columna al lado, un
+       * «lleva 3 días» se puede leer.
+       *
+       * ⚠️ **No lleva el tramo `from`/`to`.** «Cuánto lleva esperando» es una
+       * pregunta sobre ahora, y acotarla por fechas devolvería un número que
+       * parece el mismo y mide otra cosa.
+       */
+      this.prisma.$queryRaw<
+        {
+          columnId: string;
+          tareas: number;
+          p50Horas: number | null;
+          maxHoras: number | null;
+        }[]
+      >`
+        WITH ultimo AS (
+          SELECT DISTINCT ON (e."taskId")
+                 e."taskId",
+                 e."toColumnId" AS "columnId",
+                 e."occurredAt" AS entrada
+            FROM tasks.task_events e
+           WHERE e."projectId" = ${projectId}::text
+             AND e."toColumnId" IS NOT NULL
+             AND e.type IN ('CREATED', 'MOVED')
+             ${dondeLaTarea}
+           ORDER BY e."taskId", e."occurredAt" DESC, e.id DESC
+        )
+        SELECT u."columnId",
+               COUNT(*)::int AS tareas,
+               percentile_cont(0.5) WITHIN GROUP (
+                 ORDER BY EXTRACT(EPOCH FROM (now() - u.entrada)) / 3600
+               )             AS "p50Horas",
+               MAX(EXTRACT(EPOCH FROM (now() - u.entrada)) / 3600)::float8 AS "maxHoras"
+          FROM ultimo u
+          JOIN tasks.tasks t ON t.id = u."taskId"
+         WHERE t."completedAt" IS NULL
+         GROUP BY u."columnId"
+      `,
+    ]);
+
+    return { terminadas, enCurso };
   }
 
   /**

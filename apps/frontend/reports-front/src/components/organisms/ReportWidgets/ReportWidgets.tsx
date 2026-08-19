@@ -3,6 +3,7 @@ import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/orga
 import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
+  type ReportColumnTime,
   type ReportCycleTime,
   type ReportDynamics,
   type ReportFlow,
@@ -546,6 +547,144 @@ function BloqueDinamica({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/* ─── Dónde espera el trabajo ──────────────────────────────────────────── */
+
+/**
+ * Tiempo por columna: **dónde** se va el tiempo, no solo cuánto.
+ *
+ * ## Por qué no es un gráfico de barras y ya
+ *
+ * Porque hay dos medidas por columna que solo significan algo juntas: lo que
+ * **suele** costar pasar por ahí —las estancias ya terminadas— y lo que llevan
+ * **ahora** las tareas que están ahí. Un gráfico con las dos superpuestas se lee
+ * como si se pudieran sumar, y no se pueden: una es historia y la otra es un
+ * reloj corriendo.
+ *
+ * Así que va como una lista: una fila por columna, la barra proporcional a la
+ * mediana histórica, y la espera actual escrita al lado con su comparación. Es
+ * la misma forma que ya tiene `PersonasWidget`, y por lo mismo — cuando hay dos
+ * números por fila, la tabla gana al gráfico.
+ *
+ * ## ⚠️ Sale una fila por columna del tablero, aunque no tenga medidas
+ *
+ * Una columna por la que no ha pasado nada dice algo: que ese paso no se usa.
+ * Enseñar solo las que tienen datos dibujaría un tablero que no existe, y la
+ * ausencia no se puede notar.
+ */
+export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColumnTime | null }) {
+  if (!columnTime) {
+    return (
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+        No se pudo cargar el tiempo por columna.
+      </p>
+    );
+  }
+
+  const { columnas, huerfanas } = columnTime;
+  const variosTableros = cuentaTableros(columnas) > 1;
+  /* La escala la marca la columna más lenta, no un máximo fijo: lo que importa
+     es la proporción entre columnas del mismo tablero. */
+  const maximo = Math.max(...columnas.map((columna) => columna.p50Horas ?? 0), 0);
+
+  if (columnas.length === 0) {
+    return (
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+        Este proyecto todavía no tiene columnas.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-3">
+        {columnas.map((columna) => {
+          const p50 = columna.p50Horas ?? 0;
+          const ancho = maximo > 0 ? Math.max(2, (p50 / maximo) * 100) : 0;
+          /* «Lleva más de lo normal» necesita las dos medidas: sin la mediana
+             histórica, un «3 días» no se puede juzgar. Es justo la ventaja
+             sobre el umbral fijo de «lo que está parado». */
+          const envejecida =
+            columna.enCurso > 0 &&
+            columna.enCursoP50Horas !== null &&
+            columna.p50Horas !== null &&
+            columna.enCursoP50Horas > columna.p50Horas;
+
+          return (
+            <li key={columna.columnId} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate font-sans text-sm text-text-primary">
+                  {etiquetaDeColumna(columna, variosTableros)}
+                </span>
+                <span className="shrink-0 tabular-nums font-sans text-sm text-text-secondary">
+                  {formatDuration(columna.p50Horas)}
+                  {columna.p85Horas !== null && (
+                    <span className="text-text-disabled">
+                      {' '}
+                      · p85 {formatDuration(columna.p85Horas)}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              <div className="h-2 w-full overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${ancho}%`, background: tokenColor(columna.color) }}
+                />
+              </div>
+
+              <p className="font-sans text-xs text-text-disabled">
+                {columna.estancias === 0
+                  ? 'Todavía no ha salido de aquí ninguna tarea.'
+                  : `${columna.estancias} ${columna.estancias === 1 ? 'paso medido' : 'pasos medidos'}.`}
+                {columna.enCurso > 0 && (
+                  <>
+                    {' '}
+                    <span className={envejecida ? 'text-warning' : undefined}>
+                      {columna.enCurso} {columna.enCurso === 1 ? 'espera' : 'esperan'} ahora, la
+                      mitad desde hace más de {formatDuration(columna.enCursoP50Horas)}
+                      {envejecida && ' — por encima de lo normal en esta columna'}.
+                    </span>
+                  </>
+                )}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+
+      {huerfanas.estancias > 0 && (
+        <p className="font-sans text-xs text-text-disabled">
+          Otros {huerfanas.estancias} pasos ocurrieron en columnas que ya no existen. No se
+          descuentan del total, pero no tienen barra propia.
+        </p>
+      )}
+
+      <HowToRead>
+        <p>
+          El <strong>tiempo de ciclo</strong> dice cuánto tarda una tarea de principio a fin. Esto
+          dice <strong>dónde</strong> se va ese tiempo, que es lo único de los dos sobre lo que se
+          puede actuar: «doce días» no se arregla, «nueve de los doce en revisión» sí.
+        </p>
+        <p>
+          La barra y el p85 son las estancias que <strong>ya terminaron</strong>: la referencia de
+          esa columna. Lo de después es lo que llevan <strong>ahora</strong> las tareas abiertas que
+          están ahí, y solo se puede juzgar contra la referencia — por eso van en la misma línea.
+        </p>
+        <p>
+          Se cuentan <strong>días naturales</strong>, así que una tarea que entra el viernes por la
+          tarde arrastra el fin de semana. En columnas de paso rápido eso mueve la mediana; en las
+          de días, apenas.
+        </p>
+        <p>
+          Una tarea cerrada <strong>no sigue contando</strong> el tiempo que lleva en la columna de
+          «Hecho»: ahí no espera nada. Y todo esto empieza donde empieza el historial del proyecto.
+        </p>
+      </HowToRead>
     </div>
   );
 }

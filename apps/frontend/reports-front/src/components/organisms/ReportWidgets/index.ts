@@ -7,5 +7,6 @@ export {
   PorPrioridadWidget,
   PrediccionWidget,
   ResumenWidget,
+  TiempoPorColumnaWidget,
   TiemposWidget,
 } from './ReportWidgets';

@@ -39,6 +39,7 @@ export const TIPOS_WIDGET = [
   'prediccion',
   'personas',
   'dinamica',
+  'tiempo_por_columna',
   'generado',
 ] as const;
 
@@ -62,7 +63,9 @@ export type Metrica =
   | 'reaperturas_por_columna'
   | 'rotacion_por_tarea'
   | 'volatilidad_por_tarea'
-  | 'cambios_de_prioridad';
+  | 'cambios_de_prioridad'
+  | 'tiempo_en_columna'
+  | 'espera_actual_por_columna';
 
 /** La parametrización de un gráfico a medida. Espejo de `ReportChartSpec`. */
 export interface EspecificacionGrafico {
@@ -103,7 +106,8 @@ export type Informe =
   | 'people'
   | 'blocked'
   | 'weekly'
-  | 'dynamics';
+  | 'dynamics'
+  | 'columnTime';
 
 export interface EntradaDelCatalogo {
   titulo: string;
@@ -238,6 +242,18 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
     minH: 5,
     repetible: false,
   },
+  tiempo_por_columna: {
+    titulo: 'Dónde espera el trabajo',
+    vista: 'barras_horizontales',
+    descripcion:
+      'Cuánto tiempo pasa una tarea en cada columna. El ciclo dice cuánto tarda; esto dice dónde espera.',
+    informes: ['columnTime'],
+    w: 12,
+    h: 8,
+    minW: 6,
+    minH: 6,
+    repetible: false,
+  },
   generado: {
     titulo: 'Grafo a medida',
     vista: 'barras',
@@ -273,6 +289,8 @@ export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
   rotacion_por_tarea: 'dynamics',
   volatilidad_por_tarea: 'dynamics',
   cambios_de_prioridad: 'dynamics',
+  tiempo_en_columna: 'columnTime',
+  espera_actual_por_columna: 'columnTime',
 };
 
 export function informesNecesarios(widgets: Widget[]): Set<Informe> {
@@ -554,6 +572,23 @@ export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
     aceptaTopN: false,
     etiqueta: 'Hacia qué prioridad se mueve el trabajo',
     descripcion: 'A qué prioridad acaban llegando las tareas cuando se les cambia.',
+  },
+  /* ─── R9.2: dónde espera el trabajo ───────────────────────────────────── */
+  tiempo_en_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tiempo mediano en cada columna',
+    descripcion: 'Dónde se va el tiempo, no solo cuánto tarda el conjunto.',
+  },
+  espera_actual_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Espera actual en cada columna',
+    descripcion: 'Lo que llevan ahora mismo las tareas abiertas donde están.',
   },
 };
 

@@ -305,6 +305,40 @@ export class ReportsController {
   }
 
   /**
+   * **Dónde espera el trabajo**: cuánto tiempo pasa una tarea en cada columna.
+   *
+   * `cycle-time` dice cuánto tarda una tarea; este dice **dónde** se va ese
+   * tiempo, que es lo único de los dos sobre lo que se puede actuar.
+   *
+   * Devuelve dos mitades que se leen juntas y no se suman: `p50Horas`/`p85Horas`
+   * son las estancias **que ya terminaron** —la referencia de la columna— y
+   * `enCurso*` es lo que llevan ahora mismo las tareas abiertas que están ahí.
+   *
+   * ⚠️ **Sin `days`**, igual que `dynamics`: la referencia de una columna es
+   * todo lo que se ha podido medir, y para acotar un sprint están `from`/`to`.
+   * Ahí el tramo acota **cuándo terminó la estancia**, que es la única columna
+   * de fecha que tiene sentido para esto — ver `StatsService.columnTime`.
+   */
+  @Get('column-time')
+  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
+  @ApiOperation({ summary: 'Cuánto tiempo pasa una tarea en cada columna' })
+  @ApiResponse({
+    status: 200,
+    description: 'Una fila por columna del tablero, tenga estancias o no',
+  })
+  columnTime(
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: ReportFiltersQueryDto,
+  ) {
+    return firstValueFrom(
+      this.reportsClient.send(
+        { cmd: 'report_column_time' },
+        { projectId, filtros: this.filtros(query) },
+      ),
+    );
+  }
+
+  /**
    * Retrabajo, rotación de responsable y volatilidad de prioridad.
    *
    * ## Los tres salen de eventos que ya se guardaban

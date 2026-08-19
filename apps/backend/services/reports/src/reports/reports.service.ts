@@ -434,6 +434,108 @@ export class ReportsService {
   }
 
   /**
+   * **Dónde espera el trabajo**: tiempo por columna.
+   *
+   * El informe de tiempos dice cuánto tarda una tarea de principio a fin. Este
+   * dice en qué parte del tablero se va ese tiempo, que es lo único de los dos
+   * sobre lo que se puede actuar: «doce días» no se arregla, «nueve de los doce
+   * en revisión» sí.
+   *
+   * Trae dos mitades que hay que leer juntas y **no se pueden sumar**:
+   *
+   * - `terminadas`: las estancias que ya acabaron, en percentiles. Es la
+   *   referencia — cuánto suele costar pasar por esa columna.
+   * - `enCurso`: lo que llevan **ahora** las tareas abiertas donde están. Es el
+   *   envejecimiento del trabajo en vuelo, y contra la mediana de al lado se
+   *   lee solo: «lleva 3 días en una columna cuya mediana es 4 horas».
+   *
+   * ⚠️ `enCurso` es estrictamente mejor que `blocked` para la misma pregunta:
+   * aquel usa un umbral fijo de días igual para todas las columnas, y una
+   * columna de paso donde lo normal son dos horas no se puede juzgar con la
+   * misma vara que una de revisión donde lo normal es una semana. `blocked` se
+   * queda —es más simple de leer y no necesita la referencia histórica— pero
+   * cuando las dos discrepen, manda esta.
+   *
+   * El cruce con las columnas es el de siempre: tasks-service devuelve
+   * `columnId`, y el nombre, el color y el tablero salen de projects-service.
+   */
+  async columnTime(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:column-time${claveDeFiltros(filtros)}`, async () => {
+      const [crudo, columns] = await Promise.all([
+        this.ask<{
+          terminadas: {
+            columnId: string;
+            estancias: number;
+            tareas: number;
+            p50Horas: number | null;
+            p85Horas: number | null;
+            totalHoras: number | null;
+          }[];
+          enCurso: {
+            columnId: string;
+            tareas: number;
+            p50Horas: number | null;
+            maxHoras: number | null;
+          }[];
+        }>(this.tasksClient, 'task_stats_column_time', { projectId, filtros }),
+        this.columnas(projectId),
+      ]);
+
+      const porId = new Map(columns.map((c) => [c.id, c]));
+      const enCursoPorId = new Map(crudo.enCurso.map((fila) => [fila.columnId, fila]));
+
+      /**
+       * Una fila por columna **del tablero**, no por columna con estancias.
+       *
+       * Una columna por la que no ha pasado nada es un dato: significa que ese
+       * paso no se usa. Si solo salieran las que tienen medidas, el gráfico
+       * enseñaría un tablero que no existe y nadie podría notar la ausencia.
+       */
+      const filas = columns
+        .map((columna) => {
+          const terminada = crudo.terminadas.find((fila) => fila.columnId === columna.id);
+          const curso = enCursoPorId.get(columna.id);
+          return {
+            columnId: columna.id,
+            name: columna.name,
+            color: columna.color,
+            board: columna.boardName,
+            order: columna.order,
+            estancias: terminada?.estancias ?? 0,
+            tareas: terminada?.tareas ?? 0,
+            p50Horas: terminada?.p50Horas ?? null,
+            p85Horas: terminada?.p85Horas ?? null,
+            totalHoras: terminada?.totalHoras ?? null,
+            enCurso: curso?.tareas ?? 0,
+            enCursoP50Horas: curso?.p50Horas ?? null,
+            enCursoMaxHoras: curso?.maxHoras ?? null,
+          };
+        })
+        .sort((a, b) => (a.board ?? '').localeCompare(b.board ?? '') || a.order - b.order);
+
+      /**
+       * Las estancias en columnas que ya no existen no se tiran: se agrupan.
+       *
+       * Borrar una columna no borra el tiempo que el trabajo pasó en ella, y
+       * descartarlo dejaría un total que no cuadra con la suma de las barras
+       * sin decir por qué.
+       */
+      const huerfanas = crudo.terminadas.filter((fila) => !porId.has(fila.columnId));
+
+      return {
+        columnas: filas,
+        huerfanas: huerfanas.reduce(
+          (suma, fila) => ({
+            estancias: suma.estancias + fila.estancias,
+            horas: suma.horas + (fila.totalHoras ?? 0),
+          }),
+          { estancias: 0, horas: 0 },
+        ),
+      };
+    });
+  }
+
+  /**
    * Retrabajo, rotación y volatilidad: **lo que ya estaba guardado y no se
    * miraba**.
    *
@@ -567,6 +669,7 @@ export class ReportsService {
       /* Sin `days`: no mira una ventana móvil sino todo el historial capturado,
          y quien quiera acotarlo tiene `from`/`to` como en el resto. */
       dynamics: () => this.dynamics(projectId, filtros),
+      'column-time': () => this.columnTime(projectId, filtros),
     };
 
     const pedidos = incluir.filter((parte) => parte in calculos);

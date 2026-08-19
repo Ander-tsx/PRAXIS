@@ -265,6 +265,14 @@ export class TasksController {
   }
 
   /**
+   * Cuánto tiempo pasa una tarea en cada columna. Ver `StatsService.columnTime`.
+   */
+  @MessagePattern({ cmd: 'task_stats_column_time' })
+  statsColumnTime(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.columnTime(dto.projectId, dto.filtros);
+  }
+
+  /**
    * Retrabajo, rotación de responsable y volatilidad de prioridad.
    *
    * Los tres salen de `task_events` y de nada más: no se captura ningún evento

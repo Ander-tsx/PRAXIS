@@ -102,6 +102,41 @@ export interface ReportWeekly {
 }
 
 /**
+ * **Dónde espera el trabajo**: tiempo por columna.
+ *
+ * Dos medidas por columna que se leen juntas y **no se suman**:
+ *
+ * - `p50Horas` / `p85Horas` son las estancias que **ya terminaron**. La
+ *   referencia: cuánto suele costar pasar por ahí.
+ * - `enCurso*` es lo que llevan **ahora** las tareas abiertas que están ahí.
+ *
+ * ⚠️ Sale **una fila por columna del tablero**, tenga estancias o no. Una
+ * columna por la que no pasa nada es un dato, y filtrarla dejaría un gráfico de
+ * un tablero que no existe.
+ */
+export interface ReportColumnTime {
+  columnas: {
+    columnId: string;
+    name: string;
+    color: string | null;
+    board?: string | null;
+    order: number;
+    /** Estancias terminadas. Una tarea puede tener varias en la misma columna. */
+    estancias: number;
+    tareas: number;
+    p50Horas: number | null;
+    p85Horas: number | null;
+    totalHoras: number | null;
+    /** Tareas abiertas que están ahí **ahora**. */
+    enCurso: number;
+    enCursoP50Horas: number | null;
+    enCursoMaxHoras: number | null;
+  }[];
+  /** Lo que pasó por columnas que ya no existen. No se tira: se agrupa. */
+  huerfanas: { estancias: number; horas: number };
+}
+
+/**
  * Retrabajo, rotación de responsable y volatilidad de prioridad.
  *
  * Los tres salen de eventos que ya se guardaban y ningún informe miraba
