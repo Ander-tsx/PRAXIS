@@ -164,9 +164,9 @@ export function DockColumn() {
         aria-hidden={!abierto}
         aria-label={titulo || 'Panel lateral'}
         className={[
-          'relative flex shrink-0 flex-col',
+          'flex shrink-0 flex-col',
           /* Móvil: hoja fija por encima de todo. Escritorio: columna que empuja. */
-          'fixed inset-y-0 right-0 z-40 w-[min(26rem,92vw)] md:static md:z-auto',
+          'fixed inset-y-0 right-0 z-40 w-[min(26rem,92vw)] md:relative md:z-auto',
           abierto
             ? 'translate-x-0 md:w-[26rem] lg:w-[28rem]'
             : 'translate-x-full md:w-0 md:translate-x-0',
