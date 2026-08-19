@@ -3,14 +3,7 @@
 import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
-import {
-  type AdminUser,
-  Avatar,
-  Badge,
-  avatarHref,
-  globalRoleLevelOf,
-  usePresence,
-} from '@praxis/commons';
+import { type AdminUser, Avatar, Badge, avatarHref, globalRoleLevelOf } from '@praxis/commons';
 import { useMemo, useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
@@ -153,7 +146,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
         header: 'Acciones',
         /* Fija: es un botón de tres puntos y siempre mide lo mismo. Era la
            pista `auto` que descuadraba la tabla entera. */
-        track: { rem: 3 },
+        track: { rem: 6 },
         align: 'end',
         mobileLabel: false,
         cell: (usuario) => {
@@ -239,17 +232,24 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
  * envoltorio, que sí es un componente y se monta una vez por fila.
  */
 function AvatarConPresencia({ usuario, esMiCuenta }: { usuario: AdminUser; esMiCuenta: boolean }) {
-  /* La del servidor es la del último render; el flujo la pisa si ha cambiado
-     desde entonces. Fuera del proveedor devuelve la guardada, sin romperse. */
-  const presencia = usePresence(usuario.id, usuario.presence);
-
+  /**
+   * ⚠️ **Aquí no se usa `usePresence`.**
+   *
+   * El flujo en tiempo real (LiveSource) solo envía actualizaciones de presencia
+   * para los contactos mutuos (gente con la que compartes proyectos).
+   * En el panel de administración se lista a todo el mundo, así que la mayoría
+   * de las cuentas nunca recibirían eventos de presencia y siempre saldrían
+   * grises, pareciendo desconectadas aunque estuvieran dentro de la app.
+   *
+   * Es mejor no pintar la esfera que pintar una que miente.
+   */
   return (
     <Avatar
       label={nombreDe(usuario)}
       mine={esMiCuenta}
       size="md"
       src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
-      presence={presencia}
+      presence={undefined}
     />
   );
 }
