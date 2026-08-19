@@ -18,14 +18,19 @@ import { CATALOGO, TIPOS_WIDGET, type TipoWidget } from '@/lib/widgets';
 export function Catalogo({
   yaPuestos,
   onElegir,
+  onConstruir,
   onGenerar,
 }: {
   yaPuestos: Set<TipoWidget>;
   onElegir: (tipo: TipoWidget) => void;
+  /** Abre el constructor determinista. */
+  onConstruir: () => void;
+  /** Lleva al chat con la frase de ejemplo puesta. */
   onGenerar: () => void;
 }) {
-  /* `generado` no se ofrece aquí: no se elige de una lista, se pide hablando y
-     llega como propuesta. Se enseña como la última tarjeta, que lleva al chat. */
+  /* `generado` no se ofrece como una entrada más del catálogo: no es un gráfico,
+     es un gráfico **a parametrizar**. Van las dos últimas tarjetas, una por cada
+     camino — el constructor y PRAX. */
   const disponibles = TIPOS_WIDGET.filter((tipo) => tipo !== 'generado');
 
   return (
@@ -67,15 +72,36 @@ export function Catalogo({
           );
         })}
 
+        {/**
+         * Los dos caminos a un gráfico a medida, uno al lado del otro.
+         *
+         * ⚠️ **El constructor va primero, y no es orden alfabético.** Es el que
+         * funciona sin cuota, sin modelo y sin acertar con las palabras, así que
+         * es el que tiene que encontrar quien no sepa que existe ninguno de los
+         * dos. PRAX es el atajo para quien ya sabe lo que quiere preguntar.
+         */}
+        <li>
+          <button
+            type="button"
+            onClick={onConstruir}
+            className="flex h-full w-full flex-col gap-1 rounded-xl border border-dashed border-border p-3 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated"
+          >
+            <span className="font-sans text-sm text-text-primary">Uno a medida</span>
+            <span className="font-sans text-xs leading-relaxed text-text-secondary">
+              Elige qué medir y cómo dibujarlo. Diez métricas sobre los mismos datos.
+            </span>
+          </button>
+        </li>
+
         <li>
           <button
             type="button"
             onClick={onGenerar}
             className="flex h-full w-full flex-col gap-1 rounded-xl border border-dashed border-border p-3 text-left transition-colors hover:border-border-strong hover:bg-surface-elevated"
           >
-            <span className="font-sans text-sm text-text-primary">Uno a medida</span>
+            <span className="font-sans text-sm text-text-primary">Pídeselo a PRAX</span>
             <span className="font-sans text-xs leading-relaxed text-text-secondary">
-              Pídeselo al asistente en tus palabras. Te lo propone y lo añades si te encaja.
+              En tus palabras. Te lo propone y lo añades si te encaja.
             </span>
           </button>
         </li>

@@ -1,6 +1,13 @@
 'use client';
 
-import { CATALOGO, type TipoWidget, type Widget, nuevoWidget, tiposYaPuestos } from '@/lib/widgets';
+import {
+  CATALOGO,
+  type EspecificacionGrafico,
+  type TipoWidget,
+  type Widget,
+  nuevoWidget,
+  tiposYaPuestos,
+} from '@/lib/widgets';
 import { Button } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,6 +20,7 @@ import {
 
 import { CanvasVacio } from './CanvasVacio';
 import { Catalogo } from './Catalogo';
+import { ChartBuilder } from './ChartBuilder';
 import { WidgetShell } from './WidgetShell';
 
 /**
@@ -91,6 +99,7 @@ export interface ReportCanvasProps {
 export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanvasProps) {
   const [widgets, setWidgets] = useState<Widget[]>(inicial);
   const [catalogoAbierto, setCatalogoAbierto] = useState(false);
+  const [constructorAbierto, setConstructorAbierto] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -216,9 +225,10 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
    * salto en el que la tarjeta aparezca de golpe con todo dentro.
    */
   const anadir = useCallback(
-    async (tipo: TipoWidget) => {
+    async (tipo: TipoWidget, grafico?: EspecificacionGrafico) => {
       setCatalogoAbierto(false);
-      const siguientes = [...widgets, nuevoWidget(tipo, widgets)];
+      setConstructorAbierto(false);
+      const siguientes = [...widgets, nuevoWidget(tipo, widgets, grafico)];
       setWidgets(siguientes);
       const resultado = await guardar(siguientes);
       if (!resultado.ok) {
@@ -280,8 +290,18 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
                 {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
               </Button>
 
-              <Button variant="ghost" onClick={onGenerar}>
-                Generar uno a medida
+              {/* Abre el constructor, que antes llevaba al chat. Los dos
+                  caminos siguen: PRAX está en el catálogo y en su botón
+                  flotante, y el que no depende de la cuota es este. */}
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setConstructorAbierto((abierto) => !abierto);
+                  setCatalogoAbierto(false);
+                }}
+                aria-expanded={constructorAbierto}
+              >
+                {constructorAbierto ? 'Cerrar el constructor' : 'Uno a medida'}
               </Button>
             </>
           ) : (
@@ -309,7 +329,22 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
       </div>
 
       {catalogoAbierto && (
-        <Catalogo yaPuestos={yaPuestos} onElegir={anadir} onGenerar={onGenerar} />
+        <Catalogo
+          yaPuestos={yaPuestos}
+          onElegir={anadir}
+          onConstruir={() => {
+            setCatalogoAbierto(false);
+            setConstructorAbierto(true);
+          }}
+          onGenerar={onGenerar}
+        />
+      )}
+
+      {constructorAbierto && (
+        <ChartBuilder
+          onAnadir={(grafico) => anadir('generado', grafico)}
+          onCancelar={() => setConstructorAbierto(false)}
+        />
       )}
 
       {error && (
@@ -320,7 +355,10 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
 
       <div ref={containerRef}>
         {widgets.length === 0 ? (
-          <CanvasVacio onAnadir={() => setCatalogoAbierto(true)} onGenerar={onGenerar} />
+          <CanvasVacio
+            onAnadir={() => setCatalogoAbierto(true)}
+            onConstruir={() => setConstructorAbierto(true)}
+          />
         ) : (
           /* Hasta que se mide el contenedor no se dibuja: la librería asume
              1280 px por defecto y la cuadrícula aparecería con el ancho

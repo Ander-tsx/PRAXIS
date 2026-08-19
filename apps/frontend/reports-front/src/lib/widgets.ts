@@ -351,3 +351,178 @@ export function nuevoWidget(
 export function tituloDe(widget: Widget): string {
   return widget.grafico?.titulo ?? CATALOGO[widget.tipo]?.titulo ?? 'Gráfico';
 }
+
+/* ─── El conjunto cerrado de los gráficos a medida ─────────────────────────
+ *
+ * Espejo de `REPORT_METRICS` y `validarGrafico` en
+ * `@praxis/contracts/reports/report-widget.ts`, que es donde está el porqué de
+ * cada campo.
+ *
+ * ⚠️ **Son dos copias y hay que mantenerlas a la par.** El frontend no depende
+ * de los contratos —son un paquete de servidor con `class-validator` dentro, y
+ * arrastrarlo al navegador metería los decoradores y `reflect-metadata` en el
+ * bundle— así que esta duplicación es el precio, el mismo que ya se paga con
+ * `TipoWidget`, `FormaGrafico` y `Metrica` unas líneas más arriba.
+ *
+ * Lo que **no** es duplicación innecesaria: validar aquí además de allí. Es la
+ * regla del repo —«valida en el cliente igualmente: el mensaje llega antes y
+ * marca el campo»— y aquí tiene un motivo extra, que el constructor **se apoya
+ * en el catálogo para no ofrecer lo imposible**. Un desplegable de formas que
+ * enseñe «dona» para una serie temporal es un 400 esperando a que alguien lo
+ * pulse.
+ */
+
+/** Qué admite cada métrica. Espejo de `ReportMetricSpec`. */
+export interface EspecificacionDeMetrica {
+  formas: FormaGrafico[];
+  /**
+   * ⚠️ Las de `snapshot` **no** aceptan rango: son una foto del momento, y un
+   * «últimos 30 días» sobre ellas devolvería el mismo número con una etiqueta
+   * que miente.
+   */
+  aceptaRango: boolean;
+  aceptaSoloVencidas: boolean;
+  aceptaTopN: boolean;
+  etiqueta: string;
+  /** Qué mide, para el constructor. No está en el contrato: es solo de aquí. */
+  descripcion: string;
+}
+
+const CATEGORICA: FormaGrafico[] = ['barras', 'barras_horizontales', 'dona'];
+const TEMPORAL: FormaGrafico[] = ['lineas', 'area_apilada'];
+
+export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
+  tareas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas por columna',
+    descripcion: 'Dónde está el trabajo ahora mismo.',
+  },
+  tareas_por_prioridad: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas por prioridad',
+    descripcion: 'Si casi todo es urgente, no hay prioridades.',
+  },
+  tareas_por_etiqueta: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas por etiqueta',
+    descripcion: 'De qué va el trabajo abierto.',
+  },
+  carga_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Carga por persona',
+    descripcion: 'Cuánto lleva cada cual ahora.',
+  },
+  cerradas_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas cerradas por persona',
+    descripcion: 'Reparto de lo terminado. No es una clasificación.',
+  },
+  vencidas_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas vencidas por persona',
+    descripcion: 'Dónde se acumulan los incumplimientos de fecha.',
+  },
+  paradas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: true,
+    aceptaSoloVencidas: true,
+    aceptaTopN: false,
+    etiqueta: 'Tareas paradas, por columna',
+    descripcion: 'En qué columna se atasca el trabajo.',
+  },
+  flujo_por_columna: {
+    formas: TEMPORAL,
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Flujo acumulado por columna',
+    descripcion: 'Cada columna como una banda, día a día.',
+  },
+  cierres_por_semana: {
+    formas: [...TEMPORAL, 'barras'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas cerradas por semana',
+    descripcion: 'El ritmo de entrega, semana a semana.',
+  },
+  creadas_por_semana: {
+    formas: [...TEMPORAL, 'barras'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas creadas por semana',
+    descripcion: 'Cuánto trabajo entra. Con lo anterior, si el tablero crece.',
+  },
+};
+
+/** Cómo se llama cada forma en la pantalla. */
+export const FORMAS: Record<FormaGrafico, string> = {
+  barras: 'Barras',
+  barras_horizontales: 'Barras horizontales',
+  dona: 'Dona',
+  lineas: 'Líneas',
+  area_apilada: 'Área apilada',
+};
+
+/**
+ * ⚠️ En `paradas_por_columna`, `dias` **no es una ventana de historial**: es el
+ * umbral de parón, «sin moverse desde hace N días». El constructor cambia el
+ * rótulo por eso; el número viaja igual.
+ */
+export function etiquetaDelRango(metrica: Metrica): string {
+  return metrica === 'paradas_por_columna' ? 'Sin moverse desde hace (días)' : 'Días de historial';
+}
+
+/**
+ * Espejo de `validarGrafico`. Devuelve el motivo, o `null` si vale.
+ *
+ * El backend vuelve a comprobarlo —dos puertas distintas, y ninguna se fía de
+ * que la otra ya miró— así que esto no es la seguridad: es que el mensaje llegue
+ * antes de gastar una petición.
+ */
+export function validarGrafico(grafico: EspecificacionGrafico): string | null {
+  const spec = METRICAS[grafico.metrica];
+  if (!spec) return `La métrica «${grafico.metrica}» no existe`;
+
+  if (!spec.formas.includes(grafico.forma)) {
+    return `«${spec.etiqueta}» no se puede dibujar como ${FORMAS[grafico.forma] ?? grafico.forma}`;
+  }
+  if (grafico.dias !== undefined) {
+    if (!spec.aceptaRango) return `«${spec.etiqueta}» es una foto del momento: no admite rango`;
+    if (!Number.isInteger(grafico.dias) || grafico.dias < 1 || grafico.dias > 365) {
+      return 'El rango va de 1 a 365 días';
+    }
+  }
+  if (grafico.soloVencidas && !spec.aceptaSoloVencidas) {
+    return `«${spec.etiqueta}» no distingue las vencidas`;
+  }
+  if (grafico.topN !== undefined) {
+    if (!spec.aceptaTopN) return `«${spec.etiqueta}» no admite recorte por top N`;
+    if (!Number.isInteger(grafico.topN) || grafico.topN < 2 || grafico.topN > 20) {
+      return 'El top N va de 2 a 20';
+    }
+  }
+  if (!grafico.titulo?.trim()) return 'Falta el título del gráfico';
+  if (grafico.titulo.length > 80) return 'El título no puede superar 80 caracteres';
+
+  return null;
+}
