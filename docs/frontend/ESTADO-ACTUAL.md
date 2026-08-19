@@ -4819,3 +4819,45 @@ Estaba escrito como «si R4.2 o R4.4 las piden». No las piden: R4.2 agrupa
 peticiones que ya existían y R4.4 agrega en tasks-service, donde están los datos.
 El servicio sigue **sin base de datos**, que es lo que se decidió en §25.6, y el
 lienzo sigue en `projects-service` sin migración entre bases.
+
+
+### 44.7 Segunda pasada de interfaz (2026-08-19)
+
+La primera arregló fallos y dejó la pantalla casi igual. Esta la cambia.
+
+**Los paneles se abren sin dar un salto.** Los tres —filtros, catálogo,
+constructor— aparecían de golpe y miden entre 100 y 300 px: el lienzo pegaba un
+brinco y quien miraba un grafo lo perdía de vista sin tocar nada.
+
+🔴 **`grid-template-rows` de `0fr` a `1fr`, nunca `max-height`.** Aquello
+«funciona» y miente: la transición corre sobre los píxeles que el contenido **no**
+tiene, así que un panel de 100 px con `max-height: 500px` abre en un quinto del
+tiempo y pasa el resto en nada; al cerrar, empieza lento y termina de golpe. Y el
+ritmo cambia con lo que haya dentro, que aquí depende de cuántos filtros se
+pinten. `height: auto` directamente no se puede animar. Medido: 325 px a los
+120 ms, 581 px abierto. Vive en `molecules/Desplegable`, con `motion-safe`.
+
+🔴 **El panel de filtros se cerraba en cada selección**, por la `key` de §44.1:
+remontaba el organismo entero en cada cambio, así que acumular tres filtros eran
+tres viajes de abrir y volver a abrir. La `key` se mudó a los dos
+`SelectorDeFecha`, que es lo único que la necesitaba.
+
+**Los grafos se eligen por su forma.** El catálogo eran ocho tarjetas de texto:
+elegir «flujo acumulado» obligaba a leerse la frase y traducirla a una imagen.
+`molecules/MiniGrafo` dibuja las cinco formas del constructor más tres que solo
+existen en el catálogo —cifras, dispersión, lista—. En el constructor, la forma
+pasa de desplegable a **fila de miniaturas**: «área apilada» en una lista obliga
+a saber qué significan esas dos palabras antes de poder elegir.
+
+⚠️ **La miniatura nunca lleva datos reales.** En un proyecto sin historial saldría
+plana, y una fila de barras a cero se lee como «este grafo no sirve» cuando lo que
+pasa es que aún no hay nada. Dice qué forma tiene, no qué valores tendrá.
+
+**Un panel con pestañas** en lugar de dos que se cerraban el uno al otro: son dos
+formas de hacer lo mismo, y quien llega al catálogo descubre el constructor sin
+que nadie se lo cuente. El estado pasa a ser uno en vez de dos booleanos —que
+tenían un estado imposible y cuatro sitios donde acordarse de cerrar al otro—.
+
+**Y «gráfico» pasa a «Grafo»** en la interfaz, por decisión de producto del
+2026-08-19. ⚠️ Queda escrito que en español un grafo son nodos y aristas: si algún
+día chirría, el cambio está acotado a las cadenas de un solo commit.
