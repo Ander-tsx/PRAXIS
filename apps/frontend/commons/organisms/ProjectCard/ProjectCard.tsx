@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { Project, UserProfile } from '../../api/domain';
 import { personLabel } from '../../api/domain';
 import { avatarHref } from '../../api/presence';
-import { Avatar, Badge, iniciales } from '../../atoms';
-import { alpha, colors, serieColors } from '../../tokens';
+import { Avatar, Badge, ProjectMonogram } from '../../atoms';
+import { alpha, colors } from '../../tokens';
 
 export interface ProjectCardProps {
   project: Project;
@@ -84,17 +84,8 @@ const fechaLarga = new Intl.DateTimeFormat('es-MX', {
  * monograma le da a cada proyecto una cara fija —mismo color y mismas iniciales
  * siempre— y la posición en la rejilla se aprende sola.
  *
- * El color sale de `serieColors`, que existe exactamente para esto: «categorías
- * **que no tienen color propio**», medidas para distinguirse entre sí bajo
- * daltonismo y con los mismos hexadecimales en los dos temas. Un proyecto no
- * tiene color propio, así que no se inventa uno nuevo ni se reutiliza el de los
- * estados —`success` y `error` significan algo, y teñir un proyecto de rojo por
- * azar diría que pasa algo—.
- *
- * ⚠️ **El tono sale del `id`, no del nombre.** El `id` es inmutable; el nombre
- * no, y con el nombre el proyecto cambiaría de color al renombrarlo, que es
- * cuando más falta hace reconocerlo. Las iniciales sí salen del nombre —son
- * texto, y deben decir lo que se ve—.
+ * Lo pinta `ProjectMonogram`, que vive en `atoms` desde que la bandeja de
+ * Mensajes enseña el mismo: el porqué del color y de las letras está allí.
  *
  * ## Qué fecha se enseña, y por qué no «última actividad»
  *
@@ -115,7 +106,6 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const suspendido = project.status === 'SUSPENDED';
   const eresElDueno = project.ownerId === currentUserId;
-  const tono = tonoDe(project.id);
 
   /* La misma tarjeta con dos envoltorios. Se elige aquí y no con un
      `const Wrapper = sameZone ? Link : 'a'` porque las props de `Link` y las de
@@ -127,20 +117,7 @@ export function ProjectCard({
   const cuerpo = (
     <>
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-sans text-sm font-semibold uppercase transition-colors"
-          style={{
-            /* Suspendido, el monograma se apaga a gris: la tarjeta entera
-                 tiene que leerse como «esto está parado», y un color de marca
-                 vivo dice lo contrario. */
-            background: suspendido ? alpha(colors.textSecondary, 14) : alpha(tono, 16),
-            color: suspendido ? colors.textDisabled : tono,
-            boxShadow: `inset 0 0 0 1px ${alpha(suspendido ? colors.textSecondary : tono, 30)}`,
-          }}
-        >
-          {iniciales(project.name)}
-        </span>
+        <ProjectMonogram id={project.id} name={project.name} size="md" apagado={suspendido} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className="truncate font-sans text-base font-semibold text-text-primary">
@@ -323,12 +300,6 @@ function Dato({
  * sesiones— y repartir razonablemente los seis tonos entre proyectos con ids
  * aleatorios, que es lo que un UUID garantiza de sobra.
  */
-function tonoDe(id: string): string {
-  let suma = 0;
-  for (let i = 0; i < id.length; i += 1) suma += id.charCodeAt(i);
-  return serieColors[suma % serieColors.length];
-}
-
 function IconoMiembros() {
   return (
     <svg

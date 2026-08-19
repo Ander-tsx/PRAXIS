@@ -402,6 +402,9 @@ export function AssistantChat({
    * No se guarda en `localStorage`: al recargar se empieza limpio y las de antes
    * están en la lista. Recuperar sola la última convertiría cada visita a
    * Reportes en la continuación de algo que a lo mejor ya estaba cerrado.
+   *
+   * ⚠️ Lo que **sí** se recupera es la de la URL, y con sus mensajes: ver el
+   * efecto que hay junto a `cargar`.
    */
   const [conversationId, setConversationId] = useState<string | null>(conversacionInicial ?? null);
   /**
@@ -413,6 +416,16 @@ export function AssistantChat({
    * historial hay sitio para lo que hace falta al elegir.
    */
   const [vista, setVista] = useState<'chat' | 'historial'>('chat');
+  /**
+   * ¿Todavía no se ha dicho nada en esta conversación?
+   *
+   * Es lo que decide si el foco se puede soltar: sin turnos no hay contexto que
+   * mezclar, así que cambiar de proyecto no cuesta nada. Mira **las dos cosas**
+   * a propósito — un hilo recuperado de la URL tiene `conversationId` antes de
+   * que sus mensajes lleguen, y con solo `mensajes.length` el aspa parpadearía
+   * durante esa carga.
+   */
+  const enBlanco = mensajes.length === 0 && conversationId === null;
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -500,11 +513,52 @@ export function AssistantChat({
     }
   }
 
+  /**
+   * 🔴 **La conversación de la URL, al montar.**
+   *
+   * Sin esto, recargar sobre `?c=<id>` dejaba la pantalla **mintiendo entera**:
+   * la URL seguía siendo la de la conversación, la insignia seguía diciendo de
+   * qué proyecto se hablaba… y el hilo salía vacío, con el recibimiento de una
+   * conversación nueva. No se pedían los mensajes: `conversacionInicial` solo
+   * sembraba el `conversationId`, así que el estado decía «estás dentro de esta
+   * conversación» y la pantalla enseñaba «no has empezado ninguna». Escribir
+   * entonces continuaba el hilo de verdad, y la respuesta aparecía encima de un
+   * historial invisible.
+   *
+   * Es el precio de tener el hilo en la URL y en la base a la vez: navegar lo
+   * traía porque el clic del historial llamaba a `cargar`, pero **recargar no
+   * pasa por ningún clic**.
+   *
+   * Se dispara una sola vez, contra el valor con el que se montó: `cargar` deja
+   * el `conversationId` puesto, así que depender de él lo repetiría en bucle. Y
+   * no se toca si ya hay mensajes en pantalla —el caso del cajón de Análisis,
+   * que se cierra y se abre sin desmontar.
+   */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: se corre al montar y solo con el id de la URL; `cargar` cambia en cada render y `conversationId` lo escribe ella misma.
+  useEffect(() => {
+    if (!conversacionInicial) return;
+    void cargar(conversacionInicial);
+  }, [conversacionInicial]);
+
   async function enviar(pregunta: string) {
     const limpio = pregunta.trim();
-    /* ⚠️ Con archivos, un mensaje vacío es legítimo: adjuntar y enviar es
-       «mira esto». Sin ellos sigue haciendo falta texto. */
-    if ((!limpio && adjuntos.length === 0) || pendiente || agotada) return;
+    /**
+     * ⚠️ **Un archivo solo no basta: hay que decir qué se quiere de él.**
+     *
+     * Se probó al revés —adjuntar y enviar como «mira esto»— y el backend lo
+     * rechazaba con un «Validation failed» que no dice nada: el DTO exige
+     * `message`, y con razón. Un PDF sin pregunta obliga a PRAX a adivinar si lo
+     * resume, lo critica o saca tareas de él, y acierta poco.
+     *
+     * El aviso se da aquí, con el nombre de lo que falta, en vez de dejar que
+     * salga el 400.
+     */
+    if (!limpio && adjuntos.length > 0) {
+      setError('Escribe qué quieres que haga PRAX con el archivo.');
+      campoRef.current?.focus();
+      return;
+    }
+    if (!limpio || pendiente || agotada) return;
     /* Con una subida en vuelo, el turno saldría sin ese archivo y PRAX
        respondería a medias sobre algo que la burbuja sí enseña. */
     if (subiendo) return;
@@ -658,49 +712,73 @@ export function AssistantChat({
                 </Badge>
               </div>
               {/**
-               * El proyecto en foco, como insignia **y como botón**.
+               * El proyecto, como insignia. Y **con aspa solo mientras se pueda**.
                *
                * ⚠️ Sustituye a la frase que había aquí —«Lee los datos del
                * proyecto y responde con sus números…»— que era un pie de manual:
-               * decía lo mismo en cada visita y nunca cambiaba, así que se dejaba
-               * de leer a la segunda vez y ocupaba el sitio más visible de la
-               * cabecera.
+               * decía lo mismo en cada visita y ocupaba el sitio más visible de
+               * la cabecera. Lo que hace falta ahí es **de qué se está hablando**.
                *
-               * Lo que sí hace falta ahí es **de qué se está hablando**, porque
-               * en una conversación con foco cambiable eso no puede depender de
-               * acordarse. Y como se puede cambiar, la insignia es el propio
-               * control: pulsarla vuelve al recibimiento, donde están los
-               * proyectos. Es además lo que hace verdad lo que PRAX dice cuando
-               * le piden otro proyecto — ver la regla del prompt.
+               * ## El aspa aparece y desaparece, y ese es el diseño entero
+               *
+               * Fue un botón para cambiar de proyecto en cualquier momento, y se
+               * retiró: el hilo se reenvía entero al modelo en cada turno, así
+               * que empezar en un proyecto y seguir en otro le mete los dos
+               * contextos —tareas, columnas, gente— en la misma ventana, y las
+               * propuestas salen apuntando a ids del proyecto equivocado.
+               *
+               * Pero **antes del primer mensaje no hay ningún contexto que
+               * mezclar**, y ahí quitarlo era una trampa: elegías mal de la lista
+               * de botones y no había vuelta atrás salvo editando la URL. Así que
+               * el aspa está mientras la conversación esté en blanco y se va con
+               * el primer turno, que es justo cuando el foco pasa a significar
+               * algo.
+               *
+               * Con hilo empezado esto es un rótulo, y para hablar de otro
+               * proyecto se empieza otra conversación — el botón de al lado.
                */}
-              {/**
-               * El proyecto, como insignia. **Y solo como insignia.**
-               *
-               * ⚠️ Fue un botón para cambiar de proyecto, y se retiró: una
-               * conversación es sobre un proyecto y no cambia a mitad. El hilo se
-               * reenvía entero al modelo en cada turno, así que empezar en un
-               * proyecto y seguir en otro le mete los dos contextos —tareas,
-               * columnas, gente— en la misma ventana, y las propuestas salen
-               * apuntando a ids del proyecto equivocado.
-               *
-               * Para hablar de otro se empieza otra conversación, que es el botón
-               * de al lado. Esto es un rótulo: dice de qué va lo que se está
-               * leyendo, que en una lista de conversaciones hace falta.
-               */}
-              {vista === 'chat' && projectId && (
-                <span
-                  className="flex max-w-full items-center self-start rounded-full px-2.5 py-1 font-sans text-xs font-medium"
-                  style={{
-                    background: alpha(colors.primary, 12),
-                    color: colors.primary,
-                    boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 25)}`,
-                  }}
-                >
-                  <span className="truncate">
-                    {nombresDeProyecto[projectId] ?? 'Este proyecto'}
+              {vista === 'chat' &&
+                projectId &&
+                (enBlanco ? (
+                  <button
+                    type="button"
+                    onClick={() => onElegirProyecto?.('', null)}
+                    title="Elegir otro proyecto"
+                    className="group flex max-w-full items-center gap-1 self-start rounded-full px-2.5 py-1 font-sans text-xs font-medium transition-colors"
+                    style={{
+                      background: alpha(colors.primary, 12),
+                      color: colors.primary,
+                      boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 25)}`,
+                    }}
+                  >
+                    <span className="truncate">
+                      {nombresDeProyecto[projectId] ?? 'Este proyecto'}
+                    </span>
+                    <svg
+                      className="h-3 w-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                ) : (
+                  <span
+                    className="flex max-w-full items-center self-start rounded-full px-2.5 py-1 font-sans text-xs font-medium"
+                    style={{
+                      background: alpha(colors.primary, 12),
+                      color: colors.primary,
+                      boxShadow: `inset 0 0 0 1px ${alpha(colors.primary, 25)}`,
+                    }}
+                  >
+                    <span className="truncate">
+                      {nombresDeProyecto[projectId] ?? 'Este proyecto'}
+                    </span>
                   </span>
-                </span>
-              )}
+                ))}
 
               {vista === 'historial' && (
                 <p className="font-sans text-sm text-text-secondary">
@@ -1292,9 +1370,9 @@ export function AssistantChat({
 
                   <button
                     type="submit"
-                    disabled={
-                      pendiente || subiendo || (texto.trim().length === 0 && adjuntos.length === 0)
-                    }
+                    /* El texto es obligatorio aunque haya archivos: ver
+                       `enviar`. Así el botón dice lo mismo que la regla. */
+                    disabled={pendiente || subiendo || texto.trim().length === 0}
                     aria-label="Enviar"
                     title={subiendo ? 'Esperando a que suban los archivos' : 'Enviar'}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1413,8 +1491,9 @@ function Sugerencia({
 function Burbuja({ mensaje, gatewayPath }: { mensaje: Mensaje; gatewayPath: string }) {
   const mio = mensaje.role === 'user';
   const adjuntos = mensaje.attachments ?? [];
-  /* Adjuntar y enviar sin escribir es legítimo —«mira esto»—, y entonces la
-     burbuja son los archivos y nada más. */
+  /* Hoy todo turno lleva texto —ver `enviar`—, pero los hilos de antes de esa
+     regla tienen burbujas que son solo archivos, y siguen teniendo que pintarse.
+     Un `<p>` vacío debajo de la miniatura se ve como un hueco raro. */
   const conTexto = mensaje.text.trim().length > 0;
 
   return (

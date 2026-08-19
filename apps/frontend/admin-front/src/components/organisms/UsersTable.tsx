@@ -3,7 +3,14 @@
 import { type DataColumn, DataTable } from '@/components/molecules/DataTable';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
-import { type AdminUser, Avatar, Badge, avatarHref, globalRoleLevelOf } from '@praxis/commons';
+import {
+  type AdminUser,
+  Avatar,
+  Badge,
+  avatarHref,
+  globalRoleLevelOf,
+  usePresence,
+} from '@praxis/commons';
 import { useMemo, useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
@@ -73,13 +80,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
           const esMiCuenta = usuario.id === miId;
           return (
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar
-                label={nombreDe(usuario)}
-                mine={esMiCuenta}
-                size="md"
-                src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
-                presence={usuario.presence ?? null}
-              />
+              <AvatarConPresencia usuario={usuario} esMiCuenta={esMiCuenta} />
               <div className="min-w-0">
                 <p className="flex items-center gap-1 truncate font-sans text-sm font-semibold text-text-primary">
                   {esMiCuenta ? (
@@ -216,5 +217,39 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
         <UserRoleDialog usuario={rolDe} miNivel={miNivel} open onClose={() => setRolDe(null)} />
       )}
     </>
+  );
+}
+
+/**
+ * El avatar de una fila, con el punto de estado **al día**.
+ *
+ * ## 🔴 Por qué esto es un componente y no cuatro líneas dentro de la celda
+ *
+ * Porque la presencia se leía de `usuario.presence` a secas, que es lo que trajo
+ * el servidor **al cargar la página**: un valor congelado. En el resto de la
+ * aplicación los avatares pasan por `usePresence`, que pisa esa foto con los
+ * eventos del flujo en vivo; aquí no, así que el panel de administración era el
+ * único sitio donde alguien seguía «Disponible» media hora después de cerrar, y
+ * donde quien acababa de entrar salía gris. Es justo la pantalla donde ese dato
+ * se mira para decidir algo.
+ *
+ * `usePresence` es un hook, y `cell` es una función que devuelve JSX dentro de un
+ * `useMemo` — no un componente—, así que llamarlo ahí rompe las reglas de los
+ * hooks: el número de llamadas cambiaría con el número de filas. De ahí este
+ * envoltorio, que sí es un componente y se monta una vez por fila.
+ */
+function AvatarConPresencia({ usuario, esMiCuenta }: { usuario: AdminUser; esMiCuenta: boolean }) {
+  /* La del servidor es la del último render; el flujo la pisa si ha cambiado
+     desde entonces. Fuera del proveedor devuelve la guardada, sin romperse. */
+  const presencia = usePresence(usuario.id, usuario.presence);
+
+  return (
+    <Avatar
+      label={nombreDe(usuario)}
+      mine={esMiCuenta}
+      size="md"
+      src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
+      presence={presencia}
+    />
   );
 }

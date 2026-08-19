@@ -5,6 +5,7 @@ import {
   type ChatContact,
   type DirectConversation,
   type Directory,
+  ProjectMonogram,
   type UserProfile,
   alpha,
   avatarHref,
@@ -210,33 +211,37 @@ export function ChatDirectory({
 
       {/* El conmutador. Las dos pestañas llevan su contador de no leídos, que es
           lo que hace que se vea desde la otra que hay algo esperando. */}
-      {!compacto && (<div
-        className="flex gap-1 rounded-xl p-1"
-        style={{ background: alpha(colors.overlay, 18) }}
-        role="tablist"
-      >
-        <Solapa
-          activa={pestana === 'directos'}
-          onClick={() => setPestana('directos')}
-          etiqueta="Directos"
-          sinLeer={sinLeerDirectos}
-        />
-        <Solapa
-          activa={pestana === 'proyectos'}
-          onClick={() => setPestana('proyectos')}
-          etiqueta="Proyectos"
-          sinLeer={sinLeerProyectos}
-        />
-      </div>)}
+      {!compacto && (
+        <div
+          className="flex gap-1 rounded-xl p-1"
+          style={{ background: alpha(colors.overlay, 18) }}
+          role="tablist"
+        >
+          <Solapa
+            activa={pestana === 'directos'}
+            onClick={() => setPestana('directos')}
+            etiqueta="Directos"
+            sinLeer={sinLeerDirectos}
+          />
+          <Solapa
+            activa={pestana === 'proyectos'}
+            onClick={() => setPestana('proyectos')}
+            etiqueta="Proyectos"
+            sinLeer={sinLeerProyectos}
+          />
+        </div>
+      )}
 
-      {!compacto && (<input
-        type="search"
-        value={busqueda}
-        onChange={(evento) => setBusqueda(evento.target.value)}
-        placeholder={pestana === 'directos' ? 'Buscar persona…' : 'Buscar proyecto…'}
-        aria-label="Buscar"
-        className="w-full rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none"
-      />)}
+      {!compacto && (
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(evento) => setBusqueda(evento.target.value)}
+          placeholder={pestana === 'directos' ? 'Buscar persona…' : 'Buscar proyecto…'}
+          aria-label="Buscar"
+          className="w-full rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-sm text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none"
+        />
+      )}
 
       {pestana === 'directos' ? (
         <div className="flex flex-col gap-4">
@@ -264,7 +269,8 @@ export function ChatDirectory({
           )}
 
           {directosVisibles.length === 0 && (
-            <Vacio compacto={compacto}
+            <Vacio
+              compacto={compacto}
               texto={
                 filtro
                   ? 'Nadie coincide con esa búsqueda.'
@@ -276,7 +282,8 @@ export function ChatDirectory({
       ) : (
         <div className="flex flex-col gap-1">
           {proyectosVisibles.length === 0 ? (
-            <Vacio compacto={compacto}
+            <Vacio
+              compacto={compacto}
               texto={filtro ? 'Ningún proyecto coincide.' : 'Todavía no estás en ningún proyecto.'}
             />
           ) : (
@@ -333,12 +340,18 @@ function Solapa({
   );
 }
 
-function Grupo({ titulo, compacto, children }: { titulo: string; compacto?: boolean; children: React.ReactNode }) {
+function Grupo({
+  titulo,
+  compacto,
+  children,
+}: { titulo: string; compacto?: boolean; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-1">
-      {!compacto && <h3 className="px-1 font-sans text-[11px] font-semibold uppercase tracking-wide text-text-disabled">
-        {titulo}
-      </h3>}
+      {!compacto && (
+        <h3 className="px-1 font-sans text-[11px] font-semibold uppercase tracking-wide text-text-disabled">
+          {titulo}
+        </h3>
+      )}
       <ul className="flex flex-col gap-0.5">{children}</ul>
     </section>
   );
@@ -420,19 +433,21 @@ function FilaPersona({
           presence={presencia}
         />
 
-        {!compacto && (<span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-baseline gap-2">
-            <span className="truncate font-sans text-sm text-text-primary">{nombre}</span>
-            {cuando && (
-              <span className="ml-auto shrink-0 font-sans text-[10px] text-text-disabled">
-                {cuandoCorto(cuando)}
-              </span>
+        {!compacto && (
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex items-baseline gap-2">
+              <span className="truncate font-sans text-sm text-text-primary">{nombre}</span>
+              {cuando && (
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-text-disabled">
+                  {cuandoCorto(cuando)}
+                </span>
+              )}
+            </span>
+            {detalle && (
+              <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
             )}
           </span>
-          {detalle && (
-            <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
-          )}
-        </span>)}
+        )}
 
         {!compacto && <Marcas unread={unread} muted={muted} />}
       </Link>
@@ -443,13 +458,16 @@ function FilaPersona({
 /**
  * Un chat de proyecto.
  *
- * ⚠️ **Lleva fuera de esta zona**, a la pantalla del proyecto, así que es un
- * `<a>` duro y no `next/link`: `dashboard` y `projects` son apps distintas
- * (ESTADO-ACTUAL §16). La flecha de la derecha lo anuncia — quien pulsa debe
- * saber que se va a mover de sitio antes de hacerlo.
+ * ⚠️ **Ya no lleva fuera de esta zona**, y eso quita dos cosas que quedaban de
+ * cuando sí lo hacía: era un `<a>` duro —porque `chat` y `projects` son apps
+ * distintas del multi-zone (§16)— y llevaba una flecha «→» a la derecha para
+ * anunciar el salto. El chat de equipo vive aquí ahora, al lado de los privados,
+ * así que es `next/link` y **sin flecha**: no se va a ninguna parte, y una flecha
+ * que aparece al pasar por encima sin significar nada es ruido.
  *
- * El enlace usa el **slug**, que es lo que va en la URL. El id y el slug son los
- * dos `string` y confundirlos no da error de compilación (CLAUDE.md, trampa 10).
+ * La ruta lleva el **UUID**, no el slug: todo lo anidado bajo `/projects/:id` en
+ * el gateway espera el UUID. Los dos son `string` y confundirlos no da error de
+ * compilación (CLAUDE.md, trampa 10).
  */
 function FilaProyecto({
   chat,
@@ -457,8 +475,6 @@ function FilaProyecto({
   activo,
   compacto,
 }: { chat: ChatDeProyecto; autor: string | null; activo: boolean; compacto?: boolean }) {
-  const inicial = chat.project.name.trim()[0]?.toUpperCase() ?? '·';
-
   return (
     /* Enlace de la propia zona: el chat de equipo ya vive aquí, al lado de los
        privados, así que pulsarlo ya no saca de la pantalla.
@@ -473,44 +489,38 @@ function FilaProyecto({
       }`}
       style={estiloDeFila(activo)}
     >
-      {/* Cuadrado y no círculo: distingue de un vistazo un equipo de una
-          persona sin tener que leer nada. */}
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-sans text-sm font-semibold"
-        style={{ background: alpha(colors.accent, 18), color: colors.accent }}
-      >
-        {inicial}
-      </span>
+      {/**
+       * La misma cara que en la rejilla de Proyectos.
+       *
+       * ⚠️ Aquí había un cuadrado violeta con **una sola letra**, del mismo color
+       * para todos: dos proyectos que empezaran por la misma eran
+       * indistinguibles, y ninguno se parecía al de la rejilla — el mismo
+       * proyecto tenía dos caras según la pantalla desde la que se mirara. Ver
+       * `ProjectMonogram`, que explica de dónde salen el color y las letras.
+       */}
+      <ProjectMonogram id={chat.project.id} name={chat.project.name} />
 
-      {!compacto && (<span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex items-baseline gap-2">
-          <span className="truncate font-sans text-sm text-text-primary">{chat.project.name}</span>
-          {chat.ultimo && (
-            <span className="ml-auto shrink-0 font-sans text-[10px] text-text-disabled">
-              {cuandoCorto(chat.ultimo.createdAt)}
+      {!compacto && (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-baseline gap-2">
+            <span className="truncate font-sans text-sm text-text-primary">
+              {chat.project.name}
             </span>
-          )}
+            {chat.ultimo && (
+              <span className="ml-auto shrink-0 font-sans text-[10px] text-text-disabled">
+                {cuandoCorto(chat.ultimo.createdAt)}
+              </span>
+            )}
+          </span>
+          <span className="truncate font-sans text-xs text-text-secondary">
+            {chat.ultimo
+              ? `${autor ?? 'Alguien'}: ${resumenDe(chat.ultimo)}`
+              : 'Sin mensajes todavía'}
+          </span>
         </span>
-        <span className="truncate font-sans text-xs text-text-secondary">
-          {chat.ultimo
-            ? `${autor ?? 'Alguien'}: ${resumenDe(chat.ultimo)}`
-            : 'Sin mensajes todavía'}
-        </span>
-      </span>)}
+      )}
 
       {!compacto && <Marcas unread={chat.unread} muted={chat.muted} />}
-
-      <svg
-        className="h-3.5 w-3.5 shrink-0 text-text-disabled opacity-0 transition-opacity group-hover:opacity-100"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7-7 7M21 12H4" />
-      </svg>
     </Link>
   );
 }

@@ -4,6 +4,7 @@ export * from './Badge';
 export * from './Checkbox';
 export * from './Input';
 export * from './PraxAvatar';
+export * from './ProjectMonogram';
 export * from './Select';
 export * from './Sparkle';
 export * from './StatItem';

@@ -123,15 +123,24 @@ export async function preguntarAction(
   }
 
   const texto = message.trim();
-  /* ⚠️ Con archivos, un mensaje vacío es legítimo: «mira esto» es adjuntar y
-     enviar. Sin ellos sigue sin serlo. */
-  if (texto.length === 0 && (attachmentIds ?? []).length === 0) {
+  /**
+   * ⚠️ **También con archivos hace falta texto.**
+   *
+   * El DTO exige `message`, así que mandar solo un adjunto devolvía un
+   * «Validation failed» que no dice qué falta. Y la regla es buena: un PDF sin
+   * pregunta obliga al modelo a adivinar si lo resume, lo critica o saca tareas
+   * de él.
+   */
+  if (texto.length === 0) {
     return {
       reply: null,
       proposals: [],
       cuota: null,
       conversationId: null,
-      error: 'Escribe algo primero.',
+      error:
+        (attachmentIds ?? []).length > 0
+          ? 'Escribe qué quieres que haga PRAX con el archivo.'
+          : 'Escribe algo primero.',
     };
   }
   if (texto.length > 2000) {
