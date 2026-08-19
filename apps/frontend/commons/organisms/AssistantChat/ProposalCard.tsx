@@ -1776,10 +1776,17 @@ export function TemplateProposalCard({
       estado={estado}
       error={error}
       resultado={null}
-      /* El botón de aceptar no crea: abre la revisión. Crear veinte objetos de
-         golpe desde una tarjeta de chat sería la misma capacidad con el paso de
-         revisión quitado, que es justo lo que este producto decidió no hacer. */
-      onAceptar={estado === 'hecho' ? undefined : () => setRevisando(true)}
+      /**
+       * El botón de aceptar no crea: **abre la revisión**. Crear veinte objetos
+       * de golpe desde una tarjeta de chat sería la misma capacidad con el paso
+       * de revisión quitado, que es justo lo que este producto decidió no hacer.
+       *
+       * Y desaparece en cuanto la revisión está abierta: a partir de ahí el
+       * botón que cuenta es el «Crear proyecto» de dentro, y dos botones
+       * primarios en la misma tarjeta —uno de los cuales ya no hace nada— solo
+       * sirven para pulsar el que no era.
+       */
+      onAceptar={estado === 'hecho' || revisando ? undefined : () => setRevisando(true)}
       etiquetaAceptar="Revisar el plan"
       onDescartar={() => {
         setEstado('descartada');
