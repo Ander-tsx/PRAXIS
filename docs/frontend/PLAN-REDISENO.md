@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R4 — Análisis (R4.1, R4.2, R4.6 y R4.7 hechas) |
-| **Última tarea terminada** | R4.6 y R4.7 — lienzo de partida, y el asistente ya solo vive en el cajón |
-| **Siguiente** | R4.3 — filtros de verdad en los siete agregados |
+| **Etapa actual** | R4 — Análisis (R4.1, R4.2, R4.3, R4.6 y R4.7 hechas) |
+| **Última tarea terminada** | R4.3 — filtros de verdad en los siete agregados, y su barra |
+| **Siguiente** | R4.4 — la vista de cartera |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → **R4** → R5 → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
-| **Rama** | `feature/rediseno-panel-admin-analisis` (un commit por tarea, sin `push`) |
-| **Actualizado** | 2026-08-18 |
+| **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
+| **Actualizado** | 2026-08-19 |
 
 Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[!]` bloqueado o
 descartado (con motivo escrito al lado)
@@ -45,6 +45,8 @@ descartado (con motivo escrito al lado)
 | 2026-08-19 | (fuera de plan) | `940acf2` | **El tope de páginas del PDF.** Era el peor caso real: 5 MB sin límite de páginas son ~130 000 tokens en un turno. A partir de 25 páginas viaja como texto. R7 y R8 quedan escritas |
 | 2026-08-19 | R4.2 | (este) | Un viaje para los agregados. De siete peticiones —y siete resoluciones de permisos— a una. Con `allSettled` para no agrupar los fallos, y `blocked` fuera del `days` compartido |
 | 2026-08-19 | R4.6 + R4.7 | (este) | El lienzo arranca con los tres gráficos que salen de `snapshot`. R4.7 ya estaba hecha por R3.6 y se cierra verificada |
+| 2026-08-19 | (del usuario) | `c9b6f12`…`408b0f0` | Cambios que estaban sin commitear en el árbol: `SelectorDeFecha` sube a commons y filtra la actividad, la presencia deja de mentir en Administración, PRAX saluda por el nombre, la tarjeta de avisos en tema claro y el salto a PRAX en móvil. Se les quitó un `redirect()` que reintroducía lo que eliminó R4.1, un `useRouter` muerto, tres imports rotos y tres tildes |
+| 2026-08-19 | R4.3 | `fd17e53`, `84061c1` | **Filtros de verdad.** DTO compartido validado en las ocho rutas, filtros hasta el `WHERE` de las siete consultas, y la barra en la pantalla. Cuatro hallazgos: `Task` ya guarda `boardId` —no hay que traducir a columnas—, los filtros tienen que entrar en la clave de Redis y el `from` derivado de `days` **no**, un tramo ancho se rechaza en vez de recortarse, y la barra necesita `key` o «Quitar filtros» no limpia las fechas |
 
 ---
 
@@ -337,8 +339,33 @@ la navegación. La lista de arriba es la checklist; se marca entera o no se marc
       ⚠️ Y **`blocked` no recibe el `days` del paquete**: ahí `days` significa
       «lleva sin moverse», no «ventana de historial», y su defecto son 7 frente a
       60. Un `days` global lo convertía en otra pregunta con el mismo nombre.
-- [ ] **R4.3 — Filtros de verdad, con DTO compartido y validado**: `from`/`to`,
+- [x] **R4.3 — Filtros de verdad, con DTO compartido y validado**: `from`/`to`,
       `boardId`, `assigneeId`, `labelId`, `priority`, en los siete agregados.
+      ⚠️ **El tablero no hay que traducirlo a columnas.** Parecía que sí —los
+      tableros viven en projects-service y aquí se agregan tareas— pero `Task`
+      guarda `boardId` además de `columnId`, y `TaskEvent` también. Comprobarlo
+      antes ahorró un cruce contra projects-service en la ruta más pedida de la
+      sección.
+      🔴 **Los filtros van en la clave de Redis, y el `from` derivado de `days`
+      no.** Lo primero, porque sin ello quien filtra deja su resultado bajo la
+      clave de quien no filtra —un gráfico plausible y equivocado durante un
+      minuto, sin un solo error—. Lo segundo, porque ese `from` es «ahora menos
+      sesenta días»: metido en la clave, ningún informe volvería a acertar en
+      caché jamás. `claveDeFiltros` vive junto al DTO para que un filtro nuevo no
+      pueda olvidarse ahí.
+      ⚠️ **Un tramo de más de 365 días se rechaza con 400, no se recorta**, al
+      revés que `days`. Dos fechas son una pregunta concreta y estrecharla por
+      detrás devuelve un gráfico que se lee como su respuesta. Misma regla que el
+      inventario del asistente.
+      ⚠️ **`from`/`to` no acota lo mismo en todos**: `createdAt` en los que miden
+      estado —instantánea, paradas, personas—, `completedAt` en los tiempos,
+      `occurredAt` en el flujo, y en la serie semanal **es el eje**. La tabla está
+      en `StatsService`, porque los cuatro devuelven un gráfico plausible con
+      cualquier criterio.
+      ⚠️ Y la barra necesita una `key` atada a los filtros puestos: los selectores
+      de fecha no se controlan desde fuera y en una navegación suave no se
+      desmontan, así que «Quitar filtros» limpiaba la URL y dejaba la fecha en el
+      campo.
 - [ ] **R4.4 — La vista de cartera.** Cruza solo los proyectos donde ya tienes
       `canViewReports` —la consulta `GET /projects?permission=canViewReports` ya
       existe— y **agrega en el servidor**, no con N llamadas desde el navegador.
@@ -781,14 +808,15 @@ nada. Y no dar por perdido lo que no esté en `git log`.
 |---|---|
 | R1 Panel · R2 Administración · R3 Asistente | Cerradas |
 | **R6** PRAX sin proyecto + adjuntos con memoria | Cerrada |
-| **R4** Análisis | R4.1, R4.2, R4.6 y R4.7 hechas. **Faltan R4.3, R4.4, R4.5 y R4.8** |
+| **R4** Análisis | R4.1, R4.2, R4.3, R4.6 y R4.7 hechas. **Faltan R4.4, R4.5 y R4.8** |
 | R5 Cierre | Pendiente |
 | R7 Caché de contexto | **Bloqueada**: la clave de Gemini está sin presupuesto |
 | R8 Que el contexto deje de ser «todo» | Futuro, cuando exista un proyecto grande de verdad |
 
-**Por dónde seguir:** R4.3 (filtros en los siete agregados). Es la más grande de
-las que quedan y **desbloquea R4.5** — un constructor de gráficos sin filtros no
-ofrece nada que el catálogo no dé ya.
+**Por dónde seguir:** R4.4 (la vista de cartera). R4.5 ya está desbloqueada —el
+constructor necesitaba los filtros de R4.3, y el conjunto que valida el backend
+es el mismo que pinta `AnalysisFilters`— pero la cartera va antes porque es la
+que falta para cerrar el alcance que se cerró al empezar.
 
 ### Cinco cosas que costaron encontrarse
 
