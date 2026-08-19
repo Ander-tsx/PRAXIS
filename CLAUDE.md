@@ -196,6 +196,25 @@ se calcula al subir —`.md`/`.txt` decodificando, PDF por su capa de texto— y
 una **imagen no se guarda nada**: lo que queda de ella es lo que PRAX contó en su
 respuesta, y por eso el prompt se lo exige (regla 17). §42.
 
+**Lo que se le manda al modelo viaja en CADA turno, y se mide.**
+`pnpm --filter @praxis/assistant-service medir-prompt <projectId>` desglosa el
+prompt real contra un proyecto de verdad. Úsalo **antes y después** de tocar el
+briefing, las herramientas o las reglas: un campo de más no cuesta una vez,
+cuesta en cada mensaje de cada conversación, y no da ningún error — solo una
+factura y un modelo con las reglas más lejos de la atención.
+
+Hay tres topes, y ninguno es decorativo (ESTADO-ACTUAL §43):
+
+| Tope | Qué acota | Dónde |
+|---|---|---|
+| `INVENTARIO_MAX_CHARS` | Las tareas del briefing | `tasks/stats.service.ts` |
+| `ASSISTANT_EXTRACT_BUDGET_CHARS` | El texto de los adjuntos reinyectado | `contracts` |
+| `ASSISTANT_PDF_MAX_INLINE_PAGES` | Cuándo un PDF deja de ir nativo | `contracts` |
+
+⚠️ **Un recorte mudo es peor que no recortar.** Si añades uno, el prompt tiene
+que decirlo: `tareasOmitidas` existe para que PRAX no responda «esas son todas»
+sobre una lista que alguien le cortó por detrás.
+
 ## Estado
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).

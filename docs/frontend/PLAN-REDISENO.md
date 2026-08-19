@@ -770,6 +770,64 @@ nada. Y no dar por perdido lo que no esté en `git log`.
 
 ---
 
+## Traspaso — lo que hay que saber para seguir
+
+> Escrito al desplegar por primera vez esta rama. Si retomas esto sin haber
+> estado en la sesión anterior, empieza aquí.
+
+### Lo que está hecho y lo que no
+
+| Etapa | Estado |
+|---|---|
+| R1 Panel · R2 Administración · R3 Asistente | Cerradas |
+| **R6** PRAX sin proyecto + adjuntos con memoria | Cerrada |
+| **R4** Análisis | R4.1, R4.2, R4.6 y R4.7 hechas. **Faltan R4.3, R4.4, R4.5 y R4.8** |
+| R5 Cierre | Pendiente |
+| R7 Caché de contexto | **Bloqueada**: la clave de Gemini está sin presupuesto |
+| R8 Que el contexto deje de ser «todo» | Futuro, cuando exista un proyecto grande de verdad |
+
+**Por dónde seguir:** R4.3 (filtros en los siete agregados). Es la más grande de
+las que quedan y **desbloquea R4.5** — un constructor de gráficos sin filtros no
+ofrece nada que el catálogo no dé ya.
+
+### Cinco cosas que costaron encontrarse
+
+1. **Todo lo que se le manda al modelo viaja en cada turno.** Antes de tocar el
+   briefing, las herramientas o las reglas:
+   `pnpm --filter @praxis/assistant-service medir-prompt <projectId>`. Está
+   escrito para eso y trae el desglose por bloque. Los números de referencia
+   están en ESTADO-ACTUAL §43.
+2. **Un recorte mudo es peor que no recortar.** Si acotas algo que ve el modelo,
+   el prompt tiene que decirlo (`tareasOmitidas`, «las cerradas vienen
+   abreviadas», «el archivo continúa»). Un modelo al que le cortan la lista por
+   detrás responde «esas son todas» con total seguridad, y esa respuesta suena
+   igual de bien que la correcta.
+3. **`pnpm e2e:regresion` gasta el limitador de login.** Crea 84 cuentas, cada
+   una con su login, contra el mismo cubo de 10 por minuto y por IP que usa la
+   persona que esté probando la aplicación. No la lances mientras alguien la está
+   usando.
+4. **La clave de Gemini puede estar viva y aun así devolver 429.** Si el mensaje
+   habla de `spending cap`, no es el saldo: es el tope de gasto del proyecto en
+   AI Studio y no se pasa esperando. `gemini.client.ts` distingue los dos casos.
+5. **El árbol de trabajo puede traer cambios del usuario sin commitear.** Ha
+   pasado dos veces. `git status` antes de nada, y si los hay, commitéalos aparte
+   con su propio mensaje en vez de mezclarlos con lo tuyo.
+
+### Lo que NO está verificado
+
+🔴 **Nada del asistente se ha probado contra el modelo**: R6 entera —conversación
+sin proyecto, adopción de foco, plantilla desde el chat, narración de imágenes— y
+los recortes del prompt están comprobados en todo lo que no depende de Gemini
+(migraciones aplicadas, extracción con archivos reales, presupuestos, typecheck,
+`next build`, y el turno llegando hasta la llamada al modelo), pero **la
+respuesta del modelo no se ha visto ni una vez**.
+
+Y `pnpm e2e:regresion` **no se ha pasado**: se lanzó y se cortó a mitad porque
+estaba gastando el limitador de login de quien usaba la aplicación. Es lo primero
+que hay que hacer cuando la máquina esté libre.
+
+---
+
 ## Cómo retomar esto en frío
 
 1. Leer «Dónde estamos», «Decisiones cerradas» e «Invariantes».
