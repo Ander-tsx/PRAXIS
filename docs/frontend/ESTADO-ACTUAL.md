@@ -4861,3 +4861,139 @@ tenían un estado imposible y cuatro sitios donde acordarse de cerrar al otro—
 **Y «gráfico» pasa a «Grafo»** en la interfaz, por decisión de producto del
 2026-08-19. ⚠️ Queda escrito que en español un grafo son nodos y aristas: si algún
 día chirría, el cambio está acotado a las cadenas de un solo commit.
+
+---
+
+## 45. Reglas: un catálogo que son datos, y dos trampas de formulario
+
+El apartado **Reglas** de un proyecto —automatizaciones académicas—, construido
+sobre las siete rutas que `automation-service` ya servía. Antes vivía incrustado
+en `page.tsx` como marcado suelto: un formulario de tres campos que mandaba
+`conditions: []` fijo, sin editar, sin eliminar y sin `useAccion`, así que un 400
+del validador se perdía entero y el formulario se quedaba igual sin decir nada.
+
+Plan en [PLAN-FRONTEND-REGLAS-IMPLEMENTACION.md](../../.planning/PLAN-FRONTEND-REGLAS-IMPLEMENTACION.md),
+siete bloques; correcciones posteriores en
+[PLAN-CORRECCION-REGLAS.md](../../.planning/PLAN-CORRECCION-REGLAS.md). Para
+enseñarlo, [GUION-DEMO-REGLAS.md](GUION-DEMO-REGLAS.md).
+
+### 45.1 El mapa
+
+```
+lib/automation-catalog.ts     el catálogo, como datos
+lib/automation-draft.ts       borrador ⇄ cuerpo del DTO, coerción, resúmenes
+lib/validation.ts             validateAutomationDraft
+components/organisms/ProjectRules/
+├─ ProjectRules.tsx           servidor: cabecera, lista, vacío, permiso, suspensión
+├─ RuleCard.tsx               servidor: resumen legible + controles
+├─ RuleDialog.tsx             cliente: el constructor guiado
+├─ TriggerSection.tsx         «Cuando»
+├─ ConditionsSection.tsx      «Si»
+├─ ActionsSection.tsx         «Entonces»
+├─ ValueField.tsx             un renderizador por tipo de valor
+├─ RuleStatusToggle.tsx       habilitar / deshabilitar
+├─ DeleteRuleButton.tsx       eliminar, con confirmación
+└─ RuleExecutions.tsx         «Revisar ahora» + auditoría
+```
+
+La carga sigue en `page.tsx`, condicionada a la pestaña abierta **y** al permiso
+—pedirlas sin poder verlas sería una petición que siempre da 403— y con
+`.catch(() => [])`, para que un fallo del servicio de automatización no se lleve
+por delante el proyecto entero.
+
+La pestaña se llama «Reglas» y acepta `?tab=automatizaciones` como alias, para
+que un enlace compartido siga aterrizando donde debe.
+
+### 45.2 El catálogo es **datos**, no ramas de JSX
+
+`lib/automation-catalog.ts` describe cada trigger: etiqueta, explicación, campos
+de configuración, campos de condición con su tipo y sus operadores, acciones
+admitidas con su config fija, y los avisos de reglas que no pueden coincidir. Los
+componentes **recorren** ese array.
+
+```
+lib/automation-catalog.ts        se toca al añadir trigger / condición / acción
+components/…/ValueField.tsx      se toca solo al añadir un TIPO de valor nuevo
+resto de componentes             no se tocan
+```
+
+Esa es toda la abstracción: un catálogo y un renderizador por tipo de valor. **No**
+hay un motor de formularios genérico ni un editor de nodos — el MVP tiene dos
+triggers y una acción, y el requisito era que crecer fuera localizado, no que la
+pantalla se autogenerara desde un esquema arbitrario.
+
+⚠️ **Es una copia de `rule-definition.ts`, y se sabe.** Nada expone el catálogo por
+HTTP: es el hueco 1 de
+[PENDIENTES-BACKEND-AUTOMATIZACION.md](PENDIENTES-BACKEND-AUTOMATIZACION.md). El
+día que exista `GET /automations/catalog`, se sustituye el módulo por la respuesta
+y ningún componente cambia. Mientras tanto, los ocho casos de rechazo de
+`e2e/tests/api/15-automatizaciones-academicas.spec.ts` son la red: si backend
+endurece el contrato, salta ahí y no en la pantalla.
+
+### 45.3 ⚠️ Un booleano se pinta con `Select`, nunca con `Checkbox`
+
+Es la trampa con peor forma de fallar de todo el apartado.
+
+Las condiciones viajan en **tres arrays paralelos** de `FormData` —
+`conditionField`, `conditionOperator`, `conditionValue`— y se recomponen por
+posición: la entrada `i` de cada uno pertenece a la misma fila. Eso obliga a que
+**cada fila emita siempre los tres**, aunque el valor esté vacío.
+
+Un `<input type="checkbox">` sin marcar **no se envía en el `FormData`**. Una fila
+booleana en «No» no emitiría su valor, y la fila siguiente heredaría el hueco: la
+condición 2 se guardaría con el valor de la 3. No da error de tipos, no da 400 y
+produce **una regla plausible y equivocada**.
+
+Por el mismo motivo tampoco vale un `<select multiple>` para `IN`: emitiría N
+valores bajo un nombre y rompería la misma invariante. La lista viaja como una
+sola cadena JSON que `coerceConditionValue` desempaqueta.
+
+La prueba que fija esto está en `automation-draft.spec.ts`: tres condiciones, la
+del medio booleana en «No», y las tres tienen que salir en su fila.
+
+### 45.4 El resumen de una ejecución busca el campo en todo el catálogo
+
+`describeExecutionContext` traduce el `conditionResult.context` de una ejecución
+con las etiquetas del catálogo —«prioridad Alta, fecha de vencimiento 2026-08-21»—
+porque `recent()` no devuelve el trigger que la generó: solo `rule: { name }`. Por
+eso existe `conditionFieldSpecByName`, que busca por nombre **sin** el trigger.
+
+⚠️ Vale porque en el MVP ningún nombre de campo se repite entre triggers
+(`priority`/`dueDate`/`assigneeCount` contra `staleDays`/`overdue`/
+`withoutHistory`). Un trigger nuevo que reutilizara un nombre lo rompería, y sin
+ruido: enseñaría la etiqueta del otro.
+
+### 45.5 Lo que el diálogo aprendió por las malas
+
+**El borrador se siembra al abrir, no al cerrar.** El *initializer* de `useState`
+solo corre en el montaje, y `RuleDialog` **nunca se desmonta**: no lleva `key` y su
+posición en el árbol no cambia, así que `revalidateProject` re-renderiza el Server
+Component padre sin tocar el estado del hijo. El diálogo de creación arrastraba el
+nombre y las condiciones de la regla anterior — crear dos seguidas partía de lo que
+quedó de la primera, sin error y sin aviso. `ConditionsSection` tenía el mismo
+problema un nivel más abajo, y se resuelve remontándola.
+
+**Y sembrar al cerrar habría sido peor**: borraría lo escrito justo cuando el
+servidor responde con error, que es lo único que el diálogo tiene que conservar.
+
+⚠️ **`onClose` de `Dialog` no significa «alguien pidió cerrar».** Significa «el
+`<dialog>` nativo se cerró, por lo que sea»: `setOpen(false)` llama a
+`dialog.close()`, que emite el evento `close`, que vuelve a entrar por `onClose`.
+Colgar de ahí la confirmación de «hay cambios sin guardar» hacía que un guardado
+**correcto** preguntara si se descartan los cambios. Por eso esa confirmación solo
+cuelga de «Cancelar»; `Esc`, la `X` y el clic en el fondo cierran sin preguntar.
+Cubrir las tres exige que `Dialog` distinga ambos casos, y ese componente lo usan
+15 archivos.
+
+### 45.6 Lo que no se promete
+
+La revisión es **manual a propósito** —no hay cron detrás de «Revisar ahora»— y la
+interfaz lo dice donde está el botón, porque es lo primero que alguien pregunta.
+
+El resumen enseña los cuatro números que el backend manda y **no inventa** los que
+faltan: `skipped` y `deduped` no vienen (hueco 4), y el detalle de por qué una
+candidata no produjo aviso se lee fila por fila, donde `SKIPPED` sí aparece.
+
+Y hay una acción por trigger, sin botón de «añadir»: el modelo admite cinco, pero
+con el catálogo actual dos acciones serían dos avisos idénticos a las mismas
+personas. El botón aparecerá solo cuando el catálogo ofrezca una variante más.
