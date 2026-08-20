@@ -26,7 +26,7 @@ import type {
 } from '../api/domain';
 import { getSession } from '../auth/session';
 import { aplicarPlantilla } from '../template/apply';
-import { cuotaDelError, describe, requireApi } from './helpers';
+import { conversationIdDelError, cuotaDelError, describe, requireApi } from './helpers';
 
 /**
  * Las acciones del asistente.
@@ -210,7 +210,7 @@ export async function preguntarAction(
     return {
       reply: null,
       proposals: [],
-      conversationId: null,
+      conversationId: conversationIdDelError(error),
       /* En el 429 la cuota viaja en el error: el contador tiene que quedar en
          el tope, no en el número de antes de intentarlo. */
       cuota: cuotaDelError(error),

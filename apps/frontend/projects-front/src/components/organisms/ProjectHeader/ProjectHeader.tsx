@@ -166,7 +166,7 @@ export function ProjectHeader({
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-2">
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">{project.name}</h2>
             <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
           </div>

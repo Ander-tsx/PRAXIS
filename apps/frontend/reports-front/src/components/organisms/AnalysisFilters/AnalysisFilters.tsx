@@ -192,17 +192,8 @@ export function AnalysisFilters({
      * fallo que la barra existe para evitar.
      */
     <>
-      {/**
-       * ⚠️ **Lo pegajoso es solo esta fila, no el panel.** Con los dos dentro del
-       * `sticky`, al desplegar los controles se quedaba clavado en la cabeza un
-       * bloque de seis campos que en un teléfono ocupa media pantalla: el lienzo
-       * pasaba por debajo de una barra más alta que él.
-       *
-       * El panel queda en flujo normal, así que se desplaza y desaparece
-       * mientras la fila —que es la que dice qué estás mirando— se queda.
-       */}
       <div
-        className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-2 px-4 py-3 sm:-mx-6 sm:px-6"
+        className="-mx-4 flex flex-wrap items-center gap-2 px-4 py-3 sm:-mx-6 sm:px-6"
         style={{
           /* Opaco de verdad: el lienzo pasa por debajo al desplazarse. */
           background: colors.background,

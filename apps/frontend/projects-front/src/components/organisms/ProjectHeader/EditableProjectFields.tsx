@@ -201,7 +201,7 @@ export function EditableProjectFields({
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-3 gap-y-2">
         {/* La rejilla de una celda hace que el campo mida **lo que mide su
             texto**: el `<span>` invisible ocupa el mismo hueco y dicta el
             ancho. Sin esto el input abarcaría toda la fila y se leería como un

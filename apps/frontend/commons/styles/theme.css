@@ -602,3 +602,8 @@ body.arrastrando-en-tablero {
 :root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title] {
   color: var(--color-text-primary);
 }
+
+.arrastrando-en-tablero {
+  touch-action: none !important;
+}
+

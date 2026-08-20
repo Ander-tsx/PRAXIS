@@ -17,9 +17,9 @@ export interface SlideOverProps {
 }
 
 const sizeClasses = {
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-lg',
+  xl: 'sm:max-w-xl',
 } as const;
 
 const paddingSizes = {
@@ -33,7 +33,7 @@ const paddingSizes = {
  *
  * En lugar de flotar sobre la página como un `<dialog>`, empuja el contenido
  * añadiendo padding al `body`. Esto permite que la rejilla de proyectos se
- * ajuste de forma fluida.
+ * ajuste de forma fluida. En móviles abarca el 100% de la pantalla sin animar.
  */
 export function SlideOver({
   open,
@@ -46,15 +46,17 @@ export function SlideOver({
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) {
+    const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+    if (open && isDesktop) {
       document.body.style.paddingRight = paddingSizes[size];
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-      return () => {
-        document.body.style.paddingRight = '0px';
-      };
     } else {
       document.body.style.paddingRight = '0px';
     }
+
+    return () => {
+      document.body.style.paddingRight = '0px';
+    };
   }, [open, size]);
 
   useEffect(() => {
@@ -83,17 +85,12 @@ export function SlideOver({
     };
   }, [open, onClose]);
 
-  // Si no está abierto, podríamos no renderizarlo, pero mantenerlo renderizado
-  // permite la animación de salida si se usa con framer-motion o puramente CSS.
-  // Como usamos CSS transitions para el transform, lo dejamos en el DOM pero desplazado.
-  // Además, si está cerrado ocultamos el overflow para que no estorbe (o le ponemos pointer-events-none).
-
   return (
     <>
       <div
         ref={panelRef}
         className={[
-          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary transition-transform duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
+          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
           sizeClasses[size],
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}

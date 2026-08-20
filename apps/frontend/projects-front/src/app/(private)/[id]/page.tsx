@@ -453,24 +453,26 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
               </Link>
             )}
           />
-          <a
-            href={`/chat/proyecto/${project.id}`}
-            className="flex items-center gap-2 mb-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            Abrir Chat {chat.unread > 0 && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">{chat.unread}</span>}
-          </a>
-          <a
-            href={`/reports/${project.slug}`}
-            className="flex items-center gap-2 mb-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            Analizar
-          </a>
+          <div className="hidden sm:flex items-center gap-2">
+            <a
+              href={`/chat/proyecto/${project.id}`}
+              className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              Abrir Chat {chat.unread > 0 && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">{chat.unread}</span>}
+            </a>
+            <a
+              href={`/reports/${project.slug}`}
+              className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Analizar
+            </a>
+          </div>
         </div>
 
         {activeTab === 'espacios' && (

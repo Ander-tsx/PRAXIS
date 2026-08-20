@@ -1,2 +1,2 @@
-export { ChartCard, HowToRead, NotEnoughData, Stat } from './ChartCard';
-export type { ChartCardProps } from './ChartCard';
+export { ChartCard, NotEnoughData, Stat } from './ChartCard';
+export { HowToRead } from './HowToRead';

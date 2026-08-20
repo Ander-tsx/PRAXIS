@@ -68,7 +68,7 @@ export default async function ChatVacioPage() {
   }
 
   return (
-    <div className="flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed border-border p-8">
+    <div className="hidden sm:flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed border-border p-8">
       <p className="max-w-sm text-center font-sans text-sm text-text-secondary">
         Elige a alguien de la izquierda para empezar a hablar. Aquí sale quien comparte algún
         proyecto contigo.

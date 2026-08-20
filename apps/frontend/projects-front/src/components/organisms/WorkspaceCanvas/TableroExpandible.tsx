@@ -140,23 +140,25 @@ export function TableroExpandible({
             los dos controles de vista viajan juntos y no se separan cuando el
             nombre del tablero es largo. */}
         <div className="ml-auto flex shrink-0 items-center gap-1">
-          {accionesDeVista}
+          <div className="hidden sm:flex items-center gap-1">
+            {accionesDeVista}
 
-          <button
-            type="button"
-            onClick={() => setExpandido((actual) => !actual)}
-            aria-expanded={expandido}
-            aria-label={
-              expandido
-                ? `Salir de pantalla completa del tablero ${nombre}`
-                : `Ver el tablero ${nombre} en pantalla completa`
-            }
-            title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
-            className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
-            {expandido ? 'Salir' : 'Ampliar'}
-          </button>
+            <button
+              type="button"
+              onClick={() => setExpandido((actual) => !actual)}
+              aria-expanded={expandido}
+              aria-label={
+                expandido
+                  ? `Salir de pantalla completa del tablero ${nombre}`
+                  : `Ver el tablero ${nombre} en pantalla completa`
+              }
+              title={expandido ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {expandido ? <MinimizarIcono /> : <MaximizarIcono />}
+              {expandido ? 'Salir' : 'Ampliar'}
+            </button>
+          </div>
 
           {menu}
         </div>
