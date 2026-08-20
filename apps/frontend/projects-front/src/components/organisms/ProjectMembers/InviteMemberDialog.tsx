@@ -100,9 +100,9 @@ export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: In
     setErrorBusqueda('');
 
     try {
-      const pagina = await api.get<Paginated<UserProfile>>('/users', {
-        params: { search: needle, limit: MAX_RESULTS },
-      });
+      const pagina = await api.get<Paginated<UserProfile>>(
+        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS}`,
+      );
 
       const filtrados = pagina.items.filter((user) => !excluirIds.includes(user.id));
       setResults(filtrados);
