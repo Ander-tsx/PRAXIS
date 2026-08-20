@@ -109,3 +109,4 @@ crash.*.log
 graphify-out
 .agents
 skills-lock.json
+.claude
