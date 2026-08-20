@@ -1,6 +1,7 @@
 import { describeRule } from '@/lib/automation-draft';
 import { type AutomationRule, Badge } from '@praxis/commons';
 import { DeleteRuleButton } from './DeleteRuleButton';
+import { RuleDialog } from './RuleDialog';
 import { RuleStatusToggle } from './RuleStatusToggle';
 
 export interface RuleCardProps {
@@ -24,9 +25,18 @@ export function RuleCard({ projectId, rule, canManage }: RuleCardProps) {
       <p className="mt-1 font-sans text-xs text-text-secondary">{describeRule(rule)}</p>
 
       {canManage && (
-        <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
           <RuleStatusToggle projectId={projectId} ruleId={rule.id} status={rule.status} />
-          <DeleteRuleButton projectId={projectId} ruleId={rule.id} ruleName={rule.name} />
+          <div className="flex items-start gap-2">
+            <RuleDialog
+              projectId={projectId}
+              rule={rule}
+              triggerLabel="Editar"
+              triggerVariant="ghost"
+              triggerSize="sm"
+            />
+            <DeleteRuleButton projectId={projectId} ruleId={rule.id} ruleName={rule.name} />
+          </div>
         </div>
       )}
     </li>

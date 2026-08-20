@@ -4,6 +4,7 @@ import {
   bodyFromDraft,
   coerceConditionValue,
   describeRule,
+  draftFromFormData,
   draftFromRule,
   emptyDraft,
 } from './automation-draft';
@@ -140,5 +141,89 @@ describe('describeRule', () => {
     expect(describeRule(reglaEstancada)).toBe(
       'Cuando tarea estancada, entonces avisa al dueño del proyecto.',
     );
+  });
+});
+
+/** Construye el `FormData` que emite `RuleDialog`, sin depender del DOM real. */
+function formDataDe(entradas: Array<[string, string]>): FormData {
+  const formData = new FormData();
+  for (const [nombre, valor] of entradas) formData.append(nombre, valor);
+  return formData;
+}
+
+describe('draftFromFormData', () => {
+  it('reconstruye nombre, descripción, trigger y config', () => {
+    const draft = draftFromFormData(
+      formDataDe([
+        ['name', 'Avisar vencimiento'],
+        ['description', 'Nota'],
+        ['triggerType', 'TASK_DUE_SOON'],
+        ['triggerConfig.leadTimeMinutes', '4320'],
+        ['enabled', 'on'],
+      ]),
+    );
+    expect(draft).toMatchObject({
+      name: 'Avisar vencimiento',
+      description: 'Nota',
+      triggerType: 'TASK_DUE_SOON',
+      triggerConfig: { leadTimeMinutes: 4320 },
+      status: 'ENABLED',
+    });
+  });
+
+  it('sin "enabled" en el FormData, el estado es DISABLED', () => {
+    const draft = draftFromFormData(
+      formDataDe([
+        ['name', 'x'],
+        ['triggerType', 'TASK_DUE_SOON'],
+      ]),
+    );
+    expect(draft.status).toBe('DISABLED');
+  });
+
+  /**
+   * ⚠️ **La invariante de D4.** Tres condiciones, la del medio booleana con
+   * valor «No» — el caso exacto que un `<input type="checkbox">` sin marcar
+   * rompería, porque un checkbox así **no se envía en el `FormData`** y
+   * desplazaría la condición 3 al hueco de la 2. `ConditionsSection` usa un
+   * `<Select>` para los booleanos justo para evitar esto; esta prueba fija
+   * que la reconstrucción respeta el orden aunque el valor sea "falso".
+   */
+  it('tres condiciones con la del medio booleana en «No» se guardan cada una en su fila', () => {
+    const draft = draftFromFormData(
+      formDataDe([
+        ['triggerType', 'TASK_STALE'],
+        ['conditionField', 'staleDays'],
+        ['conditionOperator', 'EQUALS'],
+        ['conditionValue', '5'],
+        ['conditionField', 'overdue'],
+        ['conditionOperator', 'EQUALS'],
+        ['conditionValue', 'false'],
+        ['conditionField', 'withoutHistory'],
+        ['conditionOperator', 'EQUALS'],
+        ['conditionValue', 'true'],
+      ]),
+    );
+
+    expect(draft.conditions).toEqual([
+      { field: 'staleDays', operator: 'EQUALS', value: 5 },
+      { field: 'overdue', operator: 'EQUALS', value: false },
+      { field: 'withoutHistory', operator: 'EQUALS', value: true },
+    ]);
+  });
+
+  it('reconstruye la única acción del trigger', () => {
+    const draft = draftFromFormData(
+      formDataDe([
+        ['triggerType', 'TASK_DUE_SOON'],
+        ['actionType', 'CREATE_NOTIFICATION'],
+      ]),
+    );
+    expect(draft.actions).toEqual([{ type: 'CREATE_NOTIFICATION' }]);
+  });
+
+  it('sin condiciones en el FormData, el borrador nace con la lista vacía', () => {
+    const draft = draftFromFormData(formDataDe([['triggerType', 'TASK_DUE_SOON']]));
+    expect(draft.conditions).toEqual([]);
   });
 });

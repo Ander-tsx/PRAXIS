@@ -88,7 +88,9 @@ test.describe('Reglas del proyecto', () => {
     await expect(page.getByText('Aún no hay reglas.', { exact: false })).toBeVisible();
   });
 
-  test('con una regla creada, se ve su nombre y el resumen de su definición', async ({ page }) => {
+  test('con una regla creada desde el constructor, se ve su nombre y el resumen de su definición', async ({
+    page,
+  }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);
     await api.dispose();
@@ -96,17 +98,160 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Avisar vencimiento').slice(0, 120);
     await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    /* `exact: true`: desde el Bloque 4, el diálogo de eliminar (oculto)
-       también lleva el nombre de la regla en su título — «Eliminar
-       «<nombre>»» —, y sin `exact` el texto de sobra lo hace coincidir igual. */
+    /* `exact: true`: el diálogo de eliminar (oculto) también lleva el
+       nombre de la regla en su título — «Eliminar «<nombre>»» —, y sin
+       `exact` el texto de sobra lo hace coincidir igual. */
     await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
-    /* `describeRule` describe el trigger por defecto del formulario
+    /* `describeRule` describe el trigger por defecto del constructor
        (`TASK_DUE_SOON`) en una frase legible, no solo el identificador técnico. */
     await expect(page.getByText(/Cuando tarea próxima a vencer/)).toBeVisible();
+  });
+
+  test('crear una regla con una condición de prioridad, y verla en el resumen (Bloque 5)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const nombreRegla = nombreUnico('Vencimiento con condición').slice(0, 120);
+    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    /* El campo por defecto de una fila nueva ya es «prioridad» — el primero
+       del catálogo de TASK_DUE_SOON —, así que solo hace falta elegir el
+       valor. */
+    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('option', { name: 'Alta' }).click();
+
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta).toBeVisible();
+    await expect(tarjeta.getByText(/si prioridad es Alta/)).toBeVisible();
+  });
+
+  test('editar una regla existente actualiza su resumen (Bloque 5)', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    const nombreRegla = nombreUnico('Editar esta').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'DISABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 60 } },
+        conditions: [{ field: 'priority', operator: 'EQUALS', value: 'LOW' }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status(), 'Crear la regla a editar').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta.getByText(/si prioridad es Baja/)).toBeVisible();
+
+    await tarjeta.getByRole('button', { name: 'Editar' }).click();
+    /* Una sola fila de condición, precargada por `draftFromRule`: cambia su
+       valor de «Baja» a «Urgente». */
+    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('option', { name: 'Urgente' }).click();
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+
+    await expect(tarjeta.getByText(/si prioridad es Urgente/)).toBeVisible();
+  });
+
+  test('cambiar de trigger avisa y descarta las condiciones ya configuradas (Bloque 5)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('combobox', { name: 'Tipo de trigger' }).click();
+    await page.getByRole('option', { name: 'Tarea estancada' }).click();
+
+    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
+    /* Y el destinatario de la sección «Entonces» cambió con el trigger. */
+    await expect(page.getByText(/avisa al dueño del proyecto/)).toBeVisible();
+  });
+
+  test('el nombre vacío marca el campo y no envía (Bloque 5)', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    await expect(page.getByText('El nombre debe tener al menos 2 caracteres.')).toBeVisible();
+    /* El diálogo sigue abierto: no se perdió lo que ya había en el formulario. */
+    await expect(page.getByRole('heading', { name: 'Nueva regla' })).toBeVisible();
+  });
+
+  test('un error del servidor se ve dentro del diálogo, sin cerrarlo ni perder lo escrito (Bloque 5)', async ({
+    page,
+  }) => {
+    /* No hay ninguna combinación que la interfaz ofrezca y que el servidor
+       rechace con 400 — ese es justo el criterio de finalización del
+       Bloque 5. El error de servidor reproducible desde un diálogo ya
+       relleno es la suspensión del proyecto a media edición, y ejercita
+       exactamente el mismo camino: `state.error` dentro del `Dialog`,
+       sin cerrarlo ni perder el nombre ya escrito. */
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    const admin = await entrarComoAdmin(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const nombreRegla = nombreUnico('Se pierde con la suspensión').slice(0, 120);
+    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+
+    const suspension = await contextoDePeticion.newContext({
+      baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
+    });
+    const respuesta = await suspension.patch(`/api/admin/projects/${mundo.proyecto.id}/status`, {
+      headers: comoBearer(admin.accessToken),
+      data: { status: 'SUSPENDED', reason: 'Prueba de error de servidor en el diálogo' },
+    });
+    expect(respuesta.status()).toBe(200);
+    await suspension.dispose();
+
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    await expect(
+      page.getByText(
+        'El proyecto está suspendido: no se pueden crear ni editar reglas mientras tanto.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Nueva regla' })).toBeVisible();
+    await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
   });
 
   test('activar y desactivar una regla actualiza su estado (Bloque 4)', async ({ page }) => {
@@ -117,8 +262,13 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Alternar estado').slice(0, 120);
     await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    /* El borrador nace en DISABLED —igual que el valor por defecto del
+       servidor cuando se omite `status`, ver `emptyDraft` en el Bloque 2—,
+       así que hay que marcar el checkbox para partir de «Activa». */
+    await page.getByLabel('Activar esta regla').check();
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
@@ -142,6 +292,7 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Eliminar esta').slice(0, 120);
     await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();

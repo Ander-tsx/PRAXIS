@@ -1,9 +1,7 @@
-import {
-  createAcademicAutomationAction,
-  reviewAcademicAutomationsAction,
-} from '@/app/(private)/[id]/actions';
+import { reviewAcademicAutomationsAction } from '@/app/(private)/[id]/actions';
 import type { AutomationExecution, AutomationRule } from '@praxis/commons';
 import { RuleCard } from './RuleCard';
+import { RuleDialog } from './RuleDialog';
 
 export interface ProjectRulesProps {
   projectId: string;
@@ -25,10 +23,10 @@ export interface ProjectRulesProps {
  * cuando la causa real es que el proyecto está suspendido y el mapa de
  * permisos llega recortado por eso, no porque falte un rol.
  *
- * El formulario de alta y el panel de ejecuciones son los que ya existían,
- * movidos aquí tal cual — el constructor guiado y la revisión con más detalle
- * llegan en bloques posteriores; este no puede dejar el apartado con menos
- * capacidad de la que tenía.
+ * La creación y edición viven en `RuleDialog`, el constructor guiado
+ * Cuando/Si/Entonces. El panel de ejecuciones es el que ya existía —la
+ * revisión con más detalle llega en un bloque posterior—; este no puede
+ * dejar el apartado con menos capacidad de la que tenía.
  */
 export function ProjectRules({
   projectId,
@@ -50,61 +48,18 @@ export function ProjectRules({
   return (
     <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
       <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
-        <div>
-          <h2 className="font-display text-lg font-semibold text-text-primary">
-            Reglas académicas
-          </h2>
-          <p className="mt-1 font-sans text-sm text-text-secondary">
-            Dos plantillas concretas para la demo, sin colas ni integraciones externas.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-text-primary">
+              Reglas académicas
+            </h2>
+            <p className="mt-1 font-sans text-sm text-text-secondary">
+              Cuando ocurre algo, si se cumplen las condiciones, entonces se avisa a quien
+              corresponda.
+            </p>
+          </div>
+          <RuleDialog projectId={projectId} triggerLabel="Nueva regla" />
         </div>
-
-        <form
-          action={createAcademicAutomationAction.bind(null, projectId)}
-          className="grid gap-3 rounded-xl border border-border p-4"
-        >
-          <label className="grid gap-1 font-sans text-sm text-text-secondary">
-            Nombre
-            <input
-              required
-              minLength={2}
-              maxLength={120}
-              name="name"
-              defaultValue="Avisar tareas próximas a vencer"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
-            />
-          </label>
-          <label className="grid gap-1 font-sans text-sm text-text-secondary">
-            Tipo
-            <select
-              name="trigger"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
-            >
-              <option value="TASK_DUE_SOON">Vencimiento próximo → responsables</option>
-              <option value="TASK_STALE">Tarea estancada → dueño del proyecto</option>
-            </select>
-          </label>
-          <label className="grid gap-1 font-sans text-sm text-text-secondary">
-            Umbral (minutos para vencimiento; días para estancamiento)
-            <input
-              required
-              type="number"
-              min={1}
-              name="threshold"
-              defaultValue={1440}
-              className="rounded-lg border border-border bg-background px-3 py-2 text-text-primary"
-            />
-          </label>
-          <label className="flex items-center gap-2 font-sans text-sm text-text-primary">
-            <input type="checkbox" name="enabled" defaultChecked /> Activar al crear
-          </label>
-          <button
-            type="submit"
-            className="w-fit rounded-lg bg-primary px-4 py-2 font-sans text-sm font-medium text-primary-foreground"
-          >
-            Crear regla
-          </button>
-        </form>
 
         {rules.length === 0 ? (
           <p className="rounded-xl border border-border px-4 py-6 font-sans text-sm text-text-secondary">

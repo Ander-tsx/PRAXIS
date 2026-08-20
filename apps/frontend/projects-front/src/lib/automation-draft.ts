@@ -103,6 +103,52 @@ export function bodyFromDraft(draft: RuleDraft) {
   };
 }
 
+/**
+ * Reconstruye el borrador desde el `FormData` que emite `RuleDialog`.
+ *
+ * Las condiciones viajan en tres arrays paralelos —`conditionField`,
+ * `conditionOperator`, `conditionValue`— y se recomponen por posición: la
+ * entrada `i` de cada uno pertenece a la misma fila. Esa alineación depende
+ * de que `ConditionsSection` emita **siempre los tres** por fila, incluso
+ * cuando el valor es un booleano en «No» — D4. `triggerConfig` solo lee las
+ * claves que declara el catálogo del trigger elegido, así que un campo de
+ * configuración de otro trigger que quedara en el formulario no se cuela.
+ */
+export function draftFromFormData(formData: FormData): RuleDraft {
+  const triggerType = String(formData.get('triggerType') ?? '') as AutomationTriggerType;
+  const spec = triggerSpecFor(triggerType);
+
+  const triggerConfig: Record<string, number> = {};
+  for (const field of spec?.configFields ?? []) {
+    const raw = formData.get(`triggerConfig.${field.key}`);
+    if (raw !== null && String(raw).trim() !== '') triggerConfig[field.key] = Number(raw);
+  }
+
+  const fields = formData.getAll('conditionField').map(String);
+  const operators = formData.getAll('conditionOperator').map(String);
+  const rawValues = formData.getAll('conditionValue').map(String);
+  const conditions: ConditionDraft[] = fields.map((field, index) => {
+    const operator = operators[index] ?? '';
+    return {
+      field,
+      operator,
+      value: coerceConditionValue(triggerType, field, operator, rawValues[index] ?? ''),
+    };
+  });
+
+  const actionTypes = formData.getAll('actionType').map(String) as AutomationActionType[];
+
+  return {
+    name: String(formData.get('name') ?? ''),
+    description: String(formData.get('description') ?? ''),
+    triggerType,
+    triggerConfig,
+    conditions,
+    actions: actionTypes.map((type) => ({ type })),
+    status: formData.get('enabled') === 'on' ? 'ENABLED' : 'DISABLED',
+  };
+}
+
 function coerceScalar(kind: ConditionFieldSpec['kind'] | undefined, raw: string): unknown {
   if (kind === 'integer') return Number(raw);
   if (kind === 'boolean') return raw === 'true';

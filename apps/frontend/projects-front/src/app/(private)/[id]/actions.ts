@@ -11,9 +11,11 @@ import type {
   TaskState,
   WorkspaceState,
 } from '@/lib/action-state';
+import { bodyFromDraft, draftFromFormData } from '@/lib/automation-draft';
 import {
   normalizeMultiline,
   validateAttachment,
+  validateAutomationDraft,
   validateBoard,
   validateChatMessage,
   validateChecklistItem,
@@ -87,29 +89,55 @@ function revalidateProject(projectId: string) {
   revalidatePath(`/${projectId}`);
 }
 
-export async function createAcademicAutomationAction(projectId: string, formData: FormData) {
+/**
+ * Crea o edita una regla desde el constructor guiado.
+ *
+ * Reconstruye el borrador desde los arrays paralelos que emite
+ * `ConditionsSection` (D4), valida con el mismo criterio que
+ * `rule-definition.ts` antes de gastar una petición, arma el cuerpo exacto
+ * con `bodyFromDraft` y confirma contra el `data` de la respuesta — D6: que
+ * exista `id` y que el nombre sea el que se pidió, no que el status HTTP
+ * haya sido 200.
+ */
+export async function saveAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
   const api = await requireApi();
-  if (!api) return;
-  const trigger = String(formData.get('trigger'));
-  const isDue = trigger === 'TASK_DUE_SOON';
-  const threshold = Math.max(1, Number(formData.get('threshold')) || (isDue ? 1440 : 7));
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
 
-  await api.post(`/projects/${projectId}/automations`, {
-    name: String(formData.get('name')).trim(),
-    status: formData.get('enabled') === 'on' ? 'ENABLED' : 'DISABLED',
-    trigger: {
-      type: isDue ? 'TASK_DUE_SOON' : 'TASK_STALE',
-      config: isDue ? { leadTimeMinutes: threshold } : { days: threshold },
-    },
-    conditions: [],
-    actions: [
-      {
-        type: 'CREATE_NOTIFICATION',
-        config: { recipientSelector: isDue ? 'ASSIGNEES' : 'PROJECT_OWNER' },
-      },
-    ],
-  });
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = formData.get('ruleId');
+  const draft = draftFromFormData(formData);
+
+  const clientError = validateAutomationDraft(draft);
+  if (clientError) return { error: clientError, done: null };
+
+  const body = bodyFromDraft(draft);
+
+  try {
+    const saved = ruleId
+      ? await api.patch<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`, body)
+      : await api.post<AutomationRule>(`/projects/${projectId}/automations`, body);
+
+    if (!saved?.id || saved.name !== body.name) {
+      return { error: 'El servidor no guardó la regla. Inténtalo de nuevo.', done: null };
+    }
+  } catch (error) {
+    if (error instanceof ApiError && error.validationErrors.length > 0) {
+      return { error: error.validationErrors.join(' '), done: null };
+    }
+    if (error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE) {
+      return {
+        error: 'El proyecto está suspendido: no se pueden crear ni editar reglas mientras tanto.',
+        done: null,
+      };
+    }
+    return { error: describe(error, 'No se pudo guardar la regla.'), done: null };
+  }
+
   revalidateProject(projectId);
+  return { error: null, done: body.name };
 }
 
 export async function reviewAcademicAutomationsAction(projectId: string) {
