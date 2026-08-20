@@ -86,7 +86,7 @@ export function ProjectMembers({
         <div className="flex shrink-0 items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
-            <Button variant={isInviting ? 'secondary' : 'default'} onClick={() => setIsInviting(!isInviting)}>
+            <Button variant={isInviting ? 'secondary' : 'primary'} onClick={() => setIsInviting(!isInviting)}>
               {isInviting ? 'Cancelar' : 'Invitar persona'}
             </Button>
           )}
