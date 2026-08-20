@@ -566,6 +566,35 @@ const REGLAS: Regla[] = [
       'entiende primero de que va —pregunta lo que te falte— y cuando tengas ' +
       'suficiente, ofrecele montarselo.',
   },
+
+  /**
+   * La última — el formato, que hasta ahora nadie le había contado.
+   *
+   * ⚠️ **Esto no es cosmético: sin la regla, la capacidad no existe.** La
+   * burbuja ya sabía pintar encabezados, listas y negrita, y desde ahora
+   * también tablas y una gráfica de barras. Pero el modelo no puede adivinar
+   * qué entiende el cliente que hay al otro lado: sin decírselo, escribe las
+   * comparaciones como párrafos y las cifras sueltas dentro de una frase.
+   *
+   * El bloque de gráfica lleva una forma **cerrada y comprobada** al leerla
+   * (`leerGrafica` en `ModelText.tsx`): un JSON que no case cae al bloque de
+   * código y no rompe nada. Por eso se puede pedir sin miedo.
+   *
+   * ⚠️ Y lleva freno a propósito. Un modelo al que le dices que sabe dibujar
+   * dibuja **siempre**, y una gráfica de dos barras al lado de una frase de
+   * seis palabras es ruido que además se paga en tokens en cada turno.
+   */
+  {
+    ambito: 'siempre',
+    texto:
+      'Puedes dar formato: encabezados con #, listas con - o 1., **negrita**, ' +
+      '`codigo` y tablas de markdown con | y su linea separadora. Para comparar ' +
+      'cantidades entre categorias puedes dibujar una grafica de barras con un ' +
+      'bloque ```praxis-grafica que contenga JSON ' +
+      '{"titulo":"...","datos":[{"etiqueta":"...","valor":0}]} — maximo 20 datos, ' +
+      'valores numericos. Usa tabla o grafica SOLO cuando comparen de verdad tres ' +
+      'cosas o mas; para un dato suelto o una respuesta corta, escribe la frase.',
+  },
 ];
 
 /** Las que aplican en este modo, numeradas ya sin huecos. */

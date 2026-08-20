@@ -390,11 +390,27 @@ export class AssistantService {
           details: { ...details, conversationId },
         });
       }
-      throw new RpcException({
-        statusCode: 500,
-        message: 'Error del asistente.',
-        details: { conversationId },
-      });
+
+      /**
+       * 🔴 **Aquí se perdía el motivo real de todos los fallos del asistente.**
+       *
+       * Esto capturaba cualquier cosa que no fuera `RpcException` y la
+       * sustituía por un `500 'Error del asistente.'`. Un `GeminiError` no es
+       * una `RpcException`, así que **caía aquí siempre** — y con él caía el
+       * trabajo entero de `mensajeDelFallo()`, que distingue un límite por
+       * minuto de un tope de gasto agotado y una clave mal configurada de una
+       * sobrecarga pasajera.
+       *
+       * El remate estaba en el cliente: `describe()` devuelve el mensaje del
+       * servidor salvo en los 5xx que no son 502, así que ese 500 se convertía
+       * en «El asistente no ha podido responder. Inténtalo otra vez.» — el
+       * mismo texto para «Google va saturado», «la clave del despliegue no
+       * vale» y «se acabó el presupuesto del mes».
+       *
+       * Ahora `comoRpc()` clasifica —`GeminiError` sale como **502 con su
+       * mensaje**— y lo que llega a la burbuja dice qué ha pasado de verdad.
+       */
+      throw AssistantService.comoRpc(error, { conversationId });
     }
 
     let validadas = respuesta.calls
@@ -411,20 +427,37 @@ export class AssistantService {
     // intentamos un segundo turno automático para que el modelo se corrija o explique.
     const invalidasCount = respuesta.calls.length - validadas.length;
     if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply)) {
+      /* ⚠️ **Este turno cuesta una llamada entera más**, y hasta ahora no se
+         veía en ninguna parte: una conversación donde el modelo falla al
+         validar en cada mensaje paga el doble sin que nadie pueda notarlo hasta
+         la factura. Se registra para poder medirlo. */
+      this.log.log(
+        `assistant_turno_recuperacion invalidas=${invalidasCount} ` +
+          `llamadas=${respuesta.calls.length} sinTexto=${!reply}`,
+      );
       try {
         const feedback: string[] = [];
         if (invalidasCount > 0) {
-          feedback.push('Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.');
+          feedback.push(
+            'Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.',
+          );
         }
         if (!reply) {
-          feedback.push('Has emitido una llamada a herramienta pero NO has escrito ningún mensaje de texto para el usuario. Recuerda la regla imperativa: ESCRIBE SIEMPRE ALGO, explicando qué haces o por qué no puedes.');
+          feedback.push(
+            'Has emitido una llamada a herramienta pero NO has escrito ningún mensaje de texto para el usuario. Recuerda la regla imperativa: ESCRIBE SIEMPRE ALGO, explicando qué haces o por qué no puedes.',
+          );
         }
-        feedback.push('Por favor, genera ahora una respuesta en texto para el usuario explicando la situación o dándole alternativas.');
+        feedback.push(
+          'Por favor, genera ahora una respuesta en texto para el usuario explicando la situación o dándole alternativas.',
+        );
 
         const historyRecuperacion = [
           ...(history || []),
           { role: 'user', text: mensajeConArchivos },
-          { role: 'model', text: reply ? `${reply}\n[Llamada a herramientas...]` : '[Llamada a herramientas...]' },
+          {
+            role: 'model',
+            text: reply ? `${reply}\n[Llamada a herramientas...]` : '[Llamada a herramientas...]',
+          },
         ];
 
         const segundaRespuesta = await this.gemini.chat({
@@ -1406,16 +1439,25 @@ export class AssistantService {
     return !Number.isNaN(new Date(valor).getTime());
   }
 
-  /** Traduce el fallo de Gemini a algo que el gateway pueda devolver. */
-  static comoRpc(error: unknown): RpcException {
+  /**
+   * Traduce el fallo de Gemini a algo que el gateway pueda devolver.
+   *
+   * ⚠️ **El 502 no es decorativo.** `describe()` en el cliente deja pasar el
+   * mensaje del servidor tal cual en los 4xx y en el **502**, y lo sustituye por
+   * uno genérico en el resto de los 5xx. Devolver un `GeminiError` como 500
+   * —que es lo que hacía `chat()`— era garantizar que nadie leyera nunca el
+   * motivo. El código de estado es, literalmente, lo que decide si el mensaje
+   * llega.
+   */
+  static comoRpc(error: unknown, details: Record<string, unknown> = {}): RpcException {
     if (error instanceof GeminiError) {
-      return new RpcException({ statusCode: 502, message: error.message, details: {} });
+      return new RpcException({ statusCode: 502, message: error.message, details });
     }
     if (error instanceof RpcException) return error;
     return new RpcException({
       statusCode: 500,
       message: 'El asistente no ha podido responder.',
-      details: {},
+      details,
     });
   }
 }
