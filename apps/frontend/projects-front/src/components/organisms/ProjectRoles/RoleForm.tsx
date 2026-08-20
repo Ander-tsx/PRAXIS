@@ -99,7 +99,7 @@ export function RoleForm({
             Permisos
           </legend>
 
-          <div className="flex max-h-[45vh] flex-col gap-5 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-5 pr-1">
             {PERMISSION_GROUPS.map((group) => (
               <div key={group.title} className="flex flex-col gap-2">
                 <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">

@@ -106,9 +106,9 @@ export function CreateBoardButton({
             noValidate
             onSubmit={(event) => {
               setTouched(true);
-              if (clientError) event.preventDefault();
+              if (clientError || name.trim().length < 2) event.preventDefault();
             }}
-            className="flex items-center gap-1.5 rounded-full bg-surface pl-3 pr-1 py-1 shadow-sm border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+            className="flex items-center gap-1 rounded-md bg-surface pl-2 pr-1 h-7 border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
           >
             <input type="hidden" name="workspaceId" value={workspaceId} />
             <input type="hidden" name="projectId" value={projectId} />
@@ -122,16 +122,16 @@ export function CreateBoardButton({
               maxLength={BOARD_NAME_MAX}
               autoComplete="off"
               autoFocus
-              className={`w-36 bg-transparent text-sm font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
+              className={`w-32 bg-transparent text-xs font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
                 touched && clientError ? 'text-error' : 'text-text-primary'
               }`}
             />
             <button
               type="submit"
-              disabled={pending || (touched && Boolean(clientError))}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
+              disabled={pending || name.trim().length < 2 || Boolean(clientError)}
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
             >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </button>
@@ -142,7 +142,7 @@ export function CreateBoardButton({
                 setName('');
                 setTouched(false);
               }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

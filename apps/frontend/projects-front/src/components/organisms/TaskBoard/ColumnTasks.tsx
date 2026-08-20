@@ -287,7 +287,7 @@ function NewTaskInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-transparent px-3 py-2 font-sans text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary"
+        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-2 font-sans text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary"
       >
         <svg
           className="h-4 w-4"

@@ -24,10 +24,10 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       <label
         htmlFor={id}
         className={[
-          'flex items-start gap-3 rounded-lg border p-3 transition-colors',
+          'group flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors',
           isDisabled
-            ? 'cursor-not-allowed border-border-subtle'
-            : 'border-border hover:border-border-strong hover:bg-surface-elevated',
+            ? 'cursor-not-allowed border-border-subtle bg-surface/50 opacity-70'
+            : 'border-border hover:border-primary/50 hover:bg-surface-elevated has-[:checked]:border-primary has-[:checked]:bg-primary/5',
           className,
         ]
           .filter(Boolean)
@@ -38,13 +38,26 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           id={id}
           type="checkbox"
           disabled={isDisabled}
-          className="mt-0.5 h-4 w-4 shrink-0 cursor-[inherit] accent-primary"
+          className="peer sr-only"
           {...props}
         />
 
+        <span className="mt-[2px] flex h-4 w-4 shrink-0 items-center justify-center rounded border border-text-disabled transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
+          <svg
+            className="h-3 w-3 text-text-inverse opacity-0 transition-opacity"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3.5}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </span>
+
         <span className="flex min-w-0 flex-col gap-0.5">
           <span
-            className={`font-sans text-sm ${implied ? 'text-text-secondary' : 'text-text-primary'}`}
+            className={`font-sans text-sm font-medium ${implied ? 'text-text-secondary' : 'text-text-primary'}`}
           >
             {label}
           </span>

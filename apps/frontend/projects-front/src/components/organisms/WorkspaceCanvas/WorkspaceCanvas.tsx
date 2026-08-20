@@ -196,7 +196,7 @@ export function WorkspaceCanvas({
      para el nombre del tablero, diciendo por separado lo que aquí se lee de un
      tirón —«Diseño / Sprint 4»—. */
   const barraDelTablero = (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
+    <div className="flex min-w-0 flex-1 items-center gap-1 ">
       <WorkspacePicker
         compacto
         projectId={projectId}
@@ -289,7 +289,7 @@ export function WorkspaceCanvas({
   if (!activeWorkspace) {
     return (
       <div className="flex flex-col h-full bg-background">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border bg-surface px-4 py-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border rounded-lg bg-surface px-4 py-2">
           {barraDelTablero}
         </div>
 

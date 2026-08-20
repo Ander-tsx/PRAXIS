@@ -27,7 +27,6 @@ import { type FocusEvent, useEffect, useRef, useState } from "react";
 import { GestorDeEtiquetas } from "./GestorDeEtiquetas";
 import { TaskAttachments } from "./TaskAttachments";
 import { TaskChecklist } from "./TaskChecklist";
-import { TaskComments } from "./TaskComments";
 import { SECTION_PANEL } from "./section-panel";
 
 export interface TaskDialogProps {
@@ -341,17 +340,8 @@ export function TaskDialog({
         canUpload={canEdit}
         canModerate={canDelete}
       />
-      <TaskComments
-        projectId={projectId}
-        taskId={task.id}
-        comments={task.comments}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canComment={canComment}
-        canModerate={canDelete}
-      />
 
-      <div className="mt-8 mb-6 flex w-full shrink-0 items-center justify-between gap-2 border-t border-border pt-4">
+      <div className="mt-8 mb-12 flex w-full shrink-0 items-center justify-between gap-2 border-t border-border pt-4 pb-4">
         <div>
           {canDelete && (
             <form action={deleteAction}>
@@ -391,17 +381,6 @@ export function TaskDialog({
               )}
             </form>
           )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleClose}
-            disabled={pending}
-          >
-            {pending ? "Guardando…" : "Cerrar"}
-          </Button>
         </div>
       </div>
     </SlideOver>

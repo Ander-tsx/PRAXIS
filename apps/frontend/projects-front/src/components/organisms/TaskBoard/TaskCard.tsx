@@ -277,18 +277,12 @@ export function TaskCard({
             {done}/{total}
           </Chip>
         )}
-
-        {/* Había aquí un chip «N subtareas». Se fue con la decisión de **no
-            exponer subtareas**: nada en la interfaz puede crear una, así que era
-            un contador que siempre dice cero y que promete una función que no
-            existe. El backend las soporta; es capacidad heredada que decidimos
-            no usar. Ver ESTADO-ACTUAL §24.5. */}
       </div>
 
       {task.assignees.length > 0 && (
-        <div className="flex items-center -space-x-1.5">
+        <div className="flex items-center -space-x-1 mt-1.5">
           {mineFirst(task.assignees, currentUserId)
-            .slice(0, 4)
+            .slice(0, 7)
             .map((assignee) => {
               const user = usersById.get(assignee.userId);
               const label = user ? personLabel(user) : 'Alguien que ya no está en el proyecto';
@@ -296,25 +290,22 @@ export function TaskCard({
               return (
                 <Avatar
                   key={assignee.id}
+                  size="base"
                   label={label}
                   title={mine ? `${label} — es tuya` : label}
+                  src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
                   mine={mine}
                   ring
-                  /* Con `-space-x-1.5` los círculos se solapan y el que va
-                     después tapa al anterior. Ir primero en el DOM no basta
-                     para verse entero: hace falta subirlo de capa. */
                   className={mine ? 'relative z-10' : ''}
-                  src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
-                  /* Sin punto de estado: en una tarjeta de tarea se solapan
-                     cuatro círculos de 24 px y el punto de cada uno taparía la
-                     cara del siguiente. Aquí lo que importa es quién la lleva,
-                     no si está comiendo. */
                 />
               );
             })}
-          {task.assignees.length > 4 && (
-            <span className="pl-3 font-sans text-[11px] text-text-secondary">
-              +{task.assignees.length - 4}
+          {task.assignees.length > 7 && (
+            <span
+              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated font-sans text-[11px] font-medium text-text-secondary ring-2 ring-background"
+              title={`${task.assignees.length - 7} más`}
+            >
+              +{task.assignees.length - 7}
             </span>
           )}
         </div>
@@ -324,20 +315,14 @@ export function TaskCard({
 }
 
 /**
- * Los encargados, contigo delante.
- *
- * Va antes del `slice(0, 4)` a propósito: con cinco encargados y tú de quinto,
- * ordenar después de cortar te dejaría fuera de la tarjeta justo en el caso en
- * que más falta hace verte. El resto conserva su orden original.
- *
- * Devuelve la lista tal cual si no eres uno de ellos, para no crear un array
- * nuevo en cada render de cada tarjeta ajena — que en un tablero lleno es la
- * mayoría.
+ * Pone tu usuario primero para que lo encuentres rápido.
+ * Ahora también los ordena alfabéticamente por ID para que no salten de posición en cada render.
  */
 function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: string): T[] {
-  const index = assignees.findIndex((assignee) => assignee.userId === currentUserId);
-  if (index <= 0) return assignees;
-  return [assignees[index], ...assignees.slice(0, index), ...assignees.slice(index + 1)];
+  const sorted = [...assignees].sort((a, b) => a.userId.localeCompare(b.userId));
+  const index = sorted.findIndex((assignee) => assignee.userId === currentUserId);
+  if (index <= 0) return sorted;
+  return [sorted[index], ...sorted.slice(0, index), ...sorted.slice(index + 1)];
 }
 
 function Chip({ color, children }: { color: string; children: React.ReactNode }) {

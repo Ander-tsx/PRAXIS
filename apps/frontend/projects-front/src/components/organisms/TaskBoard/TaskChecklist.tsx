@@ -108,27 +108,26 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
       )}
 
       {canEdit && (
-        <form ref={addFormRef} action={addAction} className="flex items-end gap-2" noValidate>
+        <form ref={addFormRef} action={addAction} className="relative mt-2" noValidate>
           <input type="hidden" name="projectId" value={projectId} />
           <input type="hidden" name="taskId" value={task.id} />
-          {/* Al final de los que ya hay: sin esto todos valdrían 0. */}
           <input type="hidden" name="order" value={total} />
-          <span className="flex-1">
-            <Input
-              name="text"
-              placeholder="Añadir un paso…"
-              maxLength={500}
-              fullWidth
-              aria-label="Nuevo ítem del checklist"
-            />
-          </span>
+          
+          <input
+            name="text"
+            placeholder="Añadir un paso…"
+            maxLength={500}
+            aria-label="Nuevo ítem del checklist"
+            className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 pr-12 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-disabled focus:border-primary focus:ring-1 focus:ring-primary"
+          />
           <button
             type="submit"
             disabled={adding}
-            className="h-10 shrink-0 cursor-pointer rounded-lg px-3 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            style={{ background: alpha(colors.primary, 20) }}
+            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-text-inverse transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {adding ? 'Añadiendo…' : 'Añadir'}
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
           </button>
         </form>
       )}

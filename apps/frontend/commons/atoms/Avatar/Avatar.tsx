@@ -19,11 +19,13 @@ import { alpha, colors } from '../../tokens';
  * regla, y deja de poder divergir.
  */
 
-export type AvatarSize = 'sm' | 'md' | 'lg';
+export type AvatarSize = 'sm' | 'base' | 'md' | 'lg';
 
 const SIZES: Record<AvatarSize, string> = {
   /** El del tablero: cabe cuatro veces en una tarjeta sin ahogarla. */
   sm: 'h-6 w-6 text-[10px]',
+  /** Tamaño intermedio para destacar más en las tarjetas. */
+  base: 'h-8 w-8 text-xs',
   /** El de la barra lateral y las fichas de persona. */
   md: 'h-10 w-10 text-sm',
   /**
@@ -46,6 +48,7 @@ const SIZES: Record<AvatarSize, string> = {
  */
 const PRESENCE_DOT: Record<AvatarSize, string> = {
   sm: 'bottom-[-1px] right-[-1px] h-2 w-2',
+  base: 'bottom-[-1px] right-[-1px] h-2.5 w-2.5',
   md: 'bottom-0 right-0 h-3 w-3',
   lg: 'bottom-1.5 right-1.5 h-4 w-4 ring-[3px]',
 };
