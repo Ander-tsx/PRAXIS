@@ -141,7 +141,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                   {/* Los implícitos se marcan aparte: se conceden igual, pero
                       no están guardados en el rol. */}
                   {[...implied].map((permission) => (
-                    <Badge key={permission} variant="default">
+                    <Badge key={permission} variant="primary">
                       {PERMISSION_LABELS[permission]} · incluido
                     </Badge>
                   ))}
