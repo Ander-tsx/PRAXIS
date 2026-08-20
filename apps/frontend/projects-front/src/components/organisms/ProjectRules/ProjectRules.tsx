@@ -3,6 +3,13 @@ import { RuleCard } from './RuleCard';
 import { RuleDialog } from './RuleDialog';
 import { RuleExecutions } from './RuleExecutions';
 
+/**
+ * Id fijo, no `useId()`: esto es un Server Component y el encabezado que
+ * nombra el panel está en el mismo archivo. Solo hay un `ProjectRules` por
+ * página, así que no hay riesgo de colisión.
+ */
+const ENCABEZADO_REGLAS = 'reglas-academicas';
+
 export interface ProjectRulesProps {
   projectId: string;
   rules: AutomationRule[];
@@ -45,11 +52,23 @@ export function ProjectRules({
   }
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
-      <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+    <section
+      aria-label="Reglas de automatización"
+      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]"
+    >
+      {/* Los dos paneles son regiones con nombre propio: con el apartado en
+          una sola columna en móvil, «Reglas académicas» y «Ejecuciones» se
+          leen seguidos y sin nombre no habría forma de saltar de uno a otro. */}
+      <div
+        aria-labelledby={ENCABEZADO_REGLAS}
+        className="space-y-4 rounded-2xl border border-border bg-surface p-5"
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary">
+            <h2
+              id={ENCABEZADO_REGLAS}
+              className="font-display text-lg font-semibold text-text-primary"
+            >
               Reglas académicas
             </h2>
             <p className="mt-1 font-sans text-sm text-text-secondary">

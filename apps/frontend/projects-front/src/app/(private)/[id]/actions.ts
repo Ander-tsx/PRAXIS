@@ -122,7 +122,11 @@ export async function saveAutomationRuleAction(
       ? await api.patch<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`, body)
       : await api.post<AutomationRule>(`/projects/${projectId}/automations`, body);
 
-    if (!saved?.id || saved.name !== body.name) {
+    /* Los tres campos que nombra D6: que exista, que se llame como pedimos y
+       que sea del trigger que pedimos. El `trigger` importa porque el `PATCH`
+       es reemplazo total: un guardado que lo cambiara no dejaría ninguna otra
+       señal. */
+    if (!saved?.id || saved.name !== body.name || saved.trigger?.type !== body.trigger.type) {
       return { error: 'El servidor no guardó la regla. Inténtalo de nuevo.', done: null };
     }
   } catch (error) {

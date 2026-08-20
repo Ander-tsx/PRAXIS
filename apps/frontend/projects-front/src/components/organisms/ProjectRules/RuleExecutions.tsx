@@ -35,6 +35,9 @@ const STATUS_VARIANTS: Record<AutomationExecutionStatus, BadgeVariant> = {
 
 const ERROR_MESSAGE_MAX_CHARS = 140;
 
+/** Nombra el panel para quien navega por regiones. Ver `ProjectRules`. */
+const ENCABEZADO_EJECUCIONES = 'ejecuciones-de-reglas';
+
 function failureMessage(execution: AutomationExecution): string | null {
   const failed = execution.actionResults?.find((result) => result.status === 'FAILED');
   if (!failed) return null;
@@ -56,10 +59,18 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
   const [state, formAction, pending] = useAccion(reviewAutomationsAction, REVIEW_INITIAL_STATE);
 
   return (
-    <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
+    <div
+      aria-labelledby={ENCABEZADO_EJECUCIONES}
+      className="space-y-4 rounded-2xl border border-border bg-surface p-5"
+    >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg font-semibold text-text-primary">Ejecuciones</h2>
+          <h2
+            id={ENCABEZADO_EJECUCIONES}
+            className="font-display text-lg font-semibold text-text-primary"
+          >
+            Ejecuciones
+          </h2>
           <p className="mt-1 font-sans text-sm text-text-secondary">
             La revisión es manual a propósito, para que la demo sea determinista: nada corre en
             segundo plano, no hay un cron detrás de este botón.

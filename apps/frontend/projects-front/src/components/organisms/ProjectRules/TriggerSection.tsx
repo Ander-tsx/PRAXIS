@@ -31,7 +31,11 @@ export function TriggerSection({
 
       <Select
         name="triggerType"
-        label="Tipo de trigger"
+        /* «Qué la dispara», no «Tipo de trigger»: `trigger` es la palabra del
+           contrato y de los comentarios, no la que ve quien usa la pantalla.
+           El `<legend>` de esta sección ya dice «Cuando», y las dos frases
+           encajan. */
+        label="Qué la dispara"
         value={triggerType}
         onValueChange={onTriggerTypeChange}
         options={AUTOMATION_CATALOG.map((trigger) => ({

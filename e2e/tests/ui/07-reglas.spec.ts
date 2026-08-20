@@ -296,7 +296,7 @@ test.describe('Reglas del proyecto', () => {
     await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
 
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('combobox', { name: 'Tipo de trigger' }).click();
+    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
     await page.getByRole('option', { name: 'Tarea estancada' }).click();
 
     await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
