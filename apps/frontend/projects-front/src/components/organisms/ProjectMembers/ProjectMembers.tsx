@@ -95,128 +95,130 @@ export function ProjectMembers({
       />
 
       {members.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
+        <p className="rounded-2xl border border-border bg-surface-elevated px-6 py-8 text-center font-sans text-sm text-text-secondary shadow-sm">
           Todavía no hay nadie en este proyecto.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {members.map((member) => {
-            const user = usersById.get(member.userId);
-            const label = user ? personLabel(user) : member.userId;
-            const isOwner = member.userId === ownerId;
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-sm">
+          <ul className="flex flex-col divide-y divide-border">
+            {members.map((member) => {
+              const user = usersById.get(member.userId);
+              const label = user ? personLabel(user) : member.userId;
+              const isOwner = member.userId === ownerId;
 
-            return (
-              /**
-               * ⚠️ **En móvil es una tarjeta, no una fila.**
-               *
-               * Era una sola línea con todo dentro, y los controles no se
-               * encogen —el desplegable de rol mide lo que mide—, así que lo
-               * único que podía ceder sitio era la identidad: en un teléfono el
-               * nombre y el correo se recortaban hasta desaparecer justo debajo
-               * del avatar, que es lo que hacía falta leer.
-               *
-               * Apilar en dos filas no solo lo arregla; deja el desplegable a
-               * ancho completo, que además se toca mejor con el dedo.
-               */
-              <li
-                key={member.id}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-center"
-              >
-                {/* Identidad. Va junta en su propio bloque para que el avatar y
-                    el nombre no se separen al apilar. */}
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  {/* El mismo círculo que el tablero y la barra lateral: el rojo
-                      dice «eres tú» en todo el producto, y el punto de estado
-                      importa aquí más que en ninguna parte —la pestaña de equipo
-                      es donde se mira quién hay—. Va **en vivo**: era la única
-                      superficie con esferas que no escuchaba el flujo, así que
-                      se quedaba congelada hasta recargar. Ver `MemberAvatar`. */}
-                  <MemberAvatar
-                    userId={member.userId}
-                    label={label}
-                    mine={member.userId === currentUserId}
-                    src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
-                    presence={user?.presence ?? null}
-                  />
+              return (
+                /**
+                 * ⚠️ **En móvil es una tarjeta, no una fila.**
+                 *
+                 * Era una sola línea con todo dentro, y los controles no se
+                 * encogen —el desplegable de rol mide lo que mide—, así que lo
+                 * único que podía ceder sitio era la identidad: en un teléfono el
+                 * nombre y el correo se recortaban hasta desaparecer justo debajo
+                 * del avatar, que es lo que hacía falta leer.
+                 *
+                 * Apilar en dos filas no solo lo arregla; deja el desplegable a
+                 * ancho completo, que además se toca mejor con el dedo.
+                 */
+                <li
+                  key={member.id}
+                  className="flex flex-col gap-4 p-5 transition-colors hover:bg-surface sm:flex-row sm:flex-wrap sm:items-center"
+                >
+                  {/* Identidad. Va junta en su propio bloque para que el avatar y
+                      el nombre no se separen al apilar. */}
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
+                    {/* El mismo círculo que el tablero y la barra lateral: el rojo
+                        dice «eres tú» en todo el producto, y el punto de estado
+                        importa aquí más que en ninguna parte —la pestaña de equipo
+                        es donde se mira quién hay—. Va **en vivo**: era la única
+                        superficie con esferas que no escuchaba el flujo, así que
+                        se quedaba congelada hasta recargar. Ver `MemberAvatar`. */}
+                    <MemberAvatar
+                      userId={member.userId}
+                      label={label}
+                      mine={member.userId === currentUserId}
+                      src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
+                      presence={user?.presence ?? null}
+                    />
 
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    {/**
-                     * Siempre dos líneas, con o sin nombre: si no lo hay,
-                     * `personLabel` usa la parte local del correo.
-                     *
-                     * El nombre lleva a la conversación privada con esa persona,
-                     * salvo el tuyo — escribirte a ti mismo no existe, y el
-                     * backend lo rechaza con un 400.
-                     *
-                     * ⚠️ Es un `<a>` y no `next/link`: el chat privado vive en
-                     * la zona `dashboard` y esto es `projects`, así que la
-                     * navegación tiene que ser dura (ESTADO-ACTUAL §16).
-                     */}
-                    {member.userId === currentUserId ? (
-                      <span className="truncate font-sans text-sm font-semibold text-text-primary">
-                        {label}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      {/**
+                       * Siempre dos líneas, con o sin nombre: si no lo hay,
+                       * `personLabel` usa la parte local del correo.
+                       *
+                       * El nombre lleva a la conversación privada con esa persona,
+                       * salvo el tuyo — escribirte a ti mismo no existe, y el
+                       * backend lo rechaza con un 400.
+                       *
+                       * ⚠️ Es un `<a>` y no `next/link`: el chat privado vive en
+                       * la zona `dashboard` y esto es `projects`, así que la
+                       * navegación tiene que ser dura (ESTADO-ACTUAL §16).
+                       */}
+                      {member.userId === currentUserId ? (
+                        <span className="truncate font-sans text-sm font-semibold text-text-primary">
+                          {label}
+                        </span>
+                      ) : (
+                        <a
+                          href={`/chat/${member.userId}`}
+                          title={`Escribir a ${label} en privado`}
+                          className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
+                        >
+                          {label}
+                        </a>
+                      )}
+                      <span className="truncate font-sans text-xs text-text-secondary mt-0.5">
+                        {/* Puede faltar si el directorio se cortó por paginación. */}
+                        {user?.credential.email ?? 'Correo no disponible'}
                       </span>
-                    ) : (
-                      <a
-                        href={`/chat/${member.userId}`}
-                        title={`Escribir a ${label} en privado`}
-                        className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
-                      >
-                        {label}
-                      </a>
-                    )}
-                    <span className="truncate font-sans text-xs text-text-secondary">
-                      {/* Puede faltar si el directorio se cortó por paginación. */}
-                      {user?.credential.email ?? 'Correo no disponible'}
-                    </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                  {isOwner && <Badge variant="accent">DUEÑO</Badge>}
-                  {/**
-                   * Al dueño no se le cambia el rol: tiene bypass en el guard,
-                   * así que el desplegable prometería un efecto que no ocurre.
-                   *
-                   * A ti mismo **sí** puedes cambiártelo, incluso rebajarte.
-                   * Impedirlo no protegería de nada —siempre puedes pedírselo a
-                   * otro administrador— y esconderlo dejaría la duda de por qué
-                   * tu fila se comporta distinto.
-                   */}
-                  {canManage && !isOwner ? (
-                    <MemberRoleSelect
-                      projectId={projectId}
-                      userId={member.userId}
-                      roles={roles}
-                      currentRoleId={member.projectRoleId}
-                      label={label}
-                    />
-                  ) : (
-                    <Badge variant="primary">{member.projectRole.name}</Badge>
-                  )}
-                  <span className="hidden font-sans text-xs text-text-disabled sm:inline">
-                    desde {dateFormatter.format(new Date(member.joinedAt))}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
+                    {isOwner && <Badge variant="accent">DUEÑO</Badge>}
+                    {/**
+                     * Al dueño no se le cambia el rol: tiene bypass en el guard,
+                     * así que el desplegable prometería un efecto que no ocurre.
+                     *
+                     * A ti mismo **sí** puedes cambiártelo, incluso rebajarte.
+                     * Impedirlo no protegería de nada —siempre puedes pedírselo a
+                     * otro administrador— y esconderlo dejaría la duda de por qué
+                     * tu fila se comporta distinto.
+                     */}
+                    {canManage && !isOwner ? (
+                      <MemberRoleSelect
+                        projectId={projectId}
+                        userId={member.userId}
+                        roles={roles}
+                        currentRoleId={member.projectRoleId}
+                        label={label}
+                      />
+                    ) : (
+                      <Badge variant="primary">{member.projectRole.name}</Badge>
+                    )}
+                    <span className="hidden font-sans text-xs font-medium text-text-disabled sm:inline">
+                      desde {dateFormatter.format(new Date(member.joinedAt))}
+                    </span>
 
-                  {/**
-                   * Al dueño no se le puede quitar: perdería su propio proyecto.
-                   * Y **nadie se saca a sí mismo**: al salir pierdes los
-                   * permisos, así que tampoco podrías volver a entrar. Para irse
-                   * está «Salir del proyecto», que es otra decisión y lo dice.
-                   * El backend lo rechaza igualmente con un 400.
-                   */}
-                  {canManage && !isOwner && member.userId !== currentUserId && (
-                    <RemoveMemberButton
-                      projectId={projectId}
-                      userId={member.userId}
-                      label={label}
-                    />
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    {/**
+                     * Al dueño no se le puede quitar: perdería su propio proyecto.
+                     * Y **nadie se saca a sí mismo**: al salir pierdes los
+                     * permisos, así que tampoco podrías volver a entrar. Para irse
+                     * está «Salir del proyecto», que es otra decisión y lo dice.
+                     * El backend lo rechaza igualmente con un 400.
+                     */}
+                    {canManage && !isOwner && member.userId !== currentUserId && (
+                      <RemoveMemberButton
+                        projectId={projectId}
+                        userId={member.userId}
+                        label={label}
+                      />
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </section>
   );

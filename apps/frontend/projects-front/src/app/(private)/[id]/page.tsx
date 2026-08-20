@@ -63,7 +63,6 @@ const TABS = [
   { id: 'espacios', label: 'Espacios' },
   { id: 'equipo', label: 'Equipo' },
   { id: 'roles', label: 'Roles' },
-  { id: 'chat', label: 'Chat' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -161,7 +160,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
      */
     api
       .get<ChatMessagePage>(
-        `/projects/${project.id}/chat/messages?limit=${activeTab === 'chat' ? 50 : 1}`,
+        `/projects/${project.id}/chat/messages?limit=1`,
       )
       /* `channelId` vacío: si la carga falló no sabemos de qué canal es, y ese
          id es lo que el panel usa para filtrar los eventos del flujo en vivo.
@@ -226,12 +225,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * crudo — el mismo síntoma que ya tuvieron las invitaciones pendientes.
    */
   const idsDePersonas =
-    activeTab === 'equipo' || activeTab === 'espacios' || activeTab === 'chat'
+    activeTab === 'equipo' || activeTab === 'espacios'
       ? [
           ...new Set([
             ...members.map((m) => m.userId),
             ...invitations.map((invitation) => invitation.userId),
-            ...(activeTab === 'chat' ? chat.items.map((message) => message.authorId) : []),
             project.ownerId,
           ]),
         ]
@@ -385,7 +383,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     espacios: project.workspaces.length,
     equipo: members.length,
     roles: project.roles.length,
-    chat: chat.unread,
   };
 
   /**
@@ -440,7 +437,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         {/* `shrink-0`: en la pestaña del tablero esta columna es de alto fijo y
             el que reparte es el tablero. Sin esto, con la ventana baja las
             pestañas se aplastan antes que el lienzo. */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center justify-between border-b border-border">
           <TabNav
             ariaLabel="Secciones del proyecto"
             tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
@@ -448,20 +445,24 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             renderLink={(t, isActive, content) => (
               <Link
                 key={t.id}
-                /* Misma zona: sin el basePath, Next añade `/projects`.
-                 Con el `id` en vez del `slug`, cambiar de pestaña reescribía
-                 una URL bonita por el UUID. */
                 href={projectPath(project, { tab: t.id as TabId })}
                 aria-current={isActive ? 'page' : undefined}
                 className={tabLinkClasses(isActive)}
-                /* Sustituye la entrada en el historial: cambiar de pestaña no
-                 debería llenar el botón atrás. */
                 replace
               >
                 {content}
               </Link>
             )}
           />
+          <a
+            href={`/chat/proyecto/${project.id}`}
+            className="flex items-center gap-2 mb-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Abrir Chat {chat.unread > 0 && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">{chat.unread}</span>}
+          </a>
         </div>
 
         {activeTab === 'espacios' && (
@@ -517,17 +518,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           />
         )}
 
-        {activeTab === 'chat' && (
-          /* Solo una muestra: la conversación entera vive en Mensajes, donde
-             tiene la pantalla para ella. Ver `ProjectChatPreview`. */
-          <ProjectChatPreview
-            projectId={project.id}
-            projectName={project.name}
-            page={chat}
-            directorio={directorio}
-            currentUserId={userId}
-          />
-        )}
 
         {activeTab === 'equipo' && (
           <ProjectMembers

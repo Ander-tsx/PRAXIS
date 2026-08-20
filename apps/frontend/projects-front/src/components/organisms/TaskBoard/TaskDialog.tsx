@@ -1,10 +1,12 @@
-'use client';
+"use client";
 
-import { deleteTaskAction, updateTaskAction } from '@/app/(private)/[id]/actions';
-import { TASK_INITIAL_STATE } from '@/lib/action-state';
+import {
+  deleteTaskAction,
+  updateTaskAction,
+} from "@/app/(private)/[id]/actions";
+import { TASK_INITIAL_STATE } from "@/lib/action-state";
 import {
   Button,
-  Dialog,
   Input,
   type Label as LabelType,
   PRIORITIES,
@@ -12,6 +14,7 @@ import {
   PRIORITY_LABELS,
   Select,
   SelectorDeFecha,
+  SlideOver,
   type Task,
   Textarea,
   type UserProfile,
@@ -19,13 +22,13 @@ import {
   colors,
   personLabel,
   useAccion,
-} from '@praxis/commons';
-import { type FocusEvent, useEffect, useRef, useState } from 'react';
-import { GestorDeEtiquetas } from './GestorDeEtiquetas';
-import { TaskAttachments } from './TaskAttachments';
-import { TaskChecklist } from './TaskChecklist';
-import { TaskComments } from './TaskComments';
-import { SECTION_PANEL } from './section-panel';
+} from "@praxis/commons";
+import { type FocusEvent, useEffect, useRef, useState } from "react";
+import { GestorDeEtiquetas } from "./GestorDeEtiquetas";
+import { TaskAttachments } from "./TaskAttachments";
+import { TaskChecklist } from "./TaskChecklist";
+import { TaskComments } from "./TaskComments";
+import { SECTION_PANEL } from "./section-panel";
 
 export interface TaskDialogProps {
   open: boolean;
@@ -111,8 +114,14 @@ export function TaskDialog({
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const [state, formAction, pending] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
-  const [deleteState, deleteAction, deleting] = useAccion(deleteTaskAction, TASK_INITIAL_STATE);
+  const [state, formAction, pending] = useAccion(
+    updateTaskAction,
+    TASK_INITIAL_STATE,
+  );
+  const [deleteState, deleteAction, deleting] = useAccion(
+    deleteTaskAction,
+    TASK_INITIAL_STATE,
+  );
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const readOnly = !canEdit;
@@ -138,67 +147,34 @@ export function TaskDialog({
   };
 
   return (
-    <Dialog
+    <SlideOver
       open={open}
       onClose={handleClose}
-      size="lg"
+      size="xl"
       title={task.title}
       description={
         <span className="flex items-center gap-2">
           <span
             className="rounded-full px-2 py-0.5 font-sans text-[11px]"
-            style={{ background: alpha(colors.primary, 15), color: colors.primary }}
+            style={{
+              background: alpha(colors.primary, 15),
+              color: colors.primary,
+            }}
           >
             {columnName}
           </span>
-          <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
+          <span className="font-sans text-xs">
+            Creada {formatDate(task.createdAt)}
+          </span>
         </span>
       }
-      footer={
-        <div className="flex w-full items-center justify-between gap-2">
-          <div>
-            {canDelete && (
-              <form action={deleteAction}>
-                <input type="hidden" name="projectId" value={projectId} />
-                <input type="hidden" name="taskId" value={task.id} />
-                {confirmingDelete ? (
-                  <span className="flex items-center gap-2">
-                    <span className="font-sans text-xs text-text-secondary">¿Seguro?</span>
-                    <Button type="submit" variant="danger" size="sm" disabled={deleting}>
-                      {deleting ? 'Eliminando…' : 'Sí, eliminar'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmingDelete(false)}
-                    >
-                      No
-                    </Button>
-                  </span>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setConfirmingDelete(true)}
-                  >
-                    Eliminar
-                  </Button>
-                )}
-              </form>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button type="button" variant="secondary" onClick={handleClose} disabled={pending}>
-              {pending ? 'Guardando…' : 'Cerrar'}
-            </Button>
-          </div>
-        </div>
-      }
     >
-      <form ref={formRef} action={formAction} className="flex flex-col gap-4" noValidate>
+      <form
+        ref={formRef}
+        action={formAction}
+        className="flex flex-col gap-4"
+        noValidate
+      >
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="boardId" value={boardId} />
         <input type="hidden" name="columnId" value={columnId} />
@@ -219,7 +195,7 @@ export function TaskDialog({
         <Textarea
           name="description"
           label="Descripción"
-          defaultValue={task.description ?? ''}
+          defaultValue={task.description ?? ""}
           placeholder="Contexto, criterios de aceptación, enlaces…"
           rows={4}
           disabled={readOnly}
@@ -264,41 +240,57 @@ export function TaskDialog({
          */}
         <div className="flex flex-col gap-2">
           <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-            <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
+            <legend className="font-sans text-sm font-medium text-text-primary">
+              Etiquetas
+            </legend>
             {labels.length === 0 ? (
               <p className="font-sans text-xs text-text-secondary">
                 Este proyecto no tiene etiquetas todavía.
-                {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
+                {canManageLabels ? " Crea la primera aquí abajo." : ""}
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
+              <div
+                className="flex flex-wrap gap-2 rounded-xl p-3"
+                style={SECTION_PANEL}
+              >
                 {labels.map((label) => (
                   <LabelToggle
                     key={label.id}
                     label={label}
-                    defaultChecked={task.labels.some((l) => l.labelId === label.id)}
+                    defaultChecked={task.labels.some(
+                      (l) => l.labelId === label.id,
+                    )}
                   />
                 ))}
               </div>
             )}
           </fieldset>
 
-          {canManageLabels && <GestorDeEtiquetas projectId={projectId} labels={labels} />}
+          {canManageLabels && (
+            <GestorDeEtiquetas projectId={projectId} labels={labels} />
+          )}
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-          <legend className="font-sans text-sm font-medium text-text-primary">Encargados</legend>
+          <legend className="font-sans text-sm font-medium text-text-primary">
+            Encargados
+          </legend>
           {members.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
-            <div className="flex flex-col gap-0.5 rounded-xl p-2" style={SECTION_PANEL}>
+            <div
+              className="flex flex-col gap-0.5 rounded-xl p-2"
+              style={SECTION_PANEL}
+            >
               {members.map((member) => (
                 <AssigneeToggle
                   key={member.id}
                   member={member}
-                  defaultChecked={task.assignees.some((a) => a.userId === member.id)}
+                  defaultChecked={task.assignees.some(
+                    (a) => a.userId === member.id,
+                  )}
                 />
               ))}
             </div>
@@ -309,7 +301,11 @@ export function TaskDialog({
         </fieldset>
 
         {(state.error || deleteState.error) && (
-          <p role="alert" className="font-sans text-sm" style={{ color: colors.error }}>
+          <p
+            role="alert"
+            className="font-sans text-sm"
+            style={{ color: colors.error }}
+          >
             {state.error ?? deleteState.error}
           </p>
         )}
@@ -341,7 +337,61 @@ export function TaskDialog({
         canComment={canComment}
         canModerate={canDelete}
       />
-    </Dialog>
+
+      <div className="mt-8 mb-6 flex w-full shrink-0 items-center justify-between gap-2 border-t border-border pt-4">
+        <div>
+          {canDelete && (
+            <form action={deleteAction}>
+              <input type="hidden" name="projectId" value={projectId} />
+              <input type="hidden" name="taskId" value={task.id} />
+              {confirmingDelete ? (
+                <span className="flex items-center gap-2">
+                  <span className="font-sans text-xs text-text-secondary">
+                    ¿Seguro?
+                  </span>
+                  <Button
+                    type="submit"
+                    variant="danger"
+                    size="sm"
+                    disabled={deleting}
+                  >
+                    {deleting ? "Eliminando…" : "Sí, eliminar"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmingDelete(false)}
+                  >
+                    No
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  Eliminar
+                </Button>
+              )}
+            </form>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleClose}
+            disabled={pending}
+          >
+            {pending ? "Guardando…" : "Cerrar"}
+          </Button>
+        </div>
+      </div>
+    </SlideOver>
   );
 }
 
@@ -368,7 +418,10 @@ function SaveStatus({
 }) {
   if (saving) {
     return (
-      <span className="font-sans text-xs text-text-secondary" aria-live="polite">
+      <span
+        className="font-sans text-xs text-text-secondary"
+        aria-live="polite"
+      >
         Guardando…
       </span>
     );
@@ -376,7 +429,11 @@ function SaveStatus({
 
   if (failure) {
     return (
-      <span className="font-sans text-xs" style={{ color: colors.error }} aria-live="polite">
+      <span
+        className="font-sans text-xs"
+        style={{ color: colors.error }}
+        aria-live="polite"
+      >
         Sin save
       </span>
     );
@@ -451,7 +508,11 @@ function AssigneeToggle({
           strokeWidth={3}
           aria-hidden="true"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
       </span>
 
@@ -514,7 +575,11 @@ function LabelToggle({
           strokeWidth={3.5}
           aria-hidden="true"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M5 13l4 4L19 7"
+          />
         </svg>
       </span>
 
@@ -525,16 +590,16 @@ function LabelToggle({
 
 /** `2026-08-01T23:59:59.000Z` → `2026-08-01`, que es lo que quiere el input. */
 function toDateInput(iso: string | null): string {
-  if (!iso) return '';
+  if (!iso) return "";
   const date = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('es', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
+  return new Date(iso).toLocaleDateString("es", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }

@@ -333,10 +333,10 @@ function NewTaskInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
+        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-transparent px-3 py-2 font-sans text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary"
       >
         <svg
-          className="h-3.5 w-3.5"
+          className="h-4 w-4"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

@@ -38,11 +38,11 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
       </div>
 
       {roles.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
+        <p className="rounded-2xl border border-border bg-surface-elevated px-6 py-8 text-center font-sans text-sm text-text-secondary shadow-sm">
           Este proyecto no tiene roles. Crea uno para poder añadir a alguien.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {roles.map((role) => {
             const selected = selectedFrom(role.permissions);
             const implied = impliedFrom(selected);
@@ -51,14 +51,14 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
             return (
               <li
                 key={role.id}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5"
+                className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-elevated p-6 shadow-sm transition-all hover:shadow-md"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-1">
-                    <h4 className="font-sans text-base font-semibold text-text-primary">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <h4 className="font-sans text-lg font-semibold text-text-primary">
                       {role.name}
                     </h4>
-                    <span className="font-sans text-xs text-text-disabled">
+                    <span className="font-sans text-sm font-medium text-text-disabled">
                       {inUse === 0
                         ? 'Sin personas asignadas'
                         : `${inUse} ${inUse === 1 ? 'persona' : 'personas'}`}
@@ -79,7 +79,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2 mt-2">
                   {[...selected].map((permission) => (
                     <Badge key={permission} variant="primary">
                       {PERMISSION_LABELS[permission]}
@@ -93,7 +93,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                     </Badge>
                   ))}
                   {selected.size === 0 && (
-                    <span className="font-sans text-xs italic text-text-disabled">
+                     <span className="font-sans text-sm italic text-text-disabled py-1">
                       Sin permisos: quien tenga este rol no podrá hacer nada.
                     </span>
                   )}

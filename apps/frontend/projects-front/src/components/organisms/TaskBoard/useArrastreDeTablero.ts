@@ -209,6 +209,9 @@ export function useArrastreDeTablero({
 
   /* ─── Bucle de fotogramas ────────────────────────────────────────────── */
 
+  const debounceTarea = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceColumna = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const recalcular = useCallback(() => {
     const activo = enCurso.current;
     if (!activo) return;
@@ -232,14 +235,22 @@ export function useArrastreDeTablero({
 
       const nuevo = { columnId, indice };
       destinoRef.current = nuevo;
-      setDestinoTarea(nuevo);
+      
+      if (debounceTarea.current) clearTimeout(debounceTarea.current);
+      debounceTarea.current = setTimeout(() => {
+        setDestinoTarea(nuevo);
+      }, 50);
       return;
     }
 
     const indice = huecoDeColumna(x, activo.id);
     if (indice === null || indice === destinoColumnaRef.current) return;
     destinoColumnaRef.current = indice;
-    setDestinoColumna(indice);
+    
+    if (debounceColumna.current) clearTimeout(debounceColumna.current);
+    debounceColumna.current = setTimeout(() => {
+      setDestinoColumna(indice);
+    }, 50);
   }, [columnaBajoElPuntero, huecoDeColumna, medirTarjetas]);
 
   /**

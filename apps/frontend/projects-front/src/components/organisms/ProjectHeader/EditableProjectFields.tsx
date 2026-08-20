@@ -157,10 +157,10 @@ export function EditableProjectFields({
   if (compacto) {
     return (
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="grid min-w-0 max-w-[22rem] shrink">
+        <span className="grid min-w-0 max-w-[22rem] shrink overflow-hidden">
           <span
             aria-hidden="true"
-            className="invisible col-start-1 row-start-1 whitespace-pre border border-transparent px-2 font-display text-xl"
+            className="invisible col-start-1 row-start-1 truncate border border-transparent px-2 font-display text-xl"
           >
             {name.value || 'Sin nombre'}
           </span>
@@ -172,7 +172,7 @@ export function EditableProjectFields({
             aria-invalid={name.status === 'error'}
             maxLength={PROJECT_NAME_MAX}
             size={1}
-            className="col-start-1 row-start-1 w-full rounded-lg border border-transparent bg-transparent px-2 font-display text-xl text-text-primary outline-none transition-colors hover:border-border hover:bg-surface focus:border-border-strong focus:bg-surface"
+            className="col-start-1 row-start-1 w-full truncate rounded-lg border border-transparent bg-transparent px-2 font-display text-xl text-text-primary outline-none transition-colors hover:border-border hover:bg-surface focus:border-border-strong focus:bg-surface"
           />
         </span>
 
