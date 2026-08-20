@@ -101,8 +101,9 @@ diferencia entre poder hacer TDD sobre las reglas y no poder.
 ## 2. Huecos del backend
 
 Detectados desde frontend. **Ninguno bloquea el plan**: los siete bloques se pueden completar sin
-tocar backend. Se documentan en `docs/frontend/PENDIENTES-BACKEND.md` (Bloque 1) y, si en algún
-momento se decide cerrarlos, se hará como tarea aparte con `/praxis-backend-development`.
+tocar backend. Se documentan en `docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md` (Bloque 1,
+archivo separado del `PENDIENTES-BACKEND.md` general porque nace de esta sola tarea) y, si en
+algún momento se decide cerrarlos, se hará como tarea aparte con `/praxis-backend-development`.
 
 ### Hueco 1 — No hay endpoint de catálogo *(severidad: media)*
 
@@ -328,7 +329,7 @@ apps/frontend/projects-front/
    └─ index.ts                (N)
 e2e/tests/ui/07-reglas.spec.ts                         (N)
 e2e/tests/api/15-automatizaciones-academicas.spec.ts   (M) casos de validación
-docs/frontend/PENDIENTES-BACKEND.md                    (M) los 5 huecos de §2
+docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md     (N) los 5 huecos de §2
 docs/frontend/CONTRATO-API.md                          (M) catálogo exacto y trampas
 docs/frontend/ESTADO-ACTUAL.md                         (M) sección del apartado
 ```
@@ -349,7 +350,7 @@ Nada sube a `commons/organisms/`: solo `projects-front` usa Reglas. Los **tipos*
 **Objetivo.** Que los seis bloques siguientes se construyan sobre comportamiento comprobado y no
 sobre la lectura del código, y dejar los huecos de §2 donde el equipo de backend los va a ver.
 
-**Áreas afectadas.** `docs/frontend/PENDIENTES-BACKEND.md`,
+**Áreas afectadas.** `docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md`,
 `docs/frontend/CONTRATO-API.md` §Automatizaciones, `e2e/tests/api/15-…spec.ts`.
 
 **Implementación.**
@@ -360,8 +361,9 @@ sobre la lectura del código, y dejar los huecos de §2 donde el equipo de backe
    array, `status: 'INVALID'`, cero acciones, seis acciones, campo de condición del otro trigger.
 3. Añadir a `15-automatizaciones-academicas.spec.ts` los casos de rechazo que hoy no cubre. Fijan
    el contrato que el catálogo del Bloque 2 copia: si backend lo cambia, salta aquí y no en la UI.
-4. Escribir los cinco huecos en `PENDIENTES-BACKEND.md` con el formato del documento (qué falta,
-   por qué, cambio mínimo, severidad, reproducción).
+4. Escribir los cinco huecos en `PENDIENTES-BACKEND-AUTOMATIZACION.md`, archivo aparte del
+   `PENDIENTES-BACKEND.md` general, con el mismo formato del documento (qué falta, por qué,
+   cambio mínimo, severidad, reproducción).
 5. Ampliar `CONTRATO-API.md` §Automatizaciones con la tabla exacta de §1.2 y las trampas: el enum
    más ancho que el validador, `hasOnlyKeys`, `PATCH` como reemplazo total, `days` opcional con
    defecto 7.

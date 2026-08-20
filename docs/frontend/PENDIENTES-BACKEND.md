@@ -48,15 +48,17 @@ El **21** es de 2026-08-19 y tampoco es de seguridad: un proyecto cuyo slug sea
 `overview`, `tablero` o `tarea` queda oculto tras una ruta estática del frontend.
 Tres palabras de espacio de colisión, y ningún proyecto afectado hoy.
 
-Los **26 a 30** son de 2026-08-19, detectados al construir el apartado Reglas
-de automatización. Ninguno bloquea: el 26 y el 27 obligan a un rodeo (catálogo
-duplicado en el frontend, lee-modifica-escribe para activar/desactivar); el 28
-al 30 son huecos de auditoría, que se muestra recortada mientras tanto. Un
-sexto hallazgo de la misma sesión —`task_inventory` cambió de array a
-`{ tareas, omitidas }` sin que `automation-service` se actualizara, y tronaba
-con 500 en toda revisión `TASK_DUE_SOON`— no quedó como pendiente: era un
-cambio mecánico sin decisión de negocio, así que se arregló directo (fila
-`57f33d4` en «Cambios que hicimos»).
+Los pendientes de automatización (Reglas del proyecto) viven aparte, en
+[PENDIENTES-BACKEND-AUTOMATIZACION.md](PENDIENTES-BACKEND-AUTOMATIZACION.md):
+nacen de una sola tarea y así se pueden pasar al equipo de backend sin
+arrastrar el resto de esta lista. Ninguno bloquea el apartado.
+
+Un hallazgo de la misma sesión de automatización —`task_inventory` cambió de
+array a `{ tareas, omitidas }` sin que `automation-service` se actualizara, y
+tronaba con 500 en toda revisión `TASK_DUE_SOON`— no está en esa lista
+separada: era un bug, no un hueco de diseño, y era un cambio mecánico sin
+decisión de negocio, así que se arregló directo (fila `57f33d4` abajo, en
+«Cambios que hicimos»).
 
 ### Resueltos
 
@@ -1124,110 +1126,3 @@ la ocasión.
 Mientras tanto el frontend **no hace nada**: comprobarlo en el cliente exigiría
 que cada zona conociera las rutas de las demás, y el arreglo de verdad está en
 quien genera el slug.
-
----
-
-## 🟡 26. No hay endpoint de catálogo para triggers, condiciones y acciones de automatización
-
-El catálogo real —qué triggers existen, qué campos de condición admite cada
-uno, con qué tipo y qué operadores, y qué acciones acepta— vive **solo dentro
-de `rule-definition.ts`** (`automation-service`). No es el enum de
-`@praxis/contracts`: el enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK`
-y `SEND_EMAIL`, y el validador los rechaza con «no soportado en el MVP
-académico» — verificado en runtime, ver `e2e/tests/api/15-…spec.ts`.
-
-**Por qué importa en el frontend.** El apartado Reglas del proyecto tiene que
-construirse para que un trigger, condición o acción nuevos no obliguen a
-rehacer la pantalla. Sin catálogo servido, el frontend duplica el de
-`rule-definition.ts` en un módulo propio: el día que backend añada un trigger,
-la interfaz no lo ofrece hasta que alguien se acuerde de tocarla; el día que
-backend retire un campo, la interfaz lo sigue ofreciendo y el usuario se come
-un 400 sobre algo que la propia pantalla le propuso.
-
-**Qué haría falta.** `GET /projects/:projectId/automations/catalog`, con
-`canManageAutomations`, derivado de las mismas constantes de
-`rule-definition.ts` — no una copia. Por cada trigger: su config, sus campos de
-condición con tipo y operadores admitidos, y sus acciones con la config fija.
-Alternativa más barata: mover ese descriptor a `@praxis/contracts` y espejarlo
-en `commons/api/domain.ts`, como ya se hace con `LABEL_COLORS` — sin ruta
-nueva, pero sin evitar del todo la duplicación.
-
-Mientras tanto el frontend aísla la duplicación en un solo archivo de datos
-(`lib/automation-catalog.ts`), con una nota que apunta aquí y a
-`rule-definition.ts`.
-
-## 🟡 27. `PATCH` de una regla de automatización es reemplazo total, no parcial
-
-`UpdateAutomationRuleBodyDto extends CreateAutomationRuleBodyDto`: `name`,
-`trigger`, `conditions` y `actions` son obligatorios en cada `PATCH`. No se
-puede cambiar solo `status`.
-
-**Por qué importa en el frontend.** Habilitar y deshabilitar una regla es la
-operación más frecuente del apartado y hoy cuesta dos viajes (`GET` + `PATCH`
-con la definición completa reenviada), con tres consecuencias: una carrera de
-lectura-escritura que puede revertir la edición de otra persona; un `version`
-incrementado por un cambio que no tocó la definición; y, lo peor, que una
-regla guardada antes de un endurecimiento del validador **no se pueda ni
-desactivar**, porque el reenvío completo la vuelve a validar entera y da 400.
-
-**Qué haría falta.** `PATCH /automations/:id/status` con
-`{ status: 'ENABLED' | 'DISABLED' }`; o hacer opcionales los campos de
-`UpdateAutomationRuleBodyDto` y fusionar contra lo guardado en
-`rules.service.ts`.
-
-Mientras tanto el frontend conserva el lee-modifica-escribe, centralizado en
-una sola acción, con un mensaje propio para el 400 de revalidación.
-
-## 🟡 28. Una ejecución de automatización no dice sobre qué tarea fue
-
-`RuleExecution.conditionResult` guarda `{ matched, context }`, y `context`
-solo trae los campos de condición del trigger (`priority`/`dueDate`/… o
-`staleDays`/`overdue`/…). El `taskId` viaja incrustado en `causeKey`
-(`manual:<version>:<taskId>:<huella>`), una cadena pensada para deduplicar, no
-para leerse. `taskTitle` no se persiste en ningún sitio.
-
-**Por qué importa en el frontend.** La auditoría es el único lugar donde se
-demuestra que la automatización hizo algo. «Regla X · SUCCEEDED · hace 2 min»
-no permite comprobar nada; «Regla X avisó sobre *Preparar la exposición*» sí.
-La integración previa ya intentaba leer
-`conditionResult.context.taskTitle` y siempre valía `undefined`.
-
-**Qué haría falta.** Añadir `taskId` y `taskTitle` a lo que persiste
-`direct-execution.ts` en `reviewProject` — el `Candidate` ya los tiene en
-memoria (`candidate.taskId`, `candidate.taskTitle`) — dentro de
-`conditionResult` o en columnas propias de `RuleExecution`.
-
-Mientras tanto el frontend muestra regla, estado, momento y un resumen del
-`context` con las etiquetas del catálogo («prioridad Alta, vence
-2026-08-21»), y no vuelve a intentar leer `taskTitle`.
-
-## 🔵 29. El resumen de «Revisar ahora» no distingue por qué no hubo avisos
-
-`reviewProject` devuelve `{ rules, candidates, succeeded, failed }`. Las
-evaluaciones `SKIPPED` (condiciones no cumplidas) y las descartadas por
-idempotencia (`causeKey` ya visto, se continúa sin crear fila) no se cuentan
-en ningún campo del resumen — solo se ven, una por una, en
-`GET /automations/executions`.
-
-**Por qué importa en el frontend.** «5 candidatas, 0 avisos» tiene dos causas
-opuestas —las condiciones no se cumplen, o ya se avisó antes— y quien revisa
-necesita saber cuál para creerse el resultado. Con lo que hay, la interfaz
-solo puede mostrar los cuatro números y callarse sobre el resto.
-
-**Qué haría falta.** Añadir `skipped` y `deduped` al objeto que devuelve
-`reviewProject`; las dos ramas ya existen dentro del bucle, solo falta
-contarlas.
-
-Mientras tanto el frontend muestra los cuatro números que hay, sin inventar la
-interpretación, y deja el detalle por regla en la lista de ejecuciones.
-
-## 🔵 30. Cada ejecución arrastra un volcado completo de la regla que nadie usa
-
-`RuleExecution.ruleSnapshot` guarda la regla entera en cada fila, y
-`GET /automations/executions` lo devuelve tal cual — 20 volcados completos en
-cada carga del apartado, y el frontend no usa ninguno.
-
-**Qué haría falta.** Excluir `ruleSnapshot` del `select` de
-`AutomationEngineService.recent()`.
-
-No bloquea nada, es solo peso de sobra en cada respuesta.

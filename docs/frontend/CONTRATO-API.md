@@ -1528,13 +1528,14 @@ Cinco trampas que ya mordieron construyendo la interfaz:
    para cambiar solo `status`. No hay forma de desactivar una regla sin
    revalidarla entera — y una regla guardada antes de un endurecimiento del
    validador puede quedar **imposible de desactivar** por esa vía. Ver
-   PENDIENTES-BACKEND.md §27.
+   PENDIENTES-BACKEND-AUTOMATIZACION.md §2.
 5. ⚠️ **`GET /automations` y `GET /automations/executions` no son la misma
    forma de tarea.** El primero trae `trigger`/`conditions`/`actions`
    embebidos y ordenados por `position`; el segundo, en `conditionResult`,
    solo trae `context` con los campos de condición — nunca `taskId` ni
    `taskTitle` de forma legible (`causeKey` los lleva incrustados en una
-   cadena de deduplicación, no para leerse). Ver PENDIENTES-BACKEND.md §28.
+   cadena de deduplicación, no para leerse). Ver
+   PENDIENTES-BACKEND-AUTOMATIZACION.md §3.
 
 ## Asistente 🔒
 
