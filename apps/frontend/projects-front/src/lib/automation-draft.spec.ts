@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   bodyFromDraft,
   coerceConditionValue,
+  describeExecutionContext,
+  describeReviewSummary,
   describeRule,
   draftFromFormData,
   draftFromRule,
@@ -225,5 +227,47 @@ describe('draftFromFormData', () => {
   it('sin condiciones en el FormData, el borrador nace con la lista vacía', () => {
     const draft = draftFromFormData(formDataDe([['triggerType', 'TASK_DUE_SOON']]));
     expect(draft.conditions).toEqual([]);
+  });
+});
+
+describe('describeExecutionContext', () => {
+  it('etiqueta cada campo con el catálogo, sin necesitar el tipo de trigger', () => {
+    expect(describeExecutionContext({ priority: 'HIGH', dueDate: '2026-08-21' })).toBe(
+      'prioridad Alta, fecha de vencimiento 2026-08-21',
+    );
+  });
+
+  it('traduce booleanos a sí/no, igual que describeRule', () => {
+    expect(describeExecutionContext({ overdue: true, withoutHistory: false })).toBe(
+      'vencida sí, sin historial no',
+    );
+  });
+
+  it('un campo fuera del catálogo se enseña tal cual, sin romper', () => {
+    expect(describeExecutionContext({ unknownField: 42 })).toBe('unknownfield 42');
+  });
+
+  it('sin contexto no inventa nada', () => {
+    expect(describeExecutionContext({})).toBe('Sin contexto.');
+  });
+});
+
+describe('describeReviewSummary', () => {
+  it('pluraliza cada cifra por separado, no todas juntas', () => {
+    expect(describeReviewSummary({ rules: 1, candidates: 1, succeeded: 1, failed: 0 })).toBe(
+      '1 regla revisada · 1 candidata · 1 aviso · 0 fallos',
+    );
+  });
+
+  it('con varias reglas y candidatas, todo en plural', () => {
+    expect(describeReviewSummary({ rules: 3, candidates: 5, succeeded: 2, failed: 0 })).toBe(
+      '3 reglas revisadas · 5 candidatas · 2 avisos · 0 fallos',
+    );
+  });
+
+  it('cero candidatas no inventa ninguna regla evaluada de más', () => {
+    expect(describeReviewSummary({ rules: 2, candidates: 0, succeeded: 0, failed: 0 })).toBe(
+      '2 reglas revisadas · 0 candidatas · 0 avisos · 0 fallos',
+    );
   });
 });

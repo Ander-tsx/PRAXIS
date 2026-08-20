@@ -207,3 +207,21 @@ export function conditionFieldSpecFor(
 ): ConditionFieldSpec | undefined {
   return triggerSpecFor(triggerType)?.conditionFields.find((spec) => spec.field === field);
 }
+
+/**
+ * Busca un campo de condición por nombre en **todo** el catálogo, sin
+ * necesitar el trigger. Hace falta para las ejecuciones: `recent()` en
+ * `automation-service` incluye `rule: { select: { name: true } } }` — el
+ * trigger que generó cada `conditionResult.context` no viaja, así que no se
+ * puede resolver con `conditionFieldSpecFor`. Vale porque en el MVP ningún
+ * nombre de campo se repite entre triggers (`priority`/`dueDate`/
+ * `assigneeCount` contra `staleDays`/`overdue`/`withoutHistory`); si un
+ * trigger nuevo reutilizara un nombre, dejaría de ser correcto.
+ */
+export function conditionFieldSpecByName(field: string): ConditionFieldSpec | undefined {
+  for (const trigger of AUTOMATION_CATALOG) {
+    const spec = trigger.conditionFields.find((candidate) => candidate.field === field);
+    if (spec) return spec;
+  }
+  return undefined;
+}

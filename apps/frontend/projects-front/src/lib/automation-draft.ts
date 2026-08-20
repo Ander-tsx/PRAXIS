@@ -1,11 +1,13 @@
 import type {
   AutomationActionType,
+  AutomationReviewSummary,
   AutomationRule,
   AutomationRuleStatus,
   AutomationTriggerType,
 } from '@praxis/commons/api/domain';
 import {
   type ConditionFieldSpec,
+  conditionFieldSpecByName,
   conditionFieldSpecFor,
   triggerSpecFor,
 } from './automation-catalog';
@@ -213,6 +215,42 @@ function describeCondition(
  * que usa el constructor guiado, para que la tarjeta y el formulario cuenten
  * la misma historia.
  */
+/**
+ * Resume el `context` de una ejecución con las etiquetas del catálogo —
+ * Bloque 6, hueco 3: no hay `taskTitle` legible, pero sí los campos que
+ * evaluó la condición, y son lo que identifica el caso concreto.
+ */
+export function describeExecutionContext(context: Record<string, unknown>): string {
+  const entries = Object.entries(context);
+  if (entries.length === 0) return 'Sin contexto.';
+  return entries
+    .map(([field, value]) => {
+      const fieldSpec = conditionFieldSpecByName(field);
+      const label = (fieldSpec?.label ?? field).toLowerCase();
+      return `${label} ${describeValue(fieldSpec, value)}`;
+    })
+    .join(', ');
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return count === 1 ? singular : plural;
+}
+
+/**
+ * «3 reglas revisadas · 5 candidatas · 2 avisos · 0 fallos» — sin `skipped`
+ * ni `deduped`, que el backend no manda (hueco 4 de
+ * `PENDIENTES-BACKEND-AUTOMATIZACION.md`). El detalle de por qué una
+ * candidata no produjo aviso se lee fila por fila en la lista de
+ * ejecuciones, donde `SKIPPED` sí aparece.
+ */
+export function describeReviewSummary(summary: AutomationReviewSummary): string {
+  const reglas = pluralize(summary.rules, 'regla revisada', 'reglas revisadas');
+  const candidatas = pluralize(summary.candidates, 'candidata', 'candidatas');
+  const avisos = pluralize(summary.succeeded, 'aviso', 'avisos');
+  const fallos = pluralize(summary.failed, 'fallo', 'fallos');
+  return `${summary.rules} ${reglas} · ${summary.candidates} ${candidatas} · ${summary.succeeded} ${avisos} · ${summary.failed} ${fallos}`;
+}
+
 export function describeRule(rule: AutomationRule): string {
   const spec = triggerSpecFor(rule.trigger.type);
   const triggerLabel = (spec?.label ?? rule.trigger.type).toLowerCase();

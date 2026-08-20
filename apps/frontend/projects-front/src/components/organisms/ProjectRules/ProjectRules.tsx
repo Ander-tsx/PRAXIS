@@ -1,7 +1,7 @@
-import { reviewAcademicAutomationsAction } from '@/app/(private)/[id]/actions';
 import type { AutomationExecution, AutomationRule } from '@praxis/commons';
 import { RuleCard } from './RuleCard';
 import { RuleDialog } from './RuleDialog';
+import { RuleExecutions } from './RuleExecutions';
 
 export interface ProjectRulesProps {
   projectId: string;
@@ -24,9 +24,8 @@ export interface ProjectRulesProps {
  * permisos llega recortado por eso, no porque falte un rol.
  *
  * La creación y edición viven en `RuleDialog`, el constructor guiado
- * Cuando/Si/Entonces. El panel de ejecuciones es el que ya existía —la
- * revisión con más detalle llega en un bloque posterior—; este no puede
- * dejar el apartado con menos capacidad de la que tenía.
+ * Cuando/Si/Entonces. El panel de ejecuciones y su revisión manual viven en
+ * `RuleExecutions`.
  */
 export function ProjectRules({
   projectId,
@@ -75,44 +74,7 @@ export function ProjectRules({
         )}
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold text-text-primary">Ejecuciones</h2>
-            <p className="mt-1 font-sans text-sm text-text-secondary">
-              La revisión es manual para que la demo sea determinista.
-            </p>
-          </div>
-          <form action={reviewAcademicAutomationsAction.bind(null, projectId)}>
-            <button
-              type="submit"
-              className="rounded-lg border border-primary px-3 py-2 font-sans text-sm font-medium text-primary"
-            >
-              Revisar ahora
-            </button>
-          </form>
-        </div>
-
-        {executions.length === 0 ? (
-          <p className="font-sans text-sm text-text-secondary">Sin ejecuciones recientes.</p>
-        ) : (
-          <ul className="space-y-2">
-            {executions.map((execution) => (
-              <li key={execution.id} className="rounded-xl border border-border p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-sans text-sm font-medium text-text-primary">
-                    {execution.rule.name}
-                  </p>
-                  <span className="font-sans text-xs text-text-secondary">{execution.status}</span>
-                </div>
-                <time className="mt-1 block font-sans text-xs text-text-secondary">
-                  {new Date(execution.createdAt).toLocaleString('es-MX')}
-                </time>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <RuleExecutions projectId={projectId} executions={executions} />
     </section>
   );
 }

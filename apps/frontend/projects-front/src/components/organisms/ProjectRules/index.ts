@@ -4,6 +4,7 @@ export * from './DeleteRuleButton';
 export * from './ProjectRules';
 export * from './RuleCard';
 export * from './RuleDialog';
+export * from './RuleExecutions';
 export * from './RuleStatusToggle';
 export * from './TriggerSection';
 export * from './ValueField';

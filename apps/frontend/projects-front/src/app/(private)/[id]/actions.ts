@@ -7,6 +7,7 @@ import type {
   DeleteProjectState,
   MemberState,
   ProjectFieldState,
+  ReviewState,
   RoleState,
   TaskState,
   WorkspaceState,
@@ -30,6 +31,7 @@ import {
 } from '@/lib/validation';
 import {
   ApiError,
+  type AutomationReviewSummary,
   type AutomationRule,
   type Board,
   CHAT_ATTACHMENT_MAX_BYTES,
@@ -140,11 +142,44 @@ export async function saveAutomationRuleAction(
   return { error: null, done: body.name };
 }
 
-export async function reviewAcademicAutomationsAction(projectId: string) {
+/**
+ * «Revisar ahora»: evalúa las reglas activas contra las tareas candidatas.
+ *
+ * El resumen que devuelve el servidor —`{ rules, candidates, succeeded,
+ * failed }`— viajaba hasta ahora directo a la papelera: se pedía y se
+ * descartaba. Se transporta en el estado para que la interfaz pueda decir qué
+ * pasó, sin inventar `skipped` ni `deduped`, que el backend no manda (hueco 4
+ * de `PENDIENTES-BACKEND-AUTOMATIZACION.md`) — el detalle de esos dos casos
+ * se lee fila por fila en la lista de ejecuciones, donde `SKIPPED` sí aparece.
+ */
+export async function reviewAutomationsAction(
+  _prev: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
   const api = await requireApi();
-  if (!api) return;
-  await api.post(`/projects/${projectId}/automations/review`, {});
-  revalidateProject(projectId);
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', summary: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    const summary = await api.post<AutomationReviewSummary>(
+      `/projects/${projectId}/automations/review`,
+      {},
+    );
+    if (!summary || typeof summary.candidates !== 'number') {
+      return { error: 'El servidor no devolvió un resumen de la revisión.', summary: null };
+    }
+    revalidateProject(projectId);
+    return { error: null, summary };
+  } catch (error) {
+    if (error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE) {
+      return {
+        error: 'El proyecto está suspendido: no se pueden revisar las reglas mientras tanto.',
+        summary: null,
+      };
+    }
+    return { error: describe(error, 'No se pudo revisar las reglas.'), summary: null };
+  }
 }
 
 /**

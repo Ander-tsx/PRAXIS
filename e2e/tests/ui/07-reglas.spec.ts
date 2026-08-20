@@ -5,7 +5,7 @@ import {
   test,
 } from '@playwright/test';
 import { comoBearer, entrarComoAdmin, nombreUnico, registrar } from '../../fixtures/api';
-import { crearMundo, darDeAlta } from '../../fixtures/mundo';
+import { crearMundo, crearTarea, darDeAlta } from '../../fixtures/mundo';
 import { entrarConCuenta } from '../../fixtures/ui';
 
 /**
@@ -28,6 +28,35 @@ async function apiContext(): Promise<APIRequestContext> {
   return contextoDePeticion.newContext({
     baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
   });
+}
+
+/**
+ * Deja una tarea candidata a `TASK_DUE_SOON`: vence mañana, prioridad alta y
+ * con el dueño como responsable — el mismo montaje que
+ * `api/15-automatizaciones-academicas.spec.ts` usa para el mismo trigger.
+ */
+async function crearCandidataDeVencimiento(
+  api: APIRequestContext,
+  mundo: Awaited<ReturnType<typeof crearMundo>>,
+) {
+  const cabeceras = comoBearer(mundo.duenno.accessToken);
+  const tarea = await crearTarea(api, mundo.duenno.accessToken, mundo);
+
+  const manana = new Date();
+  manana.setUTCDate(manana.getUTCDate() + 1);
+  const actualizacion = await api.patch(`/api/tasks/${tarea.id}`, {
+    headers: cabeceras,
+    data: { dueDate: manana.toISOString(), priority: 'HIGH' },
+  });
+  expect(actualizacion.status(), 'Preparar fecha y prioridad de la tarea').toBe(200);
+
+  const asignacion = await api.post(`/api/tasks/${tarea.id}/assign`, {
+    headers: cabeceras,
+    data: { assigneeIds: [mundo.duenno.userId] },
+  });
+  expect(asignacion.status(), 'Asignar la tarea que recibirá el aviso').toBe(200);
+
+  return tarea;
 }
 
 test.describe('Reglas del proyecto', () => {
@@ -307,6 +336,79 @@ test.describe('Reglas del proyecto', () => {
     await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
     await page.getByRole('button', { name: 'Eliminar regla' }).click();
     await expect(page.locator('li', { hasText: nombreRegla })).toHaveCount(0);
+  });
+
+  test('con una regla habilitada y una candidata, «Revisar ahora» muestra el resumen y una segunda revisión no duplica la fila (Bloque 6)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await crearCandidataDeVencimiento(api, mundo);
+
+    const nombreRegla = nombreUnico('Revisión con aviso').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'ENABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 4320 } },
+        conditions: [{ field: 'priority', operator: 'EQUALS', value: 'HIGH' }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status(), 'Crear y habilitar la regla').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Revisar ahora' }).click();
+    await expect(
+      page.getByText('1 regla revisada · 1 candidata · 1 aviso · 0 fallos'),
+    ).toBeVisible();
+    await expect(page.getByText('Avisó', { exact: true })).toHaveCount(1);
+    /* El resumen del contexto usa las etiquetas del catálogo, no los nombres
+       crudos del campo — hueco 3. */
+    await expect(page.getByText(/prioridad Alta/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Revisar ahora' }).click();
+    await expect(
+      page.getByText('1 regla revisada · 1 candidata · 0 avisos · 0 fallos'),
+    ).toBeVisible();
+    /* Idempotencia visible: la segunda revisión no añade una segunda fila. */
+    await expect(page.getByText('Avisó', { exact: true })).toHaveCount(1);
+  });
+
+  test('una regla cuyas condiciones no se cumplen deja una fila «No cumplía las condiciones» (Bloque 6)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await crearCandidataDeVencimiento(api, mundo);
+
+    const nombreRegla = nombreUnico('Revisión sin coincidir').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'ENABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 4320 } },
+        /* La candidata es de prioridad alta: esta condición nunca se cumple. */
+        conditions: [{ field: 'priority', operator: 'EQUALS', value: 'LOW' }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status(), 'Crear y habilitar la regla').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Revisar ahora' }).click();
+    await expect(
+      page.getByText('1 regla revisada · 1 candidata · 0 avisos · 0 fallos'),
+    ).toBeVisible();
+    await expect(page.getByText('No cumplía las condiciones', { exact: true })).toBeVisible();
   });
 
   test('sin canManageAutomations se ve el mensaje de permiso', async ({ page }) => {
