@@ -112,8 +112,11 @@ export async function saveAutomationRuleAction(
   const ruleId = formData.get('ruleId');
   const draft = draftFromFormData(formData);
 
+  /* El `FormData` no es de fiar aunque el cliente ya haya validado, así que
+     se vuelve a comprobar aquí. Del ámbito no se hace nada: quien lo usa para
+     colocar el mensaje es el diálogo, y aquí solo hay un sitio donde ponerlo. */
   const clientError = validateAutomationDraft(draft);
-  if (clientError) return { error: clientError, done: null };
+  if (clientError) return { error: clientError.mensaje, done: null };
 
   const body = bodyFromDraft(draft);
 

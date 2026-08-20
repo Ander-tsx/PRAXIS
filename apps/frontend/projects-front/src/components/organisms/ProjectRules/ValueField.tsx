@@ -2,6 +2,7 @@
 
 import type { ConditionFieldSpec } from '@/lib/automation-catalog';
 import { Input, Select, SelectorDeFecha } from '@praxis/commons';
+import { useState } from 'react';
 
 export interface ValueFieldProps {
   fieldSpec: ConditionFieldSpec;
@@ -51,22 +52,9 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
   }
 
   if (operator === 'IN') {
-    const items: string[] = safeParseArray(value);
-    return (
-      <Input
-        label="Valor"
-        value={items.join(', ')}
-        onChange={(event) => {
-          const next = event.target.value
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
-          onChange(JSON.stringify(next));
-        }}
-        placeholder="Separados por comas"
-        fullWidth
-      />
-    );
+    /* `key` por campo: si algún día se puede cambiar de campo sin perder el
+       operador `IN`, el texto de la lista anterior no debe sobrevivir. */
+    return <ListaSeparadaPorComas key={fieldSpec.field} value={value} onChange={onChange} />;
   }
 
   if (fieldSpec.kind === 'enum' && fieldSpec.options) {
@@ -121,6 +109,54 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
       value={value}
       onChange={(event) => onChange(event.target.value)}
       min={fieldSpec.min}
+      fullWidth
+    />
+  );
+}
+
+/**
+ * Una lista escrita a mano, separada por comas.
+ *
+ * ⚠️ **El texto que se ve es estado propio, no el JSON reformateado.** Antes
+ * el `<Input>` se controlaba desde el valor ya parseado: cada pulsación se
+ * partía por comas, se limpiaba y se volvía a serializar, así que al teclear
+ * una coma la lista se recomponía sin ella —«3, 5, 8» acababa siendo «358»—
+ * y no había forma de escribir más de un elemento.
+ *
+ * Aquí el texto crudo manda mientras se escribe y hacia fuera sale siempre
+ * el JSON que espera `coerceConditionValue`, con los huecos descartados. Que
+ * el texto tenga una coma suelta al final es normal a media escritura y no
+ * ensucia lo que se envía.
+ *
+ * Se monta con el valor que reciba y no vuelve a mirarlo: cambiar de campo o
+ * de operador desmonta este componente, así que no hay que sincronizar nada.
+ */
+function ListaSeparadaPorComas({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [texto, setTexto] = useState(() => safeParseArray(value).join(', '));
+
+  return (
+    <Input
+      label="Valor"
+      value={texto}
+      onChange={(event) => {
+        const crudo = event.target.value;
+        setTexto(crudo);
+        onChange(
+          JSON.stringify(
+            crudo
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
+          ),
+        );
+      }}
+      placeholder="Separados por comas"
       fullWidth
     />
   );

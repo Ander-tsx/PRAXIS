@@ -1,7 +1,7 @@
 'use client';
 
 import { conditionFieldSpecFor, triggerSpecFor } from '@/lib/automation-catalog';
-import type { ConditionDraft } from '@/lib/automation-draft';
+import { type ConditionDraft, coerceConditionValue } from '@/lib/automation-draft';
 import { Button, Select } from '@praxis/commons';
 import { useState } from 'react';
 import { ValueField } from './ValueField';
@@ -31,6 +31,20 @@ function nuevaClave(): string {
 }
 
 /**
+ * El valor coaccionado, de vuelta al texto del que salió.
+ *
+ * ⚠️ **Una lista no vale con `String()`.** `String([3, 5, 8])` da `'3,5,8'`,
+ * que no es JSON, y `coerceConditionValue` lo intenta parsear como tal y
+ * devuelve una lista vacía: la condición se borraría sola al releerla. Con
+ * `IN` el texto **es** el JSON, tanto para pintar el campo como para el
+ * `<input>` oculto que viaja en el `FormData`.
+ */
+function comoTexto(value: unknown): string {
+  if (Array.isArray(value)) return JSON.stringify(value);
+  return String(value ?? '');
+}
+
+/**
  * «Si …» — las condiciones, combinadas por `AND`.
  *
  * Los campos y operadores que ofrece cada fila salen del catálogo del
@@ -57,8 +71,46 @@ export function ConditionsSection({ triggerType, conditions, onChange }: Conditi
     onChange(next.map(({ key, ...condition }) => condition));
   }
 
+  /**
+   * ⚠️ **El valor se guarda ya coaccionado, no como el texto del campo.**
+   *
+   * `ConditionDraft.value` está documentado como «ya coaccionado al tipo
+   * correcto», y `validateAutomationDraft` lo comprueba así:
+   * `Number.isInteger`, `typeof === 'boolean'`, `Array.isArray`. Aquí se
+   * guardaba el texto crudo que emite el campo —`'2'`, `'true'`,
+   * `'["3","5","8"]'`— y un string no es ninguna de esas tres cosas, así que
+   * **enteros, booleanos y listas no se podían guardar**: los frenaba la
+   * validación de cliente antes de salir del navegador, con un mensaje que
+   * además aparecía sobre el campo «Nombre».
+   *
+   * Solo pasaban los enum y las fechas, que se validan como texto y colaban
+   * por casualidad — y era justo el único tipo que tenía prueba.
+   *
+   * La coerción es la misma `coerceConditionValue` que usa el servidor al
+   * reconstruir el borrador desde el `FormData`, así que las dos orillas
+   * entienden lo mismo. El `<input>` oculto sigue llevando texto: es un
+   * `FormData`, ahí todo es texto por definición.
+   */
   function updateRow(key: string, patch: Partial<ConditionDraft>) {
-    commit(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    commit(
+      rows.map((row) => {
+        if (row.key !== key) return row;
+        const siguiente = { ...row, ...patch };
+        const texto = comoTexto(patch.value ?? siguiente.value);
+        return {
+          ...siguiente,
+          /* ⚠️ **Vacío se queda vacío.** `coerceConditionValue` con `''` y un
+             campo entero devuelve `Number('') === 0`, así que elegir «Número
+             de responsables» rellenaría un cero que nadie escribió — y un
+             cero **es válido**, así que la regla se podría guardar con un
+             valor inventado. Sin rellenar y «cero» no son lo mismo. */
+          value:
+            texto === ''
+              ? ''
+              : coerceConditionValue(triggerType, siguiente.field, siguiente.operator, texto),
+        };
+      }),
+    );
   }
 
   function addRow() {
@@ -127,7 +179,7 @@ export function ConditionsSection({ triggerType, conditions, onChange }: Conditi
                   <ValueField
                     fieldSpec={fieldSpec}
                     operator={row.operator}
-                    value={String(row.value ?? '')}
+                    value={comoTexto(row.value)}
                     onChange={(value) => updateRow(row.key, { value })}
                   />
                 )}
@@ -141,7 +193,7 @@ export function ConditionsSection({ triggerType, conditions, onChange }: Conditi
                   `conditionValue` entre filas — D4. */}
               <input type="hidden" name="conditionField" value={row.field} />
               <input type="hidden" name="conditionOperator" value={row.operator} />
-              <input type="hidden" name="conditionValue" value={String(row.value ?? '')} />
+              <input type="hidden" name="conditionValue" value={comoTexto(row.value)} />
             </div>
           );
         })}

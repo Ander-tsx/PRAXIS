@@ -4,7 +4,7 @@ import { saveAutomationRuleAction } from '@/app/(private)/[id]/actions';
 import { AUTOMATION_RULE_INITIAL_STATE } from '@/lib/action-state';
 import { triggerSpecFor } from '@/lib/automation-catalog';
 import { type RuleDraft, bodyFromDraft, draftFromRule, emptyDraft } from '@/lib/automation-draft';
-import { validateAutomationDraft } from '@/lib/validation';
+import { type AutomationErrorScope, validateAutomationDraft } from '@/lib/validation';
 import {
   type AutomationRule,
   type AutomationTriggerType,
@@ -143,6 +143,22 @@ export function RuleDialog({
 
   const nameId = useId();
   const clientError = validateAutomationDraft(draft);
+
+  /**
+   * El mensaje de cliente, pero **solo donde le toca**.
+   *
+   * Antes se pintaba entero bajo el campo «Nombre» sin mirar de qué hablaba,
+   * así que un fallo en una condición marcaba en rojo un campo correcto y
+   * mandaba a buscar el problema donde no estaba. `validateAutomationDraft`
+   * devuelve el ámbito justo para esto.
+   *
+   * Y solo después de intentar enviar: señalar en rojo un formulario que
+   * nadie ha terminado de rellenar es ruido, no ayuda.
+   */
+  function errorDe(ambito: AutomationErrorScope): string | undefined {
+    if (!touched || clientError?.ambito !== ambito) return undefined;
+    return clientError.mensaje;
+  }
   const spec = triggerSpecFor(draft.triggerType);
   const warnings = (spec?.warnings ?? [])
     .filter((warning) => warning.matches(draft))
@@ -204,8 +220,8 @@ export function RuleDialog({
             value={draft.name}
             onChange={(event) => setDraft((d) => ({ ...d, name: event.target.value }))}
             maxLength={120}
-            variant={touched && clientError ? 'error' : 'default'}
-            message={touched && clientError ? clientError : undefined}
+            variant={errorDe('name') ? 'error' : 'default'}
+            message={errorDe('name')}
             autoComplete="off"
             fullWidth
           />
@@ -217,6 +233,8 @@ export function RuleDialog({
             value={draft.description}
             onChange={(event) => setDraft((d) => ({ ...d, description: event.target.value }))}
             maxLength={1000}
+            variant={errorDe('description') ? 'error' : 'default'}
+            message={errorDe('description')}
             fullWidth
           />
 
@@ -228,6 +246,7 @@ export function RuleDialog({
               setDraft((d) => ({ ...d, triggerConfig: { ...d.triggerConfig, [key]: value } }))
             }
           />
+          <ErrorDeSeccion mensaje={errorDe('trigger')} />
 
           <ConditionsSection
             /* Remonta al cambiar de trigger: las filas de un catálogo
@@ -240,6 +259,7 @@ export function RuleDialog({
             conditions={draft.conditions}
             onChange={(conditions) => setDraft((d) => ({ ...d, conditions }))}
           />
+          <ErrorDeSeccion mensaje={errorDe('conditions')} />
 
           {warnings.length > 0 && (
             <div
@@ -258,6 +278,7 @@ export function RuleDialog({
           )}
 
           <ActionsSection triggerType={draft.triggerType} />
+          <ErrorDeSeccion mensaje={errorDe('actions')} />
 
           <label className="flex items-center gap-2 font-sans text-sm text-text-primary">
             <input
@@ -295,5 +316,27 @@ export function RuleDialog({
         </form>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * El error de una sección entera —«Cuando», «Si», «Entonces»—, debajo de
+ * ella.
+ *
+ * Las tres son `<fieldset>`, no un campo suelto, así que el mensaje no puede
+ * colgar de un `<Input>`: va aquí, pegado a la sección de la que habla. El
+ * texto ya nombra el campo concreto («Días parada: …»), que es lo que lo
+ * desambigua cuando hay varias condiciones.
+ */
+function ErrorDeSeccion({ mensaje }: { mensaje?: string }) {
+  if (!mensaje) return null;
+  return (
+    <p
+      role="alert"
+      className="-mt-3 rounded-lg border px-3 py-2 font-sans text-sm text-error"
+      style={{ background: alpha(colors.error, 10), borderColor: alpha(colors.error, 30) }}
+    >
+      {mensaje}
+    </p>
   );
 }

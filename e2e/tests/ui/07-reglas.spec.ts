@@ -282,6 +282,148 @@ test.describe('Reglas del proyecto', () => {
     }
   });
 
+  /**
+   * «Es alguno de» con una lista escrita a mano deja escribir comas.
+   *
+   * El campo se controlaba desde el JSON ya parseado: cada pulsación se
+   * partía por comas, se limpiaba y se volvía a serializar, así que la coma
+   * recién tecleada desaparecía antes de poder escribir el valor siguiente y
+   * la lista no se podía componer.
+   */
+  test('una condición «es alguno de» admite comas al escribir la lista', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const nombreRegla = nombreUnico('Lista con comas').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+
+    /* `staleDays` es entero: con `IN` se escribe como texto separado por
+       comas, no por casillas — esas solo las tiene un enum con catálogo
+       cerrado, como la prioridad. */
+    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
+    await page.getByRole('option', { name: 'Tarea estancada' }).click();
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Operador' }).click();
+    await page.getByRole('option', { name: 'es alguno de' }).click();
+
+    const lista = page.getByRole('group', { name: 'Si' }).getByRole('textbox');
+    /* Pulsación a pulsación, que es donde se perdía la coma. */
+    await lista.pressSequentially('3, 5, 8');
+    await expect(lista).toHaveValue('3, 5, 8');
+
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta.getByText(/días parada es alguno de 3, 5, 8/)).toBeVisible();
+  });
+
+  /**
+   * Una condición de cada tipo de valor del catálogo, guardada de verdad.
+   *
+   * ⚠️ **Esta es la laguna que dejó pasar el fallo más gordo del apartado.**
+   * Había una sola prueba de condiciones y era de prioridad —un enum—, que
+   * resultó ser de los dos únicos tipos que funcionaban. `ConditionsSection`
+   * guardaba el texto crudo del campo y `validateAutomationDraft` exige el
+   * valor ya coaccionado, así que **enteros, booleanos y listas no se podían
+   * guardar**: los frenaba la validación de cliente. Los enum y las fechas
+   * colaban porque se validan como texto.
+   *
+   * Una prueba por `kind` del catálogo, más los dos aspectos de `IN`.
+   */
+  test('una condición de cada tipo de valor se guarda y se lee en el resumen', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    const seccionSi = page.getByRole('group', { name: 'Si' });
+
+    /* ── entero: assigneeCount es igual a 2 ───────────────────────────── */
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const nombreEntero = nombreUnico('Entero').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreEntero);
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Campo' }).click();
+    await page.getByRole('option', { name: 'Número de responsables' }).click();
+    await seccionSi.getByRole('spinbutton').fill('2');
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+    await expect(
+      page.locator('li', { hasText: nombreEntero }).getByText(/número de responsables es 2/),
+    ).toBeVisible();
+
+    /* ── booleano: overdue es igual a sí ──────────────────────────────── */
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const nombreBooleano = nombreUnico('Booleano').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreBooleano);
+    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
+    await page.getByRole('option', { name: 'Tarea estancada' }).click();
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Campo' }).click();
+    await page.getByRole('option', { name: 'Vencida' }).click();
+    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('option', { name: 'Sí', exact: true }).click();
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+    await expect(
+      page.locator('li', { hasText: nombreBooleano }).getByText(/vencida es sí/),
+    ).toBeVisible();
+
+    /* ── fecha: dueDate es igual a una fecha ──────────────────────────── */
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const nombreFecha = nombreUnico('Fecha').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreFecha);
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Campo' }).click();
+    await page.getByRole('option', { name: 'Fecha de vencimiento' }).click();
+    /* `SelectorDeFecha` no es un `<input type="date">`: dibuja su propio
+       calendario para no depender del que pinte cada navegador. Se elige el
+       día 15 del mes visible, que existe siempre. */
+    await seccionSi.getByRole('button', { name: 'Fecha' }).click();
+    await page
+      .getByRole('dialog', { name: 'Elegir fecha' })
+      .getByRole('button', { name: '15', exact: true })
+      .click();
+    /* La fecha elegida se lee del campo oculto en vez de fijarla en la
+       prueba: lo que se comprueba es que **ese** valor llega entero hasta el
+       resumen, no que el calendario abra en un mes concreto. */
+    const fechaElegida = await seccionSi
+      .locator('input[type="hidden"][name="conditionValue"]')
+      .inputValue();
+    expect(fechaElegida, 'El selector de fecha no llenó el campo oculto').toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+    await expect(
+      page
+        .locator('li', { hasText: nombreFecha })
+        .getByText(new RegExp(`fecha de vencimiento es ${fechaElegida}`)),
+    ).toBeVisible();
+
+    /* ── enum con IN: por casillas ────────────────────────────────────── */
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const nombreLista = nombreUnico('Casillas').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreLista);
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Operador' }).click();
+    await page.getByRole('option', { name: 'es alguno de' }).click();
+    await seccionSi.getByRole('checkbox', { name: 'Alta' }).check();
+    await seccionSi.getByRole('checkbox', { name: 'Urgente' }).check();
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+    await expect(
+      page
+        .locator('li', { hasText: nombreLista })
+        .getByText(/prioridad es alguno de Alta, Urgente/),
+    ).toBeVisible();
+  });
+
   test('editar una regla existente actualiza su resumen (Bloque 5)', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);

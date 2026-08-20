@@ -306,48 +306,86 @@ function validateConditionValue(
   return validateConditionScalar(fieldSpec, value);
 }
 
-export function validateAutomationDraft(draft: RuleDraft): string | null {
+/**
+ * Qué parte del formulario tiene el fallo.
+ *
+ * Existe porque un mensaje suelto no dice dónde mirar: `RuleDialog` pintaba
+ * **todos** los errores bajo el campo «Nombre», así que un fallo en una
+ * condición marcaba en rojo un campo que estaba bien y mandaba a corregirlo
+ * donde no estaba el problema.
+ */
+export type AutomationErrorScope =
+  | 'name'
+  | 'description'
+  | 'trigger'
+  | 'conditions'
+  | 'actions';
+
+export interface AutomationDraftError {
+  ambito: AutomationErrorScope;
+  mensaje: string;
+}
+
+export function validateAutomationDraft(draft: RuleDraft): AutomationDraftError | null {
   const name = draft.name.trim();
   if (name.length < AUTOMATION_RULE_NAME_MIN) {
-    return `El nombre debe tener al menos ${AUTOMATION_RULE_NAME_MIN} caracteres.`;
+    return {
+      ambito: 'name',
+      mensaje: `El nombre debe tener al menos ${AUTOMATION_RULE_NAME_MIN} caracteres.`,
+    };
   }
   if (name.length > AUTOMATION_RULE_NAME_MAX) {
-    return `El nombre no puede superar ${AUTOMATION_RULE_NAME_MAX} caracteres.`;
+    return {
+      ambito: 'name',
+      mensaje: `El nombre no puede superar ${AUTOMATION_RULE_NAME_MAX} caracteres.`,
+    };
   }
   if (draft.description.trim().length > AUTOMATION_RULE_DESCRIPTION_MAX) {
-    return `La descripción no puede superar ${AUTOMATION_RULE_DESCRIPTION_MAX} caracteres.`;
+    return {
+      ambito: 'description',
+      mensaje: `La descripción no puede superar ${AUTOMATION_RULE_DESCRIPTION_MAX} caracteres.`,
+    };
   }
 
   const spec = triggerSpecFor(draft.triggerType);
-  if (!spec) return 'Elige un trigger del catálogo académico.';
+  if (!spec) return { ambito: 'trigger', mensaje: 'Elige un trigger del catálogo académico.' };
 
   for (const field of spec.configFields) {
     const value = draft.triggerConfig[field.key];
     if (field.required && (value === undefined || value === null)) {
-      return `${field.label} es obligatorio.`;
+      return { ambito: 'trigger', mensaje: `${field.label} es obligatorio.` };
     }
     if (value !== undefined && value !== null && (!Number.isInteger(value) || value < field.min)) {
-      return `${field.label} debe ser un número entero de ${field.min} o más.`;
+      return {
+        ambito: 'trigger',
+        mensaje: `${field.label} debe ser un número entero de ${field.min} o más.`,
+      };
     }
   }
 
   if (draft.actions.length === 0) {
-    return 'La regla requiere al menos una acción.';
+    return { ambito: 'actions', mensaje: 'La regla requiere al menos una acción.' };
   }
   if (draft.actions.length > AUTOMATION_RULE_MAX_ACTIONS) {
-    return 'Una regla admite como máximo cinco acciones.';
+    return { ambito: 'actions', mensaje: 'Una regla admite como máximo cinco acciones.' };
   }
 
   for (const condition of draft.conditions) {
     const fieldSpec = conditionFieldSpecFor(draft.triggerType, condition.field);
     if (!fieldSpec) {
-      return `«${condition.field}» no es una condición de ${spec.label}.`;
+      return {
+        ambito: 'conditions',
+        mensaje: `«${condition.field}» no es una condición de ${spec.label}.`,
+      };
     }
     if (!(AUTOMATION_CONDITION_OPERATORS as readonly string[]).includes(condition.operator)) {
-      return `«${condition.operator}» no es un operador admitido.`;
+      return {
+        ambito: 'conditions',
+        mensaje: `«${condition.operator}» no es un operador admitido.`,
+      };
     }
     const error = validateConditionValue(fieldSpec, condition.operator, condition.value);
-    if (error) return error;
+    if (error) return { ambito: 'conditions', mensaje: error };
   }
 
   return null;
