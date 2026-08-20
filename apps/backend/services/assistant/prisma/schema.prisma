@@ -83,28 +83,44 @@ model AssistantUsage {
 /// cada turno y el servidor no lo veía nunca. Recargar la página perdía el hilo,
 /// y cruzar de zona —que en Multi-Zones es una recarga completa— también.
 ///
-/// Es de **una persona en un proyecto**, y las dos mitades importan:
-/// el contexto que ve el modelo es del proyecto, y lo que alguien le escribe al
-/// asistente es suyo. `userId` no es solo para agrupar: es la clave de acceso.
+/// Es **de una persona**, y esa es la mitad que no cambia: lo que alguien le
+/// escribe al asistente es suyo. `userId` no es solo para agrupar, es la clave
+/// de acceso.
 ///
-/// ⚠️ `canViewReports` es del proyecto, no de la conversación. Comprobar solo el
-/// permiso dejaría a cualquier compañero leer estos hilos, así que quien los
-/// sirve comprueba **además** que el `userId` es el de quien llama.
+/// ⚠️ **`projectId` pasó a ser opcional, y es el cambio de fondo.** La
+/// conversación nacía atada a un proyecto y el listado era «mis conversaciones
+/// **de este proyecto**». Eso obligaba a elegir el proyecto **antes** de poder
+/// hablar —con un desplegable, fuera de la conversación— y partía el historial
+/// en tantas listas como proyectos tuvieras.
+///
+/// Ahora la conversación es tuya y el proyecto es un **foco**: empieza sin
+/// ninguno —PRAX pregunta por cuál, dentro del propio chat— y puede cambiar a
+/// mitad. Aquí se guarda el último, que es lo que la lista necesita para decir
+/// de qué iba; el de cada turno vive en su `Message`.
+///
+/// ⚠️ **No se cargan varios proyectos a la vez, y no es una limitación
+/// pendiente.** Los permisos son por proyecto y las herramientas se declaran con
+/// ellos, así que con dos proyectos abiertos `canCreateTask` podría ser sí en uno
+/// y no en otro y una sola lista de herramientas no puede expresarlo. Además el
+/// briefing lleva **todas** las tareas del proyecto: cargar cinco multiplicaría
+/// por cinco la ventana y empujaría las reglas fuera de la atención del modelo.
 ///
 /// Sin clave foránea hacia el proyecto ni hacia el usuario: viven en otros
 /// servicios. Al borrar el proyecto las limpia el gateway, como con las tareas.
 model Conversation {
   id        String    @id @default(uuid())
   userId    String
-  projectId String
+  /// El **último** proyecto del que se habló. `null` mientras no se ha elegido.
+  projectId String?
   /// Las primeras palabras del primer mensaje. Se puede renombrar a mano.
   title     String
-  messages  Message[]
+  messages    Message[]
+  attachments Attachment[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  /// El listado siempre es «mis conversaciones de este proyecto, la última arriba».
-  @@index([userId, projectId, updatedAt])
+  /// El listado es «mis conversaciones, la última arriba». Sin el proyecto.
+  @@index([userId, updatedAt])
   @@schema("assistant")
   @@map("assistant_conversations")
 }
@@ -123,7 +139,15 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           MessageRole
   text           String
+  /// De qué proyecto iba **este** turno. `null` antes de elegir foco.
+  ///
+  /// ⚠️ Se guarda por mensaje y no solo en la conversación porque el foco cambia
+  /// a mitad: sin esto, al releer un hilo que pasó por dos proyectos, todas las
+  /// propuestas parecerían del último. Es también lo que permite pintar la marca
+  /// de «ahora hablando de X» en el sitio exacto donde ocurrió.
+  projectId      String?
   proposals      Proposal[]
+  attachments    Attachment[]
   createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
@@ -163,4 +187,113 @@ model Proposal {
   @@index([messageId])
   @@schema("assistant")
   @@map("assistant_proposals")
+}
+
+/// Un archivo que alguien le pasó a PRAX.
+///
+/// ## Por qué se guarda, si el modelo solo lo necesita durante el turno
+///
+/// La primera versión no lo guardaba: el archivo viajaba en base64 dentro de la
+/// pregunta y se descartaba. Dos cosas lo tumbaron, y las dos importan:
+///
+/// 1. 🔴 **No cabía.** La pregunta va por una Server Action, y el cuerpo de una
+///    Server Action está topado en 1 MB. Un PNG de teléfono lo pasa de sobra, y
+///    lo que se veía era un «Body exceeded 1 MB limit» de Next en mitad de la
+///    pantalla — un error del framework, sin traducir, que no dice qué archivo
+///    ni qué hacer.
+/// 2. **La conversación quedaba mintiendo.** El modelo respondía citando el
+///    documento y en el hilo no había ni rastro de él: al releerlo una semana
+///    después, la respuesta hablaba de algo que no estaba.
+///
+/// Ahora se sube aparte —multipart, sin pasar por la Server Action— queda como
+/// borrador (`messageId` nulo) y el turno lo reclama con `attachmentIds`. Es
+/// exactamente el mismo patrón que los adjuntos del chat de equipo, y por el
+/// mismo motivo: así se pueden adjuntar varios, verlos como chips y mandarlos de
+/// una vez, sin volver a subirlos en cada intento de enviar.
+///
+/// ## Quién puede verlo
+///
+/// Aquí solo se guarda el hecho. El acceso lo decide la conversación —que es de
+/// una persona— y el permiso del proyecto, igual que con los mensajes.
+model Attachment {
+  id             String   @id @default(uuid())
+  /// ⚠️ **Nulo mientras es un borrador, igual que `messageId`.**
+  ///
+  /// Se sube antes de escribir, y en un chat recién abierto todavía no hay
+  /// conversación: exigirla aquí obligaría a crear una vacía para poder
+  /// adjuntar, y la que se abandona sin enviar nada quedaría en el historial.
+  /// El turno rellena las dos columnas de una vez al reclamarlo.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// Nulo mientras es un borrador. El turno lo reclama al enviarse.
+  messageId      String?
+  message        Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  /// Nombre con el que se subió, saneado. Es lo que se ofrece al descargar.
+  filename       String
+  mimeType       String
+  /// Bytes reales, medidos en el servidor y no declarados por el cliente.
+  size           Int
+  /// **Lo que sobrevive al turno.** Sin esto, PRAX olvidaba el archivo en cuanto
+  /// contestaba: los bytes viajan con la pregunta y no se reenvían nunca más, así
+  /// que dos turnos después la conversación hablaba de un documento que el modelo
+  /// ya no tenía delante.
+  ///
+  /// Se calcula **una vez, al subir**, y depende del tipo:
+  ///
+  /// - Texto y Markdown → el UTF-8 decodificado.
+  /// - PDF → su capa de texto. ⚠️ Y el PDF **sigue viajando nativo** en el turno
+  ///   en el que se adjunta: pasarlo a texto plano *ahí* perdería maquetación,
+  ///   tablas y figuras que Gemini sí sabe leer. Esto es para *después*.
+  /// - Imagen → **nada**. La descripción la pone PRAX en su propia respuesta,
+  ///   que ya se guarda: una segunda llamada al modelo para describirla sería
+  ///   pagar dos veces por algo que en ese turno tiene delante.
+  ///
+  /// `null` es «no hay contenido que reinyectar» —una imagen, un PDF escaneado,
+  /// una extracción fallida, o un adjunto anterior a esta columna—. En el hilo
+  /// se nombra igual, con el motivo dentro, y no se finge haberlo leído:
+  /// callarlo dejaría a PRAX negando que alguna vez le pasaran esa captura.
+  ///
+  /// ⚠️ **No se selecciona al leer una conversación.** La burbuja necesita
+  /// nombre, tipo y tamaño; meter esto ahí metería cada documento del hilo en
+  /// cada lectura de la pantalla. Lo lee solo quien arma el historial del modelo.
+  extract        String?
+  /// Cuántas páginas tiene, **solo en los PDF**.
+  ///
+  /// Se cuenta al subirlo, en el mismo momento en que ya se abre para sacarle el
+  /// texto, así que no cuesta nada. Y decide una cosa concreta: si el PDF viaja
+  /// **nativo** —con su maquetación, que es como se lee mejor— o solo como
+  /// texto. Ver `ASSISTANT_PDF_MAX_INLINE_PAGES`: sin ese tope, un manual de 500
+  /// páginas entraba entero en un turno y costaba cien veces lo previsto.
+  ///
+  /// `null` en todo lo que no sea un PDF, y en los anteriores a esta columna —
+  /// que se tratan como cortos, que es como se comportaban.
+  pages          Int?
+  uploadedBy     String
+  createdAt      DateTime @default(now())
+
+  blob AttachmentBlob?
+
+  @@index([conversationId, messageId])
+  @@index([messageId])
+  /// Los borradores de una persona: es la consulta del compositor, y la que usa
+  /// la limpieza de huérfanos.
+  @@index([uploadedBy, messageId])
+  @@schema("assistant")
+  @@map("assistant_attachments")
+}
+
+/// Los bytes de un adjunto del asistente.
+///
+/// Uno a uno con `Attachment`, y **solo cuando el proveedor activo es
+/// Postgres**. Con `STORAGE_DRIVER=gcs` esta tabla queda vacía y los bytes viven
+/// en el bucket: la API no cambia y quien la consume no se entera de dónde está
+/// el archivo. Mismo diseño que `ChatAttachmentBlob` en projects-service.
+model AttachmentBlob {
+  attachmentId String     @id
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  /// `bytea`. Postgres lo saca del bloque principal vía TOAST.
+  data         Bytes
+
+  @@schema("assistant")
+  @@map("assistant_attachment_blobs")
 }

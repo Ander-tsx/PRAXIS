@@ -1,8 +1,8 @@
-import { AdminTabs } from '@/components/organisms/AdminTabs';
+import { FilterBar } from '@/components/molecules/FilterBar';
+import { AdminHeader } from '@/components/organisms/AdminHeader';
 import { UsersTable } from '@/components/organisms/UsersTable';
-import { UsersToolbar } from '@/components/organisms/UsersToolbar';
-import { type AdminUserPage, FILAS_POR_PAGINA } from '@/lib/admin';
-import { AppHeader, Pagination, type UserStatusName } from '@praxis/commons';
+import { type AdminUserPage, ESTADOS, FILAS_POR_PAGINA } from '@/lib/admin';
+import { AppHeader, Pagination, type UserStatusName, colors } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
@@ -13,6 +13,14 @@ interface PageProps {
 }
 
 const ESTADOS_VALIDOS: readonly string[] = ['ACTIVE', 'SUSPENDED', 'INACTIVE'];
+
+/** Las opciones del filtro, en el orden en que se piensan. */
+const FILTROS = [
+  { id: 'todas', etiqueta: 'Todas' },
+  { id: 'ACTIVE', etiqueta: ESTADOS.ACTIVE.etiqueta },
+  { id: 'SUSPENDED', etiqueta: ESTADOS.SUSPENDED.etiqueta },
+  { id: 'INACTIVE', etiqueta: ESTADOS.INACTIVE.etiqueta },
+];
 
 /**
  * Cuentas de la plataforma: listar, buscar, suspender y cambiar el rol global.
@@ -38,6 +46,18 @@ const ESTADOS_VALIDOS: readonly string[] = ['ACTIVE', 'SUSPENDED', 'INACTIVE'];
  * historial apuntando a alguien que ya no está, y esos datos viven en otros
  * microservicios donde la cascada no llega. Suspender cubre el caso real y se
  * deshace.
+ *
+ * ## Las tres consultas de más, y por qué se pagan
+ *
+ * ⚠️ El listado devuelve el `total` **de lo que se está viendo**, no el de la
+ * plataforma: con un filtro puesto no hay forma de saber cuántas cuentas hay ni
+ * cuántas están suspendidas sin preguntarlo aparte. Son tres consultas con
+ * `limit=1` —solo interesa el contador— que salen en paralelo con la principal y
+ * **degradan a `null` por separado**.
+ *
+ * Se pagan porque «¿hay algo mal ahora mismo?» es la pregunta con la que se abre
+ * este panel, y antes había que filtrar por «Suspendidas» y leer el contador para
+ * responderla. Tres contadores indexados a cambio de eso salen baratos.
  */
 export default async function UsersPage({ searchParams }: PageProps) {
   const { q, estado, page: pageParam } = await searchParams;
@@ -56,9 +76,17 @@ export default async function UsersPage({ searchParams }: PageProps) {
   if (busqueda) params.set('search', busqueda);
   if (estadoFiltro) params.set('status', estadoFiltro);
 
-  const { items, total } = await createServerApiClient().get<AdminUserPage>(
-    `/admin/users?${params.toString()}`,
-  );
+  const api = createServerApiClient();
+
+  const [{ items, total }, enTotal, suspendidas, bajas] = await Promise.all([
+    api.get<AdminUserPage>(`/admin/users?${params.toString()}`),
+    /* `limit=1`: de estas tres solo se mira el `total`. Y cada una con su propio
+       `catch`: que no se pueda contar una no puede llevarse a las otras ni, mucho
+       menos, tumbar el listado. */
+    contar(api, '/admin/users?limit=1'),
+    contar(api, '/admin/users?status=SUSPENDED&limit=1'),
+    contar(api, '/admin/users?status=INACTIVE&limit=1'),
+  ]);
 
   /** Conserva los filtros al cambiar de página: perderlos es el fallo clásico. */
   const hrefFor = (destino: number) => {
@@ -73,9 +101,30 @@ export default async function UsersPage({ searchParams }: PageProps) {
   return (
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
-        <AdminTabs activo="cuentas" />
+        <AdminHeader
+          activo="cuentas"
+          titulo="Cuentas"
+          descripcion="Quién puede entrar, con qué rol y con qué plan. Suspender es reversible; borrar no existe aquí."
+          cifras={[
+            /* El total va sin color de estado: es el tamaño de la plataforma, no
+               una alarma. Los otros dos sí lo llevan, porque significan algo. */
+            { etiqueta: 'En total', valor: enTotal, tono: colors.primary },
+            { etiqueta: 'Suspendidas', valor: suspendidas, tono: colors.error },
+            { etiqueta: 'De baja', valor: bajas, tono: colors.warning },
+          ]}
+        />
 
-        <UsersToolbar busqueda={busqueda} estado={estadoFiltro} total={total} />
+        <FilterBar
+          basePath="/"
+          busqueda={busqueda}
+          placeholder="Nombre, apellido o correo"
+          filtros={FILTROS}
+          filtroActivo={estadoFiltro}
+          idTodos="todas"
+          total={total}
+          nombreSingular="cuenta"
+          nombrePlural="cuentas"
+        />
 
         {items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
@@ -99,4 +148,22 @@ export default async function UsersPage({ searchParams }: PageProps) {
       </div>
     </AppHeader>
   );
+}
+
+/**
+ * Cuántas filas hay, sin traérselas.
+ *
+ * `limit=1` porque de la respuesta solo se lee `total`, y `null` cuando falla:
+ * un contador que no se pudo leer **no es un cero**, y `AdminHeader` lo pinta
+ * como «—» justamente para no decir «no hay ninguna suspendida» cuando lo que
+ * pasa es que no se pudo preguntar.
+ */
+function contar(
+  api: ReturnType<typeof createServerApiClient>,
+  ruta: string,
+): Promise<number | null> {
+  return api
+    .get<AdminUserPage>(ruta)
+    .then((respuesta) => respuesta.total)
+    .catch(() => null);
 }

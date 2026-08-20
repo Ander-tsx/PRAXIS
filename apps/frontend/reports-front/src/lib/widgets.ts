@@ -24,6 +24,8 @@
  * no se añade: un 400 sin explicación al aceptar una propuesta del asistente se
  * lee como que el asistente falló.
  */
+import type { VistaMini } from '@/components/molecules/MiniGrafo';
+
 export const MAX_WIDGETS = 30;
 
 /** Los gráficos que se pueden poner en el lienzo. Espejo de `ReportWidgetKind`. */
@@ -36,13 +38,43 @@ export const TIPOS_WIDGET = [
   'ciclo',
   'prediccion',
   'personas',
+  'dinamica',
+  'tiempo_por_columna',
   'generado',
 ] as const;
 
 export type TipoWidget = (typeof TIPOS_WIDGET)[number];
 
 /** Espejo de `ReportChartShape`. */
-export type FormaGrafico = 'barras' | 'barras_horizontales' | 'dona' | 'lineas' | 'area_apilada';
+export type FormaGrafico =
+  | 'barras'
+  | 'barras_horizontales'
+  | 'dona'
+  | 'lineas'
+  | 'area_apilada'
+  | 'histograma'
+  | 'barras_apiladas'
+  | 'barras_divergentes'
+  | 'mapa_calor';
+
+/**
+ * Las dimensiones de un cruce. Espejo de `REPORT_CROSS_DIMENSIONS`.
+ *
+ * ⚠️ Las cadenas **no pueden desviarse**: son las que viajan en el `include` del
+ * paquete (`matrix:etiqueta:prioridad`) y las que valida el DTO. Una que no
+ * exista allí vuelve como 400, no como error de compilación.
+ */
+export type DimensionCruce = 'columna' | 'prioridad' | 'etiqueta' | 'persona';
+
+export const DIMENSIONES_CRUCE: DimensionCruce[] = ['columna', 'prioridad', 'etiqueta', 'persona'];
+
+/** Cómo se llama cada dimensión en la pantalla. */
+export const DIMENSIONES: Record<DimensionCruce, string> = {
+  columna: 'Columna',
+  prioridad: 'Prioridad',
+  etiqueta: 'Etiqueta',
+  persona: 'Persona',
+};
 
 /** Espejo de `ReportMetric`. */
 export type Metrica =
@@ -55,7 +87,16 @@ export type Metrica =
   | 'paradas_por_columna'
   | 'flujo_por_columna'
   | 'cierres_por_semana'
-  | 'creadas_por_semana';
+  | 'creadas_por_semana'
+  | 'reaperturas_por_columna'
+  | 'rotacion_por_tarea'
+  | 'volatilidad_por_tarea'
+  | 'cambios_de_prioridad'
+  | 'tiempo_en_columna'
+  | 'espera_actual_por_columna'
+  | 'distribucion_de_entrega'
+  | 'entradas_contra_cierres'
+  | 'cruce';
 
 /** La parametrización de un gráfico a medida. Espejo de `ReportChartSpec`. */
 export interface EspecificacionGrafico {
@@ -64,6 +105,9 @@ export interface EspecificacionGrafico {
   dias?: number;
   soloVencidas?: boolean;
   topN?: number;
+  /** Solo en `cruce`, y ahí las dos son obligatorias. */
+  agruparPor?: DimensionCruce;
+  partirPor?: DimensionCruce;
   titulo: string;
 }
 
@@ -88,10 +132,29 @@ export interface Widget {
  * eso. Quien tenga puesta la instantánea y nada más no paga el recorrido del
  * historial que necesitan los tiempos y la predicción.
  */
-export type Informe = 'snapshot' | 'flow' | 'cycle' | 'forecast' | 'people' | 'blocked' | 'weekly';
+export type Informe =
+  | 'snapshot'
+  | 'flow'
+  | 'cycle'
+  | 'forecast'
+  | 'people'
+  | 'blocked'
+  | 'weekly'
+  | 'dynamics'
+  | 'columnTime';
 
 export interface EntradaDelCatalogo {
   titulo: string;
+  /**
+   * La forma con la que se reconoce en el catálogo.
+   *
+   * ⚠️ **No es la forma con la que se dibuja**, aunque casi siempre coincida: es
+   * lo que hace que la tarjeta se identifique de un vistazo. `resumen` y `ciclo`
+   * son cifras, `tiempos` es una nube de puntos y `personas` una lista — ninguna
+   * de las tres cabe en `FormaGrafico`, que es el conjunto cerrado del
+   * constructor. Ver `MiniGrafo`.
+   */
+  vista: VistaMini;
   /** La frase que dice qué mide. Obligatoria, como en `ChartCard`. */
   descripcion: string;
   informes: Informe[];
@@ -115,6 +178,7 @@ export interface EntradaDelCatalogo {
 export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   resumen: {
     titulo: 'Resumen',
+    vista: 'cifras',
     descripcion: 'Tareas, abiertas, vencidas y avance del checklist, en cuatro cifras.',
     informes: ['snapshot'],
     w: 12,
@@ -125,6 +189,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   por_columna: {
     titulo: 'Dónde está el trabajo',
+    vista: 'barras',
     descripcion: 'Cuántas tareas hay ahora mismo en cada columna del tablero.',
     informes: ['snapshot'],
     w: 6,
@@ -135,6 +200,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   por_prioridad: {
     titulo: 'Reparto por prioridad',
+    vista: 'dona',
     descripcion: 'Si casi todo es urgente, en la práctica no hay prioridades.',
     informes: ['snapshot'],
     w: 6,
@@ -145,6 +211,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   flujo: {
     titulo: 'Flujo acumulado',
+    vista: 'area_apilada',
     descripcion: 'Cuántas tareas hay en cada columna, día a día.',
     informes: ['flow'],
     w: 12,
@@ -155,6 +222,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   tiempos: {
     titulo: 'Cuánto tarda una tarea',
+    vista: 'dispersion',
     descripcion: 'De crear a cerrar. Cada punto es una tarea; las líneas, la mediana y el p85.',
     informes: ['cycle'],
     w: 12,
@@ -165,6 +233,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   ciclo: {
     titulo: 'Tiempo de ciclo',
+    vista: 'cifras',
     descripcion: 'Del primer movimiento a cerrar: lo que tarda el trabajo una vez empieza.',
     informes: ['cycle'],
     w: 6,
@@ -175,6 +244,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   prediccion: {
     titulo: 'Cuándo estaría vacío el tablero',
+    vista: 'lineas',
     descripcion: 'Simulación sobre el ritmo de las últimas semanas, no sobre estimaciones.',
     informes: ['forecast'],
     w: 6,
@@ -185,6 +255,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
   },
   personas: {
     titulo: 'Cómo está repartido el trabajo',
+    vista: 'lista',
     descripcion: 'Carga y flujo de cada persona.',
     informes: ['people'],
     w: 12,
@@ -193,9 +264,34 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
     minH: 6,
     repetible: false,
   },
+  dinamica: {
+    titulo: 'Retrabajo, rotación y volatilidad',
+    vista: 'cifras',
+    descripcion:
+      'Cuánto de lo cerrado se vuelve a abrir, por cuántas manos pasa una tarea y cuánto baila su prioridad.',
+    informes: ['dynamics'],
+    w: 12,
+    h: 6,
+    minW: 6,
+    minH: 5,
+    repetible: false,
+  },
+  tiempo_por_columna: {
+    titulo: 'Dónde espera el trabajo',
+    vista: 'barras_horizontales',
+    descripcion:
+      'Cuánto tiempo pasa una tarea en cada columna. El ciclo dice cuánto tarda; esto dice dónde espera.',
+    informes: ['columnTime'],
+    w: 12,
+    h: 8,
+    minW: 6,
+    minH: 6,
+    repetible: false,
+  },
   generado: {
-    titulo: 'Gráfico a medida',
-    descripcion: 'El que pediste al asistente.',
+    titulo: 'Grafo a medida',
+    vista: 'barras',
+    descripcion: 'El que montaste tú o te propuso PRAX.',
     informes: [],
     w: 6,
     h: 7,
@@ -212,7 +308,7 @@ export const CATALOGO: Record<TipoWidget, EntradaDelCatalogo> = {
  * qué agregado come, y ese mapa es la garantía de que **ninguno necesita una
  * consulta que no exista**. Si una métrica no está aquí, no se puede pintar.
  */
-export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
+export const INFORME_DE_METRICA: Record<Metrica, Informe | null> = {
   tareas_por_columna: 'snapshot',
   tareas_por_prioridad: 'snapshot',
   tareas_por_etiqueta: 'snapshot',
@@ -223,6 +319,21 @@ export const INFORME_DE_METRICA: Record<Metrica, Informe> = {
   flujo_por_columna: 'flow',
   cierres_por_semana: 'weekly',
   creadas_por_semana: 'weekly',
+  reaperturas_por_columna: 'dynamics',
+  rotacion_por_tarea: 'dynamics',
+  volatilidad_por_tarea: 'dynamics',
+  cambios_de_prioridad: 'dynamics',
+  tiempo_en_columna: 'columnTime',
+  espera_actual_por_columna: 'columnTime',
+  distribucion_de_entrega: 'cycle',
+  entradas_contra_cierres: 'weekly',
+  /**
+   * ⚠️ **El cruce no come de un informe fijo**, y por eso vale `null`: su parte
+   * del paquete lleva las dos dimensiones dentro del nombre
+   * (`matrix:etiqueta:prioridad`), así que dos cruces distintos son dos partes
+   * distintas. Lo resuelve `partesNecesarias`, no este mapa.
+   */
+  cruce: null,
 };
 
 export function informesNecesarios(widgets: Widget[]): Set<Informe> {
@@ -235,6 +346,141 @@ export function informesNecesarios(widgets: Widget[]): Set<Informe> {
     }
   }
   return necesarios;
+}
+
+/**
+ * El nombre interno de un informe → la clave que entiende el endpoint.
+ *
+ * Difieren en dos, y por eso el mapa existe: dentro se llaman `cycle` y
+ * `columnTime`, y las rutas los exponen como `cycle-time` y `column-time`. Sin
+ * esta traducción, pedir los tiempos devolvía una clave que nadie leía y la
+ * tarjeta salía vacía **sin ningún error**.
+ */
+export const PARTE_DE_INFORME: Record<Informe, string> = {
+  snapshot: 'snapshot',
+  flow: 'flow',
+  cycle: 'cycle-time',
+  forecast: 'forecast',
+  people: 'people',
+  blocked: 'blocked',
+  weekly: 'weekly',
+  dynamics: 'dynamics',
+  columnTime: 'column-time',
+};
+
+/** La clave del paquete que corresponde a un cruce. */
+export function parteDeCruce(grafico: EspecificacionGrafico): string | null {
+  if (grafico.metrica !== 'cruce' || !grafico.agruparPor || !grafico.partirPor) return null;
+  return `matrix:${grafico.agruparPor}:${grafico.partirPor}`;
+}
+
+/**
+ * Las claves del paquete que hay que pedir para pintar este lienzo.
+ *
+ * ## Por qué no basta con `informesNecesarios`
+ *
+ * Porque desde el cruce, **una métrica puede necesitar una parte distinta según
+ * cómo esté parametrizada**: dos cruces con dimensiones distintas son dos
+ * agregados distintos, y los dos se llaman «cruce». El `include` los distingue
+ * metiéndoles las dimensiones dentro del nombre, así que la parte no se puede
+ * deducir de la métrica sola — hace falta el widget entero.
+ *
+ * La instantánea entra siempre y va la primera: es la única que sabe si el
+ * historial de este proyecto está fabricado, y ese aviso no puede depender de
+ * qué gráficos tenga puesto cada cual. Es además la más barata.
+ *
+ * ⚠️ **Se deduplica**, y hace falta: dos gráficos del mismo cruce en el mismo
+ * lienzo pedirían dos veces el mismo agregado, y el `include` repetido lo
+ * calcularía dos veces al otro lado.
+ */
+export function partesNecesarias(widgets: Widget[]): string[] {
+  const partes = new Set<string>(['snapshot']);
+
+  for (const informe of informesNecesarios(widgets)) {
+    partes.add(PARTE_DE_INFORME[informe] ?? informe);
+  }
+  for (const widget of widgets) {
+    const cruce = widget.grafico ? parteDeCruce(widget.grafico) : null;
+    if (cruce) partes.add(cruce);
+  }
+
+  return [...partes];
+}
+
+/**
+ * La disposición con la que arranca un lienzo que **nunca se ha guardado**.
+ *
+ * ## ⚠️ Esto contradice una decisión escrita, y por eso se explica entera
+ *
+ * `CanvasVacio` dice, con razón, que **no se rellena con un lienzo por
+ * defecto**: poner los cinco gráficos de antes «para que no esté vacío»
+ * devolvía el problema que el lienzo vino a resolver — tres tarjetas
+ * disculpándose («no hay suficientes datos», «faltan 10 tareas cerradas») en la
+ * primera pantalla que ve alguien.
+ *
+ * Ese argumento sigue siendo cierto **para aquellos cinco**. Lo que no se
+ * sostiene es la conclusión de que entonces no haya ninguno: un proyecto con 186
+ * tareas y dos meses de historial abría en blanco, y una pantalla en blanco con
+ * un catálogo al lado tampoco es una buena primera impresión.
+ *
+ * La salida es la que hace falsas las dos objeciones a la vez: **solo entran los
+ * gráficos que salen de `snapshot`**, que es el único informe que no necesita
+ * historial —es una foto del momento— y el único que se pide siempre. Ninguno de
+ * los tres puede disculparse por falta de datos, porque si el proyecto tiene
+ * tareas, los tres tienen algo que enseñar.
+ *
+ * Y no cuesta ni una petición más: `snapshot` ya viajaba en el paquete.
+ *
+ * ## Sigue siendo tuyo
+ *
+ * No se guarda al pintarlo. Es lo que se ve la primera vez; en cuanto alguien
+ * mueve, quita o añade algo, se guarda su versión y esto no vuelve a aparecer —
+ * incluida la versión vacía, que es por qué el `actualizadoEn` del lienzo importa
+ * más que su número de widgets.
+ */
+/**
+ * 🔴 **Los ids del lienzo de partida son UUID, y tienen que serlo.**
+ *
+ * Eran `defecto-resumen`, `defecto-columna` y `defecto-prioridad`, que se leen
+ * mejor y **rompían el guardado**: `ReportLayoutDto` valida cada `id` con
+ * `@IsUUID`, así que el primer arrastre sobre un lienzo de partida respondía
+ * `400 widgets.0.id must be a UUID`, la disposición volvía atrás sola y la
+ * pantalla decía «Validation failed». No aparecía al abrir —el lienzo se pinta
+ * sin guardar nada— sino al mover el primer gráfico.
+ *
+ * Se descubrió ejecutándolo contra el backend real; ni el typecheck ni
+ * `next build` pueden ver esto, porque los dos lados son `string`.
+ *
+ * Son constantes y no `crypto.randomUUID()` a propósito: esto se ejecuta en el
+ * servidor en cada carga, y con ids nuevos cada vez, dos pestañas abiertas del
+ * mismo proyecto guardarían dos lienzos distintos y el último ganaría.
+ */
+const ID_RESUMEN = '00000000-0000-4000-8000-000000000001';
+const ID_COLUMNA = '00000000-0000-4000-8000-000000000002';
+const ID_PRIORIDAD = '00000000-0000-4000-8000-000000000003';
+
+export function lienzoPorDefecto(): Widget[] {
+  const alto = (tipo: TipoWidget) => CATALOGO[tipo].h;
+
+  return [
+    { id: ID_RESUMEN, tipo: 'resumen', x: 0, y: 0, w: 12, h: alto('resumen') },
+    {
+      id: ID_COLUMNA,
+      tipo: 'por_columna',
+      x: 0,
+      y: alto('resumen'),
+      w: 6,
+      h: alto('por_columna'),
+    },
+    {
+      id: ID_PRIORIDAD,
+      tipo: 'por_prioridad',
+      x: 6,
+      y: alto('resumen'),
+      w: 6,
+      h: alto('por_prioridad'),
+    },
+  ];
 }
 
 /** Los tipos fijos que ya están puestos, para no ofrecerlos otra vez. */
@@ -273,5 +519,281 @@ export function nuevoWidget(
 
 /** Qué se pinta en la cabecera de un `generado`, que no tiene título fijo. */
 export function tituloDe(widget: Widget): string {
-  return widget.grafico?.titulo ?? CATALOGO[widget.tipo]?.titulo ?? 'Gráfico';
+  return widget.grafico?.titulo ?? CATALOGO[widget.tipo]?.titulo ?? 'Grafo';
+}
+
+/* ─── El conjunto cerrado de los gráficos a medida ─────────────────────────
+ *
+ * Espejo de `REPORT_METRICS` y `validarGrafico` en
+ * `@praxis/contracts/reports/report-widget.ts`, que es donde está el porqué de
+ * cada campo.
+ *
+ * ⚠️ **Son dos copias y hay que mantenerlas a la par.** El frontend no depende
+ * de los contratos —son un paquete de servidor con `class-validator` dentro, y
+ * arrastrarlo al navegador metería los decoradores y `reflect-metadata` en el
+ * bundle— así que esta duplicación es el precio, el mismo que ya se paga con
+ * `TipoWidget`, `FormaGrafico` y `Metrica` unas líneas más arriba.
+ *
+ * Lo que **no** es duplicación innecesaria: validar aquí además de allí. Es la
+ * regla del repo —«valida en el cliente igualmente: el mensaje llega antes y
+ * marca el campo»— y aquí tiene un motivo extra, que el constructor **se apoya
+ * en el catálogo para no ofrecer lo imposible**. Un desplegable de formas que
+ * enseñe «dona» para una serie temporal es un 400 esperando a que alguien lo
+ * pulse.
+ */
+
+/** Qué admite cada métrica. Espejo de `ReportMetricSpec`. */
+export interface EspecificacionDeMetrica {
+  formas: FormaGrafico[];
+  /**
+   * ⚠️ Las de `snapshot` **no** aceptan rango: son una foto del momento, y un
+   * «últimos 30 días» sobre ellas devolvería el mismo número con una etiqueta
+   * que miente.
+   */
+  aceptaRango: boolean;
+  aceptaSoloVencidas: boolean;
+  aceptaTopN: boolean;
+  etiqueta: string;
+  /** Qué mide, para el constructor. No está en el contrato: es solo de aquí. */
+  descripcion: string;
+}
+
+const CATEGORICA: FormaGrafico[] = ['barras', 'barras_horizontales', 'dona'];
+const TEMPORAL: FormaGrafico[] = ['lineas', 'area_apilada'];
+/**
+ * Una distribución admite el histograma **además** de las barras normales.
+ *
+ * No la dona ni las horizontales: una distribución sin eje pierde el orden, y
+ * en una distribución el orden **es** el dato.
+ */
+const DISTRIBUCION: FormaGrafico[] = ['histograma', 'barras'];
+/** Las dos que saben dibujar dos dimensiones a la vez. */
+const CRUZADA: FormaGrafico[] = ['mapa_calor', 'barras_apiladas'];
+
+export const METRICAS: Record<Metrica, EspecificacionDeMetrica> = {
+  tareas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas por columna',
+    descripcion: 'Dónde está el trabajo ahora mismo.',
+  },
+  tareas_por_prioridad: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas por prioridad',
+    descripcion: 'Si casi todo es urgente, no hay prioridades.',
+  },
+  tareas_por_etiqueta: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas por etiqueta',
+    descripcion: 'De qué va el trabajo abierto.',
+  },
+  carga_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Carga por persona',
+    descripcion: 'Cuánto lleva cada cual ahora.',
+  },
+  cerradas_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas cerradas por persona',
+    descripcion: 'Reparto de lo terminado. No es una clasificación.',
+  },
+  vencidas_por_persona: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: true,
+    etiqueta: 'Tareas vencidas por persona',
+    descripcion: 'Dónde se acumulan los incumplimientos de fecha.',
+  },
+  paradas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: true,
+    aceptaSoloVencidas: true,
+    aceptaTopN: false,
+    etiqueta: 'Tareas paradas, por columna',
+    descripcion: 'En qué columna se atasca el trabajo.',
+  },
+  flujo_por_columna: {
+    formas: TEMPORAL,
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Flujo acumulado por columna',
+    descripcion: 'Cada columna como una banda, día a día.',
+  },
+  cierres_por_semana: {
+    formas: [...TEMPORAL, 'barras'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas cerradas por semana',
+    descripcion: 'El ritmo de entrega, semana a semana.',
+  },
+  creadas_por_semana: {
+    formas: [...TEMPORAL, 'barras'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tareas creadas por semana',
+    descripcion: 'Cuánto trabajo entra. Con lo anterior, si el tablero crece.',
+  },
+  /* ─── Los tres de R9.1: eventos que ya se guardaban y nadie miraba ────── */
+  reaperturas_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Reaperturas por columna',
+    descripcion: 'A dónde vuelve lo que se dio por cerrado.',
+  },
+  rotacion_por_tarea: {
+    formas: DISTRIBUCION,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Manos por las que pasa una tarea',
+    descripcion: 'Cuántas tareas pasaron por una persona, por dos, por tres…',
+  },
+  volatilidad_por_tarea: {
+    formas: DISTRIBUCION,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cambios de prioridad por tarea',
+    descripcion: 'Cuántas veces se le cambia la prioridad a una misma tarea.',
+  },
+  cambios_de_prioridad: {
+    formas: [...CATEGORICA, 'barras_divergentes'],
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Hacia qué prioridad se mueve el trabajo',
+    descripcion: 'A qué prioridad acaban llegando las tareas cuando se les cambia.',
+  },
+  /* ─── R9.2: dónde espera el trabajo ───────────────────────────────────── */
+  tiempo_en_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tiempo mediano en cada columna',
+    descripcion: 'Dónde se va el tiempo, no solo cuánto tarda el conjunto.',
+  },
+  espera_actual_por_columna: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Espera actual en cada columna',
+    descripcion: 'Lo que llevan ahora mismo las tareas abiertas donde están.',
+  },
+  /* ─── R9.3: las formas que faltaban ───────────────────────────────────── */
+  distribucion_de_entrega: {
+    formas: DISTRIBUCION,
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Distribución del tiempo de entrega',
+    descripcion: 'Un p50 y un p85 esconden si hay dos poblaciones. Esto no.',
+  },
+  entradas_contra_cierres: {
+    formas: ['barras_divergentes'],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Entradas contra cierres',
+    descripcion: 'Lo que entra arriba y lo que sale abajo, semana a semana.',
+  },
+  cruce: {
+    formas: CRUZADA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cruce de dos dimensiones',
+    descripcion: 'De lo de frontend, cuánto es urgente. Dos ejes en vez de uno.',
+  },
+};
+
+/** Cómo se llama cada forma en la pantalla. */
+export const FORMAS: Record<FormaGrafico, string> = {
+  barras: 'Barras',
+  barras_horizontales: 'Barras horizontales',
+  dona: 'Dona',
+  lineas: 'Líneas',
+  area_apilada: 'Área apilada',
+  histograma: 'Histograma',
+  barras_apiladas: 'Barras apiladas',
+  barras_divergentes: 'Barras divergentes',
+  mapa_calor: 'Mapa de calor',
+};
+
+/**
+ * ⚠️ En `paradas_por_columna`, `dias` **no es una ventana de historial**: es el
+ * umbral de parón, «sin moverse desde hace N días». El constructor cambia el
+ * rótulo por eso; el número viaja igual.
+ */
+export function etiquetaDelRango(metrica: Metrica): string {
+  return metrica === 'paradas_por_columna' ? 'Sin moverse desde hace (días)' : 'Días de historial';
+}
+
+/**
+ * Espejo de `validarGrafico`. Devuelve el motivo, o `null` si vale.
+ *
+ * El backend vuelve a comprobarlo —dos puertas distintas, y ninguna se fía de
+ * que la otra ya miró— así que esto no es la seguridad: es que el mensaje llegue
+ * antes de gastar una petición.
+ */
+export function validarGrafico(grafico: EspecificacionGrafico): string | null {
+  const spec = METRICAS[grafico.metrica];
+  if (!spec) return `La métrica «${grafico.metrica}» no existe`;
+
+  if (!spec.formas.includes(grafico.forma)) {
+    return `«${spec.etiqueta}» no se puede dibujar como ${FORMAS[grafico.forma] ?? grafico.forma}`;
+  }
+  if (grafico.dias !== undefined) {
+    if (!spec.aceptaRango) return `«${spec.etiqueta}» es una foto del momento: no admite rango`;
+    if (!Number.isInteger(grafico.dias) || grafico.dias < 1 || grafico.dias > 365) {
+      return 'El rango va de 1 a 365 días';
+    }
+  }
+  if (grafico.soloVencidas && !spec.aceptaSoloVencidas) {
+    return `«${spec.etiqueta}» no distingue las vencidas`;
+  }
+  if (grafico.topN !== undefined) {
+    if (!spec.aceptaTopN) return `«${spec.etiqueta}» no admite recorte por top N`;
+    if (!Number.isInteger(grafico.topN) || grafico.topN < 2 || grafico.topN > 20) {
+      return 'El top N va de 2 a 20';
+    }
+  }
+  /* El cruce, en los dos sentidos: que lo traiga quien lo necesita y que no lo
+     traiga nadie más. Espejo exacto del contrato. */
+  if (grafico.metrica === 'cruce') {
+    if (!grafico.agruparPor || !grafico.partirPor) {
+      return 'Un cruce necesita las dos dimensiones';
+    }
+    if (grafico.agruparPor === grafico.partirPor) {
+      return 'Las dos dimensiones del cruce tienen que ser distintas';
+    }
+  } else if (grafico.agruparPor !== undefined || grafico.partirPor !== undefined) {
+    return `«${spec.etiqueta}» tiene una sola dimensión: no admite un cruce`;
+  }
+
+  if (!grafico.titulo?.trim()) return 'Falta el título del grafo';
+  if (grafico.titulo.length > 80) return 'El título no puede superar 80 caracteres';
+
+  return null;
 }

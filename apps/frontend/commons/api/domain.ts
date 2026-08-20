@@ -13,7 +13,7 @@ export interface UserProfile {
   lastName: string | null;
   /**
    * Ruta **relativa al gateway** de la foto: `/users/<id>/avatar?v=<epoch>`.
-   * La zona le antepone su propio proxy — ver `hrefDeAvatar`.
+   * La zona le antepone su propio proxy — ver `avatarHref`.
    */
   avatarUrl: string | null;
   /**
@@ -762,6 +762,21 @@ export function personLabel(user: UserProfile): string {
 }
 
 /**
+ * Con qué llamar a alguien cuando se le saluda.
+ *
+ * El nombre de pila, o la parte local del correo si la cuenta aún no tiene
+ * nombre —que es lo normal, porque el registro no lo pide—. Sale de
+ * `personLabel` justamente para heredar esa caída: un «Hola, » a secas es peor
+ * que un «Hola, andres».
+ *
+ * ⚠️ **Solo la primera palabra.** Un saludo con nombre y dos apellidos no suena
+ * a saludo, suena a citación.
+ */
+export function firstNameOf(user: UserProfile): string {
+  return personLabel(user).trim().split(' ')[0] ?? '';
+}
+
+/**
  * Tipos de aviso. Espejo de `NotificationType` en `@praxis/contracts`.
  *
  * Todos describen **algo que ya pasó**. Las invitaciones sin responder no están
@@ -814,27 +829,43 @@ export interface NotificationPage {
   unread: number;
 }
 
-/**
- * El `type` con el que viaja un mensaje de chat por el flujo de avisos.
- *
- * ⚠️ **No está en `NOTIFICATION_TYPES` y no debe estarlo.** Esa lista es espejo
- * del enum de la tabla `notifications`, y un mensaje de chat **no crea fila**:
- * una conversación de cincuenta mensajes serían cincuenta avisos por persona y
- * taparían el que importa. Comparte el flujo SSE —que es lo que hace que suene
- * y salga en pantalla estés donde estés— pero no la bandeja.
- *
- * Espejo de `CHAT_EVENT_TYPE` en `projects-service/src/chat/chat.service.ts`.
+/*
+ * ⚠️ Aquí estaba `CHAT_EVENT_TYPE = 'CHAT_MESSAGE'`, el `type` de texto libre con
+ * el que un mensaje de chat se colaba por el canal de avisos disfrazado de
+ * notificación. Ese sobre ya no existe: los eventos en vivo llevan `tipo` en la
+ * raíz y una unión cerrada, en `commons/realtime/tipos.ts`. La constante se ha
+ * ido con él para que nadie la reintroduzca creyendo que sigue significando algo.
  */
-export const CHAT_EVENT_TYPE = 'CHAT_MESSAGE';
 
 /**
- * Las reacciones que acepta el backend.
+ * Las reacciones que se **ofrecen**, en el orden en que se pintan.
  *
  * Lista **cerrada** y espejo de `CHAT_REACTIONS` en `@praxis/contracts`: el
  * emoji viaja en el cuerpo y acaba en la base, así que dejarlo abierto sería un
  * campo más donde meter lo que sea.
+ *
+ * Cinco y no seis, y estas cinco: el juego anterior —🎉 🚀 👀 😄— eran cuatro
+ * formas de decir que algo te parece bien y **ninguna** de decir que no. Un
+ * selector de reacciones sirve para contestar sin escribir, y contestar incluye
+ * discrepar: sin un 👎, quien no está de acuerdo tiene que escribirlo o
+ * callarse. El orden va de más a menos frecuente y deja el pulgar hacia abajo
+ * en el extremo, lejos del pulgar hacia arriba — son la misma silueta girada y
+ * juntos se pulsan mal.
  */
-export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+export const CHAT_REACTIONS = ['👍', '❤️', '😂', '😮', '👎'] as const;
+
+/**
+ * Las que se **aceptan**, que no son las mismas.
+ *
+ * ⚠️ **Quitar una reacción tiene que seguir funcionando aunque ya no se
+ * ofrezca.** El backend valida el emoji en las dos direcciones, así que al
+ * recortar la lista los 🎉 y 🚀 que ya estaban puestos se habrían quedado
+ * pegados para siempre: el botón daba 400 y no había forma de retirarlos. Los
+ * retirados siguen aquí —y en `CHAT_REACTIONS_ACEPTADAS` de `@praxis/contracts`,
+ * que es quien de verdad valida— pero no salen en ningún selector, así que no
+ * se pueden volver a poner.
+ */
+export const CHAT_REACTIONS_ACEPTADAS = [...CHAT_REACTIONS, '🎉', '👀', '🚀', '😄'] as const;
 
 export type ChatReactionEmoji = (typeof CHAT_REACTIONS)[number];
 
@@ -866,16 +897,54 @@ export interface ChatMessage {
   /** Quién lo fijó, para el «fijado por» de la marca. */
   pinnedById: string | null;
   /**
+   * Si fluye por la conversación general o vive solo dentro de su hilo.
+   *
+   * ⚠️ **No es lo mismo que `replyTo`.** Los dos van con la cita, pero responden
+   * preguntas distintas: `replyTo` dice a quién cita, esto dice **dónde se ve**.
+   * «Responder» desde el compositor principal deja esto en `true` —es un mensaje
+   * normal que además cita a otro—; escribir dentro del panel del hilo lo deja
+   * en `false`.
+   *
+   * El cliente lo necesita desde que los mensajes llegan por el flujo en vivo:
+   * es lo que decide si un mensaje nuevo se inserta en el historial o en el
+   * panel del hilo. Sin esto, una respuesta de hilo aparecía en medio de la
+   * conversación general.
+   */
+  visibleEnChat: boolean;
+  /**
+   * Cuándo se borró, o `null` si el mensaje está vivo.
+   *
+   * ## Un mensaje borrado sigue estando en la lista
+   *
+   * El borrado es **suave**: la fila se queda, con `body` vacío, sin adjuntos y
+   * sin reacciones, y la conversación pinta una lápida —«Mensaje eliminado»— en
+   * su sitio. Antes la fila desaparecía, y eso deja un hueco mudo: quien está
+   * leyendo ve que algo se ha movido y no sabe si alguien borró un mensaje o si
+   * falló la carga.
+   *
+   * ⚠️ **Una lápida no admite ninguna acción**: ni responder, ni reaccionar, ni
+   * fijar, ni editar, ni abrir hilo. `MessageBubble` corta por aquí antes de
+   * pintar la barra, y el backend rechaza las cuatro por su cuenta — la
+   * interfaz no es lo que las impide.
+   */
+  deletedAt: string | null;
+  /**
    * A qué mensaje responde, con lo justo para pintar la cita.
    *
    * `attachments` solo trae el `mimeType`, del primero si hay varios: la cita
    * no enseña el archivo, solo dice qué es cuando el mensaje citado no tiene
    * texto — «📷 Imagen» en vez de un hueco vacío.
+   *
+   * `deletedAt` porque el mensaje citado puede haberse borrado **después** de
+   * que alguien lo respondiera: entonces la cita dice «Mensaje eliminado» en vez
+   * de quedarse en blanco. La respuesta sigue ahí — es de otra persona y sigue
+   * teniendo sentido.
    */
   replyTo: {
     id: string;
     authorId: string;
     body: string;
+    deletedAt: string | null;
     attachments: { mimeType: string }[];
   } | null;
   /** Cuántas respuestas tiene su hilo. Para la marca «N respuestas». */
@@ -910,10 +979,32 @@ export interface ChatAttachment {
 
 /** Lo que devuelve la lista de mensajes, de proyecto o privada. */
 export interface ChatMessagePage {
+  /**
+   * El canal de esta conversación.
+   *
+   * ⚠️ Es con lo que el panel decide si un evento del flujo en vivo le incumbe,
+   * y **no se puede deducir de `items[0].channelId`**: una conversación recién
+   * empezada no tiene ni un mensaje, y sería justo la que se quedaría muda.
+   */
+  channelId: string;
   /** Del más antiguo al más nuevo, que es como se pinta una conversación. */
   items: ChatMessage[];
   /** Queda historial por encima. Lo usa el botón de «ver mensajes anteriores». */
   hasMore: boolean;
+  /**
+   * Solo en `?after=`: el hueco **no cabía entero** y viene recortado.
+   *
+   * ⚠️ Con `true` los `items` **no se pegan** a lo que ya hay: falta lo de en
+   * medio, y pegarlos deja la conversación con un agujero mudo. Hay que recargar
+   * la conversación entera.
+   *
+   * Va aparte de `hasMore` porque significan cosas opuestas: aquel dice que
+   * queda más **hacia arriba** (historial antiguo), este que falta **hacia
+   * abajo** (lo que llegó durante el corte).
+   *
+   * Opcional porque el resto de respuestas no lo traen.
+   */
+  hasMoreAfter?: boolean;
   /** Sin leer de esta persona en este canal. Es lo que pinta la insignia. */
   unread: number;
   /**
@@ -930,7 +1021,19 @@ export interface DirectConversation {
   channelId: string;
   /** Con quién hablas. El perfil se resuelve contra el directorio. */
   peerId: string;
-  ultimo: { body: string; authorId: string; createdAt: string } | null;
+  /**
+   * El último mensaje, para el resumen de la fila.
+   *
+   * `deletedAt` viaja porque un mensaje borrado deja `body` vacío: sin él, la
+   * fila de una conversación cuyo último mensaje se borró se queda **sin
+   * resumen**, que se lee como si la conversación estuviera vacía.
+   */
+  ultimo: {
+    body: string;
+    authorId: string;
+    createdAt: string;
+    deletedAt?: string | null;
+  } | null;
   unread: number;
   muted: boolean;
 }
@@ -952,7 +1055,7 @@ export interface ChatContact {
 /**
  * Lo que devuelve `POST /me/assistant/project-draft`.
  *
- * Espejo de `PlantillaDeProyecto` en `@praxis/contracts`. Está copiado por lo
+ * Espejo de `ProjectTemplate` en `@praxis/contracts`. Está copiado por lo
  * mismo que el resto de este archivo: aquel es un paquete de backend y arrastra
  * `class-validator` y los decoradores de Nest, que no pintan nada en el
  * navegador.
@@ -964,18 +1067,18 @@ export interface ChatContact {
  * IA propone; ejecuta el código que ya existe. Ninguno de estos objetos lleva
  * `id` porque nada de esto existe todavía.
  */
-export interface PlantillaEtiqueta {
+export interface TemplateLabel {
   nombre: string;
   color: LabelColor;
 }
 
-export interface PlantillaRol {
+export interface TemplateRole {
   nombre: string;
   /** Diccionario de booleanos, nunca un array. Trampa 8 de CLAUDE.md. */
   permisos: PermissionMap;
 }
 
-export interface PlantillaColumna {
+export interface TemplateColumn {
   nombre: string;
   /**
    * ⚠️ `success` **no es un color, es un significado**: marca la columna de
@@ -985,49 +1088,49 @@ export interface PlantillaColumna {
   color?: ColumnColor;
 }
 
-export interface PlantillaTablero {
+export interface TemplateBoard {
   nombre: string;
-  columnas: PlantillaColumna[];
+  columnas: TemplateColumn[];
 }
 
-export interface PlantillaEspacio {
+export interface TemplateSpace {
   nombre: string;
-  tableros: PlantillaTablero[];
+  tableros: TemplateBoard[];
 }
 
-export interface PlantillaDeProyecto {
+export interface ProjectTemplate {
   nombre: string;
   descripcion: string;
-  etiquetas: PlantillaEtiqueta[];
-  roles: PlantillaRol[];
-  espacios: PlantillaEspacio[];
+  etiquetas: TemplateLabel[];
+  roles: TemplateRole[];
+  espacios: TemplateSpace[];
   /** Por qué esta estructura y no otra. Lo pinta la pantalla junto al plan. */
   porQue: string;
 }
 
 /** El contador que acompaña al borrador, para pintarlo como hace el chat. */
-export interface PlantillaCuota {
+export interface TemplateQuota {
   plan: string;
   usados: number;
   limite: number;
 }
 
-export interface PlantillaDraftResult {
-  plantilla: PlantillaDeProyecto;
-  cuota: PlantillaCuota;
+export interface TemplateDraftResult {
+  plantilla: ProjectTemplate;
+  cuota: TemplateQuota;
 }
 
 /** Cuánto texto se le pide a quien describe su proyecto. */
-export const PLANTILLA_BRIEF_MIN = 20;
-export const PLANTILLA_BRIEF_MAX = 4000;
+export const TEMPLATE_BRIEF_MIN = 20;
+export const TEMPLATE_BRIEF_MAX = 4000;
 
 /**
  * Lo que devuelve pedir un borrador. Vive aquí, y no junto a la función que lo
  * produce, porque el diálogo es un componente de cliente y aquella es código de
  * servidor: el tipo tiene que poder cruzar esa frontera.
  */
-export interface PlantillaBorradorState {
-  resultado: PlantillaDraftResult | null;
+export interface TemplateDraftState {
+  resultado: TemplateDraftResult | null;
   error: string | null;
   /**
    * La cuota se acabó.
@@ -1040,7 +1143,7 @@ export interface PlantillaBorradorState {
 }
 
 /** Lo que devuelve materializar una plantilla aceptada. */
-export interface PlantillaResultado {
+export interface TemplateResult {
   /** El proyecto **sí** se creó, aunque algo posterior fallara. */
   proyecto: { id: string; name: string; slug: string } | null;
   creado: {
@@ -1062,4 +1165,4 @@ export interface PlantillaResultado {
 }
 
 /** Cuánto puede ocupar un retoque sobre un plan ya propuesto. */
-export const PLANTILLA_AJUSTE_MAX = 1000;
+export const TEMPLATE_TWEAK_MAX = 1000;

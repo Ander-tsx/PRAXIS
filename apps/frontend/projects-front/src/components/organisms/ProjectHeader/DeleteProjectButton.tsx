@@ -42,7 +42,7 @@ interface Line {
  *   diálogo, porque contar tareas obliga a una petición por tablero y sería
  *   trabajo tirado en las visitas donde nadie borra nada.
  * - **Hay que escribir el nombre**, como en GitHub y como ya hace
- *   `PanelDeEntidad` con un espacio o un tablero que no estén vacíos. Aquí es
+ *   `EntityPanel` con un espacio o un tablero que no estén vacíos. Aquí es
  *   **siempre**: un proyecto nunca está lo bastante vacío como para que
  *   preguntar sea ceremonia.
  *

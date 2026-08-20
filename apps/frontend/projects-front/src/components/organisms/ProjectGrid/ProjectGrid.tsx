@@ -1,8 +1,7 @@
-import type { Project, UserProfile } from '@praxis/commons';
+import { type Project, ProjectCard, type UserProfile, projectPath } from '@praxis/commons';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ProjectSearch } from '../ProjectSearch';
-import { ProjectCard } from './ProjectCard';
 
 export interface ProjectGridProps {
   projects: Project[];
@@ -93,12 +92,23 @@ export function ProjectGrid({
               project={project}
               currentUserId={currentUserId}
               equipo={equiposPorProyecto.get(project.id) ?? null}
+              /* Misma zona → la ruta relativa y `next/link`: Next añade
+                 `/projects` solo. Ver §16. */
+              href={projectPath(project)}
+              sameZone
+              gatewayPath="/projects/api/gateway"
             />
           ))}
 
           {/* Cierra la rejilla. Con dos proyectos y tres columnas, la celda
-              vacía estaba ahí de todas formas; así dice algo. */}
-          {crearSlot && <li>{crearSlot}</li>}
+              vacía estaba ahí de todas formas; así dice algo.
+
+              El `flex` no es decorativo: `ProjectCard` entra en la rejilla como
+              celda y la estira el propio grid, pero esta va envuelta en un `li`,
+              así que quien se estira es el `li` y el botón de dentro se quedaba
+              con su altura. Con esto el botón hereda la de la fila y las
+              tarjetas miden todas lo mismo. */}
+          {crearSlot && <li className="flex">{crearSlot}</li>}
         </ul>
       )}
     </div>

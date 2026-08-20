@@ -3,6 +3,7 @@ import { MessagePattern, Payload } from '@nestjs/microservices';
 
 import type { AssistantPlanName } from '@praxis/contracts';
 import { AssistantService } from './assistant.service';
+import { AttachmentsService } from './attachments.service';
 
 /**
  * ⚠️ **Ninguna comprueba permisos.** Lo hizo el gateway contra el `projectId` de
@@ -18,7 +19,10 @@ import { AssistantService } from './assistant.service';
  */
 @Controller()
 export class AssistantController {
-  constructor(private readonly assistant: AssistantService) {}
+  constructor(
+    private readonly assistant: AssistantService,
+    private readonly adjuntos: AttachmentsService,
+  ) {}
 
   @MessagePattern({ cmd: 'assistant_chat' })
   async chat(
@@ -29,6 +33,7 @@ export class AssistantController {
       message: string;
       conversationId?: string;
       history?: { role: string; text: string }[];
+      attachmentIds?: string[];
       permisos: Record<string, boolean>;
       miembros: { userId: string; nombre: string }[];
     },
@@ -126,22 +131,22 @@ export class AssistantController {
    * es de quien la escribió, y `canViewReports` —lo único que comprueba el
    * gateway— es un permiso del proyecto, no de la conversación. Sin esto, un
    * compañero con el mismo rol leería estos hilos.
+   *
+   * ⚠️ **Y ninguno lleva ya `projectId`.** Desde que el proyecto es un foco
+   * cambiable y no lo que define la conversación, filtrar por él daba 404 al
+   * pedir un hilo que había pasado por otro — que es justo el gesto que todo esto
+   * viene a permitir. El `userId` sigue siendo la clave de acceso, que es la que
+   * de verdad protegía algo.
    */
   @MessagePattern({ cmd: 'assistant_conversations' })
-  conversaciones(@Payload() dto: { userId: string; projectId: string }) {
-    return this.assistant.listarConversaciones(dto.userId, dto.projectId);
+  conversaciones(@Payload() dto: { userId: string }) {
+    return this.assistant.listarConversaciones(dto.userId);
   }
 
   @MessagePattern({ cmd: 'assistant_conversation' })
-  async conversacion(
-    @Payload() dto: { userId: string; projectId: string; conversationId: string },
-  ) {
+  async conversacion(@Payload() dto: { userId: string; conversationId: string }) {
     try {
-      return await this.assistant.detalleConversacion(
-        dto.userId,
-        dto.projectId,
-        dto.conversationId,
-      );
+      return await this.assistant.detalleConversacion(dto.userId, dto.conversationId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }
@@ -150,24 +155,19 @@ export class AssistantController {
   @MessagePattern({ cmd: 'assistant_conversation_rename' })
   async renombrar(
     @Payload()
-    dto: { userId: string; projectId: string; conversationId: string; title: string },
+    dto: { userId: string; conversationId: string; title: string },
   ) {
     try {
-      return await this.assistant.renombrarConversacion(
-        dto.userId,
-        dto.projectId,
-        dto.conversationId,
-        dto.title,
-      );
+      return await this.assistant.renombrarConversacion(dto.userId, dto.conversationId, dto.title);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }
   }
 
   @MessagePattern({ cmd: 'assistant_conversation_delete' })
-  async borrar(@Payload() dto: { userId: string; projectId: string; conversationId: string }) {
+  async borrar(@Payload() dto: { userId: string; conversationId: string }) {
     try {
-      return await this.assistant.borrarConversacion(dto.userId, dto.projectId, dto.conversationId);
+      return await this.assistant.borrarConversacion(dto.userId, dto.conversationId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }
@@ -180,6 +180,44 @@ export class AssistantController {
   ) {
     try {
       return await this.assistant.resolverPropuesta(dto.userId, dto.proposalId, dto.status);
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  /**
+   * Los adjuntos de PRAX.
+   *
+   * ⚠️ **No llevan `projectId` y no lo necesitan.** Un archivo se sube antes de
+   * escribir el mensaje —cuando puede que no haya ni conversación, ni proyecto
+   * elegido— y es de quien lo sube. `uploadedBy` es lo único que lo protege, y
+   * es lo que filtra el servicio en las tres.
+   */
+  @MessagePattern({ cmd: 'assistant_attachment_create' })
+  async crearAdjunto(
+    @Payload()
+    dto: { userId: string; filename: string; mimeType: string; content: string },
+  ) {
+    try {
+      return await this.adjuntos.crear(dto);
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  @MessagePattern({ cmd: 'assistant_attachment_delete' })
+  async borrarAdjunto(@Payload() dto: { userId: string; attachmentId: string }) {
+    try {
+      return await this.adjuntos.descartar(dto.userId, dto.attachmentId);
+    } catch (error) {
+      throw AssistantService.comoRpc(error);
+    }
+  }
+
+  @MessagePattern({ cmd: 'assistant_attachment_get_content' })
+  async contenidoDeAdjunto(@Payload() dto: { userId: string; attachmentId: string }) {
+    try {
+      return await this.adjuntos.contenido(dto.userId, dto.attachmentId);
     } catch (error) {
       throw AssistantService.comoRpc(error);
     }

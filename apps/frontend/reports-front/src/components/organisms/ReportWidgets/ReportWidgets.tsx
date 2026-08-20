@@ -3,7 +3,9 @@ import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/orga
 import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
+  type ReportColumnTime,
   type ReportCycleTime,
+  type ReportDynamics,
   type ReportFlow,
   type ReportForecast,
   type ReportPerson,
@@ -396,6 +398,291 @@ export function PersonasWidget({
           La <strong>mediana</strong> corresponde a sus tareas cerradas, de creación a cierre. Con
           pocas tareas cerradas un caso atípico la desplaza entera: conviene leerla junto a la
           columna «cerradas».
+        </p>
+      </HowToRead>
+    </div>
+  );
+}
+
+/* ─── Retrabajo, rotación y volatilidad ────────────────────────────────── */
+
+/**
+ * Los tres números que salían de eventos que ya se guardaban y **no miraba
+ * nadie**: `REOPENED`, `ASSIGNED`/`UNASSIGNED` y `PRIORITY_CHANGED`.
+ *
+ * ## Por qué los tres en una tarjeta
+ *
+ * Porque contestan a la misma pregunta desde tres sitios: **cuánto de este
+ * trabajo es volver sobre lo hecho**. Una tarea que se reabre, otra que pasa por
+ * cuatro manos y otra a la que le cambian la prioridad tres veces son el mismo
+ * síntoma —algo no estaba definido cuando se empezó— y separarlas en tres
+ * tarjetas obligaría a ponerlas juntas a mano para poder leerlo.
+ *
+ * ## ⚠️ Y por qué cada cifra lleva su lista de tareas debajo
+ *
+ * Un «12 % de retrabajo» no se puede accionar. «Estas tres tareas se han
+ * reabierto cuatro veces» sí. Es la misma decisión que ya tomó el inventario del
+ * asistente: un número agregado sin los objetos que lo componen obliga a
+ * adivinar dónde mirar.
+ *
+ * ## ⚠️ El aviso de «desde cuándo» no es opcional
+ *
+ * Todo esto empieza donde empieza la captura del historial (§25). Un 0 % de
+ * retrabajo puede ser un equipo impecable o dos semanas de datos, y el número no
+ * distingue. Por eso `desde` se pinta siempre que existe.
+ */
+export function DinamicaWidget({ dynamics }: { dynamics: ReportDynamics }) {
+  const { retrabajo, rotacion, volatilidad } = dynamics;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <BloqueDinamica
+          value={retrabajo.porcentaje === null ? '—' : `${Math.round(retrabajo.porcentaje)}%`}
+          label="Retrabajo"
+          tone={retrabajo.porcentaje !== null && retrabajo.porcentaje >= 15 ? 'warning' : 'muted'}
+          detalle={
+            retrabajo.tareasCerradas === 0
+              ? 'Todavía no se ha cerrado ninguna tarea con historial.'
+              : `${retrabajo.tareasReabiertas} de ${retrabajo.tareasCerradas} tareas cerradas se volvieron a abrir.`
+          }
+          filas={retrabajo.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.veces}×`,
+          }))}
+        />
+
+        <BloqueDinamica
+          value={rotacion.tareasQueRotan}
+          label="Tareas que rotan"
+          tone={rotacion.tareasQueRotan > 0 ? 'warning' : 'muted'}
+          detalle={`Pasaron por más de una persona. ${rotacion.asignaciones} asignaciones y ${rotacion.desasignaciones} retiradas en total.`}
+          filas={rotacion.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.manos} personas`,
+          }))}
+        />
+
+        <BloqueDinamica
+          value={volatilidad.tareasVolatiles}
+          label="Prioridad inestable"
+          tone={volatilidad.tareasVolatiles > 0 ? 'warning' : 'muted'}
+          detalle={`Tareas con más de un cambio de prioridad, sobre ${volatilidad.cambios} cambios registrados.`}
+          filas={volatilidad.top.map((fila) => ({
+            id: fila.taskId,
+            titulo: fila.titulo,
+            cifra: `${fila.cambios} cambios`,
+          }))}
+        />
+      </div>
+
+      {dynamics.desde && (
+        <p className="font-sans text-xs text-text-disabled">
+          Se mide desde el {new Date(dynamics.desde).toLocaleDateString('es-ES')}, que es cuando
+          empieza el historial de este proyecto. Lo anterior no está registrado y no se puede
+          reconstruir.
+        </p>
+      )}
+
+      <HowToRead>
+        <p>
+          <strong>Retrabajo</strong> es qué porcentaje de las tareas cerradas se volvió a abrir. No
+          es un error en sí: significa que lo que se dio por terminado no lo estaba, y suele apuntar
+          a que falta acordar cuándo algo está hecho.
+        </p>
+        <p>
+          <strong>Rotación</strong> cuenta personas distintas, no veces: asignar y quitar a la misma
+          persona tres veces sigue siendo una. Una tarea que pasa por cuatro manos casi nunca es un
+          problema de personas, es una tarea mal definida.
+        </p>
+        <p>
+          <strong>Prioridad inestable</strong> son las tareas a las que se les cambió la prioridad
+          más de una vez. Con muchas, la prioridad ha dejado de ser una decisión y se ha convertido
+          en una reacción.
+        </p>
+        <p>
+          Los tres se calculan sobre <strong>eventos que ya se guardaban</strong>: no se ha empezado
+          a registrar nada nuevo para esto, así que llegan hasta donde llegue el historial.
+        </p>
+      </HowToRead>
+    </div>
+  );
+}
+
+/** Una de las tres columnas: la cifra, la frase y hasta tres tareas. */
+function BloqueDinamica({
+  value,
+  label,
+  tone,
+  detalle,
+  filas,
+}: {
+  value: number | string;
+  label: string;
+  tone: 'warning' | 'muted';
+  detalle: string;
+  filas: { id: string; titulo: string; cifra: string }[];
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Stat value={value} label={label} tone={tone} />
+      <p className="font-sans text-xs leading-relaxed text-text-secondary">{detalle}</p>
+      {filas.length > 0 && (
+        /* Tres y no diez: la tarjeta tiene que caber en su celda de la
+           cuadrícula, y quien quiera la lista entera la tiene en el tablero.
+           El servidor devuelve diez porque el mismo agregado alimenta al
+           asistente, que sí las usa todas. */
+        <ul className="flex flex-col gap-1">
+          {filas.slice(0, 3).map((fila) => (
+            <li key={fila.id} className="flex items-baseline justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate font-sans text-text-secondary" title={fila.titulo}>
+                {fila.titulo}
+              </span>
+              <span className="shrink-0 tabular-nums font-sans text-text-disabled">
+                {fila.cifra}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ─── Dónde espera el trabajo ──────────────────────────────────────────── */
+
+/**
+ * Tiempo por columna: **dónde** se va el tiempo, no solo cuánto.
+ *
+ * ## Por qué no es un gráfico de barras y ya
+ *
+ * Porque hay dos medidas por columna que solo significan algo juntas: lo que
+ * **suele** costar pasar por ahí —las estancias ya terminadas— y lo que llevan
+ * **ahora** las tareas que están ahí. Un gráfico con las dos superpuestas se lee
+ * como si se pudieran sumar, y no se pueden: una es historia y la otra es un
+ * reloj corriendo.
+ *
+ * Así que va como una lista: una fila por columna, la barra proporcional a la
+ * mediana histórica, y la espera actual escrita al lado con su comparación. Es
+ * la misma forma que ya tiene `PersonasWidget`, y por lo mismo — cuando hay dos
+ * números por fila, la tabla gana al gráfico.
+ *
+ * ## ⚠️ Sale una fila por columna del tablero, aunque no tenga medidas
+ *
+ * Una columna por la que no ha pasado nada dice algo: que ese paso no se usa.
+ * Enseñar solo las que tienen datos dibujaría un tablero que no existe, y la
+ * ausencia no se puede notar.
+ */
+export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColumnTime | null }) {
+  if (!columnTime) {
+    return (
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+        No se pudo cargar el tiempo por columna.
+      </p>
+    );
+  }
+
+  const { columnas, huerfanas } = columnTime;
+  const variosTableros = cuentaTableros(columnas) > 1;
+  /* La escala la marca la columna más lenta, no un máximo fijo: lo que importa
+     es la proporción entre columnas del mismo tablero. */
+  const maximo = Math.max(...columnas.map((columna) => columna.p50Horas ?? 0), 0);
+
+  if (columnas.length === 0) {
+    return (
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+        Este proyecto todavía no tiene columnas.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-3">
+        {columnas.map((columna) => {
+          const p50 = columna.p50Horas ?? 0;
+          const ancho = maximo > 0 ? Math.max(2, (p50 / maximo) * 100) : 0;
+          /* «Lleva más de lo normal» necesita las dos medidas: sin la mediana
+             histórica, un «3 días» no se puede juzgar. Es justo la ventaja
+             sobre el umbral fijo de «lo que está parado». */
+          const envejecida =
+            columna.enCurso > 0 &&
+            columna.enCursoP50Horas !== null &&
+            columna.p50Horas !== null &&
+            columna.enCursoP50Horas > columna.p50Horas;
+
+          return (
+            <li key={columna.columnId} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate font-sans text-sm text-text-primary">
+                  {etiquetaDeColumna(columna, variosTableros)}
+                </span>
+                <span className="shrink-0 tabular-nums font-sans text-sm text-text-secondary">
+                  {formatDuration(columna.p50Horas)}
+                  {columna.p85Horas !== null && (
+                    <span className="text-text-disabled">
+                      {' '}
+                      · p85 {formatDuration(columna.p85Horas)}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              <div className="h-2 w-full overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${ancho}%`, background: tokenColor(columna.color) }}
+                />
+              </div>
+
+              <p className="font-sans text-xs text-text-disabled">
+                {columna.estancias === 0
+                  ? 'Todavía no ha salido de aquí ninguna tarea.'
+                  : `${columna.estancias} ${columna.estancias === 1 ? 'paso medido' : 'pasos medidos'}.`}
+                {columna.enCurso > 0 && (
+                  <>
+                    {' '}
+                    <span className={envejecida ? 'text-warning' : undefined}>
+                      {columna.enCurso} {columna.enCurso === 1 ? 'espera' : 'esperan'} ahora, la
+                      mitad desde hace más de {formatDuration(columna.enCursoP50Horas)}
+                      {envejecida && ' — por encima de lo normal en esta columna'}.
+                    </span>
+                  </>
+                )}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+
+      {huerfanas.estancias > 0 && (
+        <p className="font-sans text-xs text-text-disabled">
+          Otros {huerfanas.estancias} pasos ocurrieron en columnas que ya no existen. No se
+          descuentan del total, pero no tienen barra propia.
+        </p>
+      )}
+
+      <HowToRead>
+        <p>
+          El <strong>tiempo de ciclo</strong> dice cuánto tarda una tarea de principio a fin. Esto
+          dice <strong>dónde</strong> se va ese tiempo, que es lo único de los dos sobre lo que se
+          puede actuar: «doce días» no se arregla, «nueve de los doce en revisión» sí.
+        </p>
+        <p>
+          La barra y el p85 son las estancias que <strong>ya terminaron</strong>: la referencia de
+          esa columna. Lo de después es lo que llevan <strong>ahora</strong> las tareas abiertas que
+          están ahí, y solo se puede juzgar contra la referencia — por eso van en la misma línea.
+        </p>
+        <p>
+          Se cuentan <strong>días naturales</strong>, así que una tarea que entra el viernes por la
+          tarde arrastra el fin de semana. En columnas de paso rápido eso mueve la mediana; en las
+          de días, apenas.
+        </p>
+        <p>
+          Una tarea cerrada <strong>no sigue contando</strong> el tiempo que lleva en la columna de
+          «Hecho»: ahí no espera nada. Y todo esto empieza donde empieza el historial del proyecto.
         </p>
       </HowToRead>
     </div>

@@ -55,6 +55,7 @@ export function UserPlanDialog({ usuario, open, onClose }: UserPlanDialogProps) 
       onClose={onClose}
       size="sm"
       title="Cambiar el plan del asistente"
+      overflowVisible
       description={
         <>
           Cuántas preguntas al mes puede hacerle al asistente{' '}

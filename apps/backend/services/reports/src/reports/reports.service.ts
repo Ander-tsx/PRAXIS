@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, Transport } from '@nestjs/microservices';
+import { type ReportFilters, claveDeFiltros, leerCruce } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 
 import { RedisService } from '../redis/redis.service';
@@ -17,6 +18,7 @@ const REPORT_TTL = 60;
 
 @Injectable()
 export class ReportsService {
+  private readonly log = new Logger(ReportsService.name);
   private readonly tasksClient: ClientProxy;
   private readonly projectsClient: ClientProxy;
 
@@ -54,6 +56,28 @@ export class ReportsService {
     const fresh = await produce();
     await this.redis.set(key, fresh, REPORT_TTL);
     return fresh;
+  }
+
+  /**
+   * Los filtros con la ventana ya metida dentro, que es lo que viaja a tasks.
+   *
+   * `days` y `from` son dos formas de decir «desde cuándo», y tasks-service no
+   * tiene por qué conocer las dos: aquí se resuelven en una. **Manda `from`** —
+   * quien escribió dos fechas hizo una pregunta concreta— y si no viene, se
+   * calcula desde `dias`, que es el caso normal.
+   *
+   * 🔴 **Y esto NO puede entrar en la clave de caché.** El `from` que sale de
+   * `dias` es «ahora menos sesenta días», o sea un instante distinto en cada
+   * llamada: metido en la clave, ningún informe volvería a acertar en Redis
+   * jamás, y el fallo se vería como que la caché «no funciona» sin que nada
+   * fallara. La clave lleva `dias` —que sí es estable— y `claveDeFiltros` sobre
+   * los filtros **tal como llegaron**.
+   */
+  private conVentana(dias: number, filtros?: ReportFilters): ReportFilters {
+    return {
+      ...filtros,
+      from: filtros?.from ?? new Date(Date.now() - dias * 86_400_000).toISOString(),
+    };
   }
 
   /**
@@ -110,10 +134,10 @@ export class ReportsService {
    * **El único informe que no necesita historial**, y por eso el que enseña algo
    * real desde el primer día mientras el resto se acumula.
    */
-  async snapshot(projectId: string) {
-    return this.cached(`reports:${projectId}:snapshot`, async () => {
+  async snapshot(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:snapshot${claveDeFiltros(filtros)}`, async () => {
       const [stats, columns] = await Promise.all([
-        this.ask<any>(this.tasksClient, 'task_stats_snapshot', { projectId }),
+        this.ask<any>(this.tasksClient, 'task_stats_snapshot', { projectId, filtros }),
         this.columnas(projectId),
       ]);
 
@@ -162,13 +186,14 @@ export class ReportsService {
    * pintar la nube de puntos: un percentil solo dice dónde está la línea, y la
    * nube enseña la dispersión, que suele ser la información útil.
    */
-  async cycleTime(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:cycle:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
-
+  async cycleTime(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:cycle:${dias}${claveDeFiltros(filtros)}`, async () => {
       const muestras = await this.ask<
         { taskId: string; completedAt: string; leadHours: number; cycleHours: number | null }[]
-      >(this.tasksClient, 'task_stats_cycle', { projectId, from: desde.toISOString() });
+      >(this.tasksClient, 'task_stats_cycle', {
+        projectId,
+        filtros: this.conVentana(dias, filtros),
+      });
 
       const lead = muestras.map((m) => m.leadHours);
       const cycle = muestras.map((m) => m.cycleHours).filter((h): h is number => h !== null);
@@ -195,15 +220,13 @@ export class ReportsService {
   /**
    * Diagrama de flujo acumulado: cuántas tareas hay en cada columna cada día.
    */
-  async flow(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:flow:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
-
+  async flow(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:flow:${dias}${claveDeFiltros(filtros)}`, async () => {
       const [filas, columns] = await Promise.all([
         this.ask<{ day: string; columnId: string | null; entradas: number; salidas: number }[]>(
           this.tasksClient,
           'task_stats_flow',
-          { projectId, from: desde.toISOString() },
+          { projectId, filtros: this.conVentana(dias, filtros) },
         ),
         this.columnas(projectId),
       ]);
@@ -236,51 +259,63 @@ export class ReportsService {
    * Si no hay historial suficiente **no devuelve una predicción**: devuelve
    * cuánto falta para poder hacerla. Ver `evaluarSuficiencia`.
    */
-  async forecast(projectId: string, dias = DIAS_POR_DEFECTO) {
-    return this.cached(`reports:${projectId}:forecast:${dias}`, async () => {
-      const desde = new Date(Date.now() - dias * 86_400_000);
+  async forecast(projectId: string, dias = DIAS_POR_DEFECTO, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:forecast:${dias}${claveDeFiltros(filtros)}`,
+      async () => {
+        const conVentana = this.conVentana(dias, filtros);
+        /* El principio de la ventana, ya resuelto: hace falta aquí abajo para
+         rellenar los días de cero, y tiene que ser **el mismo** que el que se
+         mandó a tasks o el ritmo saldría dividido entre otro número de días. */
+        const desde = new Date(conVentana.from as string);
 
-      const [muestras, snapshot] = await Promise.all([
-        this.ask<{ completedAt: string }[]>(this.tasksClient, 'task_stats_cycle', {
-          projectId,
-          from: desde.toISOString(),
-        }),
-        this.ask<{ total: number; completed: number }>(this.tasksClient, 'task_stats_snapshot', {
-          projectId,
-        }),
-      ]);
+        const [muestras, snapshot] = await Promise.all([
+          this.ask<{ completedAt: string }[]>(this.tasksClient, 'task_stats_cycle', {
+            projectId,
+            filtros: conVentana,
+          }),
+          /* ⚠️ Aquí van los filtros **sin** la ventana: `pendientes` es cuánto
+           queda por hacer ahora, no cuánto entró en la ventana. Con la ventana
+           puesta, un proyecto viejo con trabajo antiguo pendiente predeciría que
+           está a punto de terminar. */
+          this.ask<{ total: number; completed: number }>(this.tasksClient, 'task_stats_snapshot', {
+            projectId,
+            filtros,
+          }),
+        ]);
 
-      const suficiencia = evaluarSuficiencia(muestras.length, dias);
-      const pendientes = snapshot.total - snapshot.completed;
+        const suficiencia = evaluarSuficiencia(muestras.length, dias);
+        const pendientes = snapshot.total - snapshot.completed;
 
-      if (!suficiencia.suficiente) {
-        return { suficiencia, pendientes, prediccion: null };
-      }
+        if (!suficiencia.suficiente) {
+          return { suficiencia, pendientes, prediccion: null };
+        }
 
-      /* Cierres por día, incluidos **los días de cero**: si se omitieran, el
+        /* Cierres por día, incluidos **los días de cero**: si se omitieran, el
          ritmo saldría inflado —solo se promediarían los días buenos— y la
          predicción sería sistemáticamente optimista. */
-      const porDia = new Map<string, number>();
-      for (let i = 0; i < dias; i++) {
-        porDia.set(new Date(desde.getTime() + i * 86_400_000).toISOString().slice(0, 10), 0);
-      }
-      for (const muestra of muestras) {
-        const dia = muestra.completedAt.slice(0, 10);
-        if (porDia.has(dia)) porDia.set(dia, porDia.get(dia)! + 1);
-      }
+        const porDia = new Map<string, number>();
+        for (let i = 0; i < dias; i++) {
+          porDia.set(new Date(desde.getTime() + i * 86_400_000).toISOString().slice(0, 10), 0);
+        }
+        for (const muestra of muestras) {
+          const dia = muestra.completedAt.slice(0, 10);
+          if (porDia.has(dia)) porDia.set(dia, porDia.get(dia)! + 1);
+        }
 
-      return {
-        suficiencia,
-        pendientes,
-        throughputDiario: {
-          media: [...porDia.values()].reduce((a, b) => a + b, 0) / porDia.size,
-        },
-        prediccion: simularEntrega({
-          throughputDiario: [...porDia.values()],
+        return {
+          suficiencia,
           pendientes,
-        }),
-      };
-    });
+          throughputDiario: {
+            media: [...porDia.values()].reduce((a, b) => a + b, 0) / porDia.size,
+          },
+          prediccion: simularEntrega({
+            throughputDiario: [...porDia.values()],
+            pendientes,
+          }),
+        };
+      },
+    );
   }
 
   /**
@@ -300,43 +335,49 @@ export class ReportsService {
    * `variacion` es `null` cuando la semana pasada fue de cero: dividir entre cero
    * daría «infinito por ciento», y «se pasó de 0 a 3» ya se dice con los totales.
    */
-  async weekly(projectId: string, semanas = 8) {
-    return this.cached(`reports:${projectId}:weekly:${semanas}`, async () => {
-      const filas = await this.ask<{ semana: string; cerradas: number; creadas: number }[]>(
-        this.tasksClient,
-        'task_stats_weekly',
-        { projectId, semanas },
-      );
+  async weekly(projectId: string, semanas = 8, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:weekly:${semanas}${claveDeFiltros(filtros)}`,
+      async () => {
+        /* Sin `conVentana`: aquí el tramo **es el eje** —qué semanas salen— y no
+         una ventana de historial que haya que rellenar desde `semanas`. Ver
+         `weeklyThroughput`. */
+        const filas = await this.ask<{ semana: string; cerradas: number; creadas: number }[]>(
+          this.tasksClient,
+          'task_stats_weekly',
+          { projectId, semanas, filtros },
+        );
 
-      const serie = filas.map((fila) => ({
-        semana: new Date(fila.semana).toISOString().slice(0, 10),
-        cerradas: fila.cerradas,
-        creadas: fila.creadas,
-      }));
+        const serie = filas.map((fila) => ({
+          semana: new Date(fila.semana).toISOString().slice(0, 10),
+          cerradas: fila.cerradas,
+          creadas: fila.creadas,
+        }));
 
-      const actual = serie[serie.length - 1] ?? { semana: '', cerradas: 0, creadas: 0 };
-      const anterior = serie[serie.length - 2] ?? { semana: '', cerradas: 0, creadas: 0 };
+        const actual = serie[serie.length - 1] ?? { semana: '', cerradas: 0, creadas: 0 };
+        const anterior = serie[serie.length - 2] ?? { semana: '', cerradas: 0, creadas: 0 };
 
-      /* Lunes = 1 … domingo = 7, como la semana de Postgres. */
-      const hoy = new Date();
-      const diasTranscurridos = ((hoy.getDay() + 6) % 7) + 1;
+        /* Lunes = 1 … domingo = 7, como la semana de Postgres. */
+        const hoy = new Date();
+        const diasTranscurridos = ((hoy.getDay() + 6) % 7) + 1;
 
-      return {
-        semana: { ...actual, diasTranscurridos },
-        anterior,
-        variacion:
-          anterior.cerradas > 0
-            ? Math.round(((actual.cerradas - anterior.cerradas) / anterior.cerradas) * 100)
-            : null,
-        /* Ritmo por día transcurrido, que es lo que se puede comparar con una
+        return {
+          semana: { ...actual, diasTranscurridos },
+          anterior,
+          variacion:
+            anterior.cerradas > 0
+              ? Math.round(((actual.cerradas - anterior.cerradas) / anterior.cerradas) * 100)
+              : null,
+          /* Ritmo por día transcurrido, que es lo que se puede comparar con una
            semana entera sin que la comparación mienta. */
-        ritmoDiario: {
-          semana: Number((actual.cerradas / diasTranscurridos).toFixed(2)),
-          anterior: Number((anterior.cerradas / 7).toFixed(2)),
-        },
-        serie,
-      };
-    });
+          ritmoDiario: {
+            semana: Number((actual.cerradas / diasTranscurridos).toFixed(2)),
+            anterior: Number((anterior.cerradas / 7).toFixed(2)),
+          },
+          serie,
+        };
+      },
+    );
   }
 
   /**
@@ -355,36 +396,384 @@ export class ReportsService {
    * no su parón. Se marcan para poder decirlo en vez de acusarlas de estar
    * paradas.
    */
-  async blocked(projectId: string, dias = 7) {
-    return this.cached(`reports:${projectId}:blocked:${dias}`, async () => {
-      const [tareas, columns] = await Promise.all([
-        this.ask<
-          {
-            taskId: string;
-            titulo: string;
-            columna: string;
+  async blocked(projectId: string, dias = 7, filtros?: ReportFilters) {
+    return this.cached(
+      `reports:${projectId}:blocked:${dias}${claveDeFiltros(filtros)}`,
+      async () => {
+        const [tareas, columns] = await Promise.all([
+          this.ask<
+            {
+              taskId: string;
+              titulo: string;
+              columna: string;
+              columnId: string;
+              diasParada: number;
+              sinHistorial: boolean;
+              vencida: boolean;
+            }[]
+            /* Los filtros **tal cual**, sin ventana: el `dias` de este informe es el
+           umbral de parón, no desde cuándo se mira. */
+          >(this.tasksClient, 'task_stats_stale', { projectId, dias, filtros }),
+          this.columnas(projectId),
+        ]);
+
+        const porId = new Map(columns.map((c) => [c.id, c]));
+
+        return {
+          dias,
+          total: tareas.length,
+          /* Con el nombre actual de la columna, no con el `status` congelado en la
+           tarea: si alguien renombró la columna, el nombre viejo despistaría. */
+          tareas: tareas.map((tarea) => ({
+            ...tarea,
+            columna: porId.get(tarea.columnId)?.name ?? tarea.columna,
+          })),
+        };
+      },
+    );
+  }
+
+  /**
+   * **Dos dimensiones a la vez.** El cruce que la sección no podía pedir.
+   *
+   * Todo lo demás de esta pantalla agrupa por una cosa. «De lo de frontend,
+   * cuánto es urgente» necesita dos, y hasta ahora la única respuesta era poner
+   * dos gráficos al lado y compararlos a ojo.
+   *
+   * Aquí solo se le pone **nombre** a lo que devolvió tasks-service: las
+   * columnas viven en projects-service, así que un cruce por columna llega con
+   * `columnId` y saldría como un UUID en el eje. Las personas las resuelve la
+   * pantalla, que ya tiene el directorio del proyecto cargado.
+   *
+   * ⚠️ La suma de las celdas **no** es el total del proyecto cuando alguna
+   * dimensión es de muchos a muchos. Viaja `tareas` al lado para que se pueda
+   * decir en vez de disimularlo. Ver `StatsService.matrix`.
+   */
+  async matrix(
+    projectId: string,
+    agruparPor: string,
+    partirPor: string,
+    filtros?: ReportFilters,
+  ) {
+    return this.cached(
+      `reports:${projectId}:matrix:${agruparPor}:${partirPor}${claveDeFiltros(filtros)}`,
+      async () => {
+        const necesitaColumnas = agruparPor === 'columna' || partirPor === 'columna';
+
+        const [crudo, columns] = await Promise.all([
+          this.ask<{
+            agruparPor: string;
+            partirPor: string;
+            celdas: { a: string | null; b: string | null; count: number }[];
+            tareas: number;
+          }>(this.tasksClient, 'task_stats_matrix', {
+            projectId,
+            agruparPor,
+            partirPor,
+            filtros,
+          }),
+          /* Solo se pide el árbol del proyecto si alguna dimensión lo necesita:
+             un cruce de etiqueta contra prioridad no tiene por qué pagar un
+             salto a projects-service. */
+          necesitaColumnas ? this.columnas(projectId) : Promise.resolve([]),
+        ]);
+
+        const porId = new Map(columns.map((c) => [c.id, c]));
+        const nombrar = (dim: string, valor: string | null): string | null => {
+          if (valor === null) return null;
+          if (dim !== 'columna') return valor;
+          return porId.get(valor)?.name ?? 'Columna eliminada';
+        };
+
+        return {
+          ...crudo,
+          celdas: crudo.celdas.map((celda) => ({
+            ...celda,
+            aNombre: nombrar(crudo.agruparPor, celda.a),
+            bNombre: nombrar(crudo.partirPor, celda.b),
+          })),
+        };
+      },
+    );
+  }
+
+  /**
+   * **Dónde espera el trabajo**: tiempo por columna.
+   *
+   * El informe de tiempos dice cuánto tarda una tarea de principio a fin. Este
+   * dice en qué parte del tablero se va ese tiempo, que es lo único de los dos
+   * sobre lo que se puede actuar: «doce días» no se arregla, «nueve de los doce
+   * en revisión» sí.
+   *
+   * Trae dos mitades que hay que leer juntas y **no se pueden sumar**:
+   *
+   * - `terminadas`: las estancias que ya acabaron, en percentiles. Es la
+   *   referencia — cuánto suele costar pasar por esa columna.
+   * - `enCurso`: lo que llevan **ahora** las tareas abiertas donde están. Es el
+   *   envejecimiento del trabajo en vuelo, y contra la mediana de al lado se
+   *   lee solo: «lleva 3 días en una columna cuya mediana es 4 horas».
+   *
+   * ⚠️ `enCurso` es estrictamente mejor que `blocked` para la misma pregunta:
+   * aquel usa un umbral fijo de días igual para todas las columnas, y una
+   * columna de paso donde lo normal son dos horas no se puede juzgar con la
+   * misma vara que una de revisión donde lo normal es una semana. `blocked` se
+   * queda —es más simple de leer y no necesita la referencia histórica— pero
+   * cuando las dos discrepen, manda esta.
+   *
+   * El cruce con las columnas es el de siempre: tasks-service devuelve
+   * `columnId`, y el nombre, el color y el tablero salen de projects-service.
+   */
+  async columnTime(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:column-time${claveDeFiltros(filtros)}`, async () => {
+      const [crudo, columns] = await Promise.all([
+        this.ask<{
+          terminadas: {
             columnId: string;
-            diasParada: number;
-            sinHistorial: boolean;
-            vencida: boolean;
-          }[]
-        >(this.tasksClient, 'task_stats_stale', { projectId, dias }),
+            estancias: number;
+            tareas: number;
+            p50Horas: number | null;
+            p85Horas: number | null;
+            totalHoras: number | null;
+          }[];
+          enCurso: {
+            columnId: string;
+            tareas: number;
+            p50Horas: number | null;
+            maxHoras: number | null;
+          }[];
+        }>(this.tasksClient, 'task_stats_column_time', { projectId, filtros }),
+        this.columnas(projectId),
+      ]);
+
+      const porId = new Map(columns.map((c) => [c.id, c]));
+      const enCursoPorId = new Map(crudo.enCurso.map((fila) => [fila.columnId, fila]));
+
+      /**
+       * Una fila por columna **del tablero**, no por columna con estancias.
+       *
+       * Una columna por la que no ha pasado nada es un dato: significa que ese
+       * paso no se usa. Si solo salieran las que tienen medidas, el gráfico
+       * enseñaría un tablero que no existe y nadie podría notar la ausencia.
+       */
+      const filas = columns
+        .map((columna) => {
+          const terminada = crudo.terminadas.find((fila) => fila.columnId === columna.id);
+          const curso = enCursoPorId.get(columna.id);
+          return {
+            columnId: columna.id,
+            name: columna.name,
+            color: columna.color,
+            board: columna.boardName,
+            order: columna.order,
+            estancias: terminada?.estancias ?? 0,
+            tareas: terminada?.tareas ?? 0,
+            p50Horas: terminada?.p50Horas ?? null,
+            p85Horas: terminada?.p85Horas ?? null,
+            totalHoras: terminada?.totalHoras ?? null,
+            enCurso: curso?.tareas ?? 0,
+            enCursoP50Horas: curso?.p50Horas ?? null,
+            enCursoMaxHoras: curso?.maxHoras ?? null,
+          };
+        })
+        .sort((a, b) => (a.board ?? '').localeCompare(b.board ?? '') || a.order - b.order);
+
+      /**
+       * Las estancias en columnas que ya no existen no se tiran: se agrupan.
+       *
+       * Borrar una columna no borra el tiempo que el trabajo pasó en ella, y
+       * descartarlo dejaría un total que no cuadra con la suma de las barras
+       * sin decir por qué.
+       */
+      const huerfanas = crudo.terminadas.filter((fila) => !porId.has(fila.columnId));
+
+      return {
+        columnas: filas,
+        huerfanas: huerfanas.reduce(
+          (suma, fila) => ({
+            estancias: suma.estancias + fila.estancias,
+            horas: suma.horas + (fila.totalHoras ?? 0),
+          }),
+          { estancias: 0, horas: 0 },
+        ),
+      };
+    });
+  }
+
+  /**
+   * Retrabajo, rotación y volatilidad: **lo que ya estaba guardado y no se
+   * miraba**.
+   *
+   * `TaskEvent` tiene ocho tipos y los informes usaban tres —`CREATED`, `MOVED`,
+   * `COMPLETED`—. Este agrega los otros tres que dicen algo: `REOPENED` (volver
+   * sobre lo hecho), `ASSIGNED`/`UNASSIGNED` (por cuántas manos pasa una tarea)
+   * y `PRIORITY_CHANGED` (cuánto baila lo que se pide). **No captura nada
+   * nuevo**: es la misma tabla leída con otra pregunta.
+   *
+   * ## ⚠️ Los tres empiezan donde empieza la captura, y hay que decirlo
+   *
+   * Un 4 % de retrabajo sobre dos semanas de historial en un proyecto de un año
+   * no es un 4 %: es lo que se ha podido ver. La respuesta trae `desde` —el
+   * primer evento del proyecto, sin filtrar— justo para que la pantalla lo diga
+   * en vez de dejar que se lea como una medida completa. Es la misma regla del
+   * recorte mudo, aplicada al principio de la serie en vez de al final.
+   *
+   * ## Y `porColumna` se cruza aquí, como en todos los demás
+   *
+   * tasks-service devuelve `columnId` y nada más: las columnas viven en
+   * projects-service, y ponerles nombre y color es literalmente para lo que
+   * existe este servicio.
+   */
+  async dynamics(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:dynamics${claveDeFiltros(filtros)}`, async () => {
+      const [crudo, columns] = await Promise.all([
+        this.ask<{
+          desde: string | null;
+          retrabajo: {
+            cierres: number;
+            reaperturas: number;
+            tareasCerradas: number;
+            tareasReabiertas: number;
+            porcentaje: number | null;
+            porColumna: { columnId: string | null; count: number }[];
+            top: { taskId: string; titulo: string; veces: number }[];
+          };
+          rotacion: {
+            asignaciones: number;
+            desasignaciones: number;
+            tareasQueRotan: number;
+            distribucion: { manos: number; tareas: number }[];
+            top: { taskId: string; titulo: string; manos: number; movimientos: number }[];
+          };
+          volatilidad: {
+            cambios: number;
+            tareasVolatiles: number;
+            distribucion: { cambios: number; tareas: number }[];
+            matriz: { desde: string; hasta: string; count: number }[];
+            top: { taskId: string; titulo: string; cambios: number }[];
+          };
+        }>(this.tasksClient, 'task_stats_dynamics', { projectId, filtros }),
         this.columnas(projectId),
       ]);
 
       const porId = new Map(columns.map((c) => [c.id, c]));
 
       return {
-        dias,
-        total: tareas.length,
-        /* Con el nombre actual de la columna, no con el `status` congelado en la
-           tarea: si alguien renombró la columna, el nombre viejo despistaría. */
-        tareas: tareas.map((tarea) => ({
-          ...tarea,
-          columna: porId.get(tarea.columnId)?.name ?? tarea.columna,
-        })),
+        ...crudo,
+        retrabajo: {
+          ...crudo.retrabajo,
+          porColumna: crudo.retrabajo.porColumna.map((fila) => ({
+            ...fila,
+            /* Una reapertura hacia una columna que ya no existe sigue siendo una
+               reapertura: se nombra y no se descarta, igual que en la
+               instantánea. */
+            name: fila.columnId
+              ? (porId.get(fila.columnId)?.name ?? 'Columna eliminada')
+              : 'Sin columna',
+            color: fila.columnId ? (porId.get(fila.columnId)?.color ?? null) : null,
+            board: fila.columnId ? (porId.get(fila.columnId)?.boardName ?? null) : null,
+          })),
+        },
       };
     });
+  }
+
+  /**
+   * Varios agregados en una sola respuesta.
+   *
+   * ## Lo que se ahorra no es el cálculo, es el andamiaje
+   *
+   * Cada informe sigue calculándose igual y conservando su caché de 60 s: aquí
+   * solo se lanzan juntos. Lo que desaparece son **seis viajes HTTP** desde el
+   * servidor de Next hasta el gateway y —lo que de verdad pesaba— **seis
+   * resoluciones de permisos idénticas**, porque `ProjectPermissionGuard`
+   * pregunta a projects-service por TCP en cada petición que entra.
+   *
+   * ## ⚠️ Un informe que falla no se lleva a los demás
+   *
+   * `allSettled` y no `all`, y es la decisión de fondo de este método. La
+   * pantalla pedía los siete con un `.catch(() => null)` cada uno, así que un
+   * fallo en el cálculo de tiempos dejaba esa tarjeta vacía y las otras seis
+   * intactas. Con `all`, agrupar las peticiones habría significado **agrupar los
+   * fallos**: cambiar siete degradaciones independientes por un todo o nada, que
+   * es peor de lo que había.
+   *
+   * Lo que falla vuelve como `null` —«se pidió y no se pudo»— y se registra,
+   * porque un `null` silencioso en producción no se distingue de un proyecto sin
+   * datos.
+   */
+  async bundle(
+    projectId: string,
+    incluir: string[],
+    opciones: { days?: number; weeks?: number; filtros?: ReportFilters } = {},
+  ): Promise<Record<string, unknown>> {
+    const { days, weeks, filtros } = opciones;
+
+    /* El mapa vive aquí y no en el gateway: es este servicio el que sabe qué
+       argumentos acepta cada informe. */
+    const calculos: Record<string, () => Promise<unknown>> = {
+      snapshot: () => this.snapshot(projectId, filtros),
+      flow: () => this.flow(projectId, days, filtros),
+      'cycle-time': () => this.cycleTime(projectId, days, filtros),
+      forecast: () => this.forecast(projectId, days, filtros),
+      people: () => this.people(projectId, filtros),
+      /**
+       * ⚠️ **`blocked` NO recibe el `days` del paquete, y no es un olvido.**
+       *
+       * En los demás informes `days` es la **ventana de historial** que se mira
+       * —60 por defecto—; en este es **cuántos días lleva parada** una tarea para
+       * considerarla bloqueada, y su defecto son 7. Pasarle el mismo número
+       * convertiría «lo que lleva una semana sin moverse» en «lo que lleva dos
+       * meses», con el mismo nombre y sin que nadie lo notara: el informe seguiría
+       * saliendo, solo que contestando a otra pregunta.
+       *
+       * Quien necesite otra ventana de estancamiento tiene su ruta suelta.
+       */
+      blocked: () => this.blocked(projectId, undefined, filtros),
+      weekly: () => this.weekly(projectId, weeks, filtros),
+      /* Sin `days`: no mira una ventana móvil sino todo el historial capturado,
+         y quien quiera acotarlo tiene `from`/`to` como en el resto. */
+      dynamics: () => this.dynamics(projectId, filtros),
+      'column-time': () => this.columnTime(projectId, filtros),
+    };
+
+    /**
+     * Los cruces no están en el mapa: llevan sus dos dimensiones dentro del
+     * nombre (`matrix:etiqueta:prioridad`), así que se resuelven aparte.
+     *
+     * ⚠️ `leerCruce` **vuelve a validar** las dos dimensiones contra el conjunto
+     * cerrado, aunque el DTO del gateway ya lo hiciera: este comando es
+     * alcanzable por TCP sin pasar por él, igual que `incluir`.
+     */
+    for (const parte of incluir) {
+      const cruce = leerCruce(parte);
+      if (cruce) {
+        calculos[parte] = () =>
+          this.matrix(projectId, cruce.agruparPor, cruce.partirPor, filtros);
+      }
+    }
+
+    const pedidos = incluir.filter((parte) => parte in calculos);
+
+    const resultados = await Promise.allSettled(
+      pedidos.map((parte) => (calculos[parte] as () => Promise<unknown>)()),
+    );
+
+    const paquete: Record<string, unknown> = {};
+    pedidos.forEach((parte, i) => {
+      const resultado = resultados[i];
+      if (resultado?.status === 'fulfilled') {
+        paquete[parte] = resultado.value;
+        return;
+      }
+      this.log.warn(
+        `El informe "${parte}" de ${projectId} fallo: ${
+          (resultado as PromiseRejectedResult | undefined)?.reason
+        }`,
+      );
+      paquete[parte] = null;
+    });
+
+    return paquete;
   }
 
   /**
@@ -484,23 +873,40 @@ export class ReportsService {
       /* El inventario: sin él, «asigna a las que no tienen responsable» era
          irresoluble — el briefing solo llevaba el número, y con un número no
          hay a qué tarea apuntar. */
-      this.ask<
-        {
+      /**
+       * ⚠️ **Ya no devuelve un array, devuelve `{ tareas, omitidas }`.**
+       *
+       * El inventario tiene un presupuesto en caracteres —viaja entero en cada
+       * turno del asistente— y `omitidas` es cuántas se quedaron fuera. Sin ese
+       * número el recorte sería mudo, y un modelo al que le cortan la lista por
+       * detrás responde «no hay ninguna más» con total seguridad.
+       */
+      this.ask<{
+        tareas: {
           id: string;
           titulo: string;
-          descripcion: string | null;
           columna: string;
           columnId: string;
-          prioridad: string;
-          vence: string | null;
           cerrada: boolean;
-          encargados: string[];
-          etiquetas: string[];
+          /**
+           * ⚠️ **De aquí abajo, todo opcional: una tarea cerrada no lo trae.**
+           *
+           * `task_inventory` manda las terminadas en versión corta —id, título,
+           * columna y poco más— porque el inventario entero viaja en cada turno
+           * y era el 81 % del prompt. Declararlos obligatorios aquí sería
+           * escribir una forma que el emisor ya no cumple.
+           */
+          descripcion?: string | null;
+          prioridad?: string;
+          vence?: string | null;
+          encargados?: string[];
+          etiquetas?: string[];
           /* El tablero al que pertenece. Lo añade tasks-service; aquí se le
              pone el nombre, que es lo único que le sirve al modelo. */
           boardId: string;
-        }[]
-      >(this.tasksClient, 'task_inventory', { projectId }),
+        }[];
+        omitidas: number;
+      }>(this.tasksClient, 'task_inventory', { projectId }),
     ]);
 
     const ordenadas = [...columnas].sort((a, b) => a.order - b.order);
@@ -589,11 +995,33 @@ export class ReportsService {
        * a3f1-…»), y sin el nombre no puede responder a «¿qué hay en el tablero
        * de diseño?» aunque tenga los datos delante.
        */
-      tareas: tareas.map((tarea) => ({
+      /**
+       * ⚠️ **`boardId` no sale de aquí: sale su nombre y nada más.**
+       *
+       * Un UUID por tarea son 47 caracteres —con su clave— que el modelo no usa
+       * para nada: nombra el tablero por su nombre, y para colocar algo dentro
+       * usa el `columnId`, que ya identifica el tablero sin ambigüedad. En un
+       * proyecto de 200 tareas eso son ~9 000 caracteres por turno pagados por
+       * un dato que nadie lee.
+       *
+       * Y la descripción solo se rellena cuando la hay: las cerradas ya no la
+       * traen, y un `""` por tarea es una clave más que no dice nada.
+       */
+      tareas: (tareas?.tareas ?? []).map(({ boardId, ...tarea }) => ({
         ...tarea,
-        descripcion: tarea.descripcion ?? '',
-        tablero: nombreDeTablero.get(tarea.boardId) ?? null,
+        ...(tarea.descripcion ? { descripcion: tarea.descripcion } : {}),
+        ...(nombreDeTablero.get(boardId) ? { tablero: nombreDeTablero.get(boardId) } : {}),
       })),
+      /**
+       * Cuántas tareas no caben en el inventario.
+       *
+       * Solo viaja **cuando hay alguna**: una clave a cero en cada turno de cada
+       * conversación es exactamente el tipo de dato que este briefing lleva
+       * evitando desde que se escribió. Y el prompt tiene una regla para leerla:
+       * con esto encima de la mesa, «esas son todas» deja de ser una afirmación
+       * que el modelo pueda hacer a ciegas.
+       */
+      ...((tareas?.omitidas ?? 0) > 0 ? { tareasOmitidas: tareas.omitidas } : {}),
       /**
        * El avance, **ya calculado aquí**.
        *
@@ -734,8 +1162,35 @@ export class ReportsService {
   }
 
   /** Carga y flujo por persona. La ruta que lo expone pide `canViewReports`. */
-  async people(projectId: string) {
-    return this.cached(`reports:${projectId}:people`, async () => {
+  /**
+   * La cartera: una fila por proyecto, para saber en cuál entrar.
+   *
+   * Este servicio no hace aquí más que orquestar y cachear —el cálculo entero
+   * son las dos consultas agrupadas de tasks-service— y aun así pasa por él en
+   * vez de que el gateway hable directamente con tasks. Por dos motivos: la
+   * caché de 60 s vive aquí y la aprovechan los siete informes ya, y el día que
+   * la cartera necesite algo de projects-service —el estado administrativo del
+   * proyecto, por ejemplo— este es el único de los tres que ve las dos mitades.
+   *
+   * ⚠️ **La clave lleva los proyectos ordenados.** El gateway los devuelve en el
+   * orden del listado, que depende de `sortBy`: sin ordenarlos, la misma cartera
+   * pedida dos veces generaría dos claves y la caché no acertaría nunca. Es el
+   * mismo cuidado que en `claveDeFiltros`.
+   *
+   * ⚠️ Y **no** lleva el usuario: la respuesta depende solo del conjunto de
+   * proyectos, no de quién pregunta. Dos personas con la misma cartera comparten
+   * el resultado, que es correcto —lo que decide qué proyectos entran en la lista
+   * ya pasó por el guard del gateway— y evita una entrada de caché por persona.
+   */
+  async portfolio(projectIds: string[], dias = 7) {
+    const clave = `reports:portfolio:${[...projectIds].sort().join('.')}:${dias}`;
+    return this.cached(clave, () =>
+      this.ask<unknown[]>(this.tasksClient, 'task_stats_portfolio', { projectIds, dias }),
+    );
+  }
+
+  async people(projectId: string, filtros?: ReportFilters) {
+    return this.cached(`reports:${projectId}:people${claveDeFiltros(filtros)}`, async () => {
       return this.ask<
         {
           userId: string;
@@ -744,7 +1199,7 @@ export class ReportsService {
           vencidas: number;
           medianaHoras: number | null;
         }[]
-      >(this.tasksClient, 'task_stats_people', { projectId });
+      >(this.tasksClient, 'task_stats_people', { projectId, filtros });
     });
   }
 }

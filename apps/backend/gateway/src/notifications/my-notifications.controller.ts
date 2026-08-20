@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Inject,
   type MessageEvent,
@@ -19,6 +20,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { FindNotificationsQueryDto } from '@praxis/contracts';
 import { type Observable, firstValueFrom, interval, map, merge } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { PresenceService } from '../presence/presence.service';
 import { NotificationsStreamService } from './notifications-stream.service';
 
 /**
@@ -51,6 +53,7 @@ export class MyNotificationsController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly avisosEnVivo: NotificationsStreamService,
+    private readonly presencia: PresenceService,
   ) {}
 
   /**
@@ -71,19 +74,75 @@ export class MyNotificationsController {
    * flujo de otra persona.
    */
   @Sse('stream')
-  @ApiOperation({ summary: 'Flujo de avisos en vivo de quien hace la petición' })
+  @ApiOperation({ summary: 'Flujo de eventos en vivo de quien hace la petición' })
   stream(@Request() req: Express.Request): Observable<MessageEvent> {
-    const avisos = this.avisosEnVivo
-      .suscribir(req.user!.userId)
-      .pipe(map((aviso): MessageEvent => ({ type: 'aviso', data: aviso })));
+    const userId = req.user!.userId;
 
-    /* El latido va como un tipo de evento propio para que el cliente pueda
-       ignorarlo sin confundirlo con un aviso vacío. */
+    /**
+     * ⚠️ **El tope se comprueba aquí, antes de abrir nada, y a propósito.**
+     *
+     * Cada flujo es un socket sostenido más un latido cada 25 s indefinidamente.
+     * Sin tope, cien pestañas son cien conexiones contra el gateway — una
+     * denegación de servicio trivial que no necesita mala fe.
+     *
+     * Va en el controlador y no dentro del `Observable` porque lo que importa
+     * es **la forma de la respuesta**: `EventSource` reintenta solo cuando un
+     * flujo ya abierto se corta, pero ante una respuesta que no es 200 con
+     * `text/event-stream` da la conexión por fallida y **no reintenta**. Un 429
+     * limpio corta el bucle; desalojar conexiones desde dentro lo provocaría.
+     *
+     * Ver `NotificationsStreamService.hayCupo`.
+     */
+    if (!this.avisosEnVivo.hayCupo(userId)) {
+      throw new HttpException(
+        {
+          code: 'TOO_MANY_STREAMS',
+          message: `Demasiadas conexiones en vivo abiertas (${this.avisosEnVivo.conexionesDe(userId)}). Cierra alguna pestaña.`,
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    /**
+     * ⚠️ **Un solo nombre de evento SSE (`evento`) para todo lo que no sea el
+     * latido, y el tipo real va dentro del cuerpo.**
+     *
+     * Con un nombre por clase de evento —`aviso`, `chat.mensaje`,
+     * `chat.borrado`…— cada tipo nuevo obliga a tocar **tres** sitios: aquí, el
+     * `addEventListener` del navegador y el despachador. Y el que se olvide
+     * falla en silencio: `EventSource` entrega los eventos con nombre solo a
+     * quien se haya suscrito a ese nombre exacto, así que un evento sin oyente
+     * no da error, simplemente no pasa nada. Es la misma familia de fallo que la
+     * trampa 12 de CLAUDE.md, donde el interceptor se comía el `type` y los
+     * avisos morían en el navegador sin un solo error.
+     *
+     * Con un único nombre, el transporte deja de tener opinión sobre el
+     * catálogo: añadir un evento es tocar el emisor y el despachador, y nada
+     * más.
+     */
+    const eventos = this.avisosEnVivo
+      .suscribir(userId)
+      .pipe(map((evento): MessageEvent => ({ type: 'evento', data: evento })));
+
+    /**
+     * El latido sí va aparte: no es contenido, y mezclarlo obligaría al
+     * despachador a filtrarlo en cada evento real.
+     *
+     * ⚠️ **Y de paso refresca la presencia.** La marca de «tiene una conexión
+     * abierta» vive en Redis con caducidad, y este es el único punto del sistema
+     * que se ejecuta periódicamente **por conexión viva**. Colgarlo aquí
+     * significa que no hay ningún temporizador extra que mantener, y que la
+     * marca deja de refrescarse exactamente cuando el flujo deja de escribir —
+     * que es la definición de estar desconectado.
+     */
     const latido = interval(LATIDO_MS).pipe(
-      map((): MessageEvent => ({ type: 'latido', data: { t: Date.now() } })),
+      map((): MessageEvent => {
+        void this.presencia.marcarVivo(req.user!.userId);
+        return { type: 'latido', data: { t: Date.now() } };
+      }),
     );
 
-    return merge(avisos, latido);
+    return merge(eventos, latido);
   }
 
   /**

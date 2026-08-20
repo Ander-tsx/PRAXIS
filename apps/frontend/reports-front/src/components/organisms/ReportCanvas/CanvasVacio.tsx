@@ -15,17 +15,29 @@ import { Button } from '@praxis/commons';
  * no lleva ningún icono de error ni ninguna disculpa, y por eso los dos botones
  * son lo único que hay.
  *
- * ⚠️ **No se rellena con un lienzo por defecto**, aunque sea tentador. Poner los
- * cinco de antes «para que no esté vacío» devolvería el problema entero: los
- * mismos avisos de datos insuficientes, el mismo orden que nadie eligió, y
- * encima la sensación de que hay que borrar antes de poder empezar.
+ * ⚠️ **Desde R4.6 sí hay un lienzo de partida, y esto sigue teniendo razón.**
+ * Aquí decía «no se rellena con un lienzo por defecto», y el argumento era
+ * bueno: poner los cinco de antes «para que no esté vacío» devolvía el problema
+ * entero —los mismos avisos de datos insuficientes, el mismo orden que nadie
+ * eligió, y la sensación de tener que borrar antes de empezar—.
+ *
+ * Lo que cambió es que las dos objeciones se hicieron falsas: el de partida son
+ * **solo los tres que salen de `snapshot`**, que es el único informe que no
+ * necesita historial. Ninguno puede disculparse por falta de datos, y no cuesta
+ * una petición más.
+ *
+ * Así que esta pantalla ya no es lo primero que se ve. Sale cuando alguien
+ * **vacía el lienzo a propósito**, y entonces no hay que rellenárselo: sería
+ * devolverle cada vez lo que acaba de quitar. Ver la page, donde la condición es
+ * `actualizadoEn === null` y no que la lista esté vacía.
  */
 export function CanvasVacio({
   onAnadir,
-  onGenerar,
+  onConstruir,
 }: {
   onAnadir: () => void;
-  onGenerar: () => void;
+  /** Abre el constructor determinista. */
+  onConstruir: () => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
@@ -38,10 +50,14 @@ export function CanvasVacio({
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button variant="primary" size="lg" onClick={onAnadir}>
-          Añadir un gráfico
+          Añadir un grafo
         </Button>
-        <Button variant="ghost" size="lg" onClick={onGenerar}>
-          Pedirle uno al asistente
+        {/* ⚠️ Dos botones y no tres, aunque los caminos a un gráfico sean tres.
+            PRAX tiene su botón flotante permanente en esta pantalla, así que no
+            se pierde; y una pantalla vacía cuyo trabajo es dar un primer paso no
+            puede ofrecer tres primeros pasos. */}
+        <Button variant="ghost" size="lg" onClick={onConstruir}>
+          Uno a medida
         </Button>
       </div>
 

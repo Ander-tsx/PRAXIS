@@ -1,7 +1,13 @@
 'use client';
 
 import { ACCIONES } from '@/lib/admin';
-import { ADMIN_ACTIONS, type AdminActionName, Button, Input, Select } from '@praxis/commons';
+import {
+  ADMIN_ACTIONS,
+  type AdminActionName,
+  Button,
+  Select,
+  SelectorDeFecha,
+} from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -72,26 +78,28 @@ export function ActivityToolbar({ accion, desde, hasta }: ActivityToolbarProps) 
         />
       </div>
 
-      <Input
-        type="date"
-        label="Desde"
-        value={valores.desde}
-        onChange={(event) => setValores((v) => ({ ...v, desde: event.target.value }))}
-      />
+      <div className="w-full sm:w-48">
+        <SelectorDeFecha
+          name="desde"
+          label="Desde"
+          defaultValue={valores.desde}
+          onValueChange={(valor) => setValores((v) => ({ ...v, desde: valor }))}
+        />
+      </div>
 
-      <Input
-        type="date"
-        label="Hasta"
-        value={valores.hasta}
-        onChange={(event) => setValores((v) => ({ ...v, hasta: event.target.value }))}
-      />
+      <div className="w-full sm:w-48">
+        <SelectorDeFecha
+          name="hasta"
+          label="Hasta"
+          defaultValue={valores.hasta}
+          onValueChange={(valor) => setValores((v) => ({ ...v, hasta: valor }))}
+        />
+      </div>
 
-      <div className="flex gap-2">
-        <Button type="submit" size="sm">
-          Filtrar
-        </Button>
+      <div className="flex gap-2 h-10">
+        <Button type="submit">Filtrar</Button>
         {hayFiltros && (
-          <Button type="button" size="sm" variant="ghost" onClick={limpiar}>
+          <Button type="button" variant="ghost" onClick={limpiar}>
             Limpiar
           </Button>
         )}

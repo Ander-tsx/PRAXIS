@@ -19,20 +19,37 @@ export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
 
   if (token) {
+    /**
+     * ⚠️ **Aquí había una llamada a `PUT /api/me/presence` para marcarse
+     * ausente, y esa ruta no existe en el gateway.**
+     *
+     * La presencia se cambiaba con `PATCH /users/:id`. O sea que esto respondía
+     * 404 en cada cierre de sesión, el `catch` se lo tragaba y el parche de
+     * «ponerse ausente al salir» **nunca hizo nada** — solo añadía un viaje de
+     * red a un camino que el usuario está esperando.
+     *
+     * Ya no hace falta ninguna llamada: la presencia la gobierna el servidor y
+     * depende de tener el flujo de eventos abierto. Al cerrar sesión el
+     * navegador abandona la página, el flujo se cierra y el gateway marca
+     * ausente por su cuenta, sin que nadie tenga que acordarse de avisar.
+     */
     try {
-      // Forzar estado a ausente antes de destruir la sesión
-      await fetch(`${GATEWAY_URL}/api/me/presence`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presence: 'AWAY' }),
-        cache: 'no-store',
-      });
-    } catch (error) {
-      console.warn('[logout] no se pudo cambiar la presencia a ausente', error);
-    }
-
-    try {
-      await fetch(`${GATEWAY_URL}/api/auth/logout`, {
+      /**
+       * ⚠️ **Hay que mirar el `ok`, no solo el `catch`.**
+       *
+       * `fetch` solo lanza si no llega a hablar con el servidor: un 400 o un 500
+       * son respuestas normales para él, así que este `try/catch` **no ve un
+       * rechazo del gateway**. Y eso no es hipotético — es exactamente lo que
+       * pasó: `POST /auth/logout` respondía 400 siempre (tipaba el `@Body()` con
+       * el DTO del microservicio, que exige un `userId` que el controlador saca
+       * del token), y aquí nadie se enteró. La cookie se borraba abajo, la
+       * persona veía que había salido, y su refresh token seguía canjeable en
+       * Redis **siete días**. Un token robado sobrevivía al cierre de sesión.
+       *
+       * Se sigue borrando la cookie pase lo que pase —quien pide salir, sale—,
+       * pero el fallo deja de ser invisible.
+       */
+      const respuesta = await fetch(`${GATEWAY_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         /**
@@ -46,6 +63,12 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(refreshToken ? { refreshToken } : {}),
         cache: 'no-store',
       });
+
+      if (!respuesta.ok) {
+        console.error(
+          `[logout] el gateway rechazó el cierre de sesión con ${respuesta.status}: la sesión del servidor sigue viva`,
+        );
+      }
     } catch (error) {
       console.warn('[logout] no se pudo notificar al gateway', error);
     }

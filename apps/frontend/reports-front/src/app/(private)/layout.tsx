@@ -1,5 +1,5 @@
 import { setPresenceAction } from '@/app/(private)/presence-actions';
-import { AppShell, PresenceFooter, displayName, hrefDeAvatar } from '@praxis/commons';
+import { AppShell, PresenceFooter, avatarHref, displayName } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
 import { getSidebarPlegada } from '@praxis/commons/theme';
 
@@ -25,7 +25,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       user={{
         name: displayName(profile),
         email: profile.credential.email,
-        avatarSrc: hrefDeAvatar(profile.avatarUrl, '/reports/api/gateway'),
+        avatarSrc: avatarHref(profile.avatarUrl, '/reports/api/gateway'),
         presence: profile.presence ?? null,
       }}
       /* El selector de estado se dibuja sobre la esquina del avatar: la

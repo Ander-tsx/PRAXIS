@@ -257,6 +257,57 @@ export class ChannelsService {
    * Se resuelve con dos consultas y un cruce en memoria, no con una por persona:
    * el coste va con el tamaño de tus proyectos, no con el de la plataforma.
    */
+  /**
+   * Solo los **ids** de quienes comparten proyecto con esta persona.
+   *
+   * ## Por qué no vale `contactos()`
+   *
+   * `contactos()` trae, por cada persona, todos los proyectos en común con su
+   * nombre, su slug y su rol. Eso es lo que necesita la lista de contactos del
+   * chat, y ahí está bien pagado.
+   *
+   * Pero el otro consumidor es el anuncio de presencia, que con toda esa
+   * información hace **una sola cosa**: recorrer los `userId` para publicar en
+   * el canal de cada uno. Estaba pagando un `join` con `Project` y otro con
+   * `ProjectRole`, más una fila por cada par (persona, proyecto compartido) y un
+   * cruce en memoria, para tirarlo todo salvo una columna.
+   *
+   * ## Por qué SQL crudo y no `distinct` de Prisma
+   *
+   * ⚠️ **`distinct` de Prisma no llega a la base.** Se comprobó registrando la
+   * consulta real: con `distinct: ['userId']`, el SQL que sale es un `SELECT`
+   * normal —sin `DISTINCT`, y encima añadiendo la columna `id`— y la
+   * deduplicación la hace el cliente en memoria. O sea que Postgres seguía
+   * devolviendo una fila por **cada par (persona, proyecto compartido)**: en un
+   * equipo que comparte cinco proyectos, cinco veces las filas necesarias, todas
+   * viajando por el cable para tirar cuatro quintas partes al llegar.
+   *
+   * Con `SELECT DISTINCT` sale una fila por persona **de la base**, que es lo
+   * que se quería. Es la misma decisión que en `contarSinLeerDeVarios`, y por el
+   * mismo motivo: cuando lo que importa es lo que hace el motor, se escribe lo
+   * que hace el motor.
+   *
+   * ⚠️ **Se descartan los proyectos `DELETED`**, igual que en `contactos()`: si
+   * no, alguien de un proyecto borrado seguiría recibiendo tus cambios de
+   * estado. La regla de a quién se le anuncia tiene que ser la misma que la de
+   * con quién puedes hablar, o la presencia filtra más de lo que filtra el chat.
+   */
+  async idsDeContactos(userId: string): Promise<string[]> {
+    const filas = await this.prisma.$queryRaw<{ userId: string }[]>`
+      SELECT DISTINCT companero."userId"
+      FROM "projects"."project_members" companero
+      JOIN "projects"."project_members" mio
+        ON mio."projectId" = companero."projectId"
+      JOIN "projects"."projects" p
+        ON p."id" = companero."projectId"
+      WHERE mio."userId" = ${userId}
+        AND companero."userId" <> ${userId}
+        AND p."status" <> 'DELETED'
+    `;
+
+    return filas.map((fila) => fila.userId);
+  }
+
   async contactos(userId: string) {
     const mios = await this.prisma.projectMember.findMany({
       where: { userId, project: { status: { not: 'DELETED' } } },

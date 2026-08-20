@@ -26,7 +26,7 @@ export const PRESENCES = [
 export type Presence = (typeof PRESENCES)[number];
 
 /** Cómo se lee cada estado, y de qué color es su punto. */
-export interface DescripcionDePresencia {
+export interface PresenceDescription {
   etiqueta: string;
   /** Una línea que explica cuándo ponerlo. Sale en el selector, no en el punto. */
   ayuda: string;
@@ -52,7 +52,7 @@ export interface DescripcionDePresencia {
  * interfaz —no dicen «error» ni «aviso»— sino la paleta de una lista cerrada,
  * y atarlos a `warning` fue justo lo que los hizo colisionar.
  */
-export const PRESENCIAS: Record<Presence, DescripcionDePresencia> = {
+export const PRESENCE_DESCRIPTIONS: Record<Presence, PresenceDescription> = {
   AVAILABLE: {
     etiqueta: 'Disponible',
     ayuda: 'Puedes recibir mensajes y te responderán pronto.',
@@ -92,8 +92,8 @@ export const PRESENCIAS: Record<Presence, DescripcionDePresencia> = {
  * estrene mañana, cae a «Ausente» en vez de dejar el punto sin color: un
  * estado que no se sabe pintar no debe romper la lista del equipo.
  */
-export function presenciaDe(valor: string | null | undefined): DescripcionDePresencia {
-  return PRESENCIAS[(valor ?? '') as Presence] ?? PRESENCIAS.AWAY;
+export function presenceOf(valor: string | null | undefined): PresenceDescription {
+  return PRESENCE_DESCRIPTIONS[(valor ?? '') as Presence] ?? PRESENCE_DESCRIPTIONS.AWAY;
 }
 
 /**
@@ -107,7 +107,7 @@ export function presenciaDe(valor: string | null | undefined): DescripcionDePres
  * Devuelve `null` cuando no hay foto, que es lo que `Avatar` espera para caer a
  * las iniciales.
  */
-export function hrefDeAvatar(
+export function avatarHref(
   avatarUrl: string | null | undefined,
   gatewayPath: string,
 ): string | null {

@@ -11,6 +11,7 @@ import {
   PRIORITY_COLORS,
   PRIORITY_LABELS,
   Select,
+  SelectorDeFecha,
   type Task,
   Textarea,
   type UserProfile,
@@ -20,7 +21,6 @@ import {
   useAccion,
 } from '@praxis/commons';
 import { type FocusEvent, useEffect, useRef, useState } from 'react';
-import { SelectorDeFecha } from '../../molecules/SelectorDeFecha/SelectorDeFecha';
 import { GestorDeEtiquetas } from './GestorDeEtiquetas';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';

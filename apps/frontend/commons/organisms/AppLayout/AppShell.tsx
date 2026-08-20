@@ -1,18 +1,52 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, createContext, useContext, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
+import { LivePresences, LiveSource } from '../../realtime';
+import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
-import { AvisosEnVivo } from '../AvisosEnVivo';
+import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import type { AppNavItem } from './navigation';
+
+/**
+ * Las tarjetas emergentes, **fuera de la carga inicial** (E6.5).
+ *
+ * ## Qué pesa y por qué
+ *
+ * `LiveNotices` usa `sileo` para las tarjetas, y `sileo` arrastra `motion`.
+ * Medido sobre la compilación de producción de dashboard-front: el trozo que
+ * lleva `motion` son **82 KB comprimidos de los 358 KB** de JavaScript de
+ * cliente — un **23%**. Y entraba en las **seis** zonas privadas, porque este
+ * armazón lo monta en todas.
+ *
+ * Eso es un cuarto del bundle de cada pantalla privada dedicado a animar unas
+ * tarjetas que **solo aparecen cuando llega un evento**, y que nunca están en
+ * pantalla al cargar.
+ *
+ * ## Lo que se pierde, dicho claro
+ *
+ * Diferirlo abre una ventana corta —desde que hidrata hasta que llega el
+ * trozo— en la que un evento **no sacaría tarjeta**. Es asumible por una razón
+ * concreta: la tarjeta no es el dato. El contador de la barra lateral, la lista
+ * de conversaciones y el propio panel del chat escuchan el flujo **por su
+ * cuenta**, así que un aviso en esa ventana se sigue viendo en todos los sitios
+ * donde importa; lo único que no aparece es el emergente.
+ *
+ * `ssr: false` porque no hay nada que renderizar en el servidor: sin eventos, no
+ * hay tarjetas.
+ */
+const LiveNotices = dynamic(() => import('../LiveNotices').then((modulo) => modulo.LiveNotices), {
+  ssr: false,
+});
 
 export interface AppShellUser {
   /** Nombre para mostrar. Puede venir vacío: el registro no pide nombre. */
   name: string;
   email: string;
-  /** Foto, ya con el proxy de la zona delante (`hrefDeAvatar`). */
+  /** Foto, ya con el proxy de la zona delante (`avatarHref`). */
   avatarSrc?: string | null;
   /** Presencia elegida. Pinta el punto de color sobre el avatar. */
   presence?: string | null;
@@ -120,7 +154,55 @@ const UN_ANO = 60 * 60 * 24 * 365;
  */
 const CUENTA_HREF = '/dashboard/profile';
 
-export function AppShell({
+/**
+ * Dónde vive el centro de mensajes.
+ *
+ * Espejo de `CHAT_HREF` en `commons/auth/nav.ts`. Se repite en vez de
+ * importarse porque aquel es un módulo de **servidor** —usa `next/headers`— y
+ * esto es un componente de cliente; importarlo arrastraría `next/headers` al
+ * navegador. Mismo caso que `SIDEBAR_COOKIE`, arriba.
+ */
+const HREF_DE_MENSAJES = '/chat';
+
+/**
+ * El armazón, con las dos fuentes de tiempo real montadas por encima.
+ *
+ * ⚠️ **La separación en dos componentes no es estética: sin ella, los hooks del
+ * propio armazón no ven el contexto.**
+ *
+ * `LiveSource` y `LivePresences` son proveedores, y un componente que
+ * *renderiza* un proveedor está **por encima** de él en el árbol: su
+ * `useContext` devuelve el valor por defecto, no el del proveedor. Con todo
+ * junto en una sola función, `useMessageCount` —que vive aquí, para la
+ * insignia de la barra lateral— se suscribía a una fuente que desde su punto de
+ * vista **no existía**.
+ *
+ * Y no daba ningún error, porque `useLiveEvent` está escrito para no lanzar
+ * cuando no encuentra la fuente: quedarse sin tiempo real es una degradación
+ * aceptable en una pantalla suelta. Esa tolerancia, pensada para otro caso,
+ * convirtió esto en un fallo mudo — la insignia sencillamente no se movía.
+ *
+ * Partiéndolo, todo lo que necesite escuchar el flujo vive en `ArmazonInterno`,
+ * que sí es descendiente.
+ */
+export function AppShell(props: AppShellProps) {
+  return (
+    <LiveSource gatewayPath={`${props.zonePath}/api/gateway`}>
+      {/* Por encima de todo lo que pinte un avatar: el punto de estado de
+          cualquier persona se corrige solo desde aquí. */}
+      <LivePresences>
+        {/* El cajón lateral, por encima del armazón: la columna la pinta él y
+            el contenido lo proyecta la página, así que el proveedor tiene que
+            envolver a los dos. Ver `DockPanel`. */}
+        <DockProvider>
+          <ArmazonInterno {...props} />
+        </DockProvider>
+      </LivePresences>
+    </LiveSource>
+  );
+}
+
+function ArmazonInterno({
   navItems,
   zonePath,
   user,
@@ -165,6 +247,28 @@ export function AppShell({
   const enCuenta = activePath === CUENTA_HREF || activePath.startsWith(`${CUENTA_HREF}/`);
   const activePathDeSecciones = enCuenta ? '' : activePath;
 
+  /**
+   * La insignia de Mensajes, **viva**.
+   *
+   * ⚠️ El número llega del servidor dentro de `navItems`, y solo cambiaba al
+   * recargar: lo que lo actualizaba era el `router.refresh()` por evento de
+   * chat, que se quitó al desatascar la cola del App Router. Se quedó sin
+   * fuente — sonaba el aviso y el número no se movía. Ahora escucha el flujo
+   * como el resto; ver `useMessageCount`.
+   *
+   * Se sustituye **solo esa entrada**: las demás insignias las sigue
+   * calculando el servidor porque cambian con cosas que no viajan por el flujo
+   * de chat.
+   */
+  const mensajesSinLeer = useMessageCount(
+    navItems.find((item) => item.href === HREF_DE_MENSAJES)?.badge ?? 0,
+    `${zonePath}/api/gateway`,
+  );
+
+  const navItemsVivos = navItems.map((item) =>
+    item.href === HREF_DE_MENSAJES ? { ...item, badge: mensajesSinLeer } : item,
+  );
+
   return (
     <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
@@ -199,7 +303,11 @@ export function AppShell({
           </div>
 
           <div className={`flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}>
-            <NavList navItems={navItems} activePath={activePathDeSecciones} plegada={plegada} />
+            <NavList
+              navItems={navItemsVivos}
+              activePath={activePathDeSecciones}
+              plegada={plegada}
+            />
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -230,9 +338,7 @@ export function AppShell({
                       src={user.avatarSrc ?? null}
                     />
                   </a>
-                  {estadoSlot && (
-                    <span className="absolute bottom-0 right-0">{estadoSlot}</span>
-                  )}
+                  {estadoSlot && <span className="absolute bottom-0 right-0">{estadoSlot}</span>}
                 </span>
               </div>
             ) : (
@@ -245,6 +351,21 @@ export function AppShell({
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
 
         {/**
+         * El cajón lateral, **hermano del contenido y no encima de él**.
+         *
+         * Al ser una columna más de esta misma fila flex, abrirlo recoloca lo de
+         * al lado porque es lo que hace un `flex` — no porque nadie le haya
+         * sumado un margen al `body`. Cerrado mide cero y **conserva dentro lo
+         * que hubiera montado**, que es lo que permite cerrar el panel de PRAX,
+         * mirar un gráfico y volver sin perder la conversación.
+         *
+         * Va después del contenido en el DOM y no antes: el orden de lectura de
+         * un lector de pantalla es el del documento, y un panel accesorio se lee
+         * después de aquello a lo que acompaña.
+         */}
+        <DockColumn />
+
+        {/**
          * Los avisos en vivo se enganchan aquí, en el armazón, y no en cada
          * zona: el armazón vive en el `layout.tsx`, así que la conexión se abre
          * una vez y **sobrevive a navegar** entre pantallas de la zona. Puesto
@@ -254,7 +375,7 @@ export function AppShell({
          * projects-front es `/projects/api/gateway`, y ahí es donde esa zona
          * monta su `createGatewayProxy()`.
          */}
-        <AvisosEnVivo gatewayPath={`${zonePath}/api/gateway`} />
+        <LiveNotices />
 
         {/* ── Cajón lateral (móvil) ────────────────────────────── */}
         {mobileMenuOpen && (
@@ -291,7 +412,7 @@ export function AppShell({
                 </div>
 
                 <NavList
-                  navItems={navItems}
+                  navItems={navItemsVivos}
                   activePath={activePathDeSecciones}
                   onNavigate={() => setMobileMenuOpen(false)}
                 />

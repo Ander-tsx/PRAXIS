@@ -134,6 +134,7 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
         onClose={reset}
         title="Invitar al proyecto"
         description="Recibirá una invitación y entrará al aceptarla, con el rol que elijas."
+        overflowVisible
       >
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="projectId" value={projectId} />

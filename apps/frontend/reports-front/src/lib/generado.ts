@@ -3,7 +3,11 @@ import {
   PRIORITY_COLOR,
   PRIORITY_ORDER,
   type ReportBlocked,
+  type ReportColumnTime,
+  type ReportCycleTime,
+  type ReportDynamics,
   type ReportFlow,
+  type ReportMatrix,
   type ReportPerson,
   type ReportSnapshot,
   type ReportWeekly,
@@ -11,6 +15,7 @@ import {
   tokenColor,
 } from './reports';
 import type { EspecificacionGrafico, Metrica } from './widgets';
+import { parteDeCruce } from './widgets';
 
 /**
  * De una parametrización a los datos que se dibujan.
@@ -59,6 +64,19 @@ export type DatosGenerados =
       series: { clave: string; nombre: string; color: string }[];
       unidad: string;
     }
+  | {
+      forma: 'distribucion';
+      tramos: { min: number; max: number; count: number }[];
+      unidadY: string;
+      unidadX: string;
+    }
+  | {
+      forma: 'matriz';
+      filas: { clave: string; nombre: string }[];
+      columnas: { clave: string; nombre: string }[];
+      valores: Record<string, Record<string, number>>;
+      unidad: string;
+    }
   /** No hay con qué dibujarlo. `motivo` se enseña tal cual. */
   | { forma: 'sin-datos'; motivo: string };
 
@@ -69,6 +87,10 @@ export interface FuentesGeneradas {
   blocked?: ReportBlocked | null;
   flow?: ReportFlow | null;
   weekly?: ReportWeekly | null;
+  dynamics?: ReportDynamics | null;
+  columnTime?: ReportColumnTime | null;
+  cycle?: ReportCycleTime | null;
+  matrices?: Record<string, ReportMatrix>;
 }
 
 /** `userId`/`labelId` → nombre. Lo resuelve la page, que es quien los pide. */
@@ -82,9 +104,16 @@ export function construirDatos(
   fuentes: FuentesGeneradas,
   nombres: Nombres,
 ): DatosGenerados {
+  if (grafico.forma === 'histograma') {
+    return construirDistribucion(grafico, fuentes);
+  }
+  if (grafico.metrica === 'cruce' && grafico.forma === 'mapa_calor') {
+    return construirMatriz(grafico, fuentes, nombres);
+  }
+
   const categoricas = construirCategorias(grafico, fuentes, nombres);
   if (categoricas) return categoricas;
-  return construirSerie(grafico, fuentes);
+  return construirSerie(grafico, fuentes, nombres);
 }
 
 /* ─── Categóricas ──────────────────────────────────────────────────────── */
@@ -95,7 +124,31 @@ function construirCategorias(
   nombres: Nombres,
 ): DatosGenerados | null {
   const { metrica, topN } = grafico;
-  const conColorPropio = new Set<Metrica>(['tareas_por_columna', 'tareas_por_prioridad']);
+  /**
+   * Las que traen el color de la entidad: una columna del tablero y una
+   * prioridad se pintan del suyo o el gráfico deja de leerse como el tablero.
+   */
+  const conColorPropio = new Set<Metrica>([
+    'tareas_por_columna',
+    'tareas_por_prioridad',
+    'reaperturas_por_columna',
+    'cambios_de_prioridad',
+    'tiempo_en_columna',
+    'espera_actual_por_columna',
+  ]);
+  /**
+   * Las que **no** se ordenan de mayor a menor.
+   *
+   * ⚠️ Antes esto era el mismo conjunto que el de arriba, y confundirlos rompe
+   * los histogramas: «1 mano, 2 manos, 3 manos» ordenado por tamaño sale
+   * «2, 1, 3» y deja de ser una distribución — pasa a ser un ranking de barras
+   * que se parece mucho a un histograma y no lo es. El orden **es** el dato.
+   */
+  const ordenNatural = new Set<Metrica>([
+    ...conColorPropio,
+    'rotacion_por_tarea',
+    'volatilidad_por_tarea',
+  ]);
 
   let crudas: Categoria[] | null = null;
   let unidad = 'tareas';
@@ -174,6 +227,83 @@ function construirCategorias(
       break;
     }
 
+    /* ─── Los tres de R9.1, todos sobre `dynamics` ────────────────────── */
+
+    case 'reaperturas_por_columna': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.retrabajo.porColumna.map((fila) => ({
+        name: fila.name,
+        value: fila.count,
+        color: tokenColor(fila.color),
+      }));
+      unidad = 'reaperturas';
+      break;
+    }
+
+    case 'rotacion_por_tarea': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.rotacion.distribucion.map((fila) => ({
+        name: etiquetaDeManos(fila.manos),
+        value: fila.tareas,
+        color: '',
+      }));
+      break;
+    }
+
+    case 'volatilidad_por_tarea': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      crudas = dynamics.volatilidad.distribucion.map((fila) => ({
+        name: etiquetaDeCambios(fila.cambios),
+        value: fila.tareas,
+        color: '',
+      }));
+      break;
+    }
+
+    case 'cambios_de_prioridad': {
+      const dynamics = fuentes.dynamics;
+      if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+      /* La matriz completa se suma por destino: «a qué prioridad acaba
+         llegando el trabajo». El origen no se pierde —viaja entero en
+         `matriz`— pero una barra por celda serían dieciséis barras para
+         contestar una pregunta de cuatro. */
+      const porDestino = new Map<string, number>();
+      for (const celda of dynamics.volatilidad.matriz) {
+        porDestino.set(celda.hasta, (porDestino.get(celda.hasta) ?? 0) + celda.count);
+      }
+      crudas = PRIORITY_ORDER.map((prioridad) => ({
+        name: ETIQUETA_PRIORIDAD[prioridad] ?? prioridad,
+        value: porDestino.get(prioridad) ?? 0,
+        color: PRIORITY_COLOR[prioridad] ?? '',
+      })).filter((fila) => fila.value > 0);
+      unidad = 'cambios';
+      break;
+    }
+
+    /* ─── R9.2: dónde espera el trabajo ───────────────────────────────── */
+
+    case 'tiempo_en_columna':
+    case 'espera_actual_por_columna': {
+      const columnTime = fuentes.columnTime;
+      if (!columnTime) return sinDatos('No se pudo leer el tiempo por columna.');
+      const actual = metrica === 'espera_actual_por_columna';
+      crudas = columnTime.columnas
+        .map((columna) => ({
+          name: columna.name,
+          /* En horas y con un decimal: el eje necesita un número, y la unidad
+             va en el rótulo. Redondear aquí y no al pintar evita que el
+             tooltip y la barra digan cosas distintas. */
+          value: redondear(actual ? columna.enCursoP50Horas : columna.p50Horas),
+          color: tokenColor(columna.color),
+        }))
+        .filter((fila) => fila.value > 0);
+      unidad = 'h (mediana)';
+      break;
+    }
+
     default:
       return null;
   }
@@ -185,7 +315,7 @@ function construirCategorias(
   /* Las que traen color propio conservan su orden natural —el del tablero, el de
      la prioridad—; las demás se ordenan de mayor a menor, que es lo único que
      ordena una lista de nombres. */
-  const ordenadas = conColorPropio.has(metrica)
+  const ordenadas = ordenNatural.has(metrica)
     ? crudas
     : [...crudas].sort((a, b) => b.value - a.value);
 
@@ -236,6 +366,40 @@ function pintarPorOrden(categorias: Categoria[]): Categoria[] {
 
 const COLOR_OTRAS = 'var(--color-text-disabled)';
 
+/**
+ * El rótulo de un tramo del histograma de manos.
+ *
+ * La última barra acumula «5 o más» (`MAX_MANOS` en tasks-service), y decirlo es
+ * obligatorio: una barra rotulada «5» sobre un tramo que también contiene las de
+ * doce manos es un recorte mudo, que es lo que este repositorio no hace.
+ */
+function etiquetaDeManos(manos: number): string {
+  if (manos === 0) return 'Sin responsable';
+  if (manos >= TOPE_HISTOGRAMA) return `${TOPE_HISTOGRAMA} o más`;
+  return manos === 1 ? '1 persona' : `${manos} personas`;
+}
+
+/** Lo mismo para los cambios de prioridad de una misma tarea. */
+function etiquetaDeCambios(cambios: number): string {
+  if (cambios >= TOPE_HISTOGRAMA) return `${TOPE_HISTOGRAMA} o más`;
+  return cambios === 1 ? '1 cambio' : `${cambios} cambios`;
+}
+
+/**
+ * Dónde corta el histograma. Espejo de `MAX_MANOS` y `MAX_CAMBIOS` en
+ * `tasks/stats.service.ts`, que son el mismo número por ahora.
+ *
+ * ⚠️ Si allí cambia y aquí no, el rótulo dice «5 o más» sobre un tramo que ya
+ * no es ese. No da ningún error: da una etiqueta equivocada sobre una barra
+ * correcta.
+ */
+const TOPE_HISTOGRAMA = 5;
+
+/** Horas con un decimal, o 0 si no hay medida. El filtro de después lo quita. */
+function redondear(horas: number | null): number {
+  return horas === null ? 0 : Math.round(horas * 10) / 10;
+}
+
 const ETIQUETA_PRIORIDAD: Record<string, string> = {
   URGENT: 'Urgente',
   HIGH: 'Alta',
@@ -245,7 +409,7 @@ const ETIQUETA_PRIORIDAD: Record<string, string> = {
 
 /* ─── Temporales ───────────────────────────────────────────────────────── */
 
-function construirSerie(grafico: EspecificacionGrafico, fuentes: FuentesGeneradas): DatosGenerados {
+function construirSerie(grafico: EspecificacionGrafico, fuentes: FuentesGeneradas, nombres: Nombres): DatosGenerados {
   switch (grafico.metrica) {
     case 'flujo_por_columna': {
       const flow = fuentes.flow;
@@ -293,6 +457,73 @@ function construirSerie(grafico: EspecificacionGrafico, fuentes: FuentesGenerada
       };
     }
 
+    case 'entradas_contra_cierres': {
+      const weekly = fuentes.weekly;
+      if (!weekly) return sinDatos('No se pudo leer la serie semanal.');
+      if (weekly.serie.length === 0) return sinDatos('Todavía no hay ninguna semana registrada.');
+      
+      return {
+        forma: 'serie',
+        puntos: weekly.serie.map((semana) => ({
+          x: formatDay(semana.semana),
+          creadas: semana.creadas,
+          // Cierres as negative values for divergent bars
+          cerradas: -semana.cerradas,
+        })),
+        series: [
+          { clave: 'creadas', nombre: 'Entradas', color: 'var(--color-primary)' },
+          { clave: 'cerradas', nombre: 'Cierres', color: 'var(--color-success)' }
+        ],
+        unidad: 'tareas',
+      };
+    }
+    
+    case 'cruce': {
+      if (grafico.forma !== 'barras_apiladas') {
+         return sinDatos('Forma no soportada para cruce en series.');
+      }
+      
+      const parte = parteDeCruce(grafico);
+      if (!parte || !fuentes.matrices || !fuentes.matrices[parte]) {
+        return sinDatos('No se pudo leer el cruce.');
+      }
+      
+      const matriz = fuentes.matrices[parte];
+      if (matriz.celdas.length === 0) return sinDatos('No hay datos para este cruce.');
+      
+      const filasMap = new Map<string, string>();
+      const columnasMap = new Map<string, string>();
+      const puntosMap = new Map<string, PuntoSerie>();
+      
+      for (const celda of matriz.celdas) {
+        const a = celda.a ?? 'Sin asignar';
+        const b = celda.b ?? 'Sin asignar';
+        
+        const aNombre = celda.aNombre ?? nombres.personas[a] ?? a;
+        const bNombre = celda.bNombre ?? nombres.personas[b] ?? b;
+        
+        filasMap.set(a, aNombre);
+        columnasMap.set(b, bNombre);
+        
+        if (!puntosMap.has(aNombre)) {
+           puntosMap.set(aNombre, { x: aNombre } as PuntoSerie);
+        }
+        
+        puntosMap.get(aNombre)![bNombre] = celda.count;
+      }
+      
+      return {
+        forma: 'serie',
+        puntos: Array.from(puntosMap.values()),
+        series: Array.from(columnasMap.values()).map((colName, index) => ({
+           clave: colName,
+           nombre: colName,
+           color: serieColors[index % serieColors.length]
+        })),
+        unidad: 'tareas'
+      };
+    }
+
     default:
       return sinDatos('Esa métrica no se puede dibujar.');
   }
@@ -313,4 +544,103 @@ function sinDatos(motivo: string): DatosGenerados {
 export function avisoDeSemanaIncompleta(weekly: ReportWeekly | null | undefined): string | null {
   if (!weekly || weekly.semana.diasTranscurridos >= 7) return null;
   return `La última semana lleva ${weekly.semana.diasTranscurridos} de 7 días, así que su barra todavía no es comparable con las anteriores.`;
+}
+
+function construirDistribucion(
+  grafico: EspecificacionGrafico,
+  fuentes: FuentesGeneradas,
+): DatosGenerados {
+  if (grafico.metrica === 'distribucion_de_entrega') {
+    const cycle = fuentes.cycle;
+    if (!cycle) return sinDatos('No se pudo leer el tiempo de ciclo.');
+    if (cycle.muestras.length === 0) return sinDatos('No hay tareas cerradas para medir.');
+    
+    // Create bins of 1 day length
+    const tramosMap = new Map<number, number>();
+    let minDay = Number.MAX_SAFE_INTEGER;
+    let maxDay = 0;
+    
+    for (const m of cycle.muestras) {
+      const days = Math.round(m.leadHours / 24);
+      tramosMap.set(days, (tramosMap.get(days) ?? 0) + 1);
+      if (days < minDay) minDay = days;
+      if (days > maxDay) maxDay = days;
+    }
+    
+    if (minDay === Number.MAX_SAFE_INTEGER) minDay = 0;
+    
+    const tramos = [];
+    for (let i = minDay; i <= maxDay; i++) {
+      tramos.push({ min: i, max: i + 1, count: tramosMap.get(i) ?? 0 });
+    }
+    
+    return {
+      forma: 'distribucion',
+      tramos,
+      unidadY: 'tareas',
+      unidadX: 'días',
+    };
+  }
+  
+  if (grafico.metrica === 'rotacion_por_tarea' || grafico.metrica === 'volatilidad_por_tarea') {
+     const dynamics = fuentes.dynamics;
+     if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
+     
+     const distribucion = grafico.metrica === 'rotacion_por_tarea' 
+       ? dynamics.rotacion.distribucion
+       : dynamics.volatilidad.distribucion;
+       
+     return {
+       forma: 'distribucion',
+       tramos: distribucion.map(d => ({
+         min: 'manos' in d ? d.manos : d.cambios,
+         max: ('manos' in d ? d.manos : d.cambios) + 1,
+         count: d.tareas
+       })),
+       unidadY: 'tareas',
+       unidadX: grafico.metrica === 'rotacion_por_tarea' ? 'personas' : 'cambios'
+     };
+  }
+  
+  return sinDatos('Métrica no soportada como distribución.');
+}
+
+function construirMatriz(
+  grafico: EspecificacionGrafico,
+  fuentes: FuentesGeneradas,
+  nombres: Nombres
+): DatosGenerados {
+  const parte = parteDeCruce(grafico);
+  if (!parte || !fuentes.matrices || !fuentes.matrices[parte]) {
+    return sinDatos('No se pudo leer el cruce.');
+  }
+  
+  const matriz = fuentes.matrices[parte];
+  if (matriz.celdas.length === 0) return sinDatos('No hay datos para este cruce.');
+  
+  const filasMap = new Map<string, string>();
+  const columnasMap = new Map<string, string>();
+  const valores: Record<string, Record<string, number>> = {};
+  
+  for (const celda of matriz.celdas) {
+    const a = celda.a ?? 'Sin asignar';
+    const b = celda.b ?? 'Sin asignar';
+    
+    const aNombre = celda.aNombre ?? nombres.personas[a] ?? a;
+    const bNombre = celda.bNombre ?? nombres.personas[b] ?? b;
+    
+    filasMap.set(a, aNombre);
+    columnasMap.set(b, bNombre);
+    
+    if (!valores[a]) valores[a] = {};
+    valores[a][b] = celda.count;
+  }
+  
+  return {
+    forma: 'matriz',
+    filas: Array.from(filasMap.entries()).map(([clave, nombre]) => ({ clave, nombre })),
+    columnas: Array.from(columnasMap.entries()).map(([clave, nombre]) => ({ clave, nombre })),
+    valores,
+    unidad: 'tareas'
+  };
 }

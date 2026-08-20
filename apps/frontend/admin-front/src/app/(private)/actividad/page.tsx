@@ -1,6 +1,6 @@
 import { ActivityTable } from '@/components/organisms/ActivityTable';
 import { ActivityToolbar } from '@/components/organisms/ActivityToolbar';
-import { AdminTabs } from '@/components/organisms/AdminTabs';
+import { AdminHeader } from '@/components/organisms/AdminHeader';
 import { type AdminActivityPage, FILAS_POR_PAGINA } from '@/lib/admin';
 import { ADMIN_ACTIONS, type AdminActionName, AppHeader, Pagination } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
@@ -24,12 +24,15 @@ interface PageProps {
  *
  * ## No es tiempo real, y no lo finge
  *
- * El repo no tiene WebSocket ni SSE —la bandeja de avisos reconsulta cada 60 s— y
- * este registro tampoco. Se recarga al navegar y con el botón de la barra. Un
- * refresco automático cada pocos segundos sería fácil de añadir con
- * `AutoRefresh`, pero aquí no aporta: a un registro de auditoría se entra a
- * *buscar* algo que ya pasó, y una tabla que se reordena sola mientras lees es
- * peor que una quieta.
+ * El resto del sistema sí tiene tiempo real —un flujo SSE por persona, abierto
+ * desde el armazón— pero este registro no lo usa, y es a propósito: a un
+ * registro de auditoría se entra a *buscar* algo que ya pasó, y una tabla que se
+ * reordena sola mientras lees es peor que una quieta. Se recarga al navegar y
+ * con el botón de la barra.
+ *
+ * ⚠️ Este párrafo decía «el repo no tiene WebSocket ni SSE» y llevaba tiempo
+ * siendo falso; también citaba un componente `AutoRefresh` que ya no existe
+ * —se retiró al mudar la bandeja al panel (E4.5)—.
  *
  * ## Los filtros son los cuatro ejes, y viven en la URL
  *
@@ -80,14 +83,14 @@ export default async function ActivityPage({ searchParams }: PageProps) {
   return (
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
-        <AdminTabs activo="actividad" />
-
-        <div className="flex flex-col gap-2">
-          <h2 className="font-display text-2xl text-text-primary">Registro de actividad</h2>
-          <p className="font-serif text-sm italic text-text-secondary">
-            Quién hizo qué, sobre quién, cuándo y por qué. No se puede editar ni borrar.
-          </p>
-        </div>
+        {/* Sin cifras: aquí el número que importa es el de la búsqueda en
+            curso, y ese ya lo lleva el paginador. Un «12.480 acciones en total»
+            no cambiaría ninguna decisión. */}
+        <AdminHeader
+          activo="actividad"
+          titulo="Registro de actividad"
+          descripcion="Quién hizo qué, sobre quién, cuándo y por qué. No se puede editar ni borrar."
+        />
 
         <ActivityToolbar accion={accionFiltro} desde={desde} hasta={hasta} />
 

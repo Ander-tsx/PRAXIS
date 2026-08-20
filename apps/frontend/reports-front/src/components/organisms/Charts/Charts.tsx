@@ -69,7 +69,14 @@ export interface BarDatum {
  */
 export function DistributionBars({ data, unit }: { data: BarDatum[]; unit: string }) {
   if (data.length === 0) {
-    return <p className="py-8 text-center font-sans text-sm text-text-disabled">Sin datos.</p>;
+    /* Centrado en el hueco y no pegado arriba: la tarjeta conserva el alto que
+       le dio quien la colocó, y un «Sin datos.» en la primera línea con medio
+       palmo de vacío debajo se lee como un gráfico que no terminó de cargar. */
+    return (
+      <p className="flex h-full min-h-32 items-center justify-center text-center font-sans text-sm text-text-disabled">
+        Sin datos.
+      </p>
+    );
   }
 
   return (

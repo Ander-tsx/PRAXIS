@@ -15,3 +15,4 @@ export { NavList } from './NavList';
 export * from './navigation';
 export { PresenceFooter } from './PresenceFooter';
 export type { PresenceFooterProps } from './PresenceFooter';
+export * from './DockPanel';

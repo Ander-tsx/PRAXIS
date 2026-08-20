@@ -920,9 +920,29 @@ Checklist, salida de montar esta:
 8. `.env.local` con `GATEWAY_URL` y el **mismo** `JWT_SECRET` que el gateway.
 9. El rewrite en `web-shell/next.config.ts` (las **dos** entradas) y
    `<ZONA>_FRONT_URL` en su `.env.local`.
+10. `scripts/dev-cli/config/services.mjs` → `FRONTEND_APPS`, de donde salen los
+    `.env.local` y los puertos que el CLI espera antes de dar la zona por arriba.
 
-`pnpm dev:frontend` la recoge sola: el filtro es por directorio
-(`--filter="./apps/frontend/*"`), no una lista de paquetes.
+🔴 **11. Y el despliegue, que es lo que se olvida.** `pnpm dev:frontend` recoge
+la zona sola —su filtro es por directorio (`--filter="./apps/frontend/*"`)— y
+eso hace creer que basta con `git push`. **No basta.** La imagen de producción
+enumera las zonas **a mano** en dos sitios de
+`infra/docker/images/frontend.Dockerfile`:
+
+- el `COPY apps/frontend/<zona>/package.json` de la capa de instalación;
+- el `--filter "@praxis/<zona>"` del `RUN pnpm … run build`.
+
+Más el proceso y su `<ZONA>_FRONT_URL` en `frontend.pm2.config.cjs`.
+
+⚠️ **Y lo que hace esto peligroso es cómo falla.** Sin el `--filter`, la imagen
+**se construye sin error**: simplemente no lleva esa zona dentro. El
+contenedor arranca, las otras seis funcionan, y el fallo solo aparece cuando
+alguien entra a `/<zona>` en producción. `cloudbuild.yaml` no ayuda: construye
+una sola imagen del frontend y no enumera zonas, así que no hay dónde
+enterarse.
+
+No hace falta tocar el cortafuegos: las zonas solo son alcanzables por
+loopback (`--network host`) y únicamente el 4100 acepta tráfico de fuera.
 
 ### 17.8 Verificado en navegador real
 
@@ -4377,3 +4397,467 @@ leen `@praxis/contracts` desde `dist/`) y comprobar en el navegador
 4. que la rejilla de proyectos hace dos peticiones y las caras salen igual.
 
 Y recordar que al desplegarlo **hay que volver a entrar una vez** (§41.2).
+
+---
+
+## 42. PRAX sin proyecto, y con memoria de lo que le das
+
+> Etapa **R6** del plan de rediseño. Dos capacidades que se pidieron juntas
+> porque la segunda sin la primera sale coja: contarle un proyecto con tres PDF
+> y que dos turnos después no se acuerde de nada es exactamente el caso que
+> venía a cubrir.
+
+### 42.1 Un adjunto se moría en su turno
+
+Los bytes de un archivo viajan con la pregunta y **no se reenvían nunca más** —
+hacerlo multiplicaría el coste por la longitud del hilo y acabaría comiéndose la
+ventana entera—. Así que dos preguntas después PRAX hablaba de un documento que
+ya no tenía delante, y la conversación quedaba mintiendo.
+
+Estaba escrito como decisión consciente en `assistant.service.ts` (`pregunta:
+payload.message`, «se guarda lo que la persona escribió, no el mensaje con los
+archivos pegados») y el motivo era bueno: un turno con cuarenta mil caracteres de
+un `.md` dentro no se lee como conversación.
+
+**La salida es guardar el texto, no el archivo.** Una columna `extract` en
+`Attachment`, calculada **una sola vez al subir**, y `historial()` la vuelve a
+poner al armar el hilo. El mensaje sigue guardando lo que la persona escribió, la
+burbuja se sigue leyendo, y el modelo vuelve a tener el documento delante.
+
+| Tipo | Extracto | Cuándo |
+|---|---|---|
+| `.txt`, `.md` | el UTF-8 decodificado | al subir. Gratis y determinista |
+| PDF | su capa de texto (`unpdf`) | al subir |
+| PDF escaneado | ninguno | no tiene capa que sacar; no es un error |
+| Imagen | **ninguno** | ver abajo |
+
+⚠️ **El PDF sigue viajando nativo en el turno en el que se adjunta.** Pasarlo a
+texto plano *ahí* sería perder maquetación, tablas y figuras que Gemini sí lee.
+El extracto es para *después*.
+
+### 42.2 Las imágenes se quedan, y la llamada para describirlas se murió
+
+El primer diseño las describía con una **segunda llamada a Gemini** cuyo
+resultado se guardaba. Se descartó entero: era una llamada más, un modo de fallo
+más, una columna con estados y una pregunta abierta sobre si eso gastaba cuota.
+
+Lo que la sustituye no cuesta nada. **En el turno en el que se adjunta una imagen
+el modelo ya la tiene delante, y su respuesta sí se guarda**, así que basta con
+que el prompt le exija contar lo que ve (regla 17). La descripción queda en su
+propio mensaje y se reinyecta por el camino que ya existe.
+
+⚠️ Y el marcador de hecho que iba a guardarse —`[imagen adjunta: captura.png]`,
+como red de seguridad para que PRAX no negara después que hubo una imagen—
+**también se cayó, al implementarlo**: se compone de `filename` y `mimeType`, que
+están siempre. Una columna con un dato derivado de otras dos es una columna que
+se va a quedar desincronizada.
+
+### 42.3 El presupuesto no es un ajuste fino
+
+Con los topes de hoy —3 adjuntos por mensaje, 40 000 caracteres por archivo— un
+hilo de 12 turnos reinyectaría hasta **360 000 caracteres en cada pregunta**. Eso
+no es un riesgo: es una certeza de reventar la ventana y la factura.
+
+- Se **almacena** hasta 40 000 caracteres por archivo.
+- Se **inyecta** hasta **24 000 en total** (`ASSISTANT_EXTRACT_BUDGET_CHARS`),
+  del mensaje más reciente hacia atrás.
+- Lo que se recorta **se avisa dentro del propio prompt**. Un recorte mudo hace
+  que el modelo hable con confianza de un documento del que solo ha visto el
+  principio, que es la peor forma de equivocarse aquí.
+
+**Guardar más de lo que se inyecta es a propósito**: subir el dial luego no
+obliga a volver a extraer nada.
+
+⚠️ Y el orden de las comprobaciones importa: primero «¿cabe entero?», después el
+mínimo útil. Al revés —que es como se escribió— un extracto corto se descartaba
+«por espacio» teniendo sitio de sobra.
+
+### 42.4 Hablar sin ningún proyecto
+
+`AssistantChat` era literalmente `{!projectId ? null : …}`: sin proyecto no había
+compositor. El argumento era correcto para lo que había —el turno iba a
+`POST /projects/:id/assistant/chat` y sin proyecto no había a dónde mandarlo— y
+lo que cambió no es el criterio, es que **ahora sí hay dónde**.
+
+`POST /me/assistant/chat`, solo con `JwtGuard`. Sin proyecto no hay briefing, ni
+miembros, ni chat de equipo, ni permisos que filtrar — no porque se ahorren, sino
+porque no existen.
+
+#### Las reglas del prompt llevan ámbito, y no hay dos listas
+
+Decirle a una conversación sin datos que «los numeros salen del CONTEXTO» es peor
+que no decir nada: le hace buscar un bloque que no existe. Pero la mitad de las
+reglas —el tono, el español de la región, escribir siempre algo, no dejar
+callejones sin salida, que las herramientas no ejecutan— vale igual en los dos
+modos.
+
+⚠️ **Duplicarlas habría sido garantizar que PRAX hablara distinto según hubieras
+elegido proyecto o no.** Así que la lista es una y cada regla dice dónde aplica
+(`ambito: 'siempre' | 'proyecto' | 'sin-proyecto'`). El número que ve el modelo se
+calcula **después de filtrar**, así que en cada modo salen del 1 al N sin huecos.
+
+#### Tres herramientas donde había doce
+
+Ninguna sale de un permiso, porque ninguna toca datos de ningún proyecto:
+`proponer_pregunta`, `proponer_abrir_proyecto` y `proponer_plantilla`.
+
+⚠️ **La plantilla sigue fuera de `herramientasPara`**, y el motivo de §36.1 no ha
+cambiado: declarársela en una conversación sobre un proyecto existente dejaría
+que a mitad de una charla sobre tareas propusiera rehacerlo entero. Sin foco ese
+riesgo no existe —no hay nada que rehacer— y es justo la conversación para la que
+se escribió.
+
+### 42.5 Adoptar un proyecto a mitad
+
+Dos caminos, y los dos conservan el hilo:
+
+1. **PRAX propone abrir uno de los tuyos.** La tarjeta es un sí/no; aceptar
+   navega a `?p=<slug>&c=<conversación>` y a partir de ahí la conversación es de
+   ese proyecto, con briefing y con las doce herramientas.
+2. **Se crea uno desde una plantilla.** Al terminar, el resumen ofrece seguir ahí
+   mismo con el proyecto recién creado.
+
+Lo que impide que el modelo se invente un proyecto no es el prompt: el gateway
+resuelve la lista con la sesión de quien pregunta —`GET
+/projects?permission=canViewReports`, la misma consulta que ya pinta el selector—
+y la propuesta **se valida contra ella**.
+
+⚠️ **Una conversación con foco no vuelve a no tenerlo.** Un turno sin proyecto
+sobre una conversación que ya lo tiene responde **409**: solo puede venir de una
+pestaña descolocada, y aceptarlo en silencio se respondería sin briefing — PRAX
+diría que no tiene datos de un proyecto que la pantalla enseña como cargado, y no
+habría forma de entender por qué.
+
+### 42.6 La invariante de §26.1, otra vez intacta
+
+Aceptar la plantilla llama a `commons/template/apply.ts`, que ya existía para el
+diálogo de proyecto nuevo: `POST /projects` y después las rutas de etiquetas,
+roles, espacios, tableros y columnas, **una a una, con la sesión de quien pulsa**.
+Ninguna ruta de escritura nueva.
+
+Y la tarjeta del chat **no crea de un clic**: su botón abre la revisión del plan,
+que es el mismo componente que usa el diálogo. Un «Aceptar» que montara veinte
+objetos de golpe sería la misma capacidad con el paso de revisión quitado.
+
+### 42.7 Cuatro cosas que solo se vieron construyéndolo
+
+| Qué | Por qué importa |
+|---|---|
+| 🔴 El resolve de propuestas es **una ruta de proyecto** | Aceptar o descartar cualquier tarjeta sin foco daba **404**. Hermana en `/me/assistant/proposals/:id/resolve` |
+| 🔴 `maxOutputTokens: 2048` era **global** | Por ahí pasa la plantilla: un plan grande llegaba cortado, con `finishReason: MAX_TOKENS` y el JSON a medias. Por fuera, «no he sabido responder» |
+| La tarjeta de abrir proyecto **anota su decisión ella misma** | Las demás lo dejan en un efecto de `Marco`; aquí aceptar navega, y una petición lanzada desde un componente que se desmonta a la vez es una carrera que se pierde la mitad de las veces |
+| El proyecto recién creado **no está en la lista de la pantalla** | Se renderizó antes de existir, así que adoptarlo se quedaba en un `return` silencioso. Por eso el `slug` viaja con la propuesta aceptada |
+
+Y un 🐛 que ya estaba: `text/x-markdown` estaba en la lista de tipos permitidos
+—con un comentario explicando que Safari y algunos Linux declaran así un `.md`—
+pero **no** en la de los que se pegan como texto. El mismo archivo entraba como
+texto en Chrome y como binario en Safari.
+
+### 42.8 Lo que **no** está verificado
+
+🔴 **Nada de esto se ha probado contra el modelo**: la clave de Gemini está sin
+crédito. Lo que sí está comprobado:
+
+- la migración, aplicada sobre la base real;
+- la extracción, con un PDF de verdad (2300 caracteres), un `.md`, una imagen y
+  un PDF corrupto —que registra el aviso y devuelve `null` sin tumbar la subida—;
+- el reparto del presupuesto, con dos mensajes y tres adjuntos;
+- typecheck de las siete zonas y de los dos servicios, y `next build` de
+  `assistant-front`.
+
+Lo que falta por ver en vivo es lo que solo dice el modelo: si con la regla 17
+narra de verdad las imágenes, si sin foco propone abrir el proyecto correcto, y
+si una plantilla pedida en mitad de una conversación sale tan buena como la que
+sale del formulario, donde el brief se escribe de una sentada.
+
+---
+
+## 43. Lo que cuesta un turno del asistente, medido
+
+> Sale de una pregunta buena: «1,6 M de tokens de entrada en 56 peticiones,
+> ¿está bien o mal?». No había forma de responderla sin medir, así que se midió
+> el prompt real contra la base real.
+
+### 43.1 La vara de medir, que es lo que faltaba
+
+| Tipo de sistema | Tokens de entrada por mensaje |
+|---|---|
+| Chatbot sin contexto | 500 – 2 000 |
+| Asistente con búsqueda (RAG) | 3 000 – 8 000 |
+| **Agente con inventario de trabajo — este** | **10 000 – 30 000** |
+| Agente de programación | 50 000 – 200 000 |
+
+A tarifa de gama Flash eso son **céntimos por conversación**. El gasto nunca fue
+el problema; el problema era que **no tenía techo**.
+
+### 43.2 Dónde iba cada token, antes de tocar nada
+
+Sobre el proyecto de demostración —186 tareas, el caso malo—:
+
+| Bloque | Tokens |
+|---|---|
+| Reglas + andamiaje | 2 500 |
+| Briefing | 23 100 |
+| — de ellos, `tareas` | **20 900** |
+| Declaración de herramientas | 3 700 |
+| **Total por turno** | **29 300** |
+
+El dato que lo decidió todo: **de los 449 caracteres que ocupaba una tarea, solo
+55 eran texto**. El resto, UUIDs y nombres de clave. Y 116 de las 186 estaban
+cerradas, viajando enteras en cada mensaje.
+
+### 43.3 Los cuatro recortes
+
+1. **Una tarea cerrada viaja en versión corta** —id, título, columna—. Se la
+   puede seguir nombrando, contando, reabriendo y borrando, que es todo lo que se
+   hace con trabajo terminado. Repartir, clasificar, priorizar o marcar pasos son
+   gestos sobre trabajo vivo.
+2. **`boardId` no sale del briefing.** El modelo nombra el tablero por su nombre
+   y coloca por `columnId`, que ya lo identifica: eran 47 caracteres por tarea
+   pagados por un dato que nadie lee.
+3. **La descripción se acota a 500 caracteres**, avisando del corte. Era el único
+   campo sin techo de todo lo que viaja en cada turno.
+4. **El inventario entero tiene presupuesto** (`INVENTARIO_MAX_CHARS`, 45 000
+   caracteres). En caracteres y no en filas por lo mismo que en los adjuntos: una
+   tarea abierta con encargados y checklist cuesta el doble que una cerrada.
+
+| | inicio | tras 1–3 | con techo |
+|---|---|---|---|
+| `tareas` | 20 900 | 13 900 | **10 700** |
+| **Total por turno** | **29 300** | 22 500 | **19 300** |
+
+Y lo que de verdad cambia: **a partir de aquí un proyecto de mil tareas cuesta lo
+mismo que uno de doscientas**.
+
+### 43.4 ⚠️ Un recorte mudo es peor que no recortar
+
+`task_inventory` devuelve `{ tareas, omitidas }` y el briefing propaga
+`tareasOmitidas` cuando hay alguna. La regla 5 del prompt le prohíbe entonces
+decir «esas son todas».
+
+Sin eso, el modelo respondería con total seguridad sobre una lista que alguien le
+cortó por detrás — y esa es la clase de error que nadie detecta, porque la
+respuesta suena igual de bien.
+
+Lo mismo vale para las cerradas abreviadas: el prompt dice que vienen sin detalle
+y que, si se lo piden, **diga que no lo tiene delante en vez de suponerlo**.
+
+### 43.5 Lo que NO se hizo, y por qué
+
+**La caché de contexto.** Es el siguiente lever y el único que queda grande: los
+modelos son sin estado, así que toda conversación se reenvía entera en cada
+turno —eso lo hacen ChatGPT, Claude y Gemini por igual— pero el proveedor puede
+tener cacheado el trabajo de procesar un prefijo idéntico y cobrarlo mucho más
+barato.
+
+No se hizo **a ciegas**: exige conocer los mínimos y el ciclo de vida del
+proveedor para el modelo concreto, y no se puede verificar nada con la clave sin
+presupuesto. Queda como R7 en el plan de rediseño, con lo que habría que hacer.
+
+---
+
+## 44. Análisis: filtros, cartera y un constructor que no necesita a PRAX
+
+La etapa R4 del [plan de rediseño](PLAN-REDISENO.md), cerrada. Cuatro cosas que
+la sección no tenía y una que tenía mal.
+
+### 44.1 Los filtros, en las ocho rutas y en el `WHERE`
+
+`from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`. Un solo DTO
+—`ReportFiltersQueryDto`— validado por el gateway en las siete rutas sueltas y
+en el paquete, y aplicado en las siete consultas agregadas de `StatsService`.
+
+**Por qué un DTO compartido y no un parámetro por ruta.** Con los filtros metidos
+ruta a ruta, la pantalla acabaría pudiendo filtrar el flujo acumulado por tablero
+pero no la instantánea, sin nada que explicara la diferencia. Un filtro que está
+en unos gráficos y no en otros no se lee como una limitación técnica: se lee como
+que el gráfico que no filtra está mal.
+
+**El tablero no hubo que traducirlo a columnas.** Parecía que sí —los tableros
+viven en projects-service y aquí se agregan tareas— pero `Task` guarda `boardId`
+además de `columnId`, y `TaskEvent` también. Comprobarlo antes ahorró un cruce
+contra projects-service en la ruta más pedida de la sección.
+
+#### 🔴 Los filtros van en la clave de Redis, y el `from` derivado de `days` no
+
+Las dos mitades hacen falta y las dos fallan en silencio:
+
+- **Sin los filtros en la clave**, quien mira el flujo de un tablero concreto deja
+  su resultado guardado bajo la clave del proyecto entero, y el siguiente en
+  entrar —filtre o no— ve el gráfico de otro durante los 60 s de la caché. No hay
+  error: hay un gráfico plausible y equivocado.
+- **Con el `from` derivado de `days` dentro**, la clave cambia cada milisegundo
+  —es «ahora menos sesenta días»— y ningún informe vuelve a acertar en caché
+  jamás. Se ve como que la caché dejó de funcionar.
+
+`claveDeFiltros` vive en el mismo archivo que el DTO para que un filtro nuevo se
+añada a los dos sitios a la vez.
+
+#### ⚠️ Un tramo demasiado ancho se rechaza; `days` se recorta
+
+Son dos formas de pedir la misma ventana y se tratan distinto a propósito. Quien
+escribe `?days=100000` está pidiendo «todo», y devolverle 365 días es lo que
+quería. Dos fechas son una pregunta concreta —«del 1 de enero al 30 de junio»— y
+estrecharla por detrás devuelve un gráfico que se lee como su respuesta sin
+serlo. Es la regla de §43: **un recorte mudo es peor que no recortar**.
+
+#### ⚠️ `from`/`to` no acota lo mismo en todos los informes
+
+Y no puede, porque no miden lo mismo:
+
+| Informe | El tramo acota | Por qué |
+|---|---|---|
+| `snapshot`, `blocked`, `people` | `createdAt` | Miden **estado de ahora**. Un tramo solo puede querer decir «de lo que entró en él» |
+| `cycle-time`, `forecast` | `completedAt` | Miden lo que se cerró |
+| `flow` | `occurredAt` | Mide movimientos |
+| `weekly` | **es el eje** | Qué semanas salen, no qué tareas cuentan |
+
+Los cuatro devuelven un gráfico plausible con cualquier criterio, que es la razón
+de que la tabla esté escrita en `StatsService`.
+
+#### ⚠️ Y el reparto se acota a la dimensión filtrada
+
+Filtrar por una responsable devolvía un reparto **por persona** con tres: la suya
+y las de quien compartiera tarea con ella, con un 1 al lado. Medido:
+`22222222:62` junto a `11111111:1` y `33333333:1`. Lo mismo por etiqueta —pedir
+«frontend» daba 45 de frontend y otras tres etiquetas con 1, 6 y 2—.
+
+Las tareas seleccionadas estaban bien; el problema era la dimensión del reparto:
+las dos relaciones son de muchos a muchos. En la pantalla eso se lee como que el
+filtro **no se aplicó**, y un filtro que funciona pareciendo roto es peor que uno
+que no está. Lo que se pierde es el cruce —«de lo de frontend, cuánto es
+urgente»— y se pierde a propósito: es una pregunta de dos dimensiones sobre un
+gráfico que tiene una.
+
+#### La barra, y su `key`
+
+Los filtros viven en la URL, como en Administración: «las urgentes del tablero de
+diseño» es un enlace que se pega en un mensaje. Sin botón «Aplicar», porque desde
+R4.2 un cambio de filtro cuesta **una** petición —la misma que abrir la pantalla—
+y un botón aparte solo crea el estado en el que la pantalla enseña unos números y
+los controles dicen otra cosa.
+
+⚠️ **`AnalysisFilters` lleva una `key` atada a los filtros puestos.** Los dos
+selectores de fecha no se controlan desde fuera y en una navegación suave del App
+Router no se desmontan: «Quitar filtros» dejaba la URL limpia y el campo seguía
+enseñando la fecha.
+
+### 44.2 La cartera — `GET /me/reports/portfolio`
+
+Una fila por proyecto con lo que hace entrar: abiertas, vencidas, sin asignar,
+paradas y el ritmo de esta semana contra la anterior. Cuelga de `/me` porque no
+hay proyecto en la ruta contra el que comprobar nada, y **la línea de acceso es
+la lista**: el gateway pide los proyectos con `canViewReports` y agrega solo
+esos.
+
+**Dos consultas, no dos por proyecto.** Llamar a `snapshot` y `sinMovimiento` por
+cada uno habría hecho que quien lleva doce pagara veinticuatro agregaciones para
+pintar una tabla que se lee en cinco segundos. Es el cálculo de R4.2
+multiplicado por cuántos proyectos lleve cada cual.
+
+⚠️ **Se recorre `projectIds`, no el resultado del `GROUP BY`**: un proyecto sin
+ninguna tarea no sale de una agrupación, y desaparecer de la cartera se lee como
+que no tienes acceso.
+
+⚠️ **No se calcula ninguna variación del ritmo**, solo los dos números. La semana
+en curso está a medias y un lunes cualquier comparación con siete días completos
+da un «−80 %» falso dicho con seguridad. En el informe semanal de un proyecto eso
+se resuelve mandando también el ritmo diario de las dos; aquí no cabe.
+
+⚠️ **`/reports/cartera` puede quedar oculta por un proyecto con ese slug.** Es una
+ruta estática hermana de `[[...id]]` y Next da prioridad a la estática. Es el
+patrón que ya usa `projects-front` con `tablero` y `tarea`; el arreglo de verdad
+—reservar esos slugs— está en PENDIENTES-BACKEND §21.
+
+### 44.3 El constructor de gráficos
+
+Diez métricas por cinco formas estaban **enteras detrás de una conversación**.
+Ahora se eligen de dos desplegables, sin modelo y sin cuota. Los dos caminos se
+quedan: PRAX sigue siendo el atajo para quien ya sabe qué preguntar.
+
+**Produce exactamente lo mismo que la propuesta del asistente** —el mismo
+`ReportChartSpec`, la misma validación, la misma ruta de guardado—. Si
+divergieran, un gráfico hecho a mano y otro pedido hablando podrían dibujar
+cosas distintas bajo el mismo título.
+
+**Los desplegables no ofrecen lo imposible.** Las formas salen de
+`METRICAS[metrica].formas`, y el rango, el top N y «solo vencidas» solo aparecen
+si esa métrica los acepta. Un conjunto cerrado que deja componer combinaciones
+inválidas y luego las rechaza es un formulario con trampas.
+
+⚠️ **Cambiar de métrica rehace la forma y el título.** Si no, queda puesta una
+forma que la métrica nueva no acepta y el error solo sale al pulsar «Añadir»; y
+un gráfico de cierres semanales rotulado «Tareas por columna» se lee mal y nadie
+lo revisa.
+
+### 44.4 🔴 El lienzo de partida no se podía tocar
+
+`lienzoPorDefecto()` nacía con los ids `defecto-resumen`, `defecto-columna` y
+`defecto-prioridad`, y `ReportLayoutDto` valida cada `id` con `@IsUUID`. El
+lienzo de R4.6 se pintaba bien y **el primer arrastre respondía 400**: la
+disposición volvía atrás sola y la pantalla decía «Validation failed».
+
+No aparecía al abrir —el lienzo de partida se pinta sin guardar nada— sino al
+mover algo, que es el gesto siguiente. Y ni el typecheck ni `next build` podían
+verlo: los dos lados son `string`. Salió al ejecutarlo contra el backend
+levantado, que es la moraleja entera de este apartado.
+
+Ahora son tres UUID constantes, y constantes a propósito: `lienzoPorDefecto()`
+corre en el servidor en cada carga, y con `crypto.randomUUID()` dos pestañas del
+mismo proyecto guardarían dos lienzos distintos y ganaría el último.
+
+### 44.5 Lo que sube a `commons` en esta etapa
+
+`SelectorDeFecha` y `DataTable`, las dos con la regla de siempre: las usan dos
+zonas. Mudanzas sin cambios de lógica y con sus comentarios intactos —los de
+`DataTable` sobre la pista `auto` y el `minmax(0, Nfr)` son media razón de que
+ese componente exista—.
+
+### 44.6 R4.8: no hacen falta tablas para `reports-service`
+
+Estaba escrito como «si R4.2 o R4.4 las piden». No las piden: R4.2 agrupa
+peticiones que ya existían y R4.4 agrega en tasks-service, donde están los datos.
+El servicio sigue **sin base de datos**, que es lo que se decidió en §25.6, y el
+lienzo sigue en `projects-service` sin migración entre bases.
+
+
+### 44.7 Segunda pasada de interfaz (2026-08-19)
+
+La primera arregló fallos y dejó la pantalla casi igual. Esta la cambia.
+
+**Los paneles se abren sin dar un salto.** Los tres —filtros, catálogo,
+constructor— aparecían de golpe y miden entre 100 y 300 px: el lienzo pegaba un
+brinco y quien miraba un grafo lo perdía de vista sin tocar nada.
+
+🔴 **`grid-template-rows` de `0fr` a `1fr`, nunca `max-height`.** Aquello
+«funciona» y miente: la transición corre sobre los píxeles que el contenido **no**
+tiene, así que un panel de 100 px con `max-height: 500px` abre en un quinto del
+tiempo y pasa el resto en nada; al cerrar, empieza lento y termina de golpe. Y el
+ritmo cambia con lo que haya dentro, que aquí depende de cuántos filtros se
+pinten. `height: auto` directamente no se puede animar. Medido: 325 px a los
+120 ms, 581 px abierto. Vive en `molecules/Desplegable`, con `motion-safe`.
+
+🔴 **El panel de filtros se cerraba en cada selección**, por la `key` de §44.1:
+remontaba el organismo entero en cada cambio, así que acumular tres filtros eran
+tres viajes de abrir y volver a abrir. La `key` se mudó a los dos
+`SelectorDeFecha`, que es lo único que la necesitaba.
+
+**Los grafos se eligen por su forma.** El catálogo eran ocho tarjetas de texto:
+elegir «flujo acumulado» obligaba a leerse la frase y traducirla a una imagen.
+`molecules/MiniGrafo` dibuja las cinco formas del constructor más tres que solo
+existen en el catálogo —cifras, dispersión, lista—. En el constructor, la forma
+pasa de desplegable a **fila de miniaturas**: «área apilada» en una lista obliga
+a saber qué significan esas dos palabras antes de poder elegir.
+
+⚠️ **La miniatura nunca lleva datos reales.** En un proyecto sin historial saldría
+plana, y una fila de barras a cero se lee como «este grafo no sirve» cuando lo que
+pasa es que aún no hay nada. Dice qué forma tiene, no qué valores tendrá.
+
+**Un panel con pestañas** en lugar de dos que se cerraban el uno al otro: son dos
+formas de hacer lo mismo, y quien llega al catálogo descubre el constructor sin
+que nadie se lo cuente. El estado pasa a ser uno en vez de dos booleanos —que
+tenían un estado imposible y cuatro sitios donde acordarse de cerrar al otro—.
+
+**Y «gráfico» pasa a «Grafo»** en la interfaz, por decisión de producto del
+2026-08-19. ⚠️ Queda escrito que en español un grafo son nodos y aristas: si algún
+día chirría, el cambio está acotado a las cadenas de un solo commit.

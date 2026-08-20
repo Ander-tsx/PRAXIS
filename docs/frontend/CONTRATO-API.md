@@ -1257,6 +1257,78 @@ volvería a abrir el agujero.
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
+### La cartera 🔒 — `GET /me/reports/portfolio`
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| GET | `/me/reports/portfolio?dias` | Solo sesión |
+
+Cuelga de `/me` porque no hay proyecto en la ruta contra el que comprobar nada,
+igual que `/me/tasks`. **La línea de acceso es la lista**: el gateway pide los
+proyectos con `canViewReports` y agrega solo esos, así que sin ninguno devuelve
+`[]` — que no es un error.
+
+```ts
+[{
+  projectId, name, slug,
+  total, abiertas, cerradas,
+  vencidas,      // abiertas con la fecha pasada. Una entregada no vence
+  sinAsignar,    // abiertas sin nadie
+  paradas,       // abiertas sin cambiar de columna desde hace `dias` (por defecto 7)
+  cerradasSemana, cerradasSemanaAnterior,
+}]
+```
+
+⚠️ **Salen todos los proyectos, incluidos los que no tienen ni una tarea**, con
+ceros. Un `GROUP BY` los habría dejado fuera, y desaparecer de la cartera se lee
+como que no tienes acceso.
+
+⚠️ **`paradas` aquí no distingue las que no tienen historial**, al contrario que
+`/reports/blocked`. En una fila por proyecto no cabe el matiz.
+
+⚠️ **No acepta los filtros de abajo.** `boardId`, `assigneeId` y `labelId` son
+ids de **un** proyecto, así que cruzarlos con una lista no significa nada.
+
+⚠️ **Y no devuelve ninguna variación del ritmo**, solo los dos números. La semana
+en curso está a medias: un lunes, comparar contra siete días completos da un
+«−80 %» falso con toda la apariencia de un dato exacto.
+
+### Filtros — los mismos seis en las ocho rutas
+
+Las siete de arriba **y el paquete** aceptan además:
+
+| Parámetro | Forma | Qué acota |
+|---|---|---|
+| `from` / `to` | ISO 8601 | El tramo. **Manda sobre `days`** |
+| `boardId` | UUID | Las tareas de ese tablero |
+| `assigneeId` | UUID | Las de esa persona |
+| `labelId` | UUID | Las de esa etiqueta |
+| `priority` | `LOW` · `MEDIUM` · `HIGH` · `URGENT` | |
+
+⚠️ **Un tramo de más de 365 días responde 400**, no se recorta —al revés que
+`days`, que sí se acota en silencio—. Dos fechas son una pregunta concreta y
+estrecharla por detrás devolvería un gráfico que se lee como su respuesta.
+
+⚠️ **Un `to` sin `from` se ignora**, y no da error: es la ventana por defecto
+acabando antes, que no es ninguna pregunta.
+
+⚠️ **`from`/`to` no acota lo mismo en todos los informes**, y no puede:
+
+| Informe | El tramo acota |
+|---|---|
+| `snapshot`, `blocked`, `people` | `createdAt` — miden estado de ahora |
+| `cycle-time`, `forecast` | `completedAt` — miden lo que se cerró |
+| `flow` | `occurredAt` — mide movimientos |
+| `weekly` | **es el eje**: qué semanas salen, no qué tareas cuentan |
+
+⚠️ **Y el `days` de `blocked` sigue significando «lleva sin moverse»**, no una
+ventana de historial. Los filtros le aplican; su `days` no cambia de sentido.
+
+Un valor mal formado —un UUID que no lo es, una prioridad inventada— responde
+**400 al paquete entero**, así que las ocho tarjetas se quedan sin datos por un
+parámetro. Si construyes la query desde algo que puede venir de la barra de
+direcciones, comprueba al menos `priority`, que es conjunto cerrado.
+
 ### ⚠️ Las siete piden `canViewReports`. Antes solo la última.
 
 Seis de las siete pedían `canViewProject`, con la idea de que la línea fuese de
@@ -1424,7 +1496,10 @@ se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofre
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
+| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds? }` | ninguno propio, solo `JwtGuard` |
 | POST | `/me/assistant/project-draft` | `{ brief }` | ninguno propio, solo `JwtGuard` |
+| POST | `/projects/:projectId/assistant/proposals/:id/resolve` | `{ status }` | `canViewReports` |
+| POST | `/me/assistant/proposals/:id/resolve` | `{ status }` | ninguno propio, solo `JwtGuard` |
 
 Las dos primeras cuelgan de `/projects/:projectId` para que el guard resuelva el
 proyecto desde la ruta, igual que los reportes. La cuota es **del usuario**, no
@@ -1444,6 +1519,82 @@ preguntarle por él: dejarlo abierto habría sido una puerta trasera al contenid
 que la pantalla ya no enseña. `/me/assistant/quota` **no** cambia — es la cuota
 del usuario, no de ningún proyecto, y Configuración la sigue leyendo sin
 permisos de proyecto.
+
+### `POST /me/assistant/chat` — hablar sin ningún proyecto
+
+Misma entrada y misma salida que la de proyecto. Lo que cambia es todo lo demás:
+**no hay proyecto, así que no hay contexto**. Sin briefing, sin miembros, sin
+chat de equipo y sin permisos que filtrar.
+
+Existe porque la otra cuelga de `/projects/:projectId` y exige `canViewReports`
+sobre ese proyecto: para hablar de uno que **todavía no existe** habría que
+inventarse un id que satisficiera al guard.
+
+Las herramientas que se le declaran al modelo son **tres**, y ninguna sale de un
+permiso porque ninguna toca datos de ningún proyecto:
+
+| Herramienta | Qué propone |
+|---|---|
+| `proponer_pregunta` | Lo mismo que en el otro modo: desambiguar con opciones |
+| `proponer_abrir_proyecto` | Cargar uno de **tus** proyectos en esta conversación |
+| `proponer_plantilla` | La estructura de arranque de un proyecto nuevo |
+
+⚠️ **`proponer_abrir_proyecto` se valida contra la lista que resuelve el
+gateway** —`GET /projects?permission=canViewReports` con la sesión de quien
+pregunta—, no contra lo que diga el modelo. Un id inventado, o el de un proyecto
+ajeno, se descarta antes de llegar al navegador. Y aceptar no da acceso a nada:
+carga el proyecto por el camino de siempre, con los guards de siempre.
+
+⚠️ **Una conversación sin foco puede adoptar un proyecto; una con foco no lo
+cambia.** El turno siguiente va por la ruta del proyecto con el mismo
+`conversationId` y el servicio fija el foco ahí. Al revés —mandar un turno sin
+proyecto a una conversación que ya lo tiene— responde **409**: se respondería sin
+briefing, así que PRAX diría que no tiene datos de un proyecto que la pantalla
+enseña como cargado.
+
+### Los adjuntos de PRAX
+
+| Método | Ruta | Entrada |
+|---|---|---|
+| POST | `/me/assistant/attachments` | **multipart**, campo `file` → 201 |
+| GET | `/me/assistant/attachments/:id/content` | — |
+| DELETE | `/me/assistant/attachments/:id` | — · **solo borradores propios** |
+
+**Se sube antes de enviar el mensaje** y queda como borrador; el turno lo reclama
+con `attachmentIds`. No es una preferencia de diseño: la pregunta viaja por una
+Server Action, cuyo cuerpo está topado en 1 MB, y con el archivo dentro
+cualquier foto de teléfono moría con un «Body exceeded 1 MB limit» de Next — sin
+traducir y sin decir qué archivo.
+
+Tres por mensaje, 5 MB cada uno, y solo PDF, PNG/JPEG/WebP, texto y Markdown.
+⚠️ `text/x-markdown` **también**: Safari y algunos Linux declaran así un `.md`.
+
+**Qué sobrevive al turno**, que es lo que hay que saber para escribir la pantalla:
+
+| Tipo | En el turno que lo lleva | En los siguientes |
+|---|---|---|
+| `.txt`, `.md` | pegado como texto en el prompt | **sí**, su texto se guardó al subirlo |
+| PDF | nativo, con su maquetación | **sí**, su capa de texto |
+| PDF escaneado | nativo | no: no tiene capa de texto que guardar |
+| Imagen | nativa, el modelo la ve | **no** — lo que queda es lo que PRAX dijo de ella |
+
+Por eso el prompt le pide a PRAX **contar qué ve** cuando el turno lleva una
+imagen: su propia respuesta es lo único que quedará. Y lo reinyectado tiene
+presupuesto (`ASSISTANT_EXTRACT_BUDGET_CHARS`, 24 000 caracteres en total, del
+más reciente hacia atrás), así que un bloque puede llegar recortado o reducido a
+su nombre — el prompt le prohíbe hablar como si lo hubiera leído entero.
+
+### `POST …/assistant/proposals/:id/resolve` — anotar lo que se decidió
+
+**No aplica nada.** Solo deja escrito si una propuesta se aceptó o se descartó,
+para que al releer el hilo dentro de una semana no vuelva a ofrecer un botón que
+ya se pulsó. Aplicarla es otra petición, al endpoint de siempre y con su permiso;
+el cliente llama aquí **después** de que aquella haya salido bien.
+
+🔴 **La versión de `/me` existe porque la de proyecto respondía 404** a cualquier
+tarjeta de una conversación sin foco: no hay `projectId` que poner en la ruta. Lo
+que protege a las dos es que el `userId` sale del token y assistant-service
+comprueba que la propuesta cuelga de una conversación de esa persona.
 
 ### `POST /me/assistant/project-draft` — la plantilla de un proyecto nuevo
 

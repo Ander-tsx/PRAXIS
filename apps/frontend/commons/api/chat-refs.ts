@@ -80,7 +80,7 @@ export type ChatToken =
  * así que compartir una instancia hace que la segunda llamada empiece por la
  * mitad. Es un fallo que solo aparece a partir del segundo mensaje de la lista.
  */
-export function trocearMensaje(cuerpo: string): ChatToken[] {
+export function splitMessage(cuerpo: string): ChatToken[] {
   const patron = new RegExp(PATRON_REFERENCIA.source, 'g');
   const patronUrl = new RegExp(PATRON_URL.source, 'g');
   const trozos: ChatToken[] = [];
@@ -134,7 +134,7 @@ export function trocearMensaje(cuerpo: string): ChatToken[] {
  * texto guardara la etiqueta entera —`@[María García](user:2222…)`—, quien
  * edita un mensaje vería un UUID de 36 caracteres en mitad de su frase.
  */
-export interface EtiquetaPlana {
+export interface FlatLabel {
   kind: ChatRefKind;
   id: string;
   /** Lo que se ve en el campo: `@María García`, o el título de la tarea. */
@@ -149,10 +149,10 @@ export interface EtiquetaPlana {
  * convierte en `@María García` + una etiqueta que guarda el id. Si se guarda sin
  * tocar nada, `serializarEtiquetas` reconstruye el cuerpo exacto.
  */
-export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: EtiquetaPlana[] } {
-  const trozos = trocearMensaje(cuerpo);
+export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: FlatLabel[] } {
+  const trozos = splitMessage(cuerpo);
   const texto: string[] = [];
-  const etiquetas: EtiquetaPlana[] = [];
+  const etiquetas: FlatLabel[] = [];
 
   for (const trozo of trozos) {
     if (trozo.tipo === 'texto') {
@@ -182,7 +182,7 @@ export function desdoblarEtiquetas(cuerpo: string): { texto: string; etiquetas: 
  * ese trozo del texto, no se encuentra y se ignora — el mensaje sale con lo que
  * de verdad quedó escrito. Espejo del `serializar()` del Composer.
  */
-export function serializarEtiquetas(texto: string, etiquetas: EtiquetaPlana[]): string {
+export function serializarEtiquetas(texto: string, etiquetas: FlatLabel[]): string {
   const salida: string[] = [];
   let desde = 0;
 
@@ -224,7 +224,7 @@ export function componerReferencia(kind: ChatRefKind, id: string, label: string)
  * Deja el nombre y se come la maquinaria, que es lo que alguien esperaría leer.
  */
 export function textoPlano(cuerpo: string): string {
-  const texto = trocearMensaje(cuerpo)
+  const texto = splitMessage(cuerpo)
     .map((trozo) =>
       trozo.tipo === 'texto'
         ? trozo.texto
@@ -245,18 +245,18 @@ export function textoPlano(cuerpo: string): string {
  * estuviera roto. Aquí se dice qué es, no el nombre del archivo —ese no
  * importa para reconocer el mensaje, y sí para el ruido visual.
  */
-export type TipoDeAdjunto = 'imagen' | 'video' | 'archivo';
+export type AttachmentKind = 'imagen' | 'video' | 'archivo';
 
-export interface PreviewDeMensaje {
+export interface MessagePreview {
   texto: string;
   /** `null` cuando el mensaje tiene texto propio: no hace falta decir qué es. */
-  tipoAdjunto: TipoDeAdjunto | null;
+  tipoAdjunto: AttachmentKind | null;
 }
 
-export function previewDeMensaje(mensaje: {
+export function messagePreview(mensaje: {
   body: string;
   attachments: { mimeType: string }[];
-}): PreviewDeMensaje {
+}): MessagePreview {
   const texto = textoPlano(mensaje.body).trim();
   if (texto) return { texto, tipoAdjunto: null };
 

@@ -48,20 +48,23 @@ export function PresenceFooter({ presencia, onCambiar }: PresenceFooterProps) {
         }
       }
       clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        inactivoRef.current = true;
-        // Si hay inactividad y estaba AVAILABLE, lo pasamos a AWAY
-        // El usuario pidio que no aplique si "manualmente eligio otro status y esta activo"
-        // Asumimos que si no es AVAILABLE o AWAY, fue elegido manualmente.
-        if (presencia === 'AVAILABLE') {
-          void onCambiar('AWAY');
-        }
-      }, 5 * 60 * 1000); // 5 minutos
+      timeout = setTimeout(
+        () => {
+          inactivoRef.current = true;
+          // Si hay inactividad y estaba AVAILABLE, lo pasamos a AWAY
+          // El usuario pidio que no aplique si "manualmente eligio otro status y esta activo"
+          // Asumimos que si no es AVAILABLE o AWAY, fue elegido manualmente.
+          if (presencia === 'AVAILABLE') {
+            void onCambiar('AWAY');
+          }
+        },
+        5 * 60 * 1000,
+      ); // 5 minutos
     }
 
     const events = ['mousemove', 'keydown', 'click', 'scroll'];
     events.forEach((event) => window.addEventListener(event, onActivity));
-    
+
     // Iniciar timer
     onActivity();
 

@@ -39,7 +39,7 @@ export class StandardResponseInterceptor implements NestInterceptor {
      *
      * Sin `type`, Nest no escribe la línea `event:`, el navegador lo entrega
      * como evento genérico `message`, y el `addEventListener('aviso', …)` de
-     * `AvisosEnVivo` **no se dispara nunca**. Los avisos en vivo llegaban hasta
+     * `LiveNotices` **no se dispara nunca**. Los avisos en vivo llegaban hasta
      * el navegador y morían ahí: sin tarjeta y sin sonido, sin ningún error de
      * por medio ni en el servidor ni en la consola.
      *

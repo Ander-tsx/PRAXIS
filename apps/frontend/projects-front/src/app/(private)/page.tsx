@@ -7,13 +7,16 @@ import { ProjectGrid } from '@/components/organisms/ProjectGrid';
 import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 import {
   AppHeader,
-  CreateProjectDialog,
+  AssistantChat,
+  DockSlot,
   type Paginated,
   Pagination,
+  PRAX_NAME,
   type Project,
   type UserProfile,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -154,16 +157,17 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   };
 
   return (
-    <AppHeader
-      title="Proyectos"
-      headerSlot={
-        <CreateProjectDialog
-          action={createProjectAction}
-          borradorAction={borradorDePlantillaAction}
-          aplicarAction={crearProyectoDesdePlantillaAction}
+    <AppHeader title="Proyectos">
+      <DockSlot titulo={`${PRAX_NAME}, el asistente`}>
+        <AssistantChat
+          projectId={null}
+          gatewayPath="/projects/api/gateway"
+          cuotaInicial={null}
+          nombres={{}}
+          etiquetas={{}}
+          variante="cajon"
         />
-      }
-    >
+      </DockSlot>
       {/* Sin «Tus proyectos» en un `h2` debajo de «Proyectos»: eran dos títulos
           y una frase en cursiva antes del primer proyecto, en una pantalla a la
           que se llega pulsando «Proyectos» en la barra lateral. Lo que decía la
@@ -173,13 +177,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         {page.items.length === 0 && !search ? (
           <ProjectsEmptyState
             action={
-              <CreateProjectDialog
-                action={createProjectAction}
-                borradorAction={borradorDePlantillaAction}
-                aplicarAction={crearProyectoDesdePlantillaAction}
-                triggerLabel="Crear mi primer proyecto"
-                triggerSize="lg"
-              />
+              <PraxCreateProjectTrigger triggerVariant="boton" />
             }
           />
         ) : (
@@ -191,12 +189,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
               search={search}
               equiposPorProyecto={equiposPorProyecto}
               crearSlot={
-                <CreateProjectDialog
-                  action={createProjectAction}
-                  borradorAction={borradorDePlantillaAction}
-                  aplicarAction={crearProyectoDesdePlantillaAction}
-                  triggerVariant="tarjeta"
-                />
+                <PraxCreateProjectTrigger triggerVariant="tarjeta" />
               }
             />
             <Pagination

@@ -23,6 +23,7 @@ import {
   GetAttachmentDto,
   MoveTaskDto,
   PurgeTasksDto,
+  type ReportFilters,
   RestatusTasksDto,
   ToggleChecklistDto,
   UpdateCommentDto,
@@ -33,7 +34,7 @@ import {
 import { AttachmentsService } from './attachments.service';
 import { CommentsService } from './comments.service';
 import { LabelsService } from './labels.service';
-import { StatsService } from './stats.service';
+import { type DimensionCruce, StatsService } from './stats.service';
 import { TasksService } from './tasks.service';
 
 @Controller()
@@ -200,24 +201,31 @@ export class TasksController {
 
   // ─── Estadísticas ─────────────────────────────────────────────────────────
 
+  /**
+   * ⚠️ **`filtros` llega ya resuelto y ya validado.** El gateway comprobó las
+   * formas contra `ReportFiltersQueryDto` y que el tramo tenga sentido;
+   * reports-service metió dentro la ventana en días, de modo que `from` siempre
+   * viene puesto en los informes con historial. Aquí no se vuelve a mirar: es el
+   * mismo trato que tiene el resto de comandos internos.
+   */
   @MessagePattern({ cmd: 'task_stats_snapshot' })
-  statsSnapshot(@Payload() dto: { projectId: string }) {
-    return this.statsService.snapshot(dto.projectId);
+  statsSnapshot(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.snapshot(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_cycle' })
-  statsCycle(@Payload() dto: { projectId: string; from?: string }) {
-    return this.statsService.cycleTimes(dto.projectId, dto.from ? new Date(dto.from) : undefined);
+  statsCycle(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.cycleTimes(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_flow' })
-  statsFlow(@Payload() dto: { projectId: string; from: string }) {
-    return this.statsService.dailyFlow(dto.projectId, new Date(dto.from));
+  statsFlow(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.dailyFlow(dto.projectId, dto.filtros);
   }
 
   @MessagePattern({ cmd: 'task_stats_people' })
-  statsPeople(@Payload() dto: { projectId: string }) {
-    return this.statsService.byPerson(dto.projectId);
+  statsPeople(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.byPerson(dto.projectId, dto.filtros);
   }
 
   /** El inventario de tareas para el contexto del asistente. */
@@ -237,16 +245,68 @@ export class TasksController {
 
   /** Entradas y cierres por semana, para «¿cómo estuvo la semana?». */
   @MessagePattern({ cmd: 'task_stats_weekly' })
-  statsWeekly(@Payload() dto: { projectId: string; semanas?: number }) {
-    return this.statsService.weeklyThroughput(dto.projectId, dto.semanas);
+  statsWeekly(@Payload() dto: { projectId: string; semanas?: number; filtros?: ReportFilters }) {
+    return this.statsService.weeklyThroughput(dto.projectId, dto.semanas, dto.filtros);
   }
 
   /**
    * Abiertas que llevan `dias` sin cambiar de columna. No hay estado
    * «bloqueada» en el modelo: se deduce del historial.
    */
+  /**
+   * Una fila por proyecto para la cartera. Ver `StatsService.portfolio`.
+   *
+   * ⚠️ `projectIds` llega **ya filtrado por `canViewReports`** desde el gateway,
+   * y es la única línea de acceso de esa vista: aquí no se comprueba nada.
+   */
+  @MessagePattern({ cmd: 'task_stats_portfolio' })
+  statsPortfolio(@Payload() dto: { projectIds: string[]; dias?: number }) {
+    return this.statsService.portfolio(dto.projectIds ?? [], dto.dias);
+  }
+
+  /**
+   * El cruce de dos dimensiones. Ver `StatsService.matrix`.
+   *
+   * ⚠️ Las dos dimensiones llegan **ya validadas** contra el conjunto cerrado
+   * por el DTO del gateway; el servicio las vuelve a comprobar porque este
+   * comando también es alcanzable por TCP sin pasar por él.
+   */
+  @MessagePattern({ cmd: 'task_stats_matrix' })
+  statsMatrix(
+    @Payload()
+    dto: {
+      projectId: string;
+      agruparPor: DimensionCruce;
+      partirPor: DimensionCruce;
+      filtros?: ReportFilters;
+    },
+  ) {
+    return this.statsService.matrix(dto.projectId, dto.agruparPor, dto.partirPor, dto.filtros);
+  }
+
+  /**
+   * Cuánto tiempo pasa una tarea en cada columna. Ver `StatsService.columnTime`.
+   */
+  @MessagePattern({ cmd: 'task_stats_column_time' })
+  statsColumnTime(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.columnTime(dto.projectId, dto.filtros);
+  }
+
+  /**
+   * Retrabajo, rotación de responsable y volatilidad de prioridad.
+   *
+   * Los tres salen de `task_events` y de nada más: no se captura ningún evento
+   * nuevo para esto. Ver `StatsService.dynamics`.
+   */
+  @MessagePattern({ cmd: 'task_stats_dynamics' })
+  statsDynamics(@Payload() dto: { projectId: string; filtros?: ReportFilters }) {
+    return this.statsService.dynamics(dto.projectId, dto.filtros);
+  }
+
   @MessagePattern({ cmd: 'task_stats_stale' })
-  statsStale(@Payload() dto: { projectId: string; dias?: number; limite?: number }) {
-    return this.statsService.sinMovimiento(dto.projectId, dto.dias, dto.limite);
+  statsStale(
+    @Payload() dto: { projectId: string; dias?: number; limite?: number; filtros?: ReportFilters },
+  ) {
+    return this.statsService.sinMovimiento(dto.projectId, dto.dias, dto.limite, dto.filtros);
   }
 }

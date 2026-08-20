@@ -68,7 +68,7 @@ write_files:
       ExecStartPre=/usr/bin/docker pull ${imagen}
 
       # --network host porque los rewrites() del shell apuntan a
-      # 127.0.0.1:4101-4105. Las zonas solo son alcanzables desde la propia
+      # 127.0.0.1:4101-4106. Las zonas solo son alcanzables desde la propia
       # máquina; el cortafuegos únicamente deja entrar al 4100.
       ExecStart=/usr/bin/docker run --rm --name praxis-frontend \
         --network host \

@@ -145,6 +145,11 @@ export class AssistantController {
           /* `history` ya no viaja: el hilo lo guarda el servicio y lo lee de su
              base. Ver la nota de `AssistantTurnDto`. */
           conversationId: body.conversationId,
+          /* Solo los ids: los bytes ya están guardados desde que se subieron,
+             y es assistant-service quien los tiene. Que aquí no viaje ningún
+             archivo es justo lo que quita de encima el tope de 1 MB de la
+             Server Action. Ver `AssistantChatBodyDto.attachmentIds`. */
+          attachmentIds: body.attachmentIds,
           permisos,
           miembros,
           chat,
@@ -166,82 +171,6 @@ export class AssistantController {
    * El permiso sigue haciendo falta igualmente: sin acceso al informe no hay
    * asistente del que tener conversaciones.
    */
-  @Get('conversations')
-  @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
-  @ApiOperation({ summary: 'Mis conversaciones en este proyecto' })
-  conversaciones(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Request() req: Express.Request,
-  ) {
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_conversations' },
-        { userId: req.user!.userId, projectId },
-      ),
-    );
-  }
-
-  @Get('conversations/:conversationId')
-  @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
-  @ApiOperation({ summary: 'Una conversación con sus mensajes y propuestas' })
-  @ApiResponse({ status: 404, description: 'No existe, o no es tuya' })
-  conversacion(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('conversationId', ParseUUIDPipe) conversationId: string,
-    @Request() req: Express.Request,
-  ) {
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_conversation' },
-        { userId: req.user!.userId, projectId, conversationId },
-      ),
-    );
-  }
-
-  @Patch('conversations/:conversationId')
-  @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
-  @ApiOperation({ summary: 'Renombrar una conversación' })
-  renombrar(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('conversationId', ParseUUIDPipe) conversationId: string,
-    @Request() req: Express.Request,
-    @Body() body: RenameConversationBodyDto,
-  ) {
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_conversation_rename' },
-        { userId: req.user!.userId, projectId, conversationId, title: body.title },
-      ),
-    );
-  }
-
-  /**
-   * Borrar una conversación propia.
-   *
-   * No contradice la regla de que el asistente nunca borra: ahí quien borraría
-   * es el modelo, sobre el trabajo de un equipo. Aquí borra una persona sus
-   * propios mensajes, que es lo mínimo que se le debe a quien ahora deja rastro
-   * de lo que escribe.
-   */
-  @Delete('conversations/:conversationId')
-  @HttpCode(HttpStatus.OK)
-  @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
-  @ApiOperation({ summary: 'Borrar una conversación propia' })
-  borrar(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('conversationId', ParseUUIDPipe) conversationId: string,
-    @Request() req: Express.Request,
-  ) {
-    return firstValueFrom(
-      this.assistantClient.send(
-        { cmd: 'assistant_conversation_delete' },
-        { userId: req.user!.userId, projectId, conversationId },
-      ),
-    );
-  }
 
   /**
    * Marcar una propuesta como aplicada o descartada.
@@ -353,18 +282,35 @@ export class AssistantController {
       this.projectsClient.send<{ userId: string }[]>({ cmd: 'member_find_all' }, { projectId }),
     ).catch(() => [] as { userId: string }[]);
 
-    return Promise.all(
-      (miembros ?? []).map(async (miembro) => {
-        const perfil = await firstValueFrom(
-          this.credentialsClient.send<{ firstName?: string; lastName?: string }>(
-            { cmd: 'user_find_one' },
-            { id: miembro.userId },
-          ),
-        ).catch(() => null);
+    const ids = [...new Set((miembros ?? []).map((miembro) => miembro.userId))];
+    if (ids.length === 0) return [];
 
-        const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
-        return { userId: miembro.userId, nombre: nombre || miembro.userId };
-      }),
-    );
+    /**
+     * ⚠️ **Una llamada, no una por miembro** (E6.1).
+     *
+     * Esto hacía `user_find_one` dentro de un `map`: una llamada TCP a
+     * credentials **por cada persona del proyecto**, cada vez que el asistente
+     * necesita saber quién es quién. Un equipo de veinte eran veinte idas y
+     * vueltas para construir un dato que se usa entero o no se usa.
+     *
+     * `user_find_by_ids` ya existía —lo usan el panel de administración y
+     * alexa-service— y resuelve los mismos perfiles de un golpe.
+     */
+    const perfiles = await firstValueFrom(
+      this.credentialsClient.send<{ id: string; firstName?: string; lastName?: string }[]>(
+        { cmd: 'user_find_by_ids' },
+        { ids },
+      ),
+    ).catch(() => [] as { id: string; firstName?: string; lastName?: string }[]);
+
+    const porId = new Map((perfiles ?? []).map((perfil) => [perfil.id, perfil]));
+
+    /* Sin perfil se cae al `userId`, igual que antes: el asistente prefiere
+       hablar en UUID a no poder nombrar a alguien. */
+    return ids.map((userId) => {
+      const perfil = porId.get(userId);
+      const nombre = [perfil?.firstName, perfil?.lastName].filter(Boolean).join(' ').trim();
+      return { userId, nombre: nombre || userId };
+    });
   }
 }

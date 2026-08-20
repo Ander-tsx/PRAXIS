@@ -127,9 +127,20 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
     const search = request.nextUrl.search;
     const target = `${gatewayUrl}/api/${path.join('/')}${search}`;
 
-    // El body se lee una sola vez: los reintentos reutilizan esta copia.
+    /**
+     * El cuerpo se lee una sola vez: los reintentos reutilizan esta copia.
+     *
+     * ⚠️ **`arrayBuffer()` y no `text()`, por lo mismo que en la respuesta.**
+     * `text()` decodifica los bytes como UTF-8 para volver a codificarlos al
+     * reenviarlos, y cualquier byte que no forme una secuencia UTF-8 válida se
+     * sustituye por el carácter de reemplazo **sin vuelta atrás**. Con JSON no
+     * se nota; con un `multipart/form-data` que lleva un PNG dentro, lo que
+     * llega al gateway es un PNG roto — y el fallo sale al abrirlo, no al
+     * subirlo. Es el mismo error que ya estaba corregido en la entrega y que
+     * seguía vivo en la subida, donde nunca había cruzado un binario.
+     */
     const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
-    const body = hasBody ? await request.text() : undefined;
+    const body = hasBody ? await request.arrayBuffer() : undefined;
 
     const forwardedHeaders = new Headers();
     request.headers.forEach((value, key) => {
@@ -161,7 +172,7 @@ export function createGatewayProxy(options: CreateGatewayProxyOptions = {}) {
           headers.set('Authorization', `Bearer ${token}`);
           return headers;
         })(),
-        ...(body !== undefined && body !== '' ? { body } : {}),
+        ...(body !== undefined && body.byteLength > 0 ? { body } : {}),
         cache: 'no-store',
         redirect: 'manual',
         /* Un cuelgue aquí deja al navegador esperando una respuesta que no

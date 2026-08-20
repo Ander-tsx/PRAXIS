@@ -1,12 +1,13 @@
-import type { ChatMessagePage, UserProfile } from '@praxis/commons';
-import { personLabel, textoPlano } from '@praxis/commons';
+import type { ChatMessagePage, Directory } from '@praxis/commons';
+import { personName, textoPlano } from '@praxis/commons';
 
 export interface ProjectChatPreviewProps {
   projectId: string;
   projectName: string;
   /** La última página del chat, ya pedida en el servidor. */
   page: ChatMessagePage;
-  usersById: Map<string, UserProfile>;
+  /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
+  directorio: Directory;
   currentUserId: string;
 }
 
@@ -34,24 +35,22 @@ export function ProjectChatPreview({
   projectId,
   projectName,
   page,
-  usersById,
+  directorio,
   currentUserId,
 }: ProjectChatPreviewProps) {
   /* Los últimos, del más antiguo al más nuevo: el mismo orden que en el chat. */
   const ultimos = page.items.slice(-CUANTOS);
 
-  const nombreDe = (userId: string) => {
-    if (userId === currentUserId) return 'Tú';
-    const perfil = usersById.get(userId);
-    return perfil ? personLabel(perfil) : 'Alguien que ya no está';
-  };
+  /* Delega en `personName`: distingue «esta cuenta ya no existe» de «no se
+     pudo consultar el directorio», que antes se leían las dos como lo primero. */
+  const nombreDe = (userId: string) => personName(directorio, userId, currentUserId);
 
-  /* Cruza de zona —el centro de mensajes vive en `dashboard`— así que la ruta
-     lleva el prefijo completo y se navega con un `<a>` duro.
+  /* Cruza de zona —el centro de mensajes tiene la suya propia desde E3— así que
+     la ruta lleva el prefijo completo y se navega con un `<a>` duro.
 
      ⚠️ Con el **UUID** y no con el slug: todo lo anidado bajo `/projects/:id`
      en el gateway espera el UUID (CLAUDE.md). */
-  const href = `/dashboard/chat/proyecto/${projectId}`;
+  const href = `/chat/proyecto/${projectId}`;
 
   return (
     <section className="flex flex-col gap-4">

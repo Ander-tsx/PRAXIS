@@ -26,13 +26,27 @@ import { CHAT_ATTACHMENT_MAX_PER_MESSAGE } from './chat-attachment.dto';
 export const CHAT_MESSAGE_MAX = 4000;
 
 /**
- * Las reacciones que se aceptan.
+ * Las reacciones que se **ofrecen**, en el orden en que las pinta el cliente.
  *
- * Una lista corta y **cerrada**, no texto libre: el emoji viaja en la URL y
+ * Una lista corta y **cerrada**, no texto libre: el emoji viaja en el cuerpo y
  * acaba en la base, así que dejarlo abierto es un campo más donde meter lo que
- * sea. Espejo de `REACCIONES` en projects-service.
+ * sea. Espejo de `REACTIONS` en projects-service.
  */
-export const CHAT_REACTIONS = ['👍', '🎉', '❤️', '👀', '🚀', '😄'] as const;
+export const CHAT_REACTIONS = ['👍', '❤️', '😂', '😮', '👎'] as const;
+
+/**
+ * Las que se **aceptan**: las de arriba más las que se retiraron del selector.
+ *
+ * ⚠️ **Validar solo contra `CHAT_REACTIONS` deja pegadas las reacciones
+ * viejas.** `on: false` pasa por esta misma validación, así que al recortar la
+ * lista un 🎉 ya guardado devolvía 400 al intentar quitarlo y no había forma
+ * de retirarlo. Los retirados se aceptan **pero no se ofrecen**: ningún cliente
+ * los pinta, así que se pueden quitar y no se pueden volver a poner. Cuando no
+ * quede ninguno en la base, esta constante puede desaparecer.
+ *
+ * Espejo de `REACCIONES_ACEPTADAS` en projects-service.
+ */
+export const CHAT_REACTIONS_ACEPTADAS = [...CHAT_REACTIONS, '🎉', '👀', '🚀', '😄'] as const;
 
 /**
  * Lo que manda el cliente al escribir.
@@ -132,6 +146,24 @@ export class FindChatMessagesQueryDto {
   before?: string;
 
   /**
+   * Devuelve los **posteriores** a este mensaje. Para rellenar un hueco.
+   *
+   * `before` sube por el historial; esto baja por lo que se perdió. Existe para
+   * el flujo en vivo: `EventSource` reconecta solo, pero **no reenvía lo
+   * publicado mientras la conexión estuvo caída**. Al volver, el cliente pide
+   * «lo que hay después del último mensaje que tengo» y rellena el hueco con una
+   * sola petición, en lugar de recargar la conversación entera —que era lo que
+   * hacía antes, y por eso cada hipo de red repintaba la pantalla.
+   *
+   * ⚠️ Es excluyente con `before`: pedir «lo anterior a X y lo posterior a Y» a
+   * la vez no significa nada aquí. Si llegan los dos, manda `after`.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID('4')
+  after?: string;
+
+  /**
    * `true`: solo los fijados, del más reciente al más antiguo. Para la lista de
    * anclados.
    *
@@ -176,8 +208,10 @@ export class MuteChatBodyDto {
  * mandaría la operación equivocada.
  */
 export class ReactChatBodyDto {
+  /* El `enum` de la documentación son las que se ofrecen; la validación acepta
+     además las retiradas, para poder quitarlas. Ver `CHAT_REACTIONS_ACEPTADAS`. */
   @ApiProperty({ enum: CHAT_REACTIONS })
-  @IsIn(CHAT_REACTIONS as unknown as string[])
+  @IsIn(CHAT_REACTIONS_ACEPTADAS as unknown as string[])
   emoji: string;
 
   @ApiProperty()

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# Imagen del frontend: el shell y las 5 zonas en un solo contenedor.
+# Imagen del frontend: el shell y las 7 zonas en un solo contenedor.
 #
 # Multi-Zones se apoya en los `rewrites()` del shell hacia cada zona. Metiéndolas
 # todas en la misma máquina esos saltos son loopback y los valores por defecto
@@ -43,7 +43,9 @@ COPY apps/backend/services/projects/package.json        apps/backend/services/pr
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
 COPY apps/frontend/admin-front/package.json             apps/frontend/admin-front/
+COPY apps/frontend/assistant-front/package.json         apps/frontend/assistant-front/
 COPY apps/frontend/auth-front/package.json              apps/frontend/auth-front/
+COPY apps/frontend/chat-front/package.json              apps/frontend/chat-front/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
 COPY apps/frontend/dashboard-front/package.json         apps/frontend/dashboard-front/
 COPY apps/frontend/projects-front/package.json          apps/frontend/projects-front/
@@ -86,9 +88,11 @@ ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 RUN pnpm --filter "@praxis/web-shell" \
          --filter "@praxis/auth-front" \
          --filter "@praxis/dashboard-front" \
+         --filter "@praxis/chat-front" \
          --filter "@praxis/projects-front" \
          --filter "@praxis/reports-front" \
          --filter "@praxis/admin-front" \
+         --filter "@praxis/assistant-front" \
          run build
 
 # ───────────────────────── runtime ──────────────────────────

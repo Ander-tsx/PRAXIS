@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PraxSidebarIcon } from '../../atoms/PraxAvatar';
 
 /**
  * Un enlace de la barra lateral del área privada.
@@ -76,6 +77,29 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
+    /**
+     * Las conversaciones privadas.
+     *
+     * Va **justo debajo de Proyectos**, y no al final del bloque de trabajo
+     * como estaba. Se pide desde el uso real: hablar con alguien del equipo
+     * ocurre a la vez que se mira un proyecto, muchas veces sobre él, y tenerlo
+     * a dos entradas de distancia obligaba a saltarse Análisis y Asistente cada
+     * vez. Arriba están los sitios a los que se vuelve a diario; Análisis y
+     * Asistente son de sentarse un rato.
+     */
+    label: 'Mensajes',
+    href: '/chat',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Análisis',
     href: '/reports',
     icon: (
@@ -92,36 +116,39 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
-     * Las conversaciones privadas.
+     * PRAX, el asistente.
      *
-     * Va antes de Notificaciones porque es un sitio donde se **trabaja**, no un
-     * registro que se consulta. Las dos últimas entradas —Notificaciones y
-     * Configuración— son de mirar; esta es de usar, como Proyectos y Análisis.
+     * ## Por qué tiene entrada propia
+     *
+     * Vivía dentro de Análisis, en un panel al lado de los gráficos, y eso lo
+     * definía: se le preguntaba por el informe que se estaba viendo. Pero sabe
+     * hacer bastante más —proponer tareas, repartir trabajo, escribir al chat
+     * del equipo— y nada de eso tiene que ver con estar mirando un percentil.
+     * Metido en una esquina, la mitad de lo que sabe no se descubría nunca.
+     *
+     * Va **justo después de Análisis**, y el sitio no es arbitrario: son las
+     * dos entradas donde se para uno a entender el trabajo en vez de a
+     * despacharlo — primero el gráfico, luego a quién preguntarle por él. Lo de
+     * arriba (Panel, Proyectos, Mensajes) es el día a día.
+     *
+     * ⚠️ Sigue estando dentro de Análisis, con el proyecto ya puesto, para quien
+     * mira un gráfico y tiene una duda ahí mismo. Las dos pantallas montan el
+     * mismo organismo (`commons/organisms/AssistantChat`).
      */
-    label: 'Mensajes',
-    href: '/dashboard/chat',
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: 'Notificaciones',
-    href: '/dashboard/notifications',
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-        />
-      </svg>
-    ),
+    label: 'Asistente',
+    href: '/assistant',
+    /**
+     * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
+     * miniatura. Un bocadillo con una chispa —que es lo que había— decía
+     * «conversación con una IA», o sea lo mismo que dicen ya otras cincuenta
+     * aplicaciones. La cara dice **quién**, que es lo que hace que se reconozca
+     * de un vistazo entre siete entradas que por lo demás son líneas grises.
+     *
+     * En `xs`, que es la única medida pensada para ir en una fila junto a
+     * iconos de trazo: más grande compite con ellos y deja de leerse como parte
+     * de la misma lista.
+     */
+    icon: <PraxSidebarIcon />,
   },
   {
     /**

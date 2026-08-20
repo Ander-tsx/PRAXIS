@@ -66,12 +66,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
 
   if (!abierto) {
     return (
-      <Button
-        type="button"
-        variant="danger"
-        size="sm"
-        onClick={() => setAbierto(true)}
-      >
+      <Button type="button" variant="danger" size="sm" onClick={() => setAbierto(true)}>
         Eliminar mi cuenta
       </Button>
     );

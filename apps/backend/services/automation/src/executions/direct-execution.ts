@@ -166,16 +166,24 @@ export class AutomationEngineService {
   }
 
   private async dueSoonCandidates(rule: Rule): Promise<Candidate[]> {
-    const tasks = await firstValueFrom<
-      Array<{
+    /**
+     * `task_inventory` devuelve `{ tareas, omitidas }` desde que el
+     * inventario del asistente empezó a recortarse por presupuesto de
+     * caracteres — antes era el array a secas. La revisión de automatización
+     * no necesita `omitidas`: no depende de recortes, así que basta con
+     * desempaquetar `tareas`.
+     */
+    const { tareas: tasks } = await firstValueFrom<{
+      tareas: Array<{
         id: string;
         titulo: string;
         prioridad: string;
         vence: string | null;
         cerrada: boolean;
         encargados: string[];
-      }>
-    >(this.tasksClient.send({ cmd: 'task_inventory' }, { projectId: rule.projectId }));
+      }>;
+      omitidas: number;
+    }>(this.tasksClient.send({ cmd: 'task_inventory' }, { projectId: rule.projectId }));
     const now = new Date();
     const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const latest = now.getTime() + Number(rule.trigger.config.leadTimeMinutes) * 60_000;

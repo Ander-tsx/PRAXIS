@@ -63,6 +63,7 @@ export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDial
       onClose={onClose}
       size="sm"
       title="Cambiar el rol global"
+      overflowVisible
       description={
         <>
           El rol de <strong className="text-text-primary">{nombreDe(usuario)}</strong> en la

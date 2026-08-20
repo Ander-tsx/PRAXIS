@@ -134,7 +134,13 @@ test.describe('Sesión en el navegador', () => {
 
   test('salir borra la sesión y devuelve al área pública', async ({ page, context }) => {
     await crearCuentaYEntrar(page);
-    await page.goto('/dashboard');
+
+    /* ⚠️ **«Cerrar sesión» está en la pantalla de cuenta, no en la barra.**
+       Esta prueba lo buscaba en `/dashboard`, donde estuvo hasta que el pie de
+       la barra lateral pasó a ser el selector de estado (ver `AppShell`). No se
+       notó porque la suite de interfaz llevaba sin ejecutarse desde entonces:
+       sin navegador instalado, estas 27 pruebas no daban ni un dato. */
+    await page.goto('/dashboard/profile');
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await page.waitForURL((url) => !url.pathname.startsWith('/dashboard'), { timeout: 30_000 });
@@ -171,7 +177,11 @@ test.describe('Proyectos desde la interfaz', () => {
     const nombre = `Rediseño del panel ${Date.now().toString(36)}`;
     await crearProyectoEnLaInterfaz(page, nombre);
 
-    await page.getByText(nombre).first().click();
+    /* Por rol y no por texto: la tarjeta del proyecto es un enlace, y
+       `getByText` casaba también con el campo del diálogo que se está cerrando
+       —el clic caía en la nada y la página se quedaba en `/projects`—. Buscar
+       el enlace hace que Playwright espere a que la rejilla se refresque. */
+    await page.getByRole('link').filter({ hasText: nombre }).first().click();
     await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
 
     const ruta = new URL(page.url()).pathname;
@@ -211,7 +221,11 @@ test.describe('Las personas de un proyecto', () => {
 
     const nombre = `Proyecto con gente ${Date.now().toString(36)}`;
     await crearProyectoEnLaInterfaz(page, nombre);
-    await page.getByText(nombre).first().click();
+    /* Por rol y no por texto: la tarjeta del proyecto es un enlace, y
+       `getByText` casaba también con el campo del diálogo que se está cerrando
+       —el clic caía en la nada y la página se quedaba en `/projects`—. Buscar
+       el enlace hace que Playwright espere a que la rejilla se refresque. */
+    await page.getByRole('link').filter({ hasText: nombre }).first().click();
     await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
 
     /**

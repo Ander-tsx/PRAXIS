@@ -51,6 +51,9 @@ const {
   GCS_PROJECT_ID = '',
   GCS_BUCKET = '',
   LOG_LEVEL = 'info',
+  /* Ver la nota de `comun`. Se deja configurable para poder subirlo sin
+     reconstruir la imagen si algún día la base de datos crece. */
+  DATABASE_POOL_MAX = '5',
 } = process.env;
 
 /**
@@ -73,6 +76,25 @@ const LOCAL = '127.0.0.1';
 const comun = {
   NODE_ENV: 'production',
   LOG_LEVEL,
+  /**
+   * Cuántas conexiones a Postgres abre **cada** servicio con Prisma.
+   *
+   * ⚠️ Sin esto, cada uno abría hasta **diez** —el `max` por defecto de
+   * `pg-pool`, que `PrismaPg` no toca—: sesenta por instancia del backend, y
+   * hasta ciento ochenta con el grupo escalado a tres, contra un Cloud SQL
+   * `db-f1-micro` que por defecto admite **veinticinco**. Pasado el techo,
+   * Postgres rechaza y el pool encola: en la pantalla eso se ve como lentitud y
+   * conexiones perdidas, nunca como un error de base de datos.
+   *
+   * Cinco por servicio son treinta por instancia. El otro extremo —subir
+   * `max_connections` a 150— está en `infra/terraform/sql.tf`; hacen falta los
+   * dos.
+   *
+   * Va en `comun` y no servicio por servicio a propósito: los que no tienen
+   * Prisma (el gateway, reports) simplemente la ignoran, y así no hay forma de
+   * añadir un servicio nuevo y olvidarse.
+   */
+  DATABASE_POOL_MAX,
 };
 
 /** Dónde encontrar a cada servicio. El gateway y varios servicios lo necesitan. */

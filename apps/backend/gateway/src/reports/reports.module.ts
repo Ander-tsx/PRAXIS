@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { MyReportsController } from './my-reports.controller';
 import { ReportLayoutController } from './report-layout.controller';
 import { ReportsController } from './reports.controller';
 
@@ -16,6 +17,10 @@ import { ReportsController } from './reports.controller';
  * Los tres los necesita además `ProjectPermissionGuard`, que se aplica aquí y
  * los inyecta por su cuenta: sin ellos en el módulo, Nest no puede construir el
  * guard y el fallo aparece al arrancar, no al llamar a la ruta.
+ *
+ * Desde R4.4 `PROJECTS_SERVICE` tiene un segundo consumidor: `MyReportsController`
+ * lista los proyectos con `canViewReports` para resolver la cartera de una vez
+ * en lugar de N.
  */
 @Module({
   imports: [
@@ -59,6 +64,6 @@ import { ReportsController } from './reports.controller';
       },
     ]),
   ],
-  controllers: [ReportsController, ReportLayoutController],
+  controllers: [ReportsController, ReportLayoutController, MyReportsController],
 })
 export class ReportsModule {}

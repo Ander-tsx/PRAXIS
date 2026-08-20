@@ -1,3 +1,5 @@
+import { REPORT_CROSS_DIMENSIONS, type ReportCrossDimension } from './report-bundle.dto';
+
 /**
  * El catálogo de gráficos del lienzo de Análisis, y el conjunto cerrado sobre
  * el que el asistente puede parametrizar uno.
@@ -54,6 +56,10 @@ export enum ReportWidgetKind {
   PREDICCION = 'prediccion',
   /** Cómo está repartido el trabajo, por persona. */
   PERSONAS = 'personas',
+  /** Retrabajo, rotación de responsable y volatilidad de prioridad. */
+  DINAMICA = 'dinamica',
+  /** Tiempo por columna: dónde espera el trabajo. */
+  TIEMPO_POR_COLUMNA = 'tiempo_por_columna',
   /** El que elige y parametriza el asistente. Lleva `grafico`. */
   GENERADO = 'generado',
 }
@@ -65,6 +71,20 @@ export enum ReportChartShape {
   DONA = 'dona',
   LINEAS = 'lineas',
   AREA_APILADA = 'area_apilada',
+  /**
+   * Distribución: barras pegadas sobre tramos, no categorías sueltas.
+   *
+   * Es una forma distinta de las barras y no un estilo: en un histograma **el
+   * orden es el dato** —no se puede ordenar de mayor a menor sin destruirlo— y
+   * el hueco entre barras se quita porque los tramos son contiguos.
+   */
+  HISTOGRAMA = 'histograma',
+  /** Dos dimensiones: una categoría por barra, la otra apilada dentro. */
+  BARRAS_APILADAS = 'barras_apiladas',
+  /** Dos medidas opuestas sobre el mismo eje: entradas arriba, salidas abajo. */
+  BARRAS_DIVERGENTES = 'barras_divergentes',
+  /** Dos dimensiones como tabla, con la intensidad del color por valor. */
+  MAPA_CALOR = 'mapa_calor',
 }
 
 /**
@@ -95,6 +115,33 @@ export enum ReportMetric {
   CIERRES_POR_SEMANA = 'cierres_por_semana',
   /** `weekly.serie.creadas` — entradas por semana. */
   CREADAS_POR_SEMANA = 'creadas_por_semana',
+  /** `dynamics.retrabajo.porColumna` — a dónde vuelve lo que se dio por cerrado. */
+  REAPERTURAS_POR_COLUMNA = 'reaperturas_por_columna',
+  /** `dynamics.rotacion.distribucion` — por cuántas manos pasa una tarea. */
+  ROTACION_POR_TAREA = 'rotacion_por_tarea',
+  /** `dynamics.volatilidad.distribucion` — cuántas veces le cambian la prioridad. */
+  VOLATILIDAD_POR_TAREA = 'volatilidad_por_tarea',
+  /** `dynamics.volatilidad.matriz` — hacia qué prioridad se mueve el trabajo. */
+  CAMBIOS_DE_PRIORIDAD = 'cambios_de_prioridad',
+  /** `column-time.columnas.p50Horas` — cuánto se espera en cada columna. */
+  TIEMPO_EN_COLUMNA = 'tiempo_en_columna',
+  /** `column-time.columnas.enCursoP50Horas` — lo que llevan ahora las abiertas. */
+  ESPERA_ACTUAL_POR_COLUMNA = 'espera_actual_por_columna',
+  /**
+   * `cycle-time.muestras.leadHours` agrupadas en tramos — la distribución.
+   *
+   * Un p50 y un p85 esconden si hay **dos poblaciones**: un montón de tareas de
+   * medio día y otro de tres semanas dan la misma mediana que una nube uniforme
+   * alrededor de ella, y no son el mismo proyecto ni de lejos.
+   */
+  DISTRIBUCION_DE_ENTREGA = 'distribucion_de_entrega',
+  /** `weekly.serie` — creadas contra cerradas, en el mismo eje y en sentidos opuestos. */
+  ENTRADAS_CONTRA_CIERRES = 'entradas_contra_cierres',
+  /**
+   * `matrix` — el cruce de dos dimensiones. La única métrica que lleva
+   * `agruparPor` y `partirPor`, y la única que los exige.
+   */
+  CRUCE = 'cruce',
 }
 
 /** Qué admite cada métrica. Lo aplica `validarGrafico`, no la buena voluntad. */
@@ -122,6 +169,15 @@ const CATEGORICA = [
   ReportChartShape.DONA,
 ];
 const TEMPORAL = [ReportChartShape.LINEAS, ReportChartShape.AREA_APILADA];
+/**
+ * Una distribución admite el histograma **además** de las barras normales.
+ *
+ * No la dona ni las horizontales: una distribución en dona pierde el eje, que
+ * es donde está el orden, y ese orden **es** el dato.
+ */
+const DISTRIBUCION = [ReportChartShape.HISTOGRAMA, ReportChartShape.BARRAS];
+/** Las dos formas que saben dibujar dos dimensiones a la vez. */
+const CRUZADA = [ReportChartShape.MAPA_CALOR, ReportChartShape.BARRAS_APILADAS];
 
 export const REPORT_METRICS: Record<ReportMetric, ReportMetricSpec> = {
   [ReportMetric.TAREAS_POR_COLUMNA]: {
@@ -195,6 +251,76 @@ export const REPORT_METRICS: Record<ReportMetric, ReportMetricSpec> = {
     aceptaTopN: false,
     etiqueta: 'Tareas creadas por semana',
   },
+  /* ─── Los eventos que ya se guardaban y nadie miraba (R9.1) ───────────── */
+  [ReportMetric.REAPERTURAS_POR_COLUMNA]: {
+    formas: CATEGORICA,
+    /* El informe no mira una ventana móvil: acota con `from`/`to` como el
+       resto, y su defecto es todo el historial capturado. */
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Reaperturas por columna',
+  },
+  [ReportMetric.ROTACION_POR_TAREA]: {
+    formas: DISTRIBUCION,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Manos por las que pasa una tarea',
+  },
+  [ReportMetric.VOLATILIDAD_POR_TAREA]: {
+    formas: DISTRIBUCION,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cambios de prioridad por tarea',
+  },
+  [ReportMetric.CAMBIOS_DE_PRIORIDAD]: {
+    /* Divergente además de las categóricas: «hacia» y «desde» son dos medidas
+       opuestas de la misma prioridad, y una sola barra tira la mitad. */
+    formas: [...CATEGORICA, ReportChartShape.BARRAS_DIVERGENTES],
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Hacia qué prioridad se mueve el trabajo',
+  },
+  /* ─── Dónde espera el trabajo (R9.2) ──────────────────────────────────── */
+  [ReportMetric.TIEMPO_EN_COLUMNA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Tiempo mediano en cada columna',
+  },
+  [ReportMetric.ESPERA_ACTUAL_POR_COLUMNA]: {
+    formas: CATEGORICA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Espera actual en cada columna',
+  },
+  /* ─── Las formas nuevas (R9.3) ────────────────────────────────────────── */
+  [ReportMetric.DISTRIBUCION_DE_ENTREGA]: {
+    formas: DISTRIBUCION,
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Distribución del tiempo de entrega',
+  },
+  [ReportMetric.ENTRADAS_CONTRA_CIERRES]: {
+    formas: [ReportChartShape.BARRAS_DIVERGENTES],
+    aceptaRango: true,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Entradas contra cierres',
+  },
+  [ReportMetric.CRUCE]: {
+    formas: CRUZADA,
+    aceptaRango: false,
+    aceptaSoloVencidas: false,
+    aceptaTopN: false,
+    etiqueta: 'Cruce de dos dimensiones',
+  },
 };
 
 /** La parametrización de un gráfico a medida. Solo la lleva `GENERADO`. */
@@ -213,6 +339,17 @@ export interface ReportChartSpec {
   soloVencidas?: boolean;
   /** Quedarse con las N categorías mayores. Solo si la métrica lo acepta. */
   topN?: number;
+  /**
+   * Las dos dimensiones del cruce. **Obligatorias en `CRUCE` y prohibidas en el
+   * resto**, que es lo mismo que ya pasa con `dias` y `soloVencidas`.
+   *
+   * Un `agruparPor` arrastrado a una métrica de una dimensión no cambiaría el
+   * gráfico —no hay dónde aplicarlo— así que sería un campo guardado que no
+   * significa nada, y el día que esa métrica aceptara cruces empezaría a
+   * significar algo sin que nadie lo hubiera pedido.
+   */
+  agruparPor?: ReportCrossDimension;
+  partirPor?: ReportCrossDimension;
   /** El título que se pinta. Lo escribe quien lo propone. */
   titulo: string;
 }
@@ -240,6 +377,8 @@ export const REPORT_WIDGET_MIN: Record<ReportWidgetKind, { w: number; h: number 
   [ReportWidgetKind.CICLO]: { w: 3, h: 4 },
   [ReportWidgetKind.PREDICCION]: { w: 4, h: 5 },
   [ReportWidgetKind.PERSONAS]: { w: 6, h: 6 },
+  [ReportWidgetKind.DINAMICA]: { w: 6, h: 5 },
+  [ReportWidgetKind.TIEMPO_POR_COLUMNA]: { w: 6, h: 6 },
   [ReportWidgetKind.GENERADO]: { w: 3, h: 6 },
 };
 
@@ -293,6 +432,31 @@ export function validarGrafico(grafico: ReportChartSpec): string | null {
       return 'El top N va de 2 a 20';
     }
   }
+  /**
+   * El cruce, que es la única métrica con dos ejes.
+   *
+   * ⚠️ Se comprueba en los **dos sentidos**: que `CRUCE` los traiga y que nadie
+   * más los traiga. Solo lo primero dejaría guardar un `agruparPor` en un
+   * gráfico de una dimensión, que no da error y no hace nada — hasta que algún
+   * día lo haga.
+   */
+  if (grafico.metrica === ReportMetric.CRUCE) {
+    if (!grafico.agruparPor || !grafico.partirPor) {
+      return 'Un cruce necesita las dos dimensiones';
+    }
+    if (!REPORT_CROSS_DIMENSIONS.includes(grafico.agruparPor)) {
+      return `La dimensión «${grafico.agruparPor}» no existe`;
+    }
+    if (!REPORT_CROSS_DIMENSIONS.includes(grafico.partirPor)) {
+      return `La dimensión «${grafico.partirPor}» no existe`;
+    }
+    if (grafico.agruparPor === grafico.partirPor) {
+      return 'Las dos dimensiones del cruce tienen que ser distintas';
+    }
+  } else if (grafico.agruparPor !== undefined || grafico.partirPor !== undefined) {
+    return `«${spec.etiqueta}» tiene una sola dimensión: no admite un cruce`;
+  }
+
   if (!grafico.titulo?.trim()) return 'Falta el título del gráfico';
   if (grafico.titulo.length > 80) return 'El título no puede superar 80 caracteres';
 

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
-import { MAX_HISTORIAL } from '@praxis/contracts';
+import { ASSISTANT_EXTRACT_BUDGET_CHARS, MAX_HISTORIAL } from '@praxis/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { textoConAdjuntos } from './attachment-text';
 
 /** Lo que cabe en un título antes de dejar de leerse de un vistazo. */
 const MAX_TITULO = 60;
@@ -32,14 +33,26 @@ const MAX_TITULO = 60;
 export class ConversationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Mis conversaciones en este proyecto, la última movida arriba. */
-  async listar(userId: string, projectId: string) {
+  /**
+   * **Mis** conversaciones, la última movida arriba.
+   *
+   * ⚠️ Ya no filtra por proyecto, y ese es el cambio: el historial era «las de
+   * este proyecto» y estaba partido en tantas listas como proyectos tuvieras, así
+   * que para encontrar aquella conversación de la semana pasada había que
+   * acordarse primero de sobre qué proyecto fue.
+   *
+   * `projectId` viaja en cada fila —el **último** del que se habló— para que la
+   * lista pueda decir de qué iba cada una sin abrirla. Es `null` en las que nunca
+   * llegaron a elegir foco.
+   */
+  async listar(userId: string) {
     const conversaciones = await this.prisma.conversation.findMany({
-      where: { userId, projectId },
+      where: { userId },
       orderBy: { updatedAt: 'desc' },
       select: {
         id: true,
         title: true,
+        projectId: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { messages: true } },
@@ -49,6 +62,7 @@ export class ConversationsService {
     return conversaciones.map((conversacion) => ({
       id: conversacion.id,
       title: conversacion.title,
+      projectId: conversacion.projectId,
       createdAt: conversacion.createdAt,
       updatedAt: conversacion.updatedAt,
       mensajes: conversacion._count.messages,
@@ -61,13 +75,22 @@ export class ConversationsService {
    * Las propuestas viajan con su `status` porque de eso depende si la tarjeta
    * lleva botones al releer: solo las `PENDING` se pueden aplicar todavía.
    */
-  async detalle(userId: string, projectId: string, conversationId: string) {
+  async detalle(userId: string, conversationId: string) {
     const conversacion = await this.prisma.conversation.findFirst({
-      where: { id: conversationId, userId, projectId },
+      /* Sin `projectId`: la conversación es de la persona y puede haber pasado
+         por varios. El `userId` sigue siendo la clave de acceso, y una ajena
+         responde 404 y no 403 — un 403 confirmaría que ese id existe. */
+      where: { id: conversationId, userId },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
-          include: { proposals: true },
+          include: {
+            proposals: true,
+            /* Sin bytes: para la burbuja bastan nombre, tipo y tamaño. El
+               contenido se pide aparte, y solo si alguien lo abre — incluirlo
+               aquí metería cada archivo del hilo en cada lectura. */
+            attachments: { select: { id: true, filename: true, mimeType: true, size: true } },
+          },
         },
       },
     });
@@ -79,6 +102,15 @@ export class ConversationsService {
     return {
       id: conversacion.id,
       title: conversacion.title,
+      /**
+       * ⚠️ **De qué proyecto iba, y sin esto no se podía seguir hablando.**
+       *
+       * Al abrir una conversación vieja desde el historial, la pantalla no tenía
+       * forma de saber su proyecto: se quedaba sin foco y por tanto **sin
+       * compositor**, así que se podía leer el hilo y no continuarlo. Con esto,
+       * abrir una conversación recupera también su foco.
+       */
+      projectId: conversacion.projectId,
       createdAt: conversacion.createdAt,
       updatedAt: conversacion.updatedAt,
       mensajes: conversacion.messages.map((mensaje) => ({
@@ -92,6 +124,10 @@ export class ConversationsService {
           args: propuesta.args,
           status: propuesta.status,
         })),
+        /* Solo los turnos del usuario tienen: PRAX responde texto y propuestas,
+           nunca archivos. Y los anteriores a que se guardaran vienen vacíos —
+           entonces viajaban con la pregunta y se descartaban. */
+        attachments: mensaje.attachments,
       })),
     };
   }
@@ -105,18 +141,51 @@ export class ConversationsService {
    *
    * Se recorta a los últimos `MAX_HISTORIAL` turnos, que es el mismo tope de
    * siempre — la ventana del modelo no ha crecido porque ahora guardemos más.
+   *
+   * ## Y aquí es donde los archivos vuelven a existir
+   *
+   * El texto de un mensaje se guarda **tal y como se escribió**, sin los
+   * archivos pegados: un turno con cuarenta mil caracteres de un `.md` dentro no
+   * se lee como conversación. Así que el archivo se recompone al armar el hilo,
+   * a partir del `extract` que se calculó al subirlo.
+   *
+   * Sin esto, PRAX olvidaba el documento en cuanto contestaba: los bytes viajan
+   * con su turno y no se reenvían nunca más. Con esto —y con el presupuesto de
+   * `ASSISTANT_EXTRACT_BUDGET_CHARS`— sigue delante mientras la conversación
+   * quepa.
    */
   async historial(conversationId: string) {
     const mensajes = await this.prisma.message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
       take: MAX_HISTORIAL,
-      select: { role: true, text: true },
+      select: {
+        role: true,
+        text: true,
+        /* Solo aquí. `detalle()` no los pide: la burbuja no necesita el
+           contenido y traerlo metería cada documento del hilo en cada lectura
+           de la pantalla. */
+        attachments: { select: { filename: true, mimeType: true, extract: true } },
+      },
     });
 
-    return mensajes
-      .reverse()
-      .map((mensaje) => ({ role: mensaje.role === 'USER' ? 'user' : 'model', text: mensaje.text }));
+    /**
+     * ⚠️ **El presupuesto se gasta del más reciente hacia atrás**, y por eso se
+     * recorre la lista tal cual viene —ordenada `desc`— y se le da la vuelta al
+     * final. Lo último que se adjuntó es lo que se está usando; lo de hace ocho
+     * turnos es lo que se puede recortar sin que nadie lo note.
+     *
+     * Sin tope esto sería una factura garantizada: 3 adjuntos por mensaje ×
+     * 40 000 caracteres × 12 turnos son 360 000 caracteres **en cada pregunta**.
+     */
+    let presupuesto: number = ASSISTANT_EXTRACT_BUDGET_CHARS;
+    const conArchivos = mensajes.map((mensaje) => {
+      const compuesto = textoConAdjuntos(mensaje.text, mensaje.attachments, presupuesto);
+      presupuesto = compuesto.presupuesto;
+      return { role: mensaje.role === 'USER' ? 'user' : 'model', text: compuesto.texto };
+    });
+
+    return conArchivos.reverse();
   }
 
   /**
@@ -126,15 +195,83 @@ export class ConversationsService {
    * pedírselo a Gemini: sería una llamada más —y una unidad más de cuota— para
    * algo que se resuelve cortando una cadena, y que además se puede renombrar.
    */
-  async resolver(userId: string, projectId: string, mensaje: string, conversationId?: string) {
+  async resolver(
+    userId: string,
+    projectId: string | null,
+    mensaje: string,
+    conversationId?: string,
+  ) {
     if (conversationId) {
       const existente = await this.prisma.conversation.findFirst({
-        where: { id: conversationId, userId, projectId },
-        select: { id: true },
+        /* Sin `projectId` en el `where`: **una conversación puede cambiar de
+           foco**, así que exigir que coincida con el del turno actual daría 404
+           justo al preguntar por otro proyecto — que es el gesto que todo esto
+           viene a permitir. Lo que sigue protegiendo el hilo es el `userId`. */
+        where: { id: conversationId, userId },
+        select: { id: true, projectId: true },
       });
       if (!existente) {
         throw new RpcException({ statusCode: 404, message: 'Conversación no encontrada' });
       }
+
+      /**
+       * ⚠️ **Una conversación NO cambia de proyecto.** Decisión de producto del
+       * 2026-08-18, y el motivo es el mismo que llevó a un foco por conversación
+       * en vez de multiproyecto: el hilo que ve el modelo se reenvía entero en
+       * cada turno, así que una conversación que empezó hablando del proyecto A
+       * y sigue en el B le mete **los dos contextos en la ventana** — con sus
+       * tareas, sus columnas y su gente mezcladas. Las propuestas salen apuntando
+       * a ids del proyecto equivocado, y la validación las descarta: por fuera se
+       * ve como un asistente que de pronto no entiende nada.
+       *
+       * Hubo una versión en que sí cambiaba y el `projectId` de la conversación
+       * era «el del último turno». Se retira: cada proyecto, su conversación.
+       *
+       * Se responde 409 y no 404 a propósito: la conversación existe y es tuya —
+       * lo que no encaja es el proyecto—, y un 404 mandaría a buscar un id que
+       * está perfectamente.
+       */
+      if (existente.projectId && projectId && existente.projectId !== projectId) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Esta conversación es de otro proyecto. Empieza una nueva para hablar de este.',
+        });
+      }
+
+      /**
+       * ⚠️ **Y al revés tampoco: una conversación con proyecto no vuelve a no
+       * tenerlo.**
+       *
+       * Este caso solo puede llegar de un cliente descolocado —una pestaña
+       * abierta desde antes de adoptar el proyecto, que sigue mandando el turno
+       * por la ruta sin foco—. Aceptarlo silenciosamente sería peor que
+       * rechazarlo: ese turno se respondería **sin el briefing**, así que PRAX
+       * diría que no tiene datos de un proyecto que la pantalla está enseñando
+       * como cargado, y no habría forma de entender por qué.
+       */
+      if (existente.projectId && !projectId) {
+        throw new RpcException({
+          statusCode: 409,
+          message: 'Esta conversación ya es de un proyecto. Vuelve a abrirla para seguir.',
+        });
+      }
+
+      /**
+       * La primera pregunta de una conversación sin foco es la que lo fija.
+       *
+       * Es también **el momento en que una conversación sin proyecto lo
+       * adopta**: se acepta `proponer_abrir_proyecto` —o se crea uno desde una
+       * plantilla—, la pantalla vuelve por la ruta del proyecto con el mismo
+       * `conversationId`, y el hilo entero sigue ahí. Sin esto habría que
+       * empezar de cero justo después de haberle contado todo.
+       */
+      if (!existente.projectId && projectId) {
+        await this.prisma.conversation.update({
+          where: { id: existente.id },
+          data: { projectId },
+        });
+      }
+
       return existente.id;
     }
 
@@ -157,20 +294,57 @@ export class ConversationsService {
    */
   async guardarTurno(params: {
     conversationId: string;
+    /**
+     * De qué proyecto iba este turno.
+     *
+     * ⚠️ Se guarda en los **dos** mensajes y no solo en la conversación: el foco
+     * cambia a mitad, y sin esto un hilo que pasó por dos proyectos parecería
+     * entero del último al releerlo — con sus propuestas apuntando al proyecto
+     * equivocado a ojos de quien lo lee.
+     *
+     * `null` en los turnos de una conversación sin foco, que es lo que permite
+     * distinguir después **dónde se dejó de hablar en abstracto**: los mensajes
+     * anteriores a adoptar un proyecto no eran sobre él.
+     */
+    projectId: string | null;
     pregunta: string;
     respuesta: string;
     proposals: { tool: string; args: Record<string, unknown> }[];
+    /** Quién pregunta. Solo se usa para no reclamar borradores de otra persona. */
+    userId: string;
+    /**
+     * Los borradores que este turno se lleva consigo.
+     *
+     * ⚠️ **Se reclaman aquí dentro y no antes, a propósito.** Un adjunto atado a
+     * un mensaje que no llegó a crearse sería una fila colgando; dentro de la
+     * transacción, o hay turno y archivos, o no hay ninguna de las dos cosas.
+     */
+    attachmentIds: string[];
   }) {
-    const { conversationId, pregunta, respuesta, proposals } = params;
+    const { conversationId, projectId, pregunta, respuesta, proposals } = params;
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.message.create({
-        data: { conversationId, role: 'USER', text: pregunta },
+      const delUsuario = await tx.message.create({
+        data: { conversationId, projectId, role: 'USER', text: pregunta },
       });
+
+      if (params.attachmentIds.length > 0) {
+        /* `messageId: null` en el filtro es lo que lo hace idempotente: un
+           reintento no le roba el archivo a un turno que ya lo tenía. */
+        await tx.attachment.updateMany({
+          where: {
+            id: { in: params.attachmentIds },
+            uploadedBy: params.userId,
+            messageId: null,
+          },
+          data: { conversationId, messageId: delUsuario.id },
+        });
+      }
 
       const delModelo = await tx.message.create({
         data: {
           conversationId,
+          projectId,
           role: 'MODEL',
           text: respuesta,
           proposals: {
@@ -232,14 +406,14 @@ export class ConversationsService {
   }
 
   /** Renombrar. El título es lo único que se puede editar de una conversación. */
-  async renombrar(userId: string, projectId: string, conversationId: string, title: string) {
+  async renombrar(userId: string, conversationId: string, title: string) {
     const limpio = title.trim().slice(0, MAX_TITULO);
     if (limpio.length === 0) {
       throw new RpcException({ statusCode: 400, message: 'El título no puede estar vacío' });
     }
 
     const { count } = await this.prisma.conversation.updateMany({
-      where: { id: conversationId, userId, projectId },
+      where: { id: conversationId, userId },
       data: { title: limpio },
     });
 
@@ -259,9 +433,9 @@ export class ConversationsService {
    *
    * Los mensajes y las propuestas caen en cascada.
    */
-  async borrar(userId: string, projectId: string, conversationId: string) {
+  async borrar(userId: string, conversationId: string) {
     const { count } = await this.prisma.conversation.deleteMany({
-      where: { id: conversationId, userId, projectId },
+      where: { id: conversationId, userId },
     });
 
     if (count === 0) {

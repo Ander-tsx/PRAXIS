@@ -58,6 +58,16 @@
   --color-primary-muted: rgba(108, 99, 255, 0.12); /* Fondo sutil primary */
   --color-primary-foreground: #ffffff; /* Texto sobre primary */
 
+  /* ── LA CARA DE PRAX ────────────────────────────────────── */
+  /* Los rasgos del asistente: ojos y boca.
+     ⚠️ **No es `--color-primary-foreground`, aunque se pinten sobre primary.**
+     Ese token es para texto y se queda blanco en los dos temas, que es lo
+     correcto para una etiqueta dentro de un botón. La cara es otra cosa: sobre
+     la aplicación oscura, unos rasgos blancos sobre el morado son el punto más
+     brillante de la pantalla y la cara se lee antes que el mensaje que está
+     leyendo. Este sí gira con el tema. */
+  --color-prax-face: #0d0f14; /* Rasgos oscuros sobre la cara, en tema oscuro */
+
   /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
   --color-accent: #d4a843; /* Badges, highlights, detalles premium */
   --color-accent-hover: #b8902f; /* Hover de accent */
@@ -168,6 +178,11 @@
   --color-primary-hover: #4740bd;
   --color-primary-muted: rgba(91, 82, 224, 0.1);
   --color-primary-foreground: #ffffff;
+
+  /* ── LA CARA DE PRAX ────────────────────────────────────── */
+  /* Claros en tema claro: el resto de la pantalla es luminoso, así que la cara
+     morada ya destaca sola y unos rasgos oscuros la endurecen. */
+  --color-prax-face: #ffffff;
 
   /* ── ACENTO SECUNDARIO ──────────────────────────────────── */
   --color-accent: #93670f;
@@ -289,7 +304,7 @@ button:disabled,
   }
 }
 
-/* La entrada de los avisos en vivo (AvisosEnVivo), desde el borde derecho.
+/* La entrada de los avisos en vivo (LiveNotices), desde el borde derecho.
 
    Va con los tokens y no en una zona porque el organismo vive en commons: el
    armazón privado lo monta en las cinco zonas, y una animación declarada en una
@@ -424,4 +439,125 @@ button:disabled,
 }
 .barra-de-video::-moz-range-track {
   background: transparent;
+}
+
+/* ─────────────────────────── Avisos emergentes ───────────────────────────
+ *
+ * `sileo` trae su propia paleta de estados en `oklch` y la declara en `:root` al
+ * importarse. Aquí se reata a la de PRAXIS para que el punto de un aviso de
+ * error sea **el mismo rojo** que el de un formulario, y no un rojo parecido: dos
+ * rojos casi iguales en la misma pantalla se leen como un descuido.
+ *
+ * ⚠️ Van fuera de `@theme` a propósito, igual que el bloque de tema claro: estas
+ * no son variables de Tailwind —nadie escribe `text-sileo-state-error`— sino
+ * variables CSS que consume una librería. Metidas en `@theme`, Tailwind las
+ * recortaría por no encontrar ninguna clase que las use (la trampa del `@theme
+ * static` que explica el aviso de arriba).
+ *
+ * ⚠️ Y se apuntan a `var(--color-…)`, no a un literal. Esas variables ya cambian
+ * solas con `data-theme`, así que los avisos siguen al tema sin necesidad de un
+ * segundo bloque aquí abajo. Copiar los valores obligaría a mantener dos
+ * paletas y a acordarse de las dos.
+ *
+ * `loading` no se usa —ese estado de sileo deja la tarjeta sin poder
+ * descartarse— pero se ata igual: si alguien lo estrena, que ya salga del tema.
+ *
+ * ⚠️ **El selector es `:root:root`, y la repetición no es un error.** `sileo`
+ * declara las suyas en `:root` y **las inyecta en tiempo de ejecución**: crea un
+ * `<style>` y lo cuelga del `<head>` al importarse el módulo, o sea **después**
+ * de esta hoja. Con la misma especificidad gana la última, así que un `:root` a
+ * secas aquí perdería siempre y estas líneas no harían absolutamente nada —sin
+ * error, sin aviso, con los colores de serie—. Repetir el selector sube la
+ * especificidad y el orden deja de importar.
+ */
+:root:root {
+  --sileo-state-success: var(--color-success);
+  --sileo-state-error: var(--color-error);
+  --sileo-state-warning: var(--color-warning);
+  --sileo-state-info: var(--color-info);
+  --sileo-state-action: var(--color-primary);
+  --sileo-state-loading: var(--color-text-secondary);
+
+  /* Algo más ancha que los 350 px de serie: los avisos llevan nombres de
+     persona y de proyecto entre comillas, y a 350 px la frase se parte en tres
+     líneas. */
+  --sileo-width: 380px;
+}
+
+/* ── Avisos: desbordes de `sileo` ──────────────────────────────────────────
+ *
+ * Tres correcciones sobre su hoja, y las tres son desbordes reales.
+ *
+ * ⚠️ **Los selectores repiten un atributo a propósito.** `sileo` inyecta su CSS
+ * en tiempo de ejecución —crea un `<style>` y lo cuelga del `<head>` al
+ * importarse—, o sea **después** de esta hoja. A igual especificidad gana la
+ * última, así que copiar su selector tal cual aquí no haría nada. Añadiendo
+ * `[data-position]` —que el contenedor siempre lleva— se sube un escalón y el
+ * orden deja de importar.
+ */
+
+/* 1. La tarjeta necesita un borde sutil para destacar en fondos planos
+ * y el botón se comía el ancho de la tarjeta.
+ *
+ * `[data-sileo-card]` o el contenedor se estilizan para añadir contraste.
+ * `[data-sileo-button]` es `display: flex` y vive como hijo de bloque dentro de
+ * la descripción, así que se estiraba al 100 %: una píldora de borde a borde que
+ * parecía salirse de la tarjeta. Con `max-content` mide lo que mide su texto. */
+[data-sileo-viewport][data-position] > div {
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+[data-sileo-viewport][data-position] [data-sileo-button] {
+  width: max-content;
+  max-width: 100%;
+}
+
+/* 2. El texto largo se salía de la píldora.
+ *
+ * La descripción lleva `padding: 1rem` y `width: 100%` sin `border-box`, así que
+ * el relleno se sumaba al ancho y las dos últimas letras de cada línea quedaban
+ * fuera. Y sin `overflow-wrap`, una palabra sin espacios —una URL pegada, un
+ * nombre de archivo largo— no se parte y desborda entera. */
+[data-sileo-viewport][data-position] [data-sileo-description] {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+/* 3. La descripción, legible sobre la píldora de PRAXIS.
+ *
+ * Un token del tema, y por eso **una sola regla para los dos**. Antes había dos,
+ * con colores literales cruzados —texto oscuro en tema oscuro— porque la píldora
+ * se pintaba con el blanco y negro de `sileo` y salía invertida respecto a la
+ * aplicación. Desde que el punto 4 la ata a `surface`, la píldora es del mismo
+ * tema que todo lo demás y el texto secundario del tema ya es el color correcto:
+ * separarlo por `data-theme` era escribir dos veces lo mismo. */
+[data-sileo-viewport][data-position] [data-sileo-description] {
+  color: var(--color-text-secondary);
+}
+
+/* 4. La tarjeta, con los colores de la aplicación en tema claro.
+ *
+ * `sileo` pinta el cuerpo y la píldora con su propio blanco casi puro, que sobre
+ * el fondo claro de PRAXIS no se distingue del lienzo. Se atan a `surface` y el
+ * relieve lo pone una sombra sobre el SVG entero —no sobre el contenedor— porque
+ * la tarjeta no es un rectángulo: es una forma con muesca, y una `box-shadow`
+ * dibujaría la caja que la contiene en vez de su silueta.
+ *
+ * ⚠️ **El `!important` no sobra.** `fill` viaja como atributo de presentación en
+ * el propio SVG, y el truco de especificidad de arriba no gana contra eso; con
+ * `!important` sí. En tema oscuro no hace falta ninguna de las tres: los tonos
+ * de `sileo` ya son los del fondo. */
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-pill],
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-body] {
+  fill: var(--color-surface) !important;
+}
+
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-svg] {
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.08))
+    drop-shadow(0 0 1px var(--color-border-subtle));
+}
+
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title] {
+  color: var(--color-text-primary);
 }

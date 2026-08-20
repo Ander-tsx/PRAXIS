@@ -1,15 +1,15 @@
 import {
-  Avatar,
   Badge,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
-  hrefDeAvatar,
+  avatarHref,
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { LeaveProjectButton } from './LeaveProjectButton';
+import { MemberAvatar } from './MemberAvatar';
 import { MemberRoleSelect } from './MemberRoleSelect';
 import { PendingInvitations } from './PendingInvitations';
 import { RemoveMemberButton } from './RemoveMemberButton';
@@ -126,14 +126,16 @@ export function ProjectMembers({
                     el nombre no se separen al apilar. */}
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   {/* El mismo círculo que el tablero y la barra lateral: el rojo
-                      dice «eres tú» en todo el producto. */}
-                  <Avatar
+                      dice «eres tú» en todo el producto, y el punto de estado
+                      importa aquí más que en ninguna parte —la pestaña de equipo
+                      es donde se mira quién hay—. Va **en vivo**: era la única
+                      superficie con esferas que no escuchaba el flujo, así que
+                      se quedaba congelada hasta recargar. Ver `MemberAvatar`. */}
+                  <MemberAvatar
+                    userId={member.userId}
                     label={label}
                     mine={member.userId === currentUserId}
-                    size="md"
-                    src={hrefDeAvatar(user?.avatarUrl, '/projects/api/gateway')}
-                    /* El estado también aquí: la pestaña de equipo es donde se
-                       mira quién hay y si está disponible. */
+                    src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
                     presence={user?.presence ?? null}
                   />
 
@@ -156,7 +158,7 @@ export function ProjectMembers({
                       </span>
                     ) : (
                       <a
-                        href={`/dashboard/chat/${member.userId}`}
+                        href={`/chat/${member.userId}`}
                         title={`Escribir a ${label} en privado`}
                         className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
                       >

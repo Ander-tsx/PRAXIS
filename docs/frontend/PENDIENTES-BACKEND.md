@@ -44,6 +44,10 @@ con su severidad en el título, aunque queden fuera del orden por impacto.
 Ninguno de la lista vieja. El punto 18 es un hueco nuevo, de escalado, no de
 seguridad: los adjuntos guardan en Postgres y el código ya está listo para GCS.
 
+El **21** es de 2026-08-19 y tampoco es de seguridad: un proyecto cuyo slug sea
+`overview`, `tablero` o `tarea` queda oculto tras una ruta estática del frontend.
+Tres palabras de espacio de colisión, y ningún proyecto afectado hoy.
+
 ### Resueltos
 
 | # | Severidad | Qué | Commit |
@@ -791,6 +795,74 @@ estructurado alrededor de un proveedor. `projects-service` tiene un
 el `.env` de ese servicio. El proveedor `gcs` usa `@google-cloud/storage` y
 espera `GCS_PROJECT_ID` y `GCS_BUCKET`.
 
+### Lo que faltaba para poder activarlo, y ya está (17-08)
+
+Cambiar `STORAGE_DRIVER` decide **dónde se guarda lo nuevo, no dónde está lo
+viejo**. Ponerlo en `gcs` sin más dejaría cada adjunto ya subido en una tabla
+que nadie vuelve a consultar: la fila de metadatos sigue ahí, el chat sigue
+enseñando el archivo en la lista, y al pulsarlo no hay nada. **Un 404 por cada
+adjunto anterior al cambio, sin un solo error en el servidor.**
+
+1. 🔴 **El proveedor de GCS ignoraba el `mimeType`.** La interfaz lo declara
+   —`put(key, data, mimeType)`— y `ChatAttachmentsService` lo envía, pero
+   `GcsBlobStorage` lo descartaba y guardaba **todo** como
+   `application/octet-stream`. El de Postgres puede permitírselo porque el tipo
+   vive en la fila de metadatos; en un bucket el objeto es lo único que hay, así
+   que perderlo rompe el servido directo y el CORS. Arreglado.
+
+   ⚠️ Este proveedor **está escrito y nunca se ha ejecutado contra un bucket
+   real**. Conviene revisarlo entero al conectarlo, no solo esto.
+
+2. ✅ **Hay script de migración**: `src/scripts/migrar-blobs.ts`, que se compila
+   a `dist/scripts/migrar-blobs.js`. Copia cada blob al bucket con la clave del
+   proveedor (`chat/<attachmentId>`) y **no borra nada** — el borrado va aparte
+   con `--borrar-origen`, y solo cuando alguien haya comprobado que el bucket
+   sirve. Un script que mueve y borra a la vez no deja forma de volver atrás si
+   el bucket estaba mal configurado.
+
+   Es idempotente (`save` sobrescribe), va por lotes de 20 —un adjunto pesa
+   hasta 25 MB y traerlos todos a memoria es lo único que puede tumbarlo— y se
+   puede interrumpir y relanzar.
+
+**El orden para activarlo, que importa:**
+
+```
+1. GCS_PROJECT_ID y GCS_BUCKET en el .env de projects-service
+2. migrar-blobs.js            ← con STORAGE_DRIVER todavía en `postgres`
+3. comprobar que el bucket sirve los archivos
+4. STORAGE_DRIVER=gcs         ← ahora sí
+5. migrar-blobs.js --borrar-origen
+```
+
+Migrar **antes** de cambiar el driver es lo que permite hacerlo sin ventana de
+indisponibilidad: mientras se copia, todo se sigue sirviendo desde Postgres.
+
+⚠️ Cloud SQL no tiene IP pública, así que el script se ejecuta **desde dentro de
+la VPC**, igual que `migrar.sh`:
+
+```
+# 1. cuánto hay (no toca el bucket ni pide credenciales de GCS)
+gcloud compute ssh <vm-backend> --tunnel-through-iap --zone <zona> \
+  --command "sudo docker exec praxis-backend node /app/apps/backend/services/projects/dist/scripts/migrar-blobs.js --contar"
+
+# 2. migrar
+gcloud compute ssh <vm-backend> --tunnel-through-iap --zone <zona> \
+  --command "sudo docker exec praxis-backend node /app/apps/backend/services/projects/dist/scripts/migrar-blobs.js"
+```
+
+⚠️ **El nombre de la máquina cambia en cada despliegue** —el grupo de instancias
+las recrea—, así que no se apunta:
+
+```
+gcloud compute instances list --filter="name~praxis-backend" --format="value(name,zone)"
+```
+
+⚠️ **En el contenedor no existe `DATABASE_URL`.** La compone
+`backend.pm2.config.cjs` y solo para los procesos que arranca; un `docker exec`
+**no la hereda**. El script la construye él mismo desde las `POSTGRES_*`, igual
+que `migrar.sh`. Sin eso, muere con «Environment variable not found:
+DATABASE_URL» y el mensaje apunta al `schema.prisma`, que no tiene nada que ver.
+
 **Qué falta por el lado del backend** (si se quiere conectar):
 
 - Crear el bucket y decidir la política de acceso (las URLs de los objetos
@@ -974,3 +1046,70 @@ Con las dos, la pantalla vuelve a ser dos peticiones.
 Sirve igual a la bandeja de avisos, al chat y al detalle de proyecto, que siguen
 pidiendo un `GET /users/:id` por persona: cambiarlos es una línea en cada uno y
 está pendiente.
+
+---
+
+## 🟢 25. Los acuses de lectura son por canal, así que dentro de un hilo no hay «visto»
+
+`ChatChannelState` guarda **un** `lastReadAt` por (canal, persona). Con eso se
+responde «¿hasta dónde ha leído fulano esta conversación?», que es justo lo que
+necesita el contador de no leídos y la marca de la conversación general.
+
+Lo que **no** se puede responder es «¿ha leído alguien *esta* respuesta?», y esa
+es la pregunta de un hilo: sus mensajes van con `visibleEnChat: false`, no
+entran en el historial general y no tienen por qué haberse visto solo porque la
+marca del canal esté más adelante. Que la marca vaya por delante de un mensaje
+de hilo no dice nada sobre si alguien abrió el hilo.
+
+Enseñar el «visto» del canal ahí sería peor que no enseñar nada: diría «leído»
+sobre una respuesta que puede no haber visto nadie, con toda la apariencia de un
+dato exacto. Así que el frontend lo **oculta** (`mostrarVisto={false}` en
+`ThreadPanel`, con el motivo escrito al lado).
+
+**Decisión (17-08): se cierra como límite del producto, no se implementa.**
+Contestarlo de verdad exige una tabla de acuses **por mensaje** —fila por (mensaje,
+persona) o un rango por hilo—, su migración, y una escritura por cada mensaje
+visto: el gesto más frecuente del sistema pasa de tocar una fila por canal a
+tocar una por mensaje en pantalla. Es un coste de escritura permanente a cambio
+de una marca en una superficie secundaria.
+
+Si algún día se retoma, lo barato es acotarlo al hilo —un `lastReadAt` por
+(hilo, persona), que es la misma forma que ya existe pero con `threadRootId` en
+vez de `channelId`— y no un acuse por mensaje suelto. Depende del punto 20, que
+es donde vive `threadRootId`.
+
+
+---
+
+## 🟡 21. Los slugs de proyecto no tienen palabras reservadas
+
+`Project.slug` es único global y es lo que va en la URL. Nada impide que un
+proyecto se llame «Overview» y se quede con el slug `overview` — ni que otro se
+quede con `tablero` o `tarea`.
+
+**Por qué importa en el frontend.** Dos zonas tienen rutas estáticas hermanas de
+la dinámica que resuelve el slug:
+
+| Zona | Ruta dinámica | Hermanas estáticas |
+|---|---|---|
+| `projects-front` | `/projects/[id]` | `/projects/tablero`, `/projects/tarea` |
+| `reports-front` | `/reports/[[...id]]` | `/reports/overview` |
+
+Next da prioridad a la estática, así que un proyecto con uno de esos tres slugs
+**queda oculto**: su enlace abre la otra pantalla. No da ningún error —la ruta
+existe y responde 200— así que se ve como un proyecto que «no se abre».
+
+**Qué haría falta.** Una lista de reservados en `generarSlugUnico`
+(`projects-service/src/projects/slug.util.ts`), que ya recibe el comprobador de
+unicidad: bastaría con tratar los reservados como colisión y dejar que el sufijo
+aleatorio haga lo suyo — «Overview» pasaría a `overview-rjv6`. Y una migración
+para los que ya existan, si los hay.
+
+**Severidad 🟡 y no naranja** porque hoy no hay ningún proyecto afectado y el
+espacio de colisión son tres palabras. Pero es exactamente la clase de fallo que
+aparece el día de una demostración, con un proyecto llamado «Overview» hecho para
+la ocasión.
+
+Mientras tanto el frontend **no hace nada**: comprobarlo en el cliente exigiría
+que cada zona conociera las rutas de las demás, y el arreglo de verdad está en
+quien genera el slug.

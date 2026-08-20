@@ -28,6 +28,12 @@ export interface DialogProps {
    * Cada escalón es un paso de la escala de Tailwind, no un salto.
    */
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  /**
+   * Si es true, el diálogo no ocultará el contenido que sobresalga de él (por
+   * ejemplo, los menús desplegables absolutos). Si se activa, el diálogo
+   * pierde la capacidad de hacer scroll interno.
+   */
+  overflowVisible?: boolean;
 }
 
 const sizeClasses = {
@@ -57,6 +63,7 @@ export function Dialog({
   children,
   footer,
   size = 'md',
+  overflowVisible = false,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = `dialog-title-${title.replace(/\s+/g, '-').toLowerCase()}`;
@@ -102,7 +109,7 @@ export function Dialog({
         /* Sin barra de scroll: en un diálogo alto la barra parte el borde
            redondeado y pesa más de lo que informa. Se sigue desplazando con la
            rueda y con el teclado. */
-        'scrollbar-none',
+        overflowVisible ? 'overflow-visible' : 'scrollbar-none',
         'backdrop:bg-overlay/75 backdrop:backdrop-blur-sm',
         sizeClasses[size],
       ].join(' ')}

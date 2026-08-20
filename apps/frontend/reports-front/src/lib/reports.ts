@@ -102,6 +102,116 @@ export interface ReportWeekly {
 }
 
 /**
+ * El cruce de dos dimensiones: una tabla de contingencia.
+ *
+ * 🔴 **La suma de las celdas NO es el total del proyecto** cuando alguna
+ * dimensión es de muchos a muchos: una tarea con tres etiquetas está en tres
+ * celdas. Por eso viaja `tareas` —las distintas que entran— al lado. Quien lo
+ * pinte tiene que poder decirlo: un total al pie que no cuadra con el del
+ * proyecto se lee como una avería, no como una propiedad del cruce.
+ *
+ * `aNombre`/`bNombre` vienen resueltos **solo** para las dimensiones que el
+ * backend sabe nombrar —columna y etiqueta—. `persona` llega como `userId` y la
+ * resuelve la pantalla, que ya tiene el directorio del proyecto cargado.
+ */
+export interface ReportMatrix {
+  agruparPor: string;
+  partirPor: string;
+  celdas: {
+    a: string | null;
+    b: string | null;
+    count: number;
+    aNombre: string | null;
+    bNombre: string | null;
+  }[];
+  /** Tareas distintas que entran en el cruce. */
+  tareas: number;
+}
+
+/**
+ * **Dónde espera el trabajo**: tiempo por columna.
+ *
+ * Dos medidas por columna que se leen juntas y **no se suman**:
+ *
+ * - `p50Horas` / `p85Horas` son las estancias que **ya terminaron**. La
+ *   referencia: cuánto suele costar pasar por ahí.
+ * - `enCurso*` es lo que llevan **ahora** las tareas abiertas que están ahí.
+ *
+ * ⚠️ Sale **una fila por columna del tablero**, tenga estancias o no. Una
+ * columna por la que no pasa nada es un dato, y filtrarla dejaría un gráfico de
+ * un tablero que no existe.
+ */
+export interface ReportColumnTime {
+  columnas: {
+    columnId: string;
+    name: string;
+    color: string | null;
+    board?: string | null;
+    order: number;
+    /** Estancias terminadas. Una tarea puede tener varias en la misma columna. */
+    estancias: number;
+    tareas: number;
+    p50Horas: number | null;
+    p85Horas: number | null;
+    totalHoras: number | null;
+    /** Tareas abiertas que están ahí **ahora**. */
+    enCurso: number;
+    enCursoP50Horas: number | null;
+    enCursoMaxHoras: number | null;
+  }[];
+  /** Lo que pasó por columnas que ya no existen. No se tira: se agrupa. */
+  huerfanas: { estancias: number; horas: number };
+}
+
+/**
+ * Retrabajo, rotación de responsable y volatilidad de prioridad.
+ *
+ * Los tres salen de eventos que ya se guardaban y ningún informe miraba
+ * (`REOPENED`, `ASSIGNED`/`UNASSIGNED`, `PRIORITY_CHANGED`).
+ *
+ * ⚠️ **`desde` no es decorativo.** Es el primer evento capturado del proyecto, y
+ * sin él un 3 % de retrabajo se lee como una medida del proyecto entero cuando
+ * puede ser la de tres semanas. Quien pinte cualquiera de los tres tiene que
+ * poder decir desde cuándo se mide.
+ */
+export interface ReportDynamics {
+  desde: string | null;
+  retrabajo: {
+    cierres: number;
+    reaperturas: number;
+    tareasCerradas: number;
+    tareasReabiertas: number;
+    /** Tareas reabiertas sobre tareas cerradas. `null` si no se cerró ninguna. */
+    porcentaje: number | null;
+    porColumna: {
+      columnId: string | null;
+      count: number;
+      name: string;
+      color: string | null;
+      board?: string | null;
+    }[];
+    top: { taskId: string; titulo: string; veces: number }[];
+  };
+  rotacion: {
+    asignaciones: number;
+    desasignaciones: number;
+    /** Tareas que pasaron por **más de una** mano. */
+    tareasQueRotan: number;
+    /** Histograma. La última fila acumula «N o más». */
+    distribucion: { manos: number; tareas: number }[];
+    top: { taskId: string; titulo: string; manos: number; movimientos: number }[];
+  };
+  volatilidad: {
+    cambios: number;
+    tareasVolatiles: number;
+    distribucion: { cambios: number; tareas: number }[];
+    /** De qué prioridad a cuál. Como mucho 4×4 filas. */
+    matriz: { desde: string; hasta: string; count: number }[];
+    top: { taskId: string; titulo: string; cambios: number }[];
+  };
+}
+
+/**
  * Del token de color del sistema al color real.
  *
  * Las columnas y las etiquetas guardan un token (`primary`, `success`…), no un
@@ -154,6 +264,39 @@ export function formatDay(iso: string): string {
   return `${Number(dia)} ${meses[Number(mes) - 1]}`;
 }
 
+/**
+ * `2026-07-21` → `21 jul`, y `2024-07-21` → `21 jul 2024`.
+ *
+ * ⚠️ **El año aparece solo cuando no es el corriente**, y esa es toda la gracia.
+ * Ponerlo siempre alarga cada etiqueta de filtro con un dato que casi nunca
+ * aporta; no ponerlo nunca hace que «Desde 21 jul» sobre un rango de 2024 se lea
+ * como de este año, que es una lectura falsa de una pantalla de datos.
+ *
+ * ⚠️ Y se parte la cadena a mano, sin `new Date(iso)`: esa construcción es
+ * medianoche **UTC**, y al oeste de Greenwich cae el día anterior en hora local.
+ * Es la misma trampa que documenta `SelectorDeFecha`, y aquí el síntoma sería
+ * una etiqueta que dice un día distinto del que se eligió en el calendario.
+ */
+export function fechaCorta(iso: string): string {
+  const [anio, mes, dia] = iso.split('-');
+  const meses = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  const texto = `${Number(dia)} ${meses[Number(mes) - 1]}`;
+  return Number(anio) === new Date().getFullYear() ? texto : `${texto} ${anio}`;
+}
+
 export const PRIORITY_ORDER = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] as const;
 
 export const PRIORITY_COLOR: Record<string, string> = {
@@ -184,4 +327,105 @@ export function etiquetaDeColumna(
 /** Cuántos tableros distintos aparecen en un reparto por columna. */
 export function cuentaTableros(filas: { board?: string | null }[]): number {
   return new Set(filas.map((fila) => fila.board).filter(Boolean)).size;
+}
+
+/**
+ * ─── Los filtros de Análisis, entre la URL y la API ───────────────────────
+ *
+ * Viven en la URL —ver `AnalysisFilters`— así que hay que leerlos de
+ * `searchParams` y volver a escribirlos en la query del paquete. Las dos
+ * conversiones van juntas aquí para que no puedan divergir: si una supiera de un
+ * filtro que la otra no, el control lo enseñaría puesto y el gráfico no lo
+ * aplicaría, sin ningún error por medio.
+ *
+ * Los nombres son **los mismos** que los del DTO del backend
+ * (`ReportFiltersQueryDto`). Traducirlos aquí solo habría añadido un sitio donde
+ * equivocarse.
+ */
+export const CLAVES_DE_FILTRO = [
+  'from',
+  'to',
+  'boardId',
+  'assigneeId',
+  'labelId',
+  'priority',
+] as const;
+
+export type ClaveDeFiltro = (typeof CLAVES_DE_FILTRO)[number];
+export type FiltrosDeAnalisis = Partial<Record<ClaveDeFiltro, string>>;
+
+/**
+ * Lo que trae la URL, quedándose solo con lo que significa algo.
+ *
+ * ⚠️ **La prioridad se comprueba contra el conjunto cerrado y las demás no.** No
+ * es incoherencia: un valor inventado en `priority` haría que el gateway
+ * respondiera 400 al **paquete entero**, y el `.catch` de la página lo degrada a
+ * `{}` — o sea, las siete tarjetas diciendo «no disponible» por una letra de más
+ * en la barra de direcciones. Eso se lee como «este proyecto no tiene datos». Un
+ * UUID o una fecha mal escritos también dan 400, pero ahí no hay conjunto
+ * cerrado contra el que comprobar sin duplicar la validación del backend, que es
+ * lo que no se hace.
+ *
+ * Un `to` sin `from` se descarta: el backend lo ignora, y dejarlo aquí haría que
+ * el control lo enseñara puesto sin estarlo.
+ */
+export function filtrosDesdeUrl(
+  searchParams: Record<string, string | string[] | undefined>,
+): FiltrosDeAnalisis {
+  const filtros: FiltrosDeAnalisis = {};
+
+  for (const clave of CLAVES_DE_FILTRO) {
+    const valor = searchParams[clave];
+    /* Un parámetro repetido (`?priority=HIGH&priority=LOW`) llega como array.
+       Se toma el primero en vez de descartarlo: es lo que hace el navegador al
+       enviar un formulario dos veces, no un intento de nada raro. */
+    const texto = Array.isArray(valor) ? valor[0] : valor;
+    if (typeof texto === 'string' && texto.length > 0) filtros[clave] = texto;
+  }
+
+  if (filtros.priority && !PRIORITY_ORDER.includes(filtros.priority as never)) {
+    filtros.priority = undefined;
+  }
+  if (!filtros.from) filtros.to = undefined;
+
+  return filtros;
+}
+
+/** Los filtros como trozo de query, ya con el `&` delante. Vacío si no hay ninguno. */
+export function filtrosAQuery(filtros: FiltrosDeAnalisis): string {
+  const params = new URLSearchParams();
+  for (const clave of CLAVES_DE_FILTRO) {
+    const valor = filtros[clave];
+    if (valor) params.set(clave, valor);
+  }
+  const qs = params.toString();
+  return qs ? `&${qs}` : '';
+}
+
+/**
+ * Una fila de la cartera. Espejo de `ReportPortfolioRow` en `@praxis/contracts`.
+ *
+ * Se redeclara aquí, como el resto de formas de esta zona, porque el frontend no
+ * depende de los contratos del backend: aquel es un paquete de servidor con
+ * `class-validator` dentro, y arrastrarlo al navegador metería los decoradores y
+ * el reflect-metadata en el bundle de una pantalla que solo lee números.
+ */
+export interface PortfolioRow {
+  projectId: string;
+  name?: string;
+  slug?: string;
+  total: number;
+  abiertas: number;
+  cerradas: number;
+  vencidas: number;
+  sinAsignar: number;
+  /**
+   * ⚠️ Aquí **no** se distingue la que no tiene historial de la que sí, al revés
+   * que en el informe de un proyecto. En una tabla de una línea por proyecto no
+   * cabe el matiz: quien quiera saber cuáles son entra, que es lo que esta vista
+   * intenta que haga.
+   */
+  paradas: number;
+  cerradasSemana: number;
+  cerradasSemanaAnterior: number;
 }

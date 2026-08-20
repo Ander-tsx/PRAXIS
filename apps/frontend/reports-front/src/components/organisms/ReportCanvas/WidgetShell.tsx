@@ -7,10 +7,24 @@ import type { ReactNode } from 'react';
  * El marco de un widget dentro del lienzo.
  *
  * Es el `ChartCard` de la pantalla anterior con dos añadidos —el tirador y el
- * botón de quitar— y una diferencia que importa: **el contenido desborda con
- * barra propia**, no empuja. En una página apilada un gráfico alto solo alarga
- * la página; en una cuadrícula, empujar significa taparle el sitio al de al
- * lado. El alto lo decide quien redimensiona.
+ * botón de quitar— y una diferencia que importa: **dentro de la cuadrícula el
+ * contenido desborda con barra propia**, no empuja. En una página apilada un
+ * gráfico alto solo alarga la página; en una cuadrícula, empujar significa
+ * taparle el sitio al de al lado. El alto lo decide quien redimensiona.
+ *
+ * ## ⚠️ `altoFijo={false}` para la lista apilada, y no es cosmético
+ *
+ * Con el alto en celdas y el desbordamiento oculto, una tarjeta que en escritorio
+ * cabe de sobra **se corta en un teléfono**: la misma altura en filas, la mitad
+ * de ancho, y el contenido reflowado al doble de alto. En la captura de un móvil
+ * de 390 px, «Resumen» perdía dos de sus cuatro cifras —una arriba y otra
+ * abajo— y quedaban a medio pintar, que no se lee como «hay que desplazar» sino
+ * como que la tarjeta está rota.
+ *
+ * No se arregla con más filas: el alto que hace falta depende de cuánto reflowe
+ * cada contenido. Se arregla quitando la restricción donde no hace falta, que es
+ * justo donde no hay cuadrícula — por debajo de `lg` no se arrastra nada, así
+ * que ninguna tarjeta puede quitarle el sitio a otra.
  *
  * ⚠️ La clase `.tirador` no es decorativa: es el selector que la cuadrícula tiene
  * configurado como `handle`. Si se renombra aquí y no allí, el lienzo deja de
@@ -21,17 +35,24 @@ export function WidgetShell({
   children,
   onQuitar,
   movible,
+  altoFijo = true,
 }: {
   widget: Widget;
   children: ReactNode;
   onQuitar: () => void;
   movible: boolean;
+  /** `false` deja que la tarjeta crezca con su contenido. Ver el bloque de arriba. */
+  altoFijo?: boolean;
 }) {
   const entrada = CATALOGO[widget.tipo];
   const titulo = tituloDe(widget);
 
   return (
-    <section className="flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface">
+    <section
+      className={`flex flex-col rounded-2xl border border-border bg-surface ${
+        altoFijo ? 'h-full overflow-hidden' : ''
+      }`}
+    >
       <header
         className={`tirador flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-4 ${
           movible ? 'cursor-grab active:cursor-grabbing' : ''
@@ -74,11 +95,13 @@ export function WidgetShell({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto px-5 pb-5 pt-1">{children ?? <Cargando />}</div>
+      <div className={`px-5 pb-5 pt-1 ${altoFijo ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
+        {children ?? <Cargando />}
+      </div>
 
       {!entrada && (
         <p className="px-5 pb-4 font-sans text-xs text-text-disabled">
-          Este gráfico ya no existe en el catálogo. Quítalo del lienzo.
+          Este grafo ya no existe en el catálogo. Quítalo del lienzo.
         </p>
       )}
     </section>

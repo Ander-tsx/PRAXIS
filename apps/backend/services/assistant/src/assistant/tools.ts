@@ -20,6 +20,8 @@
  * modelo **no puede ni sugerirlo**.
  */
 
+import { PROPONER_PLANTILLA } from './template';
+
 export interface FunctionDeclaration {
   name: string;
   description: string;
@@ -458,6 +460,297 @@ const PROPONER_GRAFICO: FunctionDeclaration = {
 };
 
 /**
+ * Borrar una tarea.
+ *
+ * ## ⚠️ Esta herramienta no existía, y su ausencia estaba documentada tres veces
+ *
+ * El argumento era que el asistente no debía poder destruir nada, y que la
+ * garantía tenía que ser **estructural**: una capacidad que no se declara no se
+ * puede invocar, mientras que una regla del prompt que diga «nunca borres» se
+ * rodea con la pregunta adecuada.
+ *
+ * Se añade el 2026-08-18 por decisión explícita, y el argumento que la vetaba no
+ * se sostiene con el patrón de propuestas: **esto no borra nada**. Devuelve una
+ * propuesta, la persona la revisa y, si acepta, quien llama a `DELETE /tasks/:id`
+ * es el frontend con **su** sesión y **sus** permisos. Es técnicamente idéntico a
+ * que lo borre desde el tablero. Sin `canDeleteTask`, aceptar falla igual que le
+ * fallaría pulsando el botón a mano — y de hecho la herramienta ni se le declara.
+ *
+ * ## Lo que sí la hace distinta de las otras nueve
+ *
+ * **No se deshace.** Una tarea propuesta de más se borra; una borrada de más no
+ * vuelve, y se lleva por delante sus subtareas, su checklist, sus comentarios y
+ * sus adjuntos, que viven en otro microservicio. Por eso:
+ *
+ * - la descripción le prohíbe proponerlo por iniciativa propia;
+ * - `porQue` no vale con una frase de relleno: la tarjeta lo enseña como el
+ *   motivo por el que alguien va a perder trabajo;
+ * - y la tarjeta es destructiva a la vista, con su propia confirmación. Ver
+ *   `DeleteProposalCard`.
+ */
+const PROPONER_BORRADO: FunctionDeclaration = {
+  name: 'proponer_borrado',
+  description:
+    'Prepara una propuesta para BORRAR una tarea. NO la borra: la persona tiene que ' +
+    'aceptarla. ⚠️ Borrar NO SE DESHACE y se lleva las subtareas, el checklist, los ' +
+    'comentarios y los adjuntos. Usala SOLO cuando te pidan explicitamente borrar, ' +
+    'eliminar o quitar una tarea concreta. NUNCA la propongas por tu cuenta como ' +
+    'limpieza, ni para duplicados, ni para tareas viejas o paradas: para eso propon ' +
+    'moverlas o cerrarlas. Si tienes cualquier duda de CUAL es la tarea, PREGUNTA en ' +
+    'vez de proponer.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      taskId: {
+        type: 'STRING',
+        description:
+          'id de una tarea del inventario del contexto. Si lo que te han dicho encaja ' +
+          'con varias, no elijas: pregunta cual.',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'Obligatorio. Por que se borra ESTA tarea, con lo que te hayan dicho. La ' +
+          'tarjeta lo enseña junto al aviso de que no se puede deshacer, asi que una ' +
+          'frase generica ahi no ayuda a nadie a decidir.',
+      },
+    },
+    required: ['taskId', 'porQue'],
+  },
+};
+
+/** Los colores de columna del design system. Espejo de `COLUMN_COLORS`. */
+const COLORES_DE_COLUMNA = ['primary', 'accent', 'info', 'warning', 'error', 'success'];
+
+/**
+ * Montar un tablero con sus columnas.
+ *
+ * ## Por qué existe, si «el asistente no configura proyectos»
+ *
+ * Porque ya lo hacía, solo que en otro sitio. La plantilla de proyecto nuevo
+ * (`proponer_plantilla`) genera el árbol entero —espacios, tableros, columnas,
+ * etiquetas y roles— y nadie la consideró nunca una vía de escritura nueva, por
+ * el mismo motivo que ninguna de las demás lo es: **propone, y ejecuta quien
+ * acepta, con sus permisos**.
+ *
+ * Que esa capacidad estuviera solo en el modal de creación era un accidente de
+ * dónde se implementó, no una decisión. Y se notaba: en un proyecto vacío, a
+ * «créame una tarea» el asistente solo podía contestar que primero hacía falta un
+ * tablero — sabiendo perfectamente cuál proponer.
+ *
+ * ## Un solo tablero por propuesta, y con sus columnas dentro
+ *
+ * No es un generador de proyectos: eso ya existe y vive en su sitio. Aquí se
+ * propone **un** tablero, porque lo que resuelve es el hueco concreto de una
+ * conversación —«no hay dónde poner esto»— y no rehacer la estructura entera.
+ *
+ * Las columnas van dentro y no en una propuesta aparte porque un tablero sin
+ * columnas no sirve para nada: aceptar dos tarjetas para tener algo utilizable
+ * es partir una decisión que es una sola.
+ */
+const PROPONER_TABLERO: FunctionDeclaration = {
+  name: 'proponer_tablero',
+  description:
+    'Prepara la propuesta de un tablero nuevo con sus columnas. NO lo crea: la ' +
+    'persona lo acepta. Usalo cuando haga falta un sitio donde poner el trabajo y ' +
+    'no lo haya —un proyecto recien creado, o un area nueva que no encaja en los ' +
+    'tableros que ya existen—. Si ya hay un tablero donde cabe lo que se esta ' +
+    'hablando, NO propongas otro: usa el que hay.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      espacio: {
+        type: 'STRING',
+        description:
+          'Nombre del espacio de trabajo donde va el tablero. Si en "tableros" ya ' +
+          'hay alguno, usa el nombre de espacio de uno de ellos. Si el proyecto ' +
+          'esta vacio, propon un nombre corto y descriptivo (por ejemplo "General").',
+      },
+      nombre: {
+        type: 'STRING',
+        description: 'Nombre del tablero. Corto y concreto. Maximo 80 caracteres.',
+      },
+      columnas: {
+        type: 'ARRAY',
+        description:
+          'De 2 a 8 columnas, EN ORDEN, de lo que esta por empezar a lo terminado. ' +
+          'Un flujo normal son tres o cuatro; mas de seis se convierte en un ' +
+          'tablero que nadie mantiene.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            nombre: { type: 'STRING', description: 'Nombre de la columna.' },
+            color: {
+              type: 'STRING',
+              enum: COLORES_DE_COLUMNA,
+              description:
+                'Opcional. ⚠️ "success" es el VERDE DE CIERRE y tiene significado: ' +
+                'una tarea en una columna verde cuenta como terminada en los ' +
+                'informes y deja de avisar aunque este vencida. Ponlo SOLO en la ' +
+                'ultima columna, la de trabajo acabado, y nunca en dos.',
+            },
+          },
+          required: ['nombre'],
+        },
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Obligatorio. Por que este tablero y por que estas columnas, en una frase.',
+      },
+    },
+    required: ['espacio', 'nombre', 'columnas', 'porQue'],
+  },
+};
+
+/**
+ * Preguntar de vuelta, con opciones que se pulsan.
+ *
+ * ## ⚠️ Es la única herramienta que no propone ningún cambio
+ *
+ * Las otras diez preparan algo que la persona acepta o descarta. Esta no toca
+ * nada: **es una pregunta**. Y sin embargo es una herramienta y no texto libre,
+ * por un motivo concreto — cuando el modelo pregunta escribiendo («¿te refieres
+ * a la del tablero de Diseño o a la de Backend?»), la respuesta hay que
+ * teclearla, y teclear una desambiguación que el modelo ya tiene enumerada es
+ * trabajo que sobra. Con esto, responder es un clic.
+ *
+ * Lo que gana no es comodidad: es **precisión**. Una respuesta elegida de una
+ * lista no se puede escribir mal, así que el turno siguiente no vuelve a
+ * empezar por «no te he entendido».
+ *
+ * ## Cuándo se le pide que la use
+ *
+ * Cuando le falta un dato para poder seguir y **las respuestas posibles son
+ * pocas y conocidas**: cuál de tres tareas, qué prioridad, en qué tablero. No
+ * para preguntas abiertas —«¿qué quieres hacer?»— que se responden mejor
+ * escribiendo, ni para pedir confirmación de algo que ya va a salir como
+ * propuesta con su propio botón.
+ */
+const PROPONER_PREGUNTA: FunctionDeclaration = {
+  name: 'proponer_pregunta',
+  description:
+    'Hazle una o varias preguntas a la persona con opciones que pueda PULSAR en vez ' +
+    'de escribir. Usalo cuando te falte un dato para seguir y las respuestas ' +
+    'posibles sean pocas y concretas: cual de varias tareas, que prioridad, en que ' +
+    'tablero, si quiere una cosa u otra. NO lo uses para preguntas abiertas ("que ' +
+    'quieres hacer?") ni para confirmar algo que ya vas a proponer con su tarjeta. ' +
+    'Acompanalo SIEMPRE de una frase tuya en el texto: la tarjeta son las opciones, ' +
+    'el contexto lo pones tu.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      preguntas: {
+        type: 'ARRAY',
+        description:
+          'De 1 a 3. Mas de tres de golpe es un formulario, y a un formulario se ' +
+          'responde peor que a una conversacion.',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            texto: {
+              type: 'STRING',
+              description: 'La pregunta, corta y en el idioma de la conversacion.',
+            },
+            tipo: {
+              type: 'STRING',
+              enum: ['una', 'varias'],
+              description:
+                '"una" si solo cabe una respuesta (que prioridad); "varias" si se ' +
+                'pueden marcar varias (cuales de estas tareas).',
+            },
+            opciones: {
+              type: 'ARRAY',
+              description: 'De 2 a 8 respuestas posibles, cortas.',
+              items: { type: 'STRING' },
+            },
+          },
+          required: ['texto', 'tipo', 'opciones'],
+        },
+      },
+      porQue: {
+        type: 'STRING',
+        description: 'Opcional. Para que necesitas saberlo, en una frase.',
+      },
+    },
+    required: ['preguntas'],
+  },
+};
+
+/**
+ * Abrir uno de los proyectos de quien habla, desde una conversación sin foco.
+ *
+ * ## Por qué es una herramienta y no una frase
+ *
+ * Sin proyecto, a «hablemos del rediseño» lo único que PRAX podía hacer era
+ * describir dónde está el selector. Con esto propone **el proyecto concreto**, y
+ * aceptar lo carga con su briefing sin salir de la conversación ni volver a
+ * contar de qué se estaba hablando.
+ *
+ * ## Lo que la sostiene, que no es el modelo
+ *
+ * El `projectId` sale de la lista que el gateway resolvió con la sesión de quien
+ * pregunta —los proyectos donde ya tiene `canViewReports`— y **se valida contra
+ * esa misma lista** antes de salir. Un id inventado, o el de un proyecto ajeno,
+ * se descarta antes de llegar a la pantalla.
+ *
+ * ⚠️ Y aceptar no da acceso a nada: carga el proyecto por el camino de siempre,
+ * con los guards de siempre. Es el mismo gesto que elegirlo en el selector.
+ *
+ * ## Una conversación no cambia de proyecto, y esto no lo contradice
+ *
+ * Lo que está vetado es **cambiar** de foco a mitad —dos briefings en la misma
+ * ventana, con sus tareas y su gente mezcladas—. Aquí no hay nada que mezclar:
+ * la conversación no tenía ninguno. Pasar de «sin proyecto» a «este proyecto»
+ * ocurre una vez y es definitivo, exactamente como cuando se elige en la
+ * pantalla de arranque.
+ */
+const PROPONER_ABRIR_PROYECTO: FunctionDeclaration = {
+  name: 'proponer_abrir_proyecto',
+  description:
+    'Ofrece cargar uno de los proyectos de la persona para poder hablar de el con ' +
+    'sus datos delante. Usalo cuando te nombren uno de la lista, o cuando quede ' +
+    'claro que quieren trabajar sobre algo que ya existe. NO lo abre: la persona ' +
+    'acepta o no. Solo ids de la lista que tienes; si lo que describen no esta en ' +
+    'ella, no es un proyecto suyo y no lo propongas.',
+  parameters: {
+    type: 'OBJECT',
+    properties: {
+      projectId: {
+        type: 'STRING',
+        description: 'El id EXACTO de la lista de proyectos. No lo inventes ni lo compongas.',
+      },
+      porQue: {
+        type: 'STRING',
+        description:
+          'OBLIGATORIO. Por que ese y no otro, en una frase, atado a lo que acaban de ' +
+          'decirte ("has dicho que el rediseno va con retraso").',
+      },
+    },
+    required: ['projectId', 'porQue'],
+  },
+};
+
+/**
+ * Las herramientas de una conversación **sin proyecto**.
+ *
+ * Tres, y ninguna sale de un permiso: no hay proyecto contra el que resolver
+ * permisos, y ninguna de las tres toca datos de ninguno.
+ *
+ * - **Preguntar**, que ya no dependía de permisos en el otro modo tampoco.
+ * - **Abrir un proyecto**, que es la salida hacia el modo con datos.
+ * - **La plantilla**, que es la salida hacia un proyecto que todavía no existe.
+ *
+ * ⚠️ **La plantilla vive aquí y NO en `herramientasPara`**, y el motivo de
+ * `template.ts` no ha cambiado: declarársela en una conversación sobre un
+ * proyecto existente dejaría que a mitad de una charla sobre tareas propusiera
+ * rehacerlo entero. Sin foco ese riesgo no existe, porque no hay nada que
+ * rehacer — es justo la conversación para la que se escribió.
+ */
+export function herramientasSinProyecto(): FunctionDeclaration[] {
+  return [PROPONER_PREGUNTA, PROPONER_ABRIR_PROYECTO, PROPONER_PLANTILLA];
+}
+
+/**
  * Las herramientas que le tocan a esta persona.
  *
  * `canEditTask` implica `canMoveTask` y demás por jerarquía, y el mapa que llega
@@ -468,7 +761,15 @@ const PROPONER_GRAFICO: FunctionDeclaration = {
  * lectura: el asistente responde preguntas y no propone nada.
  */
 export function herramientasPara(permisos: Record<string, boolean>): FunctionDeclaration[] {
-  const tools: FunctionDeclaration[] = [];
+  /**
+   * Preguntar **no depende de ningún permiso**, y es la única así.
+   *
+   * Las demás preparan un cambio, así que se filtran por lo que esa persona
+   * puede hacer. Esta solo pide un dato: negársela a un rol de solo lectura
+   * dejaría al asistente sin forma de desambiguar justo con quien más falta hace
+   * —quien no puede tocar nada solo puede preguntar— y le obligaría a adivinar.
+   */
+  const tools: FunctionDeclaration[] = [PROPONER_PREGUNTA];
   if (permisos.canCreateTask) tools.push(PROPONER_TAREA);
   if (permisos.canEditTask) tools.push(PROPONER_ASIGNACION, PROPONER_EDICION, PROPONER_CHECKLIST);
   /**
@@ -494,26 +795,54 @@ export function herramientasPara(permisos: Record<string, boolean>): FunctionDec
    * los datos de otra forma no es tocar el trabajo de nadie.
    */
   if (permisos.canViewReports) tools.push(PROPONER_GRAFICO);
+  /**
+   * El borrado cuelga de `canDeleteTask`, igual que su endpoint.
+   *
+   * ⚠️ **Y va aparte, no colgado de `canEditTask`.** `canDeleteTask` sí implica
+   * `canEditTask`, `canMoveTask`, `canComment` y `canCreateTask` por jerarquía,
+   * así que quien llega aquí ya tiene todas las demás. Lo que no pasa al revés:
+   * quien edita **no** borra.
+   */
+  if (permisos.canDeleteTask) tools.push(PROPONER_BORRADO);
+  /**
+   * El tablero pide `canCreateBoard` **y** `canCreateColumn`, no uno de los dos.
+   *
+   * Un tablero sin columnas no sirve para nada, así que proponerlo a quien solo
+   * puede lo primero acabaría en una tarjeta que crea un cascarón vacío. Y
+   * `canCreateColumn` no implica `canCreateBoard` ni al revés: son ramas
+   * distintas de la jerarquía, así que hay que exigir las dos.
+   */
+  if (permisos.canCreateBoard && permisos.canCreateColumn) tools.push(PROPONER_TABLERO);
   return tools;
 }
 
 /**
- * ⚠️ **Aquí no hay, ni va a haber, una herramienta de borrado.**
+ * ⚠️ **Aquí hay exactamente UNA herramienta destructiva, y solo una.**
  *
- * No es un olvido ni una decisión que se pueda revisar a la ligera: es la
- * garantía de que el asistente no puede destruir nada. Y la garantía es
- * **estructural, no una instrucción** — el prompt no menciona el borrado a
- * propósito, porque una regla que dice «nunca borres» se rodea con la pregunta
- * adecuada, mientras que una capacidad que no existe no se puede invocar.
+ * Este bloque decía que no había ninguna ni la iba a haber. Cambió el
+ * 2026-08-18, y conviene que quede escrito **por qué el argumento de entonces no
+ * se sostenía**, para que no se reabra cada seis meses:
  *
- * Son tres capas y ninguna depende de que el modelo obedezca:
+ * La regla de la casa nunca fue «el asistente no borra». Es **«el asistente
+ * propone; ejecuta el código que ya existe»**. Y con el patrón de propuestas,
+ * borrar cumple esa regla igual que crear: la herramienta devuelve una
+ * propuesta, la persona la revisa, y quien llama a `DELETE /tasks/:id` es el
+ * frontend con su sesión y sus permisos. Es indistinguible de que lo borre desde
+ * el tablero.
  *
- * 1. la herramienta no se le declara, así que no tiene forma de expresarlo;
- * 2. `validarPropuesta` descarta cualquier `call` fuera de esta lista;
- * 3. las server actions solo saben llamar a los endpoints que tienen escritos.
+ * Las tres capas siguen intactas y ninguna depende de que el modelo obedezca:
  *
- * Si alguna vez alguien añade aquí algo destructivo, que sea sabiendo que
- * rompe las tres a la vez.
+ * 1. las herramientas se declaran **filtradas por permiso**, así que lo que no
+ *    te toca no se puede ni expresar;
+ * 2. `validarPropuesta` descarta cualquier `call` fuera de la lista, y comprueba
+ *    el `taskId` contra el inventario real del proyecto;
+ * 3. las server actions solo saben llamar a los endpoints que tienen escritos, y
+ *    el gateway vuelve a comprobar permisos en cada uno.
+ *
+ * Lo que **sí** es distinto del resto: un borrado **no se deshace**. Toda la
+ * diferencia está en la interfaz —la tarjeta es destructiva, lleva confirmación
+ * propia y dice qué se lleva por delante— y en la descripción de la herramienta,
+ * que le prohíbe proponerlo por iniciativa propia.
  *
  * **`proponer_grafico` no es la excepción**, aunque sea la primera que no toca
  * el tablero. Solo **añade** al lienzo de quien habla; no existe la de quitar, y

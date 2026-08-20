@@ -19,6 +19,19 @@ export interface TabNavProps {
    * componente sigue siendo tonto.
    */
   renderLink: (tab: TabItem, isActive: boolean, content: ReactNode) => ReactNode;
+  /**
+   * El nombre accesible de esta navegación.
+   *
+   * ⚠️ **No puede ser «Secciones».** Ese es el de la barra lateral
+   * (`NavList`), que está en pantalla a la vez que estas pestañas: dos
+   * navegaciones con el mismo nombre en la misma página dejan a quien usa un
+   * lector de pantalla sin forma de distinguirlas —«Secciones» y «Secciones»—,
+   * que es justo lo que un `aria-label` viene a evitar.
+   *
+   * Lo destapó una prueba: `getByRole('navigation', { name: 'Secciones' })`
+   * casaba con las dos y buscaba una pestaña en la barra lateral.
+   */
+  ariaLabel?: string;
 }
 
 /**
@@ -28,7 +41,12 @@ export interface TabNavProps {
  * tiene su propia cabecera, su botón de acción y su estado vacío, apilarlas
  * obliga a bajar mucho para ver algo y ninguna se lee como la principal.
  */
-export function TabNav({ tabs, activeId, renderLink }: TabNavProps) {
+export function TabNav({
+  tabs,
+  activeId,
+  renderLink,
+  ariaLabel = 'Secciones de la página',
+}: TabNavProps) {
   return (
     /**
      * `overflow-y-hidden` es imprescindible: con solo `overflow-x-auto` el
@@ -40,7 +58,7 @@ export function TabNav({ tabs, activeId, renderLink }: TabNavProps) {
      */
     <nav
       className="scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border"
-      aria-label="Secciones"
+      aria-label={ariaLabel}
     >
       {tabs.map((tab) => {
         const isActive = tab.id === activeId;

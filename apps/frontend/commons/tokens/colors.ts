@@ -17,6 +17,16 @@ export const colors = {
   primaryHover: 'var(--color-primary-hover)', // #5A52D5
   primaryMuted: 'var(--color-primary-muted)', // rgba(108,99,255,0.12)
   primaryForeground: 'var(--color-primary-foreground)', // #FFFFFF
+  /**
+   * Los rasgos de la cara de PRAX: ojos y boca.
+   *
+   * ⚠️ **Gira con el tema, al revés que `primaryForeground`.** Los dos se pintan
+   * sobre el morado de marca, pero aquel es para texto y se queda blanco en los
+   * dos temas —lo correcto para una etiqueta dentro de un botón—. La cara no:
+   * sobre la aplicación oscura unos rasgos blancos son el punto más brillante de
+   * la pantalla, y el avatar se lee antes que el mensaje que se está leyendo.
+   */
+  praxFace: 'var(--color-prax-face)',
 
   // ── ACENTO ────────────────────────────────────────────────
   accent: 'var(--color-accent)', // #D4A843

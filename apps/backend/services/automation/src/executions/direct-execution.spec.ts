@@ -112,24 +112,27 @@ describe('ejecución directa del MVP académico', () => {
     };
     const tasksClient = {
       send: jest.fn(() =>
-        require('rxjs').of([
-          {
-            id: 'task-a',
-            titulo: 'Entregar reporte',
-            prioridad: 'HIGH',
-            vence: dueTomorrow,
-            cerrada: false,
-            encargados: ['00000000-0000-4000-8000-000000000101'],
-          },
-          {
-            id: 'task-b',
-            titulo: 'Sin urgencia',
-            prioridad: 'LOW',
-            vence: dueTomorrow,
-            cerrada: false,
-            encargados: ['00000000-0000-4000-8000-000000000102'],
-          },
-        ]),
+        require('rxjs').of({
+          tareas: [
+            {
+              id: 'task-a',
+              titulo: 'Entregar reporte',
+              prioridad: 'HIGH',
+              vence: dueTomorrow,
+              cerrada: false,
+              encargados: ['00000000-0000-4000-8000-000000000101'],
+            },
+            {
+              id: 'task-b',
+              titulo: 'Sin urgencia',
+              prioridad: 'LOW',
+              vence: dueTomorrow,
+              cerrada: false,
+              encargados: ['00000000-0000-4000-8000-000000000102'],
+            },
+          ],
+          omitidas: 0,
+        }),
       ),
     };
     const projectsClient = {

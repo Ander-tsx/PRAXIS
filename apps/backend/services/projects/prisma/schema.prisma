@@ -230,6 +230,16 @@ model ProjectMember {
   joinedAt      DateTime    @default(now())
 
   @@unique([projectId, userId])
+  /// «¿En qué proyectos estoy?», que es por donde empieza medio producto:
+  /// `GET /projects`, la lista de contactos del chat y el reparto de presencia
+  /// arrancan todos por aquí.
+  ///
+  /// ⚠️ **El `@@unique` de arriba no sirve para esto.** Un índice compuesto solo
+  /// se puede usar por su prefijo, y ahí el prefijo es `projectId`: una consulta
+  /// que solo filtra por `userId` no puede aprovecharlo y acaba en `Seq Scan`
+  /// sobre la tabla entera —confirmado con `EXPLAIN ANALYZE`—. Es la clase de
+  /// cosa que no se nota en desarrollo y crece con usuarios × proyectos.
+  @@index([userId])
   @@schema("projects")
   @@map("project_members")
 }
@@ -454,6 +464,27 @@ model ChatMessage {
   pinnedAt DateTime?
   /// Quién lo fijó, para la marca. Sin clave foránea, igual que `authorId`.
   pinnedById String?
+
+  /// Cuándo se borró. `null` mientras el mensaje está vivo.
+  ///
+  /// ## Por qué queda la fila
+  ///
+  /// El borrado era un `deleteMany` y la fila desaparecía. Eso deja **un hueco
+  /// mudo** en la conversación: quien estaba leyendo ve que algo ha cambiado de
+  /// sitio y no sabe si se borró un mensaje, si falló la carga o si nunca
+  /// existió. Peor con `replyTo`, que es `SetNull`: la respuesta se quedaba sin
+  /// cita y colgando de nada.
+  ///
+  /// Ahora la fila se queda como **lápida**: sale en su sitio del historial
+  /// diciendo que ahí había un mensaje que se borró, y las respuestas que lo
+  /// citaban lo siguen citando.
+  ///
+  /// ⚠️ **Y el contenido sí se va de verdad.** `body` se vacía, las reacciones
+  /// se borran y los adjuntos también —con sus bytes—. Lo que sobrevive es el
+  /// hecho de que hubo un mensaje, su autor y su hora, que es lo que la
+  /// conversación necesita para seguir teniendo sentido. Un borrado que dejara
+  /// el texto guardado «por si acaso» no sería un borrado.
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
 

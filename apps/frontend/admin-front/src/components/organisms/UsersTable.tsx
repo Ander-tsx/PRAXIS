@@ -1,15 +1,17 @@
 'use client';
 
+import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import {
   type AdminUser,
   Avatar,
+  avatarHref,
   Badge,
-  Button,
+  type DataColumn,
+  DataTable,
   globalRoleLevelOf,
-  hrefDeAvatar,
 } from '@praxis/commons';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
 import { UserStatusDialog } from './UserStatusDialog';
@@ -31,17 +33,24 @@ export interface UsersTableProps {
  * aplica el gateway: nada sobre tu propia cuenta, nada sobre una de nivel igual o
  * superior. El backend lo rechaza igual —con su mensaje— pero un botón que existe
  * para dar un 403 es un botón que sobra, y aquí se puede decir *por qué* está
- * apagado en el `title` en vez de esperar al error.
+ * apagado en vez de esperar al error.
  *
  * ⚠️ Esto es cortesía, no autorización: el gateway es quien manda. Si esta
  * comparación tuviera un fallo, el resultado sería un botón que da error, no un
  * cambio que no debería poder hacerse.
  *
+ * ⚠️ **Y el motivo ya no vive en un `title`.** Vive dentro del menú, escrito
+ * debajo de la opción apagada: un `title` obliga a dejar el ratón quieto sobre un
+ * botón deshabilitado para enterarte de por qué lo está, y en una pantalla táctil
+ * no aparece nunca. Ver `RowActions`.
+ *
  * ## Una tabla que en móvil no es una tabla
  *
  * En pantallas estrechas las columnas se apilan en tarjetas. Una tabla de seis
  * columnas con scroll horizontal en un móvil se lee fatal, y este panel es justo
- * el que se abre desde el teléfono cuando alguien avisa de un problema.
+ * el que se abre desde el teléfono cuando alguien avisa de un problema. Lo
+ * resuelve `DataTable`, que además es lo que impide que la cabecera y las filas
+ * vuelvan a desalinearse.
  */
 export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
   const [estadoDe, setEstadoDe] = useState<AdminUser | null>(null);
@@ -50,135 +59,155 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
 
   const miNivel = globalRoleLevelOf(misRoles);
 
+  /**
+   * Las columnas, memorizadas.
+   *
+   * Dependen de tres cosas que casi nunca cambian, y sin `useMemo` el array se
+   * reconstruía en cada render junto con las nueve funciones `cell` que lleva
+   * dentro. No es un problema de rendimiento medible con veinticinco filas; es
+   * que la plantilla de la rejilla se recalcula con él, y que esto sea estable
+   * hace evidente que **las columnas se declaran una sola vez**, que es la
+   * invariante entera de esta tabla.
+   */
+  const columnas = useMemo<DataColumn<AdminUser>[]>(
+    () => [
+      {
+        key: 'cuenta',
+        header: 'Cuenta',
+        track: { fr: 2.4 },
+        mobileLabel: false,
+        cell: (usuario) => {
+          const esMiCuenta = usuario.id === miId;
+          return (
+            <div className="flex min-w-0 items-center gap-3">
+              <AvatarConPresencia usuario={usuario} esMiCuenta={esMiCuenta} />
+              <div className="min-w-0">
+                <p className="flex items-center gap-1 truncate font-sans text-sm font-semibold text-text-primary">
+                  {esMiCuenta ? (
+                    nombreDe(usuario)
+                  ) : (
+                    /* Cruza a la zona de chat → `<a>` duro. Ver §16. */
+                    <a
+                      href={`/chat/${usuario.id}`}
+                      className="transition-colors hover:text-primary hover:underline"
+                      title={`Escribir a ${nombreDe(usuario)}`}
+                    >
+                      {nombreDe(usuario)}
+                    </a>
+                  )}
+                  {esMiCuenta && <span className="font-normal text-text-secondary">(tú)</span>}
+                </p>
+                <p className="truncate font-sans text-xs text-text-secondary">
+                  {usuario.credential.email}
+                </p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: 'estado',
+        header: 'Estado',
+        track: { fr: 1 },
+        cell: (usuario) => {
+          const estado = ESTADOS[usuario.status];
+          return <Badge variant={estado.variante}>{estado.etiqueta}</Badge>;
+        },
+      },
+      {
+        key: 'rol',
+        header: 'Rol global',
+        mobileLabel: 'Rol',
+        track: { fr: 1 },
+        cell: (usuario) => (
+          <Badge variant={usuario.globalRole === 'User' ? 'primary' : 'accent'}>
+            {ROLES[usuario.globalRole].etiqueta}
+          </Badge>
+        ),
+      },
+      {
+        key: 'plan',
+        header: 'Plan IA',
+        track: { fr: 0.8 },
+        /* El plan no es un rol y no se pinta como tal: PRO destaca porque es lo
+           que se concede a mano; FREE es el valor por defecto de casi todas las
+           cuentas y no necesita color. */
+        cell: (usuario) => (
+          <Badge variant={usuario.assistantPlan === 'PRO' ? 'success' : 'default'}>
+            {usuario.assistantPlan}
+          </Badge>
+        ),
+      },
+      {
+        key: 'alta',
+        header: 'Se registró',
+        track: { fr: 1.1 },
+        cell: (usuario) => (
+          <p className="truncate font-sans text-xs text-text-secondary">
+            {fechaYHora(usuario.createdAt)}
+          </p>
+        ),
+      },
+      {
+        key: 'acciones',
+        header: 'Acciones',
+        /* Fija: es un botón de tres puntos y siempre mide lo mismo. Era la
+           pista `auto` que descuadraba la tabla entera. */
+        track: { rem: 6 },
+        align: 'end',
+        mobileLabel: false,
+        cell: (usuario) => {
+          const esMiCuenta = usuario.id === miId;
+          const suNivel = globalRoleLevelOf(
+            usuario.globalRoles.length > 0 ? usuario.globalRoles : [usuario.globalRole],
+          );
+          const puedoTocarla = !esMiCuenta && miNivel > suNivel;
+
+          const motivo = esMiCuenta
+            ? 'No puedes administrar tu propia cuenta desde el panel.'
+            : 'Solo puedes administrar cuentas de nivel inferior al tuyo.';
+          const bloqueo = puedoTocarla ? undefined : motivo;
+
+          return (
+            <RowActions
+              label={nombreDe(usuario)}
+              actions={[
+                {
+                  id: 'estado',
+                  label: usuario.status === 'ACTIVE' ? 'Suspender cuenta' : 'Reactivar cuenta',
+                  tone: usuario.status === 'ACTIVE' ? 'danger' : 'default',
+                  disabledReason: bloqueo,
+                  onSelect: () => setEstadoDe(usuario),
+                },
+                {
+                  id: 'rol',
+                  label: 'Cambiar rol global',
+                  disabledReason: bloqueo,
+                  onSelect: () => setRolDe(usuario),
+                },
+                {
+                  id: 'plan',
+                  label: 'Cambiar plan de IA',
+                  disabledReason: bloqueo,
+                  onSelect: () => setPlanDe(usuario),
+                },
+              ]}
+            />
+          );
+        },
+      },
+    ],
+    [miId, miNivel],
+  );
+
   return (
     <>
-      <div className="overflow-hidden rounded-2xl border border-border">
-        {/* Cabecera: solo en escritorio, donde de verdad hay columnas. */}
-        <div className="hidden border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_0.8fr_1fr_auto] md:gap-4">
-          <span>Cuenta</span>
-          <span>Estado</span>
-          <span>Rol global</span>
-          <span>Plan IA</span>
-          <span>Se registró</span>
-          <span className="text-right">Acciones</span>
-        </div>
-
-        <ul>
-          {usuarios.map((usuario) => {
-            const esMiCuenta = usuario.id === miId;
-            const suNivel = globalRoleLevelOf(
-              usuario.globalRoles.length > 0 ? usuario.globalRoles : [usuario.globalRole],
-            );
-            const puedoTocarla = !esMiCuenta && miNivel > suNivel;
-
-            const motivoBloqueo = esMiCuenta
-              ? 'No puedes administrar tu propia cuenta desde el panel.'
-              : 'Solo puedes administrar cuentas de nivel inferior al tuyo.';
-
-            const estado = ESTADOS[usuario.status];
-
-            return (
-              <li
-                key={usuario.id}
-                className="flex flex-col gap-3 border-b border-border px-4 py-4 last:border-b-0 md:grid md:grid-cols-[minmax(0,2.2fr)_1fr_1fr_0.8fr_1fr_auto] md:items-center md:gap-4"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Avatar
-                    label={nombreDe(usuario)}
-                    mine={esMiCuenta}
-                    size="md"
-                    src={hrefDeAvatar(usuario.avatarUrl, '/admin/api/gateway')}
-                    presence={usuario.presence ?? null}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-sans text-sm font-semibold text-text-primary flex items-center gap-1">
-                      {esMiCuenta ? (
-                        nombreDe(usuario)
-                      ) : (
-                        <a
-                          href={`/dashboard/chat/${usuario.id}`}
-                          className="hover:underline transition-colors hover:text-primary"
-                          title={`Escribir a ${nombreDe(usuario)}`}
-                        >
-                          {nombreDe(usuario)}
-                        </a>
-                      )}
-                      {esMiCuenta && (
-                        <span className="font-normal text-text-secondary">(tú)</span>
-                      )}
-                    </p>
-                    <p className="truncate font-sans text-xs text-text-secondary">
-                      {usuario.credential.email}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <span className="mr-2 font-sans text-xs text-text-disabled md:hidden">
-                    Estado
-                  </span>
-                  <Badge variant={estado.variante}>{estado.etiqueta}</Badge>
-                </div>
-
-                <div>
-                  <span className="mr-2 font-sans text-xs text-text-disabled md:hidden">Rol</span>
-                  <Badge variant={usuario.globalRole === 'User' ? 'primary' : 'accent'}>
-                    {ROLES[usuario.globalRole].etiqueta}
-                  </Badge>
-                </div>
-
-                <div>
-                  <span className="mr-2 font-sans text-xs text-text-disabled md:hidden">
-                    Plan IA
-                  </span>
-                  {/* El plan no es un rol y no se pinta como tal: PRO destaca
-                      porque es lo que se concede a mano; FREE es el valor por
-                      defecto de casi todas las cuentas y no necesita color. */}
-                  <Badge variant={usuario.assistantPlan === 'PRO' ? 'success' : 'default'}>
-                    {usuario.assistantPlan}
-                  </Badge>
-                </div>
-
-                <p className="font-sans text-xs text-text-secondary">
-                  {fechaYHora(usuario.createdAt)}
-                </p>
-
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Button
-                    size="sm"
-                    variant={usuario.status === 'ACTIVE' ? 'danger' : 'secondary'}
-                    disabled={!puedoTocarla}
-                    title={puedoTocarla ? undefined : motivoBloqueo}
-                    onClick={() => setEstadoDe(usuario)}
-                  >
-                    {usuario.status === 'ACTIVE' ? 'Suspender' : 'Reactivar'}
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={!puedoTocarla}
-                    title={puedoTocarla ? undefined : motivoBloqueo}
-                    onClick={() => setRolDe(usuario)}
-                  >
-                    Cambiar rol
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={!puedoTocarla}
-                    title={puedoTocarla ? undefined : motivoBloqueo}
-                    onClick={() => setPlanDe(usuario)}
-                  >
-                    Plan IA
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <DataTable
+        columns={columnas}
+        rows={usuarios}
+        rowKey={(usuario) => usuario.id}
+        ariaLabel="Cuentas de la plataforma"
+      />
 
       {estadoDe && <UserStatusDialog usuario={estadoDe} open onClose={() => setEstadoDe(null)} />}
 
@@ -188,5 +217,46 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
         <UserRoleDialog usuario={rolDe} miNivel={miNivel} open onClose={() => setRolDe(null)} />
       )}
     </>
+  );
+}
+
+/**
+ * El avatar de una fila, con el punto de estado **al día**.
+ *
+ * ## 🔴 Por qué esto es un componente y no cuatro líneas dentro de la celda
+ *
+ * Porque la presencia se leía de `usuario.presence` a secas, que es lo que trajo
+ * el servidor **al cargar la página**: un valor congelado. En el resto de la
+ * aplicación los avatares pasan por `usePresence`, que pisa esa foto con los
+ * eventos del flujo en vivo; aquí no, así que el panel de administración era el
+ * único sitio donde alguien seguía «Disponible» media hora después de cerrar, y
+ * donde quien acababa de entrar salía gris. Es justo la pantalla donde ese dato
+ * se mira para decidir algo.
+ *
+ * `usePresence` es un hook, y `cell` es una función que devuelve JSX dentro de un
+ * `useMemo` — no un componente—, así que llamarlo ahí rompe las reglas de los
+ * hooks: el número de llamadas cambiaría con el número de filas. De ahí este
+ * envoltorio, que sí es un componente y se monta una vez por fila.
+ */
+function AvatarConPresencia({ usuario, esMiCuenta }: { usuario: AdminUser; esMiCuenta: boolean }) {
+  /**
+   * ⚠️ **Aquí no se usa `usePresence`.**
+   *
+   * El flujo en tiempo real (LiveSource) solo envía actualizaciones de presencia
+   * para los contactos mutuos (gente con la que compartes proyectos).
+   * En el panel de administración se lista a todo el mundo, así que la mayoría
+   * de las cuentas nunca recibirían eventos de presencia y siempre saldrían
+   * grises, pareciendo desconectadas aunque estuvieran dentro de la app.
+   *
+   * Es mejor no pintar la esfera que pintar una que miente.
+   */
+  return (
+    <Avatar
+      label={nombreDe(usuario)}
+      mine={esMiCuenta}
+      size="md"
+      src={avatarHref(usuario.avatarUrl, '/admin/api/gateway')}
+      presence={undefined}
+    />
   );
 }

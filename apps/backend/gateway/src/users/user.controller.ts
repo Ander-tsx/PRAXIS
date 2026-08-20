@@ -34,6 +34,7 @@ import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { AccountOwnerGuard } from '../common/guards/account-owner.guard';
+import { PresenceService } from '../presence/presence.service';
 
 /**
  * Tope de la foto de perfil: 2 MB.
@@ -72,7 +73,52 @@ function firmaDeImagenValida(mimeType: string, contenido: Uint8Array): boolean {
 @UseGuards(JwtGuard)
 @Controller('users')
 export class UserController {
-  constructor(@Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy) {}
+  constructor(
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    private readonly presencia: PresenceService,
+  ) {}
+
+  /**
+   * Cambia la presencia **elegida** por la que se le enseña al resto.
+   *
+   * ## Por qué se hace aquí y no en credentials-service
+   *
+   * `User.presence` es lo que la persona eligió, y por sí solo miente: era
+   * front-driven —el navegador avisaba al cerrar la pestaña— así que una
+   * conexión que se corta, una batería que se agota o un navegador que se cae
+   * dejaban la cuenta «Disponible» **para siempre**. Usuarios fantasma.
+   *
+   * La otra mitad del dato —si hay una conexión abierta— solo la conoce el
+   * gateway, que es quien mantiene los flujos SSE. credentials-service no tiene
+   * forma de saberlo y no debería: no participa en el tiempo real.
+   *
+   * Así que se cruza en el último punto por el que pasa un perfil antes de salir
+   * hacia el navegador, y **toda** la interfaz se corrige sola: el punto del
+   * avatar en el chat, la lista de conversaciones, el equipo del proyecto. Sin
+   * esto habría que acordarse en cada pantalla.
+   *
+   * Una sola consulta a Redis (`MGET`) para toda la lista, no una por persona.
+   */
+  private async conPresenciaReal<T extends { id: string; presence?: string | null }>(
+    usuarios: T[],
+  ): Promise<T[]> {
+    if (usuarios.length === 0) return usuarios;
+
+    const vivos = await this.presencia.conectados(usuarios.map((usuario) => usuario.id));
+    return usuarios.map((usuario) => ({
+      ...usuario,
+      presence: this.presencia.efectiva(usuario.presence, vivos.has(usuario.id)),
+    }));
+  }
+
+  /** Lo mismo para un perfil suelto. */
+  private async unoConPresenciaReal<T extends { id: string; presence?: string | null }>(
+    usuario: T | null,
+  ): Promise<T | null> {
+    if (!usuario) return usuario;
+    const [conPresencia] = await this.conPresenciaReal([usuario]);
+    return conPresencia ?? usuario;
+  }
 
   /**
    * Filtros por **query params**, no por body: `fetch` no puede enviar cuerpo
@@ -105,14 +151,22 @@ export class UserController {
      */
     if (query.ids?.length) {
       const items = await firstValueFrom(
-        this.credentialsClient.send({ cmd: 'user_find_by_ids' }, { ids: query.ids }),
+        this.credentialsClient.send<{ id: string; presence?: string | null }[]>(
+          { cmd: 'user_find_by_ids' },
+          { ids: query.ids },
+        ),
       );
-      return { items, total: Array.isArray(items) ? items.length : 0 };
+      const conPresencia = await this.conPresenciaReal(Array.isArray(items) ? items : []);
+      return { items: conPresencia, total: conPresencia.length };
     }
 
-    return firstValueFrom(
-      this.credentialsClient.send({ cmd: 'user_find_all' }, query.toFindUsersDto()),
+    const pagina = await firstValueFrom(
+      this.credentialsClient.send<{ items?: { id: string; presence?: string | null }[] }>(
+        { cmd: 'user_find_all' },
+        query.toFindUsersDto(),
+      ),
     );
+    return { ...pagina, items: await this.conPresenciaReal(pagina?.items ?? []) };
   }
 
   /**
@@ -130,17 +184,29 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Perfil de quien hace la petición' })
   @ApiResponse({ status: 200, description: 'Perfil recuperado' })
-  findMe(@Request() req: Express.Request) {
-    return firstValueFrom(
-      this.credentialsClient.send({ cmd: 'user_find_one' }, { id: req.user!.userId }),
+  async findMe(@Request() req: Express.Request) {
+    return this.unoConPresenciaReal(
+      await firstValueFrom(
+        this.credentialsClient.send<{ id: string; presence?: string | null } | null>(
+          { cmd: 'user_find_one' },
+          { id: req.user!.userId },
+        ),
+      ),
     );
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de usuario por ID' })
   @ApiResponse({ status: 200, description: 'Detalle del usuario recuperado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(this.credentialsClient.send({ cmd: 'user_find_one' }, { id }));
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.unoConPresenciaReal(
+      await firstValueFrom(
+        this.credentialsClient.send<{ id: string; presence?: string | null } | null>(
+          { cmd: 'user_find_one' },
+          { id },
+        ),
+      ),
+    );
   }
 
   /**
@@ -155,8 +221,35 @@ export class UserController {
   @ApiOperation({ summary: 'Actualizar información de un usuario' })
   @ApiResponse({ status: 200, description: 'Usuario actualizado exitosamente' })
   @ApiResponse({ status: 403, description: 'Solo puedes modificar tu propia cuenta' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateUserBodyDto) {
-    return firstValueFrom(this.credentialsClient.send({ cmd: 'user_update' }, { ...body, id }));
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateUserBodyDto) {
+    const actualizado = await firstValueFrom(
+      this.credentialsClient.send<{ id: string; presence?: string | null } | null>(
+        { cmd: 'user_update' },
+        { ...body, id },
+      ),
+    );
+
+    const conPresencia = await this.unoConPresenciaReal(actualizado);
+
+    /**
+     * Un cambio **manual** de estado se anuncia a quien comparte proyecto.
+     *
+     * Sin esto, ponerse «No molestar» solo se veía en la pantalla de quien lo
+     * hizo: el resto seguía viendo el punto verde hasta que su navegador
+     * volviera a pedir un perfil, cosa que puede no pasar en toda la sesión.
+     *
+     * ⚠️ Se anuncia **la presencia efectiva**, no lo que llega en el cuerpo: si
+     * la conexión se ha caído entre medias, lo que hay que enseñar es «ausente»
+     * y no el estado que se acaba de guardar. La verdad es el cruce, siempre.
+     */
+    if (body.presence !== undefined && conPresencia) {
+      void this.presencia.anunciar(
+        id,
+        this.presencia.efectiva(conPresencia.presence, await this.presencia.estaConectado(id)),
+      );
+    }
+
+    return conPresencia;
   }
 
   /**

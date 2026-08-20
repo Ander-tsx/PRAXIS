@@ -1,2 +1,2 @@
 export * from './assistant.dto';
-export * from './plantilla.dto';
+export * from './template.dto';

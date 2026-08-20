@@ -1,7 +1,15 @@
 'use client';
 
-import { CATALOGO, type TipoWidget, type Widget, nuevoWidget, tiposYaPuestos } from '@/lib/widgets';
-import { Button } from '@praxis/commons';
+import { Desplegable } from '@/components/molecules/Desplegable';
+import {
+  CATALOGO,
+  type EspecificacionGrafico,
+  type TipoWidget,
+  type Widget,
+  nuevoWidget,
+  tiposYaPuestos,
+} from '@/lib/widgets';
+import { Button, alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -13,6 +21,7 @@ import {
 
 import { CanvasVacio } from './CanvasVacio';
 import { Catalogo } from './Catalogo';
+import { ChartBuilder } from './ChartBuilder';
 import { WidgetShell } from './WidgetShell';
 
 /**
@@ -90,7 +99,16 @@ export interface ReportCanvasProps {
  */
 export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanvasProps) {
   const [widgets, setWidgets] = useState<Widget[]>(inicial);
-  const [catalogoAbierto, setCatalogoAbierto] = useState(false);
+  /**
+   * Qué hay abierto debajo de la barra. `null` es «nada».
+   *
+   * ⚠️ **Un estado y no dos booleanos.** Con `catalogoAbierto` y
+   * `constructorAbierto` por separado existía el estado imposible de los dos a la
+   * vez, y cada botón tenía que acordarse de cerrar al otro — un `set` olvidado
+   * en cualquiera de los cuatro sitios lo dejaba pasar. Con una sola variable no
+   * hay nada que recordar.
+   */
+  const [panel, setPanel] = useState<'catalogo' | 'medida' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
@@ -216,9 +234,9 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
    * salto en el que la tarjeta aparezca de golpe con todo dentro.
    */
   const anadir = useCallback(
-    async (tipo: TipoWidget) => {
-      setCatalogoAbierto(false);
-      const siguientes = [...widgets, nuevoWidget(tipo, widgets)];
+    async (tipo: TipoWidget, grafico?: EspecificacionGrafico) => {
+      setPanel(null);
+      const siguientes = [...widgets, nuevoWidget(tipo, widgets, grafico)];
       setWidgets(siguientes);
       const resultado = await guardar(siguientes);
       if (!resultado.ok) {
@@ -268,49 +286,133 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {mounted && esAnchoGrande ? (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setCatalogoAbierto((abierto) => !abierto)}
-                aria-expanded={catalogoAbierto}
-              >
-                {catalogoAbierto ? 'Cerrar el catálogo' : 'Añadir un gráfico'}
-              </Button>
-
-              <Button variant="ghost" onClick={onGenerar}>
-                Generar uno a medida
-              </Button>
-            </>
-          ) : (
-            mounted && (
-              <span className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated px-3 py-1.5 font-sans text-sm text-text-secondary">
-                <svg
-                  className="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-                Desktop only
-              </span>
-            )
-          )}
-        </div>
+      {/**
+       * La barra de acciones del lienzo.
+       *
+       * ## ⚠️ Elegir qué ver se puede en cualquier ancho; **colocarlo, no**
+       *
+       * Antes los dos botones desaparecían por debajo de `lg` y en su lugar salía
+       * una insignia que decía «Desktop only». Eran dos problemas: el rótulo
+       * estaba en inglés en un producto que habla español, y —lo de fondo— dejaba
+       * a quien entra desde el teléfono **sin poder hacer absolutamente nada**,
+       * ni siquiera añadir la instantánea a un lienzo vacío.
+       *
+       * Y no hacía falta: añadir un gráfico llama a `guardar()` con la
+       * disposición en celdas del ancho grande, que es la única que se persiste;
+       * lo que sí había que acotar —y sigue acotado— es `onLayoutChange`, porque
+       * la cuadrícula deriva los anchos pequeños compactando el grande y
+       * guardarlos convertiría la composición en una columna apilada.
+       *
+       * Así que la línea real no es «móvil sí / móvil no», es **elegir vs.
+       * colocar**. Se dice con esas palabras, debajo del lienzo y no como un
+       * cartel de error.
+       */}
+      <div className="flex flex-wrap items-center gap-2">
+        {mounted && (
+          /**
+           * ⚠️ **El rótulo no cambia al abrir**, y antes decía «Cerrar».
+           *
+           * Con el panel desplegado, un botón que solo dice «Cerrar» deja de
+           * nombrar lo que hay debajo: quien vuelve a la pestaña después de un
+           * rato ve un panel grande y, encima, una palabra que no dice de qué es.
+           * El estado lo comunican el `aria-expanded` y el propio panel, que
+           * lleva su aspa — que es donde se busca cerrar algo, la misma regla que
+           * el cajón de PRAX.
+           */
+          <Button
+            variant={panel ? 'secondary' : 'primary'}
+            onClick={() => setPanel((actual) => (actual ? null : 'catalogo'))}
+            aria-expanded={panel !== null}
+          >
+            Añadir un grafo
+          </Button>
+        )}
       </div>
 
-      {catalogoAbierto && (
-        <Catalogo yaPuestos={yaPuestos} onElegir={anadir} onGenerar={onGenerar} />
-      )}
+      {/**
+       * Los dos caminos, **en un panel con pestañas y no en dos paneles**.
+       *
+       * Eran dos botones que abrían dos bloques distintos y se cerraban el uno al
+       * otro. Se leían como dos funciones sin relación, cuando son dos formas de
+       * hacer lo mismo: poner un grafo en el lienzo. Con pestañas, la relación se
+       * ve —y el que llega buscando en el catálogo descubre que existe el
+       * constructor sin que nadie se lo cuente.
+       *
+       * Se abre por «Del catálogo» a propósito: es el camino de un clic, y el
+       * constructor pide cuatro decisiones. Quien ya sabe lo que quiere cambia de
+       * pestaña; quien no, ve ocho opciones dibujadas.
+       */}
+      <Desplegable abierto={panel !== null}>
+        <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h3 className="font-display text-lg text-text-primary">Añade lo que quieras ver</h3>
+              <p className="font-sans text-sm text-text-secondary">
+                Se coloca al final del lienzo. Después se mueve arrastrando por la cabecera y se
+                redimensiona por la esquina.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPanel(null)}
+              aria-label="Cerrar"
+              className="shrink-0 rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
+            >
+              <svg
+                className="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+
+          {/* `<fieldset>` y no un `div` con `role="tablist"`: son dos opciones
+              excluyentes de un formulario, y el carril con fondo es lo que dice
+              que solo puede estar puesta una. Mismo patrón que el control
+              segmentado de Administración. */}
+          <fieldset
+            className="flex w-max max-w-full flex-wrap gap-0.5 rounded-xl p-1"
+            style={{ background: alpha(colors.border, 45) }}
+          >
+            <legend className="sr-only">Cómo quieres añadirlo</legend>
+            {(
+              [
+                ['catalogo', 'Del catálogo'],
+                ['medida', 'A medida'],
+              ] as const
+            ).map(([clave, rotulo]) => (
+              <button
+                key={clave}
+                type="button"
+                onClick={() => setPanel(clave)}
+                aria-pressed={panel === clave}
+                className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
+                  panel === clave
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </fieldset>
+
+          {panel === 'medida' ? (
+            <ChartBuilder
+              onAnadir={(grafico) => anadir('generado', grafico)}
+              onCancelar={() => setPanel(null)}
+            />
+          ) : (
+            <Catalogo yaPuestos={yaPuestos} onElegir={anadir} onGenerar={onGenerar} />
+          )}
+        </div>
+      </Desplegable>
 
       {error && (
         <p role="alert" className="font-sans text-sm text-error">
@@ -318,14 +420,53 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
         </p>
       )}
 
-      <div ref={containerRef}>
+      {/* ⚠️ El `pb-20` deja sitio al botón flotante de PRAX, que va fijo en la
+          esquina inferior derecha y tapaba el pie de la última tarjeta — el
+          «Cómo se lee esto», que es justo lo que hay que poder pulsar. */}
+      <div ref={containerRef} className="pb-20">
         {widgets.length === 0 ? (
-          <CanvasVacio onAnadir={() => setCatalogoAbierto(true)} onGenerar={onGenerar} />
+          <CanvasVacio
+            onAnadir={() => setPanel('catalogo')}
+            onConstruir={() => setPanel('medida')}
+          />
         ) : (
           /* Hasta que se mide el contenedor no se dibuja: la librería asume
              1280 px por defecto y la cuadrícula aparecería con el ancho
              equivocado y saltaría al medirse. */
-          mounted && (
+          mounted &&
+          /**
+           * ## ⚠️ Por debajo de `lg` no hay cuadrícula, hay una lista
+           *
+           * Y no es una simplificación visual: es lo que arregla que las
+           * tarjetas se cortaran en un teléfono. La cuadrícula conserva el alto
+           * **en filas** al cambiar de ancho, así que una tarjeta que en
+           * escritorio cabe de sobra reflowa al doble de alto en 390 px y se
+           * queda con la mitad del contenido detrás de un `overflow-hidden`.
+           * «Resumen» perdía dos de sus cuatro cifras, a medio pintar.
+           *
+           * Aquí no se pierde nada por soltar la cuadrícula: por debajo de `lg`
+           * ya estaban desactivados el arrastre, el redimensionado y el guardado
+           * de la disposición, así que lo único que aportaba era el recorte. El
+           * orden es el de la composición guardada —por fila y luego por
+           * columna— para que la lista se lea como se ve en grande.
+           */
+          (!esAnchoGrande ? (
+            <div className="flex flex-col gap-4">
+              {[...widgets]
+                .sort((a, b) => a.y - b.y || a.x - b.x)
+                .map((widget) => (
+                  <WidgetShell
+                    key={widget.id}
+                    widget={widget}
+                    onQuitar={() => quitar(widget.id)}
+                    movible={false}
+                    altoFijo={false}
+                  >
+                    {slots[widget.id]}
+                  </WidgetShell>
+                ))}
+            </div>
+          ) : (
             <ResponsiveGridLayout
               width={width}
               layouts={{ lg: disposicion }}
@@ -354,9 +495,19 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
                 </div>
               ))}
             </ResponsiveGridLayout>
-          )
+          ))
         )}
       </div>
+
+      {/* Al pie y no arriba: quien entra desde el teléfono viene a leer, y el
+          aviso de que aquí no se arrastra solo hace falta cuando ya ha visto lo
+          que hay. Arriba era un cartel pidiendo perdón antes de enseñar nada. */}
+      {mounted && !esAnchoGrande && widgets.length > 0 && (
+        <p className="font-sans text-xs leading-relaxed text-text-disabled">
+          Los grafos se apilan para que quepan. Para moverlos y cambiarles el tamaño hace falta una
+          pantalla más ancha; tu composición se queda como la dejaste allí.
+        </p>
+      )}
     </div>
   );
 }
