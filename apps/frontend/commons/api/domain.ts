@@ -829,6 +829,107 @@ export interface NotificationPage {
   unread: number;
 }
 
+/**
+ * Automatizaciones académicas (Reglas).
+ *
+ * Espejo de `rule-definition.ts` en `automation-service`, **no** del enum
+ * `AutomationTriggerType`/`AutomationActionType` de `@praxis/contracts`: ese
+ * enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK` y `SEND_EMAIL`, que el
+ * validador rechaza con «no soportado en el MVP académico» — verificado contra
+ * el stack levantado en `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+ * Ver `docs/frontend/CONTRATO-API.md` §Automatizaciones académicas y
+ * `docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md` §1.
+ */
+export const AUTOMATION_TRIGGER_TYPES = ['TASK_DUE_SOON', 'TASK_STALE'] as const;
+export type AutomationTriggerType = (typeof AUTOMATION_TRIGGER_TYPES)[number];
+
+/** La única acción que admite el MVP académico. */
+export const AUTOMATION_ACTION_TYPES = ['CREATE_NOTIFICATION'] as const;
+export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
+
+/**
+ * `EQUALS`/`NOT_EQUALS` exigen un valor escalar; `IN`, una lista no vacía.
+ * Mezclarlos da 400 — no es cosmético.
+ */
+export const AUTOMATION_CONDITION_OPERATORS = ['EQUALS', 'NOT_EQUALS', 'IN'] as const;
+export type AutomationConditionOperator = (typeof AUTOMATION_CONDITION_OPERATORS)[number];
+
+/**
+ * `ENABLED`/`DISABLED` son los únicos que puede mandar el cliente.
+ * `PAUSED_SYSTEM` e `INVALID` los pone el sistema — enviarlos da 400.
+ */
+export const AUTOMATION_RULE_STATUSES = ['ENABLED', 'DISABLED'] as const;
+export type AutomationRuleStatus = (typeof AUTOMATION_RULE_STATUSES)[number];
+/** Los dos únicos que puede tener una regla ya guardada, sin poder enviarse. */
+export type AutomationRuleStatusReadOnly = 'PAUSED_SYSTEM' | 'INVALID';
+
+export const AUTOMATION_EXECUTION_STATUSES = ['RUNNING', 'SUCCEEDED', 'SKIPPED', 'FAILED'] as const;
+export type AutomationExecutionStatus = (typeof AUTOMATION_EXECUTION_STATUSES)[number];
+
+export interface AutomationTrigger {
+  type: AutomationTriggerType;
+  config: Record<string, unknown>;
+}
+
+export interface AutomationCondition {
+  /** Depende del trigger: ver el catálogo en `lib/automation-catalog.ts` de projects-front. */
+  field: string;
+  operator: string;
+  value: unknown;
+  position: number;
+}
+
+export interface AutomationAction {
+  type: AutomationActionType;
+  config: Record<string, unknown>;
+  position: number;
+}
+
+export interface AutomationRule {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  status: AutomationRuleStatus | AutomationRuleStatusReadOnly;
+  version: number;
+  createdBy: string;
+  trigger: AutomationTrigger;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** El resultado de una acción dentro de una ejecución. Reintenta una vez. */
+export type AutomationActionResult =
+  | { status: 'SUCCEEDED'; attempts: number; value: unknown }
+  | { status: 'FAILED'; attempts: number; error: { message: string } };
+
+/**
+ * Una fila de auditoría. `conditionResult.context` solo trae los campos de
+ * condición del trigger — **no** `taskId` ni `taskTitle` de forma legible.
+ * Ver `PENDIENTES-BACKEND-AUTOMATIZACION.md` §3.
+ */
+export interface AutomationExecution {
+  id: string;
+  ruleId: string;
+  rule: { name: string };
+  status: AutomationExecutionStatus;
+  conditionResult: { matched: boolean; context: Record<string, unknown> };
+  actionResults: AutomationActionResult[] | null;
+  startedAt: string;
+  finishedAt: string | null;
+  createdAt: string;
+}
+
+/** Lo que devuelve `POST /projects/:id/automations/review`. */
+export interface AutomationReviewSummary {
+  rules: number;
+  candidates: number;
+  succeeded: number;
+  failed: number;
+}
+
 /*
  * ⚠️ Aquí estaba `CHAT_EVENT_TYPE = 'CHAT_MESSAGE'`, el `type` de texto libre con
  * el que un mensaje de chat se colaba por el canal de avisos disfrazado de

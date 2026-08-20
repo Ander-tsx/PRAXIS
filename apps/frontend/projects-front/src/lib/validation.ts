@@ -5,6 +5,13 @@ import {
   LABEL_COLORS,
   formatBytes,
 } from '@praxis/commons';
+import { AUTOMATION_CONDITION_OPERATORS } from '@praxis/commons/api/domain';
+import {
+  type ConditionFieldSpec,
+  conditionFieldSpecFor,
+  triggerSpecFor,
+} from './automation-catalog';
+import type { RuleDraft } from './automation-draft';
 
 /**
  * Validación del cliente, espejo de la del gateway.
@@ -234,5 +241,114 @@ export function validateColumnColor(color: string): string | null {
   if (!COLUMN_COLORS.includes(color as (typeof COLUMN_COLORS)[number])) {
     return 'Ese color no es del sistema.';
   }
+  return null;
+}
+
+/**
+ * Validación de una regla de automatización, espejo de
+ * `rule-definition.ts` en `automation-service` — verificado contra el
+ * contrato real en `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+ *
+ * `status: 'INVALID'` y una clave de más en `trigger.config`/`action.config`
+ * no están aquí: `RuleDraft` los excluye por construcción (el tipo de
+ * `status` solo admite `ENABLED`/`DISABLED`, y `bodyFromDraft` arma la config
+ * de la acción desde el catálogo, no desde el borrador) — no hay ninguna
+ * combinación de la interfaz que pueda producirlos.
+ */
+export const AUTOMATION_RULE_NAME_MIN = 2;
+export const AUTOMATION_RULE_NAME_MAX = 120;
+export const AUTOMATION_RULE_DESCRIPTION_MAX = 1000;
+export const AUTOMATION_RULE_MAX_ACTIONS = 5;
+
+function validateConditionScalar(fieldSpec: ConditionFieldSpec, value: unknown): string | null {
+  if (fieldSpec.kind === 'integer') {
+    const min = fieldSpec.min ?? 0;
+    if (!Number.isInteger(value) || (value as number) < min) {
+      return `${fieldSpec.label} debe ser un número entero de ${min} o más.`;
+    }
+  }
+  if (fieldSpec.kind === 'boolean' && typeof value !== 'boolean') {
+    return `${fieldSpec.label} debe ser sí o no.`;
+  }
+  if (
+    fieldSpec.kind === 'date' &&
+    (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+  ) {
+    return `${fieldSpec.label} debe tener el formato AAAA-MM-DD.`;
+  }
+  if (fieldSpec.kind === 'enum' && fieldSpec.options) {
+    const allowed = fieldSpec.options.map((option) => option.value);
+    if (!allowed.includes(String(value))) {
+      return `${fieldSpec.label}: ese valor no está en el catálogo.`;
+    }
+  }
+  return null;
+}
+
+function validateConditionValue(
+  fieldSpec: ConditionFieldSpec,
+  operator: string,
+  value: unknown,
+): string | null {
+  if (operator === 'IN') {
+    if (!Array.isArray(value) || value.length === 0) {
+      return `${fieldSpec.label}: "es alguno de" exige al menos un valor.`;
+    }
+    for (const item of value) {
+      const error = validateConditionScalar(fieldSpec, item);
+      if (error) return error;
+    }
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return `${fieldSpec.label}: este operador exige un único valor, no una lista.`;
+  }
+  return validateConditionScalar(fieldSpec, value);
+}
+
+export function validateAutomationDraft(draft: RuleDraft): string | null {
+  const name = draft.name.trim();
+  if (name.length < AUTOMATION_RULE_NAME_MIN) {
+    return `El nombre debe tener al menos ${AUTOMATION_RULE_NAME_MIN} caracteres.`;
+  }
+  if (name.length > AUTOMATION_RULE_NAME_MAX) {
+    return `El nombre no puede superar ${AUTOMATION_RULE_NAME_MAX} caracteres.`;
+  }
+  if (draft.description.trim().length > AUTOMATION_RULE_DESCRIPTION_MAX) {
+    return `La descripción no puede superar ${AUTOMATION_RULE_DESCRIPTION_MAX} caracteres.`;
+  }
+
+  const spec = triggerSpecFor(draft.triggerType);
+  if (!spec) return 'Elige un trigger del catálogo académico.';
+
+  for (const field of spec.configFields) {
+    const value = draft.triggerConfig[field.key];
+    if (field.required && (value === undefined || value === null)) {
+      return `${field.label} es obligatorio.`;
+    }
+    if (value !== undefined && value !== null && (!Number.isInteger(value) || value < field.min)) {
+      return `${field.label} debe ser un número entero de ${field.min} o más.`;
+    }
+  }
+
+  if (draft.actions.length === 0) {
+    return 'La regla requiere al menos una acción.';
+  }
+  if (draft.actions.length > AUTOMATION_RULE_MAX_ACTIONS) {
+    return 'Una regla admite como máximo cinco acciones.';
+  }
+
+  for (const condition of draft.conditions) {
+    const fieldSpec = conditionFieldSpecFor(draft.triggerType, condition.field);
+    if (!fieldSpec) {
+      return `«${condition.field}» no es una condición de ${spec.label}.`;
+    }
+    if (!(AUTOMATION_CONDITION_OPERATORS as readonly string[]).includes(condition.operator)) {
+      return `«${condition.operator}» no es un operador admitido.`;
+    }
+    const error = validateConditionValue(fieldSpec, condition.operator, condition.value);
+    if (error) return error;
+  }
+
   return null;
 }
