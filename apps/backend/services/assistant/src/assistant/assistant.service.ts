@@ -397,7 +397,7 @@ export class AssistantService {
       });
     }
 
-    const validadas = respuesta.calls
+    let validadas = respuesta.calls
       .map((call) =>
         briefing
           ? this.validarPropuesta(call, briefing, payload)
@@ -405,7 +405,64 @@ export class AssistantService {
       )
       .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
 
-    const reply = respuesta.text || this.textoPorDefecto(validadas);
+    let reply = respuesta.text;
+
+    // Si falló alguna propuesta, o si no escribió texto habiendo propuesto algo,
+    // intentamos un segundo turno automático para que el modelo se corrija o explique.
+    const invalidasCount = respuesta.calls.length - validadas.length;
+    if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply)) {
+      try {
+        const feedback = [];
+        if (invalidasCount > 0) {
+          feedback.push('Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.');
+        }
+        if (!reply) {
+          feedback.push('Has emitido una llamada a herramienta pero NO has escrito ningún mensaje de texto para el usuario. Recuerda la regla imperativa: ESCRIBE SIEMPRE ALGO, explicando qué haces o por qué no puedes.');
+        }
+        feedback.push('Por favor, genera ahora una respuesta en texto para el usuario explicando la situación o dándole alternativas.');
+
+        const historyRecuperacion = [
+          ...(history || []),
+          { role: 'user', text: mensajeConArchivos },
+          { role: 'model', text: reply ? `${reply}\n[Llamada a herramientas...]` : '[Llamada a herramientas...]' },
+        ];
+
+        const segundaRespuesta = await this.gemini.chat({
+          system: briefing
+            ? systemInstruction(
+                briefing,
+                payload.miembros,
+                herramientas.map((herramienta) => herramienta.name),
+                payload.chat ?? [],
+                quienPregunta,
+              )
+            : instruccionSinProyecto(
+                payload.proyectos ?? [],
+                herramientas.map((herramienta) => herramienta.name),
+                quienPregunta,
+              ),
+          history: historyRecuperacion,
+          message: `[SISTEMA INTERNO]: ${feedback.join(' ')}`,
+          tools: herramientas,
+          ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+        });
+
+        const nuevasValidadas = segundaRespuesta.calls
+          .map((call) =>
+            briefing
+              ? this.validarPropuesta(call, briefing, payload)
+              : this.validarSinProyecto(call, payload),
+          )
+          .filter((propuesta): propuesta is AssistantProposal => propuesta !== null);
+
+        validadas = [...validadas, ...nuevasValidadas];
+        reply = reply + (reply && segundaRespuesta.text ? '\n\n' : '') + segundaRespuesta.text;
+      } catch (err) {
+        this.log.warn(`Fallo en el turno de recuperación: ${err}`);
+      }
+    }
+
+    reply = reply || this.textoPorDefecto(validadas);
 
     /* Las propuestas vuelven **con su id**: es lo que necesita el cliente para
        marcarlas como aceptadas o descartadas después. */
