@@ -100,7 +100,13 @@ export function ConditionsSection({ triggerType, conditions, onChange }: Conditi
               key={row.key}
               className="flex flex-col gap-2 rounded-lg border border-border-subtle p-3 sm:flex-row sm:items-start"
             >
-              <div className="grid flex-1 gap-2 sm:grid-cols-3">
+              {/* ⚠️ **No son tres columnas iguales.** El nombre del campo es
+                  lo más largo que se pinta en la fila —«Número de
+                  responsables»— y el operador lo más corto, así que con
+                  `grid-cols-3` el `Select` de campo truncaba a «Número de
+                  re…» y dejaba la condición sin poder leerse. Los operadores
+                  («no es igual a») caben de sobra en su fracción. */}
+              <div className="grid flex-1 gap-2 sm:grid-cols-[1.5fr_1fr_1.2fr]">
                 <Select
                   label="Campo"
                   value={row.field}

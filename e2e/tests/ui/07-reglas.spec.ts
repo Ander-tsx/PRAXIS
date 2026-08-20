@@ -248,6 +248,40 @@ test.describe('Reglas del proyecto', () => {
     await expect(dialogo.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
   });
 
+  /**
+   * El nombre del campo de una condición se lee entero.
+   *
+   * La fila son tres campos y un botón «Quitar» en la misma línea, y el
+   * nombre más largo del catálogo —«Número de responsables»— no cabía: el
+   * `Select` lo truncaba a «Número de re…» y la condición dejaba de poder
+   * leerse. Se arregló ensanchando el diálogo y repartiendo las columnas por
+   * lo que mide cada una, no a tercios.
+   *
+   * Se mide `scrollWidth` contra `clientWidth` en vez de comparar contra un
+   * ancho fijo: es la pregunta que importa —«¿cabe?»— y no se rompe si
+   * mañana cambia la tipografía o el espaciado.
+   */
+  test('el nombre del campo de una condición no se trunca', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Campo' }).click();
+    await page.getByRole('option', { name: 'Número de responsables' }).click();
+
+    const etiqueta = page.getByRole('combobox', { name: 'Campo' }).locator('span').first();
+    for (const ancho of [1280, 900, 768]) {
+      await page.setViewportSize({ width: ancho, height: 900 });
+      const cabe = await etiqueta.evaluate((el) => el.scrollWidth <= el.clientWidth);
+      expect(cabe, `«Número de responsables» se trunca con el viewport en ${ancho}px`).toBe(true);
+    }
+  });
+
   test('editar una regla existente actualiza su resumen (Bloque 5)', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);

@@ -178,7 +178,9 @@ export function RuleDialog({
            `Esc` y el clic en el fondo como el cierre programático tras
            guardar, y no se distinguen. */
         onClose={() => setOpen(false)}
-        size="lg"
+        /* `xl` y no `lg`: una fila de condición son tres campos y un botón en
+           la misma línea, y con 672 px el nombre del campo no cabía entero. */
+        size="xl"
         title={rule ? `Editar «${rule.name}»` : 'Nueva regla'}
         description="Cuando ocurre algo, si se cumplen las condiciones, entonces se ejecuta la acción."
       >
