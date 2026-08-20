@@ -148,13 +148,9 @@ export function ProjectPicker({
 
       {open && (
         <div
-          className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-surface"
-          style={{ boxShadow: `0 16px 40px ${alpha(colors.overlay, 60)}` }}
+          className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-lg"
         >
-          {/* Botones y no un `listbox`: uno de verdad exige navegación con
-              flechas y foco gestionado, y anunciarlo sin implementarlo engaña
-              al lector de pantalla. `aria-current` marca el activo. */}
-          <ul className="max-h-72 overflow-y-auto py-1">
+          <ul className="max-h-72 overflow-y-auto p-1.5 flex flex-col gap-0.5">
             {projects.map((project) => {
               const isActive = project.id === activeId;
               return (
@@ -164,15 +160,15 @@ export function ProjectPicker({
                     aria-current={isActive ? 'true' : undefined}
                     onClick={() => select(project)}
                     className={[
-                      'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors',
+                      'flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors rounded-xl',
                       isActive
-                        ? 'text-text-primary'
-                        : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+                        ? 'text-primary font-medium'
+                        : 'text-text-secondary hover:bg-surface hover:text-text-primary',
                     ].join(' ')}
                     style={isActive ? { background: alpha(colors.primary, 10) } : undefined}
                   >
                     <span className="truncate font-sans text-sm">{project.name}</span>
-                    <span className="shrink-0 font-sans text-xs text-text-disabled">
+                    <span className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}>
                       {project._count.members}{' '}
                       {project._count.members === 1 ? 'persona' : 'personas'}
                     </span>

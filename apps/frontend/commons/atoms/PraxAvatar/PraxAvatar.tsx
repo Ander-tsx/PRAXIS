@@ -210,10 +210,10 @@ const OJOS: Record<PraxMood, [Barra, Barra]> = {
  * doblar una línea.
  */
 const BOCAS: Record<PraxMood, [Barra, Barra]> = {
-  /* Raya corta y neutra. */
+  /* Sonrisa suave en reposo. */
   idle: [
-    { dx: 0, dy: 0, rot: 0, sx: 0.8, sy: 0.75 },
-    { dx: 0, dy: 0, rot: 0, sx: 0.8, sy: 0.75 },
+    { dx: -2.8, dy: 0.3, rot: 14, sx: 0.75, sy: 0.7 },
+    { dx: 2.8, dy: 0.3, rot: -14, sx: 0.75, sy: 0.7 },
   ],
   /* Puntito de concentración. */
   thinking: [
@@ -373,13 +373,13 @@ export function PraxAvatar({
   /* ── Parpadeo ───────────────────────────────────────────────────────── */
   const scheduleBlink = useCallback(() => {
     if (!canAnimate) return;
-    const delay = 2200 + Math.random() * 3800;
+    const delay = 1500 + Math.random() * 2500;
     blinkTimeout.current = setTimeout(() => {
       setBlinking(true);
       setTimeout(() => {
         setBlinking(false);
-        /* Doble parpadeo ocasional. */
-        if (Math.random() < 0.2) {
+        /* Doble parpadeo ocasional más frecuente. */
+        if (Math.random() < 0.35) {
           setTimeout(() => {
             setBlinking(true);
             setTimeout(() => setBlinking(false), 90);
@@ -400,12 +400,12 @@ export function PraxAvatar({
   /* ── Mirada ─────────────────────────────────────────────────────────── */
   const scheduleLook = useCallback(() => {
     if (!canAnimate) return;
-    const delay = 3500 + Math.random() * 5000;
+    const delay = 1500 + Math.random() * 3000;
     lookTimeout.current = setTimeout(() => {
       const dirs: LookDir[] = ['left', 'right'];
       const picked = dirs[Math.floor(Math.random() * dirs.length)] ?? 'left';
       setLookDir(picked);
-      setTimeout(() => setLookDir('center'), 500 + Math.random() * 700);
+      setTimeout(() => setLookDir('center'), 700 + Math.random() * 1000);
       scheduleLook();
     }, delay);
   }, [canAnimate]);
@@ -417,8 +417,9 @@ export function PraxAvatar({
     };
   }, [scheduleLook]);
 
-  /* Mientras piensa, la mirada se queda quieta: ya se mueve el vaivén. */
-  const gaze = mood === 'thinking' ? 0 : lookDir === 'left' ? -3 : lookDir === 'right' ? 3 : 0;
+  /* Mientras piensa, la mirada se queda quieta: ya se mueve el vaivén.
+     Gaze más notorio (4.5 en vez de 3). */
+  const gaze = mood === 'thinking' ? 0 : lookDir === 'left' ? -4.5 : lookDir === 'right' ? 4.5 : 0;
 
   /* Solo se parpadea con los ojos abiertos; aplastar un chevrón no dice nada. */
   const parpadeando = blinking && (mood === 'idle' || mood === 'thinking');

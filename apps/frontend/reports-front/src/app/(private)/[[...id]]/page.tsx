@@ -188,9 +188,23 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
     project = await api.get<ProjectDetail>(`/projects/${slug}`).catch(() => null);
     if (!project) return notFound();
   } else {
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    const lastSlug = cookieStore.get('last_reports_project_slug')?.value;
+    
     const lista = await listaPromesa;
-    project = lista.items[0] ?? null;
+    
+    let defaultProject = lista.items[0] ?? null;
+    if (lastSlug) {
+      const found = lista.items.find((p) => p.slug === lastSlug);
+      if (found) defaultProject = found;
+    }
+    
+    project = defaultProject;
     if (!project) return <SinNingunProyecto api={api} />;
+    
+    // Redirect so the URL contains the slug explicitly.
+    redirect(`/reports/${project.slug}`);
   }
 
   /**
@@ -491,25 +505,17 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
          * En móvil se apila, y el orden es el mismo: primero de qué se habla,
          * después la explicación.
          */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between bg-surface-elevated p-6 rounded-3xl border border-border shadow-sm">
           <div className="flex min-w-0 flex-col gap-2">
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
-              Cómo va el trabajo
+              Análisis del Proyecto
             </h2>
-            <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+            <p className="max-w-2xl font-sans text-sm text-text-secondary">
               Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
           </div>
 
-          <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
-            {/* El id resuelto, no el parámetro de la ruta: el selector busca cuál
-                de los proyectos es el activo, y comparando contra el slug de la
-                URL no encontraba ninguno. */}
-            {/* ⚠️ Un **diccionario**, no la función `reportPath`. Esta page es un
-                Server Component y el selector es de cliente: una función no cruza
-                esa frontera, y el síntoma no es un error de compilación sino la
-                pantalla de «no pudimos cargar esta página» **después** de que la
-                página ya se haya pintado. Ver `ProjectPicker`. */}
+          <div className="flex shrink-0 flex-col items-stretch gap-3 lg:items-end">
             <ProjectPicker
               projects={proyectos.items}
               activeId={projectId}
@@ -519,15 +525,12 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
               vacio="No tienes ningún proyecto con análisis abierto."
             />
 
-            {/* La vista general, solo con más de un proyecto: con uno, «todos tus
-                proyectos» lleva al que ya se está mirando.
-                `next/link` sin el `/reports` delante — lo añade Next. */}
             {proyectos.items.length > 1 && (
               <Link
                 href="/overview"
-                className="font-sans text-sm font-semibold text-primary underline-offset-2 hover:underline"
+                className="font-sans text-sm font-medium text-primary hover:text-primary-hover transition-colors flex items-center gap-1"
               >
-                Ver los {proyectos.items.length} de un vistazo →
+                Ver los {proyectos.items.length} proyectos →
               </Link>
             )}
           </div>
