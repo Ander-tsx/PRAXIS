@@ -1,8 +1,11 @@
 import type { AutomationRule } from '@praxis/commons/api/domain';
 import { describe, expect, it } from 'vitest';
+
+import type { AutomationCatalog } from './automation-catalog';
 import {
   bodyFromDraft,
   coerceConditionValue,
+  describeAction,
   describeConditions,
   describeExecutionContext,
   describeReviewSummary,
@@ -11,6 +14,105 @@ import {
   draftFromRule,
   emptyDraft,
 } from './automation-draft';
+
+const COLUMNA = '00000000-0000-4000-8000-0000000000c1';
+
+const CATALOGO: AutomationCatalog = {
+  operators: ['EQUALS', 'NOT_EQUALS', 'IN', 'GT', 'GTE', 'LT', 'LTE', 'CONTAINS'],
+  triggers: [
+    {
+      type: 'TASK_DUE_SOON',
+      kind: 'sweep',
+      label: 'Una tarea va a vencer',
+      sentence: 'una tarea esté a punto de vencer',
+      description: 'Con vencimiento dentro del margen.',
+      config: [
+        {
+          key: 'leadTimeMinutes',
+          label: 'Margen',
+          kind: 'integer',
+          min: 1,
+          required: true,
+          defaultValue: 1440,
+        },
+      ],
+      fields: [
+        {
+          field: 'priority',
+          label: 'Prioridad',
+          kind: 'enum',
+          operators: ['EQUALS', 'IN'],
+          options: [
+            { value: 'HIGH', label: 'Alta' },
+            { value: 'LOW', label: 'Baja' },
+          ],
+        },
+        {
+          field: 'assigneeCount',
+          label: 'Número de encargados',
+          kind: 'integer',
+          operators: ['EQUALS', 'GT'],
+          min: 0,
+        },
+      ],
+    },
+    {
+      type: 'TASK_STALE',
+      kind: 'sweep',
+      label: 'Una tarea lleva parada',
+      sentence: 'una tarea lleve demasiado sin moverse',
+      description: 'Sin movimiento.',
+      config: [
+        { key: 'days', label: 'Días', kind: 'integer', min: 1, required: false, defaultValue: 7 },
+      ],
+      fields: [
+        { field: 'staleDays', label: 'Días parada', kind: 'integer', operators: ['GTE'], min: 0 },
+        { field: 'overdue', label: 'Está vencida', kind: 'boolean', operators: ['EQUALS'] },
+      ],
+    },
+  ],
+  actions: [
+    {
+      type: 'CREATE_NOTIFICATION',
+      label: 'Avisar',
+      sentence: 'avisa a',
+      requires: null,
+      config: [
+        {
+          key: 'recipientSelector',
+          label: 'A quién',
+          kind: 'enum',
+          required: true,
+          options: [
+            { value: 'ASSIGNEES', label: 'los encargados' },
+            { value: 'PROJECT_OWNER', label: 'quien lleva el proyecto' },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'MOVE_TASK',
+      label: 'Mover la tarea',
+      sentence: 'muévela a',
+      requires: 'canEditTask',
+      config: [
+        {
+          key: 'targetColumnId',
+          label: 'Columna',
+          kind: 'uuid',
+          required: true,
+          source: 'columns',
+        },
+      ],
+    },
+  ],
+};
+
+const PROYECTO = {
+  columns: [{ value: COLUMNA, label: 'Hecho' }],
+  labels: [],
+  members: [],
+};
 
 const reglaVencimiento: AutomationRule = {
   id: 'rule-1',
@@ -29,264 +131,243 @@ const reglaVencimiento: AutomationRule = {
   updatedAt: '2026-08-19T00:00:00.000Z',
 };
 
-const reglaEstancada: AutomationRule = {
-  ...reglaVencimiento,
-  id: 'rule-2',
-  name: 'Avisar estancamiento',
-  trigger: { type: 'TASK_STALE', config: { days: 5 } },
-  conditions: [],
-  actions: [
-    { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'PROJECT_OWNER' }, position: 0 },
-  ],
-};
-
 describe('emptyDraft', () => {
-  it('rellena triggerConfig con los valores por defecto del catálogo', () => {
-    expect(emptyDraft('TASK_DUE_SOON').triggerConfig).toEqual({ leadTimeMinutes: 1440 });
-    expect(emptyDraft('TASK_STALE').triggerConfig).toEqual({ days: 7 });
+  it('siembra la configuración con los valores por defecto del catálogo', () =>
+    expect(emptyDraft(CATALOGO, 'TASK_DUE_SOON').triggerConfig).toEqual({
+      leadTimeMinutes: 1440,
+    }));
+
+  it('arranca deshabilitado, como el valor por defecto del servidor', () =>
+    expect(emptyDraft(CATALOGO, 'TASK_DUE_SOON').status).toBe('DISABLED'));
+
+  it('arranca con una acción, no con ninguna: el contrato exige al menos una', () =>
+    expect(emptyDraft(CATALOGO, 'TASK_DUE_SOON').actions).toHaveLength(1));
+});
+
+describe('draftFromRule', () => {
+  it('conserva condiciones y acciones ordenadas por posición', () => {
+    const draft = draftFromRule({
+      ...reglaVencimiento,
+      conditions: [
+        { field: 'assigneeCount', operator: 'GT', value: 1, position: 1 },
+        { field: 'priority', operator: 'EQUALS', value: 'HIGH', position: 0 },
+      ],
+    });
+    expect(draft.conditions.map((una) => una.field)).toEqual(['priority', 'assigneeCount']);
   });
 
-  it('nace sin condiciones y con la única acción del trigger', () => {
-    const draft = emptyDraft('TASK_DUE_SOON');
-    expect(draft.conditions).toEqual([]);
-    expect(draft.actions).toEqual([{ type: 'CREATE_NOTIFICATION' }]);
+  /**
+   * ⚠️ `PAUSED_SYSTEM` e `INVALID` los pone el sistema; reenviarlos da 400. Se
+   * colapsan a `DISABLED`, la única forma editable de «no está corriendo».
+   */
+  it('colapsa un estado que el cliente no puede mandar', () =>
+    expect(draftFromRule({ ...reglaVencimiento, status: 'PAUSED_SYSTEM' as never }).status).toBe(
+      'DISABLED',
+    ));
+
+  it('conserva la configuración de cada acción', () =>
+    expect(
+      draftFromRule({
+        ...reglaVencimiento,
+        actions: [{ type: 'MOVE_TASK', config: { targetColumnId: COLUMNA }, position: 0 }],
+      }).actions[0],
+    ).toEqual({ type: 'MOVE_TASK', config: { targetColumnId: COLUMNA } }));
+});
+
+describe('bodyFromDraft', () => {
+  it('no manda descripción cuando está vacía: un campo de más es un 400', () => {
+    const body = bodyFromDraft({ ...emptyDraft(CATALOGO, 'TASK_DUE_SOON'), name: '  Regla  ' });
+    expect(body).not.toHaveProperty('description');
+    expect(body.name).toBe('Regla');
   });
 
-  it('nace en DISABLED, igual que el valor por defecto del servidor', () => {
-    expect(emptyDraft('TASK_DUE_SOON').status).toBe('DISABLED');
+  it('manda todas las acciones con su configuración', () => {
+    const draft = emptyDraft(CATALOGO, 'TASK_DUE_SOON');
+    draft.actions = [
+      { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } },
+      { type: 'MOVE_TASK', config: { targetColumnId: COLUMNA } },
+    ];
+    expect(bodyFromDraft(draft).actions).toEqual([
+      { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } },
+      { type: 'MOVE_TASK', config: { targetColumnId: COLUMNA } },
+    ]);
   });
 });
 
-describe('draftFromRule ⇄ bodyFromDraft', () => {
-  it('ida y vuelta sin pérdida para una regla con condiciones', () => {
-    const draft = draftFromRule(reglaVencimiento);
-    const body = bodyFromDraft(draft);
-    expect(body).toEqual({
-      name: 'Avisar vencimiento',
-      trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 4320 } },
-      conditions: [{ field: 'priority', operator: 'EQUALS', value: 'HIGH' }],
-      actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
-      status: 'ENABLED',
-    });
-  });
+describe('draftFromFormData', () => {
+  function formulario(entradas: Array<[string, string]>): FormData {
+    const data = new FormData();
+    for (const [clave, valor] of entradas) data.append(clave, valor);
+    return data;
+  }
 
-  it('ida y vuelta sin pérdida para una regla sin condiciones', () => {
-    const draft = draftFromRule(reglaEstancada);
-    const body = bodyFromDraft(draft);
-    expect(body).toEqual({
-      name: 'Avisar estancamiento',
-      trigger: { type: 'TASK_STALE', config: { days: 5 } },
-      conditions: [],
-      actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'PROJECT_OWNER' } }],
-      status: 'ENABLED',
-    });
-  });
-
-  it('bodyFromDraft no emite ninguna clave que el DTO no declare', () => {
-    const body = bodyFromDraft(draftFromRule(reglaVencimiento));
-    expect(Object.keys(body).sort()).toEqual(
-      ['actions', 'conditions', 'name', 'status', 'trigger'].sort(),
+  it('recompone las condiciones por posición y coacciona cada valor', () => {
+    const draft = draftFromFormData(
+      CATALOGO,
+      formulario([
+        ['name', 'Regla'],
+        ['description', ''],
+        ['triggerType', 'TASK_STALE'],
+        ['triggerConfig.days', '5'],
+        ['conditionField', 'staleDays'],
+        ['conditionOperator', 'GTE'],
+        ['conditionValue', '3'],
+        ['conditionField', 'overdue'],
+        ['conditionOperator', 'EQUALS'],
+        ['conditionValue', 'true'],
+        ['actionType', 'CREATE_NOTIFICATION'],
+        ['actionConfig', '{"recipientSelector":"PROJECT_OWNER"}'],
+      ]),
     );
+
+    expect(draft.triggerConfig).toEqual({ days: 5 });
+    expect(draft.conditions).toEqual([
+      { field: 'staleDays', operator: 'GTE', value: 3 },
+      { field: 'overdue', operator: 'EQUALS', value: true },
+    ]);
+    expect(draft.actions).toEqual([
+      { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'PROJECT_OWNER' } },
+    ]);
   });
 
-  it('description solo se envía si tiene contenido', () => {
-    const conDescripcion = draftFromRule({ ...reglaVencimiento, description: 'Nota' });
-    expect(bodyFromDraft(conDescripcion)).toMatchObject({ description: 'Nota' });
-
-    const sinDescripcion = draftFromRule({ ...reglaVencimiento, description: null });
-    expect(bodyFromDraft(sinDescripcion)).not.toHaveProperty('description');
+  /**
+   * 🔴 La alineación por posición es la invariante de este formato: si una fila
+   * dejara de emitir uno de sus tres campos, todas las de abajo se
+   * desplazarían y la regla se guardaría con condiciones que nadie escribió.
+   */
+  it('mantiene la alineación con varias acciones de distinta configuración', () => {
+    const draft = draftFromFormData(
+      CATALOGO,
+      formulario([
+        ['triggerType', 'TASK_DUE_SOON'],
+        ['actionType', 'CREATE_NOTIFICATION'],
+        ['actionConfig', '{"recipientSelector":"ASSIGNEES"}'],
+        ['actionType', 'MOVE_TASK'],
+        ['actionConfig', `{"targetColumnId":"${COLUMNA}"}`],
+      ]),
+    );
+    expect(draft.actions).toEqual([
+      { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } },
+      { type: 'MOVE_TASK', config: { targetColumnId: COLUMNA } },
+    ]);
   });
 
-  it('un status de solo lectura del servidor (PAUSED_SYSTEM/INVALID) colapsa a DISABLED en el borrador', () => {
-    const draft = draftFromRule({ ...reglaVencimiento, status: 'PAUSED_SYSTEM' });
-    expect(draft.status).toBe('DISABLED');
+  it('una configuración con JSON roto se queda vacía en vez de reventar', () => {
+    const draft = draftFromFormData(
+      CATALOGO,
+      formulario([
+        ['triggerType', 'TASK_DUE_SOON'],
+        ['actionType', 'MOVE_TASK'],
+        ['actionConfig', '{no es json'],
+      ]),
+    );
+    expect(draft.actions[0]?.config).toEqual({});
+  });
+
+  it('la casilla marcada es lo único que habilita la regla', () => {
+    const base: Array<[string, string]> = [['triggerType', 'TASK_DUE_SOON']];
+    expect(draftFromFormData(CATALOGO, formulario(base)).status).toBe('DISABLED');
+    expect(draftFromFormData(CATALOGO, formulario([...base, ['enabled', 'on']])).status).toBe(
+      'ENABLED',
+    );
   });
 });
 
 describe('coerceConditionValue', () => {
-  it('coacciona un entero', () => {
-    expect(coerceConditionValue('TASK_DUE_SOON', 'assigneeCount', 'EQUALS', '3')).toBe(3);
-  });
+  it('un entero llega como número, no como texto', () =>
+    expect(coerceConditionValue(CATALOGO, 'TASK_STALE', 'staleDays', 'GTE', '4')).toBe(4));
 
-  it('coacciona un booleano', () => {
-    expect(coerceConditionValue('TASK_STALE', 'overdue', 'EQUALS', 'true')).toBe(true);
-    expect(coerceConditionValue('TASK_STALE', 'overdue', 'EQUALS', 'false')).toBe(false);
-  });
+  it('un booleano llega como booleano', () =>
+    expect(coerceConditionValue(CATALOGO, 'TASK_STALE', 'overdue', 'EQUALS', 'false')).toBe(false));
 
-  it('deja una fecha y un enum como texto', () => {
-    expect(coerceConditionValue('TASK_DUE_SOON', 'dueDate', 'EQUALS', '2026-08-21')).toBe(
-      '2026-08-21',
-    );
-    expect(coerceConditionValue('TASK_DUE_SOON', 'priority', 'EQUALS', 'HIGH')).toBe('HIGH');
-  });
+  it('con IN, la lista JSON se coacciona elemento a elemento', () =>
+    expect(
+      coerceConditionValue(CATALOGO, 'TASK_DUE_SOON', 'priority', 'IN', '["HIGH","LOW"]'),
+    ).toEqual(['HIGH', 'LOW']));
 
-  it('con IN, parsea una lista JSON y coacciona cada elemento', () => {
-    expect(coerceConditionValue('TASK_DUE_SOON', 'priority', 'IN', '["HIGH","URGENT"]')).toEqual([
-      'HIGH',
-      'URGENT',
-    ]);
-    expect(coerceConditionValue('TASK_STALE', 'staleDays', 'IN', '[1,2,3]')).toEqual([1, 2, 3]);
-  });
-
-  it('con IN y una entrada que no es JSON válido, no truena: devuelve una lista vacía', () => {
-    expect(coerceConditionValue('TASK_DUE_SOON', 'priority', 'IN', 'no-es-json')).toEqual([]);
-  });
+  it('con IN y JSON roto, lista vacía: el validador dirá que falta un valor', () =>
+    expect(coerceConditionValue(CATALOGO, 'TASK_DUE_SOON', 'priority', 'IN', 'roto')).toEqual([]));
 });
 
-describe('describeRule', () => {
-  it('describe una regla con condición en una frase legible', () => {
-    expect(describeRule(reglaVencimiento)).toBe(
-      'Cuando tarea próxima a vencer, si prioridad es Alta, entonces avisa a los responsables de la tarea.',
-    );
-  });
+describe('cómo se lee una regla', () => {
+  it('la frase entera usa el lenguaje del constructor', () =>
+    expect(describeRule(CATALOGO, reglaVencimiento, PROYECTO)).toBe(
+      'Cuando una tarea esté a punto de vencer, si prioridad es Alta, entonces avisa a los encargados.',
+    ));
 
-  it('describe una regla sin condiciones, sin la cláusula "si"', () => {
-    expect(describeRule(reglaEstancada)).toBe(
-      'Cuando tarea estancada, entonces avisa al dueño del proyecto.',
-    );
-  });
+  it('sin condiciones no inventa una cláusula «si»', () =>
+    expect(describeRule(CATALOGO, { ...reglaVencimiento, conditions: [] }, PROYECTO)).toBe(
+      'Cuando una tarea esté a punto de vencer, entonces avisa a los encargados.',
+    ));
+
+  it('las condiciones también se leen sueltas, para escanearlas', () =>
+    expect(describeConditions(CATALOGO, reglaVencimiento, PROYECTO)).toEqual([
+      'prioridad es Alta',
+    ]));
+
+  it('los operadores nuevos se leen en castellano', () =>
+    expect(
+      describeConditions(
+        CATALOGO,
+        {
+          ...reglaVencimiento,
+          conditions: [{ field: 'assigneeCount', operator: 'GT', value: 2, position: 0 }],
+        },
+        PROYECTO,
+      ),
+    ).toEqual(['número de encargados es mayor que 2']));
+
+  /** ⚠️ Un id crudo en la frase la vuelve inservible para comprobar nada. */
+  it('una acción con un id lo enseña con su nombre', () =>
+    expect(
+      describeAction(
+        CATALOGO,
+        { type: 'MOVE_TASK', config: { targetColumnId: COLUMNA } },
+        PROYECTO,
+      ),
+    ).toBe('muévela a hecho'));
+
+  it('sin catálogo no revienta: enseña el tipo crudo', () =>
+    expect(describeAction(null, { type: 'MOVE_TASK', config: {} })).toBe('MOVE_TASK'));
 });
 
-/** Construye el `FormData` que emite `RuleDialog`, sin depender del DOM real. */
-function formDataDe(entradas: Array<[string, string]>): FormData {
-  const formData = new FormData();
-  for (const [nombre, valor] of entradas) formData.append(nombre, valor);
-  return formData;
-}
+describe('el contexto de una ejecución', () => {
+  it('se lee con las etiquetas del catálogo', () =>
+    expect(
+      describeExecutionContext(CATALOGO, { priority: 'HIGH', assigneeCount: 2 }, PROYECTO),
+    ).toBe('prioridad Alta, número de encargados 2'));
 
-describe('draftFromFormData', () => {
-  it('reconstruye nombre, descripción, trigger y config', () => {
-    const draft = draftFromFormData(
-      formDataDe([
-        ['name', 'Avisar vencimiento'],
-        ['description', 'Nota'],
-        ['triggerType', 'TASK_DUE_SOON'],
-        ['triggerConfig.leadTimeMinutes', '4320'],
-        ['enabled', 'on'],
-      ]),
-    );
-    expect(draft).toMatchObject({
-      name: 'Avisar vencimiento',
-      description: 'Nota',
-      triggerType: 'TASK_DUE_SOON',
-      triggerConfig: { leadTimeMinutes: 4320 },
-      status: 'ENABLED',
-    });
-  });
+  it('un contexto vacío lo dice en vez de quedarse en blanco', () =>
+    expect(describeExecutionContext(CATALOGO, {}, PROYECTO)).toBe('Sin contexto.'));
+});
 
-  it('sin "enabled" en el FormData, el estado es DISABLED', () => {
-    const draft = draftFromFormData(
-      formDataDe([
-        ['name', 'x'],
-        ['triggerType', 'TASK_DUE_SOON'],
-      ]),
-    );
-    expect(draft.status).toBe('DISABLED');
-  });
+describe('el resumen de una revisión', () => {
+  it('cuenta lo que hubo, sin escribir los ceros', () =>
+    expect(
+      describeReviewSummary({
+        rules: 1,
+        candidates: 3,
+        succeeded: 1,
+        failed: 0,
+        filtered: 2,
+        repeated: 0,
+      }),
+    ).toBe('1 regla revisada · 3 candidatas · 1 acción · 2 sin cumplir las condiciones'));
 
   /**
-   * ⚠️ **La invariante de D4.** Tres condiciones, la del medio booleana con
-   * valor «No» — el caso exacto que un `<input type="checkbox">` sin marcar
-   * rompería, porque un checkbox así **no se envía en el `FormData`** y
-   * desplazaría la condición 3 al hueco de la 2. `ConditionsSection` usa un
-   * `<Select>` para los booleanos justo para evitar esto; esta prueba fija
-   * que la reconstrucción respeta el orden aunque el valor sea "falso".
+   * 🔴 Antes solo decía «éxitos» y «fallos», así que una revisión sin acciones
+   * se leía igual tanto si las condiciones no se cumplían como si ya se había
+   * actuado ayer. Dos situaciones opuestas y el mismo número.
    */
-  it('tres condiciones con la del medio booleana en «No» se guardan cada una en su fila', () => {
-    const draft = draftFromFormData(
-      formDataDe([
-        ['triggerType', 'TASK_STALE'],
-        ['conditionField', 'staleDays'],
-        ['conditionOperator', 'EQUALS'],
-        ['conditionValue', '5'],
-        ['conditionField', 'overdue'],
-        ['conditionOperator', 'EQUALS'],
-        ['conditionValue', 'false'],
-        ['conditionField', 'withoutHistory'],
-        ['conditionOperator', 'EQUALS'],
-        ['conditionValue', 'true'],
-      ]),
-    );
-
-    expect(draft.conditions).toEqual([
-      { field: 'staleDays', operator: 'EQUALS', value: 5 },
-      { field: 'overdue', operator: 'EQUALS', value: false },
-      { field: 'withoutHistory', operator: 'EQUALS', value: true },
-    ]);
-  });
-
-  it('reconstruye la única acción del trigger', () => {
-    const draft = draftFromFormData(
-      formDataDe([
-        ['triggerType', 'TASK_DUE_SOON'],
-        ['actionType', 'CREATE_NOTIFICATION'],
-      ]),
-    );
-    expect(draft.actions).toEqual([{ type: 'CREATE_NOTIFICATION' }]);
-  });
-
-  it('sin condiciones en el FormData, el borrador nace con la lista vacía', () => {
-    const draft = draftFromFormData(formDataDe([['triggerType', 'TASK_DUE_SOON']]));
-    expect(draft.conditions).toEqual([]);
-  });
-});
-
-describe('describeExecutionContext', () => {
-  it('etiqueta cada campo con el catálogo, sin necesitar el tipo de trigger', () => {
-    expect(describeExecutionContext({ priority: 'HIGH', dueDate: '2026-08-21' })).toBe(
-      'prioridad Alta, fecha de vencimiento 2026-08-21',
-    );
-  });
-
-  it('traduce booleanos a sí/no, igual que describeRule', () => {
-    expect(describeExecutionContext({ overdue: true, withoutHistory: false })).toBe(
-      'vencida sí, sin historial no',
-    );
-  });
-
-  it('un campo fuera del catálogo se enseña tal cual, sin romper', () => {
-    expect(describeExecutionContext({ unknownField: 42 })).toBe('unknownfield 42');
-  });
-
-  it('sin contexto no inventa nada', () => {
-    expect(describeExecutionContext({})).toBe('Sin contexto.');
-  });
-});
-
-describe('describeConditions', () => {
-  it('devuelve una frase por condición, en orden de posición', () => {
+  it('distingue «no cumplía» de «ya estaba atendida»', () =>
     expect(
-      describeConditions({
-        ...reglaVencimiento,
-        conditions: [
-          { field: 'assigneeCount', operator: 'EQUALS', value: 2, position: 1 },
-          { field: 'priority', operator: 'EQUALS', value: 'HIGH', position: 0 },
-        ],
+      describeReviewSummary({
+        rules: 2,
+        candidates: 5,
+        succeeded: 0,
+        failed: 0,
+        filtered: 0,
+        repeated: 5,
       }),
-    ).toEqual(['prioridad es Alta', 'número de responsables es 2']);
-  });
-
-  it('una regla sin condiciones devuelve la lista vacía, sin frase de relleno', () => {
-    expect(describeConditions(reglaEstancada)).toEqual([]);
-  });
-});
-
-describe('describeReviewSummary', () => {
-  it('pluraliza cada cifra por separado, no todas juntas', () => {
-    expect(describeReviewSummary({ rules: 1, candidates: 1, succeeded: 1, failed: 0 })).toBe(
-      '1 regla revisada · 1 candidata · 1 aviso · 0 fallos',
-    );
-  });
-
-  it('con varias reglas y candidatas, todo en plural', () => {
-    expect(describeReviewSummary({ rules: 3, candidates: 5, succeeded: 2, failed: 0 })).toBe(
-      '3 reglas revisadas · 5 candidatas · 2 avisos · 0 fallos',
-    );
-  });
-
-  it('cero candidatas no inventa ninguna regla evaluada de más', () => {
-    expect(describeReviewSummary({ rules: 2, candidates: 0, succeeded: 0, failed: 0 })).toBe(
-      '2 reglas revisadas · 0 candidatas · 0 avisos · 0 fallos',
-    );
-  });
+    ).toBe('2 reglas revisadas · 5 candidatas · 0 acciones · 5 ya atendidas'));
 });

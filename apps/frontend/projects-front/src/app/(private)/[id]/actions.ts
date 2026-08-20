@@ -12,6 +12,7 @@ import type {
   TaskState,
   WorkspaceState,
 } from '@/lib/action-state';
+import type { AutomationCatalog } from '@/lib/automation-catalog';
 import { bodyFromDraft, draftFromFormData } from '@/lib/automation-draft';
 import {
   normalizeMultiline,
@@ -110,12 +111,31 @@ export async function saveAutomationRuleAction(
 
   const projectId = String(formData.get('projectId') ?? '');
   const ruleId = formData.get('ruleId');
-  const draft = draftFromFormData(formData);
 
-  /* El `FormData` no es de fiar aunque el cliente ya haya validado, así que
-     se vuelve a comprobar aquí. Del ámbito no se hace nada: quien lo usa para
-     colocar el mensaje es el diálogo, y aquí solo hay un sitio donde ponerlo. */
-  const clientError = validateAutomationDraft(draft);
+  /**
+   * El catálogo, otra vez y desde el servidor.
+   *
+   * ⚠️ **No se acepta el que mande el cliente**, y no es paranoia barata: el
+   * catálogo decide qué campos existen, qué operadores valen y qué claves de
+   * configuración se aceptan. Recibirlo del navegador sería dejar que quien
+   * envía el formulario redefina las reglas con las que se valida su propio
+   * formulario. Pedirlo aquí cuesta una llamada por guardado y el gateway ya
+   * lo cachea; el servicio lo devuelve de memoria.
+   */
+  const catalog = await api
+    .get<AutomationCatalog>(`/projects/${projectId}/automations/catalog`)
+    .catch(() => null);
+  if (!catalog) {
+    return { error: 'No se ha podido comprobar la regla. Inténtalo otra vez.', done: null };
+  }
+
+  const draft = draftFromFormData(catalog, formData);
+
+  /* El `FormData` no es de fiar aunque el cliente ya haya validado, así que se
+     vuelve a comprobar aquí. Del ámbito no se hace nada: quien lo usa para
+     colocar el mensaje es el formulario, y aquí solo hay un sitio donde
+     ponerlo. */
+  const clientError = validateAutomationDraft(catalog, draft);
   if (clientError) return { error: clientError.mensaje, done: null };
 
   const body = bodyFromDraft(draft);

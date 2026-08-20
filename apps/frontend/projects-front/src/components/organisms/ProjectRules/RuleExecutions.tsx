@@ -2,6 +2,7 @@
 
 import { reviewAutomationsAction } from '@/app/(private)/[id]/actions';
 import { REVIEW_INITIAL_STATE } from '@/lib/action-state';
+import type { AutomationCatalog, OpcionesDelProyecto } from '@/lib/automation-catalog';
 import { describeExecutionContext, describeReviewSummary } from '@/lib/automation-draft';
 import {
   type AutomationExecution,
@@ -13,14 +14,19 @@ import {
   colors,
   useAccion,
 } from '@praxis/commons';
+import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 export interface RuleExecutionsProps {
   projectId: string;
-  executions: AutomationExecution[];
+  /** `null` = el servicio no respondió. No es lo mismo que «no hay ninguna». */
+  executions: AutomationExecution[] | null;
+  catalog: AutomationCatalog | null;
+  proyecto: OpcionesDelProyecto;
 }
 
 const STATUS_LABELS: Record<AutomationExecutionStatus, string> = {
-  SUCCEEDED: 'Avisó',
+  SUCCEEDED: 'Actuó',
   SKIPPED: 'No cumplía las condiciones',
   FAILED: 'Falló',
   RUNNING: 'En curso',
@@ -37,6 +43,15 @@ const ERROR_MESSAGE_MAX_CHARS = 140;
 
 /** Nombra el panel para quien navega por regiones. Ver `ProjectRules`. */
 const ENCABEZADO_EJECUCIONES = 'ejecuciones-de-reglas';
+
+function Dato({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <p className="font-sans text-sm text-text-secondary">
+      <span className="font-medium text-text-primary">{titulo}: </span>
+      {children}
+    </p>
+  );
+}
 
 function failureMessage(execution: AutomationExecution): string | null {
   const failed = execution.actionResults?.find((result) => result.status === 'FAILED');
@@ -55,29 +70,38 @@ function failureMessage(execution: AutomationExecution): string | null {
  * por qué se omitió cada candidata se lee fila por fila, donde `SKIPPED` sí
  * aparece.
  */
-export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
+export function RuleExecutions({ projectId, executions, catalog, proyecto }: RuleExecutionsProps) {
   const [state, formAction, pending] = useAccion(reviewAutomationsAction, REVIEW_INITIAL_STATE);
+  /** Qué fila está abierta. Una sola: dos detalles a la vez no se comparan. */
+  const [abierta, setAbierta] = useState<string | null>(null);
 
   return (
     /* Mismo trato que la lista de reglas y que el resto de secciones del
        proyecto: encabezado fuera de la superficie, caja debajo. */
     <section className="flex flex-col gap-4" aria-labelledby={ENCABEZADO_EJECUCIONES}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 id={ENCABEZADO_EJECUCIONES} className="font-display text-2xl text-text-primary">
+      {/* La misma barra que Reglas, Equipo y Roles. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <h3
+            id={ENCABEZADO_EJECUCIONES}
+            className="shrink-0 font-sans font-medium text-text-primary"
+          >
             Ejecuciones
           </h3>
-          <p className="font-sans text-sm text-text-secondary">
-            Revisa las últimas ejecuciones de las reglas: qué regla se evaluó, sobre qué caso, si
-            avisó y cuándo. La revisión se lanza desde aquí, no corre sola.
+          <span className="shrink-0 font-light text-text-disabled">/</span>
+          <p className="truncate font-sans text-sm text-text-secondary">
+            Qué hizo cada regla, sobre qué tarea y cuándo. Las de barrido se lanzan desde aquí.
           </p>
         </div>
-        <form action={formAction}>
-          <input type="hidden" name="projectId" value={projectId} />
-          <Button type="submit" variant="secondary" isLoading={pending}>
-            Revisar ahora
-          </Button>
-        </form>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <form action={formAction}>
+            <input type="hidden" name="projectId" value={projectId} />
+            <Button type="submit" variant="secondary" isLoading={pending}>
+              Revisar ahora
+            </Button>
+          </form>
+        </div>
       </div>
 
       {state.error && (
@@ -103,7 +127,12 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
         </output>
       )}
 
-      {executions.length === 0 ? (
+      {executions === null ? (
+        /* ⚠️ **Servicio caído no es «no hay ninguna».** Ver `ProjectRules`. */
+        <p className="rounded-xl border border-warning bg-warning-muted px-5 py-4 font-sans text-sm text-text-primary">
+          No se ha podido consultar el historial de ejecuciones. Vuelve a cargar en un momento.
+        </p>
+      ) : executions.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
           Aún no se ha revisado nada. «Revisar ahora» evalúa las reglas activas contra las tareas
           del proyecto y deja aquí una fila por cada candidata que encontró.
@@ -114,23 +143,78 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {executions.map((execution) => {
             const failure = execution.status === 'FAILED' ? failureMessage(execution) : null;
+            const desplegada = abierta === execution.id;
             return (
-              <li key={execution.id} className="p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-sans text-base font-semibold text-text-primary">
-                    {execution.rule.name}
-                  </p>
+              <li key={execution.id}>
+                {/**
+                 * 🔴 **La fila era plana y no dejaba auditar nada.**
+                 *
+                 * Enseñaba la regla, el estado y el contexto entero de golpe:
+                 * con veinte filas, la lista era un muro de datos donde no se
+                 * distinguía la que había fallado. Y no decía **sobre qué
+                 * tarea** actuó, que es lo primero que se busca.
+                 *
+                 * Ahora la fila cerrada responde a «qué regla, sobre qué tarea,
+                 * cómo acabó» y el detalle —el contexto que se evaluó, qué
+                 * acciones se ejecutaron, el error entero— se despliega solo si
+                 * se pide.
+                 */}
+                <button
+                  type="button"
+                  onClick={() => setAbierta(desplegada ? null : execution.id)}
+                  aria-expanded={desplegada}
+                  className="flex w-full items-center gap-3 p-5 text-left transition-colors hover:bg-surface-elevated"
+                >
+                  <ChevronDown
+                    aria-hidden
+                    className={[
+                      'size-4 shrink-0 text-text-disabled transition-transform',
+                      desplegada ? 'rotate-180' : '',
+                    ].join(' ')}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-sans text-base font-semibold text-text-primary">
+                      {execution.subjectTitle ?? execution.rule.name}
+                    </span>
+                    <span className="block truncate font-sans text-xs text-text-secondary">
+                      {execution.rule.name} ·{' '}
+                      {new Date(execution.createdAt).toLocaleString('es-MX')}
+                    </span>
+                  </span>
                   <Badge variant={STATUS_VARIANTS[execution.status]}>
                     {STATUS_LABELS[execution.status]}
                   </Badge>
-                </div>
-                <p className="mt-1 font-sans text-sm text-text-secondary">
-                  {describeExecutionContext(execution.conditionResult.context)}
-                </p>
-                {failure && <p className="mt-1 font-sans text-sm text-error">{failure}</p>}
-                <time className="mt-1 block font-sans text-xs text-text-disabled">
-                  {new Date(execution.createdAt).toLocaleString('es-MX')}
-                </time>
+                </button>
+
+                {desplegada && (
+                  <div className="animate-desplegar-panel">
+                    <div className="flex flex-col gap-2 px-5 pb-5 pl-12">
+                      <Dato titulo="Se evaluó con">
+                        {describeExecutionContext(
+                          catalog,
+                          execution.conditionResult.context,
+                          proyecto,
+                        )}
+                      </Dato>
+                      {execution.actionResults && execution.actionResults.length > 0 && (
+                        <Dato titulo="Acciones">
+                          {execution.actionResults
+                            .map((resultado) =>
+                              resultado.status === 'SUCCEEDED'
+                                ? `hecha en ${resultado.attempts === 1 ? 'un intento' : 'dos intentos'}`
+                                : `falló: ${resultado.error.message}`,
+                            )
+                            .join(' · ')}
+                        </Dato>
+                      )}
+                      {failure && (
+                        <Dato titulo="Error">
+                          <span className="text-error">{failure}</span>
+                        </Dato>
+                      )}
+                    </div>
+                  </div>
+                )}
               </li>
             );
           })}

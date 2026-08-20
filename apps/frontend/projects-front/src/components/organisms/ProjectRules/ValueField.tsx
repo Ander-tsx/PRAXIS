@@ -1,49 +1,66 @@
 'use client';
 
-import type { ConditionFieldSpec } from '@/lib/automation-catalog';
+import {
+  type ConditionField,
+  type OpcionesDelProyecto,
+  opcionesDe,
+} from '@/lib/automation-catalog';
 import { Input, Select, SelectorDeFecha } from '@praxis/commons';
 import { useState } from 'react';
 
 export interface ValueFieldProps {
-  fieldSpec: ConditionFieldSpec;
+  fieldSpec: ConditionField;
   operator: string;
   /** El texto crudo tal como lo espera `coerceConditionValue` — nunca el valor coaccionado. */
   value: string;
   onChange: (value: string) => void;
+  proyecto: OpcionesDelProyecto;
 }
 
 /**
- * El renderizador por tipo de valor — D3 del plan, y el único punto que hay
- * que tocar para añadir un `kind` nuevo al catálogo.
+ * El campo de valor de una condición, según lo que ese campo sea.
  *
- * Con `IN` cambia el widget, no el `kind`: una fecha o un entero se escriben
- * como lista separada por comas y se empaquetan en el array JSON que espera
- * `coerceConditionValue`; un enum con catálogo cerrado se marca por
- * casillas, para no dejar escribir un valor que no está en la lista.
+ * Es el único punto que hay que tocar para añadir una clase de valor nueva al
+ * catálogo, y por eso decide **por `kind`, nunca por el nombre del campo**: en
+ * cuanto un componente pregunta «¿es `priority`?», añadir un campo parecido
+ * obliga a encontrar y editar ese `if`.
+ *
+ * ⚠️ **Con `IN` cambia el widget, no el `kind`.** Un enum o una lista del
+ * proyecto se marcan por casillas —para no dejar escribir un valor que no está
+ * en la lista—; un entero o una fecha se escriben separados por comas y se
+ * empaquetan en el array JSON que espera `coerceConditionValue`.
  */
-export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldProps) {
-  if (operator === 'IN' && fieldSpec.kind === 'enum' && fieldSpec.options) {
-    const selected: string[] = safeParseArray(value);
+export function ValueField({ fieldSpec, operator, value, onChange, proyecto }: ValueFieldProps) {
+  const opciones = opcionesDe(fieldSpec, proyecto);
+
+  if (operator === 'IN' && opciones.length > 0) {
+    const elegidos: string[] = safeParseArray(value);
     return (
-      <div className="flex flex-wrap gap-2">
-        {fieldSpec.options.map((option) => {
-          const checked = selected.includes(option.value);
+      <div className="flex flex-wrap gap-1.5">
+        {opciones.map((opcion) => {
+          const marcado = elegidos.includes(opcion.value);
           return (
             <label
-              key={option.value}
-              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2 py-1 font-sans text-xs text-text-primary"
+              key={opcion.value}
+              className={[
+                'flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-sans text-xs transition-colors',
+                marcado
+                  ? 'border-primary bg-primary-muted text-primary'
+                  : 'border-border text-text-secondary hover:text-text-primary',
+              ].join(' ')}
             >
               <input
                 type="checkbox"
-                checked={checked}
+                className="sr-only"
+                checked={marcado}
                 onChange={(event) => {
-                  const next = event.target.checked
-                    ? [...selected, option.value]
-                    : selected.filter((item) => item !== option.value);
-                  onChange(JSON.stringify(next));
+                  const siguiente = event.target.checked
+                    ? [...elegidos, opcion.value]
+                    : elegidos.filter((item) => item !== opcion.value);
+                  onChange(JSON.stringify(siguiente));
                 }}
               />
-              {option.label}
+              {opcion.label}
             </label>
           );
         })}
@@ -52,19 +69,22 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
   }
 
   if (operator === 'IN') {
-    /* `key` por campo: si algún día se puede cambiar de campo sin perder el
-       operador `IN`, el texto de la lista anterior no debe sobrevivir. */
+    /* `key` por campo: si se cambia de campo sin perder el operador `IN`, el
+       texto de la lista anterior no debe sobrevivir. */
     return <ListaSeparadaPorComas key={fieldSpec.field} value={value} onChange={onChange} />;
   }
 
-  if (fieldSpec.kind === 'enum' && fieldSpec.options) {
+  if (opciones.length > 0) {
     return (
+      /* `placeholder` y no una opción vacía a mano: sin él, el desplegable
+         nace con la primera opción marcada y le pone a la regla un valor que
+         nadie decidió. */
       <Select
-        label="Valor"
+        label={fieldSpec.label}
+        placeholder="Elige…"
+        options={opciones.map((opcion) => ({ value: opcion.value, label: opcion.label }))}
         value={value}
         onValueChange={onChange}
-        options={[...fieldSpec.options]}
-        placeholder="Elige un valor"
         fullWidth
       />
     );
@@ -73,14 +93,13 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
   if (fieldSpec.kind === 'boolean') {
     return (
       <Select
-        label="Valor"
-        value={value}
-        onValueChange={onChange}
+        label={fieldSpec.label}
         options={[
           { value: 'true', label: 'Sí' },
           { value: 'false', label: 'No' },
         ]}
-        placeholder="Elige un valor"
+        value={value}
+        onValueChange={onChange}
         fullWidth
       />
     );
@@ -88,28 +107,36 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
 
   if (fieldSpec.kind === 'date') {
     return (
+      /* `name=""` a propósito: el valor ya viaja en el campo oculto de la fila
+         (`conditionValue`), y un segundo campo con nombre metería una entrada
+         suelta en el `FormData` que desalinearía los arrays paralelos. */
       <SelectorDeFecha
-        /* Nombre sin usar a propósito: el `<input>` oculto real de la fila lo
-           pone `ConditionsSection`, siempre uno por fila — D4. Si este
-           componente pusiera también uno con `name="conditionValue"`,
-           `getAll('conditionValue')` traería dos entradas por esta fila y
-           desalinearía las tres listas paralelas con las de las demás. */
-        name={`_fecha_sin_usar_${fieldSpec.field}`}
-        label="Fecha"
+        name=""
+        label={fieldSpec.label}
         defaultValue={value}
+        placeholder="Elige una fecha"
         onValueChange={onChange}
+      />
+    );
+  }
+
+  if (fieldSpec.kind === 'integer') {
+    return (
+      <Input
+        type="number"
+        label={fieldSpec.label}
+        min={fieldSpec.min ?? 0}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
       />
     );
   }
 
   return (
     <Input
-      label="Valor"
-      type="number"
+      label={fieldSpec.label}
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      min={fieldSpec.min}
-      fullWidth
     />
   );
 }
@@ -117,19 +144,11 @@ export function ValueField({ fieldSpec, operator, value, onChange }: ValueFieldP
 /**
  * Una lista escrita a mano, separada por comas.
  *
- * ⚠️ **El texto que se ve es estado propio, no el JSON reformateado.** Antes
- * el `<Input>` se controlaba desde el valor ya parseado: cada pulsación se
- * partía por comas, se limpiaba y se volvía a serializar, así que al teclear
- * una coma la lista se recomponía sin ella —«3, 5, 8» acababa siendo «358»—
- * y no había forma de escribir más de un elemento.
- *
- * Aquí el texto crudo manda mientras se escribe y hacia fuera sale siempre
- * el JSON que espera `coerceConditionValue`, con los huecos descartados. Que
- * el texto tenga una coma suelta al final es normal a media escritura y no
- * ensucia lo que se envía.
- *
- * Se monta con el valor que reciba y no vuelve a mirarlo: cambiar de campo o
- * de operador desmonta este componente, así que no hay que sincronizar nada.
+ * ⚠️ **El texto crudo vive aquí y no en el borrador.** El borrador guarda el
+ * array JSON, y reconstruirlo a texto en cada tecla se comía las comas mientras
+ * se escribían: escribir «3,» daba `["3"]`, que se volvía a pintar como «3» y
+ * borraba la coma recién puesta. Aquí se conserva lo escrito y se publica el
+ * array; lo que se ve es lo que se tecleó.
  */
 function ListaSeparadaPorComas({
   value,
@@ -142,29 +161,24 @@ function ListaSeparadaPorComas({
 
   return (
     <Input
-      label="Valor"
+      label="Valores separados por comas"
+      placeholder="uno, dos, tres"
       value={texto}
       onChange={(event) => {
-        const crudo = event.target.value;
-        setTexto(crudo);
-        onChange(
-          JSON.stringify(
-            crudo
-              .split(',')
-              .map((item) => item.trim())
-              .filter(Boolean),
-          ),
-        );
+        setTexto(event.target.value);
+        const partes = event.target.value
+          .split(',')
+          .map((parte) => parte.trim())
+          .filter((parte) => parte.length > 0);
+        onChange(JSON.stringify(partes));
       }}
-      placeholder="Separados por comas"
-      fullWidth
     />
   );
 }
 
-function safeParseArray(raw: string): string[] {
+function safeParseArray(value: string): string[] {
   try {
-    const parsed: unknown = JSON.parse(raw || '[]');
+    const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.map(String) : [];
   } catch {
     return [];

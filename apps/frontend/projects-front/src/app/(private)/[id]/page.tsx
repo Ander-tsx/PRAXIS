@@ -1,3 +1,5 @@
+import type { AutomationCatalog } from '@/lib/automation-catalog';
+import { TabIcon } from '@/components/atoms/TabIcon';
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
 import { ProjectHeader } from '@/components/organisms/ProjectHeader';
@@ -20,6 +22,7 @@ import {
   type ProjectMember,
   TabNav,
   type Task,
+  personLabel,
   projectPath,
   resolveProfiles,
   tabLinkClasses,
@@ -62,15 +65,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * ⚠️ **Ya no hay pestaña «Etiquetas».** Se administran desde el diálogo de la
  * tarea, que es donde se usan: ver §36.
  *
- * ⚠️ **«Automatizaciones» pasó a llamarse «Reglas».** Un enlace viejo con
- * `?tab=automatizaciones` sigue aterrizando aquí: se resuelve como alias más
- * abajo, al calcular `activeTab`.
+ * ⚠️ **La sección de automatización ha cambiado de nombre dos veces**, y las
+ * dos URLs anteriores siguen vivas: `?tab=automatizaciones` (el primer nombre)
+ * y `?tab=reglas` (el segundo) aterrizan en `automation`, que es el definitivo.
+ * Se resuelven como alias más abajo, al calcular `activeTab`.
+ *
+ * Un enlace compartido no puede morir porque en esta casa hayamos cambiado de
+ * opinión sobre cómo llamar a una pestaña, y mantener dos alias cuesta dos
+ * líneas.
+ *
+ * ⚠️ **El identificador va en inglés y la etiqueta en español**, como manda la
+ * convención del repositorio: `id` viaja en la URL y en el código —es una
+ * interfaz— y `label` es lo único que se lee en pantalla.
  */
 const TABS = [
-  { id: 'espacios', label: 'Espacios' },
-  { id: 'equipo', label: 'Equipo' },
-  { id: 'roles', label: 'Roles' },
-  { id: 'reglas', label: 'Reglas' },
+  { id: 'espacios', label: 'Espacios', icon: 'workspaces' },
+  { id: 'equipo', label: 'Equipo', icon: 'team' },
+  { id: 'roles', label: 'Roles', icon: 'roles' },
+  { id: 'automation', label: 'Automatización', icon: 'automation' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -98,8 +110,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
 
   const activeTab: TabId = TABS.some((t) => t.id === tab)
     ? (tab as TabId)
-    : tab === 'automatizaciones'
-      ? 'reglas'
+    : /* Los dos nombres que tuvo esta sección antes. Ver `TABS`. */
+      tab === 'automatizaciones' || tab === 'reglas'
+      ? 'automation'
       : 'espacios';
 
   /**
@@ -171,9 +184,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
      * el proyecto.
      */
     api
-      .get<ChatMessagePage>(
-        `/projects/${project.id}/chat/messages?limit=1`,
-      )
+      .get<ChatMessagePage>(`/projects/${project.id}/chat/messages?limit=1`)
       /* `channelId` vacío: si la carga falló no sabemos de qué canal es, y ese
          id es lo que el panel usa para filtrar los eventos del flujo en vivo.
          Una cadena vacía no coincide con ninguno — mejor sin tiempo real que
@@ -193,23 +204,38 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const can = effective.permissions;
 
   /**
-   * Reglas y ejecuciones recientes.
+   * Reglas de automatización y ejecuciones recientes.
    *
    * Solo se piden con la pestaña abierta y el permiso presente: pedirlas sin
    * poder verlas sería una petición que siempre da 403. Un fallo del servicio
    * de automatización cae a lista vacía — no se lleva por delante el proyecto.
    */
-  const [automationRules, automationExecutions] =
-    activeTab === 'reglas' && can.canManageAutomations
+  const [automationRules, automationExecutions, automationCatalog] =
+    activeTab === 'automation' && can.canManageAutomations
       ? await Promise.all([
+          /**
+           * 🔴 **`null` y no `[]` cuando el servicio no responde.**
+           *
+           * Esto caía a lista vacía, y una lista vacía **ya significa otra
+           * cosa**: «no tienes ninguna regla». Con el servicio caído, quien
+           * tuviera diez reglas veía la pantalla de bienvenida diciéndole que
+           * no había ninguna — el recorte mudo que este repositorio prohíbe en
+           * cualquier otro sitio. Ahora la sección distingue las dos cosas y
+           * lo dice.
+           */
           api
             .get<AutomationRule[]>(`/projects/${project.id}/automations`)
-            .catch(() => [] as AutomationRule[]),
+            .catch(() => null),
           api
             .get<AutomationExecution[]>(`/projects/${project.id}/automations/executions`)
-            .catch(() => [] as AutomationExecution[]),
+            .catch(() => null),
+          /* El catálogo manda: qué disparadores, condiciones y acciones se
+             pueden elegir sale del servidor, no de una copia en el cliente. */
+          api
+            .get<AutomationCatalog>(`/projects/${project.id}/automations/catalog`)
+            .catch(() => null),
         ])
-      : [[] as AutomationRule[], [] as AutomationExecution[]];
+      : [[] as AutomationRule[], [] as AutomationExecution[], null];
 
   /**
    * ¿Está suspendido?
@@ -414,7 +440,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     espacios: project.workspaces.length,
     equipo: members.length,
     roles: project.roles.length,
-    reglas: automationRules.length,
+    automation: automationRules?.length ?? 0,
   };
 
   /**
@@ -443,7 +469,10 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
           <div className="shrink-0">
-            <SuspendedProjectNotice reason={effective.suspendedReason} isOwner={effective.isOwner} />
+            <SuspendedProjectNotice
+              reason={effective.suspendedReason}
+              isOwner={effective.isOwner}
+            />
           </div>
         )}
 
@@ -471,7 +500,11 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         <div className="shrink-0 flex items-center justify-between border-b border-border">
           <TabNav
             ariaLabel="Secciones del proyecto"
-            tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
+            tabs={TABS.map((t) => ({
+              ...t,
+              count: counts[t.id],
+              icon: <TabIcon nombre={t.icon} />,
+            }))}
             activeId={activeTab}
             renderLink={(t, isActive, content) => (
               <Link
@@ -490,17 +523,42 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
               href={`/chat/proyecto/${project.id}`}
               className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
               </svg>
-              Abrir Chat {chat.unread > 0 && <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">{chat.unread}</span>}
+              Abrir Chat{' '}
+              {chat.unread > 0 && (
+                <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">
+                  {chat.unread}
+                </span>
+              )}
             </a>
             <a
               href={`/reports/${project.slug}`}
               className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
               </svg>
               Analizar
             </a>
@@ -560,7 +618,6 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           />
         )}
 
-
         {activeTab === 'equipo' && (
           <ProjectMembers
             projectId={project.id}
@@ -584,11 +641,42 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           />
         )}
 
-        {activeTab === 'reglas' && (
+        {activeTab === 'automation' && (
           <ProjectRules
             projectId={project.id}
             rules={automationRules}
             executions={automationExecutions}
+            catalog={automationCatalog}
+            /**
+             * Las listas de las que salen los valores de una condición o de una
+             * acción.
+             *
+             * ⚠️ **Ninguna consulta nueva.** Las columnas vienen embebidas en
+             * `GET /projects/:id`, y las etiquetas y la gente ya se piden para
+             * otras secciones. El catálogo dice *de qué lista* sale cada campo;
+             * los valores los pone quien ya los tiene en pantalla.
+             */
+            proyecto={{
+              columns: project.workspaces.flatMap((workspace) =>
+                workspace.boards.flatMap((board) =>
+                  board.columns.map((column) => ({
+                    value: column.id,
+                    /* Con el tablero delante: dos tableros pueden tener cada uno
+                       su «Por hacer», y un desplegable con dos entradas iguales
+                       no se puede usar. */
+                    label: `${board.name} · ${column.name}`,
+                  })),
+                ),
+              ),
+              labels: labels.map((label) => ({ value: label.id, label: label.name })),
+              members: members.map((member) => {
+                const user = usersById.get(member.userId);
+                return {
+                  value: member.userId,
+                  label: user ? personLabel(user) : member.userId,
+                };
+              }),
+            }}
             canManage={can.canManageAutomations}
             isSuspended={suspendido}
           />

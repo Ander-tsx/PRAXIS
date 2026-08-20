@@ -1,14 +1,19 @@
 import type {
-  AutomationActionType,
   AutomationReviewSummary,
   AutomationRule,
   AutomationRuleStatus,
-  AutomationTriggerType,
 } from '@praxis/commons/api/domain';
+
 import {
-  type ConditionFieldSpec,
-  conditionFieldSpecByName,
-  conditionFieldSpecFor,
+  type AutomationCatalog,
+  type ConditionField,
+  OPERADORES,
+  type OpcionesDelProyecto,
+  SIN_OPCIONES,
+  actionSpecFor,
+  conditionFieldByName,
+  conditionFieldFor,
+  etiquetaDeValor,
   triggerSpecFor,
 } from './automation-catalog';
 
@@ -20,42 +25,65 @@ export interface ConditionDraft {
 }
 
 export interface ActionDraft {
-  type: AutomationActionType;
+  type: string;
+  /**
+   * Lo que esa acción necesita para saber qué hacer.
+   *
+   * ⚠️ **Antes no existía**, y no podía existir: había una sola acción y su
+   * configuración la fijaba el catálogo. Desde que una regla puede mover a una
+   * columna concreta o poner una etiqueta concreta, la configuración es una
+   * elección de quien escribe la regla y tiene que viajar con ella.
+   */
+  config: Record<string, unknown>;
 }
 
 /**
- * El estado editable del constructor guiado. Vive en `useState` del lado del
- * cliente; `bodyFromDraft` es el único sitio que sabe traducirlo al cuerpo
- * exacto del contrato — D5 del plan.
+ * El estado editable del constructor. Vive en `useState` del lado del cliente;
+ * `bodyFromDraft` es el único sitio que sabe traducirlo al cuerpo exacto del
+ * contrato.
  */
 export interface RuleDraft {
   name: string;
   description: string;
-  triggerType: AutomationTriggerType;
+  triggerType: string;
   triggerConfig: Record<string, number>;
   conditions: ConditionDraft[];
   actions: ActionDraft[];
   status: AutomationRuleStatus;
 }
 
-/** Un borrador nuevo, con los valores por defecto del catálogo. */
-export function emptyDraft(triggerType: AutomationTriggerType): RuleDraft {
-  const spec = triggerSpecFor(triggerType);
-  const triggerConfig: Record<string, number> = {};
-  for (const field of spec?.configFields ?? []) {
-    triggerConfig[field.key] = field.defaultValue;
+/** La configuración inicial de una acción, con los valores que ya se sepan. */
+export function configInicialDeAccion(
+  catalog: AutomationCatalog | null,
+  type: string,
+): Record<string, unknown> {
+  const spec = actionSpecFor(catalog, type);
+  const config: Record<string, unknown> = {};
+  for (const campo of spec?.config ?? []) {
+    /* Un desplegable con una sola opción se rellena solo: obligar a elegir
+       cuando no hay nada que elegir es un paso de más. */
+    if (campo.options?.length === 1) config[campo.key] = campo.options[0]?.value;
   }
+  return config;
+}
+
+/** Un borrador nuevo, con los valores por defecto del catálogo. */
+export function emptyDraft(catalog: AutomationCatalog | null, triggerType: string): RuleDraft {
+  const spec = triggerSpecFor(catalog, triggerType);
+  const triggerConfig: Record<string, number> = {};
+  for (const field of spec?.config ?? []) triggerConfig[field.key] = field.defaultValue;
+
+  /* Se arranca con «Avisar»: es la única acción que no escribe nada, así que
+     es la que nunca puede fallar por permisos y la que casi todo el mundo
+     quiere. Las demás se añaden. */
+  const primera = catalog?.actions[0]?.type ?? 'CREATE_NOTIFICATION';
   return {
     name: '',
     description: '',
     triggerType,
     triggerConfig,
     conditions: [],
-    /**
-     * El MVP tiene una sola acción posible por trigger y su config la fija el
-     * catálogo (D4) — D7 explica por qué no se ofrece «añadir» todavía.
-     */
-    actions: spec ? [{ type: spec.actions[0].type }] : [],
+    actions: [{ type: primera, config: configInicialDeAccion(catalog, primera) }],
     /** Igual que el valor por defecto del servidor cuando se omite `status`. */
     status: 'DISABLED',
   };
@@ -74,13 +102,18 @@ export function draftFromRule(rule: AutomationRule): RuleDraft {
     conditions: [...rule.conditions]
       .sort((a, b) => a.position - b.position)
       .map(({ field, operator, value }) => ({ field, operator, value })),
-    actions: rule.actions.length > 0 ? [{ type: rule.actions[0].type }] : [],
+    actions: [...rule.actions]
+      .sort((a, b) => a.position - b.position)
+      .map((action) => ({
+        type: action.type,
+        config: (action.config ?? {}) as Record<string, unknown>,
+      })),
     /**
      * `PAUSED_SYSTEM` e `INVALID` los pone el sistema y el cliente no puede
      * reenviarlos — un `PATCH` con cualquiera de los dos da 400. Guardar sin
-     * tocar el estado sobre una regla en uno de esos dos colapsa a
-     * `DISABLED`, la lectura segura: es la única forma editable de "esta
-     * regla no está corriendo ahora mismo".
+     * tocar el estado sobre una regla en uno de esos dos colapsa a `DISABLED`,
+     * la lectura segura: es la única forma editable de «esta regla no está
+     * corriendo ahora mismo».
      */
     status: rule.status === 'ENABLED' ? 'ENABLED' : 'DISABLED',
   };
@@ -88,40 +121,41 @@ export function draftFromRule(rule: AutomationRule): RuleDraft {
 
 /** El cuerpo exacto que espera `POST`/`PATCH /automations` — ni un campo de más. */
 export function bodyFromDraft(draft: RuleDraft) {
-  const spec = triggerSpecFor(draft.triggerType);
-  const action = spec?.actions.find((candidate) => candidate.type === draft.actions[0]?.type);
   const description = draft.description.trim();
   return {
     name: draft.name.trim(),
     ...(description && { description }),
     trigger: { type: draft.triggerType, config: draft.triggerConfig },
-    conditions: draft.conditions.map(({ field, operator, value }) => ({
-      field,
-      operator,
-      value,
-    })),
-    actions: action ? [{ type: action.type, config: action.config }] : [],
+    conditions: draft.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
+    actions: draft.actions.map((action) => ({ type: action.type, config: action.config })),
     status: draft.status,
   };
 }
 
 /**
- * Reconstruye el borrador desde el `FormData` que emite `RuleDialog`.
+ * Reconstruye el borrador desde el `FormData` que emite el constructor.
  *
  * Las condiciones viajan en tres arrays paralelos —`conditionField`,
  * `conditionOperator`, `conditionValue`— y se recomponen por posición: la
- * entrada `i` de cada uno pertenece a la misma fila. Esa alineación depende
- * de que `ConditionsSection` emita **siempre los tres** por fila, incluso
- * cuando el valor es un booleano en «No» — D4. `triggerConfig` solo lee las
- * claves que declara el catálogo del trigger elegido, así que un campo de
- * configuración de otro trigger que quedara en el formulario no se cuela.
+ * entrada `i` de cada uno pertenece a la misma fila. Esa alineación depende de
+ * que el formulario emita **siempre los tres** por fila, incluso cuando el
+ * valor es un booleano en «No».
+ *
+ * ⚠️ **Las acciones viajan igual, y su configuración como JSON en una sola
+ * entrada.** La alternativa —un campo por clave de configuración— rompe la
+ * alineación en cuanto dos acciones tienen distinto número de campos, que es
+ * exactamente lo que pasa desde que hay siete acciones con configuraciones
+ * distintas.
  */
-export function draftFromFormData(formData: FormData): RuleDraft {
-  const triggerType = String(formData.get('triggerType') ?? '') as AutomationTriggerType;
-  const spec = triggerSpecFor(triggerType);
+export function draftFromFormData(
+  catalog: AutomationCatalog | null,
+  formData: FormData,
+): RuleDraft {
+  const triggerType = String(formData.get('triggerType') ?? '');
+  const spec = triggerSpecFor(catalog, triggerType);
 
   const triggerConfig: Record<string, number> = {};
-  for (const field of spec?.configFields ?? []) {
+  for (const field of spec?.config ?? []) {
     const raw = formData.get(`triggerConfig.${field.key}`);
     if (raw !== null && String(raw).trim() !== '') triggerConfig[field.key] = Number(raw);
   }
@@ -134,11 +168,16 @@ export function draftFromFormData(formData: FormData): RuleDraft {
     return {
       field,
       operator,
-      value: coerceConditionValue(triggerType, field, operator, rawValues[index] ?? ''),
+      value: coerceConditionValue(catalog, triggerType, field, operator, rawValues[index] ?? ''),
     };
   });
 
-  const actionTypes = formData.getAll('actionType').map(String) as AutomationActionType[];
+  const actionTypes = formData.getAll('actionType').map(String);
+  const actionConfigs = formData.getAll('actionConfig').map(String);
+  const actions: ActionDraft[] = actionTypes.map((type, index) => ({
+    type,
+    config: parseConfig(actionConfigs[index]),
+  }));
 
   return {
     name: String(formData.get('name') ?? ''),
@@ -146,31 +185,46 @@ export function draftFromFormData(formData: FormData): RuleDraft {
     triggerType,
     triggerConfig,
     conditions,
-    actions: actionTypes.map((type) => ({ type })),
+    actions,
     status: formData.get('enabled') === 'on' ? 'ENABLED' : 'DISABLED',
   };
 }
 
-function coerceScalar(kind: ConditionFieldSpec['kind'] | undefined, raw: string): unknown {
+/** La configuración de una acción, que viaja como JSON en un campo oculto. */
+function parseConfig(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    /* Un JSON roto se trata como configuración vacía: el validador dirá qué
+       falta con el nombre del campo, que es mejor mensaje que «JSON inválido». */
+    return {};
+  }
+}
+
+function coerceScalar(kind: ConditionField['kind'] | undefined, raw: string): unknown {
   if (kind === 'integer') return Number(raw);
   if (kind === 'boolean') return raw === 'true';
   return raw;
 }
 
 /**
- * Traduce lo que emite un campo de formulario (siempre texto, D3) al valor
- * tipado que el contrato espera. Con `IN`, `raw` es un array JSON producido
- * por el propio formulario — D4: un `<select multiple>` rompería la
- * invariante de los arrays paralelos de `FormData`, así que la lista viaja
- * como una sola cadena.
+ * Traduce lo que emite un campo de formulario (siempre texto) al valor tipado
+ * que el contrato espera. Con `IN`, `raw` es un array JSON producido por el
+ * propio formulario: un `<select multiple>` rompería la invariante de los
+ * arrays paralelos de `FormData`, así que la lista viaja como una sola cadena.
  */
 export function coerceConditionValue(
+  catalog: AutomationCatalog | null,
   triggerType: string,
   field: string,
   operator: string,
   raw: string,
 ): unknown {
-  const kind = conditionFieldSpecFor(triggerType, field)?.kind;
+  const kind = conditionFieldFor(catalog, triggerType, field)?.kind;
   if (operator === 'IN') {
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -182,54 +236,126 @@ export function coerceConditionValue(
   return coerceScalar(kind, raw);
 }
 
-function describeValue(fieldSpec: ConditionFieldSpec | undefined, value: unknown): string {
-  if (fieldSpec?.kind === 'enum' && fieldSpec.options) {
-    const lookup = new Map(fieldSpec.options.map((option) => [option.value, option.label]));
-    if (Array.isArray(value)) {
-      return value.map((item) => lookup.get(String(item)) ?? String(item)).join(', ');
-    }
-    return lookup.get(String(value)) ?? String(value);
+/* ─── Cómo se lee una regla ───────────────────────────────────────────────── */
+
+function describeValue(
+  campo: ConditionField | undefined,
+  value: unknown,
+  proyecto: OpcionesDelProyecto,
+): string {
+  if (campo?.kind === 'boolean') return value ? 'sí' : 'no';
+  /* Un hueco se dice con palabras. `null` y `''` salían como «null» y como nada
+     —«fecha de vencimiento null», «etiquetas ,»—, que es peor que no decirlo. */
+  if (value === null || value === undefined || value === '') return 'sin poner';
+  if (Array.isArray(value)) {
+    if (value.length === 0) return 'ninguna';
+    return value
+      .map((item) => (campo ? etiquetaDeValor(campo, item, proyecto) : String(item)))
+      .join(', ');
   }
-  if (fieldSpec?.kind === 'boolean') return value ? 'sí' : 'no';
-  if (Array.isArray(value)) return value.join(', ');
-  return String(value);
+  return campo ? etiquetaDeValor(campo, value, proyecto) : String(value);
 }
 
 function describeCondition(
+  catalog: AutomationCatalog | null,
   triggerType: string,
   condition: { field: string; operator: string; value: unknown },
+  proyecto: OpcionesDelProyecto,
 ): string {
-  const fieldSpec = conditionFieldSpecFor(triggerType, condition.field);
-  const label = (fieldSpec?.label ?? condition.field).toLowerCase();
-  const verb =
-    condition.operator === 'NOT_EQUALS'
-      ? 'no es'
-      : condition.operator === 'IN'
-        ? 'es alguno de'
-        : 'es';
-  return `${label} ${verb} ${describeValue(fieldSpec, condition.value)}`;
+  const campo = conditionFieldFor(catalog, triggerType, condition.field);
+  const label = (campo?.label ?? condition.field).toLowerCase();
+  const verbo = OPERADORES[condition.operator as keyof typeof OPERADORES] ?? condition.operator;
+  return `${label} ${verbo} ${describeValue(campo, condition.value, proyecto)}`;
 }
 
 /**
- * «Cuando …, si …, entonces avisa …» — el mismo lenguaje Cuando/Si/Entonces
- * que usa el constructor guiado, para que la tarjeta y el formulario cuenten
- * la misma historia.
+ * Las condiciones de una regla, una frase por condición.
+ *
+ * `describeRule` ya las mete dentro de su cláusula «si …», pero encadenadas con
+ * «y» dentro de una frase larga: en una tarjeta con tres condiciones hay que
+ * leerla entera para saber cuándo salta. Esto las saca a una lista, que es como
+ * se escanean.
  */
-/**
- * Resume el `context` de una ejecución con las etiquetas del catálogo —
- * Bloque 6, hueco 3: no hay `taskTitle` legible, pero sí los campos que
- * evaluó la condición, y son lo que identifica el caso concreto.
- */
-export function describeExecutionContext(context: Record<string, unknown>): string {
-  const entries = Object.entries(context);
-  if (entries.length === 0) return 'Sin contexto.';
-  return entries
-    .map(([field, value]) => {
-      const fieldSpec = conditionFieldSpecByName(field);
-      const label = (fieldSpec?.label ?? field).toLowerCase();
-      return `${label} ${describeValue(fieldSpec, value)}`;
+export function describeConditions(
+  catalog: AutomationCatalog | null,
+  rule: AutomationRule,
+  proyecto: OpcionesDelProyecto = SIN_OPCIONES,
+): string[] {
+  return [...rule.conditions]
+    .sort((a, b) => a.position - b.position)
+    .map((condition) => describeCondition(catalog, rule.trigger.type, condition, proyecto));
+}
+
+/** Cómo se lee una acción: «avisa a los encargados», «muévela a Hecho». */
+export function describeAction(
+  catalog: AutomationCatalog | null,
+  action: { type: string; config?: Record<string, unknown> | null },
+  proyecto: OpcionesDelProyecto = SIN_OPCIONES,
+): string {
+  const spec = actionSpecFor(catalog, action.type);
+  if (!spec) return action.type;
+  const partes = spec.config
+    .map((campo) => {
+      const valor = action.config?.[campo.key];
+      if (valor === undefined || valor === null || valor === '') return null;
+      return etiquetaDeValor(campo, valor, proyecto).toLowerCase();
     })
-    .join(', ');
+    .filter((parte): parte is string => parte !== null);
+  return partes.length > 0 ? `${spec.sentence} ${partes.join(', ')}` : spec.label.toLowerCase();
+}
+
+/**
+ * «Cuando …, si …, entonces …» — el mismo lenguaje que usa el constructor, para
+ * que la tarjeta y el formulario cuenten la misma historia.
+ */
+export function describeRule(
+  catalog: AutomationCatalog | null,
+  rule: AutomationRule,
+  proyecto: OpcionesDelProyecto = SIN_OPCIONES,
+): string {
+  const spec = triggerSpecFor(catalog, rule.trigger.type);
+  const disparador = spec?.sentence ?? (spec?.label ?? rule.trigger.type).toLowerCase();
+  const condiciones =
+    rule.conditions.length > 0
+      ? `, si ${describeConditions(catalog, rule, proyecto).join(' y ')}`
+      : '';
+  const acciones =
+    rule.actions.length > 0
+      ? `, entonces ${rule.actions
+          .map((action) => describeAction(catalog, action, proyecto))
+          .join(' y ')}`
+      : '';
+  return `Cuando ${disparador}${condiciones}${acciones}.`;
+}
+
+/**
+ * Resume el `context` de una ejecución con las etiquetas del catálogo: no
+ * identifica la tarea por sí solo —para eso está `subjectTitle`— pero sí dice
+ * con qué datos se evaluó la condición, que es lo que explica el resultado.
+ */
+export function describeExecutionContext(
+  catalog: AutomationCatalog | null,
+  context: Record<string, unknown>,
+  proyecto: OpcionesDelProyecto = SIN_OPCIONES,
+): string {
+  /**
+   * ⚠️ **Solo los campos que el catálogo sabe nombrar.**
+   *
+   * El contexto lleva algún dato interno que ninguna condición puede filtrar
+   * —`boardId`, `closed`— y salían crudos: «boardid
+   * 6b489497-5a26-4356-972e-ae697e94ba14» en mitad de una frase en castellano.
+   * Un identificador que nadie puede usar no explica nada; lo que explica el
+   * resultado son los campos que se podían haber filtrado.
+   */
+  const partes = Object.entries(context)
+    .map(([field, value]) => ({ campo: conditionFieldByName(catalog, field), value }))
+    .filter((entrada) => entrada.campo !== undefined)
+    .map(
+      ({ campo, value }) =>
+        `${(campo as ConditionField).label.toLowerCase()} ${describeValue(campo, value, proyecto)}`,
+    );
+
+  return partes.length === 0 ? 'Sin contexto.' : partes.join(', ');
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
@@ -237,47 +363,32 @@ function pluralize(count: number, singular: string, plural: string): string {
 }
 
 /**
- * «3 reglas revisadas · 5 candidatas · 2 avisos · 0 fallos» — sin `skipped`
- * ni `deduped`, que el backend no manda (hueco 4 de
- * `PENDIENTES-BACKEND-AUTOMATIZACION.md`). El detalle de por qué una
- * candidata no produjo aviso se lee fila por fila en la lista de
- * ejecuciones, donde `SKIPPED` sí aparece.
+ * El resumen de una revisión, ahora con el porqué de las que no actuaron.
+ *
+ * ⚠️ **«0 acciones» no significaba nada.** El resumen decía cuántas salieron
+ * bien y cuántas fallaron, y ahí se acababa: una revisión con cuarenta
+ * candidatas y ninguna acción se leía exactamente igual tanto si las
+ * condiciones no se cumplían —la regla está mal escrita— como si ya se había
+ * actuado ayer —todo va bien—. Dos situaciones opuestas y el mismo número.
+ *
+ * Los ceros no se escriben: «2 filtradas» aporta, «0 filtradas» solo alarga.
  */
 export function describeReviewSummary(summary: AutomationReviewSummary): string {
-  const reglas = pluralize(summary.rules, 'regla revisada', 'reglas revisadas');
-  const candidatas = pluralize(summary.candidates, 'candidata', 'candidatas');
-  const avisos = pluralize(summary.succeeded, 'aviso', 'avisos');
-  const fallos = pluralize(summary.failed, 'fallo', 'fallos');
-  return `${summary.rules} ${reglas} · ${summary.candidates} ${candidatas} · ${summary.succeeded} ${avisos} · ${summary.failed} ${fallos}`;
-}
-
-/**
- * Las condiciones de una regla, una frase por condición.
- *
- * `describeRule` ya las mete dentro de su cláusula «si …», pero encadenadas
- * con «y» dentro de una frase larga: en una tarjeta con tres condiciones hay
- * que leerla entera para saber cuándo salta la regla. Esto las saca a una
- * lista, que es como se escanean.
- *
- * Devuelve la lista vacía cuando no hay ninguna: quien pinta decide qué decir
- * en ese caso, aquí no se inventa una frase de relleno.
- */
-export function describeConditions(rule: AutomationRule): string[] {
-  return [...rule.conditions]
-    .sort((a, b) => a.position - b.position)
-    .map((condition) => describeCondition(rule.trigger.type, condition));
-}
-
-export function describeRule(rule: AutomationRule): string {
-  const spec = triggerSpecFor(rule.trigger.type);
-  const triggerLabel = (spec?.label ?? rule.trigger.type).toLowerCase();
-  const conditionsText =
-    rule.conditions.length > 0
-      ? `, si ${rule.conditions
-          .map((condition) => describeCondition(rule.trigger.type, condition))
-          .join(' y ')}`
-      : '';
-  const action = spec?.actions.find((candidate) => candidate.type === rule.actions[0]?.type);
-  const recipientText = action ? `, entonces avisa ${action.recipientLabel}` : '';
-  return `Cuando ${triggerLabel}${conditionsText}${recipientText}.`;
+  const partes = [
+    `${summary.rules} ${pluralize(summary.rules, 'regla revisada', 'reglas revisadas')}`,
+    `${summary.candidates} ${pluralize(summary.candidates, 'candidata', 'candidatas')}`,
+    `${summary.succeeded} ${pluralize(summary.succeeded, 'acción', 'acciones')}`,
+  ];
+  if (summary.filtered) {
+    partes.push(
+      `${summary.filtered} sin cumplir ${pluralize(summary.filtered, 'la condición', 'las condiciones')}`,
+    );
+  }
+  if (summary.repeated) {
+    partes.push(`${summary.repeated} ya ${pluralize(summary.repeated, 'atendida', 'atendidas')}`);
+  }
+  if (summary.failed) {
+    partes.push(`${summary.failed} ${pluralize(summary.failed, 'fallo', 'fallos')}`);
+  }
+  return partes.join(' · ');
 }

@@ -1,64 +1,151 @@
 'use client';
 
-import { AUTOMATION_CATALOG } from '@/lib/automation-catalog';
-import { Input, Select } from '@praxis/commons';
+import type { AutomationCatalog, TriggerSpec } from '@/lib/automation-catalog';
+import { Input } from '@praxis/commons';
+import { Clock, Zap } from 'lucide-react';
 
 export interface TriggerSectionProps {
+  catalog: AutomationCatalog;
   triggerType: string;
-  triggerConfig: Record<string, number>;
-  onTriggerTypeChange: (type: string) => void;
-  onConfigChange: (key: string, value: number) => void;
+  config: Record<string, number>;
+  onChangeTrigger: (type: string) => void;
+  onChangeConfig: (key: string, value: number) => void;
 }
 
 /**
- * «Cuando …» — el trigger y su configuración.
+ * El «Cuando»: qué hace que la regla se plantee actuar.
  *
- * Recorre `AUTOMATION_CATALOG` en vez de ramificar por tipo: un trigger
- * nuevo en el catálogo (Bloque 2) aparece aquí solo con añadir la entrada,
- * sin tocar este componente.
+ * ## ⚠️ Los disparadores van agrupados por familia, y no es decoración
+ *
+ * Un disparador **reactivo** ocurre en un instante y la regla salta sola; uno
+ * **de barrido** describe un estado y solo se mira cuando alguien revisa. Es la
+ * diferencia entre «esto pasa solo» y «esto pasa cuando lo pido», y quien
+ * escribe la regla no puede adivinarla del nombre: «se mueve una tarea» y «una
+ * tarea lleva parada» se leen igual de inmediatos.
+ *
+ * Mezclados en un desplegable, la mitad de las reglas nacían esperando algo que
+ * no iba a ocurrir. Separados y con la etiqueta puesta, la elección lleva la
+ * explicación dentro.
  */
 export function TriggerSection({
+  catalog,
   triggerType,
-  triggerConfig,
-  onTriggerTypeChange,
-  onConfigChange,
+  config,
+  onChangeTrigger,
+  onChangeConfig,
 }: TriggerSectionProps) {
-  const spec = AUTOMATION_CATALOG.find((candidate) => candidate.type === triggerType);
+  const spec = catalog.triggers.find((uno) => uno.type === triggerType);
+  const reactivos = catalog.triggers.filter((uno) => uno.kind === 'reactive');
+  const barrido = catalog.triggers.filter((uno) => uno.kind === 'sweep');
 
   return (
-    <fieldset className="flex flex-col gap-3 rounded-xl border border-border p-4">
-      <legend className="px-1 font-sans text-sm font-medium text-text-primary">Cuando</legend>
+    <fieldset className="flex flex-col gap-3">
+      <legend className="font-sans text-sm font-semibold text-text-primary">
+        Cuando… <span className="font-normal text-text-secondary">¿qué lo dispara?</span>
+      </legend>
 
-      <Select
-        name="triggerType"
-        /* «Qué la dispara», no «Tipo de trigger»: `trigger` es la palabra del
-           contrato y de los comentarios, no la que ve quien usa la pantalla.
-           El `<legend>` de esta sección ya dice «Cuando», y las dos frases
-           encajan. */
-        label="Qué la dispara"
-        value={triggerType}
-        onValueChange={onTriggerTypeChange}
-        options={AUTOMATION_CATALOG.map((trigger) => ({
-          value: trigger.type,
-          label: trigger.label,
-        }))}
-        fullWidth
+      {/* El tipo viaja aparte porque los botones no son un `<input>`: la
+          selección es visual y el formulario necesita el valor igualmente. */}
+      <input type="hidden" name="triggerType" value={triggerType} />
+
+      <Grupo
+        titulo="Pasa solo"
+        explicacion="La regla actúa en cuanto ocurre, sin que nadie pulse nada."
+        icono={<Zap className="size-3.5" />}
+        triggers={reactivos}
+        elegido={triggerType}
+        onElegir={onChangeTrigger}
       />
-      {spec && <p className="font-sans text-xs text-text-secondary">{spec.description}</p>}
+      <Grupo
+        titulo="Al revisar"
+        explicacion="Describen un estado, así que se miran cuando pulsas «Revisar ahora»."
+        icono={<Clock className="size-3.5" />}
+        triggers={barrido}
+        elegido={triggerType}
+        onElegir={onChangeTrigger}
+      />
 
-      {spec?.configFields.map((field) => (
-        <Input
-          key={field.key}
-          name={`triggerConfig.${field.key}`}
-          type="number"
-          label={field.label}
-          message={field.help}
-          min={field.min}
-          value={triggerConfig[field.key] ?? ''}
-          onChange={(event) => onConfigChange(field.key, Number(event.target.value))}
-          fullWidth
-        />
-      ))}
+      {spec && spec.config.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-elevated p-4">
+          {spec.config.map((campo) => (
+            <label key={campo.key} className="flex flex-col gap-1">
+              <span className="font-sans text-xs font-medium text-text-secondary">
+                {campo.label}
+                {!campo.required && <span className="text-text-disabled"> (opcional)</span>}
+              </span>
+              <Input
+                type="number"
+                name={`triggerConfig.${campo.key}`}
+                min={campo.min}
+                value={String(config[campo.key] ?? campo.defaultValue)}
+                onChange={(event) => onChangeConfig(campo.key, Number(event.target.value))}
+              />
+              {campo.help && (
+                <span className="font-sans text-xs text-text-disabled">{campo.help}</span>
+              )}
+            </label>
+          ))}
+        </div>
+      )}
     </fieldset>
+  );
+}
+
+function Grupo({
+  titulo,
+  explicacion,
+  icono,
+  triggers,
+  elegido,
+  onElegir,
+}: {
+  titulo: string;
+  explicacion: string;
+  icono: React.ReactNode;
+  triggers: TriggerSpec[];
+  elegido: string;
+  onElegir: (type: string) => void;
+}) {
+  if (triggers.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="flex items-center gap-1.5 font-sans text-xs font-semibold text-text-secondary">
+        <span aria-hidden className="text-primary">
+          {icono}
+        </span>
+        {titulo}
+        <span className="font-normal text-text-disabled">— {explicacion}</span>
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {triggers.map((trigger) => {
+          const activo = trigger.type === elegido;
+          return (
+            <button
+              key={trigger.type}
+              type="button"
+              onClick={() => onElegir(trigger.type)}
+              aria-pressed={activo}
+              className={[
+                'flex flex-col gap-0.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors',
+                activo
+                  ? 'border-primary bg-primary-muted'
+                  : 'border-border bg-surface hover:border-text-disabled',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'font-sans text-sm font-medium',
+                  activo ? 'text-primary' : 'text-text-primary',
+                ].join(' ')}
+              >
+                {trigger.label}
+              </span>
+              <span className="font-sans text-xs text-text-secondary">{trigger.description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

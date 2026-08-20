@@ -6,6 +6,21 @@ export interface TabItem {
   label: string;
   /** Número al lado de la etiqueta: cuántos elementos hay en esa pestaña. */
   count?: number;
+  /**
+   * Un icono a la izquierda del nombre.
+   *
+   * ⚠️ **Es un `ReactNode` y no el nombre de un icono**, a propósito. Este
+   * componente vive en `commons` y lo usan dos zonas: si aceptara un nombre,
+   * tendría que traerse dentro un catálogo de iconos —y con él la librería
+   * entera— para las dos, aunque una no ponga ninguno. Recibiéndolo ya
+   * renderizado, cada zona pone los suyos y `TabNav` sigue sin saber nada de
+   * iconos.
+   *
+   * ⚠️ Y va **decorativo**: el nombre accesible de la pestaña es su texto, que
+   * está justo al lado. Un icono que además se anunciara diría dos veces lo
+   * mismo a quien usa un lector de pantalla.
+   */
+  icon?: ReactNode;
 }
 
 export interface TabNavProps {
@@ -65,6 +80,11 @@ export function TabNav({
 
         const content = (
           <span className="flex items-center gap-2">
+            {tab.icon && (
+              <span aria-hidden className="flex shrink-0 items-center">
+                {tab.icon}
+              </span>
+            )}
             {tab.label}
             {tab.count !== undefined && (
               <span

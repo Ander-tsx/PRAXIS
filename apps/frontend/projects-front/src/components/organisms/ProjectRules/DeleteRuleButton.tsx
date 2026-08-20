@@ -2,8 +2,8 @@
 
 import { deleteAutomationRuleAction } from '@/app/(private)/[id]/actions';
 import { AUTOMATION_RULE_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, alpha, colors, useAccion } from '@praxis/commons';
-import { useEffect, useState } from 'react';
+import { Button, useAccion } from '@praxis/commons';
+import { useState } from 'react';
 
 export interface DeleteRuleButtonProps {
   projectId: string;
@@ -11,58 +11,56 @@ export interface DeleteRuleButtonProps {
   ruleName: string;
 }
 
-/** Eliminar una regla, con confirmación — calcado de `DeleteRoleButton`. */
+/**
+ * Eliminar una regla, confirmando **dentro de su propia fila**.
+ *
+ * ## 🔴 Ya no abre un diálogo, y no es una preferencia de estilo
+ *
+ * Esto sacaba un `<dialog>` a pantalla completa para preguntar por algo que ya
+ * estaba señalado con el dedo: la regla que se va a borrar está en la fila donde
+ * se pulsó. El modal la tapaba, tenía que repetir su nombre en el título para
+ * que se supiera de cuál se hablaba, y devolvía el foco al principio de la
+ * lista al cerrarse.
+ *
+ * Confirmar en la fila conserva el contexto —se sigue viendo la regla, con sus
+ * condiciones— y hace la pregunta donde está la mano. Es la misma decisión que
+ * el pie del constructor: nada de ventanas encima de ventanas.
+ */
 export function DeleteRuleButton({ projectId, ruleId, ruleName }: DeleteRuleButtonProps) {
-  const [open, setOpen] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [state, formAction, pending] = useAccion(
     deleteAutomationRuleAction,
     AUTOMATION_RULE_INITIAL_STATE,
   );
 
-  useEffect(() => {
-    if (state.done) setOpen(false);
-  }, [state]);
-
-  return (
-    <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+  if (!confirmando) {
+    return (
+      <Button variant="ghost" size="sm" onClick={() => setConfirmando(true)}>
         Eliminar
       </Button>
+    );
+  }
 
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        size="sm"
-        title={`Eliminar «${ruleName}»`}
-        description="Esta acción no se puede deshacer."
-      >
-        <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="ruleId" value={ruleId} />
+  return (
+    <form action={formAction} className="flex flex-col items-end gap-1.5">
+      <input type="hidden" name="projectId" value={projectId} />
+      <input type="hidden" name="ruleId" value={ruleId} />
 
-          {state.error && (
-            <p
-              role="alert"
-              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-              style={{
-                background: alpha(colors.error, 10),
-                borderColor: alpha(colors.error, 30),
-              }}
-            >
-              {state.error}
-            </p>
-          )}
+      <div className="flex items-center gap-2">
+        <span className="font-sans text-xs text-text-secondary">¿Eliminar «{ruleName}»?</span>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmando(false)}>
+          No
+        </Button>
+        <Button type="submit" variant="danger" size="sm" isLoading={pending}>
+          Sí, eliminar
+        </Button>
+      </div>
 
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="danger" isLoading={pending}>
-              Eliminar regla
-            </Button>
-          </div>
-        </form>
-      </Dialog>
-    </>
+      {state.error && (
+        <p role="alert" className="font-sans text-xs text-error">
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }

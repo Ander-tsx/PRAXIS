@@ -5,10 +5,11 @@ import {
   LABEL_COLORS,
   formatBytes,
 } from '@praxis/commons';
-import { AUTOMATION_CONDITION_OPERATORS } from '@praxis/commons/api/domain';
 import {
-  type ConditionFieldSpec,
-  conditionFieldSpecFor,
+  type AutomationCatalog,
+  type ConditionField,
+  actionSpecFor,
+  conditionFieldFor,
   triggerSpecFor,
 } from './automation-catalog';
 import type { RuleDraft } from './automation-draft';
@@ -260,7 +261,9 @@ export const AUTOMATION_RULE_NAME_MAX = 120;
 export const AUTOMATION_RULE_DESCRIPTION_MAX = 1000;
 export const AUTOMATION_RULE_MAX_ACTIONS = 5;
 
-function validateConditionScalar(fieldSpec: ConditionFieldSpec, value: unknown): string | null {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateConditionScalar(fieldSpec: ConditionField, value: unknown): string | null {
   if (fieldSpec.kind === 'integer') {
     const min = fieldSpec.min ?? 0;
     if (!Number.isInteger(value) || (value as number) < min) {
@@ -282,11 +285,23 @@ function validateConditionScalar(fieldSpec: ConditionFieldSpec, value: unknown):
       return `${fieldSpec.label}: ese valor no está en el catálogo.`;
     }
   }
+  /* Un campo que apunta a una columna, una etiqueta o una persona lleva su id.
+     Si aquí llega otra cosa, es que el desplegable se quedó sin elegir — y el
+     servidor respondería con un 400 sobre un UUID que no dice qué falta. */
+  if (
+    (fieldSpec.kind === 'uuid' || fieldSpec.kind === 'uuidList') &&
+    (typeof value !== 'string' || !UUID.test(value))
+  ) {
+    return `${fieldSpec.label}: elige un valor de la lista.`;
+  }
+  if (fieldSpec.kind === 'text' && (typeof value !== 'string' || value.trim().length === 0)) {
+    return `${fieldSpec.label} no puede quedar vacío.`;
+  }
   return null;
 }
 
 function validateConditionValue(
-  fieldSpec: ConditionFieldSpec,
+  fieldSpec: ConditionField,
   operator: string,
   value: unknown,
 ): string | null {
@@ -321,7 +336,10 @@ export interface AutomationDraftError {
   mensaje: string;
 }
 
-export function validateAutomationDraft(draft: RuleDraft): AutomationDraftError | null {
+export function validateAutomationDraft(
+  catalog: AutomationCatalog | null,
+  draft: RuleDraft,
+): AutomationDraftError | null {
   const name = draft.name.trim();
   if (name.length < AUTOMATION_RULE_NAME_MIN) {
     return {
@@ -342,10 +360,10 @@ export function validateAutomationDraft(draft: RuleDraft): AutomationDraftError 
     };
   }
 
-  const spec = triggerSpecFor(draft.triggerType);
-  if (!spec) return { ambito: 'trigger', mensaje: 'Elige un trigger del catálogo académico.' };
+  const spec = triggerSpecFor(catalog, draft.triggerType);
+  if (!spec) return { ambito: 'trigger', mensaje: 'Elige cuándo tiene que actuar la regla.' };
 
-  for (const field of spec.configFields) {
+  for (const field of spec.config) {
     const value = draft.triggerConfig[field.key];
     if (field.required && (value === undefined || value === null)) {
       return { ambito: 'trigger', mensaje: `${field.label} es obligatorio.` };
@@ -365,18 +383,59 @@ export function validateAutomationDraft(draft: RuleDraft): AutomationDraftError 
     return { ambito: 'actions', mensaje: 'Una regla admite como máximo cinco acciones.' };
   }
 
+  /* Cada acción, con lo que su catálogo diga que necesita. Sin esto, una acción
+     a medio configurar viaja y vuelve como un 400 sobre una clave interna. */
+  for (const action of draft.actions) {
+    const actionSpec = actionSpecFor(catalog, action.type);
+    if (!actionSpec) {
+      return { ambito: 'actions', mensaje: `«${action.type}» no es una acción admitida.` };
+    }
+    for (const campo of actionSpec.config) {
+      const valor = action.config[campo.key];
+      if (campo.required && (valor === undefined || valor === null || valor === '')) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: falta «${campo.label}».`,
+        };
+      }
+      if (
+        campo.kind === 'uuid' &&
+        valor !== undefined &&
+        (typeof valor !== 'string' || !UUID.test(valor))
+      ) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: elige un valor para «${campo.label}».`,
+        };
+      }
+      if (
+        campo.kind === 'text' &&
+        typeof valor === 'string' &&
+        valor.length > (campo.maxLength ?? 500)
+      ) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: «${campo.label}» no puede pasar de ${campo.maxLength ?? 500} caracteres.`,
+        };
+      }
+    }
+  }
+
   for (const condition of draft.conditions) {
-    const fieldSpec = conditionFieldSpecFor(draft.triggerType, condition.field);
+    const fieldSpec = conditionFieldFor(catalog, draft.triggerType, condition.field);
     if (!fieldSpec) {
       return {
         ambito: 'conditions',
         mensaje: `«${condition.field}» no es una condición de ${spec.label}.`,
       };
     }
-    if (!(AUTOMATION_CONDITION_OPERATORS as readonly string[]).includes(condition.operator)) {
+    /* Contra los operadores **de ese campo**, no contra la lista entera: `GT`
+       existe, pero no sobre un booleano. Es la misma regla que aplica el
+       servidor, y comprobarla aquí la explica antes y con el nombre del campo. */
+    if (!fieldSpec.operators.includes(condition.operator as never)) {
       return {
         ambito: 'conditions',
-        mensaje: `«${condition.operator}» no es un operador admitido.`,
+        mensaje: `«${fieldSpec.label}» no admite ese operador.`,
       };
     }
     const error = validateConditionValue(fieldSpec, condition.operator, condition.value);
