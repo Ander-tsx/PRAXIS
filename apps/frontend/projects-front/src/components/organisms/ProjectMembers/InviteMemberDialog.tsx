@@ -134,109 +134,114 @@ export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: In
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="userId" value={selected?.id ?? ''} />
 
-        <div className="flex items-end gap-2">
-            <Input
-              id={searchId}
-              type="search"
-              label="Buscar persona"
-              placeholder="Correo o nombre"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setSelected(null);
-                setResults(null);
-              }}
-              onKeyDown={(event) => {
-                /* Enter busca; sin esto enviaría el formulario a medias. */
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  search();
-                }
-              }}
-              message="Solo aparecen personas que ya tienen cuenta en PRAXIS."
-              autoComplete="off"
-              fullWidth
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={search}
-              isLoading={buscando}
-              disabled={buscando}
-              className="mb-[22px]"
-            >
-              Buscar
-            </Button>
+        <div className="flex flex-col md:flex-row gap-4 items-start w-full">
+          {/* Columna Izquierda: Búsqueda y Resultados */}
+          <div className="flex-1 w-full flex flex-col gap-4">
+            <div className="flex items-end gap-2">
+              <Input
+                id={searchId}
+                type="search"
+                label="Buscar persona"
+                placeholder="Correo o nombre"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelected(null);
+                  setResults(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    search();
+                  }
+                }}
+                message="Solo aparecen personas que ya tienen cuenta."
+                autoComplete="off"
+                fullWidth
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={search}
+                isLoading={buscando}
+                disabled={buscando}
+                className="mb-[22px]"
+              >
+                Buscar
+              </Button>
+            </div>
+
+            {selected ? (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-primary px-3 py-2"
+                style={{ background: alpha(colors.primary, 10) }}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-sans text-sm text-text-primary">
+                    {personLabel(selected)}
+                  </span>
+                  <span className="truncate font-sans text-xs text-text-secondary">
+                    {selected.credential.email}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="shrink-0 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              results !== null && (
+                <div className="flex flex-col gap-1.5">
+                  {errorBusqueda ? (
+                    <p
+                      role="alert"
+                      className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
+                    >
+                      {errorBusqueda}
+                    </p>
+                  ) : results.length === 0 ? (
+                    <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
+                      Nadie coincide con «{query.trim()}».
+                    </p>
+                  ) : (
+                    results.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => setSelected(user)}
+                        className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
+                      >
+                        <span className="font-sans text-sm text-text-primary">
+                          {personLabel(user)}
+                        </span>
+                        <span className="font-sans text-xs text-text-secondary">
+                          {user.credential.email}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )
+            )}
           </div>
 
-          {selected ? (
-            <div
-              className="flex items-center justify-between gap-3 rounded-lg border border-primary px-3 py-2"
-              style={{ background: alpha(colors.primary, 10) }}
-            >
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-sans text-sm text-text-primary">
-                  {personLabel(selected)}
-                </span>
-                <span className="truncate font-sans text-xs text-text-secondary">
-                  {selected.credential.email}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="shrink-0 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-              >
-                Cambiar
-              </button>
-            </div>
-          ) : (
-            results !== null && (
-              <div className="flex flex-col gap-1.5">
-                {/* Un fallo de red no es «no hay nadie»: decirlo así manda a
-                    buscar otra vez con otras palabras algo que sí estaba. */}
-                {errorBusqueda ? (
-                  <p
-                    role="alert"
-                    className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
-                  >
-                    {errorBusqueda}
-                  </p>
-                ) : results.length === 0 ? (
-                  <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
-                    Nadie coincide con «{query.trim()}».
-                  </p>
-                ) : (
-                  results.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => setSelected(user)}
-                      className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
-                    >
-                      <span className="font-sans text-sm text-text-primary">
-                        {personLabel(user)}
-                      </span>
-                      <span className="font-sans text-xs text-text-secondary">
-                        {user.credential.email}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )
-          )}
-
-          <Select
-            id={roleFieldId}
-            name="projectRoleId"
-            label="Rol con el que entrará"
-            value={roleId}
-            onValueChange={setRoleId}
-            options={roles.map((role) => ({ value: role.id, label: role.name }))}
-            message="Decide lo que podrá hacer dentro del proyecto."
-            fullWidth
-          />
+          {/* Columna Derecha: Rol */}
+          <div className="w-full md:w-64 shrink-0">
+            <Select
+              id={roleFieldId}
+              name="projectRoleId"
+              label="Rol asignado"
+              value={roleId}
+              onValueChange={setRoleId}
+              options={roles.map((role) => ({ value: role.id, label: role.name }))}
+              message="Decide lo que podrá hacer."
+              fullWidth
+            />
+          </div>
+        </div>
 
           {state.error && (
             <p

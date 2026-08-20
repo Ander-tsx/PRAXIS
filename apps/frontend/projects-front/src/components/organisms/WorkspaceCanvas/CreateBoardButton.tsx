@@ -35,8 +35,8 @@ export function CreateBoardButton({
   const [name, setName] = useState('');
   const [touched, setTouched] = useState(false);
   const nameId = useId();
-
   const clientError = validateBoard(name);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (state.savedName) {
@@ -45,6 +45,33 @@ export function CreateBoardButton({
       setTouched(false);
     }
   }, [state]);
+
+  useEffect(() => {
+    if (!open || !isDesktop) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false);
+        setName('');
+        setTouched(false);
+      }
+    }
+
+    function handleClickOutside(event: MouseEvent) {
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setName('');
+        setTouched(false);
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [open, isDesktop]);
 
   return (
     <>
@@ -74,6 +101,7 @@ export function CreateBoardButton({
         </button>
       ) : isDesktop ? (
           <form
+            ref={formRef}
             action={formAction}
             noValidate
             onSubmit={(event) => {

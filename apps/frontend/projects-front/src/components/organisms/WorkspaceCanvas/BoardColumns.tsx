@@ -150,6 +150,10 @@ export function BoardColumns({
 
   const [renderedTask, setRenderedTask] = useState<Task | null>(openTask);
 
+  const handleCloseTask = useCallback(() => {
+    setOpenTask(null);
+  }, []);
+
   useEffect(() => {
     if (openTask) setRenderedTask(openTask);
   }, [openTask]);
@@ -736,7 +740,7 @@ export function BoardColumns({
 
       {renderedTask && <TaskDialog
         open={!!openTask}
-        onClose={() => setOpenTask(null)}
+        onClose={handleCloseTask}
         projectId={projectId}
         boardId={board.id}
         task={renderedTask}

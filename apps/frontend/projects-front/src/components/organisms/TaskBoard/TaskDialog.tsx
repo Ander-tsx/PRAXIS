@@ -127,16 +127,28 @@ export function TaskDialog({
   const readOnly = !canEdit;
 
   /**
-   * Cierra cuando el borrado o el guardado terminan con éxito.
+   * Cierra cuando el borrado termina con éxito.
+   * El guardado ya es optimista y no debe cerrar el panel (el usuario puede querer seguir editando).
    */
   useEffect(() => {
-    if (state.done || deleteState.done) onClose();
-  }, [state.done, deleteState.done, onClose]);
+    if (deleteState.done) onClose();
+  }, [deleteState, onClose]);
 
   /** Reabrir tras un borrado cancelado no debe recordar la confirmación. */
   useEffect(() => {
     if (!open) setConfirmingDelete(false);
   }, [open]);
+
+  /** Guarda los cambios de la tarea actual antes de cambiar a otra */
+  useEffect(() => {
+    const form = formRef.current;
+    return () => {
+      if (canEdit && form) {
+        // Enviar FormData directamente, porque form.requestSubmit() falla si el formulario ya no está en el DOM
+        formAction(new FormData(form));
+      }
+    };
+  }, [task.id, canEdit, formAction]);
 
   const handleClose = () => {
     if (canEdit && formRef.current && !pending) {
