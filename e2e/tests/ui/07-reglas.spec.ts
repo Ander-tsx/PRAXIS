@@ -169,6 +169,85 @@ test.describe('Reglas del proyecto', () => {
     await expect(tarjeta.getByText(/si prioridad es Alta/)).toBeVisible();
   });
 
+  /**
+   * El diálogo de creación arrastraba el borrador de la regla anterior.
+   *
+   * Hallazgo §3 del informe de revisión del Bloque 7. `RuleDialog` sembraba el
+   * borrador con un *initializer* de `useState`, que solo corre en el montaje,
+   * y el componente nunca se desmonta: no lleva `key` y su posición en el
+   * árbol no cambia. Cerrar el diálogo no lo reiniciaba, así que la segunda
+   * regla de una sesión partía del nombre y las condiciones de la primera.
+   *
+   * ⚠️ **Se localiza acotando al diálogo abierto** y no con
+   * `page.getByLabel('Nombre')` a secas: con una tarjeta en pantalla, su
+   * diálogo «Editar» también tiene un campo «Nombre» en el DOM, y el locator
+   * suelto resuelve a dos elementos.
+   */
+  test('el diálogo de creación se reinicia al reabrirlo tras crear (corrección C1)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const nombreRegla = nombreUnico('Primera').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await page.getByRole('button', { name: 'Añadir condición' }).click();
+    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('option', { name: 'Alta' }).click();
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue('');
+    await expect(dialogo.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
+    /* Y sin marcar el campo en rojo: el diálogo está vacío porque acaba de
+       abrirse, no porque alguien lo haya dejado mal. */
+    await expect(dialogo.getByText('El nombre debe tener al menos 2 caracteres.')).toHaveCount(0);
+  });
+
+  test('el diálogo de edición sigue precargando su propia regla al reabrirlo (corrección C1)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    const nombreRegla = nombreUnico('Precargada').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'DISABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 60 } },
+        conditions: [{ field: 'priority', operator: 'EQUALS', value: 'LOW' }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status(), 'Crear la regla a editar').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    const dialogo = page.getByRole('dialog', { name: `Editar «${nombreRegla}»` });
+
+    await tarjeta.getByRole('button', { name: 'Editar' }).click();
+    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+
+    /* Cancelar y volver: el reinicio al abrir tiene que recalcular la regla,
+       no vaciar el formulario como hace el de creación. */
+    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    await tarjeta.getByRole('button', { name: 'Editar' }).click();
+    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+    await expect(dialogo.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
+  });
+
   test('editar una regla existente actualiza su resumen (Bloque 5)', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);

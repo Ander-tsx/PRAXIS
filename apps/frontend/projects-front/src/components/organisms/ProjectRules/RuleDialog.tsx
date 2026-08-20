@@ -50,10 +50,50 @@ export function RuleDialog({
     saveAutomationRuleAction,
     AUTOMATION_RULE_INITIAL_STATE,
   );
-  const [draft, setDraft] = useState<RuleDraft>(() =>
-    rule ? draftFromRule(rule) : emptyDraft('TASK_DUE_SOON'),
-  );
+
+  /** Lo que tiene que haber dentro cada vez que el diálogo se abre. */
+  function borradorInicial(): RuleDraft {
+    return rule ? draftFromRule(rule) : emptyDraft('TASK_DUE_SOON');
+  }
+
+  const [draft, setDraft] = useState<RuleDraft>(borradorInicial);
   const [touched, setTouched] = useState(false);
+  /**
+   * Cuenta las veces que se ha abierto el diálogo. Solo sirve para la `key` de
+   * `ConditionsSection`, que guarda sus propias filas y tiene el mismo
+   * problema que el borrador: las siembra con un *initializer* de `useState`
+   * que no vuelve a correr. Vaciar `draft.conditions` no le llega — hay que
+   * remontarla, que es el mecanismo que ya usaba para cambiar de trigger.
+   */
+  const [sesion, setSesion] = useState(0);
+
+  /**
+   * ⚠️ **Se siembra el borrador al abrir, no al cerrar.**
+   *
+   * El *initializer* de `useState` solo corre en el montaje, y este componente
+   * **nunca se desmonta**: no lleva `key` y su posición en el árbol no cambia,
+   * así que `revalidateProject` re-renderiza el Server Component padre sin
+   * tocar el estado de este hijo. El diálogo de creación arrastraba entonces
+   * el nombre y las condiciones de la regla anterior — crear dos seguidas
+   * partía de lo que quedó de la primera, sin error y sin aviso. Hallazgo §3
+   * del informe de revisión del Bloque 7.
+   *
+   * Al abrir se sabe con certeza qué debe haber; al cerrar hay dos motivos
+   * distintos —guardado y cancelación— que no tienen por qué comportarse
+   * igual. Y sembrar en el camino de cierre borraría lo escrito cuando el
+   * servidor responde con error, que es justo lo que el diálogo tiene que
+   * conservar.
+   *
+   * Tampoco vale un `key` sobre el `<Dialog>`: remontaría también `useAccion`
+   * y se llevaría por delante el `state.error` que se acaba de recibir.
+   */
+  function abrir() {
+    setDraft(borradorInicial());
+    /* Sin esto, un diálogo recién abierto y vacío nace con el nombre en rojo. */
+    setTouched(false);
+    setSesion((anterior) => anterior + 1);
+    setOpen(true);
+  }
 
   const nameId = useId();
   const clientError = validateAutomationDraft(draft);
@@ -82,7 +122,7 @@ export function RuleDialog({
 
   return (
     <>
-      <Button variant={triggerVariant} size={triggerSize} onClick={() => setOpen(true)}>
+      <Button variant={triggerVariant} size={triggerSize} onClick={abrir}>
         {triggerLabel}
       </Button>
 
@@ -141,8 +181,10 @@ export function RuleDialog({
           <ConditionsSection
             /* Remonta al cambiar de trigger: las filas de un catálogo
                distinto no se reconcilian, se sustituyen — sus ids internos
-               dejan de tener sentido junto a campos que ya no existen. */
-            key={draft.triggerType}
+               dejan de tener sentido junto a campos que ya no existen.
+               Y remonta también al reabrir (`sesion`), porque sus filas son
+               estado suyo y no se derivan de `conditions` en cada render. */
+            key={`${sesion}-${draft.triggerType}`}
             triggerType={draft.triggerType}
             conditions={draft.conditions}
             onChange={(conditions) => setDraft((d) => ({ ...d, conditions }))}
