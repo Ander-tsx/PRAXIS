@@ -71,15 +71,16 @@ export function ProjectMembers({
 
   return (
     <section className="flex flex-col gap-4" aria-label="Equipo del proyecto">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-display text-2xl text-text-primary">Equipo</h3>
-          <p className="font-sans text-sm text-text-secondary">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <h3 className="font-sans font-medium text-text-primary shrink-0">Equipo</h3>
+          <span className="text-text-disabled font-light shrink-0">/</span>
+          <p className="truncate font-sans text-sm text-text-secondary">
             Quien invites entra al aceptar la invitación, con el rol que le des.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
             <InviteMemberDialog projectId={projectId} roles={roles} excluirIds={excluirIds} />
@@ -99,7 +100,7 @@ export function ProjectMembers({
           Todavía no hay nadie en este proyecto.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-sm">
+        <div className="rounded-2xl border border-border bg-surface-elevated shadow-sm">
           <ul className="flex flex-col divide-y divide-border">
             {members.map((member) => {
               const user = usersById.get(member.userId);
@@ -121,7 +122,7 @@ export function ProjectMembers({
                  */
                 <li
                   key={member.id}
-                  className="flex flex-col gap-4 p-5 transition-colors hover:bg-surface sm:flex-row sm:flex-wrap sm:items-center"
+                  className="flex flex-col gap-4 p-5 transition-colors hover:bg-surface first:rounded-t-2xl last:rounded-b-2xl sm:flex-row sm:flex-wrap sm:items-center"
                 >
                   {/* Identidad. Va junta en su propio bloque para que el avatar y
                       el nombre no se separen al apilar. */}
@@ -158,13 +159,15 @@ export function ProjectMembers({
                           {label}
                         </span>
                       ) : (
-                        <a
-                          href={`/chat/${member.userId}`}
-                          title={`Escribir a ${label} en privado`}
-                          className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
-                        >
-                          {label}
-                        </a>
+                        <div className="flex min-w-0 self-start">
+                          <a
+                            href={`/chat/${member.userId}`}
+                            title={`Escribir a ${label} en privado`}
+                            className="truncate font-sans text-sm font-semibold text-text-primary underline-offset-2 hover:underline"
+                          >
+                            {label}
+                          </a>
+                        </div>
                       )}
                       <span className="truncate font-sans text-xs text-text-secondary mt-0.5">
                         {/* Puede faltar si el directorio se cortó por paginación. */}

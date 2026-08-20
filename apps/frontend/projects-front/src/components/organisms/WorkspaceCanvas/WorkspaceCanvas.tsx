@@ -288,18 +288,12 @@ export function WorkspaceCanvas({
 
   if (!activeWorkspace) {
     return (
-      <div className="flex flex-col gap-4">
-        <WorkspacePicker
-          projectId={projectId}
-          projectSlug={projectSlug}
-          workspaces={workspaces}
-          activeId=""
-          canManage={canManage}
-          canEditBoard={canEditBoard}
-          canDeleteBoard={canDeleteBoard}
-        />
+      <div className="flex flex-col h-full bg-background">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border bg-surface px-4 py-2">
+          {barraDelTablero}
+        </div>
 
-        <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-6 py-16 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 gap-3 px-6 py-16 text-center">
           <span
             className="flex h-12 w-12 items-center justify-center rounded-xl"
             style={{ background: alpha(colors.accent, 12), color: colors.accent }}
@@ -334,23 +328,12 @@ export function WorkspaceCanvas({
 
   if (!boardActivo) {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <WorkspacePicker
-            projectId={projectId}
-            projectSlug={projectSlug}
-            workspaces={workspaces}
-            activeId={activeWorkspace.id}
-            canManage={canManage}
-            canEditBoard={canEditBoard}
-            canDeleteBoard={canDeleteBoard}
-          />
-          {canManage && (
-            <CreateBoardButton workspaceId={activeWorkspace.id} projectId={projectId} />
-          )}
+      <div className="flex flex-col h-full bg-background">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border bg-surface px-4 py-2">
+          {barraDelTablero}
         </div>
 
-        <div className="flex flex-col items-center gap-3 rounded-2xl bg-surface px-6 py-16 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 gap-3 px-6 py-16 text-center">
           <h3 className="font-display text-2xl text-text-primary">
             «{activeWorkspace.name}» está vacío
           </h3>

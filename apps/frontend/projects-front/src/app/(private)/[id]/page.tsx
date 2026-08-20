@@ -416,9 +416,8 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
         )}
 
         <ProjectHeader
-          /* En el tablero la cabecera se pliega a una línea: cada fila de cromo
-             que sobra son cinco tarjetas menos de columna visible. */
-          compacto={esTablero}
+          /* Todas las pestañas usan ahora la cabecera compacta por consistencia visual. */
+          compacto={true}
           project={project}
           isOwner={effective.isOwner}
           memberCount={members.length}

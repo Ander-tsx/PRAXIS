@@ -26,15 +26,18 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
   return (
     <section className="flex flex-col gap-4" aria-label="Roles del proyecto">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-display text-2xl text-text-primary">Roles</h3>
-          <p className="font-sans text-sm text-text-secondary">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <h3 className="font-sans font-medium text-text-primary shrink-0">Roles</h3>
+          <span className="text-text-disabled font-light shrink-0">/</span>
+          <p className="truncate font-sans text-sm text-text-secondary">
             Cada persona entra con un rol, y el rol decide lo que puede hacer.
           </p>
         </div>
 
-        {canManage && <RoleDialog projectId={projectId} triggerLabel="Nuevo rol" />}
+        <div className="flex shrink-0 items-center gap-2">
+          {canManage && <RoleDialog projectId={projectId} triggerLabel="Nuevo rol" />}
+        </div>
       </div>
 
       {roles.length === 0 ? (

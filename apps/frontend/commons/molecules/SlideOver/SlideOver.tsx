@@ -96,7 +96,7 @@ export function SlideOver({
       <div
         ref={panelRef}
         className={[
-          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary shadow-2xl transition-transform duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
+          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary transition-transform duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
           sizeClasses[size],
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}

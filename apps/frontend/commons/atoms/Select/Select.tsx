@@ -244,10 +244,10 @@ export function Select({
           onClick={() => (abierto ? setAbierto(false) : abrir())}
           onKeyDown={alTeclear}
           className={[
-            'flex h-10 w-full items-center gap-2 rounded-lg border bg-surface-elevated py-2 pl-3 pr-9',
-            'font-sans text-sm text-text-primary outline-none transition-colors duration-150',
+            'flex h-10 w-full items-center gap-2 rounded-xl border bg-surface py-2 pl-3 pr-9 shadow-sm',
+            'font-sans text-sm text-text-primary outline-none transition-all duration-150',
             'focus-visible:ring-2 focus-visible:ring-primary',
-            'disabled:cursor-not-allowed disabled:opacity-50',
+            'disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-md',
             variantClasses[variant],
             className,
           ]
@@ -282,7 +282,7 @@ export function Select({
             aria-labelledby={label ? `${campoId}-etiqueta` : undefined}
             tabIndex={-1}
             onKeyDown={alTeclear}
-            className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-border py-1"
+            className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border py-1"
             style={{
               background: colors.surfaceElevated,
               boxShadow: `0 8px 24px ${alpha(colors.overlay, 45)}`,
