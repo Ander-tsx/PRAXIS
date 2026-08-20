@@ -388,20 +388,40 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     chat: chat.unread,
   };
 
+  /**
+   * La pestaña de espacios **no desplaza la página**: el tablero es la pantalla.
+   *
+   * ⚠️ Este `lleno` es la pieza que arregla el defecto que más se notaba al usar
+   * esto: había tres desplazamientos anidados —la página, la tira de columnas y
+   * la lista de tareas de cada columna— y la rueda del ratón hacía una cosa u
+   * otra según dónde estuviera el cursor. Con la página quieta solo quedan dos,
+   * y cada uno en un eje distinto, así que ya no se pisan.
+   *
+   * Las otras tres pestañas siguen desplazándose: son documentos —una lista de
+   * gente, una de roles, una conversación— y ahí recortar el alto solo añadiría
+   * un contenedor más que desplazar.
+   */
+  const esTablero = activeTab === 'espacios';
+
   return (
     /* El nombre del proyecto **no** va aquí: lo pinta la propia página, en
        grande y editable (`EditableProjectFields`). Repetirlo en la cabecera
        gastaba la única línea que dice dónde estás en decir dos veces lo mismo,
        y con un nombre largo además se truncaba. La cabecera nombra la sección,
        igual que el enlace de la barra lateral por el que se llega. */
-    <AppHeader title="Proyectos">
-      <div className="flex flex-col gap-6">
+    <AppHeader title="Proyectos" lleno={esTablero}>
+      <div className={esTablero ? 'flex min-h-0 flex-1 flex-col gap-3' : 'flex flex-col gap-6'}>
         {/* Antes de la cabecera: es la condición que explica todo lo que sigue. */}
         {suspendido && (
-          <SuspendedProjectNotice reason={effective.suspendedReason} isOwner={effective.isOwner} />
+          <div className="shrink-0">
+            <SuspendedProjectNotice reason={effective.suspendedReason} isOwner={effective.isOwner} />
+          </div>
         )}
 
         <ProjectHeader
+          /* En el tablero la cabecera se pliega a una línea: cada fila de cromo
+             que sobra son cinco tarjetas menos de columna visible. */
+          compacto={esTablero}
           project={project}
           isOwner={effective.isOwner}
           memberCount={members.length}
@@ -417,85 +437,48 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           canEdit={can.canEditProject}
         />
 
-        <TabNav
-          ariaLabel="Secciones del proyecto"
-          tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
-          activeId={activeTab}
-          renderLink={(t, isActive, content) => (
-            <Link
-              key={t.id}
-              /* Misma zona: sin el basePath, Next añade `/projects`.
+        {/* `shrink-0`: en la pestaña del tablero esta columna es de alto fijo y
+            el que reparte es el tablero. Sin esto, con la ventana baja las
+            pestañas se aplastan antes que el lienzo. */}
+        <div className="shrink-0">
+          <TabNav
+            ariaLabel="Secciones del proyecto"
+            tabs={TABS.map((t) => ({ ...t, count: counts[t.id] }))}
+            activeId={activeTab}
+            renderLink={(t, isActive, content) => (
+              <Link
+                key={t.id}
+                /* Misma zona: sin el basePath, Next añade `/projects`.
                  Con el `id` en vez del `slug`, cambiar de pestaña reescribía
                  una URL bonita por el UUID. */
-              href={projectPath(project, { tab: t.id as TabId })}
-              aria-current={isActive ? 'page' : undefined}
-              className={tabLinkClasses(isActive)}
-              /* Sustituye la entrada en el historial: cambiar de pestaña no
+                href={projectPath(project, { tab: t.id as TabId })}
+                aria-current={isActive ? 'page' : undefined}
+                className={tabLinkClasses(isActive)}
+                /* Sustituye la entrada en el historial: cambiar de pestaña no
                  debería llenar el botón atrás. */
-              replace
-            >
-              {content}
-            </Link>
-          )}
-        />
+                replace
+              >
+                {content}
+              </Link>
+            )}
+          />
+        </div>
 
         {activeTab === 'espacios' && (
           <WorkspaceCanvas
-            /**
-             * El filtro de «mis tareas», **dentro de la cabecera del tablero y
-             * junto a «Ampliar»**.
-             *
-             * Estuvo suelto encima del lienzo y ahí no se leía como lo que es.
-             * Los dos son controles de **vista del tablero** —qué se ve y de qué
-             * tamaño— así que van juntos y con el mismo tratamiento; separados,
-             * el filtro parecía una acción del proyecto entero.
-             *
-             * Es un enlace y no un interruptor: el estado vive en la URL
-             * (`?mias=1`), así que recargar lo mantiene, el botón atrás lo
-             * deshace y un enlace compartido lleva a la misma vista. Misma
-             * regla que la pestaña activa.
-             */
-            filtroMisTareas={
-              <Link
-                href={projectPath(project, {
-                  tab: 'espacios',
-                  ws: activeWorkspace?.id,
-                  ...(soloMias ? {} : { mias: '1' }),
-                })}
-                replace
-                aria-pressed={soloMias}
-                title={
-                  soloMias
-                    ? `Ver todas las tareas (${totalDelEspacio})`
-                    : `Ver solo las mías (${misTareasDelEspacio} de ${totalDelEspacio})`
-                }
-                className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  soloMias
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                }`}
-              >
-                <svg
-                  className="h-3.5 w-3.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.75}
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-                {soloMias ? `Solo mías · ${misTareasDelEspacio}` : 'Solo mías'}
-              </Link>
-            }
+            /* Los recuentos del filtro salen de aquí, que es quien tiene las
+               tareas sin filtrar; el control lo dibuja el lienzo, que es quien
+               sabe qué tablero está abierto. Ver `WorkspaceCanvas`. */
+            soloMias={soloMias}
+            misTareasDelEspacio={misTareasDelEspacio}
+            totalDelEspacio={totalDelEspacio}
             projectId={project.id}
             projectSlug={project.slug}
             workspaces={project.workspaces}
             activeWorkspace={activeWorkspace}
+            /* Solo el punto de partida: a partir de ahí el tablero se elige en
+               el cliente, sin navegar. Ver `WorkspaceCanvas`. */
+            boardIdInicial={targetBoard ?? null}
             canManage={can.canCreateBoard}
             /* Renombrar y eliminar **espacios y tableros** cuelgan de estos dos,
                no de `canCreateBoard`: el gateway pide `canEditBoard` para los

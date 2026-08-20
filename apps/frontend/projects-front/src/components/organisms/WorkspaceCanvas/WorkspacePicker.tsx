@@ -30,6 +30,16 @@ export interface WorkspacePickerProps {
   canEditBoard: boolean;
   /** Eliminar un espacio: `canDeleteBoard`. */
   canDeleteBoard: boolean;
+  /**
+   * Versión de una línea, para la barra del tablero.
+   *
+   * El selector nació ocupando una fila para él solo, con su etiqueta encima del
+   * nombre. Eso está bien cuando la pantalla se desplaza y sobra alto; en el
+   * tablero a pantalla completa cada fila de cromo son cinco tarjetas menos, y
+   * el espacio activo es un dato de una palabra. En compacto es un botón como
+   * los de al lado y el panel se despliega flotando.
+   */
+  compacto?: boolean;
 }
 
 /**
@@ -65,6 +75,7 @@ export function WorkspacePicker({
   canManage,
   canEditBoard,
   canDeleteBoard,
+  compacto = false,
 }: WorkspacePickerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -137,25 +148,34 @@ export function WorkspacePicker({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-sm">
+    <div ref={containerRef} className={compacto ? 'relative shrink-0' : 'relative w-full max-w-sm'}>
       <button
         type="button"
         onClick={() => (open ? cerrar() : setOpen(true))}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong"
+        title={compacto ? `Espacio de trabajo: ${active?.name ?? 'ninguno'}` : undefined}
+        className={
+          compacto
+            ? 'flex max-w-[14rem] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-left font-sans text-sm font-semibold text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong'
+        }
       >
-        <span className="flex min-w-0 flex-col">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
-            Espacio de trabajo
+        {compacto ? (
+          <span className="truncate">{active?.name ?? 'Ninguno todavía'}</span>
+        ) : (
+          <span className="flex min-w-0 flex-col">
+            <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+              Espacio de trabajo
+            </span>
+            <span className="truncate font-sans text-base font-semibold text-text-primary">
+              {active?.name ?? 'Ninguno todavía'}
+            </span>
           </span>
-          <span className="truncate font-sans text-base font-semibold text-text-primary">
-            {active?.name ?? 'Ninguno todavía'}
-          </span>
-        </span>
+        )}
 
         <svg
-          className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`${compacto ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -168,7 +188,12 @@ export function WorkspacePicker({
 
       {open && (
         <div
-          className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-surface"
+          className={`absolute top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-surface ${
+            /* Flotando y con ancho propio: en la barra del tablero el botón mide
+               lo que mide el nombre, y estirar el panel hasta sus bordes lo
+               dejaría en cuatro centímetros. */
+            compacto ? 'left-0 w-72 shadow-2xl' : 'left-0 right-0'
+          }`}
           style={{ boxShadow: `0 16px 40px ${alpha(colors.overlay, 60)}` }}
         >
           {/* Lista de botones, no un `listbox`: un listbox de verdad exige

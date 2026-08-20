@@ -355,6 +355,47 @@ button:disabled,
   }
 }
 
+/* ─── Arrastre del tablero ──────────────────────────────────────────────
+
+   Mientras una tarjeta o una columna viaja, el gesto vale para **toda** la
+   pantalla: el puntero pasa por encima de columnas, del lienzo y de la propia
+   cabecera, y en cualquiera de esos sitios tiene que seguir diciendo lo mismo.
+   Por eso el estado se marca en el `<body>` y no en el elemento arrastrado.
+
+   `user-select: none` no es cosmético: sin él, mover el puntero con el botón
+   pulsado selecciona el texto de todo lo que va tocando por el camino, y el
+   tablero termina el arrastre teñido de azul de selección. */
+body.arrastrando-en-tablero {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* El fantasma que sigue al puntero.
+
+   ⚠️ Va en un hijo del nodo que se traslada, y esto **no** se puede simplificar:
+   el `transform` del padre se reescribe en cada fotograma con la posición del
+   puntero, así que cualquier escala o giro puesto ahí se perdería en el primer
+   movimiento. Separando los dos, uno se ocupa de dónde está y el otro de cómo
+   se levanta.
+
+   El giro es de grado y medio. Más se lee como un naipe y distrae; menos no se
+   distingue de estar plano, y lo que se busca es exactamente eso: que la pieza
+   parezca despegada del tablero y sostenida por la mano. */
+@keyframes alzar-pieza {
+  from {
+    transform: scale(1) rotate(0deg);
+  }
+  to {
+    transform: scale(1.03) rotate(1.5deg);
+  }
+}
+
+.fantasma-alzado {
+  animation: alzar-pieza 160ms cubic-bezier(0.22, 0.85, 0.28, 1) forwards;
+  transform-origin: 30% 30%;
+}
+
 /* Oculta la barra de scroll sin perder el desplazamiento.
    Para tiras horizontales (pestañas, lienzos) donde la barra estorba más de lo
    que informa. */

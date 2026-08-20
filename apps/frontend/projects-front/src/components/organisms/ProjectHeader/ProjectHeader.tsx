@@ -22,6 +22,20 @@ export interface ProjectHeaderProps {
    * desactivados.
    */
   canEdit: boolean;
+  /**
+   * La cabecera en una sola línea.
+   *
+   * Lo pide la pestaña del tablero, que ya no desplaza la página: allí el alto
+   * es un recurso escaso y la cabecera completa —volver, título a `text-4xl`,
+   * descripción en serif y el pie de metadatos— gastaba cuatro filas para decir
+   * cosas que solo se leen al llegar. En compacto queda lo que sigue haciendo
+   * falta mientras se trabaja: volver, el nombre, de quién es y el borrado.
+   *
+   * ⚠️ **La fecha de creación y los recuentos no salen en compacto**, y es a
+   * propósito: son contexto de aterrizaje, no de trabajo, y los mismos números
+   * están en los contadores de las pestañas y en el diálogo de borrado.
+   */
+  compacto?: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -39,7 +53,71 @@ export function ProjectHeader({
   labelCount,
   canDelete,
   canEdit,
+  compacto = false,
 }: ProjectHeaderProps) {
+  if (compacto) {
+    return (
+      <header className="flex min-w-0 shrink-0 items-center gap-3">
+        <Link
+          href="/"
+          aria-label="Volver a todos los proyectos"
+          title="Todos los proyectos"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </Link>
+
+        {canEdit ? (
+          <EditableProjectFields
+            compacto
+            key={project.id}
+            projectId={project.id}
+            initialName={project.name}
+            initialDescription={project.description ?? ''}
+            badgeSlot={
+              <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
+            }
+          />
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <h2 className="truncate font-display text-xl text-text-primary">{project.name}</h2>
+            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
+            {project.description && (
+              <p
+                title={project.description}
+                className="min-w-0 flex-1 truncate font-serif text-sm italic text-text-secondary"
+              >
+                {project.description}
+              </p>
+            )}
+          </div>
+        )}
+
+        {canDelete && (
+          <DeleteProjectButton
+            projectId={project.id}
+            projectName={project.name}
+            workspaceCount={project.workspaces.length}
+            boardCount={boardCount}
+            columnCount={columnCount}
+            labelCount={labelCount}
+            memberCount={memberCount}
+            roleCount={project.roles.length}
+          />
+        )}
+      </header>
+    );
+  }
+
   return (
     <header className="flex flex-col gap-4">
       {/* Volver y eliminar comparten fila: son las dos acciones sobre el

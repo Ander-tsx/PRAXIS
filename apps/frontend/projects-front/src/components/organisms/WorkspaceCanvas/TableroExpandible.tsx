@@ -5,10 +5,24 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface TableroExpandibleProps {
-  /** Nombre del tablero, para la cabecera y el texto accesible del botón. */
+  /** Nombre del tablero. Nombra el botón de pantalla completa y el `aria-label`. */
   nombre: string;
   /** «4 columnas · 12 tareas». Lo compone quien nos monta. */
   resumen: string;
+  /**
+   * Sustituye al nombre y al resumen en la cabecera.
+   *
+   * Existe porque en un espacio con varios tableros lo que tiene que haber ahí
+   * **no es el nombre del tablero abierto, sino la forma de cambiar de tablero**.
+   * Escribir el nombre y además una fila de pestañas debajo gasta dos líneas en
+   * decir lo mismo, y en una pantalla que ya no se desplaza cada línea de cromo
+   * son cinco tarjetas menos.
+   *
+   * Llega como slot y no como `boards` + `onCambiar` porque este componente no
+   * tiene por qué saber qué hay a la izquierda de sus controles: hoy es el
+   * espacio y las pestañas, mañana podría ser otra cosa.
+   */
+  titulo?: ReactNode;
   /**
    * Controles extra de la cabecera, a la izquierda de «Ampliar».
    *
@@ -58,6 +72,7 @@ export interface TableroExpandibleProps {
 export function TableroExpandible({
   nombre,
   resumen,
+  titulo,
   accionesDeVista,
   menu,
   children,
@@ -92,9 +107,10 @@ export function TableroExpandible({
   return (
     <div
       className={
-        expandido
-          ? 'scrollbar-slim fixed inset-0 z-40 flex flex-col gap-4 overflow-auto p-5'
-          : 'contents'
+        /* Sin `overflow-auto`: quien se desplaza es la tira de columnas y la
+           lista de cada columna. Una barra aquí encima sería la tercera, y
+           desplazar la de fuera dejaría la cabecera fuera de la pantalla. */
+        expandido ? 'fixed inset-0 z-40 flex min-h-0 flex-col gap-3 p-5' : 'contents'
       }
       /**
        * En pantalla completa se lleva consigo la retícula de puntos del lienzo.
@@ -110,11 +126,15 @@ export function TableroExpandible({
        */
       style={expandido ? { ...BOARD_SURFACE, backgroundColor: colors.background } : undefined}
     >
-      <header className="flex flex-wrap items-baseline gap-3">
-        <h4 className="font-sans text-base font-semibold text-text-primary">{nombre}</h4>
-        {/* Más contraste que antes: sobre el fondo del lienzo, `text-disabled`
-            se leía como un borrón. */}
-        <span className="font-sans text-xs text-text-secondary">{resumen}</span>
+      <header className="flex shrink-0 flex-wrap items-center gap-2">
+        {titulo ?? (
+          <>
+            <h4 className="font-sans text-base font-semibold text-text-primary">{nombre}</h4>
+            {/* Más contraste que antes: sobre el fondo del lienzo, `text-disabled`
+                se leía como un borrón. */}
+            <span className="font-sans text-xs text-text-secondary">{resumen}</span>
+          </>
+        )}
 
         {/* Empujado a la derecha por el `ml-auto` del grupo, no del botón: así
             los dos controles de vista viajan juntos y no se separan cuando el

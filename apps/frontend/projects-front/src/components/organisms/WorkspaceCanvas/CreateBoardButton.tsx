@@ -10,10 +10,23 @@ export interface CreateBoardButtonProps {
   workspaceId: string;
   /** Hace falta para revalidar el detalle, que es de donde cuelga el lienzo. */
   projectId: string;
+  /**
+   * Un «+» al final de las pestañas de tablero, en vez de un botón con texto.
+   *
+   * Se usa dentro de la barra del tablero, donde el botón entero robaba ancho a
+   * los nombres de los tableros —que es lo que de verdad hay que leer ahí— para
+   * una acción que se usa una vez cada muchas semanas. El texto no se pierde: va
+   * en el `title` y en el `aria-label`.
+   */
+  compacto?: boolean;
 }
 
 /** Añade un tablero dentro del espacio abierto. */
-export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonProps) {
+export function CreateBoardButton({
+  workspaceId,
+  projectId,
+  compacto = false,
+}: CreateBoardButtonProps) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useAccion(createBoardAction, BOARD_INITIAL_STATE);
 
@@ -33,9 +46,30 @@ export function CreateBoardButton({ workspaceId, projectId }: CreateBoardButtonP
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setOpen(true)}>
-        Nuevo tablero
-      </Button>
+      {compacto ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Nuevo tablero"
+          title="Nuevo tablero"
+          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      ) : (
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Nuevo tablero
+        </Button>
+      )}
 
       <Dialog
         open={open}

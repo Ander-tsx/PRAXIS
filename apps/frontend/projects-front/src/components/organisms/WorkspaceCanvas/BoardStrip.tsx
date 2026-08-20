@@ -8,6 +8,11 @@ import { BOARD_SURFACE } from './superficie-tablero';
 export interface BoardStripProps {
   /** El control de «solo mis tareas», que va junto a «Ampliar». */
   filtroMisTareas?: ReactNode;
+  /**
+   * Lo que va a la izquierda de la cabecera en vez del nombre del tablero: el
+   * selector de espacio y las pestañas de tablero. Ver `TableroExpandible`.
+   */
+  titulo?: ReactNode;
   board: Board;
   projectId: string;
   /** Renombrar el tablero: `canEditBoard`. */
@@ -53,6 +58,7 @@ export interface BoardStripProps {
 export function BoardStrip({
   board,
   filtroMisTareas,
+  titulo,
   projectId,
   canEditBoard,
   canDeleteBoard,
@@ -77,13 +83,17 @@ export function BoardStrip({
   return (
     <section
       aria-label={`Tablero ${board.name}`}
-      className="flex flex-col gap-4 rounded-2xl border border-border p-5"
+      /* `min-h-0 flex-1`: el tablero ocupa lo que quede de pantalla y **no la
+         estira**. Es lo que permite que la página no tenga desplazamiento
+         propio y que el único scroll vertical sea el de dentro de una columna. */
+      className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl border border-border p-4"
       style={BOARD_SURFACE}
     >
       {/* La cabecera se fue a `TableroExpandible` con el botón de ampliar: los
           dos tienen que moverse juntos a la capa de pantalla completa, y desde
           aquí —que es un componente de servidor— no hay estado que compartir. */}
       <TableroExpandible
+        titulo={titulo}
         accionesDeVista={filtroMisTareas}
         /* A la derecha de «Ampliar», el último de la fila: es el sitio donde
            se busca lo que no se usa a diario. */
