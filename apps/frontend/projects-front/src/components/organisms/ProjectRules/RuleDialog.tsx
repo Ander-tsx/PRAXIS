@@ -3,7 +3,7 @@
 import { saveAutomationRuleAction } from '@/app/(private)/[id]/actions';
 import { AUTOMATION_RULE_INITIAL_STATE } from '@/lib/action-state';
 import { triggerSpecFor } from '@/lib/automation-catalog';
-import { type RuleDraft, draftFromRule, emptyDraft } from '@/lib/automation-draft';
+import { type RuleDraft, bodyFromDraft, draftFromRule, emptyDraft } from '@/lib/automation-draft';
 import { validateAutomationDraft } from '@/lib/validation';
 import {
   type AutomationRule,
@@ -57,6 +57,8 @@ export function RuleDialog({
   }
 
   const [draft, setDraft] = useState<RuleDraft>(borradorInicial);
+  /** Con qué se abrió, para saber si hay algo que perder al cerrar. */
+  const [referencia, setReferencia] = useState<RuleDraft>(borradorInicial);
   const [touched, setTouched] = useState(false);
   /**
    * Cuenta las veces que se ha abierto el diálogo. Solo sirve para la `key` de
@@ -88,11 +90,55 @@ export function RuleDialog({
    * y se llevaría por delante el `state.error` que se acaba de recibir.
    */
   function abrir() {
-    setDraft(borradorInicial());
+    const inicial = borradorInicial();
+    setDraft(inicial);
+    setReferencia(inicial);
     /* Sin esto, un diálogo recién abierto y vacío nace con el nombre en rojo. */
     setTouched(false);
     setSesion((anterior) => anterior + 1);
     setOpen(true);
+  }
+
+  /**
+   * Cerrar con cambios sin guardar pregunta antes. **Solo desde «Cancelar».**
+   *
+   * ⚠️ **`Esc`, la `X` y el clic en el fondo no preguntan, y no es un olvido.**
+   * Las tres acaban en el `onClose` del `Dialog` de commons, que **no
+   * significa «alguien pidió cerrar»** sino «el `<dialog>` nativo se cerró,
+   * por lo que sea»: `setOpen(false)` dispara `dialog.close()`, que emite el
+   * evento `close`, que vuelve a entrar por `onClose`. Colgar la guarda de
+   * ahí hacía que un guardado **correcto** preguntara si se descartan los
+   * cambios — reproducido, y el motivo de que esto se quedara en «Cancelar».
+   *
+   * Con `Esc` hay además un segundo problema: el navegador ya cerró el
+   * diálogo cuando `onClose` llega, así que no se puede cancelar, solo
+   * reabrir, y el efecto del `Dialog` no vuelve a correr porque su
+   * dependencia `[open]` no ha cambiado.
+   *
+   * Cubrir las tres vías exige que `Dialog` distinga las dos cosas, y ese
+   * componente lo usan 15 archivos: es un cambio con su propio alcance y su
+   * propia regresión, no un detalle de este diálogo. Queda anotado.
+   *
+   * La comparación va sobre `bodyFromDraft` y no sobre el borrador crudo: es
+   * el módulo que ya sabe cuál es la forma canónica del contrato, tiene un
+   * orden de claves fijo y está probado. El borrador crudo no sirve —
+   * `handleTriggerTypeChange` reconstruye el objeto y **reordena las
+   * claves**, así que dos borradores idénticos podrían dar cadenas distintas
+   * y la pregunta saldría siempre; una confirmación que salta siempre se
+   * aprende a despachar sin leerla, y deja de proteger nada.
+   *
+   * Es `window.confirm` y no un segundo `Dialog`, igual que en
+   * `handleTriggerTypeChange`: el `Dialog` de commons usa `showModal()`, y
+   * dos modales nativos superpuestos traen su propia pila de foco que este
+   * apartado no necesita estrenar.
+   */
+  function intentarCerrar() {
+    const hayCambios =
+      JSON.stringify(bodyFromDraft(draft)) !== JSON.stringify(bodyFromDraft(referencia));
+    if (hayCambios && !window.confirm('Hay cambios sin guardar. ¿Cerrar y descartarlos?')) {
+      return;
+    }
+    setOpen(false);
   }
 
   const nameId = useId();
@@ -128,6 +174,9 @@ export function RuleDialog({
 
       <Dialog
         open={open}
+        /* Sin guarda a propósito — ver `intentarCerrar`. Aquí llegan tanto
+           `Esc` y el clic en el fondo como el cierre programático tras
+           guardar, y no se distinguen. */
         onClose={() => setOpen(false)}
         size="lg"
         title={rule ? `Editar «${rule.name}»` : 'Nueva regla'}
@@ -234,7 +283,7 @@ export function RuleDialog({
           )}
 
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button type="button" variant="ghost" onClick={intentarCerrar}>
               Cancelar
             </Button>
             <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>

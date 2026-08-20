@@ -320,6 +320,90 @@ test.describe('Reglas del proyecto', () => {
     await expect(page.getByRole('heading', { name: 'Nueva regla' })).toBeVisible();
   });
 
+  /**
+   * Cerrar con cambios sin guardar pregunta antes — Bloque 7, ítem 4, y la
+   * otra mitad del riesgo «sin perder silenciosamente lo editado».
+   *
+   * ⚠️ **Solo desde «Cancelar».** `Esc`, la `X` y el clic en el fondo entran
+   * por el `onClose` del `Dialog` de commons, que también recibe el cierre
+   * programático de después de guardar y no los distingue — colgar la guarda
+   * de ahí hacía preguntar sobre un guardado correcto. El motivo entero está
+   * en `RuleDialog.intentarCerrar`.
+   */
+  test('cerrar con cambios sin guardar pregunta, y al rechazar no se pierde nada (corrección C2)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const nombreRegla = nombreUnico('A medio escribir').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+
+    page.once('dialog', (aviso) => aviso.dismiss());
+    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+
+    page.once('dialog', (aviso) => aviso.accept());
+    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialogo).toBeHidden();
+  });
+
+  test('cerrar sin haber tocado nada no pregunta (corrección C2)', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    let avisos = 0;
+    page.on('dialog', (aviso) => {
+      avisos += 1;
+      void aviso.accept();
+    });
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    await expect(dialogo).toBeVisible();
+    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+
+    await expect(dialogo).toBeHidden();
+    expect(avisos, 'Cerrar un formulario intacto no debería preguntar nada').toBe(0);
+  });
+
+  test('guardar correctamente cierra el diálogo sin preguntar (corrección C2)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    let avisos = 0;
+    page.on('dialog', (aviso) => {
+      avisos += 1;
+      void aviso.accept();
+    });
+
+    await page.getByRole('button', { name: 'Nueva regla' }).click();
+    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const nombreRegla = nombreUnico('Guardada sin preguntar').slice(0, 120);
+    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
+    await expect(dialogo).toBeHidden();
+    expect(avisos, 'Un guardado correcto no pierde nada, así que no pregunta').toBe(0);
+  });
+
   test('un error del servidor se ve dentro del diálogo, sin cerrarlo ni perder lo escrito (Bloque 5)', async ({
     page,
   }) => {
