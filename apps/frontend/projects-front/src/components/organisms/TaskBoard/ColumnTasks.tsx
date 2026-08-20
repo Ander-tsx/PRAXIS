@@ -25,10 +25,9 @@ export interface ColumnTasksProps {
   canComment: boolean;
   /** Gestionar las etiquetas del proyecto desde el diálogo de tarea: `canManageLabels`. */
   canManageLabels: boolean;
-  /** Tarea a abrir al entrar, si está en esta columna. Llega de la URL. */
-  openTaskId?: string | null;
   canEdit: boolean;
   canDelete: boolean;
+  onOpenTask: (task: Task) => void;
   /** Lo que viaja ahora mismo por el tablero, si es que viaja algo. */
   arrastre: ArrastreEnCurso | null;
   /** El hueco donde caería. Solo se pinta si es de esta columna. */
@@ -77,9 +76,9 @@ export function ColumnTasks({
   canMove,
   canComment,
   canManageLabels,
-  openTaskId,
   canEdit,
   canDelete,
+  onOpenTask,
   arrastre,
   destino,
   alEmpezarArrastre,
@@ -90,31 +89,9 @@ export function ColumnTasks({
   layout = 'columna',
 }: ColumnTasksProps) {
   const enRejilla = layout === 'rejilla';
-  /**
-   * Si la URL pide una tarea y está en esta columna, se abre ya en el primer
-   * render: hacerlo en un `useEffect` mostraría el tablero y el diálogo saltando
-   * encima un instante después.
-   */
-  const [openTask, setOpenTask] = useState<Task | null>(
-    () => tasks.find((task) => task.id === openTaskId) ?? null,
-  );
 
   /** Columna de cierre: lo que hay dentro está entregado. Ver `DONE_COLUMN_COLOR`. */
   const isDoneColumn = column.color === DONE_COLUMN_COLOR;
-
-  /**
-   * El diálogo abierto se reengancha a la tarea recién revalidada.
-   *
-   * Sin esto, tras guardar un cambio el diálogo seguiría enseñando el objeto
-   * viejo: la página revalida y llegan tareas nuevas, pero `openTask` guarda la
-   * instancia con la que se abrió.
-   */
-  useEffect(() => {
-    if (!openTask) return;
-    const fresh = tasks.find((task) => task.id === openTask.id);
-    if (fresh && fresh !== openTask) setOpenTask(fresh);
-    if (!fresh) setOpenTask(null);
-  }, [tasks, openTask]);
 
   const referenciaDeLista = useCallback(
     (el: HTMLElement | null) => registrarLista(column.id, el, layout),
@@ -152,7 +129,7 @@ export function ColumnTasks({
         task={task}
         usersById={usersById}
         currentUserId={currentUserId}
-        onOpen={() => setOpenTask(task)}
+        onOpen={() => onOpenTask(task)}
         canEdit={canEdit}
         isDone={isDoneColumn}
         draggable={canMove}
@@ -256,30 +233,7 @@ export function ColumnTasks({
         )}
       </div>
 
-      {openTask && (
-        <TaskDialog
-          /* Remonta el formulario al cambiar de tarea: los campos son no
-             controlados y sin esto conservarían los valores de la anterior. */
-          key={openTask.id}
-          open
-          onClose={() => setOpenTask(null)}
-          projectId={projectId}
-          boardId={boardId}
-          columnId={openTask.columnId}
-          columnName={column.name}
-          task={openTask}
-          members={members}
-          labels={labels}
-          usersById={usersById}
-          currentUserId={currentUserId}
-          /* Marcar pasos va con mover: las dos son ejecutar la tarea. */
-          canToggleChecklist={canMove}
-          canComment={canComment}
-          canManageLabels={canManageLabels}
-          canEdit={canEdit}
-          canDelete={canDelete}
-        />
-      )}
+      {/* Se eliminó TaskDialog de aquí para montarlo una sola vez en BoardColumns. */}
     </>
   );
 }

@@ -23,6 +23,7 @@ export interface InviteMemberDialogProps {
   roles: ProjectRole[];
   /** Quiénes no deben salir: miembros, invitados sin responder y el dueño. */
   excluirIds: string[];
+  onClose?: () => void;
 }
 
 /** Toda petición del navegador pasa por el proxy de la zona, que pone el Bearer. */
@@ -47,8 +48,7 @@ const MAX_RESULTS = 6;
  * tanto, buscar solo encontraba a quien cupiera en las primeras cien cuentas de
  * **toda la plataforma** — o sea, a casi nadie en cuanto hubo cuentas de verdad.
  */
-export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMemberDialogProps) {
-  const [open, setOpen] = useState(false);
+export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: InviteMemberDialogProps) {
   const [state, formAction, pending] = useAccion(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
@@ -81,12 +81,12 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
    */
   useEffect(() => {
     if (state.done) {
-      setOpen(false);
       setQuery('');
       setResults(null);
       setSelected(null);
+      onClose?.();
     }
-  }, [state]);
+  }, [state, onClose]);
 
   async function search() {
     const needle = query.trim();
@@ -100,47 +100,41 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
     setErrorBusqueda('');
 
     try {
-      /* Se piden de más para poder descartar a los que ya están dentro sin
-         quedarse corto de resultados. */
-      const pagina = await api.get<Paginated<UserProfile>>(
-        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS * 3}`,
-      );
+      const pagina = await api.get<Paginated<UserProfile>>('/users', {
+        params: { search: needle, limit: MAX_RESULTS },
+      });
 
-      const excluidos = new Set(excluirIds);
-      setResults(pagina.items.filter((user) => !excluidos.has(user.id)).slice(0, MAX_RESULTS));
+      const filtrados = pagina.items.filter((user) => !excluirIds.includes(user.id));
+      setResults(filtrados);
     } catch {
-      setResults([]);
-      setErrorBusqueda('No se pudo buscar. Inténtalo de nuevo.');
+      setErrorBusqueda('La búsqueda falló por un problema de red.');
+      setResults(null);
     } finally {
       setBuscando(false);
     }
   }
 
   function reset() {
-    setOpen(false);
     setQuery('');
     setResults(null);
     setSelected(null);
+    onClose?.();
   }
 
   return (
-    <>
-      <Button variant="secondary" onClick={() => setOpen(true)} disabled={roles.length === 0}>
-        Invitar persona
-      </Button>
+    <div className="rounded-2xl border border-border bg-surface-elevated p-6 shadow-sm">
+      <header className="mb-4 flex flex-col gap-1">
+        <h3 className="font-display text-xl text-text-primary">Invitar al proyecto</h3>
+        <p className="font-sans text-sm text-text-secondary">
+          Recibirá una invitación y entrará al aceptarla, con el rol que elijas.
+        </p>
+      </header>
 
-      <Dialog
-        open={open}
-        onClose={reset}
-        title="Invitar al proyecto"
-        description="Recibirá una invitación y entrará al aceptarla, con el rol que elijas."
-        overflowVisible
-      >
-        <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="userId" value={selected?.id ?? ''} />
+      <form action={formAction} className="flex flex-col gap-4">
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="userId" value={selected?.id ?? ''} />
 
-          <div className="flex items-end gap-2">
+        <div className="flex items-end gap-2">
             <Input
               id={searchId}
               type="search"
@@ -266,7 +260,6 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
             </Button>
           </div>
         </form>
-      </Dialog>
-    </>
+    </div>
   );
 }

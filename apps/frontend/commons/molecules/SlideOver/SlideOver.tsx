@@ -51,8 +51,13 @@ export function SlideOver({
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
 
       const handleGlobalClick = (event: MouseEvent) => {
+        const target = event.target as Node;
+        // Ignorar clicks en nodos que ya no están en el DOM (ej. menús que se cierran al hacer click)
+        if (!document.contains(target)) {
+          return;
+        }
         // Ignorar clicks dentro del panel
-        if (panelRef.current && panelRef.current.contains(event.target as Node)) {
+        if (panelRef.current && panelRef.current.contains(target)) {
           return;
         }
 

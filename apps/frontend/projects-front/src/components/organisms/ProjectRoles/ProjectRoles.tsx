@@ -1,6 +1,9 @@
+"use client";
+import { useState } from "react";
+import { Button } from "@praxis/commons";
 import { Badge, type ProjectMember, type ProjectRole } from '@praxis/commons';
-import { DeleteRoleButton } from './DeleteRoleButton';
-import { RoleDialog } from './RoleDialog';
+import { DeleteRoleForm } from './DeleteRoleForm';
+import { RoleForm } from './RoleForm';
 import { PERMISSION_LABELS, impliedFrom, selectedFrom } from './permissions';
 
 export interface ProjectRolesProps {
@@ -19,6 +22,10 @@ export interface ProjectRolesProps {
  * borra el último.
  */
 export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRolesProps) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [deletingRoleId, setDeletingRoleId] = useState<string | null>(null);
+
   const usageByRole = new Map<string, number>();
   for (const member of members) {
     usageByRole.set(member.projectRoleId, (usageByRole.get(member.projectRoleId) ?? 0) + 1);
@@ -36,9 +43,19 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {canManage && <RoleDialog projectId={projectId} triggerLabel="Nuevo rol" />}
+          {canManage && (
+            <Button variant={isCreating ? 'secondary' : 'default'} onClick={() => setIsCreating(!isCreating)}>
+              {isCreating ? 'Cancelar' : 'Nuevo rol'}
+            </Button>
+          )}
         </div>
       </div>
+
+      {isCreating && canManage && (
+        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
+          <RoleForm projectId={projectId} onCancel={() => setIsCreating(false)} onSuccess={() => setIsCreating(false)} />
+        </div>
+      )}
 
       {roles.length === 0 ? (
         <p className="rounded-2xl border border-border bg-surface-elevated px-6 py-8 text-center font-sans text-sm text-text-secondary shadow-sm">
@@ -50,6 +67,33 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
             const selected = selectedFrom(role.permissions);
             const implied = impliedFrom(selected);
             const inUse = usageByRole.get(role.id) ?? 0;
+
+            if (editingRoleId === role.id) {
+              return (
+                <li key={role.id} className="animate-in fade-in zoom-in-95 duration-200 lg:col-span-2">
+                  <RoleForm
+                    projectId={projectId}
+                    role={role}
+                    onCancel={() => setEditingRoleId(null)}
+                    onSuccess={() => setEditingRoleId(null)}
+                  />
+                </li>
+              );
+            }
+
+            if (deletingRoleId === role.id) {
+              const inUse = usageByRole.get(role.id) ?? 0;
+              return (
+                <li key={role.id} className="animate-in fade-in zoom-in-95 duration-200 lg:col-span-2">
+                  <DeleteRoleForm
+                    projectId={projectId}
+                    role={role}
+                    membersUsing={inUse}
+                    onCancel={() => setDeletingRoleId(null)}
+                  />
+                </li>
+              );
+            }
 
             return (
               <li
@@ -70,14 +114,20 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
                   {canManage && (
                     <div className="flex shrink-0 gap-2">
-                      <RoleDialog
-                        projectId={projectId}
-                        role={role}
-                        triggerLabel="Editar"
-                        triggerVariant="ghost"
-                        triggerSize="sm"
-                      />
-                      <DeleteRoleButton projectId={projectId} role={role} membersUsing={inUse} />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingRoleId(role.id)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeletingRoleId(role.id)}
+                      >
+                        Eliminar
+                      </Button>
                     </div>
                   )}
                 </div>

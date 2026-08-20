@@ -1,5 +1,7 @@
+"use client";
+import { useState } from "react";
 import {
-  Badge,
+  Badge, Button,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
@@ -53,6 +55,7 @@ export function ProjectMembers({
   projectName,
   currentUserId,
 }: ProjectMembersProps) {
+  const [isInviting, setIsInviting] = useState(false);
   const memberIds = new Set(members.map((member) => member.userId));
   const invitedIds = new Set(invitations.map((invitation) => invitation.userId));
 
@@ -83,10 +86,18 @@ export function ProjectMembers({
         <div className="flex shrink-0 items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
-            <InviteMemberDialog projectId={projectId} roles={roles} excluirIds={excluirIds} />
+            <Button variant={isInviting ? 'secondary' : 'default'} onClick={() => setIsInviting(!isInviting)}>
+              {isInviting ? 'Cancelar' : 'Invitar persona'}
+            </Button>
           )}
         </div>
       </div>
+
+      {isInviting && canManage && (
+        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
+          <InviteMemberDialog projectId={projectId} roles={roles} excluirIds={excluirIds} onClose={() => setIsInviting(false)} />
+        </div>
+      )}
 
       <PendingInvitations
         projectId={projectId}

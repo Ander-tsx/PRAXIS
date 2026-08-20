@@ -141,9 +141,9 @@ export function TaskDialog({
   const handleClose = () => {
     if (canEdit && formRef.current && !pending) {
       formRef.current.requestSubmit();
-    } else if (!canEdit && !pending) {
-      onClose();
     }
+    // Optimistic close: allow animation to start instantly without waiting for server response
+    onClose();
   };
 
   return (
@@ -170,6 +170,7 @@ export function TaskDialog({
       }
     >
       <form
+        key={task.id}
         ref={formRef}
         action={formAction}
         className="flex flex-col gap-4"

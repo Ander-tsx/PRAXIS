@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
+import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { TaskCard } from '../TaskBoard/TaskCard';
 import { CURVA } from '../TaskBoard/arrastre';
 import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movimientos';
@@ -142,6 +143,23 @@ export function BoardColumns({
   const [columns, setColumns] = useState<Column[]>(() =>
     [...board.columns].sort((a, b) => a.order - b.order),
   );
+
+  const [openTask, setOpenTask] = useState<Task | null>(
+    () => tasks.find((task) => task.id === openTaskId) ?? null,
+  );
+
+  const [renderedTask, setRenderedTask] = useState<Task | null>(openTask);
+
+  useEffect(() => {
+    if (openTask) setRenderedTask(openTask);
+  }, [openTask]);
+
+  useEffect(() => {
+    if (!openTask) return;
+    const fresh = tasks.find((task) => task.id === openTask.id);
+    if (fresh && fresh !== openTask) setOpenTask(fresh);
+    if (!fresh) setOpenTask(null);
+  }, [tasks, openTask]);
 
   /**
    * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
@@ -477,11 +495,11 @@ export function BoardColumns({
             currentUserId={currentUserId}
             canCreate={canCreateTask}
             canMove={canMoveTask}
-            openTaskId={openTaskId}
             canComment={canComment}
             canManageLabels={canManageLabels}
             canEdit={canEditTask}
             canDelete={canDeleteTask}
+            onOpenTask={setOpenTask}
             arrastre={arrastre}
             destino={destinoTarea}
             alEmpezarArrastre={empezarArrastreDeTarea}
@@ -702,6 +720,7 @@ export function BoardColumns({
               canManageLabels={canManageLabels}
               canEdit={canEditTask}
               canDelete={canDeleteTask}
+              onOpenTask={setOpenTask}
               arrastre={null}
               destino={null}
               alEmpezarArrastre={() => undefined}
@@ -714,6 +733,25 @@ export function BoardColumns({
           </div>
         </div>
       )}
+
+      {renderedTask && <TaskDialog
+        open={!!openTask}
+        onClose={() => setOpenTask(null)}
+        projectId={projectId}
+        boardId={board.id}
+        task={renderedTask}
+        columnId={renderedTask.columnId}
+        columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
+        members={members}
+        labels={labels}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canToggleChecklist={canMoveTask}
+        canComment={canComment}
+        canManageLabels={canManageLabels}
+        canEdit={canEditTask}
+        canDelete={canDeleteTask}
+      />}
     </div>
   );
 }
