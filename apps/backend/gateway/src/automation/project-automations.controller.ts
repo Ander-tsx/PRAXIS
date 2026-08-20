@@ -74,6 +74,13 @@ export class ProjectAutomationsController {
     );
   }
 
+  @Get('catalog')
+  @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
+  @ApiOperation({ summary: 'Disparadores, condiciones y acciones que admite una regla' })
+  catalog() {
+    return firstValueFrom(this.automationClient.send({ cmd: 'automation_catalog' }, {}));
+  }
+
   @Get('executions')
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
   @ApiOperation({ summary: 'Lista las ejecuciones recientes de automatización' })

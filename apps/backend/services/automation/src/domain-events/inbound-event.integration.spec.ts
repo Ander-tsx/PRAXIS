@@ -44,16 +44,31 @@ describe('InboundEventConsumer integration', () => {
     await client.quit();
   });
 
+  /**
+   * Un motor que no hace nada.
+   *
+   * Estas pruebas miden el **camino del hecho** —outbox, stream, inbox, reclamo,
+   * deduplicación—, no lo que se decide con él. Con un motor de verdad, cada
+   * prueba necesitaría además reglas, proyecto y tareas, y lo que fallara ya no
+   * diría dónde está el problema.
+   */
+  const motorInerte = { handleTaskEvent: async () => ({ evaluadas: 0, ejecutadas: 0 }) };
+
   const consumerFor = (stream: string, group: string, name: string) =>
-    new InboundEventConsumer(prisma, redis, {
-      get: <T>(key: string, fallback: T) =>
-        (({
-          DOMAIN_EVENTS_STREAM: stream,
-          DOMAIN_EVENTS_CONSUMER_GROUP: group,
-          DOMAIN_EVENTS_CONSUMER_NAME: name,
-          DOMAIN_EVENTS_CLAIM_IDLE_MS: 1,
-        })[key] ?? fallback) as T,
-    } as never);
+    new InboundEventConsumer(
+      prisma,
+      redis,
+      motorInerte as never,
+      {
+        get: <T>(key: string, fallback: T) =>
+          (({
+            DOMAIN_EVENTS_STREAM: stream,
+            DOMAIN_EVENTS_CONSUMER_GROUP: group,
+            DOMAIN_EVENTS_CONSUMER_NAME: name,
+            DOMAIN_EVENTS_CLAIM_IDLE_MS: 1,
+          })[key] ?? fallback) as T,
+      } as never,
+    );
 
   it('recibe dos proyectos del stream y conserva su contexto aislado', async () => {
     const stream = `praxis:test:inbound:${randomUUID()}`;

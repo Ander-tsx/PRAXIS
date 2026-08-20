@@ -21,16 +21,48 @@ export enum AutomationRuleStatus {
   INVALID = 'INVALID',
 }
 
+/**
+ * Qué hace que una regla se plantee actuar.
+ *
+ * Hay **dos familias**, y la diferencia no es de implementación sino de lo que
+ * significan para quien escribe la regla:
+ *
+ * - **De barrido**: describen un *estado* («vence pronto», «lleva parada»). No
+ *   hay un instante en que ocurran, así que se evalúan cuando alguien pulsa
+ *   «Revisar ahora». Preguntar «¿cuándo venció?» no tiene respuesta: venció y
+ *   sigue vencida.
+ * - **Reactivos**: describen un *hecho* («la han movido», «la han cerrado»).
+ *   Ocurren en un instante concreto, llegan por el flujo de eventos de dominio
+ *   y se atienden solos.
+ *
+ * El catálogo del servicio (`catalog.ts`) es quien sabe a cuál pertenece cada
+ * uno y qué se puede filtrar en cada caso. Este enum solo pone los nombres.
+ */
 export enum AutomationTriggerType {
   GITHUB_PULL_REQUEST_OPENED = 'GITHUB_PULL_REQUEST_OPENED',
+  // De barrido
   TASK_DUE_SOON = 'TASK_DUE_SOON',
   TASK_STALE = 'TASK_STALE',
+  TASK_OVERDUE = 'TASK_OVERDUE',
+  TASK_UNASSIGNED = 'TASK_UNASSIGNED',
+  // Reactivos
+  TASK_CREATED = 'TASK_CREATED',
+  TASK_MOVED = 'TASK_MOVED',
+  TASK_COMPLETED = 'TASK_COMPLETED',
+  TASK_REOPENED = 'TASK_REOPENED',
+  TASK_ASSIGNED = 'TASK_ASSIGNED',
+  TASK_DUE_DATE_CHANGED = 'TASK_DUE_DATE_CHANGED',
 }
 
 export enum AutomationActionType {
   MOVE_TASK = 'MOVE_TASK',
   SEND_EMAIL = 'SEND_EMAIL',
   CREATE_NOTIFICATION = 'CREATE_NOTIFICATION',
+  ASSIGN_TASK = 'ASSIGN_TASK',
+  SET_PRIORITY = 'SET_PRIORITY',
+  ADD_LABEL = 'ADD_LABEL',
+  ADD_COMMENT = 'ADD_COMMENT',
+  POST_CHAT_MESSAGE = 'POST_CHAT_MESSAGE',
 }
 
 export class AutomationTriggerDto {

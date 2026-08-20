@@ -25,15 +25,31 @@ const consumerFor = () => {
   const prisma = {
     inboundEvent: {
       create: jest.fn(async () => ({ id: 'inbound-1' })),
+      /* La evaluación de reglas es un paso aparte y aquí no se mide: lo que
+         estas pruebas comprueban es el trato con el stream —persistir antes de
+         confirmar, deduplicar, reclamar—, y con la cola vacía ese paso no hace
+         nada. Tiene sus propias pruebas. */
+      findMany: jest.fn(async () => []),
+      update: jest.fn(async () => ({})),
+      /* La purga por antigüedad forma parte del ciclo desde que los hechos
+         atendidos dejaron de acumularse para siempre. */
+      deleteMany: jest.fn(async () => ({ count: 0 })),
     },
   };
+  const engine = { handleTaskEvent: jest.fn(async () => ({ evaluadas: 0, ejecutadas: 0 })) };
   const config = {
     get: <T>(_key: string, fallback: T) => fallback,
   };
   return {
-    consumer: new InboundEventConsumer(prisma as never, redis as never, config as never),
+    consumer: new InboundEventConsumer(
+      prisma as never,
+      redis as never,
+      engine as never,
+      config as never,
+    ),
     prisma,
     redis,
+    engine,
   };
 };
 

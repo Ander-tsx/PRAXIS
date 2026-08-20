@@ -16,6 +16,20 @@ export class RulesController {
     private readonly engine: AutomationEngineService,
   ) {}
 
+  /**
+   * Qué disparadores, condiciones y acciones existen.
+   *
+   * ⚠️ **No lleva `projectId` y no lo necesita**: el catálogo es del sistema, no
+   * del proyecto. Lo que sí es de cada proyecto —sus columnas, sus etiquetas, su
+   * gente— no viaja aquí: el catálogo dice de qué lista sale cada valor
+   * (`source`) y quien pinta el formulario ya las tiene en pantalla. Traerlas
+   * también sería duplicar datos que envejecen.
+   */
+  @MessagePattern({ cmd: 'automation_catalog' })
+  catalog() {
+    return this.rules.catalog();
+  }
+
   @MessagePattern({ cmd: 'automation_rule_list' })
   list(@Payload() dto: { projectId: string }) {
     return this.rules.list(dto.projectId);

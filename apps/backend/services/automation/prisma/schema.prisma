@@ -9,8 +9,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// En qué punto está un hecho recibido.
+///
+/// ⚠️ **`ACCEPTED` no significa «atendido», significa «guardado».** La copia
+/// durable y la evaluación de reglas son dos pasos, y separarlos es lo que
+/// permite que un fallo al evaluar no pierda el hecho: se queda en `ACCEPTED` y
+/// la siguiente pasada vuelve a por él.
 enum InboundEventStatus {
   ACCEPTED
+  PROCESSED
+  FAILED
 
   @@schema("automation")
 }
@@ -55,6 +63,12 @@ model InboundEvent {
   payload       Json
   status        InboundEventStatus @default(ACCEPTED)
   receivedAt    DateTime           @default(now())
+  /// Cuándo se evaluaron las reglas contra este hecho.
+  processedAt   DateTime?
+  /// Cuántas veces se ha intentado evaluarlo. Con techo: ver `EVENT_MAX_ATTEMPTS`.
+  attempts      Int                @default(0)
+  /// El último motivo por el que no se pudo evaluar, recortado.
+  lastError     String?
 
   @@index([projectId, receivedAt])
   @@index([status, receivedAt])
@@ -91,6 +105,20 @@ model RuleExecution {
   ruleId          String
   ruleVersion     Int
   causeKey        String
+  /**
+   * Qué disparó esto y sobre qué, para poder auditarlo sin abrir la regla.
+   *
+   * ⚠️ Una ejecución decía «Éxito» y nada más: ni qué tarea, ni por qué. Con
+   * cuarenta filas iguales, la pantalla de ejecuciones no servía para
+   * comprobar nada — que es su único motivo de existir.
+   *
+   * El título va **copiado**, no referenciado: la tarea puede renombrarse o
+   * borrarse, y una auditoría que cambia cuando cambia el presente no es una
+   * auditoría.
+   */
+  triggerType     String?
+  subjectId       String?
+  subjectTitle    String?
   ruleSnapshot    Json
   conditionResult Json
   actionResults   Json?

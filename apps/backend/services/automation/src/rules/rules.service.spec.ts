@@ -32,7 +32,12 @@ const serviceFor = (projectStatus = 'ACTIVE') => {
       delete: jest.fn(async () => ({ id: 'rule-a' })),
       deleteMany: jest.fn(async ({ where }) => ({ count: where.projectId === projectId ? 1 : 0 })),
     },
-    $transaction: jest.fn(async (callback) => callback(tx)),
+    inboundEvent: {
+      deleteMany: jest.fn(async ({ where }) => ({ count: where.projectId === projectId ? 3 : 0 })),
+    },
+    /* Prisma admite las dos formas —una función para una transacción
+       interactiva y un array para un lote— y el servicio usa las dos. */
+    $transaction: jest.fn(async (arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(tx))),
   };
   const projectsClient = {
     send: ({ cmd }: { cmd: string }) => {
@@ -92,11 +97,15 @@ describe('RulesService', () => {
   it('purga exclusivamente las reglas del proyecto solicitado', async () => {
     const { service, prisma } = serviceFor();
 
-    await expect(service.purgeProject(projectId)).resolves.toEqual({ deleted: 1 });
+    await expect(service.purgeProject(projectId)).resolves.toEqual({ deleted: 1, events: 3 });
     await expect(service.purgeProject('00000000-0000-4000-8000-000000000098')).resolves.toEqual({
       deleted: 0,
+      events: 0,
     });
 
     expect(prisma.automationRule.deleteMany).toHaveBeenNthCalledWith(1, { where: { projectId } });
+    /* Y los hechos de ese proyecto también: el rastro de un proyecto borrado no
+       se queda en el buzón de entrada para siempre. */
+    expect(prisma.inboundEvent.deleteMany).toHaveBeenNthCalledWith(1, { where: { projectId } });
   });
 });
