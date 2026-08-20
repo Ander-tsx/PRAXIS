@@ -251,6 +251,23 @@ export function describeReviewSummary(summary: AutomationReviewSummary): string 
   return `${summary.rules} ${reglas} · ${summary.candidates} ${candidatas} · ${summary.succeeded} ${avisos} · ${summary.failed} ${fallos}`;
 }
 
+/**
+ * Las condiciones de una regla, una frase por condición.
+ *
+ * `describeRule` ya las mete dentro de su cláusula «si …», pero encadenadas
+ * con «y» dentro de una frase larga: en una tarjeta con tres condiciones hay
+ * que leerla entera para saber cuándo salta la regla. Esto las saca a una
+ * lista, que es como se escanean.
+ *
+ * Devuelve la lista vacía cuando no hay ninguna: quien pinta decide qué decir
+ * en ese caso, aquí no se inventa una frase de relleno.
+ */
+export function describeConditions(rule: AutomationRule): string[] {
+  return [...rule.conditions]
+    .sort((a, b) => a.position - b.position)
+    .map((condition) => describeCondition(rule.trigger.type, condition));
+}
+
 export function describeRule(rule: AutomationRule): string {
   const spec = triggerSpecFor(rule.trigger.type);
   const triggerLabel = (spec?.label ?? rule.trigger.type).toLowerCase();

@@ -150,7 +150,11 @@ describe('validateAutomationDraft', () => {
         const draft = emptyDraft(trigger);
         draft.name = 'Regla';
         draft.conditions = [
-          { field, operator: 'EQUALS', value: coerceConditionValue(trigger, field, 'EQUALS', crudo) },
+          {
+            field,
+            operator: 'EQUALS',
+            value: coerceConditionValue(trigger, field, 'EQUALS', crudo),
+          },
         ];
         expect(validateAutomationDraft(draft)).toBeNull();
       });

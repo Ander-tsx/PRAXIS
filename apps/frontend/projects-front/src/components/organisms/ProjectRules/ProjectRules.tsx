@@ -52,13 +52,13 @@ export function ProjectRules({
   }
 
   return (
-    <section
-      aria-label="Reglas de automatización"
-      className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]"
-    >
-      {/* Los dos paneles son regiones con nombre propio: con el apartado en
-          una sola columna en móvil, «Reglas académicas» y «Ejecuciones» se
-          leen seguidos y sin nombre no habría forma de saltar de uno a otro. */}
+    /* Uno debajo del otro y los dos a todo el ancho. En dos columnas, las
+       ejecuciones se quedaban en una franja estrecha donde el resumen del
+       contexto de cada fila —«prioridad Alta, fecha de vencimiento …»— no
+       cabía en una línea. */
+    <section aria-label="Reglas de automatización" className="flex flex-col gap-6">
+      {/* Los dos paneles son regiones con nombre propio: se leen seguidos, y
+          sin nombre no habría forma de saltar de uno a otro. */}
       <div
         aria-labelledby={ENCABEZADO_REGLAS}
         className="space-y-4 rounded-2xl border border-border bg-surface p-5"

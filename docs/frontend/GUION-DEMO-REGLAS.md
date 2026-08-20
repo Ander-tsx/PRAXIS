@@ -35,8 +35,7 @@ porque es lo primero que alguien pregunta.
 1. Entrar a un proyecto propio y abrir la pestaña **Reglas**.
 2. **Debe verse**: el estado vacío, que explica qué es una regla —«dice cuándo
    revisar, qué condiciones tienen que cumplirse y a quién avisar»— y no un
-   «no hay nada» a secas. A la derecha, el panel de **Ejecuciones**, también
-   vacío, con su frase sobre la revisión manual.
+   «no hay nada» a secas. Debajo, el panel de **Ejecuciones**, también vacío.
 
 ---
 
@@ -58,10 +57,11 @@ porque es lo primero que alguien pregunta.
      otro trigger cambia solo. Mandarlo desde el navegador daría 400.
 9. Marcar **«Activar esta regla»**.
 10. **«Crear regla»**.
-11. **Debe verse** en la tarjeta: el nombre, la insignia **Activa**, y el
-    resumen en español — «Cuando tarea próxima a vencer, si prioridad es Alta,
-    entonces avisa a los responsables de la tarea.» Ni un identificador
-    técnico.
+11. **Debe verse** en la tarjeta: el nombre, la insignia **Activa**, el resumen
+    en español —«Cuando tarea próxima a vencer, si prioridad es Alta, entonces
+    avisa a los responsables de la tarea.»— y debajo, sueltas, sus condiciones
+    de activación: «Se activa si prioridad es Alta». Ni un identificador
+    técnico en ninguna de las dos.
 
 ---
 

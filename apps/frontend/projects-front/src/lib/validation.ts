@@ -314,12 +314,7 @@ function validateConditionValue(
  * condición marcaba en rojo un campo que estaba bien y mandaba a corregirlo
  * donde no estaba el problema.
  */
-export type AutomationErrorScope =
-  | 'name'
-  | 'description'
-  | 'trigger'
-  | 'conditions'
-  | 'actions';
+export type AutomationErrorScope = 'name' | 'description' | 'trigger' | 'conditions' | 'actions';
 
 export interface AutomationDraftError {
   ambito: AutomationErrorScope;

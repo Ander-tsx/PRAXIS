@@ -166,7 +166,40 @@ test.describe('Reglas del proyecto', () => {
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
     await expect(tarjeta).toBeVisible();
-    await expect(tarjeta.getByText(/si prioridad es Alta/)).toBeVisible();
+    await expect(
+      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Alta/),
+    ).toBeVisible();
+    /* Y las condiciones también sueltas, debajo: la frase de arriba las lleva
+       encadenadas y con dos o tres hay que leerla entera para saber cuándo
+       salta la regla. */
+    await expect(tarjeta.getByText('Se activa si prioridad es Alta')).toBeVisible();
+  });
+
+  test('una regla sin condiciones lo dice en la tarjeta, en vez de callarse', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    const nombreRegla = nombreUnico('Sin condiciones').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'DISABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 60 } },
+        conditions: [],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status(), 'Crear la regla sin condiciones').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    await expect(
+      page
+        .locator('li', { hasText: nombreRegla })
+        .getByText('Sin condiciones: se activa con toda tarea que encaje con el disparador.'),
+    ).toBeVisible();
   });
 
   /**
@@ -320,7 +353,9 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
-    await expect(tarjeta.getByText(/días parada es alguno de 3, 5, 8/)).toBeVisible();
+    await expect(
+      tarjeta.getByText(/Cuando tarea estancada, si días parada es alguno de 3, 5, 8/),
+    ).toBeVisible();
   });
 
   /**
@@ -357,7 +392,9 @@ test.describe('Reglas del proyecto', () => {
     await seccionSi.getByRole('spinbutton').fill('2');
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
-      page.locator('li', { hasText: nombreEntero }).getByText(/número de responsables es 2/),
+      page
+        .locator('li', { hasText: nombreEntero })
+        .getByText(/Cuando tarea próxima a vencer, si número de responsables es 2/),
     ).toBeVisible();
 
     /* ── booleano: overdue es igual a sí ──────────────────────────────── */
@@ -373,7 +410,9 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('option', { name: 'Sí', exact: true }).click();
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
-      page.locator('li', { hasText: nombreBooleano }).getByText(/vencida es sí/),
+      page
+        .locator('li', { hasText: nombreBooleano })
+        .getByText(/Cuando tarea estancada, si vencida es sí/),
     ).toBeVisible();
 
     /* ── fecha: dueDate es igual a una fecha ──────────────────────────── */
@@ -404,7 +443,9 @@ test.describe('Reglas del proyecto', () => {
     await expect(
       page
         .locator('li', { hasText: nombreFecha })
-        .getByText(new RegExp(`fecha de vencimiento es ${fechaElegida}`)),
+        .getByText(
+          new RegExp(`Cuando tarea próxima a vencer, si fecha de vencimiento es ${fechaElegida}`),
+        ),
     ).toBeVisible();
 
     /* ── enum con IN: por casillas ────────────────────────────────────── */
@@ -420,7 +461,7 @@ test.describe('Reglas del proyecto', () => {
     await expect(
       page
         .locator('li', { hasText: nombreLista })
-        .getByText(/prioridad es alguno de Alta, Urgente/),
+        .getByText(/Cuando tarea próxima a vencer, si prioridad es alguno de Alta, Urgente/),
     ).toBeVisible();
   });
 
@@ -445,7 +486,9 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
-    await expect(tarjeta.getByText(/si prioridad es Baja/)).toBeVisible();
+    await expect(
+      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Baja/),
+    ).toBeVisible();
 
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
     /* Una sola fila de condición, precargada por `draftFromRule`: cambia su
@@ -454,7 +497,9 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('option', { name: 'Urgente' }).click();
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
-    await expect(tarjeta.getByText(/si prioridad es Urgente/)).toBeVisible();
+    await expect(
+      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Urgente/),
+    ).toBeVisible();
   });
 
   test('cambiar de trigger avisa y descarta las condiciones ya configuradas (Bloque 5)', async ({

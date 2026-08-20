@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bodyFromDraft,
   coerceConditionValue,
+  describeConditions,
   describeExecutionContext,
   describeReviewSummary,
   describeRule,
@@ -249,6 +250,24 @@ describe('describeExecutionContext', () => {
 
   it('sin contexto no inventa nada', () => {
     expect(describeExecutionContext({})).toBe('Sin contexto.');
+  });
+});
+
+describe('describeConditions', () => {
+  it('devuelve una frase por condición, en orden de posición', () => {
+    expect(
+      describeConditions({
+        ...reglaVencimiento,
+        conditions: [
+          { field: 'assigneeCount', operator: 'EQUALS', value: 2, position: 1 },
+          { field: 'priority', operator: 'EQUALS', value: 'HIGH', position: 0 },
+        ],
+      }),
+    ).toEqual(['prioridad es Alta', 'número de responsables es 2']);
+  });
+
+  it('una regla sin condiciones devuelve la lista vacía, sin frase de relleno', () => {
+    expect(describeConditions(reglaEstancada)).toEqual([]);
   });
 });
 

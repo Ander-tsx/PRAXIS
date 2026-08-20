@@ -72,8 +72,8 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
             Ejecuciones
           </h2>
           <p className="mt-1 font-sans text-sm text-text-secondary">
-            La revisión es manual a propósito, para que la demo sea determinista: nada corre en
-            segundo plano, no hay un cron detrás de este botón.
+            Revisa las últimas ejecuciones de las reglas: qué regla se evaluó, sobre qué caso, si
+            avisó y cuándo. La revisión se lanza desde aquí, no corre sola.
           </p>
         </div>
         <form action={formAction}>
