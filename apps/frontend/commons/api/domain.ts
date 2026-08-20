@@ -793,6 +793,14 @@ export const NOTIFICATION_TYPES = [
   'TASK_UNASSIGNED',
   'AUTOMATION_TASK_DUE_SOON',
   'AUTOMATION_TASK_STALE',
+  'AUTOMATION_TASK_OVERDUE',
+  'AUTOMATION_TASK_UNASSIGNED',
+  'AUTOMATION_TASK_CREATED',
+  'AUTOMATION_TASK_MOVED',
+  'AUTOMATION_TASK_COMPLETED',
+  'AUTOMATION_TASK_REOPENED',
+  'AUTOMATION_TASK_ASSIGNEES_CHANGED',
+  'AUTOMATION_TASK_DUE_DATE_CHANGED',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -830,29 +838,21 @@ export interface NotificationPage {
 }
 
 /**
- * Automatizaciones académicas (Reglas).
+ * Automatización.
  *
- * Espejo de `rule-definition.ts` en `automation-service`, **no** del enum
- * `AutomationTriggerType`/`AutomationActionType` de `@praxis/contracts`: ese
- * enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK` y `SEND_EMAIL`, que el
- * validador rechaza con «no soportado en el MVP académico» — verificado contra
- * el stack levantado en `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
- * Ver `docs/frontend/CONTRATO-API.md` §Automatizaciones académicas y
- * `docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md` §1.
+ * 🔴 **Estas listas eran un espejo escrito a mano de lo que aceptaba el
+ * validador, y los espejos se rompen.** Cuando el servidor pasó de dos
+ * disparadores a diez, esto seguía declarando dos y **nada fallaba**: el
+ * formulario ofrecía de menos y no hay compilación que avise de eso.
+ *
+ * Ahora la lista viva la sirve el propio servicio en
+ * `GET /projects/:id/automations/catalog`, y lo que queda aquí son **tipos
+ * abiertos**: `string` en vez de una unión cerrada. Es a propósito — una unión
+ * cerrada en el cliente vuelve a ser una copia que envejece.
  */
-export const AUTOMATION_TRIGGER_TYPES = ['TASK_DUE_SOON', 'TASK_STALE'] as const;
-export type AutomationTriggerType = (typeof AUTOMATION_TRIGGER_TYPES)[number];
-
-/** La única acción que admite el MVP académico. */
-export const AUTOMATION_ACTION_TYPES = ['CREATE_NOTIFICATION'] as const;
-export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
-
-/**
- * `EQUALS`/`NOT_EQUALS` exigen un valor escalar; `IN`, una lista no vacía.
- * Mezclarlos da 400 — no es cosmético.
- */
-export const AUTOMATION_CONDITION_OPERATORS = ['EQUALS', 'NOT_EQUALS', 'IN'] as const;
-export type AutomationConditionOperator = (typeof AUTOMATION_CONDITION_OPERATORS)[number];
+export type AutomationTriggerType = string;
+export type AutomationActionType = string;
+export type AutomationConditionOperator = string;
 
 /**
  * `ENABLED`/`DISABLED` son los únicos que puede mandar el cliente.
@@ -896,6 +896,15 @@ export interface AutomationRule {
   trigger: AutomationTrigger;
   conditions: AutomationCondition[];
   actions: AutomationAction[];
+  /**
+   * Por qué el sistema la pausó, si lo hizo.
+   *
+   * ⚠️ Sin esto, una regla en `PAUSED_SYSTEM` se ve apagada y parece que
+   * alguien la desactivó a mano — así que se vuelve a activar y se vuelve a
+   * pausar en la siguiente ejecución.
+   */
+  pausedAt?: string | null;
+  pauseReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -906,15 +915,23 @@ export type AutomationActionResult =
   | { status: 'FAILED'; attempts: number; error: { message: string } };
 
 /**
- * Una fila de auditoría. `conditionResult.context` solo trae los campos de
- * condición del trigger — **no** `taskId` ni `taskTitle` de forma legible.
- * Ver `PENDIENTES-BACKEND-AUTOMATIZACION.md` §3.
+ * Una fila de auditoría.
+ *
+ * ⚠️ **`subjectTitle` y `triggerType` llegan copiados, no referenciados.** La
+ * tarea puede renombrarse o borrarse después, y una auditoría que cambia cuando
+ * cambia el presente no es una auditoría. Son opcionales porque las filas
+ * anteriores a que existieran siguen ahí: se pintan sin ellos.
  */
 export interface AutomationExecution {
   id: string;
   ruleId: string;
   rule: { name: string };
   status: AutomationExecutionStatus;
+  /** Qué disparó esta ejecución. */
+  triggerType?: string | null;
+  /** Sobre qué tarea actuó, y cómo se llamaba entonces. */
+  subjectId?: string | null;
+  subjectTitle?: string | null;
   conditionResult: { matched: boolean; context: Record<string, unknown> };
   actionResults: AutomationActionResult[] | null;
   startedAt: string;
@@ -928,6 +945,18 @@ export interface AutomationReviewSummary {
   candidates: number;
   succeeded: number;
   failed: number;
+  /**
+   * Candidatas que no cumplían las condiciones.
+   *
+   * ⚠️ **Sin esto, «0 acciones» no significa nada.** El resumen decía cuántas
+   * salieron bien y cuántas fallaron, y una revisión con cuarenta candidatas y
+   * ninguna acción se leía igual tanto si las condiciones no se cumplían —la
+   * regla está mal escrita— como si ya se actuó ayer —todo va bien—. Son dos
+   * situaciones opuestas y pedían dos decisiones opuestas.
+   */
+  filtered: number;
+  /** Candidatas cuya causa ya se había atendido antes. */
+  repeated: number;
 }
 
 /*

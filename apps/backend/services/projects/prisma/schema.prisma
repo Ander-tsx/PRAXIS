@@ -262,10 +262,27 @@ enum NotificationType {
   TASK_ASSIGNED
   /// Te quitaron de una tarea.
   TASK_UNASSIGNED
-  /// Una automatización detectó que una tarea vencerá pronto.
+  /// ─── Automatización ─────────────────────────────────────────────────────
+  ///
+  /// ⚠️ **Hay un tipo por disparador, y no es por gusto.** El aviso salía del
+  /// destinatario elegido —a quien lleva el proyecto, `AUTOMATION_TASK_STALE`;
+  /// a los encargados, `AUTOMATION_TASK_DUE_SOON`— y con dos disparadores
+  /// coincidía por casualidad. Con diez, crear una tarea avisaba de que
+  /// «lleva varios días sin movimiento»: el texto no describía lo que había
+  /// pasado, describía a quién se le contaba.
+  ///
+  /// El catálogo de `automation-service` es quien empareja disparador y tipo.
+  /// Un disparador nuevo sin su tipo aquí no compila allí.
   AUTOMATION_TASK_DUE_SOON
-  /// Una automatización detectó una tarea sin movimiento.
   AUTOMATION_TASK_STALE
+  AUTOMATION_TASK_OVERDUE
+  AUTOMATION_TASK_UNASSIGNED
+  AUTOMATION_TASK_CREATED
+  AUTOMATION_TASK_MOVED
+  AUTOMATION_TASK_COMPLETED
+  AUTOMATION_TASK_REOPENED
+  AUTOMATION_TASK_ASSIGNEES_CHANGED
+  AUTOMATION_TASK_DUE_DATE_CHANGED
 
   @@schema("projects")
 }
