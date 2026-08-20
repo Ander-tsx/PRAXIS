@@ -1,7 +1,8 @@
-"use client";
-import { useState } from "react";
+'use client';
+import { useState } from 'react';
 import {
-  Badge, Button,
+  Badge,
+  Button,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
@@ -86,16 +87,35 @@ export function ProjectMembers({
         <div className="flex shrink-0 items-center gap-2">
           {canLeave && <LeaveProjectButton projectId={projectId} projectName={projectName} />}
           {canManage && (
-            <Button variant={isInviting ? 'secondary' : 'primary'} onClick={() => setIsInviting(!isInviting)}>
+            <Button
+              variant={isInviting ? 'secondary' : 'primary'}
+              onClick={() => setIsInviting(!isInviting)}
+            >
               {isInviting ? 'Cancelar' : 'Invitar persona'}
             </Button>
           )}
         </div>
       </div>
 
+      {/* ⚠️ Aquí ponía `animate-in slide-in-from-top-4 fade-in duration-300`, del
+          plugin `tailwindcss-animate`, **que no está instalado**: Tailwind no
+          genera nada para una utilidad que no conoce y no avisa, así que el
+          panel llevaba meses apareciendo de golpe mientras el código decía que
+          se deslizaba.
+
+          El `<div>` interior no sobra: `.animate-desplegar-panel` es un grid de
+          una fila y su hijo es quien lleva el `overflow: hidden` que impide que
+          el contenido se vea entero desde el primer fotograma. */}
       {isInviting && canManage && (
-        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
-          <InviteMemberDialog projectId={projectId} roles={roles} excluirIds={excluirIds} onClose={() => setIsInviting(false)} />
+        <div className="animate-desplegar-panel">
+          <div>
+            <InviteMemberDialog
+              projectId={projectId}
+              roles={roles}
+              excluirIds={excluirIds}
+              onClose={() => setIsInviting(false)}
+            />
+          </div>
         </div>
       )}
 

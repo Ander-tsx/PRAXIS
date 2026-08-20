@@ -327,6 +327,47 @@ button:disabled,
   animation: entrar-desde-la-derecha 220ms ease-out;
 }
 
+/* Un panel que se despliega dentro de su sección, sin sacar un modal.
+
+   🔴 **Aquí había un agujero silencioso.** El primer sitio que quiso esto
+   —«Invitar persona», en Equipo— se escribió con `animate-in
+   slide-in-from-top-4 fade-in duration-300`, que son utilidades del plugin
+   `tailwindcss-animate`… **que este repositorio no tiene instalado**. Tailwind
+   no genera nada para una utilidad que no conoce y no avisa: el panel llevaba
+   meses apareciendo de golpe mientras el código decía que se deslizaba.
+
+   Se anima `grid-template-rows` de `0fr` a `1fr` y no `height`, que es lo que
+   permite abrir hasta el alto real del contenido sin medirlo en JavaScript ni
+   fijar un máximo a ojo —un `max-height` inventado o recorta el panel o hace
+   que la animación tarde de más cuando el contenido es corto—.
+
+   El hijo necesita `overflow: hidden` propio: sin él, el contenido rebosa la
+   fila de cero y se ve entero desde el primer fotograma.
+
+   Con `prefers-reduced-motion` el bloque global de más abajo lo deja en su
+   estado final, que es exactamente lo que se quiere: abierto, sin recorrido. */
+@keyframes desplegar-panel {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+.animate-desplegar-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  animation: desplegar-panel 260ms cubic-bezier(0.22, 0.85, 0.28, 1);
+}
+
+.animate-desplegar-panel > * {
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Los tres puntos del paso en curso del asistente (FlujoDePensamiento).
 
    `steps(4)` en vez de una transición continua: los puntos aparecen de uno en
@@ -606,4 +647,3 @@ body.arrastrando-en-tablero {
 .arrastrando-en-tablero {
   touch-action: none !important;
 }
-
