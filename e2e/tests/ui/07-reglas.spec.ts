@@ -46,7 +46,6 @@ test.describe('Reglas del proyecto', () => {
     await request.get('/projects/calentar-turbopack', { timeout: 60_000 }).catch(() => {});
   });
 
-
   test('la pestaña se llama Reglas y se llega a ella desde la barra de secciones', async ({
     page,
   }) => {
@@ -89,9 +88,7 @@ test.describe('Reglas del proyecto', () => {
     await expect(page.getByText('Aún no hay reglas.', { exact: false })).toBeVisible();
   });
 
-  test('con una regla creada, se ve su nombre y el resumen de su definición', async ({
-    page,
-  }) => {
+  test('con una regla creada, se ve su nombre y el resumen de su definición', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);
     await api.dispose();
@@ -103,10 +100,62 @@ test.describe('Reglas del proyecto', () => {
     await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    await expect(page.getByText(nombreRegla)).toBeVisible();
+    /* `exact: true`: desde el Bloque 4, el diálogo de eliminar (oculto)
+       también lleva el nombre de la regla en su título — «Eliminar
+       «<nombre>»» —, y sin `exact` el texto de sobra lo hace coincidir igual. */
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
     /* `describeRule` describe el trigger por defecto del formulario
        (`TASK_DUE_SOON`) en una frase legible, no solo el identificador técnico. */
     await expect(page.getByText(/Cuando tarea próxima a vencer/)).toBeVisible();
+  });
+
+  test('activar y desactivar una regla actualiza su estado (Bloque 4)', async ({ page }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    const nombreRegla = nombreUnico('Alternar estado').slice(0, 120);
+    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta).toBeVisible();
+    await expect(tarjeta.getByText('Activa', { exact: true })).toBeVisible();
+
+    await tarjeta.getByRole('button', { name: 'Desactivar' }).click();
+    await expect(tarjeta.getByText('Inactiva', { exact: true })).toBeVisible();
+
+    await tarjeta.getByRole('button', { name: 'Activar' }).click();
+    await expect(tarjeta.getByText('Activa', { exact: true })).toBeVisible();
+  });
+
+  test('eliminar una regla pide confirmación, y al cancelar sigue ahí (Bloque 4)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    const nombreRegla = nombreUnico('Eliminar esta').slice(0, 120);
+    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await page.getByRole('button', { name: 'Crear regla' }).click();
+
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta).toBeVisible();
+
+    await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
+    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(tarjeta).toBeVisible();
+
+    await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
+    await page.getByRole('button', { name: 'Eliminar regla' }).click();
+    await expect(page.locator('li', { hasText: nombreRegla })).toHaveCount(0);
   });
 
   test('sin canManageAutomations se ve el mensaje de permiso', async ({ page }) => {

@@ -20,7 +20,13 @@ export type ApiErrorCode =
   | 'UNPROCESSABLE_ENTITY'
   | 'INTERNAL_SERVER_ERROR'
   | 'BAD_GATEWAY'
-  | 'HTTP_ERROR';
+  | 'HTTP_ERROR'
+  /**
+   * Código de dominio explícito, no derivado del status. Un 403 de
+   * suspensión y un 403 de permiso normal se distinguen por esto —
+   * `PROJECT_SUSPENDED_CODE` en `domain.ts` — y no por el mensaje.
+   */
+  | 'PROJECT_SUSPENDED';
 
 export interface ApiEnvelopeError {
   success: false;

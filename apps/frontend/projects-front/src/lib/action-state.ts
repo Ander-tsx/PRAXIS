@@ -67,6 +67,14 @@ export interface TaskState {
 
 export const TASK_INITIAL_STATE: TaskState = { error: null, done: null };
 
+export interface AutomationRuleState {
+  error: string | null;
+  /** Se rellena cuando el servidor confirma: el estado nuevo o 'eliminada'. */
+  done: string | null;
+}
+
+export const AUTOMATION_RULE_INITIAL_STATE: AutomationRuleState = { error: null, done: null };
+
 /**
  * Estado del borrado de un proyecto.
  *

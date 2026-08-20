@@ -114,7 +114,7 @@ export function ProjectRules({
         ) : (
           <ul className="space-y-2">
             {rules.map((rule) => (
-              <RuleCard key={rule.id} projectId={projectId} rule={rule} />
+              <RuleCard key={rule.id} projectId={projectId} rule={rule} canManage={canManage} />
             ))}
           </ul>
         )}

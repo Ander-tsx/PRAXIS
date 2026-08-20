@@ -1,21 +1,17 @@
-import { setAcademicAutomationStatusAction } from '@/app/(private)/[id]/actions';
 import { describeRule } from '@/lib/automation-draft';
 import { type AutomationRule, Badge } from '@praxis/commons';
+import { DeleteRuleButton } from './DeleteRuleButton';
+import { RuleStatusToggle } from './RuleStatusToggle';
 
 export interface RuleCardProps {
   projectId: string;
   rule: AutomationRule;
+  /** Sale de `permissions/me`: sin esto no se enseñan los controles. */
+  canManage: boolean;
 }
 
-/**
- * Una regla, en su tarjeta.
- *
- * El botón de activar/deshabilitar es el formulario original, sin
- * `useAccion` ni confirmación contra el resultado — es el hueco que llena el
- * Bloque 4 con `RuleStatusToggle`. Se mantiene funcionando mientras tanto
- * para no dejar el apartado con menos capacidad de la que ya tenía.
- */
-export function RuleCard({ projectId, rule }: RuleCardProps) {
+/** Una regla, en su tarjeta: nombre, estado, resumen legible y sus controles. */
+export function RuleCard({ projectId, rule, canManage }: RuleCardProps) {
   return (
     <li className="rounded-xl border border-border p-3">
       <div className="flex items-center justify-between gap-3">
@@ -27,22 +23,12 @@ export function RuleCard({ projectId, rule }: RuleCardProps) {
 
       <p className="mt-1 font-sans text-xs text-text-secondary">{describeRule(rule)}</p>
 
-      <form
-        action={setAcademicAutomationStatusAction.bind(
-          null,
-          projectId,
-          rule.id,
-          rule.status === 'ENABLED' ? 'DISABLED' : 'ENABLED',
-        )}
-        className="mt-3"
-      >
-        <button
-          type="submit"
-          className="rounded-lg border border-border px-3 py-1.5 font-sans text-xs font-medium text-text-primary"
-        >
-          {rule.status === 'ENABLED' ? 'Desactivar' : 'Activar'}
-        </button>
-      </form>
+      {canManage && (
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <RuleStatusToggle projectId={projectId} ruleId={rule.id} status={rule.status} />
+          <DeleteRuleButton projectId={projectId} ruleId={rule.id} ruleName={rule.name} />
+        </div>
+      )}
     </li>
   );
 }

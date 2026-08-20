@@ -207,4 +207,75 @@ test.describe('Automatización académica', () => {
       expect(respuesta.status(), 'staleDays pertenece a TASK_STALE, no a TASK_DUE_SOON').toBe(400);
     });
   });
+
+  /**
+   * Bloque 4 del plan de Reglas: activar/desactivar reenvía la definición
+   * completa porque `PATCH` es reemplazo total (hueco 2 de
+   * PENDIENTES-BACKEND-AUTOMATIZACION.md). Esta prueba fija el contrato del
+   * que depende ese lee-modifica-escribe: que reenviar la misma definición
+   * con el estado cambiado no pierde condiciones ni acciones por el camino.
+   */
+  test('activar/desactivar reenviando la definición completa no pierde condiciones ni acciones', async ({
+    request,
+  }) => {
+    const mundo = await crearMundo(request);
+    const headers = comoBearer(mundo.duenno.accessToken);
+
+    const alta = await request.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers,
+      data: {
+        name: nombreUnico('Regla con condiciones').slice(0, 120),
+        status: 'DISABLED',
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 60 } },
+        conditions: [{ field: 'priority', operator: 'EQUALS', value: 'HIGH' }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+      },
+    });
+    expect(alta.status()).toBe(201);
+    const creada = await data<{
+      id: string;
+      name: string;
+      description?: string | null;
+      trigger: { type: string; config: Record<string, unknown> };
+      conditions: Array<{ field: string; operator: string; value: unknown }>;
+      actions: Array<{ type: string; config: Record<string, unknown> }>;
+    }>(alta);
+
+    // El lee-modifica-escribe: leer la regla y reenviarla con solo el estado cambiado.
+    const activacion = await request.patch(
+      `/api/projects/${mundo.proyecto.id}/automations/${creada.id}`,
+      {
+        headers,
+        data: {
+          name: creada.name,
+          ...(creada.description != null && { description: creada.description }),
+          status: 'ENABLED',
+          trigger: { type: creada.trigger.type, config: creada.trigger.config },
+          conditions: creada.conditions.map(({ field, operator, value }) => ({
+            field,
+            operator,
+            value,
+          })),
+          actions: creada.actions.map(({ type, config }) => ({ type, config })),
+        },
+      },
+    );
+    expect(activacion.status(), 'Activar la regla').toBe(200);
+    const activada = await data<{
+      status: string;
+      conditions: Array<{ field: string; operator: string; value: unknown }>;
+      actions: Array<{ type: string; config: Record<string, unknown> }>;
+    }>(activacion);
+
+    expect(activada.status).toBe('ENABLED');
+    expect(activada.conditions).toEqual([
+      expect.objectContaining({ field: 'priority', operator: 'EQUALS', value: 'HIGH' }),
+    ]);
+    expect(activada.actions).toEqual([
+      expect.objectContaining({
+        type: 'CREATE_NOTIFICATION',
+        config: { recipientSelector: 'ASSIGNEES' },
+      }),
+    ]);
+  });
 });

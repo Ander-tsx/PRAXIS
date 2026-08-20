@@ -1,6 +1,7 @@
 'use server';
 
 import type {
+  AutomationRuleState,
   BoardState,
   ColumnState,
   DeleteProjectState,
@@ -27,6 +28,7 @@ import {
 } from '@/lib/validation';
 import {
   ApiError,
+  type AutomationRule,
   type Board,
   CHAT_ATTACHMENT_MAX_BYTES,
   type ChatAttachment,
@@ -34,6 +36,7 @@ import {
   type ChecklistItem,
   type Column,
   type Label,
+  PROJECT_SUSPENDED_CODE,
   type Paginated,
   type PermissionMap,
   type ProjectDetail,
@@ -116,30 +119,95 @@ export async function reviewAcademicAutomationsAction(projectId: string) {
   revalidateProject(projectId);
 }
 
-export async function setAcademicAutomationStatusAction(
-  projectId: string,
-  ruleId: string,
-  status: 'ENABLED' | 'DISABLED',
-) {
+/**
+ * Habilita o deshabilita una regla.
+ *
+ * ⚠️ **`PATCH` es reemplazo total, no parcial** — hueco 2 de
+ * `PENDIENTES-BACKEND-AUTOMATIZACION.md`: no existe una ruta para cambiar
+ * solo `status`, así que hay que leer la regla entera y reenviarla con el
+ * único campo cambiado. Confirma contra `data.status`, no contra el código
+ * de estado: un 200 con el estado de siempre sería un cambio que no cambió
+ * nada.
+ */
+export async function toggleAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
   const api = await requireApi();
-  if (!api) return;
-  const rule = await api.get<{
-    name: string;
-    description?: string | null;
-    trigger: { id: string; ruleId: string; type: string; config: Record<string, unknown> };
-    conditions: Array<{ field: string; operator: string; value: unknown }>;
-    actions: Array<{ type: string; config: Record<string, unknown> }>;
-  }>(`/projects/${projectId}/automations/${ruleId}`);
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
 
-  await api.patch(`/projects/${projectId}/automations/${ruleId}`, {
-    name: rule.name,
-    ...(rule.description != null && { description: rule.description }),
-    status,
-    trigger: { type: rule.trigger.type, config: rule.trigger.config },
-    conditions: rule.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
-    actions: rule.actions.map(({ type, config }) => ({ type, config })),
-  });
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = String(formData.get('ruleId') ?? '');
+  const nextStatus = String(formData.get('nextStatus') ?? '');
+
+  try {
+    const rule = await api.get<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`);
+
+    const saved = await api.patch<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`, {
+      name: rule.name,
+      ...(rule.description != null && { description: rule.description }),
+      status: nextStatus,
+      trigger: { type: rule.trigger.type, config: rule.trigger.config },
+      conditions: rule.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
+      actions: rule.actions.map(({ type, config }) => ({ type, config })),
+    });
+
+    if (saved.status !== nextStatus) {
+      return {
+        error: 'El servidor no cambió el estado de la regla. Inténtalo de nuevo.',
+        done: null,
+      };
+    }
+  } catch (error) {
+    return { error: describeAutomationToggleError(error), done: null };
+  }
+
   revalidateProject(projectId);
+  return { error: null, done: nextStatus };
+}
+
+export async function deleteAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = String(formData.get('ruleId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}/automations/${ruleId}`);
+  } catch (error) {
+    return {
+      error:
+        error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE
+          ? 'El proyecto está suspendido: no se puede eliminar ninguna regla mientras tanto.'
+          : describe(error, 'No se pudo eliminar la regla.'),
+      done: null,
+    };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'eliminada' };
+}
+
+/**
+ * El 400 de `toggleAutomationRuleAction` no es «campo inválido»: es que la
+ * regla se reenvía entera y el catálogo pudo endurecerse desde que se
+ * guardó — hueco 2. El mensaje genérico de `describe()` hablaría de un campo
+ * que nadie tocó.
+ */
+function describeAutomationToggleError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === PROJECT_SUSPENDED_CODE) {
+      return 'El proyecto está suspendido: no se puede activar ni desactivar ninguna regla mientras tanto.';
+    }
+    if (error.status === 400) {
+      return 'Esta regla ya no es válida con el catálogo actual: ábrela y corrígela antes de cambiar su estado.';
+    }
+  }
+  return describe(error, 'No se pudo cambiar el estado de la regla.');
 }
 
 /**
