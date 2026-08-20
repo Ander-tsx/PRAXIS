@@ -44,7 +44,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
         <div className="flex shrink-0 items-center gap-2">
           {canManage && (
-            <Button variant={isCreating ? 'secondary' : 'default'} onClick={() => setIsCreating(!isCreating)}>
+            <Button variant={isCreating ? 'secondary' : 'primary'} onClick={() => setIsCreating(!isCreating)}>
               {isCreating ? 'Cancelar' : 'Nuevo rol'}
             </Button>
           )}
