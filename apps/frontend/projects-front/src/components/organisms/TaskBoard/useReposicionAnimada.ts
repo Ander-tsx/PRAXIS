@@ -91,7 +91,11 @@ export function useReposicionAnimada() {
          justo lo que hay que enseñar. El resto se salta si la pasada está sucia
          por un desplazamiento. */
       if (!sembrado && saltarAnimacion) continue;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+      
+      // Filtro anti-zarandeos: si el movimiento es minúsculo (< 20px), es ruido del
+      // DOM reacomodándose (ej. Next.js reinyectando Server Components o HMR).
+      // Un cambio de orden real mueve una tarjeta entera (> 100px) o columna (> 250px).
+      if (!sembrado && Math.abs(dx) < 20 && Math.abs(dy) < 20) continue;
 
       el.animate(
         [{ transform: `translate3d(${dx}px, ${dy}px, 0)` }, { transform: 'translate3d(0,0,0)' }],
