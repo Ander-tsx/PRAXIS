@@ -727,7 +727,7 @@ export function Composer({
          * texto completo sigue a la vista en el compositor ancho.
          */}
         <div
-          className={`flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
+          className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
         >
           <span className="flex items-center gap-1.5">
             <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">

@@ -19,7 +19,7 @@ import { alpha, colors } from '../../tokens';
  * regla, y deja de poder divergir.
  */
 
-export type AvatarSize = 'sm' | 'base' | 'md' | 'lg';
+export type AvatarSize = 'sm' | 'base' | 'md' | 'lg' | 'xl';
 
 const SIZES: Record<AvatarSize, string> = {
   /** El del tablero: cabe cuatro veces en una tarjeta sin ahogarla. */
@@ -37,6 +37,7 @@ const SIZES: Record<AvatarSize, string> = {
    * seguía reservando 40 px, así que todo lo de al lado se le montaba encima y
    * había que compensarlo con márgenes a ojo.
    */
+  xl: 'h-14 w-14 text-xl',
   lg: 'h-24 w-24 text-2xl',
 };
 

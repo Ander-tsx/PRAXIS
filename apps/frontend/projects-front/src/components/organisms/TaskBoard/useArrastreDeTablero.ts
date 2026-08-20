@@ -463,7 +463,8 @@ export function useArrastreDeTablero({
           Math.abs(evento.clientX - p.x0),
           Math.abs(evento.clientY - p.y0),
         );
-        if (recorrido <= UMBRAL_DE_ARRASTRE) return;
+        const umbral = p.esTactil ? 15 : UMBRAL_DE_ARRASTRE;
+        if (recorrido <= umbral) return;
 
         /* Con el dedo, moverse antes de que venza la pulsación larga significa
            «estoy desplazando la pantalla». Se abandona el gesto entero. */
@@ -497,16 +498,24 @@ export function useArrastreDeTablero({
       limpiar();
     }
 
+    function alTouchMove(evento: TouchEvent) {
+      if (enCurso.current && evento.cancelable) {
+        evento.preventDefault();
+      }
+    }
+
     window.addEventListener('pointermove', alMover, { passive: false });
     window.addEventListener('pointerup', alLevantar);
     window.addEventListener('pointercancel', alLevantar);
     window.addEventListener('keydown', alTeclear, true);
+    window.addEventListener('touchmove', alTouchMove, { passive: false });
 
     return () => {
       window.removeEventListener('pointermove', alMover);
       window.removeEventListener('pointerup', alLevantar);
       window.removeEventListener('pointercancel', alLevantar);
       window.removeEventListener('keydown', alTeclear, true);
+      window.removeEventListener('touchmove', alTouchMove);
     };
   }, [activar, limpiar, soltar, pedirFotograma]);
 

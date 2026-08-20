@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
 import { useCurrentTheme, useRefrescoAgrupado } from '../../hooks';
@@ -218,6 +218,16 @@ export function LiveNotices() {
    */
   useReconnection(pedirRefresco);
 
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mobileQuery = window.matchMedia('(max-width: 639px)');
+    setIsMobile(mobileQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mobileQuery.addEventListener('change', handler);
+    return () => mobileQuery.removeEventListener('change', handler);
+  }, []);
+
   /**
    * ⚠️ **El `theme` va explícito, y no se puede omitir.**
    *
@@ -233,9 +243,15 @@ export function LiveNotices() {
    * atributo la descripción se queda sin regla de color.
    *
    * `bottom-right` para no tapar la cabecera ni el buscador, que es donde estaba
-   * el apilado anterior.
+   * el apilado anterior. En móvil van al centro para no romper los márgenes.
    */
-  return <Toaster position="bottom-right" theme={tema === 'dark' ? 'light' : 'dark'} offset={16} />;
+  return (
+    <Toaster
+      position={isMobile ? 'bottom-center' : 'bottom-right'}
+      theme={tema === 'dark' ? 'light' : 'dark'}
+      offset={16}
+    />
+  );
 }
 
 /**

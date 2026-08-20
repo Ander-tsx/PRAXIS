@@ -14,6 +14,7 @@ import {
   uploadDirectAttachmentAction,
 } from '@/app/(private)/actions';
 import {
+  Avatar,
   Badge,
   type ChatMessagePage,
   ChatPanel,
@@ -179,19 +180,13 @@ function Encabezado({
   const [ampliada, setAmpliada] = useState(false);
   const inicial = (nombre.charAt(0) || peerId.charAt(0)).toUpperCase();
 
-  const avatarElement = perfil?.avatarUrl ? (
-    <img
-      src={`/chat/api/gateway${perfil.avatarUrl}`}
-      alt={nombre}
-      className="h-14 w-14 rounded-full object-cover"
+  const avatarElement = (
+    <Avatar
+      label={nombre}
+      src={perfil?.avatarUrl ? `/chat/api/gateway${perfil.avatarUrl}` : null}
+      presence={perfil?.presence}
+      size="xl"
     />
-  ) : (
-    <div
-      className="flex h-14 w-14 items-center justify-center rounded-full font-sans text-xl font-medium"
-      style={{ background: colors.surfaceElevated, color: colors.textSecondary }}
-    >
-      {inicial}
-    </div>
   );
 
   return (
@@ -203,7 +198,7 @@ function Encabezado({
           onClick={() => setAmpliada(true)}
           aria-label={`Ver foto de ${nombre}`}
           title="Ver foto"
-          className="shrink-0 cursor-zoom-in transition-transform hover:scale-105 active:scale-95 overflow-hidden rounded-full border border-border"
+          className="shrink-0 cursor-zoom-in transition-transform hover:scale-105 active:scale-95"
         >
           {avatarElement}
         </button>
