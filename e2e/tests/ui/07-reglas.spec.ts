@@ -574,6 +574,64 @@ test.describe('Reglas del proyecto', () => {
     await expect(page.getByText('No cumplía las condiciones', { exact: true })).toBeVisible();
   });
 
+  /**
+   * `TASK_STALE`, hasta donde se puede llegar por la API — corrección C3.
+   *
+   * ⚠️ **Esto NO demuestra que el trigger dispare, y no debe leerse así.**
+   * Una tarea estancada no se puede preparar desde una prueba: `StatsService`
+   * mide el estancamiento contra `MAX(task_events.occurredAt)`, crear una
+   * tarea emite un `CREATED` con `occurredAt = now()`, y `rule-definition.ts`
+   * exige `days >= 1`. Una tarea recién creada tiene `diasParada = 0`, así
+   * que **ninguna combinación de llamadas al gateway produce una candidata**:
+   * habría que esperar un día de reloj. Es el hueco 6 de
+   * `docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md`.
+   *
+   * Lo que sí fija esta prueba es que el otro trigger del catálogo se crea,
+   * se revisa y se resume sin romperse — que el camino entero de `TASK_STALE`
+   * está montado, aunque el disparo se compruebe a mano.
+   */
+  test('una regla TASK_STALE se revisa y resume sin candidatas (corrección C3)', async ({
+    page,
+  }) => {
+    const api = await apiContext();
+    const mundo = await crearMundo(api);
+    /* Una tarea recién creada: `diasParada = 0`, así que no es candidata. */
+    await crearTarea(api, mundo.duenno.accessToken, mundo);
+
+    const nombreRegla = nombreUnico('Estancamiento').slice(0, 120);
+    const alta = await api.post(`/api/projects/${mundo.proyecto.id}/automations`, {
+      headers: comoBearer(mundo.duenno.accessToken),
+      data: {
+        name: nombreRegla,
+        status: 'ENABLED',
+        trigger: { type: 'TASK_STALE', config: { days: 7 } },
+        conditions: [{ field: 'overdue', operator: 'EQUALS', value: false }],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'PROJECT_OWNER' } }],
+      },
+    });
+    expect(alta.status(), 'Crear y habilitar la regla TASK_STALE').toBe(201);
+    await api.dispose();
+
+    await entrarConCuenta(page, mundo.duenno.email);
+    await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
+
+    /* El resumen legible del otro trigger, con su destinatario propio. En una
+       sola aserción sobre la frase de `describeRule`: «avisa al dueño del
+       proyecto» aparece también en la sección «Entonces» del diálogo de
+       edición, que está en el DOM aunque cerrado. */
+    const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(
+      tarjeta.getByText(
+        'Cuando tarea estancada, si vencida es no, entonces avisa al dueño del proyecto.',
+      ),
+    ).toBeVisible();
+
+    await page.getByRole('button', { name: 'Revisar ahora' }).click();
+    await expect(
+      page.getByText('1 regla revisada · 0 candidatas · 0 avisos · 0 fallos'),
+    ).toBeVisible();
+  });
+
   test('sin canManageAutomations se ve el mensaje de permiso', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);

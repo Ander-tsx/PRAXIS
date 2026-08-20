@@ -11,7 +11,7 @@
 > Última revisión: 2026-08-19 · gateway en `localhost:3000` · verificado contra
 > el stack levantado con `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
 >
-> **Estado: 0 de 5 resueltos.** Ninguno bloquea el apartado Reglas: el frontend
+> **Estado: 0 de 6 resueltos.** Ninguno bloquea el apartado Reglas: el frontend
 > tiene una forma de trabajar mientras tanto para cada uno, descrita en su
 > propio punto.
 
@@ -35,11 +35,17 @@ al final con su severidad en el título.
 
 ## Resumen
 
-Los cinco son de 2026-08-19, detectados al construir el apartado Reglas de
-automatización (`.planning/PLAN-FRONTEND-REGLAS-IMPLEMENTACION.md`, Bloque 1).
-Ninguno bloquea: el 1 y el 2 obligan a un rodeo (catálogo duplicado en el
-frontend, lee-modifica-escribe para activar/desactivar); el 3 al 5 son huecos
-de auditoría, que se muestra recortada mientras tanto.
+Los cinco primeros son de 2026-08-19, detectados al construir el apartado
+Reglas de automatización (`.planning/PLAN-FRONTEND-REGLAS-IMPLEMENTACION.md`,
+Bloque 1). Ninguno bloquea: el 1 y el 2 obligan a un rodeo (catálogo duplicado
+en el frontend, lee-modifica-escribe para activar/desactivar); el 3 al 5 son
+huecos de auditoría, que se muestra recortada mientras tanto.
+
+El 6 es de 2026-08-20 y salió al revisar el apartado terminado
+(`.planning/PLAN-CORRECCION-REGLAS.md`, corrección C3): `TASK_STALE` no se
+puede llevar hasta el aviso desde una prueba, así que la mitad del catálogo
+del MVP se queda sin verificación de punta a punta. Tampoco bloquea, pero es
+el que más pesa en una demostración.
 
 Un sexto hallazgo de la misma sesión —`task_inventory` cambió de array a
 `{ tareas, omitidas }` sin que `automation-service` se actualizara, y tronaba
@@ -154,3 +160,49 @@ cada carga del apartado, y el frontend no usa ninguno.
 `AutomationEngineService.recent()`.
 
 No bloquea nada, es solo peso de sobra en cada respuesta.
+
+## 🟡 6. Una tarea estancada no se puede preparar por la API, así que `TASK_STALE` no se puede probar
+
+De los dos triggers del MVP, `TASK_DUE_SOON` se puede llevar hasta el aviso
+desde una prueba: se crea la tarea, se le pone fecha y prioridad y se le
+asignan responsables, todo con llamadas al gateway. **`TASK_STALE` no.**
+
+`StatsService` calcula el estancamiento contra el último evento de la tarea:
+
+```sql
+diasParada = floor(EXTRACT(EPOCH FROM (now() - COALESCE(MAX(e."occurredAt"), t."createdAt"))) / 86400)
+…
+HAVING diasParada >= ${dias}
+```
+
+y `rule-definition.ts` exige `days >= 1`. Una tarea recién creada tiene
+`diasParada = 0`, y además emite un evento `CREATED` con `occurredAt = now()`,
+así que ni siquiera bastaría con poder retrasar `createdAt`. **Ninguna
+combinación de llamadas al gateway produce una candidata**: haría falta
+esperar un día de reloj.
+
+**Por qué importa en el frontend.** La mitad del catálogo del MVP no tiene
+forma de verificarse de punta a punta. De `TASK_STALE` se puede probar que se
+crea, se edita, se describe y se valida —y todo eso está cubierto—, pero no
+que llegue a disparar un aviso. En una demostración eso significa que si no
+dispara, no hay manera de distinguir si falla la regla o faltan los datos.
+
+**Qué haría falta.** Alguna de estas, por orden de preferencia:
+
+1. Que `task_stats_stale` acepte un umbral en **horas** además de en días, o
+   que `days` admita `0`. Con `>= 0` una tarea recién creada ya sería
+   candidata y la prueba se escribiría entera contra la API.
+2. Una utilidad de siembra fuera de la API de producto —un script de `seed`—
+   que deje un proyecto con tareas antiguas de verdad.
+
+**Mientras tanto**, la prueba de UI cubre el caso vacío: con una regla
+`TASK_STALE` habilitada, «Revisar ahora» responde limpiamente con 0
+candidatas y sin fallos. ⚠️ **Eso no demuestra que el trigger dispare**, y no
+debe leerse así; el disparo real se comprueba a mano, con una tarea
+envejecida en la base, y así está anotado en el guion de demostración.
+
+⚠️ Este hueco es la razón por la que **no** se añadió una segunda escritura
+directa a la base en `e2e/fixtures/`. `verificacion.ts` lo deja escrito: es lo
+único que las pruebas hacen sin pasar por la API, y «si algún día hay que
+tocar la base para otra cosa, es señal de que falta un endpoint, no de que ese
+archivo tenga que crecer». Esto es esa señal.
