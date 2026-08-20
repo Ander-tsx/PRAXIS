@@ -56,3 +56,13 @@ export function cuotaDelError(error: unknown): AssistantQuota | null {
   }
   return null;
 }
+
+/** El conversationId que el backend mete en details cuando falla después de crearlo, si viene. */
+export function conversationIdDelError(error: unknown): string | null {
+  if (!(error instanceof ApiError)) return null;
+  const details = error.details;
+  if (details && typeof details === 'object' && 'conversationId' in details) {
+    return (details as { conversationId: string }).conversationId;
+  }
+  return null;
+}

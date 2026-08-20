@@ -17,9 +17,9 @@ export interface SlideOverProps {
 }
 
 const sizeClasses = {
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-lg',
+  xl: 'sm:max-w-xl',
 } as const;
 
 const paddingSizes = {
@@ -33,7 +33,7 @@ const paddingSizes = {
  *
  * En lugar de flotar sobre la página como un `<dialog>`, empuja el contenido
  * añadiendo padding al `body`. Esto permite que la rejilla de proyectos se
- * ajuste de forma fluida.
+ * ajuste de forma fluida. En móviles abarca el 100% de la pantalla sin animar.
  */
 export function SlideOver({
   open,
@@ -46,57 +46,51 @@ export function SlideOver({
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) {
+    const isDesktop = window.matchMedia('(min-width: 640px)').matches;
+    if (open && isDesktop) {
       document.body.style.paddingRight = paddingSizes[size];
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-
-      const handleGlobalClick = (event: MouseEvent) => {
-        // Ignorar clicks dentro del panel
-        if (panelRef.current && panelRef.current.contains(event.target as Node)) {
-          return;
-        }
-
-        // Ignorar clicks en elementos que lo abrieron (como botones con data-state="open")
-        // No tenemos una forma perfecta de saber si el click fue en el trigger,
-        // pero podemos asumir que si se hizo click fuera y está abierto, queremos cerrarlo.
-        // Un pequeño retraso para no cerrarlo inmediatamente al abrir.
-        onClose();
-      };
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-          onClose();
-        }
-      };
-
-      // Usar timeout para evitar capturar el click que abrió el panel
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleGlobalClick);
-        document.addEventListener('keydown', handleKeyDown);
-      }, 0);
-
-      return () => {
-        document.body.style.paddingRight = '0px';
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleGlobalClick);
-        document.removeEventListener('keydown', handleKeyDown);
-      };
     } else {
       document.body.style.paddingRight = '0px';
     }
-  }, [open, size, onClose]);
 
-  // Si no está abierto, podríamos no renderizarlo, pero mantenerlo renderizado
-  // permite la animación de salida si se usa con framer-motion o puramente CSS.
-  // Como usamos CSS transitions para el transform, lo dejamos en el DOM pero desplazado.
-  // Además, si está cerrado ocultamos el overflow para que no estorbe (o le ponemos pointer-events-none).
+    return () => {
+      document.body.style.paddingRight = '0px';
+    };
+  }, [open, size]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!document.contains(target)) return;
+      if (panelRef.current && panelRef.current.contains(target)) return;
+      onClose();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleGlobalClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleGlobalClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose]);
 
   return (
     <>
       <div
         ref={panelRef}
         className={[
-          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary shadow-2xl transition-transform duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
+          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
           sizeClasses[size],
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}

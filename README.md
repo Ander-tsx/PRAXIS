@@ -20,20 +20,28 @@
 
 # <img src="https://api.iconify.design/lucide/list.svg?color=%233b82f6" width="24" height="24" alt="TOC"> Tabla de contenido
 
-- [Sobre el proyecto](#-sobre-el-proyecto)
-- [Arquitectura](#-arquitectura)
-- [Stack tecnológico](#-stack-tecnológico)
-- [Estructura del proyecto](#-estructura-del-proyecto)
-- [Requisitos previos](#-requisitos-previos)
-- [Instalación y configuración](#-instalación-y-configuración)
-- [Uso y comandos](#-uso-y-comandos)
-- [Variables de entorno](#-variables-de-entorno)
-- [Pruebas](#-pruebas)
-- [Despliegue](#-despliegue)
-- [Capturas de pantalla](#-capturas-de-pantalla)
-- [Roadmap](#-roadmap)
-- [Contribuciones](#-contribuciones)
-- [Licencia](#-licencia)
+- [PRAXIS](#praxis)
+- [ Tabla de contenido](#-tabla-de-contenido)
+- [ Sobre el proyecto](#-sobre-el-proyecto)
+- [ Arquitectura](#-arquitectura)
+  - [Visión general](#visión-general)
+  - [Infraestructura en producción](#infraestructura-en-producción)
+- [ Stack tecnológico](#-stack-tecnológico)
+- [ Estructura del proyecto](#-estructura-del-proyecto)
+- [ Requisitos previos](#-requisitos-previos)
+- [ Instalación y configuración](#-instalación-y-configuración)
+  - [Opción A: CLI interactivo (recomendado)](#opción-a-cli-interactivo-recomendado)
+  - [Opción B: Paso a paso](#opción-b-paso-a-paso)
+- [ Uso y comandos](#-uso-y-comandos)
+  - [Desarrollo](#desarrollo)
+  - [Base de datos](#base-de-datos)
+  - [Calidad](#calidad)
+- [ Variables de entorno](#-variables-de-entorno)
+- [ Pruebas](#-pruebas)
+- [ Despliegue](#-despliegue)
+- [ Capturas de pantalla](#-capturas-de-pantalla)
+- [ Contribuciones](#-contribuciones)
+- [ Licencia](#-licencia)
 
 ---
 
@@ -70,6 +78,8 @@ flowchart TB
         Proj["projects-front :4103\n/projects"]
         Rep["reports-front :4104\n/reports"]
         Adm["admin-front :4105\n/admin"]
+        Chat["chat-front :4106\n/chat"]
+        AsstF["assistant-front :4107\n/assistant"]
     end
 
     subgraph gw["API Gateway :3000"]
@@ -121,7 +131,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | Componente | Recurso GCP | Detalle |
 | :--- | :--- | :--- |
 | Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa los 8 procesos Node.js |
-| Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa las 6 apps Next.js |
+| Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa las 8 apps Next.js |
 | Base de datos | Cloud SQL PostgreSQL 16 (IP privada) | Backups 7 días, acceso exclusivo por VPC |
 | Caché/Sesiones | VM e2-micro con Redis 7 | Firewall solo desde el backend |
 | Almacenamiento | Cloud Storage (bucket privado) | Adjuntos de chat con acceso IAM |
@@ -138,7 +148,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | Categoría | Tecnología | Uso |
 | :--- | :--- | :--- |
 | **Monorepo** | ![Turborepo](https://img.shields.io/badge/Turborepo-000?style=flat-square&logo=turborepo&logoColor=white) ![pnpm](https://img.shields.io/badge/pnpm_9-F69220?style=flat-square&logo=pnpm&logoColor=white) | Orquestación de tareas con caché y gestión de workspaces |
-| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | 6 microfrontends Multi-Zone con Server Components |
+| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | 8 microfrontends Multi-Zone con Server Components |
 | **Estilos** | ![Tailwind](https://img.shields.io/badge/Tailwind_v4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white) | `@theme static` en CSS, sin `tailwind.config` |
 | **3D / Animación** | ![Three.js](https://img.shields.io/badge/Three.js-000?style=flat-square&logo=three.js&logoColor=white) ![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=flat-square&logoColor=black) | Landing page interactiva del web-shell |
 | **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 8 microservicios TCP |
@@ -167,6 +177,8 @@ PRAXIS/
 │   │   ├── projects-front/     # /projects — catálogo, Kanban, tareas, miembros
 │   │   ├── reports-front/      # /reports — métricas, Monte Carlo, asistente IA
 │   │   ├── admin-front/        # /admin — cuentas, suspensión, auditoría (rol Admin)
+│   │   ├── chat-front/         # /chat — mensajería en tiempo real, canales, DMs
+│   │   ├── assistant-front/    # /assistant — interfaz del asistente conversacional
 │   │   └── commons/            # Atomic Design: atoms/, molecules/, organisms/
 │   │                           # + auth, api, tokens, hooks, theme
 │   ├── backend/
@@ -251,7 +263,7 @@ pnpm prisma:seed
 
 # 7. Arrancar todo
 pnpm dev:backend    # gateway + 8 microservicios
-pnpm dev:frontend   # web-shell + 5 zonas
+pnpm dev:frontend   # web-shell + 7 zonas
 ```
 
 > [!IMPORTANT]
@@ -268,12 +280,10 @@ pnpm dev:frontend   # web-shell + 5 zonas
 # <img src="https://api.iconify.design/lucide/square-terminal.svg?color=%233b82f6" width="24" height="24" alt="Comandos"> Uso y comandos
 
 ## Desarrollo
-
 | Comando | Descripción |
 | :--- | :--- |
-| `pnpm dev:cli` | CLI interactivo con presets y REPL `praxis>` |
 | `pnpm dev:backend` | Gateway + 8 microservicios |
-| `pnpm dev:frontend` | Web-shell + 5 microfrontends |
+| `pnpm dev:frontend` | Web-shell + 7 microfrontends |
 | `pnpm build` | Build de producción completo |
 | `pnpm build:shared` | Compila `contracts` + `observability` |
 

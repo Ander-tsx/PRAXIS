@@ -26,7 +26,9 @@ export function PraxCreateProjectTrigger({
   const dock = useDock();
 
   const onClick = useCallback(() => {
-    if (dock) {
+    if (window.innerWidth < 768) {
+      window.location.assign('/assistant');
+    } else if (dock) {
       dock.abrir();
     }
   }, [dock]);

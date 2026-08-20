@@ -30,6 +30,16 @@ export interface WorkspacePickerProps {
   canEditBoard: boolean;
   /** Eliminar un espacio: `canDeleteBoard`. */
   canDeleteBoard: boolean;
+  /**
+   * Versión de una línea, para la barra del tablero.
+   *
+   * El selector nació ocupando una fila para él solo, con su etiqueta encima del
+   * nombre. Eso está bien cuando la pantalla se desplaza y sobra alto; en el
+   * tablero a pantalla completa cada fila de cromo son cinco tarjetas menos, y
+   * el espacio activo es un dato de una palabra. En compacto es un botón como
+   * los de al lado y el panel se despliega flotando.
+   */
+  compacto?: boolean;
 }
 
 /**
@@ -65,6 +75,7 @@ export function WorkspacePicker({
   canManage,
   canEditBoard,
   canDeleteBoard,
+  compacto = false,
 }: WorkspacePickerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -137,25 +148,34 @@ export function WorkspacePicker({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-sm">
+    <div ref={containerRef} className={compacto ? 'relative shrink-0' : 'relative w-full max-w-sm'}>
       <button
         type="button"
         onClick={() => (open ? cerrar() : setOpen(true))}
         aria-haspopup="true"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong"
+        title={compacto ? `Espacio de trabajo: ${active?.name ?? 'ninguno'}` : undefined}
+        className={
+          compacto
+            ? 'flex max-w-[14rem] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-left font-sans text-sm font-semibold text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong'
+        }
       >
-        <span className="flex min-w-0 flex-col">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
-            Espacio de trabajo
+        {compacto ? (
+          <span className="truncate">{active?.name ?? 'Ninguno todavía'}</span>
+        ) : (
+          <span className="flex min-w-0 flex-col">
+            <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+              Espacio de trabajo
+            </span>
+            <span className="truncate font-sans text-base font-semibold text-text-primary">
+              {active?.name ?? 'Ninguno todavía'}
+            </span>
           </span>
-          <span className="truncate font-sans text-base font-semibold text-text-primary">
-            {active?.name ?? 'Ninguno todavía'}
-          </span>
-        </span>
+        )}
 
         <svg
-          className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`${compacto ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -168,23 +188,20 @@ export function WorkspacePicker({
 
       {open && (
         <div
-          className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-xl border border-border bg-surface"
-          style={{ boxShadow: `0 16px 40px ${alpha(colors.overlay, 60)}` }}
+          className={`absolute top-full z-30 mt-2 overflow-hidden rounded-2xl border border-border bg-surface-elevated ${
+            compacto ? 'left-0 w-72 shadow-lg' : 'left-0 right-0 shadow-lg'
+          }`}
         >
-          {/* Lista de botones, no un `listbox`: un listbox de verdad exige
-              navegación con flechas y foco gestionado, y anunciarlo sin
-              implementarlo engaña al lector de pantalla. `aria-current` marca
-              el activo, que es lo que hace falta aquí. */}
           {gestionando ? (
             <div className="flex flex-col gap-1 p-2">
-              <div className="flex items-center justify-between gap-2 px-1">
-                <span className="truncate font-sans text-sm font-semibold text-text-primary">
+              <div className="flex items-center justify-between gap-2 px-2 py-1">
+                <span className="truncate font-sans text-sm font-medium text-text-primary">
                   {gestionando.name}
                 </span>
                 <button
                   type="button"
                   onClick={cerrarGestion}
-                  className="shrink-0 cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  className="shrink-0 cursor-pointer rounded-md px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
                 >
                   Volver
                 </button>
@@ -197,9 +214,6 @@ export function WorkspacePicker({
                 validarNombre={validateWorkspace}
                 canEdit={canEditBoard}
                 canDelete={canDeleteBoard}
-                /* Vacío se borra de un clic; con tableros dentro, hay que
-                   escribir el nombre: el borrado cascadea sobre ellos y sobre
-                   sus columnas, y el backend responde 200 tan tranquilo. */
                 exigeEscribirNombre={gestionando.boards.length > 0}
                 avisoDeBorrado={avisoDeBorrado(gestionando)}
                 camposOcultos={
@@ -226,19 +240,15 @@ export function WorkspacePicker({
           ) : (
             <>
               {workspaces.length > 0 && (
-                <ul className="max-h-64 overflow-y-auto py-1">
+                <ul className="max-h-64 overflow-y-auto p-1.5 flex flex-col gap-0.5">
                   {workspaces.map((workspace) => {
                     const isActive = workspace.id === activeId;
                     return (
-                      /* Fila = elegir + gestionar. Dos botones hermanos y no uno
-                     dentro de otro: un `<button>` anidado es HTML inválido y el
-                     navegador lo desanida por su cuenta, sacando los tres
-                     puntos de la fila. */
                       <li
                         key={workspace.id}
                         className={[
-                          'flex items-center transition-colors',
-                          isActive ? '' : 'hover:bg-surface-elevated',
+                          'flex items-center transition-colors rounded-xl',
+                          isActive ? '' : 'hover:bg-surface',
                         ].join(' ')}
                         style={isActive ? { background: alpha(colors.primary, 10) } : undefined}
                       >
@@ -247,15 +257,15 @@ export function WorkspacePicker({
                           aria-current={isActive ? 'true' : undefined}
                           onClick={() => select(workspace.id)}
                           className={[
-                            'flex min-w-0 flex-1 items-center justify-between gap-3 py-2.5 pl-4 text-left',
-                            puedeGestionar ? 'pr-2' : 'pr-4',
+                            'flex min-w-0 flex-1 items-center justify-between gap-3 py-2 pl-3 text-left',
+                            puedeGestionar ? 'pr-1' : 'pr-3',
                             isActive
-                              ? 'text-text-primary'
+                              ? 'text-primary font-medium'
                               : 'text-text-secondary hover:text-text-primary',
                           ].join(' ')}
                         >
                           <span className="truncate font-sans text-sm">{workspace.name}</span>
-                          <span className="shrink-0 font-sans text-xs text-text-disabled">
+                          <span className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}>
                             {workspace.boards.length}{' '}
                             {workspace.boards.length === 1 ? 'tablero' : 'tableros'}
                           </span>
@@ -267,7 +277,7 @@ export function WorkspacePicker({
                             onClick={() => setGestionando(workspace)}
                             aria-label={`Opciones del espacio ${workspace.name}`}
                             title="Renombrar o eliminar"
-                            className="mr-2 shrink-0 cursor-pointer rounded-lg px-1.5 py-1.5 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="mr-1.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
                             <svg
                               className="h-4 w-4"
@@ -294,35 +304,28 @@ export function WorkspacePicker({
                   onSubmit={(event) => {
                     if (clientError || !name.trim()) event.preventDefault();
                   }}
-                  className="flex flex-col gap-2 border-t border-border p-3"
+                  className="flex flex-col gap-2 border-t border-border p-2 bg-surface"
                 >
                   <input type="hidden" name="projectId" value={projectId} />
 
-                  <label
-                    htmlFor={inputId}
-                    className="font-sans text-[11px] uppercase tracking-wider text-text-disabled"
-                  >
-                    Crear un espacio
-                  </label>
-
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <input
                       id={inputId}
                       name="name"
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       maxLength={WORKSPACE_NAME_MAX}
-                      placeholder="Desarrollo, Diseño, QA…"
+                      placeholder="Crear espacio nuevo..."
                       autoComplete="off"
-                      className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface-elevated px-3 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-disabled focus:border-primary"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-disabled hover:bg-surface-elevated focus:bg-surface-elevated focus:border-border"
                     />
-                    <Button type="submit" size="sm" isLoading={pending} disabled={!name.trim()}>
-                      Crear
+                    <Button type="submit" size="sm" variant="secondary" isLoading={pending} disabled={!name.trim()} className="h-8 py-0">
+                      Añadir
                     </Button>
                   </div>
 
                   {(clientError || state.error) && (
-                    <p role="alert" className="font-sans text-xs text-error">
+                    <p role="alert" className="font-sans text-xs text-error px-2 pb-1">
                       {clientError ?? state.error}
                     </p>
                   )}

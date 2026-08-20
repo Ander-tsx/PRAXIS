@@ -6,6 +6,7 @@ import {
   type Board,
   type Column,
   type ColumnColor,
+  DONE_COLUMN_COLOR,
   type Label,
   type Task,
   type UserProfile,
@@ -13,8 +14,15 @@ import {
   colors,
   useAccion,
 } from '@praxis/commons';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
+import { TaskDialog } from '../TaskBoard/TaskDialog';
+import { TaskCard } from '../TaskBoard/TaskCard';
+import { CURVA } from '../TaskBoard/arrastre';
+import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movimientos';
+import { useArrastreDeTablero } from '../TaskBoard/useArrastreDeTablero';
+import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
 import { MinimizarIcono } from './TableroExpandible';
@@ -73,23 +81,45 @@ function tintOf(color: ColumnColor, index: number): string {
 }
 
 /**
- * Columnas de un tablero, reordenables arrastrando.
+ * Las columnas de un tablero, y todo lo que se arrastra dentro de ellas.
  *
- * **El reordenado es en vivo:** al pasar sobre otra columna, las dos se
- * intercambian en el momento, así que lo que ves mientras arrastras es
- * exactamente cómo va a quedar. Esperar al soltar obligaba a imaginárselo.
+ * ## Lo que cambió, y por qué importa
  *
- * El intercambio se hace en `dragover` y se autoestabiliza: tras el cambio, el
- * cursor queda sobre la columna arrastrada, así que el siguiente `dragover` ve
- * origen y destino iguales y no hace nada. Sin eso, mantener el puntero quieto
- * sobre un vecino provocaría un parpadeo continuo.
+ * Este componente hacía dos cosas mal, y las dos se notaban en la mano:
  *
- * Se guarda al soltar, no en cada cruce: un arrastre largo son muchos
- * intercambios y no tiene sentido mandar una petición por cada uno.
+ * 1. 🔴 **Soltar una tarjeta no la movía; se lo pedía al servidor y esperaba.**
+ *    La tarjeta volvía a su columna de origen y ahí se quedaba hasta que la
+ *    petición terminaba y la página revalidaba entera. En una red normal eso es
+ *    medio segundo de una tarjeta deshaciendo lo que acabas de hacer, y luego un
+ *    salto. Ahora el movimiento **se aplica en el cliente al soltar** y solo se
+ *    deshace si el servidor lo rechaza. Ver `TaskBoard/movimientos.ts`.
+ * 2. **El gesto era el arrastre nativo del navegador.** Fantasma que no se puede
+ *    animar, eventos a saltos, nada en pantallas táctiles y —lo peor— un destino
+ *    que solo sabía decir «encima de esta columna», así que toda tarjeta soltada
+ *    aterrizaba al final. Ahora el gesto se calcula midiendo, y cae **en el hueco
+ *    exacto** que enseña el propio tablero mientras arrastras. Ver
+ *    `TaskBoard/arrastre.ts`.
  *
- * Usa la API nativa del navegador en vez de una librería: mover elementos en
- * una sola fila es el caso más simple del problema y no justifica la
- * dependencia.
+ * ## Cómo encajan las piezas
+ *
+ * | Pieza | De qué se ocupa |
+ * |---|---|
+ * | `useArrastreDeTablero` | El gesto: qué viaja, dónde caería, autodesplazamiento |
+ * | `useMovimientosOptimistas` | Que la pantalla vaya por delante del servidor, y sepa volver |
+ * | `useReposicionAnimada` | Que nada aparezca ni desaparezca de golpe |
+ *
+ * Este componente solo las conecta y decide **qué se guarda**: eso es lo único
+ * que no puede vivir en un hook genérico, porque depende del contrato del
+ * backend —`status` es el nombre de la columna, el `order` no lo reindexa nadie—.
+ *
+ * ## El reordenado de columnas sigue siendo en vivo
+ *
+ * Al pasar por encima de otra columna se abre el hueco donde va a caer, y se
+ * guarda al soltar: un arrastre largo son muchos cruces y no tiene sentido
+ * mandar una petición por cada uno. Lo que cambió es que la columna arrastrada
+ * ya no se intercambia con sus vecinas, sino que **sale de la fila** y deja un
+ * hueco — con el intercambio, mover una columna tres puestos repintaba tres
+ * veces todo su contenido.
  */
 export function BoardColumns({
   board,
@@ -113,86 +143,68 @@ export function BoardColumns({
   const [columns, setColumns] = useState<Column[]>(() =>
     [...board.columns].sort((a, b) => a.order - b.order),
   );
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
+
+  const [openTask, setOpenTask] = useState<Task | null>(
+    () => tasks.find((task) => task.id === openTaskId) ?? null,
+  );
+
+  const [renderedTask, setRenderedTask] = useState<Task | null>(openTask);
+
+  const handleCloseTask = useCallback(() => {
+    setOpenTask(null);
+  }, []);
+
+  useEffect(() => {
+    if (openTask) setRenderedTask(openTask);
+  }, [openTask]);
+
+  useEffect(() => {
+    if (!openTask) return;
+    const fresh = tasks.find((task) => task.id === openTask.id);
+    if (fresh && fresh !== openTask) setOpenTask(fresh);
+    if (!fresh) setOpenTask(null);
+  }, [tasks, openTask]);
 
   /**
    * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
    *
-   * Dentro de un ancestro `draggable` el navegador no deja seleccionar texto con
-   * el ratón: sin esto, el campo de renombrar no se podía ni marcar para
-   * corregir una letra.
+   * Dentro del menú hay un campo de renombrar, y un `pointerdown` que empieza un
+   * arrastre le roba el gesto de colocar el cursor.
    */
   const [menuOpenColumnId, setMenuOpenColumnId] = useState<string | null>(null);
 
   /** Columna abierta a pantalla completa, si hay alguna. */
   const [columnaExpandidaId, setColumnaExpandidaId] = useState<string | null>(null);
 
-  /** Tarea en vuelo. Mientras haya una, el arrastre de columnas se desactiva. */
-  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
-  /** Movimiento pendiente de guardar; lo dispara el formulario oculto. */
-  const [pendingMove, setPendingMove] = useState<{
-    taskId: string;
-    columnId: string;
-    status: string;
-    order: number;
-  } | null>(null);
   const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
-  const moveFormRef = useRef<HTMLFormElement>(null);
+  const [reorderState, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
 
-  const formRef = useRef<HTMLFormElement>(null);
-  /** Orden con el que empezó el arrastre: si no cambia, no se guarda nada. */
-  const orderAtDragStart = useRef<string>('');
+  const { movimientos, registrar, confirmar, revertir } = useMovimientosOptimistas(tasks);
+  const reposicion = useReposicionAnimada();
+
+  const tasksByColumn = repartirPorColumna(tasks, movimientos);
 
   /**
-   * Envía el movimiento cuando el estado ya está pintado.
+   * A qué tarea corresponde cada respuesta.
    *
-   * Va por un formulario oculto, como el reordenado de columnas: el gesto
-   * termina en el cliente y no hay ningún botón que pulsar.
+   * `useAccion` devuelve **un** estado, no uno por llamada, así que con dos
+   * movimientos seguidos no habría forma de saber cuál acaba de fallar. Las
+   * acciones del router se procesan en el orden en que se despachan, así que una
+   * cola FIFO basta: el resultado que llega es el de la cabeza.
    */
+  const colaDeMovimientos = useRef<string[]>([]);
+  const ultimoResultado = useRef(moveState);
+
   useEffect(() => {
-    if (!pendingMove) return;
-    queueMicrotask(() => moveFormRef.current?.requestSubmit());
-  }, [pendingMove]);
+    if (moveState === ultimoResultado.current) return;
+    ultimoResultado.current = moveState;
 
-  /** Agrupa por columna una sola vez, en vez de filtrar dentro del map. */
-  const tasksByColumn = new Map<string, Task[]>();
-  for (const task of tasks) {
-    const list = tasksByColumn.get(task.columnId);
-    if (list) list.push(task);
-    else tasksByColumn.set(task.columnId, [task]);
-  }
-  for (const list of tasksByColumn.values()) {
-    list.sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt));
-  }
-
-  /**
-   * Suelta una tarea en una columna.
-   *
-   * ⚠️ Manda `columnId` **y** `status`, y `status` es el **nombre** de la
-   * columna destino, no su id: así lo modela el backend, y mandar el id dejaría
-   * la tarea con un estado que no corresponde a ninguna columna.
-   *
-   * Va al final de la columna destino. Reordenar dentro de una columna sería
-   * otro gesto y todavía no lo tenemos.
-   */
-  function dropTask(columnId: string) {
-    const taskId = draggingTaskId;
-    setDraggingTaskId(null);
+    const taskId = colaDeMovimientos.current.shift();
     if (!taskId) return;
 
-    const task = tasks.find((candidate) => candidate.id === taskId);
-    const target = columns.find((column) => column.id === columnId);
-    if (!task || !target) return;
-    if (task.columnId === columnId) return;
-
-    setPendingMove({
-      taskId,
-      columnId,
-      status: target.name,
-      order: tasksByColumn.get(columnId)?.length ?? 0,
-    });
-  }
+    if (moveState.error) revertir(taskId);
+    else confirmar(taskId);
+  }, [moveState, revertir, confirmar]);
 
   /**
    * El servidor manda: cuando la página revalida, el orden que llega sustituye
@@ -201,6 +213,143 @@ export function BoardColumns({
   useEffect(() => {
     setColumns([...board.columns].sort((a, b) => a.order - b.order));
   }, [board.columns]);
+
+  /* ─── El gesto ───────────────────────────────────────────────────────── */
+
+  const guardarMovimiento = useCallback(
+    (
+      taskId: string,
+      destino: { columnId: string; indice: number },
+      cajaDelFantasma: DOMRect | null,
+    ) => {
+      const task = tasks.find((candidata) => candidata.id === taskId);
+      const columnaDestino = columns.find((column) => column.id === destino.columnId);
+      if (!task || !columnaDestino) return;
+
+      const actual = tasksByColumn.get(task.columnId) ?? [];
+      const posicionActual = actual.findIndex((candidata) => candidata.id === taskId);
+      const enLaMismaColumna = (tasksByColumn.get(destino.columnId) ?? []).some(
+        (candidata) => candidata.id === taskId,
+      );
+
+      /* Soltar donde ya estaba no es un movimiento. Sin esta salida, cada
+         arrastre que se arrepiente a mitad manda una petición y revalida la
+         página entera para dejar todo igual. */
+      if (enLaMismaColumna && destino.indice === posicionActual) return;
+
+      /* La tarjeta aterriza donde la dejó la mano y viaja hasta su hueco. */
+      reposicion.sembrar(taskId, cajaDelFantasma);
+
+      const sinLaTarea = (tasksByColumn.get(destino.columnId) ?? []).filter(
+        (candidata) => candidata.id !== taskId,
+      );
+      const finales = [...sinLaTarea];
+      finales.splice(Math.min(destino.indice, finales.length), 0, task);
+
+      registrar({
+        taskId,
+        columnId: destino.columnId,
+        status: columnaDestino.name,
+        indice: destino.indice,
+      });
+
+      /**
+       * Las que hay que renumerar, y solo esas.
+       *
+       * ⚠️ El backend escribe el `order` que le mandas y **no reindexa nada**, así
+       * que insertar en medio deja dos tareas con el mismo número y su orden
+       * relativo pasa a decidirlo el desempate por `createdAt`. Aquí se comparan
+       * los `order` que ya hay en pantalla contra la posición final y se manda
+       * únicamente la diferencia: soltar al final de una columna —el caso
+       * corriente— no genera ninguna.
+       */
+      const renumerar = finales
+        .map((candidata, indice) => ({ candidata, indice }))
+        .filter(({ candidata, indice }) => candidata.id !== taskId && candidata.order !== indice)
+        .map(({ candidata, indice }) => `${candidata.id}:${indice}`)
+        .join(',');
+
+      const datos = new FormData();
+      datos.set('projectId', projectId);
+      datos.set('taskId', taskId);
+      datos.set('columnId', destino.columnId);
+      datos.set('status', columnaDestino.name);
+      datos.set('order', String(finales.findIndex((candidata) => candidata.id === taskId)));
+      datos.set('renumerar', renumerar);
+
+      colaDeMovimientos.current.push(taskId);
+      moveAction(datos);
+    },
+    [tasks, columns, tasksByColumn, projectId, moveAction, registrar, reposicion],
+  );
+
+  const guardarOrdenDeColumnas = useCallback(
+    (siguiente: Column[]) => {
+      const datos = new FormData();
+      datos.set('boardId', board.id);
+      datos.set('projectId', projectId);
+      datos.set('columnIds', siguiente.map((column) => column.id).join(','));
+      reorderAction(datos);
+    },
+    [board.id, projectId, reorderAction],
+  );
+
+  /**
+   * Coloca una columna en una posición y lo guarda.
+   *
+   * ⚠️ **El cálculo va fuera de `setColumns`, y no es cuestión de estilo.**
+   * Estuvo dentro del actualizador, que parece el sitio natural —ahí tienes el
+   * valor bueno— salvo que React ejecuta esa función **durante el render**, y
+   * despachar desde ahí una Server Action revienta con `Cannot update action
+   * state while rendering`. Salía en la consola en cada arrastre de columna, y
+   * el orden se guardaba igual: por eso era fácil no mirarlo.
+   */
+  const soltarColumna = useCallback(
+    (columnId: string, indice: number, cajaDelFantasma: DOMRect | null) => {
+      const desde = columns.findIndex((column) => column.id === columnId);
+      if (desde === -1) return;
+
+      const siguiente = [...columns];
+      const [movida] = siguiente.splice(desde, 1);
+      siguiente.splice(Math.min(indice, siguiente.length), 0, movida);
+
+      // Soltarla donde ya estaba no es un cambio, y no cuesta una petición.
+      const antes = columns.map((column) => column.id).join(',');
+      if (siguiente.map((column) => column.id).join(',') === antes) return;
+
+      reposicion.sembrar(`columna:${columnId}`, cajaDelFantasma);
+      setColumns(siguiente);
+      guardarOrdenDeColumnas(siguiente);
+    },
+    [columns, guardarOrdenDeColumnas, reposicion],
+  );
+
+  const arrastreDeTablero = useArrastreDeTablero({
+    alSoltarTarea: guardarMovimiento,
+    alSoltarColumna: soltarColumna,
+  });
+
+  const {
+    arrastre,
+    destinoTarea,
+    destinoColumna,
+    fantasmaRef,
+    empezar,
+    registrarPista,
+    registrarColumna,
+    registrarLista,
+    registrarTarjeta,
+  } = arrastreDeTablero;
+
+  const empezarArrastreDeTarea = useCallback(
+    (taskId: string, columnId: string, evento: React.PointerEvent) => {
+      if (!canMoveTask) return;
+      empezar(evento, { tipo: 'tarea', id: taskId, columnaOrigen: columnId });
+    },
+    [canMoveTask, empezar],
+  );
+
+  /* ─── Pantalla completa de una columna ───────────────────────────────── */
 
   /** Escape sale de la columna a pantalla completa, y el fondo no se desplaza. */
   useEffect(() => {
@@ -233,9 +382,139 @@ export function BoardColumns({
     ? (columns.find((column) => column.id === columnaExpandidaId) ?? null)
     : null;
 
-  function startDrag(id: string) {
-    setDraggingId(id);
-    orderAtDragStart.current = columns.map((column) => column.id).join(',');
+  /* ─── Pintado ────────────────────────────────────────────────────────── */
+
+  const arrastrandoColumna = arrastre?.tipo === 'columna' ? arrastre : null;
+  const columnasVisibles = arrastrandoColumna
+    ? columns.filter((column) => column.id !== arrastrandoColumna.id)
+    : columns;
+  const huecoDeColumna =
+    arrastrandoColumna && destinoColumna !== null
+      ? Math.min(destinoColumna, columnasVisibles.length)
+      : -1;
+
+  /** La tarea que viaja, para pintarla dentro del fantasma. */
+  const tareaEnVuelo =
+    arrastre?.tipo === 'tarea' ? tasks.find((task) => task.id === arrastre.id) : undefined;
+  const columnaEnVuelo =
+    arrastre?.tipo === 'columna' ? columns.find((column) => column.id === arrastre.id) : undefined;
+
+  function pintarColumna(column: Column, index: number) {
+    const conMenuAbierto = menuOpenColumnId === column.id;
+    const deLaColumna = tasksByColumn.get(column.id) ?? [];
+
+    return (
+      <div
+        key={column.id}
+        ref={(el) => {
+          registrarColumna(column.id, el);
+          reposicion.registrar(`columna:${column.id}`, el);
+        }}
+        className="flex h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface"
+        style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
+      >
+        {/**
+         * La cabecera **es el asa**, y el resto de la columna no lo es.
+         *
+         * Antes lo era la columna entera, con dos efectos malos: dentro de un
+         * elemento arrastrable no se puede seleccionar texto —había que apagar
+         * el arrastre a mano cada vez que se abría el menú de renombrar— y coger
+         * una tarjeta empezaba a mover la columna si el gesto se escapaba un
+         * píxel. Con el asa acotada aquí, los dos gestos dejan de competir.
+         */}
+        <header
+          onPointerDown={(evento) => {
+            if (!canEditColumn || conMenuAbierto) return;
+            /* Solo el fondo de la cabecera: sobre un botón, el gesto es del botón. */
+            if ((evento.target as HTMLElement).closest('button')) return;
+            empezar(evento, { tipo: 'columna', id: column.id });
+          }}
+          className={[
+            'flex shrink-0 items-center justify-between gap-2 px-4 pb-3 pt-4',
+            canEditColumn && !conMenuAbierto ? 'cursor-grab active:cursor-grabbing' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full transition-colors"
+              style={{ background: tintOf(column.color, index) }}
+            />
+            <h5 className="truncate font-sans text-sm font-semibold text-text-primary">
+              {column.name}
+            </h5>
+          </span>
+
+          <span className="flex shrink-0 items-center gap-1">
+            {/* Reordenar sin arrastrar: el arrastre no llega al teclado ni
+                a un lector de pantalla, así que no puede ser la única
+                forma de mover una columna. */}
+            {canEditColumn && columns.length > 1 && (
+              <>
+                <NudgeButton
+                  direction={-1}
+                  disabled={index === 0}
+                  columnName={column.name}
+                  onClick={() => nudge(column.id, -1)}
+                />
+                <NudgeButton
+                  direction={1}
+                  disabled={index === columns.length - 1}
+                  columnName={column.name}
+                  onClick={() => nudge(column.id, 1)}
+                />
+              </>
+            )}
+            <span
+              className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
+              style={{ background: alpha(colors.border, 60) }}
+            >
+              {deLaColumna.length}
+            </span>
+            <ColumnMenu
+              boardId={board.id}
+              projectId={projectId}
+              columnId={column.id}
+              columnName={column.name}
+              columnColor={column.color}
+              taskCount={deLaColumna.length}
+              canEdit={canEditColumn}
+              canDelete={canDeleteColumn}
+              onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}
+              onFullscreen={() => setColumnaExpandidaId(column.id)}
+            />
+          </span>
+        </header>
+
+        <div className="flex min-h-0 flex-1 flex-col px-2 pb-3">
+          <ColumnTasks
+            projectId={projectId}
+            boardId={board.id}
+            column={column}
+            tasks={deLaColumna}
+            members={members}
+            labels={labels}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            canCreate={canCreateTask}
+            canMove={canMoveTask}
+            canComment={canComment}
+            canManageLabels={canManageLabels}
+            canEdit={canEditTask}
+            canDelete={canDeleteTask}
+            onOpenTask={setOpenTask}
+            arrastre={arrastre}
+            destino={destinoTarea}
+            alEmpezarArrastre={empezarArrastreDeTarea}
+            registrarLista={registrarLista}
+            registrarTarjeta={registrarTarjeta}
+            registrarReposicion={reposicion.registrar}
+            alDesplazar={reposicion.invalidar}
+          />
+        </div>
+      </div>
+    );
   }
 
   /** Mueve una columna un puesto a izquierda o derecha y lo guarda. */
@@ -249,207 +528,113 @@ export function BoardColumns({
     next.splice(to, 0, moved);
 
     setColumns(next);
-    queueMicrotask(() => formRef.current?.requestSubmit());
+    guardarOrdenDeColumnas(next);
   }
 
-  /** Mueve la columna arrastrada a la posición de `targetId`. */
-  function moveOver(targetId: string) {
-    if (!draggingId || draggingId === targetId) return;
-
-    setColumns((current) => {
-      const from = current.findIndex((column) => column.id === draggingId);
-      const to = current.findIndex((column) => column.id === targetId);
-      if (from === -1 || to === -1 || from === to) return current;
-
-      const next = [...current];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  }
-
-  function endDrag() {
-    setDraggingId(null);
-
-    const finalOrder = columns.map((column) => column.id).join(',');
-    if (finalOrder === orderAtDragStart.current) return;
-
-    // Tras el repintado, para que el campo oculto lleve ya el orden final.
-    queueMicrotask(() => formRef.current?.requestSubmit());
-  }
+  const aviso = moveState.error ?? reorderState.error;
 
   return (
-    <>
-      <form ref={formRef} action={reorderAction} className="hidden">
-        <input type="hidden" name="boardId" value={board.id} />
-        <input type="hidden" name="projectId" value={projectId} />
-        <input type="hidden" name="columnIds" value={columns.map((c) => c.id).join(',')} />
-      </form>
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/**
+       * La pista de columnas: **el único desplazamiento horizontal de la
+       * pantalla**, y ocupa todo el alto que le den.
+       *
+       * `items-stretch` es lo que hace que todas las columnas midan lo mismo
+       * independientemente de cuántas tareas tengan. Antes eran `items-start` y
+       * cada columna medía su contenido: una con dos tareas al lado de una con
+       * quince dejaba un escalón de medio metro y el tablero se leía como una
+       * gráfica de barras.
+       */}
+      <div
+        ref={registrarPista}
+        onScroll={reposicion.invalidar}
+        className="scrollbar-slim -mx-1 flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto px-1 pb-1"
+      >
+        {columnasVisibles.flatMap((column, index) =>
+          index === huecoDeColumna
+            ? [
+                <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />,
+                pintarColumna(column, index),
+              ]
+            : [pintarColumna(column, index)],
+        )}
+        {huecoDeColumna >= columnasVisibles.length && (
+          <HuecoDeColumna key="hueco-columna" ancho={arrastrandoColumna?.ancho ?? 288} />
+        )}
 
-      <form ref={moveFormRef} action={moveAction} className="hidden">
-        <input type="hidden" name="projectId" value={projectId} />
-        <input type="hidden" name="taskId" value={pendingMove?.taskId ?? ''} />
-        <input type="hidden" name="columnId" value={pendingMove?.columnId ?? ''} />
-        <input type="hidden" name="status" value={pendingMove?.status ?? ''} />
-        <input type="hidden" name="order" value={pendingMove?.order ?? 0} />
-      </form>
+        {canCreateColumn && (
+          <div className="self-start">
+            <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
+          </div>
+        )}
+      </div>
 
-      {moveState.error && (
-        <p role="alert" className="pb-2 font-sans text-xs" style={{ color: colors.error }}>
-          {moveState.error}
+      {/**
+       * El aviso de un guardado que falló, **flotando sobre el tablero**.
+       *
+       * Ocupaba una línea del flujo, así que aparecer y desaparecer empujaba las
+       * columnas dos centímetros arriba y abajo. Un error que reorganiza la
+       * pantalla al llegar es peor que el error.
+       */}
+      {aviso && (
+        <p
+          role="alert"
+          className="pointer-events-none absolute inset-x-0 bottom-2 mx-auto w-fit rounded-lg px-3 py-1.5 font-sans text-xs shadow-lg"
+          style={{ background: alpha(colors.error, 15), color: colors.error }}
+        >
+          {aviso}
         </p>
       )}
 
-      <div className="scrollbar-none -mx-1 flex items-start gap-4 overflow-x-auto px-1 pb-2">
-        {columns.map((column, index) => {
-          const isDragging = column.id === draggingId;
-
-          return (
-            <div
-              key={column.id}
-              /* Mientras viaja una tarea la columna no se arrastra: si no, coger
-                 una tarjeta acabaría moviendo la columna entera. Con el menú
-                 abierto tampoco: dentro de un ancestro arrastrable no se puede
-                 seleccionar texto, y el campo de renombrar está ahí dentro. */
-              draggable={canEditColumn && !draggingTaskId && menuOpenColumnId !== column.id}
-              onDragStart={(event) => {
-                /**
-                 * El estado se marca **primero**. `dataTransfer` es opcional
-                 * —Firefox exige escribir algo para iniciar el arrastre, y hay
-                 * contextos donde es de solo lectura y `setData` lanza—; si
-                 * fuera lo primero, esa excepción abortaría el handler y el
-                 * arrastre entero no haría nada.
-                 */
-                startDrag(column.id);
-                try {
-                  event.dataTransfer.setData('text/plain', column.id);
-                  event.dataTransfer.effectAllowed = 'move';
-                } catch {
-                  // Sin dataTransfer el reordenado en vivo funciona igual.
-                }
-              }}
-              onDragEnd={endDrag}
-              onDragOver={(event) => {
-                event.preventDefault();
-                try {
-                  event.dataTransfer.dropEffect = 'move';
-                } catch {
-                  // Irrelevante para el reordenado; solo cambia el cursor.
-                }
-                // Si lo que viaja es una tarea, el destino lo decide la zona de
-                // tareas: reordenar columnas aquí sería un efecto colateral.
-                if (!draggingTaskId) moveOver(column.id);
-              }}
-              onDrop={(event) => {
-                // El orden ya está aplicado; soltar solo cierra el gesto.
-                event.preventDefault();
-                if (!draggingTaskId) endDrag();
-              }}
-              className={[
-                'flex w-72 shrink-0 flex-col rounded-2xl bg-surface',
-                /* La transición va sobre transform y sombra, no sobre layout:
-                   animar posiciones aquí pelearía con el reordenado en vivo. */
-                /* Sin `transform`: la columna arrastrada **no cambia de
-                   tamaño**. Crecer la desalinea de sus vecinas y hace que el
-                   hueco donde va a caer parezca de otra medida. La sombra y el
-                   borde ya dicen cuál se está moviendo. */
-                'transition-[box-shadow,opacity] duration-200 ease-out',
-                /* Reordenar es editar la columna, igual que en el endpoint. */
-                canEditColumn ? 'cursor-grab active:cursor-grabbing' : '',
-                isDragging ? 'opacity-90' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              style={{
-                boxShadow: isDragging
-                  ? `0 18px 40px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.primary, 35)}`
-                  : `0 1px 0 ${alpha(colors.border, 45)}`,
-                /* Sacar la columna arrastrada del flujo visual del resto. */
-                zIndex: isDragging ? 10 : undefined,
-              }}
-            >
-              <header className="flex items-center justify-between gap-2 px-4 pb-3 pt-4">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full transition-colors"
-                    style={{ background: tintOf(column.color, index) }}
-                  />
-                  <h5 className="truncate font-sans text-sm font-semibold text-text-primary">
-                    {column.name}
-                  </h5>
-                </span>
-
-                <span className="flex shrink-0 items-center gap-1">
-                  {/* Reordenar sin arrastrar: el arrastre no llega al teclado ni
-                      a un lector de pantalla, así que no puede ser la única
-                      forma de mover una columna. */}
-                  {canEditColumn && columns.length > 1 && (
-                    <>
-                      <NudgeButton
-                        direction={-1}
-                        disabled={index === 0}
-                        columnName={column.name}
-                        onClick={() => nudge(column.id, -1)}
-                      />
-                      <NudgeButton
-                        direction={1}
-                        disabled={index === columns.length - 1}
-                        columnName={column.name}
-                        onClick={() => nudge(column.id, 1)}
-                      />
-                    </>
-                  )}
-                  <span
-                    className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
-                    style={{ background: alpha(colors.border, 60) }}
-                  >
-                    {tasksByColumn.get(column.id)?.length ?? 0}
-                  </span>
-                  <ColumnMenu
-                    boardId={board.id}
-                    projectId={projectId}
-                    columnId={column.id}
-                    columnName={column.name}
-                    columnColor={column.color}
-                    taskCount={tasksByColumn.get(column.id)?.length ?? 0}
-                    canEdit={canEditColumn}
-                    canDelete={canDeleteColumn}
-                    onOpenChange={(isOpen) => setMenuOpenColumnId(isOpen ? column.id : null)}
-                    onFullscreen={() => setColumnaExpandidaId(column.id)}
-                  />
-                </span>
-              </header>
-
-              <div className="px-2 pb-3">
-                <ColumnTasks
-                  projectId={projectId}
-                  boardId={board.id}
-                  column={column}
-                  tasks={tasksByColumn.get(column.id) ?? []}
-                  members={members}
-                  labels={labels}
+      {/**
+       * El fantasma: la pieza que sigue al puntero.
+       *
+       * Va en un portal al `<body>` por una razón muy concreta: cualquier
+       * antepasado con `overflow` distinto de `visible` —y aquí hay dos, la pista
+       * y la lista de la columna— **recorta** un hijo posicionado, por muy
+       * `fixed` que sea. Dentro del árbol, la tarjeta desaparecería en cuanto
+       * saliera de su columna.
+       */}
+      {arrastre &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={fantasmaRef}
+            className="pointer-events-none fixed left-0 top-0 z-[60]"
+            style={{
+              width: arrastre.ancho,
+              transform: `translate3d(${arrastre.inicialX}px, ${arrastre.inicialY}px, 0)`,
+              willChange: 'transform',
+            }}
+          >
+            <div className="fantasma-alzado">
+              {tareaEnVuelo && (
+                <TaskCard
+                  fantasma
+                  task={tareaEnVuelo}
                   usersById={usersById}
                   currentUserId={currentUserId}
-                  canCreate={canCreateTask}
-                  canMove={canMoveTask}
-                  openTaskId={openTaskId}
-                  canComment={canComment}
-                  canManageLabels={canManageLabels}
+                  onOpen={() => undefined}
                   canEdit={canEditTask}
-                  canDelete={canDeleteTask}
-                  draggingTaskId={draggingTaskId}
-                  onDragTask={setDraggingTaskId}
-                  onDropTask={dropTask}
+                  isDone={
+                    columns.find((column) => column.id === tareaEnVuelo.columnId)?.color ===
+                    DONE_COLUMN_COLOR
+                  }
+                  draggable={false}
                 />
-              </div>
-            </div>
-          );
-        })}
+              )}
 
-        {canCreateColumn && (
-          <AddColumnCard boardId={board.id} projectId={projectId} nextOrder={columns.length} />
+              {columnaEnVuelo && (
+                <ColumnaFantasma
+                  nombre={columnaEnVuelo.name}
+                  tono={tintOf(columnaEnVuelo.color, columns.indexOf(columnaEnVuelo))}
+                  tareas={(tasksByColumn.get(columnaEnVuelo.id) ?? []).length}
+                />
+              )}
+            </div>
+          </div>,
+          document.body,
         )}
-      </div>
 
       {/**
        * Una columna ocupando la pantalla.
@@ -462,6 +647,11 @@ export function BoardColumns({
        * tira, y las dos abrirían la tarea que llega en la URL: dos `<dialog
        * open>` apilados sobre la misma tarea, y al cerrar uno queda el otro
        * detrás. La de la tira ya se encarga de ese caso.
+       *
+       * ⚠️ **Tampoco registra sus nodos en el motor de arrastre.** Serían los
+       * mismos ids que los de la tira, que sigue montada debajo, y el registro
+       * es un mapa por id: la segunda instancia pisaría las medidas de la
+       * primera y el destino se calcularía contra una columna que no se ve.
        */}
       {columnaExpandida && (
         /**
@@ -529,20 +719,109 @@ export function BoardColumns({
               usersById={usersById}
               currentUserId={currentUserId}
               canCreate={canCreateTask}
-              canMove={canMoveTask}
+              canMove={false}
               canComment={canComment}
               canManageLabels={canManageLabels}
               canEdit={canEditTask}
               canDelete={canDeleteTask}
-              draggingTaskId={draggingTaskId}
-              onDragTask={setDraggingTaskId}
-              onDropTask={dropTask}
+              onOpenTask={setOpenTask}
+              arrastre={null}
+              destino={null}
+              alEmpezarArrastre={() => undefined}
+              registrarLista={() => undefined}
+              registrarTarjeta={() => undefined}
+              registrarReposicion={() => undefined}
+              alDesplazar={() => undefined}
               layout="rejilla"
             />
           </div>
         </div>
       )}
-    </>
+
+      {renderedTask && <TaskDialog
+        open={!!openTask}
+        onClose={handleCloseTask}
+        projectId={projectId}
+        boardId={board.id}
+        task={renderedTask}
+        columnId={renderedTask.columnId}
+        columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
+        members={members}
+        labels={labels}
+        usersById={usersById}
+        currentUserId={currentUserId}
+        canToggleChecklist={canMoveTask}
+        canComment={canComment}
+        canManageLabels={canManageLabels}
+        canEdit={canEditTask}
+        canDelete={canDeleteTask}
+      />}
+    </div>
+  );
+}
+
+/** El sitio que va a ocupar la columna que viaja. Mide lo mismo que ella. */
+function HuecoDeColumna({ ancho }: { ancho: number }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="h-full shrink-0 rounded-2xl"
+      style={{
+        width: ancho,
+        background: alpha(colors.primary, 8),
+        outline: `2px dashed ${alpha(colors.primary, 35)}`,
+        outlineOffset: '-2px',
+        transition: `width 200ms ${CURVA}`,
+      }}
+    />
+  );
+}
+
+/**
+ * La columna, resumida, mientras viaja.
+ *
+ * No lleva sus tareas dentro a propósito: montar una segunda copia de treinta
+ * tarjetas por cada arrastre cuesta más que todo lo demás junto, y con la
+ * cabecera y el número ya se sabe qué se está moviendo — que es lo único que hay
+ * que saber mientras el ojo mira el hueco.
+ */
+function ColumnaFantasma({
+  nombre,
+  tono,
+  tareas,
+}: {
+  nombre: string;
+  tono: string;
+  tareas: number;
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-4"
+      style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tono }} />
+        <h5 className="truncate font-sans text-sm font-semibold text-text-primary">{nombre}</h5>
+        <span
+          className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
+          style={{ background: alpha(colors.border, 60) }}
+        >
+          {tareas}
+        </span>
+      </span>
+
+      {/* Tres trazos que insinúan las tarjetas: el fantasma tiene que parecer
+          una columna con cosas dentro, no una cabecera suelta. */}
+      <span className="flex flex-col gap-1.5" aria-hidden="true">
+        {[0, 1, 2].map((linea) => (
+          <span
+            key={linea}
+            className="h-6 rounded-lg"
+            style={{ background: alpha(colors.border, 45 - linea * 12) }}
+          />
+        ))}
+      </span>
+    </div>
   );
 }
 

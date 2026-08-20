@@ -315,13 +315,12 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         {projects.length === 0 ? (
           <DashboardEmptyState
             action={
-              <CreateProjectSlideOver
-                action={createProjectAction}
-                borradorAction={borradorDePlantillaAction}
-                aplicarAction={crearProyectoDesdePlantillaAction}
-                triggerLabel="Crear mi primer proyecto"
-                triggerSize="lg"
-              />
+              <a
+                href="/assistant"
+                className="inline-flex items-center justify-center font-sans font-medium transition-all duration-150 cursor-pointer select-none bg-primary text-primary-foreground hover:bg-primary-hover active:scale-[0.98] h-12 px-6 text-base rounded-xl gap-2.5"
+              >
+                Crear mi primer proyecto con PRAX
+              </a>
             }
           />
         ) : (

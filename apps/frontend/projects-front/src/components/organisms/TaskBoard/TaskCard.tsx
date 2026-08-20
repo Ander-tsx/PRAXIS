@@ -13,7 +13,7 @@ import {
   dueState,
   personLabel,
 } from '@praxis/commons';
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 /**
  * Cuántos píxeles puede desplazarse el puntero entre pulsar y soltar sin que
@@ -48,10 +48,26 @@ export interface TaskCardProps {
    * hacía desconfiar del tablero entero.
    */
   isDone: boolean;
+  /** Con permiso de mover, la tarjeta se puede levantar. */
   draggable: boolean;
-  isDragging: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
+  /**
+   * Empieza el gesto de arrastre.
+   *
+   * Es un `pointerdown` y no el `onDragStart` de la API nativa: quien decide si
+   * aquello llega a ser un arrastre es `useArrastreDeTablero`, midiendo el
+   * recorrido —o el tiempo, en una pantalla táctil—. Ver `arrastre.ts`.
+   */
+  onArrastrar?: (evento: React.PointerEvent) => void;
+  /** Le da el nodo a quien mide: el motor de arrastre y la animación de reposición. */
+  registrarNodo?: (el: HTMLElement | null) => void;
+  /**
+   * Esta copia es el fantasma que sigue al puntero.
+   *
+   * Cambia dos cosas y ninguna es cosmética: no reacciona al puntero —está
+   * debajo de él, no debajo del ratón— y no lleva el borde de «esto se abre»,
+   * porque en ese momento no se abre nada.
+   */
+  fantasma?: boolean;
 }
 
 /**
@@ -99,9 +115,9 @@ export function TaskCard({
   canEdit,
   isDone,
   draggable,
-  isDragging,
-  onDragStart,
-  onDragEnd,
+  onArrastrar,
+  registrarNodo,
+  fantasma = false,
 }: TaskCardProps) {
   const { done, total } = checklistProgress(task);
   const due = dueState(task.dueDate);
@@ -138,35 +154,26 @@ export function TaskCard({
     onOpen();
   }
 
+  const referencia = useCallback(
+    (el: HTMLElement | null) => {
+      if (!fantasma) registrarNodo?.(el);
+    },
+    [fantasma, registrarNodo],
+  );
+
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: el equivalente de teclado es el <button> del título, cuyo click burbujea hasta aquí; poner role="button" en el <article> aplanaría su contenido para un lector de pantalla
     <article
+      ref={referencia}
       onPointerDown={(event) => {
         origenDelPuntero.current = { x: event.clientX, y: event.clientY };
+        if (draggable && !fantasma) onArrastrar?.(event);
       }}
-      onClick={alPulsar}
-      draggable={draggable}
-      onDragStart={(event) => {
-        /**
-         * Sin esto el arrastre subiría a la columna, que también es
-         * `draggable`, y mover una tarjeta acabaría reordenando columnas.
-         */
-        event.stopPropagation();
-        onDragStart();
-        try {
-          event.dataTransfer.setData('text/plain', task.id);
-          event.dataTransfer.effectAllowed = 'move';
-        } catch {
-          // Sin dataTransfer el arrastre funciona igual; solo cambia el cursor.
-        }
-      }}
-      onDragEnd={(event) => {
-        event.stopPropagation();
-        onDragEnd();
-      }}
+      onClick={fantasma ? undefined : alPulsar}
       className={[
         'relative flex flex-col gap-2 rounded-xl bg-background p-3 text-left',
-        'transition-[transform,box-shadow,opacity,outline-color] duration-150 ease-out',
+        'transition-[box-shadow,outline-color] duration-150 ease-out',
+        fantasma ? 'pointer-events-none w-full' : '',
         /**
          * El borde azul al pasar por encima: es la pista de que la tarjeta se
          * abre, que es justo lo que faltaba cuando el gesto vivía en un icono.
@@ -178,16 +185,25 @@ export function TaskCard({
          * `has-[:focus-visible]` lo enciende también cuando el título recibe el
          * foco por teclado, para que quien tabula vea lo mismo que quien apunta.
          */
-        'outline-2 outline-transparent hover:outline-primary has-[:focus-visible]:outline-primary',
+        fantasma
+          ? 'outline-2 outline-transparent'
+          : 'outline-2 outline-transparent hover:outline-primary has-[:focus-visible]:outline-primary',
         /* Se puede mover: la mano de arrastrar manda sobre el puntero, porque
            describe el gesto que hay que aprender. Sin ese permiso, la tarjeta
            solo se abre y el cursor lo dice. */
         draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
-        isDragging ? 'scale-[1.02] opacity-60' : '',
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
+      style={{
+        boxShadow: fantasma
+          ? `0 24px 48px -12px ${alpha(colors.overlay, 70)}, 0 0 0 1px ${alpha(colors.primary, 45)}`
+          : `0 1px 0 ${alpha(colors.border, 40)}`,
+        /* El fantasma **no** se toca con el dedo ni con el ratón: los eventos
+           siguen yendo al tablero de debajo, que es quien tiene que saber sobre
+           qué columna estás. */
+        touchAction: fantasma ? undefined : 'manipulation',
+      }}
     >
       {/* Aquí había un punto de color por prioridad, a la izquierda del título.
           Se fue porque **toda** tarea tiene prioridad: el punto no marcaba las
@@ -261,18 +277,12 @@ export function TaskCard({
             {done}/{total}
           </Chip>
         )}
-
-        {/* Había aquí un chip «N subtareas». Se fue con la decisión de **no
-            exponer subtareas**: nada en la interfaz puede crear una, así que era
-            un contador que siempre dice cero y que promete una función que no
-            existe. El backend las soporta; es capacidad heredada que decidimos
-            no usar. Ver ESTADO-ACTUAL §24.5. */}
       </div>
 
       {task.assignees.length > 0 && (
-        <div className="flex items-center -space-x-1.5">
+        <div className="flex items-center -space-x-1 mt-1.5">
           {mineFirst(task.assignees, currentUserId)
-            .slice(0, 4)
+            .slice(0, 7)
             .map((assignee) => {
               const user = usersById.get(assignee.userId);
               const label = user ? personLabel(user) : 'Alguien que ya no está en el proyecto';
@@ -280,25 +290,22 @@ export function TaskCard({
               return (
                 <Avatar
                   key={assignee.id}
+                  size="base"
                   label={label}
                   title={mine ? `${label} — es tuya` : label}
+                  src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
                   mine={mine}
                   ring
-                  /* Con `-space-x-1.5` los círculos se solapan y el que va
-                     después tapa al anterior. Ir primero en el DOM no basta
-                     para verse entero: hace falta subirlo de capa. */
                   className={mine ? 'relative z-10' : ''}
-                  src={avatarHref(user?.avatarUrl, '/projects/api/gateway')}
-                  /* Sin punto de estado: en una tarjeta de tarea se solapan
-                     cuatro círculos de 24 px y el punto de cada uno taparía la
-                     cara del siguiente. Aquí lo que importa es quién la lleva,
-                     no si está comiendo. */
                 />
               );
             })}
-          {task.assignees.length > 4 && (
-            <span className="pl-3 font-sans text-[11px] text-text-secondary">
-              +{task.assignees.length - 4}
+          {task.assignees.length > 7 && (
+            <span
+              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated font-sans text-[11px] font-medium text-text-secondary ring-2 ring-background"
+              title={`${task.assignees.length - 7} más`}
+            >
+              +{task.assignees.length - 7}
             </span>
           )}
         </div>
@@ -308,20 +315,14 @@ export function TaskCard({
 }
 
 /**
- * Los encargados, contigo delante.
- *
- * Va antes del `slice(0, 4)` a propósito: con cinco encargados y tú de quinto,
- * ordenar después de cortar te dejaría fuera de la tarjeta justo en el caso en
- * que más falta hace verte. El resto conserva su orden original.
- *
- * Devuelve la lista tal cual si no eres uno de ellos, para no crear un array
- * nuevo en cada render de cada tarjeta ajena — que en un tablero lleno es la
- * mayoría.
+ * Pone tu usuario primero para que lo encuentres rápido.
+ * Ahora también los ordena alfabéticamente por ID para que no salten de posición en cada render.
  */
 function mineFirst<T extends { userId: string }>(assignees: T[], currentUserId: string): T[] {
-  const index = assignees.findIndex((assignee) => assignee.userId === currentUserId);
-  if (index <= 0) return assignees;
-  return [assignees[index], ...assignees.slice(0, index), ...assignees.slice(index + 1)];
+  const sorted = [...assignees].sort((a, b) => a.userId.localeCompare(b.userId));
+  const index = sorted.findIndex((assignee) => assignee.userId === currentUserId);
+  if (index <= 0) return sorted;
+  return [sorted[index], ...sorted.slice(0, index), ...sorted.slice(index + 1)];
 }
 
 function Chip({ color, children }: { color: string; children: React.ReactNode }) {

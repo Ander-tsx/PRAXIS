@@ -357,33 +357,45 @@ export class AssistantService {
        —no debería pasar— el prompt omite el bloque en vez de mentir con un id. */
     const quienPregunta = payload.miembros.find((miembro) => miembro.userId === payload.userId);
 
-    const respuesta = await this.gemini.chat({
-      system: briefing
-        ? systemInstruction(
-            briefing,
-            payload.miembros,
-            herramientas.map((herramienta) => herramienta.name),
-            payload.chat ?? [],
-            quienPregunta,
-          )
-        : instruccionSinProyecto(
-            payload.proyectos ?? [],
-            herramientas.map((herramienta) => herramienta.name),
-            quienPregunta,
-          ),
-      /* Sale de la base, ya recortado a MAX_HISTORIAL. */
-      history,
-      archivos,
-      message: mensajeConArchivos,
-      tools: herramientas,
-      /* Sin foco, PRAX puede devolver una plantilla entera en la llamada, y eso
-         no cabe en el techo de siempre. Ver `MAX_TOKENS_PLANTILLA`. */
-      ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
-    });
+    let respuesta;
+    let cuota;
+    try {
+      respuesta = await this.gemini.chat({
+        system: briefing
+          ? systemInstruction(
+              briefing,
+              payload.miembros,
+              herramientas.map((herramienta) => herramienta.name),
+              payload.chat ?? [],
+              quienPregunta,
+            )
+          : instruccionSinProyecto(
+              payload.proyectos ?? [],
+              herramientas.map((herramienta) => herramienta.name),
+              quienPregunta,
+            ),
+        history,
+        archivos,
+        message: mensajeConArchivos,
+        tools: herramientas,
+        ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
+      });
 
-    /* Si Gemini falló, `chat` ya lanzó y no se llega aquí: la cuota no se toca.
-       Ver `GeminiError`. */
-    const cuota = await this.quota.consumir(payload.userId);
+      cuota = await this.quota.consumir(payload.userId);
+    } catch (error) {
+      if (error instanceof RpcException) {
+        const details = (error.getError() as any).details || {};
+        throw new RpcException({
+          ...((error.getError() as any) || {}),
+          details: { ...details, conversationId },
+        });
+      }
+      throw new RpcException({
+        statusCode: 500,
+        message: 'Error del asistente.',
+        details: { conversationId },
+      });
+    }
 
     const validadas = respuesta.calls
       .map((call) =>

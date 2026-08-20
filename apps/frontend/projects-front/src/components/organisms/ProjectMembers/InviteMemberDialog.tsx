@@ -23,6 +23,7 @@ export interface InviteMemberDialogProps {
   roles: ProjectRole[];
   /** Quiénes no deben salir: miembros, invitados sin responder y el dueño. */
   excluirIds: string[];
+  onClose?: () => void;
 }
 
 /** Toda petición del navegador pasa por el proxy de la zona, que pone el Bearer. */
@@ -47,8 +48,7 @@ const MAX_RESULTS = 6;
  * tanto, buscar solo encontraba a quien cupiera en las primeras cien cuentas de
  * **toda la plataforma** — o sea, a casi nadie en cuanto hubo cuentas de verdad.
  */
-export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMemberDialogProps) {
-  const [open, setOpen] = useState(false);
+export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: InviteMemberDialogProps) {
   const [state, formAction, pending] = useAccion(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
@@ -81,12 +81,12 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
    */
   useEffect(() => {
     if (state.done) {
-      setOpen(false);
       setQuery('');
       setResults(null);
       setSelected(null);
+      onClose?.();
     }
-  }, [state]);
+  }, [state, onClose]);
 
   async function search() {
     const needle = query.trim();
@@ -100,149 +100,148 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
     setErrorBusqueda('');
 
     try {
-      /* Se piden de más para poder descartar a los que ya están dentro sin
-         quedarse corto de resultados. */
       const pagina = await api.get<Paginated<UserProfile>>(
-        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS * 3}`,
+        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS}`,
       );
 
-      const excluidos = new Set(excluirIds);
-      setResults(pagina.items.filter((user) => !excluidos.has(user.id)).slice(0, MAX_RESULTS));
+      const filtrados = pagina.items.filter((user) => !excluirIds.includes(user.id));
+      setResults(filtrados);
     } catch {
-      setResults([]);
-      setErrorBusqueda('No se pudo buscar. Inténtalo de nuevo.');
+      setErrorBusqueda('La búsqueda falló por un problema de red.');
+      setResults(null);
     } finally {
       setBuscando(false);
     }
   }
 
   function reset() {
-    setOpen(false);
     setQuery('');
     setResults(null);
     setSelected(null);
+    onClose?.();
   }
 
   return (
-    <>
-      <Button variant="secondary" onClick={() => setOpen(true)} disabled={roles.length === 0}>
-        Invitar persona
-      </Button>
+    <div className="rounded-2xl border border-border bg-surface-elevated p-6 shadow-sm">
+      <header className="mb-4 flex flex-col gap-1">
+        <h3 className="font-display text-xl text-text-primary">Invitar al proyecto</h3>
+        <p className="font-sans text-sm text-text-secondary">
+          Recibirá una invitación y entrará al aceptarla, con el rol que elijas.
+        </p>
+      </header>
 
-      <Dialog
-        open={open}
-        onClose={reset}
-        title="Invitar al proyecto"
-        description="Recibirá una invitación y entrará al aceptarla, con el rol que elijas."
-        overflowVisible
-      >
-        <form action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="projectId" value={projectId} />
-          <input type="hidden" name="userId" value={selected?.id ?? ''} />
+      <form action={formAction} className="flex flex-col gap-4">
+        <input type="hidden" name="projectId" value={projectId} />
+        <input type="hidden" name="userId" value={selected?.id ?? ''} />
 
-          <div className="flex items-end gap-2">
-            <Input
-              id={searchId}
-              type="search"
-              label="Buscar persona"
-              placeholder="Correo o nombre"
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setSelected(null);
-                setResults(null);
-              }}
-              onKeyDown={(event) => {
-                /* Enter busca; sin esto enviaría el formulario a medias. */
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  search();
-                }
-              }}
-              message="Solo aparecen personas que ya tienen cuenta en PRAXIS."
-              autoComplete="off"
-              fullWidth
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={search}
-              isLoading={buscando}
-              disabled={buscando}
-              className="mb-[22px]"
-            >
-              Buscar
-            </Button>
+        <div className="flex flex-col md:flex-row gap-4 items-start w-full">
+          {/* Columna Izquierda: Búsqueda y Resultados */}
+          <div className="flex-1 w-full flex flex-col gap-4">
+            <div className="flex items-end gap-2">
+              <Input
+                id={searchId}
+                type="search"
+                label="Buscar persona"
+                placeholder="Correo o nombre"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setSelected(null);
+                  setResults(null);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    search();
+                  }
+                }}
+                message="Solo aparecen personas que ya tienen cuenta."
+                autoComplete="off"
+                fullWidth
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={search}
+                isLoading={buscando}
+                disabled={buscando}
+                className="mb-[22px]"
+              >
+                Buscar
+              </Button>
+            </div>
+
+            {selected ? (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border border-primary px-3 py-2"
+                style={{ background: alpha(colors.primary, 10) }}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-sans text-sm text-text-primary">
+                    {personLabel(selected)}
+                  </span>
+                  <span className="truncate font-sans text-xs text-text-secondary">
+                    {selected.credential.email}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="shrink-0 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  Cambiar
+                </button>
+              </div>
+            ) : (
+              results !== null && (
+                <div className="flex flex-col gap-1.5">
+                  {errorBusqueda ? (
+                    <p
+                      role="alert"
+                      className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
+                    >
+                      {errorBusqueda}
+                    </p>
+                  ) : results.length === 0 ? (
+                    <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
+                      Nadie coincide con «{query.trim()}».
+                    </p>
+                  ) : (
+                    results.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => setSelected(user)}
+                        className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
+                      >
+                        <span className="font-sans text-sm text-text-primary">
+                          {personLabel(user)}
+                        </span>
+                        <span className="font-sans text-xs text-text-secondary">
+                          {user.credential.email}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )
+            )}
           </div>
 
-          {selected ? (
-            <div
-              className="flex items-center justify-between gap-3 rounded-lg border border-primary px-3 py-2"
-              style={{ background: alpha(colors.primary, 10) }}
-            >
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate font-sans text-sm text-text-primary">
-                  {personLabel(selected)}
-                </span>
-                <span className="truncate font-sans text-xs text-text-secondary">
-                  {selected.credential.email}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="shrink-0 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-              >
-                Cambiar
-              </button>
-            </div>
-          ) : (
-            results !== null && (
-              <div className="flex flex-col gap-1.5">
-                {/* Un fallo de red no es «no hay nadie»: decirlo así manda a
-                    buscar otra vez con otras palabras algo que sí estaba. */}
-                {errorBusqueda ? (
-                  <p
-                    role="alert"
-                    className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
-                  >
-                    {errorBusqueda}
-                  </p>
-                ) : results.length === 0 ? (
-                  <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
-                    Nadie coincide con «{query.trim()}».
-                  </p>
-                ) : (
-                  results.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => setSelected(user)}
-                      className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
-                    >
-                      <span className="font-sans text-sm text-text-primary">
-                        {personLabel(user)}
-                      </span>
-                      <span className="font-sans text-xs text-text-secondary">
-                        {user.credential.email}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )
-          )}
-
-          <Select
-            id={roleFieldId}
-            name="projectRoleId"
-            label="Rol con el que entrará"
-            value={roleId}
-            onValueChange={setRoleId}
-            options={roles.map((role) => ({ value: role.id, label: role.name }))}
-            message="Decide lo que podrá hacer dentro del proyecto."
-            fullWidth
-          />
+          {/* Columna Derecha: Rol */}
+          <div className="w-full md:w-64 shrink-0">
+            <Select
+              id={roleFieldId}
+              name="projectRoleId"
+              label="Rol asignado"
+              value={roleId}
+              onValueChange={setRoleId}
+              options={roles.map((role) => ({ value: role.id, label: role.name }))}
+              message="Decide lo que podrá hacer."
+              fullWidth
+            />
+          </div>
+        </div>
 
           {state.error && (
             <p
@@ -266,7 +265,6 @@ export function InviteMemberDialog({ projectId, roles, excluirIds }: InviteMembe
             </Button>
           </div>
         </form>
-      </Dialog>
-    </>
+    </div>
   );
 }

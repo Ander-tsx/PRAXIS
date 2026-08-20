@@ -30,6 +30,9 @@ import type { ReactNode } from 'react';
  * configurado como `handle`. Si se renombra aquí y no allí, el lienzo deja de
  * moverse **sin ningún error**.
  */
+import { useState } from 'react';
+import { WidgetContext } from './WidgetContext';
+
 export function WidgetShell({
   widget,
   children,
@@ -41,70 +44,88 @@ export function WidgetShell({
   children: ReactNode;
   onQuitar: () => void;
   movible: boolean;
-  /** `false` deja que la tarjeta crezca con su contenido. Ver el bloque de arriba. */
   altoFijo?: boolean;
 }) {
   const entrada = CATALOGO[widget.tipo];
   const titulo = tituloDe(widget);
+  const [flipped, setFlipped] = useState(false);
+  const [hasHelp, setHasHelp] = useState(false);
 
   return (
-    <section
-      className={`flex flex-col rounded-2xl border border-border bg-surface ${
-        altoFijo ? 'h-full overflow-hidden' : ''
-      }`}
-    >
-      <header
-        className={`tirador flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-4 ${
-          movible ? 'cursor-grab active:cursor-grabbing' : ''
+    <WidgetContext.Provider value={{ flipped, setFlipped, hasHelp, setHasHelp }}>
+      <section
+        className={`relative flex flex-col rounded-2xl border border-border bg-surface ${
+          altoFijo ? 'h-full overflow-hidden' : ''
         }`}
       >
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h3 className="truncate font-display text-lg text-text-primary" title={titulo}>
-            {titulo}
-          </h3>
-          {/* La frase que dice qué mide va **siempre**, también en los
-              generados: un gráfico sin ella se interpreta mal con muchísima
-              seguridad, porque quien lo mira inventa la explicación que le
-              encaja. Es la misma razón por la que era obligatoria en ChartCard. */}
-          <p className="truncate font-sans text-xs text-text-disabled" title={subtitulo(widget)}>
-            {subtitulo(widget)}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onQuitar}
-          aria-label={`Quitar «${titulo}» del lienzo`}
-          title="Quitar del lienzo"
-          /* Fuera del tirador para que pulsarlo no cuente como principio de un
-             arrastre. La cuadrícula tiene un umbral de píxeles, pero depender de
-             él para que un botón funcione es depender de que nadie tiemble. */
-          onPointerDown={(evento) => evento.stopPropagation()}
-          className="shrink-0 rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-error"
-        >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
+        <div className="flex flex-col h-full w-full">
+          <header
+            className={`tirador flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-4 ${
+              movible ? 'cursor-grab active:cursor-grabbing' : ''
+            }`}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </header>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h3 className="truncate font-display text-lg text-text-primary" title={titulo}>
+                {titulo}
+              </h3>
+              <p className="truncate font-sans text-xs text-text-disabled" title={subtitulo(widget)}>
+                {subtitulo(widget)}
+              </p>
+            </div>
 
-      <div className={`px-5 pb-5 pt-1 ${altoFijo ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
-        {children ?? <Cargando />}
-      </div>
+            <div 
+              className="flex shrink-0 items-center gap-1"
+              onPointerDown={(evento) => evento.stopPropagation()}
+            >
+              {hasHelp && (
+                <button
+                  type="button"
+                  onClick={() => setFlipped(!flipped)}
+                  title="Cómo se lee esto"
+                  className={`shrink-0 rounded-lg p-1.5 transition-colors ${
+                    flipped
+                      ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
+                      : 'text-text-disabled hover:bg-surface-elevated hover:text-text-primary'
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onQuitar}
+                aria-label={`Quitar «${titulo}» del lienzo`}
+                title="Quitar del lienzo"
+                className="shrink-0 rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-error"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </header>
 
-      {!entrada && (
-        <p className="px-5 pb-4 font-sans text-xs text-text-disabled">
-          Este grafo ya no existe en el catálogo. Quítalo del lienzo.
-        </p>
-      )}
-    </section>
+          <div className={`relative px-5 pb-5 pt-1 ${altoFijo ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
+            {children ?? <Cargando />}
+          </div>
+
+          {!entrada && (
+            <p className="px-5 pb-4 font-sans text-xs text-text-disabled">
+              Este grafo ya no existe en el catálogo. Quítalo del lienzo.
+            </p>
+          )}
+        </div>
+      </section>
+    </WidgetContext.Provider>
   );
 }
 

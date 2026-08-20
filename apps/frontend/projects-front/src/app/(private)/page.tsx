@@ -3,20 +3,20 @@ import {
   crearProyectoDesdePlantillaAction,
   createProjectAction,
 } from '@/app/actions';
+import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import { ProjectGrid } from '@/components/organisms/ProjectGrid';
 import { ProjectsEmptyState } from '@/components/organisms/ProjectsEmptyState';
 import {
   AppHeader,
   AssistantChat,
   DockSlot,
+  PRAX_NAME,
   type Paginated,
   Pagination,
-  PRAX_NAME,
   type Project,
   type UserProfile,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
-import { PraxCreateProjectTrigger } from '@/components/organisms/PraxCreateProjectTrigger';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -175,11 +175,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
           contador, dentro de `ProjectGrid`. */}
       <div className="flex flex-col gap-6">
         {page.items.length === 0 && !search ? (
-          <ProjectsEmptyState
-            action={
-              <PraxCreateProjectTrigger triggerVariant="boton" />
-            }
-          />
+          <ProjectsEmptyState action={<PraxCreateProjectTrigger triggerVariant="boton" />} />
         ) : (
           <>
             <ProjectGrid
@@ -188,9 +184,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
               currentUserId={userId}
               search={search}
               equiposPorProyecto={equiposPorProyecto}
-              crearSlot={
-                <PraxCreateProjectTrigger triggerVariant="tarjeta" />
-              }
+              crearSlot={<PraxCreateProjectTrigger triggerVariant="tarjeta" />}
             />
             <Pagination
               page={pagina}

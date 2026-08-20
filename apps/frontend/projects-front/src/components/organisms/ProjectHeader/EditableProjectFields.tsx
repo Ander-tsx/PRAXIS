@@ -18,6 +18,16 @@ export interface EditableProjectFieldsProps {
    * `AuthForm` y `AppHeader`.
    */
   badgeSlot?: ReactNode;
+  /**
+   * Todo en una línea, para la pestaña del tablero.
+   *
+   * Ahí la pantalla no se desplaza y el alto es un presupuesto: la cabecera
+   * completa —título a `text-4xl`, descripción en dos líneas de serif y el pie
+   * de metadatos— se come casi una quinta parte de las columnas. En compacto el
+   * nombre baja a `text-xl` y la descripción pasa a una sola línea que se corta,
+   * **sin dejar de ser editable**: son los mismos campos con otro tamaño.
+   */
+  compacto?: boolean;
 }
 
 /** Milisegundos de silencio antes de guardar. */
@@ -71,6 +81,7 @@ export function EditableProjectFields({
   initialName,
   initialDescription,
   badgeSlot,
+  compacto = false,
 }: EditableProjectFieldsProps) {
   /**
    * ¿Se ha guardado algo desde la última revalidación?
@@ -143,9 +154,54 @@ export function EditableProjectFields({
     await settleProjectAction(projectId);
   }, [name, description, projectId]);
 
+  if (compacto) {
+    return (
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="grid min-w-0 max-w-[22rem] shrink overflow-hidden">
+          <span
+            aria-hidden="true"
+            className="invisible col-start-1 row-start-1 truncate border border-transparent px-2 font-display text-xl"
+          >
+            {name.value || 'Sin nombre'}
+          </span>
+          <input
+            value={name.value}
+            onChange={(event) => name.change(event.target.value)}
+            onBlur={settle}
+            aria-label="Nombre del proyecto"
+            aria-invalid={name.status === 'error'}
+            maxLength={PROJECT_NAME_MAX}
+            size={1}
+            className="col-start-1 row-start-1 w-full truncate rounded-lg border border-transparent bg-transparent px-2 font-display text-xl text-text-primary outline-none transition-colors hover:border-border hover:bg-surface focus:border-border-strong focus:bg-surface"
+          />
+        </span>
+
+        {badgeSlot}
+
+        {/* La descripción, de una línea y con lo que no cabe cortado. Sigue
+            siendo el mismo campo: se pincha y se escribe. */}
+        <input
+          value={description.value}
+          onChange={(event) => description.change(event.target.value)}
+          onBlur={settle}
+          aria-label="Descripción del proyecto"
+          aria-invalid={description.status === 'error'}
+          maxLength={PROJECT_DESCRIPTION_MAX}
+          placeholder="Sin descripción"
+          title={description.value || 'Sin descripción'}
+          className="min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-2 py-1 font-serif text-sm italic text-text-secondary outline-none transition-colors placeholder:text-text-disabled hover:border-border hover:bg-surface focus:border-border-strong focus:bg-surface"
+        />
+
+        <span className="shrink-0">
+          <Status field={name.status === 'idle' ? description : name} />
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-3 gap-y-2">
         {/* La rejilla de una celda hace que el campo mida **lo que mide su
             texto**: el `<span>` invisible ocupa el mismo hueco y dicta el
             ancho. Sin esto el input abarcaría toda la fila y se leería como un

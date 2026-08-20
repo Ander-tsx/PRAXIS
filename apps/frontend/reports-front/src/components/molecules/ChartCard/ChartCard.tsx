@@ -1,3 +1,4 @@
+import { HowToRead } from "./HowToRead";
 import { alpha, colors } from '@praxis/commons';
 import type { ReactNode } from 'react';
 
@@ -56,32 +57,7 @@ export function ChartCard({ title, description, highlight, howToRead, children }
  * Cerrado por defecto, y esa es la decisión: la explicación no puede competir
  * con el gráfico ni empujarlo fuera de la pantalla, pero tampoco puede vivir en
  * una documentación que nadie va a abrir en otro sitio.
- */
-export function HowToRead({ children }: { children: ReactNode }) {
-  return (
-    <details className="group rounded-xl border border-border-subtle bg-background/40">
-      <summary className="cursor-pointer list-none px-4 py-2.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary">
-        <span className="inline-flex items-center gap-2">
-          <svg
-            className="h-3.5 w-3.5 transition-transform group-open:rotate-90"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          Cómo se lee esto
-        </span>
-      </summary>
 
-      <div className="flex flex-col gap-2 px-4 pb-4 pt-1 font-sans text-sm leading-relaxed text-text-secondary [&_strong]:font-semibold [&_strong]:text-text-primary">
-        {children}
-      </div>
-    </details>
-  );
-}
 
 /** Cifra grande con su etiqueta. Para el hueco de `highlight` y los resúmenes. */
 export function Stat({

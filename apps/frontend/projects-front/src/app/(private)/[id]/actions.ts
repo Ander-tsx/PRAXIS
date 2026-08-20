@@ -1173,6 +1173,40 @@ export async function updateTaskAction(_prev: TaskState, formData: FormData): Pr
  * igualar el nombre de la columna destino, así que quien llama tiene que
  * conocer la correspondencia nombre ↔ id.
  */
+/**
+ * Cuántas renumeraciones se aceptan detrás de un movimiento.
+ *
+ * Es un tope de cordura, no un límite de producto: una columna razonable
+ * renumera dos o tres tareas, y si alguna vez salieran cincuenta peticiones de
+ * un solo arrastre, el fallo está en quien las calcula y no en el tablero.
+ */
+const MAX_RENUMERACIONES = 30;
+
+/**
+ * Mueve una tarea **a un hueco concreto**, no al final de la columna.
+ *
+ * ⚠️ **El backend no reindexa nada.** `POST /tasks/:id/move` escribe el `order`
+ * que le mandes y se acabó: si insertas en medio, la tarea nueva comparte número
+ * con la que ya estaba ahí y el orden entre las dos lo decide el desempate por
+ * `createdAt`, es decir, el azar de cuál se creó antes. Por eso el cliente manda
+ * también `renumerar`: la lista `id:orden` de las que **de verdad** cambian de
+ * número, calculada contra los `order` que ya tiene en pantalla.
+ *
+ * Van desde aquí y no desde el navegador por una razón concreta: cada llamada
+ * suelta desde el cliente arrastraría su propia revalidación de esta ruta —que
+ * es el árbol entero del proyecto—, así que arrastrar una tarjeta costaría tres
+ * o cuatro renders completos. Aquí son N peticiones al gateway y **una sola**
+ * revalidación al final.
+ *
+ * ⚠️ **Una renumeración que falle no tumba el movimiento.** Lo que importaba
+ * —que la tarea esté en su columna— ya está hecho y confirmado contra el `data`;
+ * lo otro es cosmética del orden, y devolver un error por ello dejaría la
+ * pantalla deshaciendo un movimiento que sí se guardó.
+ *
+ * La lista de sucesión pedía un endpoint de reordenado en bloque como el que ya
+ * tienen las columnas (`PATCH /boards/:id/columns/reorder`). Ver
+ * PENDIENTES-BACKEND.
+ */
 export async function moveTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {
   const api = await requireApi();
   if (!api) return { error: 'Tu sesión ha caducado.', done: null };
@@ -1190,6 +1224,26 @@ export async function moveTaskAction(_prev: TaskState, formData: FormData): Prom
     }
   } catch (error) {
     return { error: describe(error, 'No se pudo mover la tarea.'), done: null };
+  }
+
+  /* `id:orden,id:orden`. Solo llegan las que cambian, y sin `status`: no se
+     mueven de columna, así que su estado es el que ya tenían. */
+  const renumeraciones = String(formData.get('renumerar') ?? '')
+    .split(',')
+    .filter(Boolean)
+    .slice(0, MAX_RENUMERACIONES)
+    .map((par) => {
+      const [id, posicion] = par.split(':');
+      return { id, order: Number(posicion) };
+    })
+    .filter((entrada) => entrada.id && Number.isInteger(entrada.order) && entrada.order >= 0);
+
+  if (renumeraciones.length > 0) {
+    await Promise.allSettled(
+      renumeraciones.map((entrada) =>
+        api.post<Task>(`/tasks/${entrada.id}/move`, { columnId, order: entrada.order }),
+      ),
+    );
   }
 
   revalidateProject(projectId);

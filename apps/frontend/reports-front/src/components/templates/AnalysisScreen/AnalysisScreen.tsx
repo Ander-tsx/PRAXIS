@@ -84,6 +84,8 @@ function cabeElCajon(): boolean {
   return window.innerWidth >= ANCHO_MINIMO_DEL_CAJON;
 }
 
+import { RememberProject } from '@/components/molecules/RememberProject';
+
 export function AnalysisScreen({
   projectSlug,
   projectId,
@@ -133,6 +135,7 @@ export function AnalysisScreen({
 
   return (
     <>
+      <RememberProject slug={projectSlug} />
       <DisparadorDePrax projectSlug={projectSlug} />
 
       <DockSlot titulo={`${PRAX_NAME}, el asistente`}>

@@ -324,7 +324,7 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
             onClick={() => setPanel((actual) => (actual ? null : 'catalogo'))}
             aria-expanded={panel !== null}
           >
-            Añadir un grafo
+            Añadir un gráfico
           </Button>
         )}
       </div>
