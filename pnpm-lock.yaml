@@ -49,6 +49,37 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
 
+  apps/backend/commons/domain-events:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.0.1
+        version: 11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/config':
+        specifier: ^4.0.0
+        version: 4.0.4(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+    devDependencies:
+      '@nestjs/testing':
+        specifier: ^11.0.1
+        version: 11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.28)(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28)(ioredis@5.11.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.28(@nestjs/common@11.1.28(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.28))
+      '@types/jest':
+        specifier: ^30.0.0
+        version: 30.0.0
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      ioredis:
+        specifier: ^5.3.2
+        version: 5.11.1
+      jest:
+        specifier: ^30.0.0
+        version: 30.4.2(@types/node@24.13.3)(ts-node@10.9.2(@types/node@24.13.3)(typescript@5.9.3))
+      ts-jest:
+        specifier: ^29.2.5
+        version: 29.4.12(@babel/core@7.29.7)(@jest/transform@30.4.1)(@jest/types@30.4.1)(babel-jest@30.4.1(@babel/core@7.29.7))(jest-util@30.4.1)(jest@30.4.2(@types/node@24.13.3)(ts-node@10.9.2(@types/node@24.13.3)(typescript@5.9.3)))(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   apps/backend/commons/observability:
     dependencies:
       '@nestjs/common':
@@ -829,6 +860,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../../commons/contracts
+      '@praxis/domain-events':
+        specifier: workspace:*
+        version: link:../../commons/domain-events
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability
@@ -1077,6 +1111,9 @@ importers:
       '@praxis/contracts':
         specifier: workspace:*
         version: link:../../commons/contracts
+      '@praxis/domain-events':
+        specifier: workspace:*
+        version: link:../../commons/domain-events
       '@praxis/observability':
         specifier: workspace:*
         version: link:../../commons/observability
@@ -1399,6 +1436,9 @@ importers:
       '@praxis/commons':
         specifier: workspace:*
         version: link:../commons
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.31.0(react@19.2.4)
       next:
         specifier: 16.2.11
         version: 16.2.11(@babel/core@7.29.7)(@playwright/test@1.62.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

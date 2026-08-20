@@ -1,7 +1,25 @@
 /// <reference types="jest" />
 import { randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
-import { TaskDomainOutboxPublisher } from './domain-outbox.publisher';
+
+import {
+  DomainOutboxPublisher,
+  type OutboxStore,
+  type OutboxStream,
+} from './domain-outbox.publisher';
+
+/**
+ * Una subclase mínima, que es todo lo que los servicios añaden.
+ *
+ * ⚠️ Estas pruebas vivían **dos veces**, una en `tasks-service` y otra en
+ * `projects-service`, con el mismo contenido palabra por palabra. Ahora que la
+ * clase es una, sus pruebas también.
+ */
+class PublicadorDePrueba extends DomainOutboxPublisher {
+  constructor(prisma: OutboxStore, redis: OutboxStream, config: unknown) {
+    super(prisma, redis, config as never, 'PublicadorDePrueba');
+  }
+}
 
 const row = () => ({
   id: 'row-1',
@@ -32,6 +50,7 @@ const publisherFor = (stored = row()) => {
         stored.publishedAt = new Date();
         return { count: 1 };
       }),
+      deleteMany: jest.fn(async () => ({ count: 0 })),
     },
   };
   const config = { get: <T>(_key: string, fallback: T) => fallback };
@@ -41,16 +60,11 @@ const publisherFor = (stored = row()) => {
     redis,
     prisma,
     logger,
-    publisher: new TaskDomainOutboxPublisher(
-      prisma as never,
-      redis as never,
-      config as never,
-      logger as never,
-    ),
+    publisher: new PublicadorDePrueba(prisma as never, redis as never, config as never),
   };
 };
 
-describe('TaskDomainOutboxPublisher', () => {
+describe('DomainOutboxPublisher', () => {
   it('entrega fila pendiente a Redis Stream real', async () => {
     const stream = `praxis:test:domain-outbox:${randomUUID()}`;
     const client = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
@@ -65,6 +79,7 @@ describe('TaskDomainOutboxPublisher', () => {
           stored.publishedAt = new Date();
           return { count: 1 };
         },
+        deleteMany: async () => ({ count: 0 }),
       },
     };
     const config = {
@@ -74,11 +89,7 @@ describe('TaskDomainOutboxPublisher', () => {
       xadd: (target: string, fields: Record<string, string>) =>
         client.xadd(target, '*', ...Object.entries(fields).flat()),
     };
-    const publisher = new TaskDomainOutboxPublisher(
-      prisma as never,
-      redis as never,
-      config as never,
-    );
+    const publisher = new PublicadorDePrueba(prisma as never, redis as never, config as never);
 
     try {
       await publisher.publishPending();
@@ -115,6 +126,7 @@ describe('TaskDomainOutboxPublisher', () => {
           stored.publishedAt = new Date();
           return { count: 1 };
         },
+        deleteMany: async () => ({ count: 0 }),
       },
     };
     const config = {
@@ -127,7 +139,7 @@ describe('TaskDomainOutboxPublisher', () => {
     };
     const disconnected = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
     disconnected.disconnect();
-    const failedPublisher = new TaskDomainOutboxPublisher(
+    const failedPublisher = new PublicadorDePrueba(
       prisma as never,
       {
         xadd: (target: string, fields: Record<string, string>) =>
@@ -140,7 +152,7 @@ describe('TaskDomainOutboxPublisher', () => {
     expect(stored.publishedAt).toBeNull();
 
     const recovered = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
-    const recoveredPublisher = new TaskDomainOutboxPublisher(
+    const recoveredPublisher = new PublicadorDePrueba(
       prisma as never,
       {
         xadd: (target: string, fields: Record<string, string>) =>
@@ -163,7 +175,9 @@ describe('TaskDomainOutboxPublisher', () => {
 
     await publisher.publishPending();
 
-    expect(JSON.parse(redis.xadd.mock.calls[0][1].event)).toMatchObject({
+    expect(
+      JSON.parse((redis.xadd.mock.calls[0] as unknown as [string, { event: string }])[1].event),
+    ).toMatchObject({
       id: stored.eventId,
       type: stored.type,
       projectId: stored.projectId,
@@ -220,11 +234,7 @@ describe('TaskDomainOutboxPublisher', () => {
       get: <T>(key: string, fallback: T) =>
         (key === 'DOMAIN_OUTBOX_BATCH_SIZE' ? 1 : fallback) as T,
     };
-    const publisher = new TaskDomainOutboxPublisher(
-      prisma as never,
-      redis as never,
-      config as never,
-    );
+    const publisher = new PublicadorDePrueba(prisma as never, redis as never, config as never);
 
     const stats = await publisher.publishPending();
 
@@ -243,8 +253,12 @@ describe('TaskDomainOutboxPublisher', () => {
 
     await publisher.publishPending();
     expect(redis.xadd).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(redis.xadd.mock.calls[0][1].event).id).toBe(stored.eventId);
-    expect(JSON.parse(redis.xadd.mock.calls[1][1].event).id).toBe(stored.eventId);
+    expect(
+      JSON.parse((redis.xadd.mock.calls[0] as unknown as [string, { event: string }])[1].event).id,
+    ).toBe(stored.eventId);
+    expect(
+      JSON.parse((redis.xadd.mock.calls[1] as unknown as [string, { event: string }])[1].event).id,
+    ).toBe(stored.eventId);
     expect(stored.publishedAt).toBeInstanceOf(Date);
   });
 });
