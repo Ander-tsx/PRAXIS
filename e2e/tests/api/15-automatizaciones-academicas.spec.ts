@@ -97,4 +97,114 @@ test.describe('Automatización académica', () => {
       ),
     ).toHaveLength(1);
   });
+
+  /**
+   * Fija el catálogo real de `rule-definition.ts`, que es **más estrecho**
+   * que el enum de `@praxis/contracts`: el enum admite triggers y acciones
+   * que el validador rechaza con «no soportado en el MVP académico». El
+   * frontend de Reglas construye su catálogo leyendo este comportamiento, no
+   * el enum — estos casos son la especificación contra la que se valida ese
+   * catálogo, y si backend cambia el contrato, la caída ocurre aquí y no en
+   * la interfaz.
+   */
+  test.describe('rechaza lo que queda fuera del catálogo académico', () => {
+    let cabeceras: Record<string, string>;
+    let proyectoId: string;
+
+    test.beforeAll(async ({ request }) => {
+      const mundo = await crearMundo(request);
+      cabeceras = comoBearer(mundo.duenno.accessToken);
+      proyectoId = mundo.proyecto.id;
+    });
+
+    function reglaBase(overrides: Record<string, unknown> = {}) {
+      return {
+        name: nombreUnico('Regla de rechazo').slice(0, 120),
+        trigger: { type: 'TASK_DUE_SOON', config: { leadTimeMinutes: 60 } },
+        conditions: [] as unknown[],
+        actions: [{ type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } }],
+        ...overrides,
+      };
+    }
+
+    test('una clave de más en trigger.config da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({
+          trigger: {
+            type: 'TASK_DUE_SOON',
+            config: { leadTimeMinutes: 60, extra: 'no debería aceptarse' },
+          },
+        }),
+      });
+      expect(respuesta.status(), 'clave extra en trigger.config').toBe(400);
+    });
+
+    test('recipientSelector cruzado con el trigger da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({
+          actions: [
+            { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'PROJECT_OWNER' } },
+          ],
+        }),
+      });
+      expect(respuesta.status(), 'TASK_DUE_SOON solo admite recipientSelector ASSIGNEES').toBe(400);
+    });
+
+    test('IN con un valor escalar (no lista) da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({
+          conditions: [{ field: 'priority', operator: 'IN', value: 'HIGH' }],
+        }),
+      });
+      expect(respuesta.status(), 'IN exige una lista').toBe(400);
+    });
+
+    test('EQUALS con una lista (no escalar) da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({
+          conditions: [{ field: 'priority', operator: 'EQUALS', value: ['HIGH', 'URGENT'] }],
+        }),
+      });
+      expect(respuesta.status(), 'EQUALS exige un valor escalar').toBe(400);
+    });
+
+    test('status INVALID (reservado al sistema) da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({ status: 'INVALID' }),
+      });
+      expect(respuesta.status(), 'solo ENABLED/DISABLED vienen del cliente').toBe(400);
+    });
+
+    test('cero acciones da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({ actions: [] }),
+      });
+      expect(respuesta.status(), 'una regla requiere al menos una acción').toBe(400);
+    });
+
+    test('seis acciones (máximo cinco) da 400', async ({ request }) => {
+      const accion = { type: 'CREATE_NOTIFICATION', config: { recipientSelector: 'ASSIGNEES' } };
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({ actions: Array(6).fill(accion) }),
+      });
+      expect(respuesta.status(), 'máximo cinco acciones secuenciales').toBe(400);
+    });
+
+    test('un campo de condición del otro trigger da 400', async ({ request }) => {
+      const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
+        headers: cabeceras,
+        data: reglaBase({
+          conditions: [{ field: 'staleDays', operator: 'EQUALS', value: 3 }],
+        }),
+      });
+      expect(respuesta.status(), 'staleDays pertenece a TASK_STALE, no a TASK_DUE_SOON').toBe(400);
+    });
+  });
 });

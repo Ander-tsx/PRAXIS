@@ -1489,6 +1489,53 @@ se combinan por `AND`, hay un máximo de cinco acciones secuenciales y cada acci
 se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofrece
 “Revisar ahora” para que la demostración no dependa del reloj ni de una cola.
 
+### El catálogo real es más estrecho que el enum
+
+⚠️ **`AutomationTriggerType` y `AutomationActionType` (`@praxis/contracts`) no
+son el catálogo.** El enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK` y
+`SEND_EMAIL` porque vienen del diseño original; el validador de
+`rule-definition.ts` los rechaza con «no soportado en el MVP académico». Quien
+construya contra el contrato debe seguir al validador, no al enum — verificado
+en runtime, `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+
+| Trigger | Config admitida | Condiciones (`field`) | Acción y destinatario |
+|---|---|---|---|
+| `TASK_DUE_SOON` | `{ leadTimeMinutes }`, entero ≥ 1, **obligatorio** | `priority` (texto), `dueDate` (`YYYY-MM-DD`), `assigneeCount` (entero ≥ 0) | `CREATE_NOTIFICATION` → `ASSIGNEES` |
+| `TASK_STALE` | `{ days }`, entero ≥ 1, **opcional**, por defecto 7 | `staleDays` (entero ≥ 0), `overdue` (booleano), `withoutHistory` (booleano) | `CREATE_NOTIFICATION` → `PROJECT_OWNER` |
+
+Operadores: `EQUALS`, `NOT_EQUALS`, `IN`. `IN` exige una **lista no vacía**; los
+otros dos, un **valor escalar** — un array o un objeto con `EQUALS`/`NOT_EQUALS`
+da 400, igual que un escalar con `IN`.
+
+`priority` se compara con `===` contra `task.priority`: el validador solo exige
+«texto no vacío», así que un valor fuera de `LOW`/`MEDIUM`/`HIGH`/`URGENT` **se
+guarda sin error y no coincide nunca** con ninguna tarea.
+
+Cinco trampas que ya mordieron construyendo la interfaz:
+
+1. ⚠️ **`hasOnlyKeys` es estricto en `trigger.config` y en `action.config`.**
+   Una clave de más —aunque el valor sea válido— da 400, igual que el
+   `forbidNonWhitelisted: true` del gateway con el body entero.
+2. ⚠️ **`recipientSelector` lo decide el trigger, no quien llama.** Mandar
+   `PROJECT_OWNER` con `TASK_DUE_SOON` (o al revés) da 400. No es una opción de
+   formulario: es una consecuencia del trigger elegido.
+3. ⚠️ **`status` desde el cliente solo admite `ENABLED` o `DISABLED`.**
+   `PAUSED_SYSTEM` e `INVALID` existen en el enum pero los pone el sistema;
+   enviarlos da 400 con «Solo el sistema puede pausar o invalidar una regla».
+4. 🔴 **`PATCH` es reemplazo total, no parcial.**
+   `UpdateAutomationRuleBodyDto extends CreateAutomationRuleBodyDto`: `name`,
+   `trigger`, `conditions` y `actions` son obligatorios en cada `PATCH`, incluso
+   para cambiar solo `status`. No hay forma de desactivar una regla sin
+   revalidarla entera — y una regla guardada antes de un endurecimiento del
+   validador puede quedar **imposible de desactivar** por esa vía. Ver
+   PENDIENTES-BACKEND.md §27.
+5. ⚠️ **`GET /automations` y `GET /automations/executions` no son la misma
+   forma de tarea.** El primero trae `trigger`/`conditions`/`actions`
+   embebidos y ordenados por `position`; el segundo, en `conditionResult`,
+   solo trae `context` con los campos de condición — nunca `taskId` ni
+   `taskTitle` de forma legible (`causeKey` los lleva incrustados en una
+   cadena de deduplicación, no para leerse). Ver PENDIENTES-BACKEND.md §28.
+
 ## Asistente 🔒
 
 | Método | Ruta | Entrada | Permiso |
