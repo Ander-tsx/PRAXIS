@@ -412,7 +412,7 @@ export class AssistantService {
     const invalidasCount = respuesta.calls.length - validadas.length;
     if (invalidasCount > 0 || (respuesta.calls.length > 0 && !reply)) {
       try {
-        const feedback = [];
+        const feedback: string[] = [];
         if (invalidasCount > 0) {
           feedback.push('Has intentado usar herramientas, pero fallaron la validación (quizá referenciaste un id que no existe o usaste mal los parámetros) y fueron descartadas.');
         }
