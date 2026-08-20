@@ -202,9 +202,6 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
     
     project = defaultProject;
     if (!project) return <SinNingunProyecto api={api} />;
-    
-    // Redirect so the URL contains the slug explicitly.
-    redirect(`/reports/${project.slug}`);
   }
 
   /**
