@@ -49,47 +49,39 @@ export function SlideOver({
     if (open) {
       document.body.style.paddingRight = paddingSizes[size];
       document.body.style.transition = 'padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-
-      const handleGlobalClick = (event: MouseEvent) => {
-        const target = event.target as Node;
-        // Ignorar clicks en nodos que ya no están en el DOM (ej. menús que se cierran al hacer click)
-        if (!document.contains(target)) {
-          return;
-        }
-        // Ignorar clicks dentro del panel
-        if (panelRef.current && panelRef.current.contains(target)) {
-          return;
-        }
-
-        // Ignorar clicks en elementos que lo abrieron (como botones con data-state="open")
-        // No tenemos una forma perfecta de saber si el click fue en el trigger,
-        // pero podemos asumir que si se hizo click fuera y está abierto, queremos cerrarlo.
-        // Un pequeño retraso para no cerrarlo inmediatamente al abrir.
-        onClose();
-      };
-
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-          onClose();
-        }
-      };
-
-      // Usar timeout para evitar capturar el click que abrió el panel
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleGlobalClick);
-        document.addEventListener('keydown', handleKeyDown);
-      }, 0);
-
       return () => {
         document.body.style.paddingRight = '0px';
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleGlobalClick);
-        document.removeEventListener('keydown', handleKeyDown);
       };
     } else {
       document.body.style.paddingRight = '0px';
     }
-  }, [open, size, onClose]);
+  }, [open, size]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (!document.contains(target)) return;
+      if (panelRef.current && panelRef.current.contains(target)) return;
+      onClose();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('click', handleGlobalClick);
+      document.addEventListener('keydown', handleKeyDown);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('click', handleGlobalClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, onClose]);
 
   // Si no está abierto, podríamos no renderizarlo, pero mantenerlo renderizado
   // permite la animación de salida si se usa con framer-motion o puramente CSS.
