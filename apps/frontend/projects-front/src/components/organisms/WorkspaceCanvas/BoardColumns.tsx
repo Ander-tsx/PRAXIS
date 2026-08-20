@@ -22,6 +22,7 @@ import { TaskCard } from '../TaskBoard/TaskCard';
 import { CURVA } from '../TaskBoard/arrastre';
 import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movimientos';
 import { useArrastreDeTablero } from '../TaskBoard/useArrastreDeTablero';
+import { TaskMobileMoveSheet } from '../TaskBoard/TaskMobileMoveSheet';
 import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
@@ -176,6 +177,9 @@ export function BoardColumns({
   /** Columna abierta a pantalla completa, si hay alguna. */
   const [columnaExpandidaId, setColumnaExpandidaId] = useState<string | null>(null);
 
+  /** Tarea de la que se abrió el menú de mover en versión móvil. */
+  const [mobileMenuTask, setMobileMenuTask] = useState<{ id: string; columnId: string } | null>(null);
+
   const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
   const [reorderState, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
 
@@ -327,6 +331,11 @@ export function BoardColumns({
   const arrastreDeTablero = useArrastreDeTablero({
     alSoltarTarea: guardarMovimiento,
     alSoltarColumna: soltarColumna,
+    alMenuMobile: (taskId, columnId) => {
+      if (canMoveTask) {
+        setMobileMenuTask({ id: taskId, columnId });
+      }
+    },
   });
 
   const {
@@ -736,6 +745,19 @@ export function BoardColumns({
             />
           </div>
         </div>
+      )}
+
+      {mobileMenuTask && (
+        <TaskMobileMoveSheet
+          isOpen={!!mobileMenuTask}
+          onClose={() => setMobileMenuTask(null)}
+          columns={columns.map((c) => ({ id: c.id, name: c.name }))}
+          currentColumnId={mobileMenuTask.columnId}
+          onMoveToColumn={(destColId) => {
+            const destIndex = tasksByColumn.get(destColId)?.length ?? 0;
+            guardarMovimiento(mobileMenuTask.id, { columnId: destColId, indice: destIndex }, null);
+          }}
+        />
       )}
 
       {renderedTask && <TaskDialog

@@ -54,6 +54,7 @@ export interface OpcionesDeArrastre {
    * columna destino y el gesto terminaría en un corte.
    */
   alSoltarTarea: (taskId: string, destino: DestinoDeTarea, cajaDelFantasma: DOMRect | null) => void;
+  alMenuMobile?: (taskId: string, columnaOrigen: string) => void;
   /** La columna se soltó en una posición concreta de la pista. */
   alSoltarColumna: (columnId: string, indice: number, cajaDelFantasma: DOMRect | null) => void;
   /** Si es `false`, ningún gesto llega a empezar (sin permiso, o proyecto suspendido). */
@@ -80,6 +81,7 @@ interface Pendiente {
 export function useArrastreDeTablero({
   alSoltarTarea,
   alSoltarColumna,
+  alMenuMobile,
   activo = true,
 }: OpcionesDeArrastre) {
   const [arrastre, setArrastre] = useState<ArrastreEnCurso | null>(null);
@@ -554,9 +556,18 @@ export function useArrastreDeTablero({
       puntero.current = { x: evento.clientX, y: evento.clientY };
       pendiente.current = nuevo;
 
-      if (esTactil) nuevo.temporizador = setTimeout(activar, PULSACION_LARGA_MS);
+      if (esTactil) {
+        nuevo.temporizador = setTimeout(() => {
+          if (descriptor.tipo === 'tarea' && alMenuMobile) {
+            alMenuMobile(descriptor.id, descriptor.columnaOrigen ?? '');
+            limpiar();
+          } else {
+            activar();
+          }
+        }, PULSACION_LARGA_MS);
+      }
     },
-    [activo, activar],
+    [activo, activar, alMenuMobile, limpiar],
   );
 
   return {
