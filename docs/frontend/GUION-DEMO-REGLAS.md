@@ -57,7 +57,7 @@ porque es lo primero que alguien pregunta.
      otro trigger cambia solo. Mandarlo desde el navegador daría 400.
 9. Marcar **«Activar esta regla»**.
 10. **«Crear regla»**.
-11. **Debe verse** en la tarjeta: el nombre, la insignia **Activa**, el resumen
+11. **Debe verse** en su fila de la lista: el nombre, la insignia **Activa**, el resumen
     en español —«Cuando tarea próxima a vencer, si prioridad es Alta, entonces
     avisa a los responsables de la tarea.»— y debajo, sueltas, sus condiciones
     de activación: «Se activa si prioridad es Alta». Ni un identificador
@@ -119,7 +119,7 @@ la auditoría distingue «no se cumplió» de «no había candidatas».
 
 ## Parte 5 — Ciclo de vida y permisos
 
-22. **«Desactivar»** en la tarjeta. La insignia pasa a **Inactiva**. Volver a
+22. **«Desactivar»** en la fila de la regla. La insignia pasa a **Inactiva**. Volver a
     activarla.
 23. **«Eliminar»**. Pide confirmación y dice que no se puede deshacer.
     Cancelar: la regla sigue ahí. Confirmar: desaparece.

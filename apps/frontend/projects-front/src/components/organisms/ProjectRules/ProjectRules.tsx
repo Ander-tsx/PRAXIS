@@ -8,7 +8,7 @@ import { RuleExecutions } from './RuleExecutions';
  * nombra el panel está en el mismo archivo. Solo hay un `ProjectRules` por
  * página, así que no hay riesgo de colisión.
  */
-const ENCABEZADO_REGLAS = 'reglas-academicas';
+const ENCABEZADO_REGLAS = 'reglas-de-automatizacion';
 
 export interface ProjectRulesProps {
   projectId: string;
@@ -56,22 +56,19 @@ export function ProjectRules({
        ejecuciones se quedaban en una franja estrecha donde el resumen del
        contexto de cada fila —«prioridad Alta, fecha de vencimiento …»— no
        cabía en una línea. */
-    <section aria-label="Reglas de automatización" className="flex flex-col gap-6">
-      {/* Los dos paneles son regiones con nombre propio: se leen seguidos, y
-          sin nombre no habría forma de saltar de uno a otro. */}
-      <div
-        aria-labelledby={ENCABEZADO_REGLAS}
-        className="space-y-4 rounded-2xl border border-border bg-surface p-5"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2
-              id={ENCABEZADO_REGLAS}
-              className="font-display text-lg font-semibold text-text-primary"
-            >
-              Reglas académicas
-            </h2>
-            <p className="mt-1 font-sans text-sm text-text-secondary">
+    <div className="flex flex-col gap-10">
+      {/* Misma forma que `ProjectRoles`, `ProjectMembers` y el resto de
+          secciones del proyecto: el encabezado **fuera** de la superficie, con
+          su explicación y su botón al lado, y la caja debajo con el contenido.
+          Antes el título vivía dentro de la caja y con otro tamaño, así que
+          Reglas parecía de otra pantalla. */}
+      <section className="flex flex-col gap-4" aria-labelledby={ENCABEZADO_REGLAS}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h3 id={ENCABEZADO_REGLAS} className="font-display text-2xl text-text-primary">
+              Reglas de automatización
+            </h3>
+            <p className="font-sans text-sm text-text-secondary">
               Cuando ocurre algo, si se cumplen las condiciones, entonces se avisa a quien
               corresponda.
             </p>
@@ -80,20 +77,25 @@ export function ProjectRules({
         </div>
 
         {rules.length === 0 ? (
-          <p className="rounded-xl border border-border px-4 py-6 font-sans text-sm text-text-secondary">
+          <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
             Aún no hay reglas. Una regla dice cuándo revisar, qué condiciones tienen que cumplirse y
             a quién avisar cuando se cumplen.
           </p>
         ) : (
-          <ul className="space-y-2">
+          /* Una sola caja para todas, separadas por una línea, y no una
+             tarjeta por regla: cada una ya lleva dentro dos párrafos y una
+             fila de controles, así que apilar cajas con borde propio dentro
+             de otra caja daba tres bordes anidados para una lista. Igual que
+             `GestorDeEtiquetas`. */
+          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {rules.map((rule) => (
               <RuleCard key={rule.id} projectId={projectId} rule={rule} canManage={canManage} />
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
       <RuleExecutions projectId={projectId} executions={executions} />
-    </section>
+    </div>
   );
 }

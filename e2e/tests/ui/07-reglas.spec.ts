@@ -90,7 +90,7 @@ test.describe('Reglas del proyecto', () => {
       .getByRole('link', { name: 'Reglas' })
       .click();
 
-    await expect(page.getByRole('heading', { name: 'Reglas académicas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reglas de automatización' })).toBeVisible();
   });
 
   test('un enlace viejo con ?tab=automatizaciones sigue aterrizando en Reglas', async ({
@@ -103,7 +103,7 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=automatizaciones`);
 
-    await expect(page.getByRole('heading', { name: 'Reglas académicas' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Reglas de automatización' })).toBeVisible();
   });
 
   test('sin reglas se ve el estado vacío, no solo «no hay nada»', async ({ page }) => {

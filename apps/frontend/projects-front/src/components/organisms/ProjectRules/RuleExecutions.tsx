@@ -59,26 +59,22 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
   const [state, formAction, pending] = useAccion(reviewAutomationsAction, REVIEW_INITIAL_STATE);
 
   return (
-    <div
-      aria-labelledby={ENCABEZADO_EJECUCIONES}
-      className="space-y-4 rounded-2xl border border-border bg-surface p-5"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2
-            id={ENCABEZADO_EJECUCIONES}
-            className="font-display text-lg font-semibold text-text-primary"
-          >
+    /* Mismo trato que la lista de reglas y que el resto de secciones del
+       proyecto: encabezado fuera de la superficie, caja debajo. */
+    <section className="flex flex-col gap-4" aria-labelledby={ENCABEZADO_EJECUCIONES}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 id={ENCABEZADO_EJECUCIONES} className="font-display text-2xl text-text-primary">
             Ejecuciones
-          </h2>
-          <p className="mt-1 font-sans text-sm text-text-secondary">
+          </h3>
+          <p className="font-sans text-sm text-text-secondary">
             Revisa las últimas ejecuciones de las reglas: qué regla se evaluó, sobre qué caso, si
             avisó y cuándo. La revisión se lanza desde aquí, no corre sola.
           </p>
         </div>
         <form action={formAction}>
           <input type="hidden" name="projectId" value={projectId} />
-          <Button type="submit" variant="secondary" size="sm" isLoading={pending}>
+          <Button type="submit" variant="secondary" isLoading={pending}>
             Revisar ahora
           </Button>
         </form>
@@ -108,29 +104,31 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
       )}
 
       {executions.length === 0 ? (
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
           Aún no se ha revisado nada. «Revisar ahora» evalúa las reglas activas contra las tareas
           del proyecto y deja aquí una fila por cada candidata que encontró.
         </p>
       ) : (
-        <ul className="space-y-2">
+        /* Una caja para todas, separadas por una línea — igual que la lista
+           de reglas. */
+        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {executions.map((execution) => {
             const failure = execution.status === 'FAILED' ? failureMessage(execution) : null;
             return (
-              <li key={execution.id} className="rounded-xl border border-border p-3">
+              <li key={execution.id} className="p-5">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-sans text-sm font-medium text-text-primary">
+                  <p className="font-sans text-base font-semibold text-text-primary">
                     {execution.rule.name}
                   </p>
                   <Badge variant={STATUS_VARIANTS[execution.status]}>
                     {STATUS_LABELS[execution.status]}
                   </Badge>
                 </div>
-                <p className="mt-1 font-sans text-xs text-text-secondary">
+                <p className="mt-1 font-sans text-sm text-text-secondary">
                   {describeExecutionContext(execution.conditionResult.context)}
                 </p>
-                {failure && <p className="mt-1 font-sans text-xs text-error">{failure}</p>}
-                <time className="mt-1 block font-sans text-xs text-text-secondary">
+                {failure && <p className="mt-1 font-sans text-sm text-error">{failure}</p>}
+                <time className="mt-1 block font-sans text-xs text-text-disabled">
                   {new Date(execution.createdAt).toLocaleString('es-MX')}
                 </time>
               </li>
@@ -138,6 +136,6 @@ export function RuleExecutions({ projectId, executions }: RuleExecutionsProps) {
           })}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
