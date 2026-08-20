@@ -5,7 +5,7 @@ import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
 import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 export interface CreateBoardButtonProps {
   workspaceId: string;
