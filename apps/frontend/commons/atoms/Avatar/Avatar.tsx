@@ -51,6 +51,7 @@ const PRESENCE_DOT: Record<AvatarSize, string> = {
   sm: 'bottom-[-1px] right-[-1px] h-2 w-2',
   base: 'bottom-[-1px] right-[-1px] h-2.5 w-2.5',
   md: 'bottom-0 right-0 h-3 w-3',
+  xl: 'bottom-0.5 right-0.5 h-3.5 w-3.5',
   lg: 'bottom-1.5 right-1.5 h-4 w-4 ring-[3px]',
 };
 
