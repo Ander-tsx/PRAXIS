@@ -104,7 +104,23 @@ export function construirDatos(
   fuentes: FuentesGeneradas,
   nombres: Nombres,
 ): DatosGenerados {
-  if (grafico.forma === 'histograma') {
+  /**
+   * ⚠️ **El reparto se decide por la métrica, no solo por la forma.**
+   *
+   * Empezó siendo `forma === 'histograma'` a secas, y eso dejaba un agujero:
+   * `distribucion_de_entrega` acepta las dos formas de `DISTRIBUCION`
+   * —histograma y barras— pero el único sitio que sabe leer `cycle.muestras` es
+   * `construirDistribucion`. Pedida como barras se caía hasta el `default` de
+   * `construirSerie` y salía «Esa métrica no se puede dibujar», sobre una
+   * combinación que el contrato **acepta** y que el constructor **ofrece**.
+   *
+   * Así que las distribuciones se reparten por métrica y la forma solo decide
+   * si las barras van pegadas o separadas. Las otras dos métricas de
+   * `DISTRIBUCION` —rotación y volatilidad— vienen del servidor ya agrupadas en
+   * tramos y las sabe leer también `construirCategorias`, que es por donde
+   * salen cuando se piden como barras.
+   */
+  if (grafico.metrica === 'distribucion_de_entrega' || grafico.forma === 'histograma') {
     return construirDistribucion(grafico, fuentes);
   }
   if (grafico.metrica === 'cruce' && grafico.forma === 'mapa_calor') {
@@ -367,6 +383,16 @@ function pintarPorOrden(categorias: Categoria[]): Categoria[] {
 const COLOR_OTRAS = 'var(--color-text-disabled)';
 
 /**
+ * La clave del segmento «Otras» en un cruce apilado.
+ *
+ * Lleva un prefijo que no puede ser un UUID ni una prioridad porque **comparte
+ * espacio de nombres con las claves reales**: es un campo más del objeto que
+ * lee Recharts, y si coincidiera con el id de una columna del cruce, el
+ * agrupado pisaría su segmento sin dar ningún error.
+ */
+const CLAVE_OTRAS = '__otras__';
+
+/**
  * El rótulo de un tramo del histograma de manos.
  *
  * La última barra acumula «5 o más» (`MAX_MANOS` en tasks-service), y decirlo es
@@ -409,7 +435,11 @@ const ETIQUETA_PRIORIDAD: Record<string, string> = {
 
 /* ─── Temporales ───────────────────────────────────────────────────────── */
 
-function construirSerie(grafico: EspecificacionGrafico, fuentes: FuentesGeneradas, nombres: Nombres): DatosGenerados {
+function construirSerie(
+  grafico: EspecificacionGrafico,
+  fuentes: FuentesGeneradas,
+  nombres: Nombres,
+): DatosGenerados {
   switch (grafico.metrica) {
     case 'flujo_por_columna': {
       const flow = fuentes.flow;
@@ -461,67 +491,106 @@ function construirSerie(grafico: EspecificacionGrafico, fuentes: FuentesGenerada
       const weekly = fuentes.weekly;
       if (!weekly) return sinDatos('No se pudo leer la serie semanal.');
       if (weekly.serie.length === 0) return sinDatos('Todavía no hay ninguna semana registrada.');
-      
+
       return {
         forma: 'serie',
         puntos: weekly.serie.map((semana) => ({
           x: formatDay(semana.semana),
           creadas: semana.creadas,
-          // Cierres as negative values for divergent bars
+          /**
+           * ⚠️ **Los cierres viajan en negativo, y es la métrica entera.**
+           *
+           * Es lo único que separa unas barras divergentes de unas barras
+           * apiladas: el signo pone los cierres por debajo del cero y deja el
+           * saldo de la semana a la vista —si la parte de arriba es más larga
+           * que la de abajo, entra más de lo que sale—. Con las dos en positivo
+           * el gráfico se dibuja igual de bien y hay que restar de cabeza.
+           *
+           * Por eso `BARRAS_DIVERGENTES` es la **única** forma que el contrato
+           * acepta para esta métrica: pedida como línea, la de cierres saldría
+           * bajo el eje y se leería como una caída que no existe.
+           */
           cerradas: -semana.cerradas,
         })),
         series: [
           { clave: 'creadas', nombre: 'Entradas', color: 'var(--color-primary)' },
-          { clave: 'cerradas', nombre: 'Cierres', color: 'var(--color-success)' }
+          { clave: 'cerradas', nombre: 'Cierres', color: 'var(--color-success)' },
         ],
         unidad: 'tareas',
       };
     }
-    
+
+    /**
+     * El cruce apilado: una barra por valor de `agruparPor`, partida dentro por
+     * `partirPor`. El mismo dato que el mapa de calor, leído al revés — aquel
+     * compara celda contra celda, esta compara el total de cada barra.
+     */
     case 'cruce': {
-      if (grafico.forma !== 'barras_apiladas') {
-         return sinDatos('Forma no soportada para cruce en series.');
-      }
-      
-      const parte = parteDeCruce(grafico);
-      if (!parte || !fuentes.matrices || !fuentes.matrices[parte]) {
-        return sinDatos('No se pudo leer el cruce.');
-      }
-      
-      const matriz = fuentes.matrices[parte];
-      if (matriz.celdas.length === 0) return sinDatos('No hay datos para este cruce.');
-      
-      const filasMap = new Map<string, string>();
-      const columnasMap = new Map<string, string>();
-      const puntosMap = new Map<string, PuntoSerie>();
-      
-      for (const celda of matriz.celdas) {
-        const a = celda.a ?? 'Sin asignar';
-        const b = celda.b ?? 'Sin asignar';
-        
-        const aNombre = celda.aNombre ?? nombres.personas[a] ?? a;
-        const bNombre = celda.bNombre ?? nombres.personas[b] ?? b;
-        
-        filasMap.set(a, aNombre);
-        columnasMap.set(b, bNombre);
-        
-        if (!puntosMap.has(aNombre)) {
-           puntosMap.set(aNombre, { x: aNombre } as PuntoSerie);
-        }
-        
-        puntosMap.get(aNombre)![bNombre] = celda.count;
-      }
-      
-      return {
-        forma: 'serie',
-        puntos: Array.from(puntosMap.values()),
-        series: Array.from(columnasMap.values()).map((colName, index) => ({
-           clave: colName,
-           nombre: colName,
-           color: serieColors[index % serieColors.length]
+      const matriz = matrizDe(grafico, fuentes);
+      if (typeof matriz === 'string') return sinDatos(matriz);
+
+      const { filas, columnas, valores } = celdasEnTabla(matriz, nombres);
+
+      /**
+       * ⚠️ **Las series se recortan a los seis tonos medidos, como en la dona.**
+       *
+       * Un cruce de persona contra etiqueta puede traer treinta valores en el
+       * eje partido, y el código anterior ciclaba `serieColors` con un módulo:
+       * a partir del séptimo, dos segmentos distintos de la **misma barra** se
+       * pintaban del mismo color. No da ningún error y el gráfico deja de poder
+       * leerse — que es exactamente lo que `pintarPorOrden` evita en el resto
+       * del archivo, y por lo mismo se evita aquí.
+       *
+       * Lo que sobra se suma en «Otras», no se tira: una barra a la que le
+       * faltaran segmentos tendría una altura que no es la del total.
+       */
+      const totales = columnas.map((columna) => ({
+        columna,
+        total: filas.reduce((suma, fila) => suma + (valores[fila.clave]?.[columna.clave] ?? 0), 0),
+      }));
+      totales.sort((a, b) => b.total - a.total);
+
+      const cabeza = totales.slice(0, MAX_SERIES - 1).map((fila) => fila.columna);
+      const resto = totales.slice(MAX_SERIES - 1).map((fila) => fila.columna);
+      const agrupa = resto.length > 1;
+
+      const series = [
+        ...cabeza.map((columna, i) => ({
+          clave: columna.clave,
+          nombre: columna.nombre,
+          color: serieColors[i],
         })),
-        unidad: 'tareas'
-      };
+        ...(agrupa
+          ? [{ clave: CLAVE_OTRAS, nombre: 'Otras', color: COLOR_OTRAS }]
+          : resto.map((columna, i) => ({
+              clave: columna.clave,
+              nombre: columna.nombre,
+              color: serieColors[cabeza.length + i],
+            }))),
+      ];
+
+      /* La clave de cada segmento es la del **valor**, no su nombre: dos
+         personas homónimas son dos segmentos, y con el nombre por clave serían
+         uno con la suma de los dos. El nombre solo se pinta. */
+      const puntos: PuntoSerie[] = filas.map((fila) => {
+        const punto: PuntoSerie = { x: fila.nombre };
+        for (const columna of cabeza) {
+          punto[columna.clave] = valores[fila.clave]?.[columna.clave] ?? 0;
+        }
+        if (agrupa) {
+          punto[CLAVE_OTRAS] = resto.reduce(
+            (suma, columna) => suma + (valores[fila.clave]?.[columna.clave] ?? 0),
+            0,
+          );
+        } else {
+          for (const columna of resto) {
+            punto[columna.clave] = valores[fila.clave]?.[columna.clave] ?? 0;
+          }
+        }
+        return punto;
+      });
+
+      return { forma: 'serie', puntos, series, unidad: 'tareas' };
     }
 
     default:
@@ -546,101 +615,212 @@ export function avisoDeSemanaIncompleta(weekly: ReportWeekly | null | undefined)
   return `La última semana lleva ${weekly.semana.diasTranscurridos} de 7 días, así que su barra todavía no es comparable con las anteriores.`;
 }
 
+/**
+ * Cuántos tramos tiene un histograma de tiempos de entrega.
+ *
+ * ⚠️ **No es una preferencia estética: sin esto el gráfico es ilegible.** La
+ * primera versión hacía un tramo por día entre el mínimo y el máximo de la
+ * muestra, y una sola tarea que tardara siete meses convertía el histograma en
+ * doscientas barras de un píxel con todo el volumen aplastado contra el margen
+ * izquierdo. La distribución seguía siendo correcta y no se veía.
+ */
+const TRAMOS_DE_ENTREGA = 12;
+
+/**
+ * Anchos de tramo que una persona lee sin traducir.
+ *
+ * El ancho «ideal» de un histograma de doce tramos sale casi siempre en decimal
+ * —3,417 días— y un eje que dice «de 3,4 a 6,8» no se lee: se descifra. Se
+ * redondea hacia arriba al primero de estos que llegue, así que los tramos
+ * siempre empiezan y acaban en un número que alguien diría en voz alta.
+ */
+const ANCHOS_LEGIBLES = [1, 2, 3, 5, 7, 10, 14, 21, 30, 60, 90, 180, 365] as const;
+
+/** El mayor de la lista: el tope de `days` es 365, así que no hay recorrido más ancho. */
+const ANCHO_MAXIMO = ANCHOS_LEGIBLES[ANCHOS_LEGIBLES.length - 1];
+
+function anchoDeTramo(recorrido: number): number {
+  const ideal = recorrido / TRAMOS_DE_ENTREGA;
+  return ANCHOS_LEGIBLES.find((ancho) => ancho >= ideal) ?? ANCHO_MAXIMO;
+}
+
+/**
+ * Las métricas cuya respuesta **es una distribución**: cuántas tareas caen en
+ * cada tramo, con el orden de los tramos como parte del dato.
+ *
+ * Las dos de `dynamics` llegan ya agrupadas por el servidor —«tres tareas
+ * pasaron por dos manos»— y aquí solo se les cambia el nombre a los campos. La
+ * de entrega llega como una muestra por tarea y hay que agruparla, que es lo
+ * único de este archivo que se parece a un cálculo. Sigue sin estimar nada:
+ * contar cuántas muestras caen en un tramo no inventa ninguna.
+ */
 function construirDistribucion(
   grafico: EspecificacionGrafico,
   fuentes: FuentesGeneradas,
 ): DatosGenerados {
   if (grafico.metrica === 'distribucion_de_entrega') {
     const cycle = fuentes.cycle;
-    if (!cycle) return sinDatos('No se pudo leer el tiempo de ciclo.');
-    if (cycle.muestras.length === 0) return sinDatos('No hay tareas cerradas para medir.');
-    
-    // Create bins of 1 day length
-    const tramosMap = new Map<number, number>();
-    let minDay = Number.MAX_SAFE_INTEGER;
-    let maxDay = 0;
-    
-    for (const m of cycle.muestras) {
-      const days = Math.round(m.leadHours / 24);
-      tramosMap.set(days, (tramosMap.get(days) ?? 0) + 1);
-      if (days < minDay) minDay = days;
-      if (days > maxDay) maxDay = days;
+    if (!cycle) return sinDatos('No se pudo leer el tiempo de entrega.');
+    if (cycle.muestras.length === 0) return sinDatos('No hay tareas cerradas que medir.');
+
+    const dias = cycle.muestras.map((muestra) => muestra.leadHours / 24);
+    const maximo = Math.max(...dias);
+    /**
+     * El eje arranca en cero, no en el mínimo de la muestra.
+     *
+     * Es la diferencia entre «esto es lo que se tarda» y «esto es lo que se
+     * tarda descontando lo rápido». Un proyecto cuya tarea más rápida son cinco
+     * días tiene un problema, y un eje que empezara en cinco lo escondería
+     * justamente en el gráfico que existe para verlo.
+     */
+    const ancho = anchoDeTramo(Math.max(maximo, 1));
+    const tramos = Array.from({ length: Math.max(Math.ceil(maximo / ancho), 1) }, (_, indice) => ({
+      min: indice * ancho,
+      max: (indice + 1) * ancho,
+      count: 0,
+    }));
+
+    for (const valor of dias) {
+      /* El último tramo se lleva el máximo: con `[min, max)` a secas, la tarea
+         más lenta de todas cae fuera del array y desaparece del gráfico. */
+      const indice = Math.min(Math.floor(valor / ancho), tramos.length - 1);
+      tramos[indice].count += 1;
     }
-    
-    if (minDay === Number.MAX_SAFE_INTEGER) minDay = 0;
-    
-    const tramos = [];
-    for (let i = minDay; i <= maxDay; i++) {
-      tramos.push({ min: i, max: i + 1, count: tramosMap.get(i) ?? 0 });
+
+    return { forma: 'distribucion', tramos, unidadY: 'tareas', unidadX: 'días' };
+  }
+
+  if (grafico.metrica === 'rotacion_por_tarea' || grafico.metrica === 'volatilidad_por_tarea') {
+    const dynamics = fuentes.dynamics;
+    if (!dynamics) return sinDatos('No se pudo leer el historial del proyecto.');
+
+    const rotacion = grafico.metrica === 'rotacion_por_tarea';
+    const distribucion = rotacion
+      ? dynamics.rotacion.distribucion
+      : dynamics.volatilidad.distribucion;
+    if (distribucion.length === 0) {
+      return sinDatos(
+        rotacion
+          ? 'Ninguna tarea ha cambiado de responsable en el historial capturado.'
+          : 'Ninguna tarea ha cambiado de prioridad en el historial capturado.',
+      );
     }
-    
+
     return {
       forma: 'distribucion',
-      tramos,
+      /* Los tramos de estas dos son enteros sueltos —una mano, dos manos— así
+         que `max` es siempre `min + 1`: el ancho no es un dato, es la unidad. */
+      tramos: distribucion.map((fila) => {
+        const valor = 'manos' in fila ? fila.manos : fila.cambios;
+        return { min: valor, max: valor + 1, count: fila.tareas };
+      }),
       unidadY: 'tareas',
-      unidadX: 'días',
+      unidadX: rotacion ? 'personas' : 'cambios',
     };
   }
-  
-  if (grafico.metrica === 'rotacion_por_tarea' || grafico.metrica === 'volatilidad_por_tarea') {
-     const dynamics = fuentes.dynamics;
-     if (!dynamics) return sinDatos('No se pudo leer el historial de eventos.');
-     
-     const distribucion = grafico.metrica === 'rotacion_por_tarea' 
-       ? dynamics.rotacion.distribucion
-       : dynamics.volatilidad.distribucion;
-       
-     return {
-       forma: 'distribucion',
-       tramos: distribucion.map(d => ({
-         min: 'manos' in d ? d.manos : d.cambios,
-         max: ('manos' in d ? d.manos : d.cambios) + 1,
-         count: d.tareas
-       })),
-       unidadY: 'tareas',
-       unidadX: grafico.metrica === 'rotacion_por_tarea' ? 'personas' : 'cambios'
-     };
-  }
-  
-  return sinDatos('Métrica no soportada como distribución.');
+
+  return sinDatos('Esa métrica no se puede dibujar como distribución.');
 }
 
+/* ─── El cruce de dos dimensiones ──────────────────────────────────────── */
+
+/**
+ * El nombre que se pinta para un valor de una dimensión del cruce.
+ *
+ * ⚠️ **El servidor solo resuelve una de las cuatro dimensiones.** `matrix`
+ * traduce `columna` —el nombre está en projects-service, que es a quien le
+ * pregunta— y devuelve `persona` y `etiqueta` como el identificador crudo y
+ * `prioridad` como la constante del enum. No es un descuido suyo: los nombres de
+ * las personas los resuelve el directorio y los de las etiquetas ya viajan a
+ * esta pantalla para la barra de filtros, así que pedírselos otra vez sería un
+ * viaje de ida y vuelta por datos que la page ya tiene delante.
+ *
+ * Lo que sí era un descuido, y costó encontrarse: esto miraba **solo**
+ * `nombres.personas`, así que un cruce partido por etiqueta pintaba una columna
+ * por UUID y una fila de prioridades decía `URGENT`. Salía plausible —la tabla
+ * se dibujaba entera y las cifras eran correctas— y no se podía leer.
+ */
+function nombreDeDimension(
+  dimension: string,
+  clave: string,
+  delServidor: string | null,
+  nombres: Nombres,
+): string {
+  if (delServidor !== null) return delServidor;
+  if (dimension === 'persona') return nombres.personas[clave] ?? clave;
+  if (dimension === 'etiqueta') return nombres.etiquetas[clave] ?? clave;
+  if (dimension === 'prioridad') return ETIQUETA_PRIORIDAD[clave] ?? clave;
+  return clave;
+}
+
+/** Lo que se pinta en el hueco de una tarea sin valor en esa dimensión. */
+const SIN_VALOR = 'Sin asignar';
+
+/**
+ * El cruce leído como tabla: una fila por valor de `agruparPor`, una columna por
+ * valor de `partirPor` y el recuento dentro.
+ *
+ * ⚠️ **Las claves se conservan además de los nombres.** Dos personas pueden
+ * llamarse igual, y una tabla indexada por el nombre las fundiría en una fila
+ * con la suma de las dos — que se lee perfectamente y es mentira.
+ */
+function celdasEnTabla(matriz: ReportMatrix, nombres: Nombres) {
+  const filas = new Map<string, string>();
+  const columnas = new Map<string, string>();
+  const valores: Record<string, Record<string, number>> = {};
+
+  for (const celda of matriz.celdas) {
+    const a = celda.a ?? SIN_VALOR;
+    const b = celda.b ?? SIN_VALOR;
+
+    filas.set(
+      a,
+      celda.a === null
+        ? SIN_VALOR
+        : nombreDeDimension(matriz.agruparPor, a, celda.aNombre, nombres),
+    );
+    columnas.set(
+      b,
+      celda.b === null ? SIN_VALOR : nombreDeDimension(matriz.partirPor, b, celda.bNombre, nombres),
+    );
+
+    valores[a] ??= {};
+    valores[a][b] = celda.count;
+  }
+
+  const enLista = (mapa: Map<string, string>) =>
+    Array.from(mapa, ([clave, nombre]) => ({ clave, nombre }));
+
+  return { filas: enLista(filas), columnas: enLista(columnas), valores };
+}
+
+/** El cruce de un `mapa_calor`. */
 function construirMatriz(
   grafico: EspecificacionGrafico,
   fuentes: FuentesGeneradas,
-  nombres: Nombres
+  nombres: Nombres,
 ): DatosGenerados {
+  const matriz = matrizDe(grafico, fuentes);
+  if (typeof matriz === 'string') return sinDatos(matriz);
+
+  const { filas, columnas, valores } = celdasEnTabla(matriz, nombres);
+  return { forma: 'matriz', filas, columnas, valores, unidad: 'tareas' };
+}
+
+/**
+ * El cruce en el paquete de informes, o el motivo por el que no está.
+ *
+ * Devuelve la matriz o la frase que hay que enseñar en su hueco, en vez de
+ * `null`: el motivo distingue «no se pudo leer» de «no hay nada que enseñar», y
+ * son dos pantallas distintas (invariante 6).
+ */
+function matrizDe(
+  grafico: EspecificacionGrafico,
+  fuentes: FuentesGeneradas,
+): ReportMatrix | string {
   const parte = parteDeCruce(grafico);
-  if (!parte || !fuentes.matrices || !fuentes.matrices[parte]) {
-    return sinDatos('No se pudo leer el cruce.');
-  }
-  
-  const matriz = fuentes.matrices[parte];
-  if (matriz.celdas.length === 0) return sinDatos('No hay datos para este cruce.');
-  
-  const filasMap = new Map<string, string>();
-  const columnasMap = new Map<string, string>();
-  const valores: Record<string, Record<string, number>> = {};
-  
-  for (const celda of matriz.celdas) {
-    const a = celda.a ?? 'Sin asignar';
-    const b = celda.b ?? 'Sin asignar';
-    
-    const aNombre = celda.aNombre ?? nombres.personas[a] ?? a;
-    const bNombre = celda.bNombre ?? nombres.personas[b] ?? b;
-    
-    filasMap.set(a, aNombre);
-    columnasMap.set(b, bNombre);
-    
-    if (!valores[a]) valores[a] = {};
-    valores[a][b] = celda.count;
-  }
-  
-  return {
-    forma: 'matriz',
-    filas: Array.from(filasMap.entries()).map(([clave, nombre]) => ({ clave, nombre })),
-    columnas: Array.from(columnasMap.entries()).map(([clave, nombre]) => ({ clave, nombre })),
-    valores,
-    unidad: 'tareas'
-  };
+  const matriz = parte ? fuentes.matrices?.[parte] : undefined;
+  if (!matriz) return 'No se pudo leer el cruce.';
+  if (matriz.celdas.length === 0) return 'No hay ninguna tarea que caiga en este cruce.';
+  return matriz;
 }

@@ -1,6 +1,6 @@
-import { HowToRead } from "./HowToRead";
 import { alpha, colors } from '@praxis/commons';
 import type { ReactNode } from 'react';
+import { HowToRead } from './HowToRead';
 
 export interface ChartCardProps {
   title: string;

@@ -26,8 +26,18 @@ export function HowToRead({ children }: { children: ReactNode }) {
           onClick={() => setFlipped(false)}
           className="shrink-0 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
           title="Volver al gráfico"
+          aria-label="Volver al gráfico"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          {/* El nombre accesible lo pone el `aria-label` del botón: el icono es
+              decoración y se oculta, en vez de leerse dos veces. */}
+          <svg
+            aria-hidden="true"
+            className="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
         </button>

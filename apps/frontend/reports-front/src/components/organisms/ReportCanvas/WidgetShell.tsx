@@ -68,12 +68,15 @@ export function WidgetShell({
               <h3 className="truncate font-display text-lg text-text-primary" title={titulo}>
                 {titulo}
               </h3>
-              <p className="truncate font-sans text-xs text-text-disabled" title={subtitulo(widget)}>
+              <p
+                className="truncate font-sans text-xs text-text-disabled"
+                title={subtitulo(widget)}
+              >
                 {subtitulo(widget)}
               </p>
             </div>
 
-            <div 
+            <div
               className="flex shrink-0 items-center gap-1"
               onPointerDown={(evento) => evento.stopPropagation()}
             >
@@ -82,14 +85,27 @@ export function WidgetShell({
                   type="button"
                   onClick={() => setFlipped(!flipped)}
                   title="Cómo se lee esto"
+                  aria-label="Cómo se lee esto"
                   className={`shrink-0 rounded-lg p-1.5 transition-colors ${
                     flipped
                       ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
                       : 'text-text-disabled hover:bg-surface-elevated hover:text-text-primary'
                   }`}
                 >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  {/* Decoración: el botón ya se llama igual que su título. */}
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                 </button>
               )}
@@ -114,7 +130,9 @@ export function WidgetShell({
             </div>
           </header>
 
-          <div className={`relative px-5 pb-5 pt-1 ${altoFijo ? 'min-h-0 flex-1 overflow-auto' : ''}`}>
+          <div
+            className={`relative px-5 pb-5 pt-1 ${altoFijo ? 'min-h-0 flex-1 overflow-auto' : ''}`}
+          >
             {children ?? <Cargando />}
           </div>
 

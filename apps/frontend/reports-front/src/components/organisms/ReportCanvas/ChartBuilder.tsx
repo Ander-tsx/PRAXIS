@@ -2,6 +2,9 @@
 
 import { MiniGrafo } from '@/components/molecules/MiniGrafo';
 import {
+  DIMENSIONES,
+  DIMENSIONES_CRUCE,
+  type DimensionCruce,
   type EspecificacionGrafico,
   FORMAS,
   type FormaGrafico,
@@ -9,9 +12,6 @@ import {
   type Metrica,
   etiquetaDelRango,
   validarGrafico,
-  type DimensionCruce,
-  DIMENSIONES_CRUCE,
-  DIMENSIONES,
 } from '@/lib/widgets';
 import { Button, Input, Select, alpha, colors } from '@praxis/commons';
 import { useState } from 'react';
@@ -229,20 +229,20 @@ export function ChartBuilder({
             )}
           </div>
         )}
-        
+
         {metrica === 'cruce' && (
           <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
             <Select
               label="Agrupar por"
               fullWidth
-              options={DIMENSIONES_CRUCE.map(d => ({ value: d, label: DIMENSIONES[d] }))}
+              options={DIMENSIONES_CRUCE.map((d) => ({ value: d, label: DIMENSIONES[d] }))}
               value={agruparPor}
               onValueChange={(valor) => setAgruparPor(valor as DimensionCruce)}
             />
             <Select
               label="Partir por"
               fullWidth
-              options={DIMENSIONES_CRUCE.map(d => ({ value: d, label: DIMENSIONES[d] }))}
+              options={DIMENSIONES_CRUCE.map((d) => ({ value: d, label: DIMENSIONES[d] }))}
               value={partirPor}
               onValueChange={(valor) => setPartirPor(valor as DimensionCruce)}
             />
