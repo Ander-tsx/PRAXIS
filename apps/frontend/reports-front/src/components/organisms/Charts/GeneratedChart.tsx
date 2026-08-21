@@ -308,6 +308,19 @@ function Temporal({
   );
 }
 
+/**
+ * La distribución: barras sobre tramos contiguos, no sobre categorías sueltas.
+ *
+ * ⚠️ **Lo único que cambia entre `histograma` y `barras` es el hueco**, y no es
+ * un detalle de estilo. En un histograma los tramos son contiguos —«de 0 a 3
+ * días» acaba justo donde empieza «de 3 a 6»— y el hueco insinuaría que entre
+ * los dos hay algo que no se cuenta. Con las barras separadas, el mismo dato se
+ * lee como categorías independientes, que es lo que quiere quien las pide así.
+ *
+ * El eje **no se ordena por tamaño**: el orden de los tramos es el dato, y por
+ * eso `construirDatos` reparte estas métricas antes de llegar al ordenador de
+ * `construirCategorias`.
+ */
 function Distribucion({
   datos,
   forma,
@@ -316,35 +329,48 @@ function Distribucion({
   forma: FormaGrafico;
 }) {
   const { tramos, unidadX, unidadY } = datos;
-  
+  /* Los tramos de ancho uno son enteros sueltos —una mano, dos manos— y ahí el
+     rótulo «1-2» se leería como un intervalo que no existe. */
+  const enteros = tramos.every((tramo) => tramo.max - tramo.min === 1);
+  const rotulo = (tramo: { min: number; max: number }) =>
+    enteros ? `${tramo.min}` : `${tramo.min}-${tramo.max}`;
+
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={160}>
-      <BarChart data={tramos} margin={{ left: -16, right: 8, top: 8 }}>
+      <BarChart
+        data={tramos}
+        margin={{ left: -16, right: 8, top: 8 }}
+        barCategoryGap={forma === 'histograma' ? 1 : '20%'}
+      >
         <CartesianGrid stroke={colors.border} strokeDasharray="3 3" vertical={false} />
-        <XAxis 
-          dataKey="min" 
-          {...ejes} 
-          tickFormatter={(val, index) => {
-             const tramo = tramos[index];
-             if (!tramo) return val;
-             return `${tramo.min}-${tramo.max}`;
-          }} 
+        <XAxis
+          dataKey="min"
+          {...ejes}
+          minTickGap={8}
+          tickFormatter={(_valor, indice) => {
+            const tramo = tramos[indice];
+            return tramo ? rotulo(tramo) : '';
+          }}
         />
         <YAxis {...ejes} allowDecimals={false} />
         <Tooltip
           {...tooltipStyle}
           cursor={{ fill: alpha(colors.primary, 8) }}
           formatter={(valor) => [`${valor} ${unidadY}`, '']}
-          labelFormatter={(label, payload) => {
-            if (payload.length === 0) return label;
-            const tramo = payload[0].payload;
-            return `De ${tramo.min} a ${tramo.max} ${unidadX}`;
+          labelFormatter={(etiqueta, carga) => {
+            const tramo = carga[0]?.payload as { min: number; max: number } | undefined;
+            if (!tramo) return etiqueta;
+            return enteros
+              ? `${tramo.min} ${unidadX}`
+              : `De ${tramo.min} a ${tramo.max} ${unidadX}`;
           }}
         />
         <Bar
           dataKey="count"
           fill={colors.primary}
-          radius={[4, 4, 0, 0]}
+          /* El histograma va a ras: unas esquinas redondeadas sobre barras
+             pegadas dibujan una muesca entre tramos que no significa nada. */
+          radius={forma === 'histograma' ? 0 : [4, 4, 0, 0]}
           isAnimationActive={false}
         />
       </BarChart>
@@ -352,60 +378,125 @@ function Distribucion({
   );
 }
 
+/**
+ * El cruce como mapa de calor: una tabla donde el color dice cuánto.
+ *
+ * ## Por qué es una `<table>` y no un SVG
+ *
+ * Porque **es** una tabla: dos dimensiones categóricas y un número en cada
+ * cruce. Dibujarla en Recharts habría costado una malla de rectángulos que un
+ * lector de pantalla recorre como una lista de nada, mientras que aquí cada
+ * cifra está en su celda con su fila y su columna nombradas. El color es un
+ * refuerzo del número, no su sustituto — la celda dice `12` además de pintarse.
+ *
+ * ⚠️ **Con la escala al lado, siempre.** Un degradado sin leyenda no dice si lo
+ * oscuro es mucho o es poco, y esa es exactamente la pregunta que responde un
+ * mapa de calor. Va debajo con el máximo escrito.
+ */
 function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }> }) {
   const { filas, columnas, valores } = datos;
-  
-  // Find max value for heatmap color intensity
-  let max = 0;
-  for (const fila of filas) {
-    for (const col of columnas) {
-       const val = valores[fila.clave]?.[col.clave] ?? 0;
-       if (val > max) max = val;
-    }
-  }
-  
+
   if (filas.length === 0 || columnas.length === 0) {
-     return (
-       <div className="flex h-full min-h-32 items-center justify-center px-4 text-center">
-         <p className="font-sans text-sm text-text-disabled">No hay datos en el cruce.</p>
-       </div>
-     );
+    return (
+      <div className="flex h-full min-h-32 items-center justify-center px-4 text-center">
+        <p className="font-sans text-sm text-text-disabled">No hay nada en este cruce.</p>
+      </div>
+    );
   }
 
+  let max = 0;
+  for (const fila of filas) {
+    for (const columna of columnas) {
+      const valor = valores[fila.clave]?.[columna.clave] ?? 0;
+      if (valor > max) max = valor;
+    }
+  }
+
+  /**
+   * De un recuento a su intensidad.
+   *
+   * Arranca en 12 y no en 0 para que **una celda con un 1 se distinga de una
+   * vacía**: con la escala pegada al cero, el valor más bajo de una matriz con
+   * un máximo alto sale transparente y se lee como «aquí no hay nada», que es
+   * justo lo contrario de lo que dice.
+   */
+  const intensidad = (valor: number) => (max > 0 ? 12 + (valor / max) * 78 : 0);
+  /* Por encima de la mitad de la escala el fondo ya no deja leer el texto del
+     cuerpo, así que la cifra se pinta del color de la superficie. */
+  const invierte = (valor: number) => intensidad(valor) > 55;
+
   return (
-    <div className="overflow-x-auto h-full w-full flex flex-col items-start justify-start">
-      <table className="min-w-full border-collapse text-sm">
-        <thead>
-          <tr>
-            <th className="p-2 border border-border bg-surface-elevated text-left font-sans text-text-secondary font-medium sticky top-0 left-0 z-20"></th>
-            {columnas.map((col) => (
-              <th key={col.clave} className="p-2 border border-border bg-surface-elevated text-center font-sans text-text-secondary font-medium min-w-[80px] max-w-[120px] truncate sticky top-0 z-10" title={col.nombre}>
-                {col.nombre}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {filas.map((fila) => (
-            <tr key={fila.clave}>
-              <th className="p-2 border border-border bg-surface text-left font-sans text-text-secondary font-medium sticky left-0 z-10 max-w-[150px] truncate" title={fila.nombre}>
-                {fila.nombre}
-              </th>
-              {columnas.map((col) => {
-                const val = valores[fila.clave]?.[col.clave] ?? 0;
-                const opacity = max > 0 ? (val / max) * 0.8 + 0.1 : 0;
-                const color = val > 0 ? alpha(colors.primary, opacity * 100) : 'transparent';
-                
-                return (
-                  <td key={col.clave} className="p-2 border border-border text-center font-sans tabular-nums" style={{ backgroundColor: color }}>
-                    {val > 0 ? <span className={opacity > 0.5 ? 'text-surface' : 'text-text-primary'}>{val}</span> : <span className="text-border-subtle">-</span>}
-                  </td>
-                );
-              })}
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="min-w-full border-collapse font-sans text-sm">
+          <caption className="sr-only">
+            Cruce de dos dimensiones. Cada celda cuenta las tareas que comparten la fila y la
+            columna.
+          </caption>
+          <thead>
+            <tr>
+              {/* La esquina no rotula nada: los dos ejes ya llevan su nombre en
+                  el título del gráfico, que es donde se eligió el cruce. */}
+              <th className="sticky top-0 left-0 z-20 border border-border bg-surface-elevated p-2" />
+              {columnas.map((columna) => (
+                <th
+                  key={columna.clave}
+                  scope="col"
+                  title={columna.nombre}
+                  className="sticky top-0 z-10 max-w-[120px] min-w-[80px] truncate border border-border bg-surface-elevated p-2 text-center font-medium text-text-secondary"
+                >
+                  {columna.nombre}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filas.map((fila) => (
+              <tr key={fila.clave}>
+                <th
+                  scope="row"
+                  title={fila.nombre}
+                  className="sticky left-0 z-10 max-w-[150px] truncate border border-border bg-surface p-2 text-left font-medium text-text-secondary"
+                >
+                  {fila.nombre}
+                </th>
+                {columnas.map((columna) => {
+                  const valor = valores[fila.clave]?.[columna.clave] ?? 0;
+                  return (
+                    <td
+                      key={columna.clave}
+                      className="border border-border p-2 text-center tabular-nums"
+                      style={{
+                        background:
+                          valor > 0 ? alpha(colors.primary, intensidad(valor)) : 'transparent',
+                        color: invierte(valor) ? colors.surface : colors.textPrimary,
+                      }}
+                    >
+                      {/* El cero va como raya y no como «0»: una matriz llena de
+                          ceros esconde los números que sí hay. */}
+                      {valor > 0 ? valor : <span className="text-border-strong">—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2 font-sans text-xs text-text-disabled">
+        <span>0</span>
+        <span
+          aria-hidden="true"
+          className="h-2 flex-1 rounded-full"
+          style={{
+            background: `linear-gradient(to right, ${alpha(colors.primary, 12)}, ${alpha(colors.primary, 90)})`,
+          }}
+        />
+        <span>
+          {max} {datos.unidad}
+        </span>
+      </div>
     </div>
   );
 }

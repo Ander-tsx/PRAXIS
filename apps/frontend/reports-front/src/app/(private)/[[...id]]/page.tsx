@@ -28,12 +28,7 @@ import {
   filtrosAQuery,
   filtrosDesdeUrl,
 } from '@/lib/reports';
-import {
-  type Widget,
-  lienzoPorDefecto,
-  parteDeCruce,
-  partesNecesarias,
-} from '@/lib/widgets';
+import { type Widget, lienzoPorDefecto, parteDeCruce, partesNecesarias } from '@/lib/widgets';
 import {
   AppHeader,
   type AssistantQuota,
@@ -191,15 +186,15 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
     const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     const lastSlug = cookieStore.get('last_reports_project_slug')?.value;
-    
+
     const lista = await listaPromesa;
-    
+
     let defaultProject = lista.items[0] ?? null;
     if (lastSlug) {
       const found = lista.items.find((p) => p.slug === lastSlug);
       if (found) defaultProject = found;
     }
-    
+
     project = defaultProject;
     if (!project) return <SinNingunProyecto api={api} />;
   }
