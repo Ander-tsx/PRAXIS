@@ -67,6 +67,47 @@ export async function setProjectStatusAction(
 }
 
 /**
+ * Borra un proyecto de verdad, con su purga en los otros servicios.
+ *
+ * ⚠️ **No es archivar.** Archivar es un estado y se deshace; esto quita la fila
+ * y arrastra espacios, tableros, columnas, roles, miembros, chat, tareas y
+ * reglas. No hay pantalla desde la que recuperarlo.
+ *
+ * Por eso la confirmación pide **escribir el nombre**: un «¿seguro?» se pulsa
+ * con la misma mano y la misma atención con la que se pulsó el botón que lo
+ * abrió, y aquí lo que hace falta es un segundo de más.
+ */
+export async function deleteProjectAction(
+  _prev: AdminProjectState,
+  formData: FormData,
+): Promise<AdminProjectState> {
+  const session = await getSession();
+  if (!session) {
+    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+  }
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const nombre = String(formData.get('projectName') ?? '');
+  const confirmacion = String(formData.get('confirmacion') ?? '');
+
+  /* Se comprueba aquí además de en el cliente: el `FormData` de una Server
+     Function no es de fiar solo porque el formulario lo haya validado. */
+  if (confirmacion.trim() !== nombre.trim()) {
+    return { error: 'El nombre no coincide. Escríbelo tal cual para confirmar.', done: null };
+  }
+
+  try {
+    await createServerApiClient().delete(`/admin/projects/${projectId}`);
+  } catch (error) {
+    return { error: describeError(error), done: null };
+  }
+
+  revalidatePath('/projects');
+  revalidatePath('/actividad');
+  return { error: null, done: projectId };
+}
+
+/**
  * Traduce el error del gateway a algo legible.
  *
  * Los mensajes de estas rutas **ya vienen redactados para una persona**, así que se

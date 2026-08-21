@@ -1,5 +1,6 @@
 'use client';
 
+import { deleteProjectAction } from '@/app/(private)/projects/actions';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS_PROYECTO, fechaYHora } from '@/lib/admin';
 import {
@@ -10,6 +11,7 @@ import {
   type ProjectStatusName,
 } from '@praxis/commons';
 import { useMemo, useState } from 'react';
+import { HardDeleteDialog } from './HardDeleteDialog';
 import { ProjectStatusDialog } from './ProjectStatusDialog';
 
 export interface ProjectsTableProps {
@@ -45,6 +47,7 @@ export interface ProjectsTableProps {
  * una sola vez y `Track` no admite `auto`. Ver `DataTable`.
  */
 export function ProjectsTable({ proyectos }: ProjectsTableProps) {
+  const [borrar, setBorrar] = useState<AdminProject | null>(null);
   const [objetivo, setObjetivo] = useState<{
     proyecto: AdminProject;
     destino: ProjectStatusName;
@@ -147,6 +150,14 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
                         onSelect: () => setObjetivo({ proyecto, destino: 'DELETED' as const }),
                       },
                     ]),
+                /* ⚠️ **Borrar no es archivar**, y van seguidos a propósito:
+                   archivar es el paso reversible y tiene que verse primero. */
+                {
+                  id: 'borrar',
+                  label: 'Borrar para siempre',
+                  tone: 'danger' as const,
+                  onSelect: () => setBorrar(proyecto),
+                },
               ]}
             />
           );
@@ -167,6 +178,23 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
         align="start"
         ariaLabel="Proyectos de la plataforma"
       />
+
+      {borrar && (
+        <HardDeleteDialog
+          open
+          onClose={() => setBorrar(null)}
+          queCosa="este proyecto"
+          nombre={borrar.name}
+          campos={{ projectId: borrar.id, projectName: borrar.name }}
+          accion={deleteProjectAction}
+          arrastra={[
+            'El proyecto, sus espacios, tableros y columnas',
+            'Todas sus tareas, con sus checklists, adjuntos y comentarios',
+            'Sus roles, su gente y su chat de equipo',
+            'Sus reglas de automatización y su historial de ejecuciones',
+          ]}
+        />
+      )}
 
       {objetivo && (
         <ProjectStatusDialog

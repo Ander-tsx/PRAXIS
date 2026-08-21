@@ -1,5 +1,6 @@
 'use client';
 
+import { deleteUserAction } from '@/app/(private)/actions';
 import { RowActions } from '@/components/molecules/RowActions';
 import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import {
@@ -12,6 +13,7 @@ import {
   globalRoleLevelOf,
 } from '@praxis/commons';
 import { useMemo, useState } from 'react';
+import { HardDeleteDialog } from './HardDeleteDialog';
 import { UserPlanDialog } from './UserPlanDialog';
 import { UserRoleDialog } from './UserRoleDialog';
 import { UserStatusDialog } from './UserStatusDialog';
@@ -55,6 +57,7 @@ export interface UsersTableProps {
 export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
   const [estadoDe, setEstadoDe] = useState<AdminUser | null>(null);
   const [rolDe, setRolDe] = useState<AdminUser | null>(null);
+  const [borrarA, setBorrarA] = useState<AdminUser | null>(null);
   const [planDe, setPlanDe] = useState<AdminUser | null>(null);
 
   const miNivel = globalRoleLevelOf(misRoles);
@@ -151,8 +154,8 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
       {
         key: 'acciones',
         header: 'Acciones',
-        /* Fija: es un botón de tres puntos y siempre mide lo mismo. Era la
-           pista `auto` que descuadraba la tabla entera. */
+        /* Fija: es un botón de icono y siempre mide lo mismo. Era la pista
+           `auto` que descuadraba la tabla entera. */
         track: { rem: 6 },
         align: 'end',
         mobileLabel: false,
@@ -191,6 +194,13 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                   disabledReason: bloqueo,
                   onSelect: () => setPlanDe(usuario),
                 },
+                {
+                  id: 'borrar',
+                  label: 'Borrar cuenta',
+                  tone: 'danger',
+                  disabledReason: bloqueo,
+                  onSelect: () => setBorrarA(usuario),
+                },
               ]}
             />
           );
@@ -212,6 +222,25 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
       {estadoDe && <UserStatusDialog usuario={estadoDe} open onClose={() => setEstadoDe(null)} />}
 
       {planDe && <UserPlanDialog usuario={planDe} open onClose={() => setPlanDe(null)} />}
+
+      {borrarA && (
+        <HardDeleteDialog
+          open
+          onClose={() => setBorrarA(null)}
+          queCosa="esta cuenta"
+          nombre={nombreDe(borrarA)}
+          campos={{ userId: borrarA.id, userLabel: nombreDe(borrarA) }}
+          accion={deleteUserAction}
+          arrastra={['La cuenta y sus credenciales', 'Sus sesiones abiertas, web y de voz']}
+          /* Lo que se queda es la mitad del mensaje: sin esto, quien administra
+             cree que borrar una cuenta vacía los tableros donde esa persona
+             trabajó — y no borra nunca. */
+          conserva={[
+            'Sus tareas, comentarios y mensajes, que se leerán como «Usuario eliminado»',
+            'El registro de actividad de administración',
+          ]}
+        />
+      )}
 
       {rolDe && (
         <UserRoleDialog usuario={rolDe} miNivel={miNivel} open onClose={() => setRolDe(null)} />

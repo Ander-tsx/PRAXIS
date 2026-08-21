@@ -168,6 +168,50 @@ export async function setAssistantPlanAction(
 }
 
 /**
+ * Borra una cuenta de verdad.
+ *
+ * ⚠️ **No es desactivar.** Aquello es un estado y se deshace; esto quita la
+ * cuenta y sus credenciales, y no se deshace.
+ *
+ * Lo que esa persona escribió —tareas, mensajes, actividad— **se queda**: vive
+ * en otros esquemas sin clave foránea, y borrarlo dejaría huecos en tableros de
+ * proyectos que no tienen nada que ver con ella. Se lee como «Usuario
+ * eliminado».
+ *
+ * El gateway se niega si todavía es dueña de algún proyecto, y dice cuáles: un
+ * proyecto sin dueño no se puede administrar desde ningún sitio.
+ */
+export async function deleteUserAction(
+  _prev: AdminUserState,
+  formData: FormData,
+): Promise<AdminUserState> {
+  const session = await getSession();
+  if (!session) {
+    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+  }
+
+  const userId = String(formData.get('userId') ?? '');
+  const etiqueta = String(formData.get('userLabel') ?? '');
+  const confirmacion = String(formData.get('confirmacion') ?? '');
+
+  /* Se comprueba aquí además de en el cliente: el `FormData` de una Server
+     Function no es de fiar solo porque el formulario lo haya validado. */
+  if (confirmacion.trim() !== etiqueta.trim()) {
+    return { error: 'El nombre no coincide. Escríbelo tal cual para confirmar.', done: null };
+  }
+
+  try {
+    await createServerApiClient().delete(`/admin/users/${userId}`);
+  } catch (error) {
+    return { error: describeError(error), done: null };
+  }
+
+  revalidatePath('/');
+  revalidatePath('/actividad');
+  return { error: null, done: userId };
+}
+
+/**
  * Traduce el error del gateway a algo que se pueda leer en pantalla.
  *
  * Los 403 y los 409 de aquí **ya vienen redactados para una persona** —«Solo

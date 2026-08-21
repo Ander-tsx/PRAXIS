@@ -22,6 +22,7 @@ import {
   type ProjectMember,
   TabNav,
   type Task,
+  PERSONA_ELIMINADA,
   personLabel,
   projectPath,
   resolveProfiles,
@@ -678,7 +679,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                 const user = usersById.get(member.userId);
                 return {
                   value: member.userId,
-                  label: user ? personLabel(user) : member.userId,
+                  label: user ? personLabel(user) : PERSONA_ELIMINADA,
                 };
               }),
             }}

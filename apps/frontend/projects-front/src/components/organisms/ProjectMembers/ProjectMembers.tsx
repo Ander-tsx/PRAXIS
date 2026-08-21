@@ -8,6 +8,7 @@ import {
   type ProjectRole,
   type UserProfile,
   avatarHref,
+  PERSONA_ELIMINADA,
   personLabel,
 } from '@praxis/commons';
 import { InviteMemberDialog } from './InviteMemberDialog';
@@ -135,7 +136,7 @@ export function ProjectMembers({
           <ul className="flex flex-col divide-y divide-border">
             {members.map((member) => {
               const user = usersById.get(member.userId);
-              const label = user ? personLabel(user) : member.userId;
+              const label = user ? personLabel(user) : PERSONA_ELIMINADA;
               const isOwner = member.userId === ownerId;
 
               return (
