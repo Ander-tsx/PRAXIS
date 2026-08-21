@@ -75,7 +75,12 @@ export function VueltaDelPago({ planActual }: { planActual: 'FREE' | 'PRO' }) {
           mensajes del mes, y tus proyectos siguen exactamente donde los dejaste.
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button type="button" onClick={() => router.push('/assistant')}>
+          {/* ⚠️ **Navegación dura, no `router.push`.** El asistente es otra zona
+              del multi-zone y esta app se sirve con `basePath: '/dashboard'`,
+              así que el router de Next antepone el prefijo y `/assistant` se
+              convertía en `/dashboard/assistant`, que no existe. Cruzar de zona
+              siempre es `window.location`. */}
+          <Button type="button" onClick={() => window.location.assign('/assistant')}>
             Hablar con PRAX
           </Button>
         </div>

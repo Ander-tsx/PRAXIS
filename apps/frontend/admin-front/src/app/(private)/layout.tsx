@@ -9,6 +9,7 @@ import {
   hasAdminRole,
 } from '@praxis/commons';
 import { loadPrivateChrome } from '@praxis/commons/auth';
+import { CuentaEnCabecera } from '@praxis/commons/organisms/AppLayout/CuentaEnCabecera';
 import { getSidebarPlegada } from '@praxis/commons/theme';
 
 /**
@@ -53,6 +54,9 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       /* El selector de estado se dibuja sobre la esquina del avatar: la
          esfera **es** el botón. Ver `PresenceFooter`. */
       estadoSlot={<PresenceFooter presencia={profile.presence} onCambiar={setPresenceAction} />}
+      /* Rol global y plan, arriba a la derecha de todas las pantallas de la
+         zona. Va aquí y no en cada página: no cambia al navegar. */
+      cuentaSlot={<CuentaEnCabecera roles={roles} />}
     >
       {hasAdminRole(roles) ? (
         children

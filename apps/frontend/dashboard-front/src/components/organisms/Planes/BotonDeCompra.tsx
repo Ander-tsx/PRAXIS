@@ -40,6 +40,24 @@ export function BotonDeCompra({
       destino === 'checkout' ? await abrirPagoProAction() : await abrirPortalAction();
 
     if (url) {
+      if (destino === 'portal') {
+        /**
+         * El portal, en una pestaña aparte.
+         *
+         * Gestionar la suscripción es un rodeo —cambiar la tarjeta, mirar un
+         * recibo— del que se vuelve, y llevarse la pestaña entera obliga a
+         * rehacer el camino hasta donde estabas. La compra es lo contrario: es
+         * el final del recorrido y termina volviendo aquí con `?pago=ok`, así
+         * que esa sí se lleva la pestaña.
+         *
+         * `noopener` no es opcional: sin él, la página abierta recibe un
+         * `window.opener` con el que puede redirigir la nuestra.
+         */
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setAbriendo(false);
+        return;
+      }
+
       window.location.href = url;
       /* No se apaga la espera: la pestaña se está yendo, y un botón que vuelve
          a estar disponible durante la navegación invita a pulsarlo dos veces. */

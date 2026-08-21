@@ -56,6 +56,10 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
   }, []);
 
   const reinicio = formatoReinicio(cuota.reinicia);
+  /* Solo cartelería, igual que en la página de planes: el precio de verdad es
+     el `price_…` de Stripe. El respaldo evita que quede un hueco si la zona que
+     monta el chat no declara la variable. */
+  const precio = process.env.NEXT_PUBLIC_PRECIO_PRO || '120';
 
   /* Mientras no se sabe si hay pago, se enseña el aviso de siempre: parpadear
      entre dos mensajes distintos es peor que tardar un segundo en ofrecer. */
@@ -77,24 +81,56 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
   }
 
   return (
+    /**
+     * Se distingue del resto del hilo a propósito.
+     *
+     * Todo lo demás en esta columna es una burbuja o un aviso: gris, plano y
+     * fácil de saltarse. Esto tiene que leerse como **otra cosa** —un borde de
+     * color, un fondo con degradado y el rayo delante— porque aparece una sola
+     * vez y en el único momento en que la respuesta importa. Sigue sin gritar:
+     * el degradado es del primario de la casa a un 12 %, no un cartel.
+     */
     <div
-      className="mt-auto flex shrink-0 flex-col gap-3 rounded-xl border px-4 py-4"
-      style={{ background: alpha(colors.primary, 8), borderColor: alpha(colors.primary, 30) }}
+      className="mt-auto flex shrink-0 flex-col gap-4 overflow-hidden rounded-2xl border p-5"
+      style={{
+        borderColor: alpha(colors.primary, 40),
+        background: `linear-gradient(135deg, ${alpha(colors.primary, 12)} 0%, ${alpha(colors.accent, 8)} 100%)`,
+        boxShadow: `0 8px 24px ${alpha(colors.primary, 12)}`,
+      }}
     >
-      <div className="flex flex-col gap-1">
-        <p className="font-sans text-sm font-medium text-text-primary">
-          Has gastado tus {cuota.limite} mensajes de este mes.
-        </p>
-        <p className="font-sans text-sm text-text-secondary">
-          Vuelven el {reinicio}. Con PRO no esperas: {ASSISTANT_PLAN_LIMITS.PRO} mensajes al mes,
-          desde {ASSISTANT_PLAN_LIMITS.FREE}.
-        </p>
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: alpha(colors.primary, 18), color: colors.primary }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-5"
+          >
+            <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </span>
+
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="font-sans text-base font-semibold text-text-primary">
+            Con PRO no esperas
+          </p>
+          <p className="font-sans text-sm text-text-secondary">
+            Obtén acceso a {ASSISTANT_PLAN_LIMITS.PRO} mensajes al mes desde {precio}$ pesos.
+          </p>
+        </div>
       </div>
 
       {/* Lo que se lleva quien pague, dicho con lo que ya hace PRAX y no con
           adjetivos: son las capacidades que esta persona acaba de usar. */}
-      <ul className="flex flex-col gap-1 font-sans text-xs text-text-secondary">
-        <Ventaja>Pregunta por tus proyectos y te responde con sus datos, no de memoria.</Ventaja>
+      <ul className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
+        <Ventaja>Pregunta por tus proyectos y responde con sus datos, no de memoria.</Ventaja>
         <Ventaja>Propone tareas, asignaciones y tableros que aceptas con un botón.</Ventaja>
         <Ventaja>Lee los archivos que le adjuntes y te contesta sobre ellos.</Ventaja>
       </ul>
@@ -112,7 +148,7 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
         {/* ⚠️ Se dice que se renueva, y se dice aquí. Cobrar un segundo mes a
             quien creía estar comprando uno suelto es la peor reseña posible. */}
         <span className="font-sans text-xs text-text-disabled">
-          Suscripción mensual. Se cancela cuando quieras.
+          Suscripción mensual · tus {cuota.limite} mensajes vuelven el {reinicio}
         </span>
       </div>
     </div>
