@@ -100,8 +100,10 @@ export class StripeService {
         : data.email
           ? { customer_email: data.email }
           : {}),
-      success_url: `${this.appUrl}/dashboard/settings?pago=ok`,
-      cancel_url: `${this.appUrl}/dashboard/settings?pago=cancelado`,
+      /* A la página de planes, no a Configuración: es donde está la
+         enhorabuena, y es la pantalla que ya sabe esperar al webhook. */
+      success_url: `${this.appUrl}/dashboard/planes?pago=ok`,
+      cancel_url: `${this.appUrl}/dashboard/planes?pago=cancelado`,
     });
 
     if (!session.url) {

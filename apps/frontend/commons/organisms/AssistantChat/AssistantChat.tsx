@@ -33,6 +33,7 @@ import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
+import { ProUpsell } from './ProUpsell';
 import { ModelText } from './ModelText';
 import {
   AccionDelLienzo,
@@ -1388,17 +1389,10 @@ export function AssistantChat({
              * escrito, y de ahí sale la propuesta de montarlo.
              */}
             {agotada && cuota ? (
-              <p
-                role="note"
-                className="mt-auto shrink-0 rounded-xl border px-4 py-3 font-sans text-sm text-warning"
-                style={{
-                  background: alpha(colors.warning, 8),
-                  borderColor: alpha(colors.warning, 30),
-                }}
-              >
-                Has gastado los <strong>{cuota.limite}</strong> mensajes de este mes. Vuelven el{' '}
-                <strong>{formatoReinicio(cuota.reinicia)}</strong>.
-              </p>
+              /* Quedarse sin mensajes deja de ser un callejón: `ProUpsell`
+                 decide si ofrece PRO o si enseña el aviso de siempre — no lo
+                 ofrece a quien ya lo tiene ni donde no hay pasarela. */
+              <ProUpsell cuota={cuota} />
             ) : (
               <form
                 /* `shrink-0` y `mt-auto`: el compositor se queda pegado abajo

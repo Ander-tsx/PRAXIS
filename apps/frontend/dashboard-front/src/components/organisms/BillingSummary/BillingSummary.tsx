@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import { formatoPeriodo, formatoReinicio } from '@/lib/billing';
 import { Badge, alpha, colors } from '@praxis/commons';
@@ -125,7 +126,17 @@ export function BillingSummary({ quota, billing }: BillingSummaryProps) {
         </p>
 
         {otro === 'PRO' && billing?.disponible ? (
-          <PlanActionButton accion="checkout">Pasar a PRO</PlanActionButton>
+          <div className="flex flex-col gap-2">
+            <PlanActionButton accion="checkout">Pasar a PRO</PlanActionButton>
+            {/* El detalle completo —qué incluye cada plan y el precio— vive en
+                su propia página. Aquí solo cabe el resumen. */}
+            <Link
+              href="/dashboard/planes"
+              className="font-sans text-xs text-text-secondary underline-offset-2 hover:underline"
+            >
+              Ver los dos planes en detalle
+            </Link>
+          </div>
         ) : (
           /**
            * Dos casos distintos con la misma pinta, y es correcto:
