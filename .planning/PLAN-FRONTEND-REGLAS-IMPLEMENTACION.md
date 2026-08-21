@@ -328,7 +328,7 @@ apps/frontend/projects-front/
    ├─ RuleExecutions.tsx      (N) servidor: «Revisar ahora» + auditoría
    └─ index.ts                (N)
 e2e/tests/ui/07-reglas.spec.ts                         (N)
-e2e/tests/api/15-automatizaciones-academicas.spec.ts   (M) casos de validación
+e2e/tests/api/17-automatizaciones.spec.ts   (M) casos de validación
 docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md     (N) los 5 huecos de §2
 docs/frontend/CONTRATO-API.md                          (M) catálogo exacto y trampas
 docs/frontend/ESTADO-ACTUAL.md                         (M) sección del apartado
@@ -359,7 +359,7 @@ sobre la lectura del código, y dejar los huecos de §2 donde el equipo de backe
 2. Comprobar los rechazos que la interfaz va a tener que evitar: clave de más en
    `trigger.config`, `recipientSelector` cruzado con el trigger, `IN` con escalar, `EQUALS` con
    array, `status: 'INVALID'`, cero acciones, seis acciones, campo de condición del otro trigger.
-3. Añadir a `15-automatizaciones-academicas.spec.ts` los casos de rechazo que hoy no cubre. Fijan
+3. Añadir a `17-automatizaciones.spec.ts` los casos de rechazo que hoy no cubre. Fijan
    el contrato que el catálogo del Bloque 2 copia: si backend lo cambia, salta aquí y no en la UI.
 4. Escribir los cinco huecos en `PENDIENTES-BACKEND-AUTOMATIZACION.md`, archivo aparte del
    `PENDIENTES-BACKEND.md` general, con el mismo formato del documento (qué falta, por qué,

@@ -15,7 +15,7 @@ import { entrarConCuenta } from '../../fixtures/ui';
  *
  * ## Por qué esto y no solo la prueba de API
  *
- * `api/15-automatizaciones-academicas.spec.ts` ya prueba el contrato: que las
+ * `api/17-automatizaciones.spec.ts` ya prueba el contrato: que las
  * rutas validan, que la revisión no duplica avisos. Lo que no prueba es que la
  * **pantalla** siga pintándose — un `ProjectRules` que rompiera la frontera
  * servidor/cliente, un `describeRule` que lanzara con una regla real, o el
@@ -35,7 +35,7 @@ async function apiContext(): Promise<APIRequestContext> {
 /**
  * Deja una tarea candidata a `TASK_DUE_SOON`: vence mañana, prioridad alta y
  * con el dueño como responsable — el mismo montaje que
- * `api/15-automatizaciones-academicas.spec.ts` usa para el mismo trigger.
+ * `api/17-automatizaciones.spec.ts` usa para el mismo trigger.
  */
 async function crearCandidataDeVencimiento(
   api: APIRequestContext,

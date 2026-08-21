@@ -9,7 +9,7 @@
 > autorización explícita y cambios mecánicos sin decisión de negocio.
 >
 > Última revisión: 2026-08-20 · gateway en `localhost:3000` · verificado contra
-> el stack levantado con `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+> el stack levantado con `e2e/tests/api/17-automatizaciones.spec.ts`.
 >
 > **Estado: 4 de 6 resueltos** (§1, §3, §4 y §5, en `4a2f26a`). Los dos que
 > quedan no bloquean nada: el §2 obliga a un rodeo —lee-modifica-escribe para

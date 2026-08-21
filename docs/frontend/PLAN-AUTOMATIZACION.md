@@ -562,7 +562,7 @@ reescribieron contra la interfaz de hoy.
    debería tener un valor por defecto silencioso— pero queda escrito, porque es
    lo que rompía media suite.
 
-**Un fallo más, en la prueba de API** (`15-automatizaciones-academicas`): exigía
+**Un fallo más, en la prueba de API** (`17-automatizaciones`): exigía
 un 400 al cruzar `recipientSelector` con el disparador. Dejó de ser un error
 cuando el motivo del aviso pasó a salir del disparador y el destinatario de la
 regla, así que ahora exige el 201.
