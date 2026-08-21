@@ -755,6 +755,25 @@ export function displayName(user: UserProfile): string {
  * lo pide— cae a la parte local del correo. Sin esto, las filas de un listado
  * quedaban de dos alturas distintas según la cuenta tuviera nombre o no.
  */
+/**
+ * Cómo se nombra a alguien de quien ya no queda perfil.
+ *
+ * ⚠️ **El UUID no es una alternativa.** Varios sitios caían a `member.userId`
+ * cuando el perfil no resolvía, y en pantalla eso es
+ * «3f2a…-9c11 salió del proyecto»: no dice quién era, no se puede buscar y
+ * parece un error de la aplicación.
+ *
+ * Desde que administración puede borrar cuentas de verdad esto deja de ser un
+ * caso raro: el trabajo de esa persona se conserva a propósito —borrarlo
+ * dejaría huecos en tableros ajenos— así que su id sigue en tareas y mensajes
+ * de proyectos que siguen vivos.
+ *
+ * Se dice «eliminado» y no «desconocido» porque es lo que casi siempre es. Un
+ * fallo al resolver el perfil cae aquí también, y en ese caso el texto se
+ * queda corto — pero sigue siendo más útil que un identificador.
+ */
+export const PERSONA_ELIMINADA = 'Usuario eliminado';
+
 export function personLabel(user: UserProfile): string {
   const name = displayName(user);
   if (name) return name;

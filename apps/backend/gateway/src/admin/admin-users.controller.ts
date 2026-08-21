@@ -3,6 +3,7 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -98,6 +99,10 @@ export class AdminUsersController {
     @Inject('PERMISSIONS_SERVICE') private readonly permissionsClient: ClientProxy,
     @Inject('ALEXA_SERVICE') private readonly alexaClient: ClientProxy,
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
+    /* Para comprobar si la cuenta todavía es dueña de algún proyecto: ver
+       `delete`. Un proyecto sin dueño no se puede administrar desde ningún
+       sitio. */
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly globalRoles: GlobalRolesService,
     private readonly actividad: AdminActivityRecorder,
   ) {}
@@ -366,6 +371,82 @@ export class AdminUsersController {
    * Las dos juntas para que no se puedan aplicar en una ruta y olvidar en la
    * otra, que es como la suspensión se habría quedado sin la regla de niveles.
    */
+  /**
+   * Borra una cuenta de verdad. No es `INACTIVE`, que es un estado.
+   *
+   * ## 🔴 Lo que esta ruta **no** borra, y por qué
+   *
+   * Las tareas, los mensajes y la actividad de esa persona viven en otros
+   * esquemas y **no tienen clave foránea** contra la cuenta. Borrarlos dejaría
+   * huecos en tableros de proyectos que no tienen nada que ver con ella: una
+   * tarea que desaparece de la columna de otro equipo porque quien la escribió
+   * se dio de baja. Se quedan, y la interfaz los lee como «Usuario eliminado».
+   *
+   * ## ⚠️ Y por qué se niega si todavía es dueña de algún proyecto
+   *
+   * Un proyecto sin dueño **sí** rompe cosas: `ownerId` es lo que resuelve los
+   * permisos, lo que decide a quién avisan las automatizaciones y lo que la
+   * pantalla de administración enseña en su columna. Un id que no existe deja
+   * ese proyecto sin nadie que pueda administrarlo y sin forma de arreglarlo
+   * desde la interfaz.
+   *
+   * Así que se dice cuáles son y se pide resolverlos primero — borrarlos o
+   * pasarlos a otra persona. Es un paso más, y es el que evita el estado del
+   * que no se sale.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borra una cuenta (solo administradores)' })
+  @ApiResponse({ status: 200, description: 'Cuenta borrada' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sobre tu propia cuenta, o una de nivel igual o superior',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Todavía es dueña de proyectos, o es el último SuperAdmin',
+  })
+  async delete(@Request() req: Express.Request, @Param('id', ParseUUIDPipe) id: string) {
+    const actorId = req.user!.userId;
+
+    await this.exigirMando(actorId, id);
+    await this.exigirQueNoSeaElUltimoSuperAdmin(id);
+
+    const propios = await firstValueFrom(
+      this.projectsClient.send<Array<{ id: string; name: string }>>(
+        { cmd: 'project_find_owned' },
+        { ownerId: id },
+      ),
+    );
+    if (propios && propios.length > 0) {
+      throw new ConflictException(
+        `Esta cuenta todavía es dueña de ${propios.length} ` +
+          `${propios.length === 1 ? 'proyecto' : 'proyectos'} (${propios
+            .slice(0, 3)
+            .map((proyecto) => proyecto.name)
+            .join(', ')}${propios.length > 3 ? '…' : ''}). ` +
+          'Bórralos o pásalos a otra persona antes de borrar la cuenta.',
+      );
+    }
+
+    /* La etiqueta se resuelve **antes**: después ya no hay a quién preguntar, y
+       el registro se quedaría con un UUID en vez de un nombre. */
+    const etiqueta = await this.etiquetaDe(id);
+
+    await firstValueFrom(this.credentialsClient.send({ cmd: 'user_delete' }, { id }));
+
+    await this.actividad.record({
+      actorId,
+      actorLabel: await this.etiquetaDe(actorId),
+      action: AdminActionType.USER_DELETED,
+      targetType: AdminTargetType.USER,
+      targetId: id,
+      targetLabel: etiqueta,
+    });
+
+    return { success: true, id };
+  }
+
   private async exigirMando(actorId: string, targetId: string): Promise<void> {
     if (actorId === targetId) {
       throw new ForbiddenException('No puedes administrar tu propia cuenta desde el panel.');

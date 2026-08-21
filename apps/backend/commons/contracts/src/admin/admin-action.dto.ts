@@ -58,6 +58,20 @@ export enum AdminActionType {
    * del registro es la única prueba de quién concedió PRO a quién.
    */
   ASSISTANT_PLAN_CHANGED = 'ASSISTANT_PLAN_CHANGED',
+  /**
+   * Se **borró** una cuenta. No es `USER_DEACTIVATED`: aquello es un estado y
+   * se deshace; esto quita la fila y las credenciales, y no se deshace.
+   *
+   * ⚠️ Lo que esa persona escribió —tareas, mensajes, actividad— **no se
+   * borra**: vive en otros esquemas sin clave foránea y borrarlo dejaría
+   * tableros ajenos con huecos. Se lee como «Usuario eliminado».
+   */
+  USER_DELETED = 'USER_DELETED',
+  /**
+   * Se **borró** un proyecto desde administración, con su purga en los otros
+   * servicios. No es `PROJECT_ARCHIVED`, que es un estado reversible.
+   */
+  PROJECT_DELETED = 'PROJECT_DELETED',
 }
 
 /** Sobre qué clase de cosa se actuó. */

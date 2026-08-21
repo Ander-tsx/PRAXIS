@@ -561,6 +561,21 @@ export class ProjectsService {
    * Incluye los archivados: para el panel son visibles, es el único sitio donde lo
    * son, y sin ellos no habría forma de recuperarlos.
    */
+  /**
+   * Los proyectos de los que alguien es dueño, con lo mínimo para nombrarlos.
+   *
+   * ⚠️ Los `DELETED` **cuentan igual**: siguen en la base con su `ownerId`, así
+   * que borrar la cuenta los dejaría igual de huérfanos aunque no se vean en
+   * ningún listado.
+   */
+  async findOwned(ownerId: string) {
+    return this.prisma.project.findMany({
+      where: { ownerId },
+      select: { id: true, name: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async findAllForAdmin(dto: {
     page?: number;
     limit?: number;
