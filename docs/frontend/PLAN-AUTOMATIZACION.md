@@ -14,7 +14,8 @@
 | S3 | Interfaz de Automatización | ✅ **hecho** (2026-08-20) |
 | S4 | Tablero — el slideout tras crear | ✅ **hecho** (2026-08-20) |
 | S5 | Administración con más poder | ✅ **hecho** (2026-08-20) |
-| S6 | Cierre — documentación, e2e, regresión | ⬜ pendiente |
+| S6 | Cierre — documentación, e2e, regresión | 🟡 **a medias** — ESTADO-ACTUAL §46 hecho |
+| S7 | Pulido y capacidades nuevas | ⬜ pendiente |
 
 **Cada stack termina con un aviso a quien encarga esto y una prueba manual desde
 el frontend antes de pasar al siguiente.** Las pruebas de regresión
@@ -525,6 +526,145 @@ no dejaría rastro o se confundiría con archivar.
 ### Apuntes
 
 _(se rellena conforme se trabaja)_
+
+---
+
+## S7 — Pulido y capacidades nuevas
+
+> Sale de probar S1–S5 en vivo el 2026-08-20. Cada punto lleva **lo que ya está
+> hecho** y **lo que cuesta**, porque dos de los cinco eran preguntas y una ya
+> estaba resuelta a medias.
+
+### S7.1 — El rayo y el color, también en el toast
+
+- [ ] Los diez tipos `AUTOMATION_*` en `PRESENTACION_POR_TIPO`
+      (`commons/organisms/LiveNotices/styles.ts`).
+
+**Estado: medio hecho, y la otra mitad es barata.** En la **bandeja** del panel
+ya está: `TypeIcon` tiene su rama `AUTOMATION_` con el rayo y `TYPE_TONE` da un
+tono por tipo (S1 de esta etapa).
+
+Lo que falta es el **toast**. `PRESENTACION_POR_TIPO` es un diccionario por tipo
+de aviso, y los diez de automatización no están en él: caen a
+`PRESENTACION_POR_DEFECTO`, que es `tipo: 'info'` y título «Aviso». Así que un
+aviso de automatización sale con el mismo aspecto que cualquier otro.
+
+⚠️ **No se resuelve con `startsWith('AUTOMATION_')`.** El diccionario decide
+cuatro cosas —estado de color, título, duración y ritmo de despliegue— y no todas
+se parecen: `AUTOMATION_TASK_OVERDUE` quiere `warning` y quedarse; uno de tarea
+creada es `info` y pasa. Son diez entradas de cuatro líneas, y por eso el fichero
+es un diccionario y no un `switch`: es exactamente el caso para el que existe.
+
+**Coste: bajo.** Un archivo, sin migración, sin contrato.
+
+### S7.2 — La lista de reglas no tiene límite
+
+- [ ] Decidir un techo y decirlo, o paginar.
+
+**Respuesta: no, ninguno.** `RulesService.list()` hace
+`findMany({ where: { projectId } })` sin `take`, y el gateway lo devuelve entero.
+
+No es urgente —un proyecto con más de veinte reglas no es realista hoy— pero **es
+un listado sin techo que además se pide en cada carga de la página de proyecto**
+desde que el contador de la pestaña se resuelve siempre (S7 de la corrección de
+S3). Lo barato es un `take` generoso con aviso cuando se alcanza: la regla de
+esta casa es que **un recorte mudo es peor que no recortar**, así que si se
+acota, la pantalla lo dice.
+
+**Coste: bajo si es un techo con aviso. Medio si se pagina de verdad** —el
+constructor y la tarjeta viven en la misma lista, así que paginar obliga a
+decidir qué pasa al editar la última de una página.
+
+### S7.3 — Las ejecuciones no tienen paginador
+
+- [ ] Paginar, o al menos decir que se está viendo un recorte.
+
+**Respuesta: no.** `AutomationEngineService.recent()` acepta `limit` con tope de
+50, pero **el gateway lo fija en 20** y no expone el parámetro. No hay `page`, no
+hay `total`, y la pantalla no dice que sean las últimas veinte de un histórico
+más largo.
+
+🔴 **Esto sí es un recorte mudo**, y es de los que engañan: quien mire las
+ejecuciones para comprobar por qué una regla no actuó puede estar mirando una
+ventana que no llega hasta el caso que busca, y nada se lo dice. Con el motor
+reactivo el histórico crece mucho más deprisa que antes —una fila por hecho, no
+por pulsación de botón— así que el problema es nuevo y va a doler pronto.
+
+**Lo mínimo:** que el listado diga «las últimas 20» y traiga el total.
+**Lo bueno:** paginar, y filtrar por regla y por estado — «enséñame los fallos»
+es la consulta que de verdad se hace.
+
+**Coste: medio.** Toca `recent()`, el gateway, el tipo del cliente y la pantalla.
+Sin migración.
+
+### S7.4 — Que PRAX ayude a escribir automatizaciones
+
+- [ ] Herramienta `proponer_automatizacion`, con su validación y su tarjeta.
+
+Es la más grande de las cinco y la que más aporta. La forma **ya está decidida
+por las reglas de la casa**: el asistente propone, nunca ejecuta. Así que:
+
+1. Una herramienta nueva en `tools.ts` que devuelve **la misma forma que acepta
+   `POST /automations`**: nombre, disparador con su configuración, condiciones y
+   acciones.
+2. Validarla en `assistant-service` contra el **catálogo real**, igual que
+   `validarPropuesta` valida hoy los ids contra el briefing. Una regla con un
+   disparador inventado o una columna que no existe se descarta antes de llegar
+   a la pantalla.
+3. Una tarjeta de propuesta que enseñe la regla **en la frase de siempre**
+   —«Cuando…, si…, entonces…»— y no un JSON, y un botón que llama a
+   `POST /projects/:id/automations` con la sesión de quien acepta, por el mismo
+   endpoint y con el mismo permiso que el constructor.
+
+⚠️ **El catálogo tiene que viajar en el prompt, y eso se paga en cada turno.**
+Diez disparadores con sus campos y siete acciones no son gratis. Antes de darlo
+por bueno hay que medirlo:
+`pnpm --filter @praxis/assistant-service medir-prompt <projectId>`. Si pesa
+demasiado, la salida es mandar **solo los nombres** y que el modelo pida el
+detalle del disparador que ha elegido — pero eso es un turno más, así que se
+decide con el número delante, no antes.
+
+⚠️ **Y solo en el modo con proyecto.** Una regla cuelga de un proyecto, sus
+columnas y su gente; sin foco no hay contra qué validarla. La herramienta lleva
+`ambito: 'proyecto'`.
+
+⚠️ **Exige `canManageAutomations`, no `canViewReports`.** El chat de proyecto se
+abre con lo segundo, así que la herramienta se filtra por permisos como las otras
+doce: quien no pueda administrar automatizaciones no debe ver la tarjeta —
+aceptarla le daría un 403 y una explicación que no puede resolver.
+
+**Coste: alto.** Contrato, servicio, prompt, validación, tarjeta, acción de
+aceptar y pruebas. Es un stack por sí solo.
+
+### S7.5 — La burbuja de no leídos del chat
+
+- [ ] Mismo estilo que el resto de contadores, y que se actualice al instante.
+
+Dos cosas distintas metidas en una:
+
+- **El estilo** es barato: hay un patrón de contador en `TabNav` (la píldora
+  `bg-primary-muted`) y otro en la bandeja. Unificar es elegir uno y usarlo.
+- **«Al instante» no lo es tanto.** Ese número sale del render del servidor, así
+  que hoy se actualiza cuando la página se revalida. Para que cambie solo hace
+  falta engancharlo al flujo de eventos en vivo, que **ya existe y ya recibe los
+  mensajes de chat** (`useLiveEvent`, `CHAT_MESSAGE`). Es leer lo que ya llega y
+  llevar la cuenta en el cliente hasta la siguiente revalidación.
+
+⚠️ **`CHAT_MESSAGE` viaja por el flujo de avisos pero NO es un
+`NotificationType`** y no deja fila en la bandeja (CLAUDE.md, trampa 14). Quien
+enganche esto tiene que tratar el `type` del flujo como texto libre.
+
+**Coste: bajo el estilo, medio lo instantáneo.**
+
+### S7.6 — «Automatización» → «Automatizaciones»
+
+- [ ] La etiqueta de la pestaña, en plural.
+
+**La URL no cambia.** `?tab=automation` es un identificador y va en inglés; lo
+que se renombra es lo que se lee. Cambia una línea de `TABS` en `page.tsx` y los
+textos de las e2e que buscan la pestaña por su nombre.
+
+**Coste: mínimo.**
 
 ---
 
