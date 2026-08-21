@@ -142,16 +142,21 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
    * (`#fbbf24` en oscuro, `#a16207` en claro), y tiñe insignia, título y botón
    * de una vez.
    *
-   * ⚠️ **Lo que no comparten es el ritmo, y por eso siguen siendo diez
-   * entradas.** Una tarea vencida tiene que quedarse en pantalla; una tarea
-   * recién creada es un dato que pasa. Con una sola entrada para todos, o las
-   * diez se quedan diez segundos o la vencida desaparece antes de leerse. El
-   * título también es propio: nombra el hecho —«Vencida», «Sin encargado»— en
-   * vez del genérico «Aviso» al que caían todos.
+   * **El título dice «Automatización» en los diez, y es deliberado.** Llegó a
+   * nombrar el hecho —«Vencida», «Movida», «Sin encargado»—, y era repetir en
+   * la etiqueta lo que la frase de debajo ya cuenta con más detalle. La
+   * etiqueta es lo único que se lee con la píldora cerrada: sirve mejor
+   * respondiendo a lo que el texto **no** dice —de dónde viene esto— que
+   * resumiendo lo que sí dice.
+   *
+   * ⚠️ **Aun así siguen siendo diez entradas, porque el ritmo no se comparte.**
+   * Una tarea vencida tiene que quedarse en pantalla; una recién creada es un
+   * dato que pasa. Con una sola entrada para todos, o las diez se quedan diez
+   * segundos o la vencida desaparece antes de leerse.
    */
   AUTOMATION_TASK_OVERDUE: {
     tipo: 'warning',
-    titulo: 'Vencida',
+    titulo: 'Automatización',
     duracion: 10000,
     autopilot: { expand: 600, collapse: 8500 },
     accion: 'Ver',
@@ -159,7 +164,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_DUE_SOON: {
     tipo: 'warning',
-    titulo: 'Vence pronto',
+    titulo: 'Automatización',
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
@@ -167,7 +172,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_STALE: {
     tipo: 'warning',
-    titulo: 'Parada',
+    titulo: 'Automatización',
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
@@ -175,7 +180,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_UNASSIGNED: {
     tipo: 'warning',
-    titulo: 'Sin encargado',
+    titulo: 'Automatización',
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
@@ -183,7 +188,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_COMPLETED: {
     tipo: 'warning',
-    titulo: 'Terminada',
+    titulo: 'Automatización',
     duracion: 6500,
     autopilot: { expand: 400, collapse: 5000 },
     accion: 'Ver',
@@ -193,7 +198,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
      de tiempo que los que solo informan. */
   AUTOMATION_TASK_REOPENED: {
     tipo: 'warning',
-    titulo: 'Reabierta',
+    titulo: 'Automatización',
     duracion: 7000,
     autopilot: { expand: 450, collapse: 5500 },
     accion: 'Ver',
@@ -201,7 +206,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_CREATED: {
     tipo: 'warning',
-    titulo: 'Nueva tarea',
+    titulo: 'Automatización',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
@@ -209,7 +214,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_MOVED: {
     tipo: 'warning',
-    titulo: 'Movida',
+    titulo: 'Automatización',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
@@ -217,7 +222,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_ASSIGNEES_CHANGED: {
     tipo: 'warning',
-    titulo: 'Encargados',
+    titulo: 'Automatización',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
@@ -225,7 +230,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   },
   AUTOMATION_TASK_DUE_DATE_CHANGED: {
     tipo: 'warning',
-    titulo: 'Vencimiento',
+    titulo: 'Automatización',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
