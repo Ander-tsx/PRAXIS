@@ -1,5 +1,7 @@
 import {
   type APIRequestContext,
+  type Locator,
+  type Page,
   request as contextoDePeticion,
   expect,
   test,
@@ -13,7 +15,7 @@ import { entrarConCuenta } from '../../fixtures/ui';
  *
  * ## Por qué esto y no solo la prueba de API
  *
- * `api/15-automatizaciones-academicas.spec.ts` ya prueba el contrato: que las
+ * `api/17-automatizaciones.spec.ts` ya prueba el contrato: que las
  * rutas validan, que la revisión no duplica avisos. Lo que no prueba es que la
  * **pantalla** siga pintándose — un `ProjectRules` que rompiera la frontera
  * servidor/cliente, un `describeRule` que lanzara con una regla real, o el
@@ -33,7 +35,7 @@ async function apiContext(): Promise<APIRequestContext> {
 /**
  * Deja una tarea candidata a `TASK_DUE_SOON`: vence mañana, prioridad alta y
  * con el dueño como responsable — el mismo montaje que
- * `api/15-automatizaciones-academicas.spec.ts` usa para el mismo trigger.
+ * `api/17-automatizaciones.spec.ts` usa para el mismo trigger.
  */
 async function crearCandidataDeVencimiento(
   api: APIRequestContext,
@@ -59,6 +61,36 @@ async function crearCandidataDeVencimiento(
   return tarea;
 }
 
+/**
+ * Rellena lo mínimo que el constructor exige para poder guardar.
+ *
+ * ⚠️ **«A quién» no tiene valor por defecto, y antes ni se elegía.** El
+ * destinatario del aviso salía del disparador; desde que el motivo lo pone el
+ * disparador y el destinatario la regla —son dos cosas distintas—, hay que
+ * elegirlo, y sin hacerlo el formulario responde «Avisar: falta «A quién».» y
+ * no envía nada. Las pruebas que solo ponían el nombre se quedaban esperando
+ * una regla que el servidor nunca llegó a ver.
+ *
+ * Las opciones se buscan en `page` y no en el panel: el desplegable las pinta
+ * fuera, al final del documento.
+ */
+async function rellenarReglaMinima(page: Page, panel: Locator, nombre: string): Promise<void> {
+  await panel.getByLabel('Nombre', { exact: true }).fill(nombre);
+  await panel.getByRole('combobox', { name: 'A quién' }).click();
+  await page.getByRole('option', { name: 'Los encargados de la tarea' }).click();
+}
+
+/**
+ * Lo que se espera a que aparezca **después de guardar**.
+ *
+ * ⚠️ No es holgura por si acaso. Guardar una regla es una Server Function que
+ * pasa por el gateway y el servicio, revalida la ruta y repinta la página
+ * entera en modo desarrollo; con las 25 pruebas seguidas sobre el mismo
+ * servidor, eso pasa de sobra de los 10 s de serie. Se ve claro en el síntoma:
+ * las mismas pruebas ejecutadas sueltas guardan en menos de dos segundos.
+ */
+const ESPERA_TRAS_GUARDAR = { timeout: 30_000 };
+
 test.describe('Reglas del proyecto', () => {
   /**
    * ⚠️ **Calienta la ruta `/projects/[id]` antes de medir nada.**
@@ -75,7 +107,7 @@ test.describe('Reglas del proyecto', () => {
     await request.get('/projects/calentar-turbopack', { timeout: 60_000 }).catch(() => {});
   });
 
-  test('la pestaña se llama Reglas y se llega a ella desde la barra de secciones', async ({
+  test('la pestaña se llama Automatizaciones y se llega desde la barra de secciones', async ({
     page,
   }) => {
     const api = await apiContext();
@@ -87,13 +119,20 @@ test.describe('Reglas del proyecto', () => {
 
     await page
       .getByRole('navigation', { name: 'Secciones del proyecto' })
-      .getByRole('link', { name: 'Reglas' })
+      .getByRole('link', { name: 'Automatizaciones' })
       .click();
 
-    await expect(page.getByRole('heading', { name: 'Reglas de automatización' })).toBeVisible();
+    /* ⚠️ 30 s, y solo aquí: **la primera prueba de la tanda paga la compilación
+       de `/projects/[id]`**. El calentamiento del `beforeAll` pide una ruta que
+       no existe, así que Turbopack compila el árbol común pero no esta página;
+       si alguien acaba de tocar un componente del proyecto, la primera visita
+       se queda en «Cargando» bastante más de los 10 s de serie. */
+    await expect(page.getByRole('heading', { name: 'Reglas', exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
-  test('un enlace viejo con ?tab=automatizaciones sigue aterrizando en Reglas', async ({
+  test('un enlace viejo con ?tab=automatizaciones sigue aterrizando en la pestaña', async ({
     page,
   }) => {
     const api = await apiContext();
@@ -103,7 +142,14 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=automatizaciones`);
 
-    await expect(page.getByRole('heading', { name: 'Reglas de automatización' })).toBeVisible();
+    /* ⚠️ 30 s, y solo aquí: **la primera prueba de la tanda paga la compilación
+       de `/projects/[id]`**. El calentamiento del `beforeAll` pide una ruta que
+       no existe, así que Turbopack compila el árbol común pero no esta página;
+       si alguien acaba de tocar un componente del proyecto, la primera visita
+       se queda en «Cargando» bastante más de los 10 s de serie. */
+    await expect(page.getByRole('heading', { name: 'Reglas', exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test('sin reglas se ve el estado vacío, no solo «no hay nada»', async ({ page }) => {
@@ -129,16 +175,16 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Avisar vencimiento').slice(0, 120);
-    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    /* `exact: true`: el diálogo de eliminar (oculto) también lleva el
-       nombre de la regla en su título — «Eliminar «<nombre>»» —, y sin
-       `exact` el texto de sobra lo hace coincidir igual. */
-    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
+    /* `exact: true`: el nombre de la regla vuelve a salir dentro de frases más
+       largas —la de `describeRule`, y la confirmación de borrado en cuanto se
+       pulsa—, y sin `exact` el texto de sobra las hace coincidir igual. */
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible(ESPERA_TRAS_GUARDAR);
     /* `describeRule` describe el trigger por defecto del constructor
        (`TASK_DUE_SOON`) en una frase legible, no solo el identificador técnico. */
-    await expect(page.getByText(/Cuando tarea próxima a vencer/)).toBeVisible();
+    await expect(page.getByText(/Cuando una tarea esté a punto de vencer/)).toBeVisible();
   });
 
   test('crear una regla con una condición de prioridad, y verla en el resumen (Bloque 5)', async ({
@@ -153,21 +199,24 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Vencimiento con condición').slice(0, 120);
-    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
 
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     /* El campo por defecto de una fila nueva ya es «prioridad» — el primero
-       del catálogo de TASK_DUE_SOON —, así que solo hace falta elegir el
-       valor. */
-    await page.getByRole('combobox', { name: 'Valor' }).click();
+       del catálogo de TASK_DUE_SOON —, así que solo hace falta elegir el valor.
+
+       ⚠️ **Y el desplegable del valor no se llama «Valor»**: lleva por rótulo el
+       campo que se está comparando —«Prioridad»— y el nombre accesible arrastra
+       además lo ya elegido («Prioridad Elige…»), de ahí la expresión regular. */
+    await page.getByRole('combobox', { name: /^Prioridad/ }).click();
     await page.getByRole('option', { name: 'Alta' }).click();
 
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
-    await expect(tarjeta).toBeVisible();
+    await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
     await expect(
-      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Alta/),
+      tarjeta.getByText(/Cuando una tarea esté a punto de vencer, si prioridad es Alta/),
     ).toBeVisible();
     /* Y las condiciones también sueltas, debajo: la frase de arriba las lleva
        encadenadas y con dos o tres hay que leerla entera para saber cuándo
@@ -198,25 +247,25 @@ test.describe('Reglas del proyecto', () => {
     await expect(
       page
         .locator('li', { hasText: nombreRegla })
-        .getByText('Sin condiciones: se activa con toda tarea que encaje con el disparador.'),
+        .getByText('Sin condiciones: actúa sobre toda tarea que encaje con el disparador.'),
     ).toBeVisible();
   });
 
   /**
-   * El diálogo de creación arrastraba el borrador de la regla anterior.
+   * El constructor arrastraba el borrador de la regla anterior.
    *
-   * Hallazgo §3 del informe de revisión del Bloque 7. `RuleDialog` sembraba el
+   * Hallazgo §3 del informe de revisión del Bloque 7. El formulario sembraba el
    * borrador con un *initializer* de `useState`, que solo corre en el montaje,
-   * y el componente nunca se desmonta: no lleva `key` y su posición en el
-   * árbol no cambia. Cerrar el diálogo no lo reiniciaba, así que la segunda
-   * regla de una sesión partía del nombre y las condiciones de la primera.
+   * y el componente no se desmontaba: no llevaba `key` y su posición en el
+   * árbol no cambiaba. Cerrarlo no lo reiniciaba, así que la segunda regla de
+   * una sesión partía del nombre y las condiciones de la primera.
    *
-   * ⚠️ **Se localiza acotando al diálogo abierto** y no con
-   * `page.getByLabel('Nombre')` a secas: con una tarjeta en pantalla, su
-   * diálogo «Editar» también tiene un campo «Nombre» en el DOM, y el locator
-   * suelto resuelve a dos elementos.
+   * ⚠️ **Se localiza acotando al panel abierto** y no con
+   * `page.getByLabel('Nombre')` a secas: el panel de edición de una regla trae
+   * su propio campo «Nombre», y con los dos desplegados el locator suelto
+   * resuelve a dos elementos.
    */
-  test('el diálogo de creación se reinicia al reabrirlo tras crear (corrección C1)', async ({
+  test('el constructor se reinicia al reabrirlo tras crear (corrección C1)', async ({
     page,
   }) => {
     const api = await apiContext();
@@ -227,25 +276,30 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const panel = page.getByRole('form', { name: 'Nueva regla' });
     const nombreRegla = nombreUnico('Primera').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, panel, nombreRegla);
     await page.getByRole('button', { name: 'Añadir condición' }).click();
-    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('combobox', { name: /^Prioridad/ }).click();
     await page.getByRole('option', { name: 'Alta' }).click();
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible(ESPERA_TRAS_GUARDAR);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue('');
-    await expect(dialogo.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
+    await expect(panel.getByLabel('Nombre', { exact: true })).toHaveValue('');
+    /* ⚠️ **«Quitar» a secas ya no vale**: el nombre accesible se compara por
+       trozo y sin distinguir mayúsculas, y dos disparadores lo llevan dentro de
+       su explicación —«Al asignar o quitar a alguien», «Al poner, quitar o
+       mover la fecha»—. El botón de la fila se llama «Quitar la condición
+       sobre …». */
+    await expect(panel.getByRole('button', { name: /^Quitar la condición/ })).toHaveCount(0);
     /* Y sin marcar el campo en rojo: el diálogo está vacío porque acaba de
        abrirse, no porque alguien lo haya dejado mal. */
-    await expect(dialogo.getByText('El nombre debe tener al menos 2 caracteres.')).toHaveCount(0);
+    await expect(panel.getByText('El nombre debe tener al menos 2 caracteres.')).toHaveCount(0);
   });
 
-  test('el diálogo de edición sigue precargando su propia regla al reabrirlo (corrección C1)', async ({
+  test('el panel de edición sigue precargando su propia regla al reabrirlo (corrección C1)', async ({
     page,
   }) => {
     const api = await apiContext();
@@ -268,24 +322,24 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
-    const dialogo = page.getByRole('dialog', { name: `Editar «${nombreRegla}»` });
+    const panel = page.getByRole('form', { name: `Editar «${nombreRegla}»` });
 
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
-    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+    await expect(panel.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
 
     /* Cancelar y volver: el reinicio al abrir tiene que recalcular la regla,
        no vaciar el formulario como hace el de creación. */
-    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
-    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
-    await expect(dialogo.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
+    await expect(panel.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+    await expect(panel.getByRole('button', { name: /^Quitar la condición/ })).toHaveCount(1);
   });
 
   /**
    * El nombre del campo de una condición se lee entero.
    *
    * La fila son tres campos y un botón «Quitar» en la misma línea, y el
-   * nombre más largo del catálogo —«Número de responsables»— no cabía: el
+   * nombre más largo del catálogo —«Número de encargados»— no cabía: el
    * `Select` lo truncaba a «Número de re…» y la condición dejaba de poder
    * leerse. Se arregló ensanchando el diálogo y repartiendo las columnas por
    * lo que mide cada una, no a tercios.
@@ -305,25 +359,34 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     await page.getByRole('combobox', { name: 'Campo' }).click();
-    await page.getByRole('option', { name: 'Número de responsables' }).click();
+    await page.getByRole('option', { name: 'Número de encargados' }).click();
 
     const etiqueta = page.getByRole('combobox', { name: 'Campo' }).locator('span').first();
     for (const ancho of [1280, 900, 768]) {
       await page.setViewportSize({ width: ancho, height: 900 });
       const cabe = await etiqueta.evaluate((el) => el.scrollWidth <= el.clientWidth);
-      expect(cabe, `«Número de responsables» se trunca con el viewport en ${ancho}px`).toBe(true);
+      expect(cabe, `«Número de encargados» se trunca con el viewport en ${ancho}px`).toBe(true);
     }
   });
 
   /**
-   * «Es alguno de» con una lista escrita a mano deja escribir comas.
+   * Los operadores que se ofrecen salen del catálogo del servidor.
    *
-   * El campo se controlaba desde el JSON ya parseado: cada pulsación se
-   * partía por comas, se limpiaba y se volvía a serializar, así que la coma
-   * recién tecleada desaparecía antes de poder escribir el valor siguiente y
-   * la lista no se podía componer.
+   * ⚠️ **Esta prueba comprobaba otra cosa y ya no se puede comprobar.** Miraba
+   * que «es alguno de» sobre un campo entero dejara escribir la lista a mano,
+   * con sus comas —el campo se controlaba desde el JSON ya parseado y la coma
+   * recién tecleada desaparecía—. Pero desde que el catálogo manda, `IN` solo
+   * existe sobre `enum` y `uuid`, y los dos se eligen con casillas: **ningún
+   * campo del catálogo ofrece hoy esa caja de texto**, así que la prueba
+   * esperaba para siempre una opción que ya no está en la lista.
+   *
+   * Lo que sí importa fijar es lo que hay debajo de aquello: que la fila de
+   * condición ofrece **los operadores del campo**, no una lista escrita a mano
+   * en el cliente. Si alguien vuelve a quemarla, esto lo dice.
    */
-  test('una condición «es alguno de» admite comas al escribir la lista', async ({ page }) => {
+  test('los operadores de una condición son los que el catálogo da a ese campo', async ({
+    page,
+  }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);
     await api.dispose();
@@ -332,30 +395,22 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
-    const nombreRegla = nombreUnico('Lista con comas').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
-
-    /* `staleDays` es entero: con `IN` se escribe como texto separado por
-       comas, no por casillas — esas solo las tiene un enum con catálogo
-       cerrado, como la prioridad. */
-    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
-    await page.getByRole('option', { name: 'Tarea estancada' }).click();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
+
+    /* «Prioridad» es un enum: comparaciones de igualdad y pertenencia, sin
+       mayor/menor. */
     await page.getByRole('combobox', { name: 'Operador' }).click();
-    await page.getByRole('option', { name: 'es alguno de' }).click();
+    await expect(page.getByRole('option', { name: 'es alguno de' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'es mayor que' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
 
-    const lista = page.getByRole('group', { name: 'Si' }).getByRole('textbox');
-    /* Pulsación a pulsación, que es donde se perdía la coma. */
-    await lista.pressSequentially('3, 5, 8');
-    await expect(lista).toHaveValue('3, 5, 8');
-
-    await page.getByRole('button', { name: 'Crear regla' }).click();
-
-    const tarjeta = page.locator('li', { hasText: nombreRegla });
-    await expect(
-      tarjeta.getByText(/Cuando tarea estancada, si días parada es alguno de 3, 5, 8/),
-    ).toBeVisible();
+    /* «Número de encargados» es entero: mayor, menor y sus variantes, y ninguna
+       de pertenencia. */
+    await page.getByRole('combobox', { name: 'Campo' }).click();
+    await page.getByRole('option', { name: 'Número de encargados' }).click();
+    await page.getByRole('combobox', { name: 'Operador' }).click();
+    await expect(page.getByRole('option', { name: 'es mayor que' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'es alguno de' })).toHaveCount(0);
   });
 
   /**
@@ -383,49 +438,53 @@ test.describe('Reglas del proyecto', () => {
 
     /* ── entero: assigneeCount es igual a 2 ───────────────────────────── */
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const panel = page.getByRole('form', { name: 'Nueva regla' });
     const nombreEntero = nombreUnico('Entero').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreEntero);
+    await rellenarReglaMinima(page, panel, nombreEntero);
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     await page.getByRole('combobox', { name: 'Campo' }).click();
-    await page.getByRole('option', { name: 'Número de responsables' }).click();
+    await page.getByRole('option', { name: 'Número de encargados' }).click();
     await seccionSi.getByRole('spinbutton').fill('2');
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
         .locator('li', { hasText: nombreEntero })
-        .getByText(/Cuando tarea próxima a vencer, si número de responsables es 2/),
-    ).toBeVisible();
+        .getByText(/Cuando una tarea esté a punto de vencer, si número de encargados es 2/),
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
     /* ── booleano: overdue es igual a sí ──────────────────────────────── */
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreBooleano = nombreUnico('Booleano').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreBooleano);
-    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
-    await page.getByRole('option', { name: 'Tarea estancada' }).click();
+    await rellenarReglaMinima(page, panel, nombreBooleano);
+    /* El disparador dejó de ser un desplegable: son botones con su
+       explicación debajo, así que el nombre accesible lleva las dos frases. */
+    await page.getByRole('button', { name: /^Una tarea lleva parada/ }).click();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     await page.getByRole('combobox', { name: 'Campo' }).click();
-    await page.getByRole('option', { name: 'Vencida' }).click();
-    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('option', { name: 'Está vencida' }).click();
+    await page.getByRole('combobox', { name: /^Está vencida/ }).click();
     await page.getByRole('option', { name: 'Sí', exact: true }).click();
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
         .locator('li', { hasText: nombreBooleano })
-        .getByText(/Cuando tarea estancada, si vencida es sí/),
-    ).toBeVisible();
+        .getByText(/Cuando una tarea lleve demasiado tiempo sin moverse, si está vencida es sí/),
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
     /* ── fecha: dueDate es igual a una fecha ──────────────────────────── */
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreFecha = nombreUnico('Fecha').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreFecha);
+    await rellenarReglaMinima(page, panel, nombreFecha);
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     await page.getByRole('combobox', { name: 'Campo' }).click();
     await page.getByRole('option', { name: 'Fecha de vencimiento' }).click();
     /* `SelectorDeFecha` no es un `<input type="date">`: dibuja su propio
        calendario para no depender del que pinte cada navegador. Se elige el
        día 15 del mes visible, que existe siempre. */
-    await seccionSi.getByRole('button', { name: 'Fecha' }).click();
+    /* Con el nombre entero y `exact`: «Fecha» a secas casa también con el botón
+       de quitar la fila, que se llama «Quitar la condición sobre Fecha de
+       vencimiento». */
+    await seccionSi.getByRole('button', { name: 'Fecha de vencimiento', exact: true }).click();
     await page
       .getByRole('dialog', { name: 'Elegir fecha' })
       .getByRole('button', { name: '15', exact: true })
@@ -444,25 +503,27 @@ test.describe('Reglas del proyecto', () => {
       page
         .locator('li', { hasText: nombreFecha })
         .getByText(
-          new RegExp(`Cuando tarea próxima a vencer, si fecha de vencimiento es ${fechaElegida}`),
+          new RegExp(`Cuando una tarea esté a punto de vencer, si fecha de vencimiento es ${fechaElegida}`),
         ),
-    ).toBeVisible();
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
     /* ── enum con IN: por casillas ────────────────────────────────────── */
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreLista = nombreUnico('Casillas').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreLista);
+    await rellenarReglaMinima(page, panel, nombreLista);
     await page.getByRole('button', { name: 'Añadir condición' }).click();
     await page.getByRole('combobox', { name: 'Operador' }).click();
     await page.getByRole('option', { name: 'es alguno de' }).click();
-    await seccionSi.getByRole('checkbox', { name: 'Alta' }).check();
-    await seccionSi.getByRole('checkbox', { name: 'Urgente' }).check();
+    /* `force`: la casilla va `sr-only` —un píxel— y lo que recibe el clic es el
+       cuadro dibujado al lado. */
+    await seccionSi.getByRole('checkbox', { name: 'Alta' }).check({ force: true });
+    await seccionSi.getByRole('checkbox', { name: 'Urgente' }).check({ force: true });
     await page.getByRole('button', { name: 'Crear regla' }).click();
     await expect(
       page
         .locator('li', { hasText: nombreLista })
-        .getByText(/Cuando tarea próxima a vencer, si prioridad es alguno de Alta, Urgente/),
-    ).toBeVisible();
+        .getByText(/Cuando una tarea esté a punto de vencer, si prioridad es alguno de Alta, Urgente/),
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
   });
 
   test('editar una regla existente actualiza su resumen (Bloque 5)', async ({ page }) => {
@@ -487,19 +548,19 @@ test.describe('Reglas del proyecto', () => {
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
     await expect(
-      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Baja/),
+      tarjeta.getByText(/Cuando una tarea esté a punto de vencer, si prioridad es Baja/),
     ).toBeVisible();
 
     await tarjeta.getByRole('button', { name: 'Editar' }).click();
     /* Una sola fila de condición, precargada por `draftFromRule`: cambia su
        valor de «Baja» a «Urgente». */
-    await page.getByRole('combobox', { name: 'Valor' }).click();
+    await page.getByRole('combobox', { name: /^Prioridad/ }).click();
     await page.getByRole('option', { name: 'Urgente' }).click();
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
 
     await expect(
-      tarjeta.getByText(/Cuando tarea próxima a vencer, si prioridad es Urgente/),
-    ).toBeVisible();
+      tarjeta.getByText(/Cuando una tarea esté a punto de vencer, si prioridad es Urgente/),
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
   });
 
   test('cambiar de trigger avisa y descarta las condiciones ya configuradas (Bloque 5)', async ({
@@ -514,15 +575,22 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
-    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /^Quitar la condición/ })).toHaveCount(1);
 
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('combobox', { name: 'Qué la dispara' }).click();
-    await page.getByRole('option', { name: 'Tarea estancada' }).click();
+    /* ⚠️ Esto esperaba un `confirm()` del navegador. Ya no lo hay —los diálogos
+       del sistema se retiraron (D4)—, pero el aviso sigue: se cuenta **después**
+       y dentro del formulario, con las condiciones ya descartadas a la vista. */
+    /* El disparador dejó de ser un desplegable: son botones con su
+       explicación debajo, así que el nombre accesible lleva las dos frases. */
+    await page.getByRole('button', { name: /^Una tarea lleva parada/ }).click();
 
-    await expect(page.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
-    /* Y el destinatario de la sección «Entonces» cambió con el trigger. */
-    await expect(page.getByText(/avisa al dueño del proyecto/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Quitar la condición/ })).toHaveCount(0);
+    await expect(page.getByText(/Se descartó la condición que tenías/)).toBeVisible();
+    /* ⚠️ Aquí se comprobaba además que **el destinatario cambiaba con el
+       disparador**. Ya no: el motivo del aviso sale del disparador y el
+       destinatario lo elige la regla, así que cambiar de disparador no toca lo
+       que hay en «Entonces» — que es justo lo que dice el aviso de arriba sobre
+       las condiciones, y solo sobre las condiciones. */
   });
 
   test('el nombre vacío marca el campo y no envía (Bloque 5)', async ({ page }) => {
@@ -536,9 +604,9 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    await expect(page.getByText('El nombre debe tener al menos 2 caracteres.')).toBeVisible();
-    /* El diálogo sigue abierto: no se perdió lo que ya había en el formulario. */
-    await expect(page.getByRole('heading', { name: 'Nueva regla' })).toBeVisible();
+    await expect(page.getByText('El nombre debe tener al menos 2 caracteres.')).toBeVisible(ESPERA_TRAS_GUARDAR);
+    /* El panel sigue abierto: no se perdió lo que ya había en el formulario. */
+    await expect(page.getByRole('form', { name: 'Nueva regla' })).toBeVisible();
   });
 
   /**
@@ -562,17 +630,21 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const panel = page.getByRole('form', { name: 'Nueva regla' });
     const nombreRegla = nombreUnico('A medio escribir').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await panel.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
 
-    page.once('dialog', (aviso) => aviso.dismiss());
-    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialogo.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+    /* La pregunta ya no es una ventana del sistema: aparece en el pie, donde
+       estaba el botón, con el formulario entero todavía a la vista. */
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(panel.getByText('Tienes cambios sin guardar. ¿Los descarto?')).toBeVisible();
 
-    page.once('dialog', (aviso) => aviso.accept());
-    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(dialogo).toBeHidden();
+    await panel.getByRole('button', { name: 'Seguir editando' }).click();
+    await expect(panel.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
+
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
+    await panel.getByRole('button', { name: 'Descartar' }).click();
+    await expect(panel).toBeHidden();
   });
 
   test('cerrar sin haber tocado nada no pregunta (corrección C2)', async ({ page }) => {
@@ -583,22 +655,19 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
-    let avisos = 0;
-    page.on('dialog', (aviso) => {
-      avisos += 1;
-      void aviso.accept();
-    });
-
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
-    await expect(dialogo).toBeVisible();
-    await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+    const panel = page.getByRole('form', { name: 'Nueva regla' });
+    await expect(panel).toBeVisible();
+    await panel.getByRole('button', { name: 'Cancelar' }).click();
 
-    await expect(dialogo).toBeHidden();
-    expect(avisos, 'Cerrar un formulario intacto no debería preguntar nada').toBe(0);
+    await expect(panel).toBeHidden();
+    await expect(
+      page.getByText('Tienes cambios sin guardar. ¿Los descarto?'),
+      'Cerrar un formulario intacto no debería preguntar nada',
+    ).toHaveCount(0);
   });
 
-  test('guardar correctamente cierra el diálogo sin preguntar (corrección C2)', async ({
+  test('guardar correctamente cierra el panel sin preguntar (corrección C2)', async ({
     page,
   }) => {
     const api = await apiContext();
@@ -608,24 +677,21 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
-    let avisos = 0;
-    page.on('dialog', (aviso) => {
-      avisos += 1;
-      void aviso.accept();
-    });
-
     await page.getByRole('button', { name: 'Nueva regla' }).click();
-    const dialogo = page.getByRole('dialog', { name: 'Nueva regla' });
+    const panel = page.getByRole('form', { name: 'Nueva regla' });
     const nombreRegla = nombreUnico('Guardada sin preguntar').slice(0, 120);
-    await dialogo.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, panel, nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible();
-    await expect(dialogo).toBeHidden();
-    expect(avisos, 'Un guardado correcto no pierde nada, así que no pregunta').toBe(0);
+    await expect(page.getByText(nombreRegla, { exact: true })).toBeVisible(ESPERA_TRAS_GUARDAR);
+    await expect(panel).toBeHidden();
+    await expect(
+      page.getByText('Tienes cambios sin guardar. ¿Los descarto?'),
+      'Un guardado correcto no pierde nada, así que no pregunta',
+    ).toHaveCount(0);
   });
 
-  test('un error del servidor se ve dentro del diálogo, sin cerrarlo ni perder lo escrito (Bloque 5)', async ({
+  test('un error del servidor se ve dentro del panel, sin cerrarlo ni perder lo escrito (Bloque 5)', async ({
     page,
   }) => {
     /* No hay ninguna combinación que la interfaz ofrezca y que el servidor
@@ -644,7 +710,9 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Se pierde con la suspensión').slice(0, 120);
-    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    /* Con el destinatario puesto: sin él ni siquiera se llegaría al servidor,
+       y lo que esta prueba mira es el error que **manda el servidor**. */
+    await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
 
     const suspension = await contextoDePeticion.newContext({
       baseURL: process.env.E2E_GATEWAY_URL ?? 'http://localhost:3000',
@@ -662,8 +730,8 @@ test.describe('Reglas del proyecto', () => {
       page.getByText(
         'El proyecto está suspendido: no se pueden crear ni editar reglas mientras tanto.',
       ),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Nueva regla' })).toBeVisible();
+    ).toBeVisible(ESPERA_TRAS_GUARDAR);
+    await expect(page.getByRole('form', { name: 'Nueva regla' })).toBeVisible();
     await expect(page.getByLabel('Nombre', { exact: true })).toHaveValue(nombreRegla);
   });
 
@@ -677,15 +745,17 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Alternar estado').slice(0, 120);
-    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
     /* El borrador nace en DISABLED —igual que el valor por defecto del
        servidor cuando se omite `status`, ver `emptyDraft` en el Bloque 2—,
        así que hay que marcar el checkbox para partir de «Activa». */
-    await page.getByLabel('Activar esta regla').check();
+    /* `force`: la casilla va `peer sr-only` y quien recibe el clic es el cuadro
+       dibujado al lado. */
+    await page.getByLabel('Activar la regla al guardar').check({ force: true });
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
-    await expect(tarjeta).toBeVisible();
+    await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
     await expect(tarjeta.getByText('Activa', { exact: true })).toBeVisible();
 
     await tarjeta.getByRole('button', { name: 'Desactivar' }).click();
@@ -707,18 +777,21 @@ test.describe('Reglas del proyecto', () => {
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     const nombreRegla = nombreUnico('Eliminar esta').slice(0, 120);
-    await page.getByLabel('Nombre', { exact: true }).fill(nombreRegla);
+    await rellenarReglaMinima(page, page.getByRole('form', { name: 'Nueva regla' }), nombreRegla);
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
     const tarjeta = page.locator('li', { hasText: nombreRegla });
+    await expect(tarjeta).toBeVisible(ESPERA_TRAS_GUARDAR);
+
+    /* La confirmación ya no es una ventana aparte: sale en la propia fila, con
+       la regla —y su nombre— todavía delante. */
+    await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
+    await expect(tarjeta.getByText(`¿Eliminar «${nombreRegla}»?`)).toBeVisible();
+    await tarjeta.getByRole('button', { name: 'No', exact: true }).click();
     await expect(tarjeta).toBeVisible();
 
     await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
-    await page.getByRole('button', { name: 'Cancelar' }).click();
-    await expect(tarjeta).toBeVisible();
-
-    await tarjeta.getByRole('button', { name: 'Eliminar' }).click();
-    await page.getByRole('button', { name: 'Eliminar regla' }).click();
+    await tarjeta.getByRole('button', { name: 'Sí, eliminar' }).click();
     await expect(page.locator('li', { hasText: nombreRegla })).toHaveCount(0);
   });
 
@@ -747,20 +820,33 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Revisar ahora' }).click();
-    await expect(
-      page.getByText('1 regla revisada · 1 candidata · 1 aviso · 0 fallos'),
-    ).toBeVisible();
-    await expect(page.getByText('Avisó', { exact: true })).toHaveCount(1);
-    /* El resumen del contexto usa las etiquetas del catálogo, no los nombres
+    /**
+     * ⚠️ **Se comprueba la fila, no el resumen, y no es por comodidad.**
+     *
+     * El resumen de la revisión vive en el estado del cliente
+     * (`useAccion`), y la propia revisión emite un aviso que llega por el flujo
+     * en vivo y refresca la ruta — la carrera que documenta `useAccion` en
+     * `commons/hooks`: la petición se ejecuta, el servidor actúa, y el
+     * resultado no llega a pintarse. Se ha visto en esta misma prueba, con el
+     * toast del aviso ya en pantalla y el resumen vacío.
+     *
+     * La fila de la ejecución sí es estado del servidor y sobrevive al
+     * refresco. El texto exacto del resumen lo fijan las unitarias de
+     * `describeReviewSummary`, que es donde se puede comprobar sin carreras.
+     */
+    await expect(page.getByText('Actuó', { exact: true })).toHaveCount(1, { timeout: 30_000 });
+    /* ⚠️ **El detalle va plegado**: la fila cerrada dice qué regla, sobre qué
+       tarea y cómo acabó, y el contexto con el que se evaluó se despliega solo
+       si se pide (S3.6). Antes la tabla era plana y esto se veía sin pulsar.
+
+       El resumen del contexto usa las etiquetas del catálogo, no los nombres
        crudos del campo — hueco 3. */
+    await page.getByRole('button', { expanded: false }).filter({ hasText: 'Actuó' }).click();
     await expect(page.getByText(/prioridad Alta/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Revisar ahora' }).click();
-    await expect(
-      page.getByText('1 regla revisada · 1 candidata · 0 avisos · 0 fallos'),
-    ).toBeVisible();
     /* Idempotencia visible: la segunda revisión no añade una segunda fila. */
-    await expect(page.getByText('Avisó', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Actuó', { exact: true })).toHaveCount(1);
   });
 
   test('una regla cuyas condiciones no se cumplen deja una fila «No cumplía las condiciones» (Bloque 6)', async ({
@@ -789,10 +875,10 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Revisar ahora' }).click();
-    await expect(
-      page.getByText('1 regla revisada · 1 candidata · 0 avisos · 0 fallos'),
-    ).toBeVisible();
-    await expect(page.getByText('No cumplía las condiciones', { exact: true })).toBeVisible();
+    /* La fila, no el resumen: ver el porqué en la prueba de arriba. */
+    await expect(page.getByText('No cumplía las condiciones', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   /**
@@ -836,21 +922,24 @@ test.describe('Reglas del proyecto', () => {
     await entrarConCuenta(page, mundo.duenno.email);
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
-    /* El resumen legible del otro trigger, con su destinatario propio. En una
-       sola aserción sobre la frase de `describeRule`: «avisa al dueño del
-       proyecto» aparece también en la sección «Entonces» del diálogo de
-       edición, que está en el DOM aunque cerrado. */
+    /* El resumen legible del otro trigger, con su destinatario propio, en una
+       sola aserción sobre la frase de `describeRule`. Se acota a la fila de la
+       regla: «avisa a quien lleva el proyecto» vuelve a salir en la sección
+       «Entonces» del panel de edición en cuanto se despliega. */
     const tarjeta = page.locator('li', { hasText: nombreRegla });
     await expect(
       tarjeta.getByText(
-        'Cuando tarea estancada, si vencida es no, entonces avisa al dueño del proyecto.',
+        'Cuando una tarea lleve demasiado tiempo sin moverse, si está vencida es no, entonces avisa a quien lleva el proyecto.',
       ),
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Revisar ahora' }).click();
-    await expect(
-      page.getByText('1 regla revisada · 0 candidatas · 0 avisos · 0 fallos'),
-    ).toBeVisible();
+    /* Aquí sí se mira el resumen, y se puede: sin candidatas no hay aviso, sin
+       aviso no hay evento en vivo, y sin evento nadie refresca la ruta por
+       debajo. Es justo lo contrario del caso de arriba. */
+    await expect(page.getByText('1 regla revisada · 0 candidatas · 0 acciones')).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test('sin canManageAutomations se ve el mensaje de permiso', async ({ page }) => {
@@ -890,7 +979,7 @@ test.describe('Reglas del proyecto', () => {
 
     await expect(
       page.getByText(
-        'Las reglas de este proyecto no se pueden ver ni administrar mientras esté suspendido.',
+        'La automatización de este proyecto no se puede ver ni administrar mientras esté suspendido.',
       ),
     ).toBeVisible();
     await expect(

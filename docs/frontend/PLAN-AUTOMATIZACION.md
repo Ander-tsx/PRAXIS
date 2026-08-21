@@ -509,23 +509,63 @@ no dejaría rastro o se confundiría con archivar.
 
 ## S6 — Cierre
 
-- [ ] **S6.1** ESTADO-ACTUAL, CONTRATO-API y CLAUDE.md al día. La línea de
+- [x] **S6.1** ESTADO-ACTUAL, CONTRATO-API y CLAUDE.md al día. La línea de
       puertos de CLAUDE.md todavía no menciona `automation :3008`; el README sí.
-- [ ] **S6.2** Marcar en PENDIENTES-BACKEND-AUTOMATIZACION lo que este plan
+- [x] **S6.2** Marcar en PENDIENTES-BACKEND-AUTOMATIZACION lo que este plan
       resuelve.
 - [ ] **S6.3** e2e actualizadas: las 24 de Automatización buscan el texto
       «Reglas», y hay dos ficheros con el prefijo `15-`.
-- [ ] **S6.4** Revertir el `.gitignore` que se coló en la rama: ignora `.claude`
-      y saca `skills-lock.json` del control de versiones, y no tiene nada que ver
-      con automatizaciones.
-- [ ] **S6.5** Separar las specs de integración de las unitarias. Desde esta
+- [x] **S6.4** ~~Revertir~~ **acotar** el `.gitignore` que se coló en la rama.
+      No se revierte, y se decidió a la vista de la historia: quien añadió
+      `.claude`, `.codex`, `.agents` y `skills-lock.json` lo hizo a propósito y
+      lo dijo en su propio commit —«no subo las skills porsiacaso»—, así que
+      revertirlo subiría al repositorio la configuración local de cada máquina.
+      Lo que faltaba era decirlo: el bloque lleva su comentario, `.claude/` se
+      escribe como carpeta y `.claude/.gitkeep` queda exceptuado, que estaba
+      versionado y el patrón anterior lo ocultaba.
+- [x] **S6.5** Separar las specs de integración de las unitarias. Desde esta
       rama exigen Postgres y Redis vivos y están en el mismo `jest`, así que
       `pnpm test` dejó de correr en seco — en `main` no había ninguna.
 - [ ] **S6.6** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
 
 ### Apuntes
 
-_(se rellena conforme se trabaja)_
+**`pnpm test` vuelve a correr en seco** (S6.5). `testPathIgnorePatterns` deja
+fuera los `*.integration.spec.ts` y `test:int` corre solo esos, en `tasks`, en
+`automation` y desde la raíz. Automation: 91 unitarias y 8 de integración;
+tasks: 1 y 19.
+
+**Las 24 pruebas de Automatización no estaban «desfasadas por el renombre»: la
+interfaz que describen ya no existe** (S6.3). El constructor dejó de ser un
+modal, así que `getByRole('dialog')` no encuentra nada; el aviso de cambios sin
+guardar dejó de ser un `confirm()` del navegador; la confirmación de borrado se
+mudó a la fila; el disparador se elige con botones y no con un desplegable; y
+las etiquetas y las frases las manda ahora el catálogo del servidor. Se
+reescribieron contra la interfaz de hoy.
+
+**Y arreglando el spec salieron tres fallos de la propia interfaz:**
+
+1. 🔴 **El resumen de toda regla que avisa decía «avisa a a los encargados de la
+   tarea»**, con la «a» repetida. `describeAction` concatena el `sentence` de la
+   acción —«avisa a»— con la etiqueta del valor, y la etiqueta del catálogo
+   traía la preposición otra vez. Lo llamativo es que la prueba unitaria de
+   `describeRule` **ya esperaba el texto correcto**: su catálogo de mentira
+   decía «Los encargados», el de verdad decía «A los encargados», y nadie
+   comparaba los dos.
+2. 🔴 **Cambiar de disparador descartaba las condiciones en silencio.** Antes lo
+   preguntaba con un `confirm()`, y al retirar los diálogos del sistema (D4) se
+   fue la ventana **y el aviso entero**. Ahora se cuenta después, dentro del
+   formulario y con la sección «Si» ya vacía a la vista.
+3. ⚠️ **El constructor no se puede guardar sin elegir «A quién»**, y el error lo
+   dice bien —«Avisar: falta «A quién».»—, pero es un paso nuevo: antes el
+   destinatario salía del disparador. No se cambia —elegir a quién se avisa no
+   debería tener un valor por defecto silencioso— pero queda escrito, porque es
+   lo que rompía media suite.
+
+**Un fallo más, en la prueba de API** (`17-automatizaciones`): exigía
+un 400 al cruzar `recipientSelector` con el disparador. Dejó de ser un error
+cuando el motivo del aviso pasó a salir del disparador y el destinatario de la
+regla, así que ahora exige el 201.
 
 ---
 
@@ -535,9 +575,9 @@ _(se rellena conforme se trabaja)_
 > hecho** y **lo que cuesta**, porque dos de los cinco eran preguntas y una ya
 > estaba resuelta a medias.
 
-### S7.1 — El rayo y el color, también en el toast
+### S7.1 — El rayo y el color, también en el toast ✅
 
-- [ ] Los diez tipos `AUTOMATION_*` en `PRESENTACION_POR_TIPO`
+- [x] Los diez tipos `AUTOMATION_*` en `PRESENTACION_POR_TIPO`
       (`commons/organisms/LiveNotices/styles.ts`).
 
 **Estado: medio hecho, y la otra mitad es barata.** En la **bandeja** del panel
@@ -557,6 +597,18 @@ es un diccionario y no un `switch`: es exactamente el caso para el que existe.
 
 **Coste: bajo.** Un archivo, sin migración, sin contrato.
 
+**Hecho** (`87dbb2f`). Con dos apuntes que salieron al escribirlo:
+
+- **El rayo no viaja al toast, y no por olvido.** `sileo.show()` no admite
+  icono: la píldora solo tiene estado de color y etiqueta. Lo que distingue un
+  aviso de automatización aquí es el **título**, que nombra el hecho
+  —«Vencida», «Sin encargado»— en vez del genérico «Aviso». El rayo sigue en la
+  bandeja del panel, que es a donde lleva el botón.
+- **La tabla pasa a `Record<NotificationType, Presentacion>`.** Faltando una
+  entrada no falla nada —sale un toast soso—, que es exactamente por lo que
+  esto llevaba diez tipos sin cubrir sin que nadie se enterara. Ahora lo dice
+  `tsc`.
+
 ### S7.2 — La lista de reglas no tiene límite
 
 - [ ] Decidir un techo y decirlo, o paginar.
@@ -575,9 +627,10 @@ acota, la pantalla lo dice.
 constructor y la tarjeta viven en la misma lista, así que paginar obliga a
 decidir qué pasa al editar la última de una página.
 
-### S7.3 — Las ejecuciones no tienen paginador
+### S7.3 — Las ejecuciones no tienen paginador 🟡
 
-- [ ] Paginar, o al menos decir que se está viendo un recorte.
+- [x] Decir que se está viendo un recorte, y traer el total.
+- [ ] Paginar de verdad, y filtrar por regla y por estado.
 
 **Respuesta: no.** `AutomationEngineService.recent()` acepta `limit` con tope de
 50, pero **el gateway lo fija en 20** y no expone el parámetro. No hay `page`, no
@@ -596,6 +649,15 @@ es la consulta que de verdad se hace.
 
 **Coste: medio.** Toca `recent()`, el gateway, el tipo del cliente y la pantalla.
 Sin migración.
+
+**Hecho lo mínimo** (`recent()` devuelve `{ items, total, limit }`, y la pantalla
+dice «Se ven las últimas 20 de N» **solo cuando falta algo**). Queda lo bueno:
+paginar y filtrar por regla y por estado — «enséñame los fallos» es la consulta
+que de verdad se hace.
+
+⚠️ **El límite sigue fijado en 20 por el gateway y no se expone.** Se decidió no
+añadir el parámetro todavía: sin una pantalla que lo use sería una entrada de
+API sin dueño, y la que la usará —el paginador— aún no está escrita.
 
 ### S7.4 — Que PRAX ayude a escribir automatizaciones
 

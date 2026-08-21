@@ -248,7 +248,7 @@ export function validateColumnColor(color: string): string | null {
 /**
  * Validación de una regla de automatización, espejo de
  * `rule-definition.ts` en `automation-service` — verificado contra el
- * contrato real en `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+ * contrato real en `e2e/tests/api/17-automatizaciones.spec.ts`.
  *
  * `status: 'INVALID'` y una clave de más en `trigger.config`/`action.config`
  * no están aquí: `RuleDraft` los excluye por construcción (el tipo de

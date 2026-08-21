@@ -556,7 +556,7 @@ body.arrastrando-en-tablero {
   --sileo-state-success: var(--color-success);
   --sileo-state-error: var(--color-error);
   --sileo-state-warning: var(--color-warning);
-  --sileo-state-info: var(--color-info);
+  --sileo-state-info: var(--color-primary);
   --sileo-state-action: var(--color-primary);
   --sileo-state-loading: var(--color-text-secondary);
 
@@ -581,13 +581,18 @@ body.arrastrando-en-tablero {
 /* 1. La tarjeta necesita un borde sutil para destacar en fondos planos
  * y el botón se comía el ancho de la tarjeta.
  *
- * `[data-sileo-card]` o el contenedor se estilizan para añadir contraste.
  * `[data-sileo-button]` es `display: flex` y vive como hijo de bloque dentro de
  * la descripción, así que se estiraba al 100 %: una píldora de borde a borde que
  * parecía salirse de la tarjeta. Con `max-content` mide lo que mide su texto. */
-[data-sileo-viewport][data-position] > div {
-  border: 1px solid var(--color-border-subtle);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+[data-sileo-viewport][data-position] [data-sileo-toast] {
+  /* Se elimina el borde y box-shadow rectangular. La sombra la pone el contenedor
+     padre, para no ser recortada por el threshold alpha del filtro gooey del SVG. */
+  overflow: visible !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 10px 30px rgba(255, 255, 255, 0.08))
+    drop-shadow(0 0 1px rgba(255, 255, 255, 0.15));
 }
 
 [data-sileo-viewport][data-position] [data-sileo-button] {
@@ -606,16 +611,14 @@ body.arrastrando-en-tablero {
   overflow-wrap: anywhere;
 }
 
-/* 3. La descripción, legible sobre la píldora de PRAXIS.
- *
- * Un token del tema, y por eso **una sola regla para los dos**. Antes había dos,
- * con colores literales cruzados —texto oscuro en tema oscuro— porque la píldora
- * se pintaba con el blanco y negro de `sileo` y salía invertida respecto a la
- * aplicación. Desde que el punto 4 la ata a `surface`, la píldora es del mismo
- * tema que todo lo demás y el texto secundario del tema ya es el color correcto:
- * separarlo por `data-theme` era escribir dos veces lo mismo. */
+/* 3. La descripción y título blancos en modo oscuro con su sombra respectiva. */
+[data-sileo-viewport][data-position] [data-sileo-title],
 [data-sileo-viewport][data-position] [data-sileo-description] {
-  color: var(--color-text-secondary);
+  color: #ffffff !important;
+}
+
+[data-sileo-viewport][data-position] [data-sileo-svg] {
+  overflow: visible !important;
 }
 
 /* 4. La tarjeta, con los colores de la aplicación en tema claro.
@@ -635,13 +638,14 @@ body.arrastrando-en-tablero {
   fill: var(--color-surface) !important;
 }
 
-:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-svg] {
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.08))
-    drop-shadow(0 0 1px var(--color-border-subtle));
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-toast] {
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.25))
+    drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
 }
 
-:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title] {
-  color: var(--color-text-primary);
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title],
+:root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-description] {
+  color: #000000 !important;
 }
 
 .arrastrando-en-tablero {

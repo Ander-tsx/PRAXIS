@@ -9,6 +9,7 @@
     "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability --filter @praxis/domain-events run build",
     "lint": "turbo run lint",
     "test": "turbo run test --filter=!@praxis/e2e",
+    "test:int": "turbo run test:int --filter=!@praxis/e2e",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "docker:up": "docker compose -f infra/docker/compose/docker-compose.yml up -d",

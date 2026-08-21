@@ -71,7 +71,9 @@ const CATALOGO: AutomationCatalog = {
           label: 'A quién',
           kind: 'enum',
           required: true,
-          options: [{ value: 'ASSIGNEES', label: 'A los encargados' }],
+          /* Sin la preposición: la pone `sentence`. Ver el catálogo del
+             servicio — «A los encargados» daba «avisa a a los encargados». */
+          options: [{ value: 'ASSIGNEES', label: 'Los encargados' }],
         },
       ],
     },

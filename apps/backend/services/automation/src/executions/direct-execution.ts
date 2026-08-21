@@ -419,13 +419,33 @@ export class AutomationEngineService {
     }
   }
 
+  /**
+   * Las últimas ejecuciones del proyecto, **y cuántas hay en total**.
+   *
+   * ⚠️ **El total no es decorativo: sin él esto es un recorte mudo.** Quien
+   * mira las ejecuciones lo hace para averiguar por qué una regla no actuó, y
+   * devolver veinte filas sin decir que hay trescientas deja a esa persona
+   * concluyendo que su regla no se evaluó nunca cuando lo que pasa es que su
+   * caso se salió de la ventana. Con el motor reactivo el histórico crece por
+   * hecho, no por pulsación de botón, así que la ventana se agota deprisa.
+   *
+   * Devuelve un sobre y no un array por eso mismo — es la misma forma que la
+   * bandeja de avisos, `{ items, … }`.
+   */
   async recent(projectId: string, limit = 20) {
-    return this.prisma.ruleExecution.findMany({
-      where: { rule: { projectId } },
-      include: { rule: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(Math.max(limit, 1), 50),
-    });
+    const tope = Math.min(Math.max(limit, 1), 50);
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.ruleExecution.findMany({
+        where: { rule: { projectId } },
+        include: { rule: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: tope,
+      }),
+      this.prisma.ruleExecution.count({ where: { rule: { projectId } } }),
+    ]);
+
+    return { items, total, limit: tope };
   }
 
   /* ─── Candidatas de cada disparador de barrido ──────────────────────────── */

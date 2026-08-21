@@ -6,6 +6,7 @@ import type { AutomationCatalog, OpcionesDelProyecto } from '@/lib/automation-ca
 import { describeExecutionContext, describeReviewSummary } from '@/lib/automation-draft';
 import {
   type AutomationExecution,
+  type AutomationExecutionPage,
   type AutomationExecutionStatus,
   Badge,
   type BadgeVariant,
@@ -20,7 +21,7 @@ import { useState } from 'react';
 export interface RuleExecutionsProps {
   projectId: string;
   /** `null` = el servicio no respondió. No es lo mismo que «no hay ninguna». */
-  executions: AutomationExecution[] | null;
+  executions: AutomationExecutionPage | null;
   catalog: AutomationCatalog | null;
   proyecto: OpcionesDelProyecto;
 }
@@ -89,15 +90,23 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
             Ejecuciones
           </h3>
           <span className="shrink-0 font-light text-text-disabled">/</span>
+          {/* ⚠️ **«Las de barrido se lanzan desde aquí» no explicaba nada.**
+              «Barrido» es como se llama por dentro; quien lee esto solo quiere
+              saber qué pasa si pulsa el botón de al lado. */}
           <p className="truncate font-sans text-sm text-text-secondary">
-            Qué hizo cada regla, sobre qué tarea y cuándo. Las de barrido se lanzan desde aquí.
+            Qué hizo cada regla, sobre qué tarea y cuándo.
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <form action={formAction}>
             <input type="hidden" name="projectId" value={projectId} />
-            <Button type="submit" variant="secondary" isLoading={pending}>
+            <Button
+              type="submit"
+              variant="secondary"
+              isLoading={pending}
+              title="Comprueba ahora las reglas que vigilan un estado —vence pronto, lleva parada, ya venció, sigue sin encargado— contra las tareas del proyecto. Las que reaccionan a un hecho (se crea, se mueve, se completa…) no lo necesitan: saltan solas."
+            >
               Revisar ahora
             </Button>
           </form>
@@ -132,7 +141,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
         <p className="rounded-xl border border-warning bg-warning-muted px-5 py-4 font-sans text-sm text-text-primary">
           No se ha podido consultar el historial de ejecuciones. Vuelve a cargar en un momento.
         </p>
-      ) : executions.length === 0 ? (
+      ) : executions.items.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
           Aún no se ha revisado nada. «Revisar ahora» evalúa las reglas activas contra las tareas
           del proyecto y deja aquí una fila por cada candidata que encontró.
@@ -141,7 +150,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
         /* Una caja para todas, separadas por una línea — igual que la lista
            de reglas. */
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-          {executions.map((execution) => {
+          {executions.items.map((execution) => {
             const failure = execution.status === 'FAILED' ? failureMessage(execution) : null;
             const desplegada = abierta === execution.id;
             return (
@@ -219,6 +228,24 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
             );
           })}
         </ul>
+      )}
+
+      {/**
+       * 🔴 **Decir que esto es una ventana, no el histórico.**
+       *
+       * El listado trae las últimas veinte y no había forma de saberlo. Quien
+       * abre las ejecuciones lo hace para averiguar por qué una regla no actuó,
+       * y una ventana que no llega hasta el caso que busca —sin decirlo— le
+       * hace concluir que la regla no se evaluó nunca. Es el recorte mudo que
+       * este repositorio prohíbe en cualquier otro sitio.
+       *
+       * Solo aparece cuando de verdad falta algo: con menos ejecuciones que el
+       * tope, la lista **es** el histórico y anunciarlo sería ruido.
+       */}
+      {executions !== null && executions.total > executions.items.length && (
+        <p className="font-sans text-xs text-text-secondary">
+          Se ven las últimas {executions.items.length} de {executions.total}.
+        </p>
       )}
     </section>
   );

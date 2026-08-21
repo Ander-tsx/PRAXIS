@@ -448,9 +448,13 @@ export const ACTIONS: readonly ActionSpec[] = [
         label: 'A quién',
         kind: 'enum',
         required: true,
+        /* ⚠️ **Sin la preposición delante: la pone la frase.** `sentence` es
+           «avisa a», y `describeAction` la concatena con esta etiqueta en
+           minúscula, así que «A los encargados» daba «avisa a a los encargados
+           de la tarea» en el resumen de cada regla — con la «a» repetida. */
         options: [
-          { value: 'ASSIGNEES', label: 'A los encargados de la tarea' },
-          { value: 'PROJECT_OWNER', label: 'A quien lleva el proyecto' },
+          { value: 'ASSIGNEES', label: 'Los encargados de la tarea' },
+          { value: 'PROJECT_OWNER', label: 'Quien lleva el proyecto' },
         ],
       },
     ],

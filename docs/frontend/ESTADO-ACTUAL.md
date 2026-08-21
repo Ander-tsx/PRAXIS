@@ -4927,7 +4927,7 @@ HTTP: es el hueco 1 de
 [PENDIENTES-BACKEND-AUTOMATIZACION.md](PENDIENTES-BACKEND-AUTOMATIZACION.md). El
 día que exista `GET /automations/catalog`, se sustituye el módulo por la respuesta
 y ningún componente cambia. Mientras tanto, los ocho casos de rechazo de
-`e2e/tests/api/15-automatizaciones-academicas.spec.ts` son la red: si backend
+`e2e/tests/api/17-automatizaciones.spec.ts` son la red: si backend
 endurece el contrato, salta ahí y no en la pantalla.
 
 ### 45.3 ⚠️ Un booleano se pinta con `Select`, nunca con `Checkbox`

@@ -63,12 +63,16 @@ test.describe('Automatización académica', () => {
       failed: 0,
     });
 
-    const ejecuciones = await data<Ejecucion[]>(
+    /* ⚠️ El listado devuelve un sobre `{ items, total, limit }`, no un array:
+       veinte filas sin decir cuántas hay era un recorte mudo, y la pantalla
+       necesita el total para poder decirlo. */
+    const ejecuciones = await data<{ items: Ejecucion[]; total: number; limit: number }>(
       await request.get(`/api/projects/${mundo.proyecto.id}/automations/executions`, {
         headers,
       }),
     );
-    expect(ejecuciones).toContainEqual(
+    expect(ejecuciones.total).toBeGreaterThan(0);
+    expect(ejecuciones.items).toContainEqual(
       expect.objectContaining({ status: 'SUCCEEDED', rule: { name: nombreRegla } }),
     );
 
@@ -140,7 +144,18 @@ test.describe('Automatización académica', () => {
       expect(respuesta.status(), 'clave extra en trigger.config').toBe(400);
     });
 
-    test('recipientSelector cruzado con el trigger da 400', async ({ request }) => {
+    /**
+     * ⚠️ **Esto exigía un 400 y ahora exige un 201, y es el diseño que cambió.**
+     *
+     * El destinatario estaba atado al disparador porque el **tipo** del aviso
+     * se deducía de `recipientSelector`: con dos disparadores la coincidencia
+     * colaba, y cruzarlos daba un aviso con el texto equivocado. Desde el motor
+     * reactivo el motivo sale del disparador y el destinatario de la regla, que
+     * son dos cosas distintas —`crearAviso()` en `actions.ts`—, así que «cuando
+     * algo vaya a vencer, avisa a quien lleva el proyecto» es una regla legítima
+     * y el catálogo ofrece los dos destinatarios en cualquier disparador.
+     */
+    test('el destinatario ya no está atado al disparador', async ({ request }) => {
       const respuesta = await request.post(`/api/projects/${proyectoId}/automations`, {
         headers: cabeceras,
         data: reglaBase({
@@ -149,7 +164,7 @@ test.describe('Automatización académica', () => {
           ],
         }),
       });
-      expect(respuesta.status(), 'TASK_DUE_SOON solo admite recipientSelector ASSIGNEES').toBe(400);
+      expect(respuesta.status(), 'avisar a quien lleva el proyecto es válido').toBe(201);
     });
 
     test('IN con un valor escalar (no lista) da 400', async ({ request }) => {

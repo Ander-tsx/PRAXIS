@@ -958,6 +958,23 @@ export interface AutomationExecution {
   createdAt: string;
 }
 
+/**
+ * Lo que devuelve `GET /projects/:id/automations/executions`.
+ *
+ * ⚠️ **`total` existe para que la pantalla pueda decir que está recortando.**
+ * Esto devolvía un array de veinte filas y nada más, y ese es el peor tipo de
+ * recorte: quien mira las ejecuciones lo hace para saber por qué una regla no
+ * actuó, y sin el total concluye que no se evaluó nunca cuando lo que pasa es
+ * que su caso quedó fuera de la ventana.
+ */
+export interface AutomationExecutionPage {
+  items: AutomationExecution[];
+  /** Cuántas hay en el proyecto, no cuántas vienen. */
+  total: number;
+  /** Cuántas caben en esta respuesta. Hoy lo fija el gateway en 20. */
+  limit: number;
+}
+
 /** Lo que devuelve `POST /projects/:id/automations/review`. */
 export interface AutomationReviewSummary {
   rules: number;

@@ -1,12 +1,13 @@
 import type { SileoOptions } from 'sileo';
+import type { NotificationType } from '../../api/domain';
 
 /**
  * Cómo se anuncia cada cosa: forma, color y ritmo.
  *
  * ## Por qué una tabla y no un `switch` dentro del componente
  *
- * Son ocho clases de aviso y cada una tiene cuatro decisiones —el estado de
- * color, la etiqueta corta, cuánto se queda y cómo se despliega—. Repartidas por
+ * Son dieciocho clases de aviso y cada una tiene cuatro decisiones —el estado
+ * de color, la etiqueta corta, cuánto se queda y cómo se despliega—. Repartidas por
  * un `switch` de cien líneas no hay forma de ver si dos se parecen demasiado o
  * si a una se le olvidó algo; en una tabla se lee de un vistazo y se compara
  * columna a columna.
@@ -42,6 +43,13 @@ export interface Presentacion {
   autopilot: { expand: number; collapse: number };
   /** El texto del botón, si el aviso lleva a algún sitio. */
   accion?: string;
+  /**
+   * El icono de la insignia, si lleva uno propio.
+   *
+   * Es una **clave**, no el icono: esta tabla es un módulo de datos y el icono
+   * es JSX. Lo resuelve `LiveNotices`, que sí es un componente.
+   */
+  icono?: 'rayo';
 }
 
 /** Lo que se enseña cuando llega un tipo que este navegador no conoce todavía. */
@@ -63,7 +71,16 @@ export const PRESENTACION_DE_MENSAJE: Presentacion = {
   accion: 'Abrir',
 };
 
-export const PRESENTACION_POR_TIPO: Record<string, Presentacion> = {
+/**
+ * ⚠️ **El tipo es `Record<NotificationType, …>` a propósito: los quiere todos.**
+ *
+ * Faltando uno, el aviso no falla —cae a `PRESENTACION_POR_DEFECTO` y sale como
+ * «Aviso», en gris—, así que un tipo nuevo sin entrada aquí no se nota hasta
+ * que alguien mira un toast y le parece soso. Que es exactamente lo que pasó
+ * con los diez de automatización. Con el `Record` completo, el que añada un tipo
+ * en `NOTIFICATION_TYPES` se encuentra el error en `tsc`.
+ */
+export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   /* Espera una decisión: se abre con retraso y se queda el doble. */
   INVITATION_RECEIVED: {
     tipo: 'action',
@@ -114,11 +131,118 @@ export const PRESENTACION_POR_TIPO: Record<string, Presentacion> = {
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
   },
+
+  /**
+   * Los diez de automatización.
+   *
+   * **El ámbar y el rayo los llevan los diez**: lo que tienen en común no es
+   * la urgencia, es el origen —nadie los mandó, los disparó una regla—, y eso
+   * es justo lo que hay que reconocer de un vistazo antes de leer el texto. El
+   * estado `warning` de `sileo` es el token `--color-warning` de la casa
+   * (`#fbbf24` en oscuro, `#a16207` en claro), y tiñe insignia, título y botón
+   * de una vez.
+   *
+   * **El título dice «Automatización» en los diez, y es deliberado.** Llegó a
+   * nombrar el hecho —«Vencida», «Movida», «Sin encargado»—, y era repetir en
+   * la etiqueta lo que la frase de debajo ya cuenta con más detalle. La
+   * etiqueta es lo único que se lee con la píldora cerrada: sirve mejor
+   * respondiendo a lo que el texto **no** dice —de dónde viene esto— que
+   * resumiendo lo que sí dice.
+   *
+   * ⚠️ **Aun así siguen siendo diez entradas, porque el ritmo no se comparte.**
+   * Una tarea vencida tiene que quedarse en pantalla; una recién creada es un
+   * dato que pasa. Con una sola entrada para todos, o las diez se quedan diez
+   * segundos o la vencida desaparece antes de leerse.
+   */
+  AUTOMATION_TASK_OVERDUE: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 10000,
+    autopilot: { expand: 600, collapse: 8500 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_DUE_SOON: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 8000,
+    autopilot: { expand: 450, collapse: 6500 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_STALE: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 8000,
+    autopilot: { expand: 450, collapse: 6500 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_UNASSIGNED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 8000,
+    autopilot: { expand: 450, collapse: 6500 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_COMPLETED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 6500,
+    autopilot: { expand: 400, collapse: 5000 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  /* Volver a abrir algo dado por hecho merece mirarse: amarillo, y un poco más
+     de tiempo que los que solo informan. */
+  AUTOMATION_TASK_REOPENED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 7000,
+    autopilot: { expand: 450, collapse: 5500 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_CREATED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 5500,
+    autopilot: { expand: 350, collapse: 4200 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_MOVED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 5500,
+    autopilot: { expand: 350, collapse: 4200 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_ASSIGNEES_CHANGED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 5500,
+    autopilot: { expand: 350, collapse: 4200 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
+  AUTOMATION_TASK_DUE_DATE_CHANGED: {
+    tipo: 'warning',
+    titulo: 'Automatización',
+    duracion: 5500,
+    autopilot: { expand: 350, collapse: 4200 },
+    accion: 'Ver',
+    icono: 'rayo',
+  },
 };
 
 /** La presentación de un aviso de bandeja, con respaldo para lo desconocido. */
 export function presentacionDe(tipo: string): Presentacion {
-  return PRESENTACION_POR_TIPO[tipo] ?? PRESENTACION_POR_DEFECTO;
+  /* El `as` es la frontera: por el flujo en vivo llega texto libre —`CHAT_MESSAGE`
+     viaja por ahí y no es un `NotificationType`—, y el `??` es quien decide. */
+  return PRESENTACION_POR_TIPO[tipo as NotificationType] ?? PRESENTACION_POR_DEFECTO;
 }
 
 /**

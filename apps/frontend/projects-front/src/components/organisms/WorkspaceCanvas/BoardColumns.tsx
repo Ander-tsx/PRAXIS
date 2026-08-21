@@ -189,6 +189,23 @@ export function BoardColumns({
   }, [tasks, openTask]);
 
   /**
+   * ⚠️ **La tarea que se pinta también se refresca con el panel cerrado.**
+   *
+   * `renderedTask` sobrevive al cierre a propósito —es lo que deja terminar la
+   * animación de salida—, pero el efecto de arriba se apaga en cuanto
+   * `openTask` es `null`, así que se quedaba **congelada en el estado que tenía
+   * la tarea antes de editarla**. El panel sigue montado con esos datos viejos,
+   * y de ellos salen los `defaultValue` y `defaultChecked` de su formulario: al
+   * volver a abrirlo, o al remontarlo para otra tarea, los valores que se daban
+   * por buenos eran los de antes del último guardado.
+   */
+  useEffect(() => {
+    if (openTask || !renderedTask) return;
+    const fresh = tasks.find((task) => task.id === renderedTask.id);
+    if (fresh && fresh !== renderedTask) setRenderedTask(fresh);
+  }, [tasks, openTask, renderedTask]);
+
+  /**
    * Columna con el menú abierto. Mientras lo esté, esa columna no se arrastra.
    *
    * Dentro del menú hay un campo de renombrar, y un `pointerdown` que empieza un

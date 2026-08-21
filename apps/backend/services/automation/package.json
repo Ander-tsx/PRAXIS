@@ -8,6 +8,7 @@
     "dev": "nest start --watch",
     "start:prod": "node dist/main",
     "test": "jest --passWithNoTests",
+    "test:int": "jest --passWithNoTests --testRegex '.*\\.integration\\.spec\\.ts$' --testPathIgnorePatterns '/node_modules/'",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -41,6 +42,7 @@
     "moduleFileExtensions": ["js", "json", "ts"],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
+    "testPathIgnorePatterns": ["/node_modules/", "\\.integration\\.spec\\.ts$"],
     "transform": { "^.+\\.(t|j)s$": "ts-jest" },
     "testEnvironment": "node"
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import type { AutomationCatalog, OpcionesDelProyecto } from '@/lib/automation-catalog';
-import { type AutomationExecution, type AutomationRule, Button } from '@praxis/commons';
+import { type AutomationExecutionPage, type AutomationRule, Button } from '@praxis/commons';
 import { AlertTriangle, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { RuleBuilder } from './RuleBuilder';
@@ -18,7 +18,7 @@ export interface ProjectRulesProps {
   projectId: string;
   /** `null` = el servicio no respondió. **No** es lo mismo que «no hay ninguna». */
   rules: AutomationRule[] | null;
-  executions: AutomationExecution[] | null;
+  executions: AutomationExecutionPage | null;
   /** El catálogo del servidor. Sin él no se puede construir ninguna regla. */
   catalog: AutomationCatalog | null;
   /** Columnas, etiquetas y gente del proyecto, para los campos con `source`. */

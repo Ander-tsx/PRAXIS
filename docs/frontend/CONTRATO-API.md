@@ -1496,7 +1496,7 @@ son el catálogo.** El enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK` y
 `SEND_EMAIL` porque vienen del diseño original; el validador de
 `rule-definition.ts` los rechaza con «no soportado en el MVP académico». Quien
 construya contra el contrato debe seguir al validador, no al enum — verificado
-en runtime, `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+en runtime, `e2e/tests/api/17-automatizaciones.spec.ts`.
 
 | Trigger | Config admitida | Condiciones (`field`) | Acción y destinatario |
 |---|---|---|---|
