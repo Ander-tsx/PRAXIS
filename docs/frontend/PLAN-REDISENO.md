@@ -9,12 +9,12 @@
 
 | | |
 |---|---|
-| **Etapa actual** | R1–R6 cerradas. **R9 en cola**; R7 bloqueada y R8 es futuro |
-| **Última tarea terminada** | R5 — cierre. El plan queda hecho salvo R7 (bloqueada) y R8 (futuro) |
-| **Siguiente** | **R9** — que el análisis no se le escape nada. Encargada el 2026-08-19 y escrita con el diseño hecho. R7 sigue esperando presupuesto en la clave de Gemini |
-| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → R5 ✅ → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
+| **Etapa actual** | R1–R6 y **R9 cerradas**; R7 bloqueada y R8 es futuro |
+| **Última tarea terminada** | R9.4, y la corrección de lectura de R9.3/R9.4 (`155bdda`) |
+| **Siguiente** | **Nada de este plan.** Lo que sigue es [ENCARGO-ENTERPRISE.md](ENCARGO-ENTERPRISE.md), en `feature/enterprise`. R7 sigue esperando presupuesto en la clave de Gemini y R8 a que exista un proyecto grande de verdad |
+| **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → R5 ✅ → R9 ✅ → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
-| **Actualizado** | 2026-08-19 |
+| **Actualizado** | 2026-08-21 |
 
 Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[!]` bloqueado o
 descartado (con motivo escrito al lado)
@@ -54,6 +54,10 @@ descartado (con motivo escrito al lado)
 | 2026-08-19 | R4.8 | — | **Cerrada sin código.** Ni R4.2 ni R4.4 piden tablas: la primera agrupa peticiones que ya existían, la segunda agrega donde están los datos |
 | 2026-08-19 | R5.2 – R5.3 | `1c3feae`, `b927585` | Ocho zonas y ocho servicios en verde, `next build` de las ocho. Y la suite terminada por primera vez: 190 pasan, 5 caían por una línea de la fixture desfasada desde `dc06673` |
 | 2026-08-19 | R5.1 | `04a54b8`…`535fe29` | Documentación: ESTADO-ACTUAL §44, CONTRATO-API (filtros y cartera), PENDIENTES-BACKEND §21 (slugs reservados) y CLAUDE.md (puerto 4107 y las tres trampas) |
+| 2026-08-19 | R9.1 | `461ddd1` | **Retrabajo, rotación y volatilidad**, sin capturar nada nuevo. `report_dynamics` y cuatro métricas más en el constructor |
+| 2026-08-19 | R9.2 | `b35661d` | **Dónde espera el trabajo.** `report_column_time`, con `terminadas` y `enCurso` como dos mitades que no se suman. Cerrada **sin tabla nueva**: los eventos están en tasks-service y la caché de Redis basta |
+| 2026-08-19 | R9.3 + R9.4 | `963f1d8` | Histograma, apiladas, divergentes y mapa de calor, y el cruce de dos dimensiones. Funcionando, con cuatro fallos de lectura que no dan error |
+| 2026-08-21 | R9 (corrección) | `155bdda` | **Los cuatro fallos de `963f1d8`.** La distribución como barras no salía, el histograma hacía un tramo por día, el cruce pintaba UUIDs y las apiladas repetían tono. Más la escala del mapa de calor, la prosa en español y el formato |
 
 ---
 
@@ -774,10 +778,60 @@ modelo de negocio, es **cobrar como dos** el mensaje que lleva adjuntos.
 
 ---
 
-## R9 — Que el análisis no se le escape nada (en cola, 2026-08-19)
+## R9 — Que el análisis no se le escape nada (cerrada, 2026-08-21)
 
-> **Encargado y sin empezar.** Se escribe con el diseño hecho para que se pueda
-> retomar sin volver a pensarlo, no como recordatorio.
+> **Escrita el 2026-08-19 con el diseño hecho, ejecutada entre el 19 y el 21.**
+> Lo de abajo se conserva tal cual —es el diseño, y sigue siendo la explicación
+> de por qué cada métrica existe—; el estado va en la tabla siguiente.
+
+### Estado
+
+- [x] **R9.1 — Los eventos que ya estaban guardados.** Retrabajo (`REOPENED`),
+      rotación de responsable (`ASSIGNED`/`UNASSIGNED`) y volatilidad de
+      prioridad (`PRIORITY_CHANGED`), sin capturar ni un evento nuevo.
+      `report_dynamics` en reports-service, cuatro métricas en el constructor y
+      el widget `dinamica` en el catálogo (`461ddd1`).
+- [x] **R9.2 — Tiempo por columna.** `report_column_time`, con las dos mitades
+      que hay que leer juntas y **no se pueden sumar**: `terminadas` en
+      percentiles —cuánto suele costar pasar por esa columna— y `enCurso` —lo
+      que llevan **ahora** las abiertas donde están—. La segunda es
+      estrictamente mejor que `blocked` para la misma pregunta: aquel usa un
+      umbral fijo de días igual para todas, y una columna de paso donde lo
+      normal son dos horas no se juzga con la vara de una revisión donde lo
+      normal es una semana (`b35661d`).
+      ⚠️ **Se cerró sin tabla nueva en reports-service**, y la trampa 2 de
+      abajo decía que probablemente la pediría. No hizo falta: la reconstrucción
+      del historial la hace `tasks-service`, que es quien tiene los eventos, y
+      el resultado entra en la caché de Redis con los filtros en la clave como
+      los otros siete. Materializar sigue siendo la salida si algún día un
+      proyecto grande la pide — pero no se paga por adelantado.
+- [x] **R9.3 — Las formas que faltaban.** Histograma, barras apiladas, barras
+      divergentes y mapa de calor, más las tres métricas que las estrenan
+      (`distribucion_de_entrega`, `entradas_contra_cierres`, `cruce`)
+      (`963f1d8`, corregida en `155bdda`).
+- [x] **R9.4 — Las dos dimensiones en el constructor.** `report_matrix` con
+      `agruparPor` × `partirPor` sobre las cuatro dimensiones —columna,
+      prioridad, etiqueta, persona—, y los dos desplegables en el constructor
+      (`963f1d8`, corregida en `155bdda`).
+- [!] **Lo que R9 dejó fuera, a propósito.** De la tabla 9.1 quedan sin medir
+      los checklists como indicador adelantado, los comentarios como señal de
+      fricción y `parentTaskId` como profundidad de descomposición; de 9.2, WIP
+      contra throughput en la misma serie y la mezcla de trabajo semana a
+      semana; de 9.4, la comparación con el periodo anterior, la línea de
+      objetivo y el acumulado contra por periodo. Ninguna está empezada y
+      ninguna bloquea nada: son catálogo, no cimientos.
+- [!] **La trampa 1 sigue abierta y hay que decirlo.** Todo se cuenta en **días
+      de calendario**, así que una tarea abierta un viernes por la tarde
+      arrastra el fin de semana entero. Con percentiles y distribuciones eso ya
+      no es ruido: mueve la mediana. La pantalla **todavía no lo dice**, y esa
+      es la parte que incumple la regla del recorte mudo.
+
+⚠️ **`155bdda` no es pulido: son cuatro fallos de lectura.** R9.3 y R9.4 se
+commitearon funcionando y con cuatro cosas que se dibujaban bien y no se podían
+leer —la distribución pedida como barras no salía, el histograma hacía un tramo
+por día (doscientas barras con una tarea lenta), el cruce pintaba UUIDs en tres
+de sus cuatro dimensiones y las apiladas repetían tono a partir del séptimo
+valor—. Ninguna daba un error. Está entero en el mensaje de ese commit.
 
 ### El hueco, dicho en una línea
 
@@ -933,13 +987,16 @@ nada. Y no dar por perdido lo que no esté en `git log`.
 | **R6** PRAX sin proyecto + adjuntos con memoria | Cerrada |
 | **R4** Análisis | Cerrada entera (R4.1 – R4.8) |
 | R5 Cierre | Cerrada |
+| **R9** Que el análisis no se le escape nada | Cerrada (R9.1 – R9.4), con dos cosas dichas y sin hacer: el catálogo que quedó fuera y el día natural |
 | R7 Caché de contexto | **Bloqueada**: la clave de Gemini está sin presupuesto |
 | R8 Que el contexto deje de ser «todo» | Futuro, cuando exista un proyecto grande de verdad |
 
-**Por dónde seguir:** nada de este plan. R7 espera a que la clave de Gemini
-tenga presupuesto y R8 a que exista un proyecto grande de verdad. Lo que sí queda
-suelto y no es de aquí: PENDIENTES-BACKEND §21 —los slugs reservados— que afecta
-a `projects-front` y a `reports-front`.
+**Por dónde seguir:** nada de este plan. Lo siguiente es
+[ENCARGO-ENTERPRISE.md](ENCARGO-ENTERPRISE.md) —planes, cuotas y Enterprise— en
+`feature/enterprise`. R7 espera a que la clave de Gemini tenga presupuesto y R8 a
+que exista un proyecto grande de verdad. Lo que sí queda suelto y no es de aquí:
+PENDIENTES-BACKEND §21 —los slugs reservados— que afecta a `projects-front` y a
+`reports-front`.
 
 ### Cinco cosas que costaron encontrarse
 
