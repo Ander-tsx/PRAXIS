@@ -23,7 +23,6 @@
 - [PRAXIS](#praxis)
 - [ Tabla de contenido](#-tabla-de-contenido)
 - [ Sobre el proyecto](#-sobre-el-proyecto)
-- [ Estado del proyecto](#-estado-del-proyecto)
 - [ Arquitectura](#-arquitectura)
   - [Visión general](#visión-general)
   - [Infraestructura en producción](#infraestructura-en-producción)
@@ -56,29 +55,6 @@ Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho 
 
 ![Demo del producto](docs/assets/product-demo.gif)
 <!-- docs/assets/product-demo.gif | Recorrido corto: login → dashboard con métricas → abrir proyecto → tablero Kanban con drag-and-drop → vista de reportes | 1280×720, horizontal | GIF animado (~15 s) -->
-
----
-
-# <img src="https://api.iconify.design/lucide/activity.svg?color=%233b82f6" width="24" height="24" alt="Estado"> Estado del proyecto
-
-| Área | Estado | Qué hay |
-| :--- | :--- | :--- |
-| Identidad y sesión | ✅ | Registro con confirmación por correo, login, Google OAuth, refresh, sesiones en Redis |
-| Proyectos y tableros | ✅ | Espacios, tableros, columnas, tareas con checklists, etiquetas, adjuntos y comentarios |
-| Permisos | ✅ | Dos capas: rol global de plataforma y rol por proyecto, con `permissions/me` como fuente |
-| Chat | ✅ | Mensajes en vivo por SSE, hilos, adjuntos, presencia y silenciado |
-| Análisis | ✅ | Siete agregados con filtros, pronóstico Monte Carlo, informes en caché |
-| Asistente | ✅ | PRAX sobre Gemini, con y sin proyecto en foco. **Propone; nunca ejecuta** |
-| Administración | ✅ | Cuentas, suspensión de proyectos, auditoría y borrado real |
-| Automatizaciones | 🟢 en curso | Motor reactivo funcionando: 10 disparadores, 7 acciones, 8 operadores. Falta paginar el histórico de ejecuciones y que PRAX sepa proponer reglas |
-| Facturación | 🟡 | Stripe integrado en el gateway; la pantalla de planes no está construida |
-
-**Lo que sabemos que falta**, con severidad y reproducción, está escrito y no
-escondido:
-
-- [`docs/frontend/ESTADO-ACTUAL.md`](docs/frontend/ESTADO-ACTUAL.md) — arquitectura viva y deuda técnica priorizada.
-- [`docs/frontend/PENDIENTES-BACKEND.md`](docs/frontend/PENDIENTES-BACKEND.md) — lo que el frontend necesita del backend y no puede resolver.
-- [`docs/frontend/PLAN-AUTOMATIZACION.md`](docs/frontend/PLAN-AUTOMATIZACION.md) — la etapa en curso, con sus decisiones cerradas y sus invariantes.
 
 ---
 
