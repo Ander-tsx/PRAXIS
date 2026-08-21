@@ -592,9 +592,10 @@ acota, la pantalla lo dice.
 constructor y la tarjeta viven en la misma lista, así que paginar obliga a
 decidir qué pasa al editar la última de una página.
 
-### S7.3 — Las ejecuciones no tienen paginador
+### S7.3 — Las ejecuciones no tienen paginador 🟡
 
-- [ ] Paginar, o al menos decir que se está viendo un recorte.
+- [x] Decir que se está viendo un recorte, y traer el total.
+- [ ] Paginar de verdad, y filtrar por regla y por estado.
 
 **Respuesta: no.** `AutomationEngineService.recent()` acepta `limit` con tope de
 50, pero **el gateway lo fija en 20** y no expone el parámetro. No hay `page`, no
@@ -613,6 +614,15 @@ es la consulta que de verdad se hace.
 
 **Coste: medio.** Toca `recent()`, el gateway, el tipo del cliente y la pantalla.
 Sin migración.
+
+**Hecho lo mínimo** (`recent()` devuelve `{ items, total, limit }`, y la pantalla
+dice «Se ven las últimas 20 de N» **solo cuando falta algo**). Queda lo bueno:
+paginar y filtrar por regla y por estado — «enséñame los fallos» es la consulta
+que de verdad se hace.
+
+⚠️ **El límite sigue fijado en 20 por el gateway y no se expone.** Se decidió no
+añadir el parámetro todavía: sin una pantalla que lo use sería una entrada de
+API sin dueño, y la que la usará —el paginador— aún no está escrita.
 
 ### S7.4 — Que PRAX ayude a escribir automatizaciones
 

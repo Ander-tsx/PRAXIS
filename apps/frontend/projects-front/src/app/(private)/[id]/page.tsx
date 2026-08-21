@@ -10,7 +10,7 @@ import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectN
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
 import {
   AppHeader,
-  type AutomationExecution,
+  type AutomationExecutionPage,
   type AutomationRule,
   type ChatMessagePage,
   type EffectivePermissions,
@@ -83,7 +83,10 @@ const TABS = [
   { id: 'espacios', label: 'Espacios', icon: 'workspaces' },
   { id: 'equipo', label: 'Equipo', icon: 'team' },
   { id: 'roles', label: 'Roles', icon: 'roles' },
-  { id: 'automation', label: 'Automatización', icon: 'automation' },
+  /* En plural: la pestaña no es una capacidad abstracta, es la lista de las
+     automatizaciones que tiene el proyecto — igual que Espacios y Roles. El
+     `id` no se toca: viaja en la URL y hay enlaces compartidos con él. */
+  { id: 'automation', label: 'Automatizaciones', icon: 'automation' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -233,7 +236,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
     activeTab === 'automation' && can.canManageAutomations
       ? await Promise.all([
           api
-            .get<AutomationExecution[]>(`/projects/${project.id}/automations/executions`)
+            .get<AutomationExecutionPage>(`/projects/${project.id}/automations/executions`)
             .catch(() => null),
           /* El catálogo manda: qué disparadores, condiciones y acciones se
              pueden elegir sale del servidor, no de una copia en el cliente. */
@@ -241,7 +244,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             .get<AutomationCatalog>(`/projects/${project.id}/automations/catalog`)
             .catch(() => null),
         ])
-      : [[] as AutomationExecution[], null];
+      : [{ items: [], total: 0, limit: 0 } as AutomationExecutionPage, null];
 
   /**
    * ¿Está suspendido?

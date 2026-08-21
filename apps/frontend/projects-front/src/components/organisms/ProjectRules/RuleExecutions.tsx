@@ -6,6 +6,7 @@ import type { AutomationCatalog, OpcionesDelProyecto } from '@/lib/automation-ca
 import { describeExecutionContext, describeReviewSummary } from '@/lib/automation-draft';
 import {
   type AutomationExecution,
+  type AutomationExecutionPage,
   type AutomationExecutionStatus,
   Badge,
   type BadgeVariant,
@@ -20,7 +21,7 @@ import { useState } from 'react';
 export interface RuleExecutionsProps {
   projectId: string;
   /** `null` = el servicio no respondió. No es lo mismo que «no hay ninguna». */
-  executions: AutomationExecution[] | null;
+  executions: AutomationExecutionPage | null;
   catalog: AutomationCatalog | null;
   proyecto: OpcionesDelProyecto;
 }
@@ -132,7 +133,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
         <p className="rounded-xl border border-warning bg-warning-muted px-5 py-4 font-sans text-sm text-text-primary">
           No se ha podido consultar el historial de ejecuciones. Vuelve a cargar en un momento.
         </p>
-      ) : executions.length === 0 ? (
+      ) : executions.items.length === 0 ? (
         <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
           Aún no se ha revisado nada. «Revisar ahora» evalúa las reglas activas contra las tareas
           del proyecto y deja aquí una fila por cada candidata que encontró.
@@ -141,7 +142,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
         /* Una caja para todas, separadas por una línea — igual que la lista
            de reglas. */
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-          {executions.map((execution) => {
+          {executions.items.map((execution) => {
             const failure = execution.status === 'FAILED' ? failureMessage(execution) : null;
             const desplegada = abierta === execution.id;
             return (
@@ -219,6 +220,25 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
             );
           })}
         </ul>
+      )}
+
+      {/**
+       * 🔴 **Decir que esto es una ventana, no el histórico.**
+       *
+       * El listado trae las últimas veinte y no había forma de saberlo. Quien
+       * abre las ejecuciones lo hace para averiguar por qué una regla no actuó,
+       * y una ventana que no llega hasta el caso que busca —sin decirlo— le
+       * hace concluir que la regla no se evaluó nunca. Es el recorte mudo que
+       * este repositorio prohíbe en cualquier otro sitio.
+       *
+       * Solo aparece cuando de verdad falta algo: con menos ejecuciones que el
+       * tope, la lista **es** el histórico y anunciarlo sería ruido.
+       */}
+      {executions !== null && executions.total > executions.items.length && (
+        <p className="font-sans text-xs text-text-secondary">
+          Se ven las últimas {executions.items.length} de {executions.total}. El histórico
+          completo todavía no se puede recorrer desde aquí.
+        </p>
       )}
     </section>
   );

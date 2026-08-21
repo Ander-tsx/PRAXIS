@@ -120,7 +120,16 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
   }
 
   return (
+    /**
+     * ⚠️ **El `aria-label` no es decorativo: es lo que convierte esto en una
+     * región.** Un `<form>` sin nombre accesible no expone rol de formulario,
+     * así que este panel —que dejó de ser un modal en S3 y pasó a desplegarse
+     * dentro de la pestaña— no se podía anunciar ni localizar como una unidad:
+     * quien navega con lector de pantalla se encontraba los campos sueltos
+     * detrás de la lista de reglas, sin nada que dijera dónde empiezan.
+     */
     <form
+      aria-label={rule ? `Editar «${rule.name}»` : 'Nueva regla'}
       action={formAction}
       noValidate
       onSubmit={(event) => {
