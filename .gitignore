@@ -105,6 +105,13 @@ infra/terraform/.terraform/
 crash.log
 crash.*.log
 
+# El plan de la entrega de PRAX + Stripe.
+#
+# Lleva la guía de configuración de una cuenta de Stripe real —qué claves se
+# copian de dónde— y el calendario de una presentación. Ni lo uno ni lo otro
+# tiene por qué estar publicado en el repositorio.
+docs/frontend/PLAN-PRAX-AUTOMATIZA.md
+
 # Configuración local de agentes de código.
 #
 # No es deuda ni un descuido: son ajustes de la máquina de cada quien —claves de
