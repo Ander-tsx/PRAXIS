@@ -310,9 +310,18 @@ Swagger: `http://localhost:3000/api/docs` — **solo fuera de producción**.
 ## Pruebas end-to-end
 
 ```bash
+pnpm test                 # unitarias. En seco: no necesitan nada levantado
+pnpm test:int             # las de integración. Exigen Postgres y Redis vivos
 pnpm e2e:regresion        # antes y después de tocar código. Verde siempre.
 pnpm e2e:seguridad        # el marcador del endurecimiento
 ```
+
+⚠️ **`pnpm test` no incluye las de integración, y es a propósito.** Los ficheros
+`*.integration.spec.ts` de `tasks` y `automation` hablan con Postgres y con
+Redis de verdad. Estaban en la misma tanda que las unitarias, así que `pnpm
+test` dejó de poder correrse sin el stack levantado —y en `main` no había
+ninguna, así que el cambio pasó desapercibido—. Ahora `test` las ignora por
+`testPathIgnorePatterns` y `test:int` corre solo esas.
 
 Con el stack levantado y los seeds puestos. Playwright, en `e2e/`. Las
 etiquetadas `@security` describen lo que queremos, no lo que hay: viven aparte
