@@ -13,7 +13,7 @@
 | S2 | Motor de automatización | ✅ **hecho** (2026-08-20) |
 | S3 | Interfaz de Automatización | ✅ **hecho** (2026-08-20) |
 | S4 | Tablero — el slideout tras crear | ✅ **hecho** (2026-08-20) |
-| S5 | Administración con más poder | ⬜ pendiente |
+| S5 | Administración con más poder | ✅ **hecho** (2026-08-20) |
 | S6 | Cierre — documentación, e2e, regresión | ⬜ pendiente |
 
 **Cada stack termina con un aviso a quien encarga esto y una prueba manual desde
@@ -470,19 +470,39 @@ una tecla más por tarea. A cambio, ninguna tarea se queda con solo el título.
 
 ## S5 — Administración con más poder
 
-- [ ] **S5.1** Borrado real de un usuario, conservando su trabajo como «Usuario
-      eliminado». D6. Hoy solo existe `PATCH /admin/users/:id/status`.
-- [ ] **S5.2** Borrado real de un proyecto desde administración, distinto del
-      `DELETE /projects/:id` del dueño, y con purga orquestada reusando el
-      patrón de `task-purge` / `automation-purge` que ya existe en el gateway.
-- [ ] **S5.3** Confirmación **escribiendo el nombre**, no un «¿seguro?». Lo que
-      se lleva por delante, listado antes de pulsar.
-- [ ] **S5.4** El icono de acciones deja de ser tres puntos y pasa a algo que se
-      entienda sin abrirlo.
+- [x] **S5.1** `DELETE /admin/users/:id`, conservando su trabajo.
+- [x] **S5.2** `DELETE /admin/projects/:id`, con la purga de los otros servicios.
+- [x] **S5.3** Confirmación escribiendo el nombre, con el inventario delante.
+- [x] **S5.4** El icono de acciones pasa de tres puntos a un engranaje.
 
 ### Apuntes
 
-_(se rellena conforme se trabaja)_
+**Borrar una cuenta se niega si todavía es dueña de algún proyecto, y dice
+cuáles.** Un proyecto sin dueño **sí** rompe cosas: `ownerId` es lo que resuelve
+los permisos, lo que decide a quién avisan las automatizaciones y lo que la
+pantalla de administración enseña en su columna. Un id que no existe deja ese
+proyecto sin nadie que pueda administrarlo y sin forma de arreglarlo desde la
+interfaz. Hizo falta un `project_find_owned` para poder comprobarlo — y devuelve
+el nombre, porque el mensaje tiene que decir cuáles.
+
+**Su trabajo se queda, y la interfaz tenía que saber leerlo.** Varios sitios
+caían al UUID cuando el perfil no resolvía, y en pantalla eso es «3f2a…-9c11
+salió del proyecto». Ahora hay `PERSONA_ELIMINADA` en commons y esos tres sitios
+la usan. `TaskCard` y los informes ya lo hacían bien por su cuenta.
+
+**El diálogo enumera lo que se lleva y lo que se queda.** «Esta acción no se
+puede deshacer» no dice nada útil: quien administra ya sabe que un borrado no se
+deshace; lo que no sabe es hasta dónde llega. Y lo que se **conserva** es la
+mitad del mensaje — sin ella, quien administra cree que borrar una cuenta vacía
+los tableros donde esa persona trabajó, y no borra nunca.
+
+**El borrado de proyecto reutiliza `TaskPurgeService` y `AutomationPurgeService`**,
+los mismos que usa el `DELETE` del dueño. Repetir las llamadas habría dejado dos
+sitios que olvidar cuando aparezca un tercer servicio con datos de proyecto.
+
+**Dos verbos nuevos en el registro de administración** (`USER_DELETED`,
+`PROJECT_DELETED`) con su migración: sin ellos, el borrado más grave que existe
+no dejaría rastro o se confundiría con archivar.
 
 ---
 
