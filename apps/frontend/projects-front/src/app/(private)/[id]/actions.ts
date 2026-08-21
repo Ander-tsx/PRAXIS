@@ -1125,8 +1125,9 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
 
+  let creada: Task;
   try {
-    const created = await api.post<Task>(`/boards/${boardId}/tasks`, {
+    creada = await api.post<Task>(`/boards/${boardId}/tasks`, {
       columnId,
       title,
       status,
@@ -1137,7 +1138,7 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
       ...(labelIds.length > 0 && { labelIds }),
     });
 
-    if (!created?.id || created.title !== title) {
+    if (!creada?.id || creada.title !== title) {
       return { error: 'El servidor no guardó la tarea.', done: null };
     }
   } catch (error) {
@@ -1145,7 +1146,15 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   }
 
   revalidateProject(projectId);
-  return { error: null, done: 'created' };
+  /**
+   * ⚠️ **Devuelve el id, no la cadena `'created'`.**
+   *
+   * El alta rápida solo pide el título, así que lo siguiente que quiere hacer
+   * quien la usa es rellenar el resto — y para abrir el panel de la tarea hace
+   * falta su id. Confirmar con una cadena fija obligaba a buscarla después por
+   * el título, que ni siquiera es único.
+   */
+  return { error: null, done: creada.id };
 }
 
 export async function updateTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {

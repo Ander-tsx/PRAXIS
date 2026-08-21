@@ -12,7 +12,7 @@
 | S1 | PRAX responde siempre | ✅ **hecho** (2026-08-20) |
 | S2 | Motor de automatización | ✅ **hecho** (2026-08-20) |
 | S3 | Interfaz de Automatización | ✅ **hecho** (2026-08-20) |
-| S4 | Tablero — el slideout tras crear | ⬜ pendiente |
+| S4 | Tablero — el slideout tras crear | ✅ **hecho** (2026-08-20) |
 | S5 | Administración con más poder | ⬜ pendiente |
 | S6 | Cierre — documentación, e2e, regresión | ⬜ pendiente |
 
@@ -439,15 +439,32 @@ volvería a activar para volver a pausarse en la siguiente ejecución.
 
 ## S4 — Tablero: el slideout tras crear
 
-- [ ] **S4.1** Al crear una tarea —que solo pide nombre—, abrir su panel de
-      detalle con la tarea ya seleccionada. La página ya sabe abrir por
-      `?task=<id>`; falta que la creación navegue ahí con el id que devuelve la
-      respuesta.
-- [ ] **S4.2** Lo mismo en móvil, con su variante.
+- [x] **S4.1** Al crear una tarea —que solo pide nombre—, abrir su panel de
+      detalle con la tarea ya seleccionada.
+- [x] **S4.2** Lo mismo en móvil.
 
 ### Apuntes
 
-_(se rellena conforme se trabaja)_
+**No hizo falta navegar a `?task=`.** El panel no se abre por la URL: `?task=`
+solo **siembra** el estado inicial de `BoardColumns`, y a partir de ahí abrir y
+cerrar es estado local. Meter una navegación por medio habría metido un render
+del App Router —y su cola, la del girador eterno— en un gesto que no lo
+necesita.
+
+**El id no basta para abrir el panel.** La acción confirma con el id, pero el
+panel pinta la columna, las etiquetas y los encargados: necesita la tarea
+entera, que llega con el siguiente render del Server Component. Se apunta el id
+y se abre en cuanto aparece en `tasks`; si no llegara nunca, se queda a `null` y
+no hay panel a medio abrir esperando datos que no vienen.
+
+**Móvil y escritorio salen del mismo cambio.** Los dos diseños montan
+`ColumnTasks` y los dos abren con `setOpenTask`, así que el aviso de creación se
+enchufa una vez por diseño y el panel es el mismo componente.
+
+⚠️ **Esto cambia un gesto deliberado.** El alta rápida vaciaba el campo y
+devolvía el foco para escribir varias seguidas sin tocar el ratón. Seguía
+funcionando —cerrar el panel deja el formulario abierto y con el foco— pero es
+una tecla más por tarea. A cambio, ninguna tarea se queda con solo el título.
 
 ---
 

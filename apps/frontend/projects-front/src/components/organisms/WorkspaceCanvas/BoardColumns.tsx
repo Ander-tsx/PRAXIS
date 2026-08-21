@@ -155,6 +155,28 @@ export function BoardColumns({
     setOpenTask(null);
   }, []);
 
+  /**
+   * La tarea que se acaba de crear y todavía no ha llegado en `tasks`.
+   *
+   * ⚠️ **No se puede abrir en el mismo gesto.** La acción confirma con el id,
+   * pero la tarea entera llega con el siguiente render del Server Component
+   * —`revalidatePath` va por la cola del App Router— y el panel necesita el
+   * objeto, no el id: pinta su columna, sus etiquetas y sus encargados.
+   *
+   * Así que se apunta el id y se abre en cuanto aparece. Si no llegara nunca
+   * —la revalidación falló, alguien la borró en medio— esto se queda a `null` y
+   * no pasa nada más: no hay panel a medio abrir esperando datos que no vienen.
+   */
+  const [recienCreada, setRecienCreada] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!recienCreada) return;
+    const nueva = tasks.find((task) => task.id === recienCreada);
+    if (!nueva) return;
+    setOpenTask(nueva);
+    setRecienCreada(null);
+  }, [tasks, recienCreada]);
+
   useEffect(() => {
     if (openTask) setRenderedTask(openTask);
   }, [openTask]);
@@ -513,6 +535,7 @@ export function BoardColumns({
             canEdit={canEditTask}
             canDelete={canDeleteTask}
             onOpenTask={setOpenTask}
+            onTaskCreated={setRecienCreada}
             arrastre={arrastre}
             destino={destinoTarea}
             alEmpezarArrastre={empezarArrastreDeTarea}
@@ -734,6 +757,7 @@ export function BoardColumns({
               canEdit={canEditTask}
               canDelete={canDeleteTask}
               onOpenTask={setOpenTask}
+              onTaskCreated={setRecienCreada}
               arrastre={null}
               destino={null}
               alEmpezarArrastre={() => undefined}
