@@ -122,10 +122,29 @@ export async function saveAutomationRuleAction(
    * formulario. Pedirlo aquí cuesta una llamada por guardado y el gateway ya
    * lo cachea; el servicio lo devuelve de memoria.
    */
-  const catalog = await api
-    .get<AutomationCatalog>(`/projects/${projectId}/automations/catalog`)
-    .catch(() => null);
-  if (!catalog) {
+  let catalog: AutomationCatalog;
+  try {
+    catalog = await api.get<AutomationCatalog>(`/projects/${projectId}/automations/catalog`);
+  } catch (error) {
+    /**
+     * 🔴 **Un proyecto suspendido moría aquí con el mensaje equivocado.**
+     *
+     * Esto era un `.catch(() => null)` y un texto genérico. Pero
+     * `permissions/me` llega recortado cuando el proyecto está suspendido, así
+     * que esta llamada —que exige `canManageAutomations`— responde 403 antes de
+     * que se intente guardar nada: el mensaje bueno, el que está más abajo, ya
+     * no se alcanzaba nunca.
+     *
+     * La diferencia no es de matiz. «Inténtalo otra vez» invita a reintentar
+     * algo que no va a funcionar por mucho que se repita; la suspensión la
+     * levanta quien administra la plataforma (CLAUDE.md, trampa 11).
+     */
+    if (error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE) {
+      return {
+        error: 'El proyecto está suspendido: no se pueden crear ni editar reglas mientras tanto.',
+        done: null,
+      };
+    }
     return { error: 'No se ha podido comprobar la regla. Inténtalo otra vez.', done: null };
   }
 

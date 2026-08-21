@@ -95,7 +95,13 @@ export function ConditionsSection({
                 <input type="hidden" name="conditionOperator" value={fila.operator} />
                 <input type="hidden" name="conditionValue" value={fila.value} />
 
-                <div className="min-w-[9rem] flex-1">
+                {/* ⚠️ **14rem, y sale de medir la etiqueta más larga.** Con
+                    `9rem` el `Select` truncaba «Número de encargados» a
+                    «Número de enc…» en cuanto la ventana bajaba de 1000 px, y
+                    una condición que no se puede leer no se puede comprobar.
+                    La fila es `flex-wrap`: si no caben los tres campos, baja a
+                    la línea siguiente en vez de estrecharse. */}
+                <div className="min-w-[14rem] flex-1">
                   <Select
                     label="Campo"
                     fullWidth
