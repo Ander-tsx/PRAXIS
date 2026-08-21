@@ -90,6 +90,16 @@ export class SetProjectStatusDto {
   @IsOptional()
   @IsUUID()
   actorId?: string;
+
+  /** Contexto interno confiable; gateway HTTP nunca lo toma del cliente. */
+  @IsOptional()
+  @IsUUID('4')
+  correlationId?: string;
+
+  /** Id del evento que causó esta operación, solo para productores internos. */
+  @IsOptional()
+  @IsUUID('4')
+  causationId?: string;
 }
 
 /**

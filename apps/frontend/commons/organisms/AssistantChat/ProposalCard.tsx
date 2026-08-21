@@ -1712,22 +1712,11 @@ export function TemplateProposalCard({
   proposalId,
   estadoGuardado,
   propuesta,
-  onAbrir,
 }: {
   projectId: string | null;
   proposalId?: string;
   estadoGuardado?: EstadoPropuesta;
   propuesta: TemplateProposal;
-  /**
-   * Adoptar el proyecto recién creado, sin perder el hilo.
-   *
-   * ⚠️ **Se entrega también el `slug`, y sin él esto no funcionaba.** La
-   * pantalla resuelve el destino buscando el proyecto en la lista que le sirvió
-   * el servidor, y un proyecto que se acaba de crear **no está en ella**: se
-   * renderizó antes de que existiera. El resultado era un botón que no hacía
-   * absolutamente nada.
-   */
-  onAbrir?: (projectId: string, slug?: string) => void;
 }) {
   const [estado, setEstado] = useState<Estado>('pendiente');
   const [error, setError] = useState<string | null>(null);
@@ -1778,17 +1767,20 @@ export function TemplateProposalCard({
       estadoGuardado={estadoGuardado}
     >
       {resultado ? (
-        <div className="flex flex-col gap-3">
-          <TemplateResultSummary resultado={resultado} />
-          {onAbrir && resultado.proyecto && (
-            <Button
-              type="button"
-              onClick={() => onAbrir(resultado.proyecto!.id, resultado.proyecto!.slug)}
-            >
-              Seguir aquí con {resultado.proyecto.name}
-            </Button>
-          )}
-        </div>
+        /**
+         * ⚠️ **Aquí había un botón «Seguir aquí con X», y se retiró.**
+         *
+         * Adoptaba el proyecto recién creado como foco de la conversación. La
+         * idea era razonable y el resultado no: un proyecto que acaba de nacer
+         * **no tiene de qué hablar** —ni tareas, ni movimiento, ni informe— así
+         * que el briefing que llegaba estaba vacío y PRAX pasaba de proponer un
+         * plan entero a no tener nada que decir sobre él. Un botón que empeora
+         * la conversación no es un atajo, es una trampa.
+         *
+         * Quien quiera trabajar el proyecto lo abre; quien quiera seguir
+         * hablando, sigue escribiendo.
+         */
+        <TemplateResultSummary resultado={resultado} />
       ) : (
         <div className="flex flex-col gap-4">
           <TemplatePlanReview

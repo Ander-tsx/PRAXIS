@@ -14,6 +14,8 @@
  * que los consume: `commons/organisms/CreateProjectDialog/project-form.ts`.
  * Se reexportan para no tocar los imports existentes.
  */
+import type { AutomationReviewSummary } from '@praxis/commons';
+
 export { CREATE_PROJECT_INITIAL_STATE, type CreateProjectState } from '@praxis/commons';
 
 export interface RoleState {
@@ -66,6 +68,22 @@ export interface TaskState {
 }
 
 export const TASK_INITIAL_STATE: TaskState = { error: null, done: null };
+
+export interface AutomationRuleState {
+  error: string | null;
+  /** Se rellena cuando el servidor confirma: el estado nuevo o 'eliminada'. */
+  done: string | null;
+}
+
+export const AUTOMATION_RULE_INITIAL_STATE: AutomationRuleState = { error: null, done: null };
+
+export interface ReviewState {
+  error: string | null;
+  /** Lo que confirmó el servidor de la última revisión — se pierde al recargar, no se persiste. */
+  summary: AutomationReviewSummary | null;
+}
+
+export const REVIEW_INITIAL_STATE: ReviewState = { error: null, summary: null };
 
 /**
  * Estado del borrado de un proyecto.

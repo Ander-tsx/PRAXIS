@@ -28,6 +28,15 @@ export interface ColumnTasksProps {
   canEdit: boolean;
   canDelete: boolean;
   onOpenTask: (task: Task) => void;
+  /**
+   * Acaba de crearse una tarea en esta columna.
+   *
+   * El alta rápida solo pide el título, así que quien la usa casi siempre
+   * quiere seguir rellenando el resto. Quien decide qué hacer con eso es el
+   * tablero —es quien tiene el panel de detalle y la lista fresca de tareas—,
+   * no esta columna.
+   */
+  onTaskCreated?: (taskId: string) => void;
   /** Lo que viaja ahora mismo por el tablero, si es que viaja algo. */
   arrastre: ArrastreEnCurso | null;
   /** El hueco donde caería. Solo se pinta si es de esta columna. */
@@ -79,6 +88,7 @@ export function ColumnTasks({
   canEdit,
   canDelete,
   onOpenTask,
+  onTaskCreated,
   arrastre,
   destino,
   alEmpezarArrastre,
@@ -229,6 +239,7 @@ export function ColumnTasks({
             boardId={boardId}
             columnId={column.id}
             columnName={column.name}
+            onCreated={onTaskCreated}
           />
         )}
       </div>
@@ -259,12 +270,14 @@ function NewTaskInline({
   boardId,
   columnId,
   columnName,
+  onCreated,
 }: {
   projectId: string;
   boardId: string;
   columnId: string;
   /** `status` tiene que igualar el nombre de la columna, no su id. */
   columnName: string;
+  onCreated?: (taskId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -276,11 +289,24 @@ function NewTaskInline({
   }, [open]);
 
   useEffect(() => {
-    if (state.done) {
-      setTitle('');
-      inputRef.current?.focus();
-    }
-  }, [state]);
+    if (!state.done) return;
+    setTitle('');
+    /**
+     * ⚠️ **Al crear se abre el detalle de la tarea, y eso cambia el gesto.**
+     *
+     * Esto vaciaba el campo y devolvía el foco para escribir la siguiente sin
+     * tocar el ratón. Era un buen gesto para vaciar una lista de pendientes,
+     * pero dejaba cada tarea con lo único que el alta rápida pide —el título— y
+     * sin encargado, sin fecha y sin prioridad; completarlas después obligaba a
+     * volver a buscarlas una a una.
+     *
+     * Ahora se abre el panel con la tarea recién creada. Para encadenar varias
+     * sigue bastando con cerrarlo: el formulario se queda abierto y con el foco
+     * puesto, así que es una tecla más por tarea, no un camino distinto.
+     */
+    inputRef.current?.focus();
+    onCreated?.(state.done);
+  }, [state.done, onCreated]);
 
   if (!open) {
     return (

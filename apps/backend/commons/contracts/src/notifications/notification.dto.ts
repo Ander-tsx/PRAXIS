@@ -35,6 +35,22 @@ export enum NotificationType {
   MEMBER_REMOVED = 'MEMBER_REMOVED',
   TASK_ASSIGNED = 'TASK_ASSIGNED',
   TASK_UNASSIGNED = 'TASK_UNASSIGNED',
+  /**
+   * ⚠️ **Un tipo por disparador de automatización.** Antes eran dos y se
+   * elegían por el destinatario, no por lo ocurrido: con diez disparadores,
+   * crear una tarea avisaba de que «lleva varios días sin movimiento». El
+   * catálogo de `automation-service` empareja cada disparador con el suyo.
+   */
+  AUTOMATION_TASK_DUE_SOON = 'AUTOMATION_TASK_DUE_SOON',
+  AUTOMATION_TASK_STALE = 'AUTOMATION_TASK_STALE',
+  AUTOMATION_TASK_OVERDUE = 'AUTOMATION_TASK_OVERDUE',
+  AUTOMATION_TASK_UNASSIGNED = 'AUTOMATION_TASK_UNASSIGNED',
+  AUTOMATION_TASK_CREATED = 'AUTOMATION_TASK_CREATED',
+  AUTOMATION_TASK_MOVED = 'AUTOMATION_TASK_MOVED',
+  AUTOMATION_TASK_COMPLETED = 'AUTOMATION_TASK_COMPLETED',
+  AUTOMATION_TASK_REOPENED = 'AUTOMATION_TASK_REOPENED',
+  AUTOMATION_TASK_ASSIGNEES_CHANGED = 'AUTOMATION_TASK_ASSIGNEES_CHANGED',
+  AUTOMATION_TASK_DUE_DATE_CHANGED = 'AUTOMATION_TASK_DUE_DATE_CHANGED',
 }
 
 /**

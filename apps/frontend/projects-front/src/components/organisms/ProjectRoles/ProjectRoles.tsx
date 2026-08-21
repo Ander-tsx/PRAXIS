@@ -1,6 +1,6 @@
-"use client";
-import { useState } from "react";
-import { Button } from "@praxis/commons";
+'use client';
+import { useState } from 'react';
+import { Button } from '@praxis/commons';
 import { Badge, type ProjectMember, type ProjectRole } from '@praxis/commons';
 import { DeleteRoleForm } from './DeleteRoleForm';
 import { RoleForm } from './RoleForm';
@@ -44,16 +44,26 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
         <div className="flex shrink-0 items-center gap-2">
           {canManage && (
-            <Button variant={isCreating ? 'secondary' : 'primary'} onClick={() => setIsCreating(!isCreating)}>
+            <Button
+              variant={isCreating ? 'secondary' : 'primary'}
+              onClick={() => setIsCreating(!isCreating)}
+            >
               {isCreating ? 'Cancelar' : 'Nuevo rol'}
             </Button>
           )}
         </div>
       </div>
 
+      {/* ⚠️ Aquí ponía `animate-in slide-in-from-top-4 fade-in duration-300`, del
+          plugin `tailwindcss-animate`, **que no está instalado**: Tailwind no
+          genera nada para una utilidad que no conoce y no avisa. */}
       {isCreating && canManage && (
-        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
-          <RoleForm projectId={projectId} onCancel={() => setIsCreating(false)} onSuccess={() => setIsCreating(false)} />
+        <div className="animate-desplegar-panel">
+          <RoleForm
+            projectId={projectId}
+            onCancel={() => setIsCreating(false)}
+            onSuccess={() => setIsCreating(false)}
+          />
         </div>
       )}
 
@@ -70,7 +80,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
             if (editingRoleId === role.id) {
               return (
-                <li key={role.id} className="animate-in fade-in zoom-in-95 duration-200 lg:col-span-2">
+                <li key={role.id} className="animate-desplegar-panel lg:col-span-2">
                   <RoleForm
                     projectId={projectId}
                     role={role}
@@ -84,7 +94,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
             if (deletingRoleId === role.id) {
               const inUse = usageByRole.get(role.id) ?? 0;
               return (
-                <li key={role.id} className="animate-in fade-in zoom-in-95 duration-200 lg:col-span-2">
+                <li key={role.id} className="animate-desplegar-panel lg:col-span-2">
                   <DeleteRoleForm
                     projectId={projectId}
                     role={role}
@@ -114,18 +124,10 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
 
                   {canManage && (
                     <div className="flex shrink-0 gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingRoleId(role.id)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => setEditingRoleId(role.id)}>
                         Editar
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingRoleId(role.id)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => setDeletingRoleId(role.id)}>
                         Eliminar
                       </Button>
                     </div>
@@ -146,7 +148,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                     </Badge>
                   ))}
                   {selected.size === 0 && (
-                     <span className="font-sans text-sm italic text-text-disabled py-1">
+                    <span className="font-sans text-sm italic text-text-disabled py-1">
                       Sin permisos: quien tenga este rol no podrá hacer nada.
                     </span>
                   )}

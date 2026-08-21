@@ -5,6 +5,14 @@ import {
   LABEL_COLORS,
   formatBytes,
 } from '@praxis/commons';
+import {
+  type AutomationCatalog,
+  type ConditionField,
+  actionSpecFor,
+  conditionFieldFor,
+  triggerSpecFor,
+} from './automation-catalog';
+import type { RuleDraft } from './automation-draft';
 
 /**
  * Validación del cliente, espejo de la del gateway.
@@ -234,5 +242,205 @@ export function validateColumnColor(color: string): string | null {
   if (!COLUMN_COLORS.includes(color as (typeof COLUMN_COLORS)[number])) {
     return 'Ese color no es del sistema.';
   }
+  return null;
+}
+
+/**
+ * Validación de una regla de automatización, espejo de
+ * `rule-definition.ts` en `automation-service` — verificado contra el
+ * contrato real en `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+ *
+ * `status: 'INVALID'` y una clave de más en `trigger.config`/`action.config`
+ * no están aquí: `RuleDraft` los excluye por construcción (el tipo de
+ * `status` solo admite `ENABLED`/`DISABLED`, y `bodyFromDraft` arma la config
+ * de la acción desde el catálogo, no desde el borrador) — no hay ninguna
+ * combinación de la interfaz que pueda producirlos.
+ */
+export const AUTOMATION_RULE_NAME_MIN = 2;
+export const AUTOMATION_RULE_NAME_MAX = 120;
+export const AUTOMATION_RULE_DESCRIPTION_MAX = 1000;
+export const AUTOMATION_RULE_MAX_ACTIONS = 5;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function validateConditionScalar(fieldSpec: ConditionField, value: unknown): string | null {
+  if (fieldSpec.kind === 'integer') {
+    const min = fieldSpec.min ?? 0;
+    if (!Number.isInteger(value) || (value as number) < min) {
+      return `${fieldSpec.label} debe ser un número entero de ${min} o más.`;
+    }
+  }
+  if (fieldSpec.kind === 'boolean' && typeof value !== 'boolean') {
+    return `${fieldSpec.label} debe ser sí o no.`;
+  }
+  if (
+    fieldSpec.kind === 'date' &&
+    (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+  ) {
+    return `${fieldSpec.label} debe tener el formato AAAA-MM-DD.`;
+  }
+  if (fieldSpec.kind === 'enum' && fieldSpec.options) {
+    const allowed = fieldSpec.options.map((option) => option.value);
+    if (!allowed.includes(String(value))) {
+      return `${fieldSpec.label}: ese valor no está en el catálogo.`;
+    }
+  }
+  /* Un campo que apunta a una columna, una etiqueta o una persona lleva su id.
+     Si aquí llega otra cosa, es que el desplegable se quedó sin elegir — y el
+     servidor respondería con un 400 sobre un UUID que no dice qué falta. */
+  if (
+    (fieldSpec.kind === 'uuid' || fieldSpec.kind === 'uuidList') &&
+    (typeof value !== 'string' || !UUID.test(value))
+  ) {
+    return `${fieldSpec.label}: elige un valor de la lista.`;
+  }
+  if (fieldSpec.kind === 'text' && (typeof value !== 'string' || value.trim().length === 0)) {
+    return `${fieldSpec.label} no puede quedar vacío.`;
+  }
+  return null;
+}
+
+function validateConditionValue(
+  fieldSpec: ConditionField,
+  operator: string,
+  value: unknown,
+): string | null {
+  if (operator === 'IN') {
+    if (!Array.isArray(value) || value.length === 0) {
+      return `${fieldSpec.label}: "es alguno de" exige al menos un valor.`;
+    }
+    for (const item of value) {
+      const error = validateConditionScalar(fieldSpec, item);
+      if (error) return error;
+    }
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return `${fieldSpec.label}: este operador exige un único valor, no una lista.`;
+  }
+  return validateConditionScalar(fieldSpec, value);
+}
+
+/**
+ * Qué parte del formulario tiene el fallo.
+ *
+ * Existe porque un mensaje suelto no dice dónde mirar: `RuleDialog` pintaba
+ * **todos** los errores bajo el campo «Nombre», así que un fallo en una
+ * condición marcaba en rojo un campo que estaba bien y mandaba a corregirlo
+ * donde no estaba el problema.
+ */
+export type AutomationErrorScope = 'name' | 'description' | 'trigger' | 'conditions' | 'actions';
+
+export interface AutomationDraftError {
+  ambito: AutomationErrorScope;
+  mensaje: string;
+}
+
+export function validateAutomationDraft(
+  catalog: AutomationCatalog | null,
+  draft: RuleDraft,
+): AutomationDraftError | null {
+  const name = draft.name.trim();
+  if (name.length < AUTOMATION_RULE_NAME_MIN) {
+    return {
+      ambito: 'name',
+      mensaje: `El nombre debe tener al menos ${AUTOMATION_RULE_NAME_MIN} caracteres.`,
+    };
+  }
+  if (name.length > AUTOMATION_RULE_NAME_MAX) {
+    return {
+      ambito: 'name',
+      mensaje: `El nombre no puede superar ${AUTOMATION_RULE_NAME_MAX} caracteres.`,
+    };
+  }
+  if (draft.description.trim().length > AUTOMATION_RULE_DESCRIPTION_MAX) {
+    return {
+      ambito: 'description',
+      mensaje: `La descripción no puede superar ${AUTOMATION_RULE_DESCRIPTION_MAX} caracteres.`,
+    };
+  }
+
+  const spec = triggerSpecFor(catalog, draft.triggerType);
+  if (!spec) return { ambito: 'trigger', mensaje: 'Elige cuándo tiene que actuar la regla.' };
+
+  for (const field of spec.config) {
+    const value = draft.triggerConfig[field.key];
+    if (field.required && (value === undefined || value === null)) {
+      return { ambito: 'trigger', mensaje: `${field.label} es obligatorio.` };
+    }
+    if (value !== undefined && value !== null && (!Number.isInteger(value) || value < field.min)) {
+      return {
+        ambito: 'trigger',
+        mensaje: `${field.label} debe ser un número entero de ${field.min} o más.`,
+      };
+    }
+  }
+
+  if (draft.actions.length === 0) {
+    return { ambito: 'actions', mensaje: 'La regla requiere al menos una acción.' };
+  }
+  if (draft.actions.length > AUTOMATION_RULE_MAX_ACTIONS) {
+    return { ambito: 'actions', mensaje: 'Una regla admite como máximo cinco acciones.' };
+  }
+
+  /* Cada acción, con lo que su catálogo diga que necesita. Sin esto, una acción
+     a medio configurar viaja y vuelve como un 400 sobre una clave interna. */
+  for (const action of draft.actions) {
+    const actionSpec = actionSpecFor(catalog, action.type);
+    if (!actionSpec) {
+      return { ambito: 'actions', mensaje: `«${action.type}» no es una acción admitida.` };
+    }
+    for (const campo of actionSpec.config) {
+      const valor = action.config[campo.key];
+      if (campo.required && (valor === undefined || valor === null || valor === '')) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: falta «${campo.label}».`,
+        };
+      }
+      if (
+        campo.kind === 'uuid' &&
+        valor !== undefined &&
+        (typeof valor !== 'string' || !UUID.test(valor))
+      ) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: elige un valor para «${campo.label}».`,
+        };
+      }
+      if (
+        campo.kind === 'text' &&
+        typeof valor === 'string' &&
+        valor.length > (campo.maxLength ?? 500)
+      ) {
+        return {
+          ambito: 'actions',
+          mensaje: `${actionSpec.label}: «${campo.label}» no puede pasar de ${campo.maxLength ?? 500} caracteres.`,
+        };
+      }
+    }
+  }
+
+  for (const condition of draft.conditions) {
+    const fieldSpec = conditionFieldFor(catalog, draft.triggerType, condition.field);
+    if (!fieldSpec) {
+      return {
+        ambito: 'conditions',
+        mensaje: `«${condition.field}» no es una condición de ${spec.label}.`,
+      };
+    }
+    /* Contra los operadores **de ese campo**, no contra la lista entera: `GT`
+       existe, pero no sobre un booleano. Es la misma regla que aplica el
+       servidor, y comprobarla aquí la explica antes y con el nombre del campo. */
+    if (!fieldSpec.operators.includes(condition.operator as never)) {
+      return {
+        ambito: 'conditions',
+        mensaje: `«${fieldSpec.label}» no admite ese operador.`,
+      };
+    }
+    const error = validateConditionValue(fieldSpec, condition.operator, condition.value);
+    if (error) return { ambito: 'conditions', mensaje: error };
+  }
+
   return null;
 }

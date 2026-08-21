@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import {
@@ -6,6 +7,7 @@ import {
   READ_ONLY_PROJECT_PERMISSIONS,
   UpdateProjectRoleDto,
 } from '@praxis/contracts';
+import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -72,6 +74,7 @@ export function recortarPorEstado(
 
 @Injectable()
 export class ProjectRolesService {
+  private readonly domainOutbox = new ProjectDomainOutboxFactory();
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -129,7 +132,12 @@ export class ProjectRolesService {
     return updated;
   }
 
-  async deleteProjectRole(id: string) {
+  async deleteProjectRole(
+    id: string,
+    projectId: string,
+    requesterId: string,
+    context: { correlationId?: string; causationId?: string } = {},
+  ) {
     const role = await this.prisma.projectRole.findUnique({
       where: { id },
       include: { members: true },
@@ -144,7 +152,27 @@ export class ProjectRolesService {
       });
     }
 
-    await this.prisma.projectRole.delete({ where: { id } });
+    if (role.projectId !== projectId) {
+      throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+    }
+    const correlationId = context.correlationId ?? randomUUID();
+    await this.prisma.$transaction(async (tx) => {
+      const snapshot = await tx.projectRole.findUniqueOrThrow({ where: { id } });
+      if (snapshot.projectId !== projectId)
+        throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+      await tx.projectRole.delete({ where: { id: snapshot.id } });
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: snapshot.projectId,
+          subject: { type: 'PROJECT_ROLE', id: snapshot.id },
+          actor: { type: 'USER', id: requesterId },
+          correlationId,
+          causationId: context.causationId,
+        },
+        { type: 'project.role-deleted.v1', payload: { roleId: snapshot.id } },
+      );
+    });
     await this.invalidateProjectCache(role.projectId);
     return { success: true };
   }

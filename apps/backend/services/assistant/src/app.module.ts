@@ -37,6 +37,9 @@ import { PrismaModule } from './prisma/prisma.module';
          */
         GEMINI_API_KEY: Joi.string().required(),
         GEMINI_MODEL: Joi.string().default('gemini-flash-latest'),
+        /* Opcional a propósito: sin él se agotan los reintentos contra el
+           principal y se falla con el motivo real. Ver `GeminiClient`. */
+        GEMINI_MODEL_FALLBACK: Joi.string().allow('').optional(),
         LOG_LEVEL: Joi.string()
           .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal')
           .default('info'),

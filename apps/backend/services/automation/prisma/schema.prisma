@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["automation"]
+  url      = env("DATABASE_URL")
+}
+
+/// En qué punto está un hecho recibido.
+///
+/// ⚠️ **`ACCEPTED` no significa «atendido», significa «guardado».** La copia
+/// durable y la evaluación de reglas son dos pasos, y separarlos es lo que
+/// permite que un fallo al evaluar no pierda el hecho: se queda en `ACCEPTED` y
+/// la siguiente pasada vuelve a por él.
+enum InboundEventStatus {
+  ACCEPTED
+  PROCESSED
+  FAILED
+
+  @@schema("automation")
+}
+
+enum AutomationRuleStatus {
+  ENABLED
+  DISABLED
+  PAUSED_SYSTEM
+  INVALID
+
+  @@schema("automation")
+}
+
+enum RuleExecutionStatus {
+  RUNNING
+  SUCCEEDED
+  SKIPPED
+  FAILED
+
+  @@schema("automation")
+}
+
+/// Copia durable e idempotente de un hecho recibido por Redis Streams.
+///
+/// `eventId` identifica el hecho de dominio y `dedupeKey` es un hash canónico
+/// estable que permite absorber sobres distintos de la misma causa.
+model InboundEvent {
+  id            String             @id @default(uuid())
+  eventId       String             @unique
+  dedupeKey     String             @unique
+  streamId      String
+  type          String
+  source        String
+  occurredAt    DateTime
+  projectId     String
+  subjectType   String
+  subjectId     String
+  actorType     String
+  actorId       String?
+  correlationId String
+  causationId   String?
+  payload       Json
+  status        InboundEventStatus @default(ACCEPTED)
+  receivedAt    DateTime           @default(now())
+  /// Cuándo se evaluaron las reglas contra este hecho.
+  processedAt   DateTime?
+  /// Cuántas veces se ha intentado evaluarlo. Con techo: ver `EVENT_MAX_ATTEMPTS`.
+  attempts      Int                @default(0)
+  /// El último motivo por el que no se pudo evaluar, recortado.
+  lastError     String?
+
+  @@index([projectId, receivedAt])
+  @@index([status, receivedAt])
+  @@schema("automation")
+  @@map("inbound_events")
+}
+
+model AutomationRule {
+  id              String               @id @default(uuid())
+  projectId       String
+  name            String
+  description     String?
+  createdBy       String
+  version         Int                  @default(1)
+  status          AutomationRuleStatus @default(DISABLED)
+  pausedAt        DateTime?
+  pauseReason     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  trigger         AutomationTrigger?
+  conditions      AutomationCondition[]
+  actions         AutomationAction[]
+  executions      RuleExecution[]
+
+  @@index([projectId, createdAt])
+  @@index([projectId, status])
+  @@schema("automation")
+  @@map("automation_rules")
+}
+
+/// Auditoría mínima de una evaluación directa del MVP académico.
+model RuleExecution {
+  id              String              @id @default(uuid())
+  ruleId          String
+  ruleVersion     Int
+  causeKey        String
+  /**
+   * Qué disparó esto y sobre qué, para poder auditarlo sin abrir la regla.
+   *
+   * ⚠️ Una ejecución decía «Éxito» y nada más: ni qué tarea, ni por qué. Con
+   * cuarenta filas iguales, la pantalla de ejecuciones no servía para
+   * comprobar nada — que es su único motivo de existir.
+   *
+   * El título va **copiado**, no referenciado: la tarea puede renombrarse o
+   * borrarse, y una auditoría que cambia cuando cambia el presente no es una
+   * auditoría.
+   */
+  triggerType     String?
+  subjectId       String?
+  subjectTitle    String?
+  ruleSnapshot    Json
+  conditionResult Json
+  actionResults   Json?
+  status          RuleExecutionStatus @default(RUNNING)
+  error           Json?
+  startedAt       DateTime            @default(now())
+  finishedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  rule            AutomationRule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, causeKey])
+  @@index([ruleId, createdAt])
+  @@index([status, createdAt])
+  @@schema("automation")
+  @@map("rule_executions")
+}
+
+model AutomationTrigger {
+  id        String         @id @default(uuid())
+  ruleId    String         @unique
+  type      String
+  config    Json
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@schema("automation")
+  @@map("automation_triggers")
+}
+
+model AutomationCondition {
+  id        String         @id @default(uuid())
+  ruleId    String
+  field     String
+  operator  String
+  value     Json
+  position  Int
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, position])
+  @@schema("automation")
+  @@map("automation_conditions")
+}
+
+model AutomationAction {
+  id        String         @id @default(uuid())
+  ruleId    String
+  type      String
+  config    Json
+  position  Int
+  rule      AutomationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, position])
+  @@schema("automation")
+  @@map("automation_actions")
+}

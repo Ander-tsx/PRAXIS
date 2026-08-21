@@ -35,6 +35,19 @@ export enum ProjectPermission {
   CAN_MANAGE_ROLES = 'canManageRoles',
 
   /**
+   * Crear, editar, habilitar, deshabilitar y eliminar reglas de automatización
+   * del proyecto. No concede acceso a recursos externos.
+   */
+  CAN_MANAGE_AUTOMATIONS = 'canManageAutomations',
+
+  /**
+   * Solicitar, conectar, reconectar y desconectar integraciones externas del
+   * proyecto. Se mantiene separado de automatizaciones para que configurar una
+   * regla no permita vincular repositorios o cuentas de terceros.
+   */
+  CAN_MANAGE_INTEGRATIONS = 'canManageIntegrations',
+
+  /**
    * Comentar en una tarea.
    *
    * Comentar exigía `canEditTask`, así que un perfil de solo lectura —cliente,

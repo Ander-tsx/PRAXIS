@@ -50,7 +50,4 @@ export class LogoutDto {
    * tiene que verificar la firma para sacar el `jti`. Un token ilegible cierra
    * todas — quien pide salir, sale.
    */
-  @IsOptional()
-  @IsString()
-  refreshToken?: string;
 }

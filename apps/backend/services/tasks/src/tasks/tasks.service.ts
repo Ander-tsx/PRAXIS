@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ClientProxy, ClientProxyFactory, RpcException, Transport } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
+import { TaskDomainOutboxFactory } from '../domain-events/task-domain-outbox.factory';
 import { Prisma } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -97,6 +99,7 @@ const TASK_INCLUDE = {
 @Injectable()
 export class TasksService {
   private readonly projectsClient: ClientProxy;
+  private readonly domainOutbox = new TaskDomainOutboxFactory();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -216,6 +219,14 @@ export class TasksService {
         .filter((userId) => !despues.has(userId))
         .map((userId): TaskEventDraft => ({ type: 'UNASSIGNED', subjectId: userId })),
     ];
+  }
+
+  /** Una lista es un conjunto: el orden del selector no constituye un cambio. */
+  private assigneesChanged(before: string[], after?: string[]): boolean {
+    if (after === undefined) return false;
+    const previous = new Set(before);
+    const next = new Set(after);
+    return previous.size !== next.size || [...previous].some((userId) => !next.has(userId));
   }
 
   /**
@@ -500,6 +511,7 @@ export class TasksService {
 
     /* En transacción con su historial: una tarea que nace sin evento `CREATED`
        no tiene principio, y su tiempo de entrega es incalculable para siempre. */
+    const correlationId = randomUUID();
     const task = await this.prisma.$transaction(async (tx) => {
       const created = await tx.task.create({
         data: {
@@ -530,6 +542,19 @@ export class TasksService {
            que nace con dueño no tendría registro de cuándo lo ganó. */
         ...assignees.map((userId): TaskEventDraft => ({ type: 'ASSIGNED', subjectId: userId })),
       ]);
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: created.projectId,
+          taskId: created.id,
+          actor: { type: 'USER', id: dto.requesterId },
+          correlationId,
+        },
+        {
+          type: 'task.created.v1',
+          payload: { taskId: created.id, boardId: created.boardId, columnId: created.columnId },
+        },
+      );
 
       return created;
     });
@@ -706,6 +731,7 @@ export class TasksService {
     /* Solo si el `PATCH` toca encargados. Omitirlos los deja como estaban, y
        entonces no hay nada de qué avisar ni por qué consultarlo. */
     const before = assignees !== undefined ? await this.currentAssignees(dto.id) : [];
+    const assigneesChanged = this.assigneesChanged(before, assignees);
 
     /**
      * Este `PATCH` **también mueve**: acepta `columnId`. Se le da el mismo
@@ -721,6 +747,15 @@ export class TasksService {
             isClosingColumn: dto.isClosingColumn,
           })
         : { events: [] as TaskEventDraft[], completedAt: undefined };
+    const nextDueDate =
+      dto.dueDate === undefined ? undefined : dto.dueDate ? new Date(dto.dueDate) : null;
+    const dueDateChanged =
+      nextDueDate !== undefined &&
+      (task.dueDate?.getTime() ?? null) !== (nextDueDate?.getTime() ?? null);
+    const moved = change.events.some((event) => event.type === 'MOVED');
+    const completed = change.events.some((event) => event.type === 'COMPLETED');
+    const reopened = change.events.some((event) => event.type === 'REOPENED');
+    const correlationId = randomUUID();
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (assignees !== undefined) {
@@ -740,7 +775,7 @@ export class TasksService {
           ...(dto.priority !== undefined && { priority: dto.priority }),
           // `null` limpia la fecha; sin esto no habría forma de quitarla.
           ...(dto.dueDate !== undefined && {
-            dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+            dueDate: nextDueDate,
           }),
           ...(change.completedAt !== undefined && { completedAt: change.completedAt }),
         },
@@ -763,6 +798,51 @@ export class TasksService {
           : []),
         ...this.assigneeEvents(before, assignees),
       ]);
+
+      const eventContext = {
+        projectId: saved.projectId,
+        taskId: saved.id,
+        actor: { type: 'USER' as const, id: dto.requesterId },
+        correlationId,
+      };
+      if (moved) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.moved.v1',
+          payload: { taskId: saved.id, fromColumnId: task.columnId, toColumnId: saved.columnId },
+        });
+      }
+      if (dueDateChanged) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.due-date-changed.v1',
+          payload: {
+            taskId: saved.id,
+            previousDueDate: task.dueDate?.toISOString() ?? null,
+            dueDate: saved.dueDate?.toISOString() ?? null,
+          },
+        });
+      }
+      if (completed) {
+        if (!saved.completedAt) throw new Error('La tarea completada debe incluir completedAt');
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.completed.v1',
+          payload: { taskId: saved.id, completedAt: saved.completedAt.toISOString() },
+        });
+      }
+      if (reopened) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.reopened.v1',
+          payload: { taskId: saved.id },
+        });
+      }
+      if (assigneesChanged) {
+        await this.domainOutbox.persist(tx, eventContext, {
+          type: 'task.assignees-changed.v1',
+          payload: {
+            taskId: saved.id,
+            assigneeIds: saved.assignees.map((assignee) => assignee.userId),
+          },
+        });
+      }
 
       return saved;
     });
@@ -806,6 +886,7 @@ export class TasksService {
       isClosingColumn: dto.isClosingColumn,
     });
 
+    const correlationId = randomUUID();
     const updated = await this.prisma.$transaction(async (tx) => {
       const moved = await tx.task.update({
         where: { id: dto.id },
@@ -819,6 +900,52 @@ export class TasksService {
       });
 
       await this.recordEvents(tx, moved, dto.requesterId, change.events);
+      if (task.columnId !== moved.columnId) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.moved.v1',
+            payload: { taskId: moved.id, fromColumnId: task.columnId, toColumnId: moved.columnId },
+          },
+        );
+      }
+      if (change.events.some((event) => event.type === 'COMPLETED')) {
+        if (!moved.completedAt) throw new Error('La tarea completada debe incluir completedAt');
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.completed.v1',
+            payload: { taskId: moved.id, completedAt: moved.completedAt.toISOString() },
+          },
+        );
+      }
+      if (change.events.some((event) => event.type === 'REOPENED')) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: moved.projectId,
+            taskId: moved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.reopened.v1',
+            payload: { taskId: moved.id },
+          },
+        );
+      }
       return moved;
     });
 
@@ -834,8 +961,16 @@ export class TasksService {
     await this.assertPermission(dto.requesterId, dto.projectId, 'canDeleteTask');
 
     const task = await this.loadTaskInProject(dto.id, dto.projectId);
+    const correlationId = randomUUID();
 
     await this.prisma.$transaction(async (tx) => {
+      // Se vuelve a capturar dentro de la transacción: tras borrar no existe
+      // ninguna fuente confiable para reconstruir el hecho durable.
+      const snapshot = await tx.task.findUniqueOrThrow({ where: { id: dto.id } });
+      if (snapshot.projectId !== dto.projectId) {
+        throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+      }
+
       /**
        * El evento **antes** del borrado, y sobrevive a él.
        *
@@ -845,10 +980,20 @@ export class TasksService {
        * se limpió del tablero desaparecería del throughput **retroactivamente**,
        * cambiando cifras del pasado que ya se habían enseñado.
        */
-      await this.recordEvents(tx, task, dto.requesterId, [
-        { type: 'DELETED', fromColumnId: task.columnId },
+      await this.recordEvents(tx, snapshot, dto.requesterId, [
+        { type: 'DELETED', fromColumnId: snapshot.columnId },
       ]);
-      await tx.task.delete({ where: { id: dto.id } });
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: snapshot.projectId,
+          taskId: snapshot.id,
+          actor: { type: 'USER', id: dto.requesterId },
+          correlationId,
+        },
+        { type: 'task.deleted.v1', payload: { taskId: snapshot.id } },
+      );
+      await tx.task.delete({ where: { id: snapshot.id } });
     });
 
     await Promise.all([
@@ -874,6 +1019,8 @@ export class TasksService {
     /* Quién había **antes**: es la única forma de saber a quién avisar de que
        entra y a quién de que sale. Después del reemplazo ya no existe. */
     const before = await this.currentAssignees(dto.id);
+    const assigneesChanged = this.assigneesChanged(before, assignees);
+    const correlationId = randomUUID();
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await this.replaceAssignees(tx, dto.id, assignees, dto.requesterId);
@@ -883,6 +1030,24 @@ export class TasksService {
       });
 
       await this.recordEvents(tx, saved, dto.requesterId, this.assigneeEvents(before, assignees));
+      if (assigneesChanged) {
+        await this.domainOutbox.persist(
+          tx,
+          {
+            projectId: saved.projectId,
+            taskId: saved.id,
+            actor: { type: 'USER', id: dto.requesterId },
+            correlationId,
+          },
+          {
+            type: 'task.assignees-changed.v1',
+            payload: {
+              taskId: saved.id,
+              assigneeIds: saved.assignees.map((assignee) => assignee.userId),
+            },
+          },
+        );
+      }
 
       return saved;
     });

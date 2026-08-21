@@ -53,12 +53,20 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Panel',
     href: '/dashboard',
+    /**
+     * ⚠️ **Era una cuadrícula de cuatro celdas, y ya la usaba otra cosa.** Es
+     * el mismo dibujo que marca «Espacios» dentro de un proyecto, así que en la
+     * misma pantalla había dos sitios distintos con el mismo icono — que es
+     * exactamente lo que un icono viene a evitar.
+     *
+     * Una casa: el Panel es a dónde se vuelve, no una rejilla de contenido.
+     */
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z"
+          d="M3 10.5 12 3l9 7.5M5.5 9.5V19a1 1 0 001 1h3.5v-5h4v5H17a1 1 0 001-1V9.5"
         />
       </svg>
     ),

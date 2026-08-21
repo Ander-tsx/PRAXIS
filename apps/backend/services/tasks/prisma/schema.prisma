@@ -117,6 +117,30 @@ model TaskEvent {
   @@map("task_events")
 }
 
+/// Hechos durables pendientes de publicación. No tiene transporte en esta etapa.
+model DomainOutbox {
+  id            String   @id @default(uuid())
+  eventId       String   @unique
+  type          String
+  source        String
+  occurredAt    DateTime
+  projectId     String
+  subjectType   String
+  subjectId     String
+  actorType     String
+  actorId       String?
+  correlationId String
+  causationId   String?
+  payload       Json
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([publishedAt, createdAt])
+  @@index([projectId, createdAt])
+  @@schema("tasks")
+  @@map("domain_outbox")
+}
+
 /// Encargado de una tarea.
 ///
 /// Sustituye al antiguo `Task.assigneeId`, que era un solo campo. Se migró en

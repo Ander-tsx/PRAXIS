@@ -48,6 +48,18 @@ El **21** es de 2026-08-19 y tampoco es de seguridad: un proyecto cuyo slug sea
 `overview`, `tablero` o `tarea` queda oculto tras una ruta estática del frontend.
 Tres palabras de espacio de colisión, y ningún proyecto afectado hoy.
 
+Los pendientes de automatización (Reglas del proyecto) viven aparte, en
+[PENDIENTES-BACKEND-AUTOMATIZACION.md](PENDIENTES-BACKEND-AUTOMATIZACION.md):
+nacen de una sola tarea y así se pueden pasar al equipo de backend sin
+arrastrar el resto de esta lista. Ninguno bloquea el apartado.
+
+Un hallazgo de la misma sesión de automatización —`task_inventory` cambió de
+array a `{ tareas, omitidas }` sin que `automation-service` se actualizara, y
+tronaba con 500 en toda revisión `TASK_DUE_SOON`— no está en esa lista
+separada: era un bug, no un hueco de diseño, y era un cambio mecánico sin
+decisión de negocio, así que se arregló directo (fila `57f33d4` abajo, en
+«Cambios que hicimos»).
+
 ### Resueltos
 
 | # | Severidad | Qué | Commit |
@@ -705,6 +717,7 @@ alguno de estos archivos, avisad para evitar conflictos.
 | `a71956d` | Namespace `/api/admin` y panel de cuentas: estado, rol y corte de sesión |
 | `7e94f06` | Los ids fijos de los seeders no eran UUIDs válidos |
 | rama `feature/administracion-global` | Estado administrativo del proyecto: suspensión y archivado |
+| `57f33d4` | `automation-service` esperaba que `task_inventory` devolviera un array; desde que el inventario del asistente se recorta por presupuesto, devuelve `{ tareas, omitidas }`. `TypeError` en toda revisión `TASK_DUE_SOON`. Cambio mecánico, sin decisión de negocio |
 
 ### ⚠️ Lo más invasivo de la última tanda: el estado del proyecto
 

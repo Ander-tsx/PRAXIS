@@ -25,6 +25,7 @@ import { JwtGuard } from '../auth/jwt.guard';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 import { TaskPurgeService } from './task-purge.service';
+import { AutomationPurgeService } from './automation-purge.service';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -34,6 +35,7 @@ export class ProjectsController {
   constructor(
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly taskPurge: TaskPurgeService,
+    private readonly automationPurge: AutomationPurgeService,
   ) {}
 
   /** Crea un nuevo proyecto (el ownerId viene del token) */
@@ -111,7 +113,10 @@ export class ProjectsController {
       this.projectsClient.send({ cmd: 'project_delete' }, { id }),
     );
     // Las tareas viven en otro microservicio: el cascade no llega hasta ellas.
-    await this.taskPurge.afterProjectDeleted(id);
+    await Promise.all([
+      this.taskPurge.afterProjectDeleted(id),
+      this.automationPurge.afterProjectDeleted(id),
+    ]);
     return result;
   }
 }

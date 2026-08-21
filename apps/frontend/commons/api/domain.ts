@@ -296,6 +296,8 @@ export const PROJECT_PERMISSIONS = [
   'canDeleteColumn',
   'canManageMembers',
   'canManageRoles',
+  'canManageAutomations',
+  'canManageIntegrations',
   'canComment',
   'canManageLabels',
   'canEditProject',
@@ -328,6 +330,8 @@ export const PERMISSION_LABELS: Record<ProjectPermission, string> = {
   canDeleteTask: 'Eliminar tareas',
   canManageMembers: 'Gestionar el equipo',
   canManageRoles: 'Gestionar los roles',
+  canManageAutomations: 'Gestionar automatizaciones',
+  canManageIntegrations: 'Gestionar integraciones',
   canComment: 'Comentar en las tareas',
   canManageLabels: 'Gestionar las etiquetas',
   canEditProject: 'Renombrar el proyecto y cambiar su descripción',
@@ -355,6 +359,7 @@ export const PERMISSION_IMPLIES: Partial<Record<ProjectPermission, ProjectPermis
   canEditBoard: ['canCreateBoard', 'canEditProject'],
   canEditProject: ['canViewReports'],
   canManageMembers: ['canViewReports'],
+  canManageRoles: ['canManageAutomations', 'canManageIntegrations'],
   canDeleteColumn: ['canEditColumn', 'canCreateColumn'],
   canEditColumn: ['canCreateColumn'],
   canDeleteTask: ['canEditTask', 'canMoveTask', 'canComment', 'canCreateTask'],
@@ -750,6 +755,25 @@ export function displayName(user: UserProfile): string {
  * lo pide— cae a la parte local del correo. Sin esto, las filas de un listado
  * quedaban de dos alturas distintas según la cuenta tuviera nombre o no.
  */
+/**
+ * Cómo se nombra a alguien de quien ya no queda perfil.
+ *
+ * ⚠️ **El UUID no es una alternativa.** Varios sitios caían a `member.userId`
+ * cuando el perfil no resolvía, y en pantalla eso es
+ * «3f2a…-9c11 salió del proyecto»: no dice quién era, no se puede buscar y
+ * parece un error de la aplicación.
+ *
+ * Desde que administración puede borrar cuentas de verdad esto deja de ser un
+ * caso raro: el trabajo de esa persona se conserva a propósito —borrarlo
+ * dejaría huecos en tableros ajenos— así que su id sigue en tareas y mensajes
+ * de proyectos que siguen vivos.
+ *
+ * Se dice «eliminado» y no «desconocido» porque es lo que casi siempre es. Un
+ * fallo al resolver el perfil cae aquí también, y en ese caso el texto se
+ * queda corto — pero sigue siendo más útil que un identificador.
+ */
+export const PERSONA_ELIMINADA = 'Usuario eliminado';
+
 export function personLabel(user: UserProfile): string {
   const name = displayName(user);
   if (name) return name;
@@ -786,6 +810,16 @@ export const NOTIFICATION_TYPES = [
   'MEMBER_REMOVED',
   'TASK_ASSIGNED',
   'TASK_UNASSIGNED',
+  'AUTOMATION_TASK_DUE_SOON',
+  'AUTOMATION_TASK_STALE',
+  'AUTOMATION_TASK_OVERDUE',
+  'AUTOMATION_TASK_UNASSIGNED',
+  'AUTOMATION_TASK_CREATED',
+  'AUTOMATION_TASK_MOVED',
+  'AUTOMATION_TASK_COMPLETED',
+  'AUTOMATION_TASK_REOPENED',
+  'AUTOMATION_TASK_ASSIGNEES_CHANGED',
+  'AUTOMATION_TASK_DUE_DATE_CHANGED',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -820,6 +854,128 @@ export interface NotificationPage {
   total: number;
   /** No leídas en total, **sin recortar por `limit`**: es lo que pinta la insignia. */
   unread: number;
+}
+
+/**
+ * Automatización.
+ *
+ * 🔴 **Estas listas eran un espejo escrito a mano de lo que aceptaba el
+ * validador, y los espejos se rompen.** Cuando el servidor pasó de dos
+ * disparadores a diez, esto seguía declarando dos y **nada fallaba**: el
+ * formulario ofrecía de menos y no hay compilación que avise de eso.
+ *
+ * Ahora la lista viva la sirve el propio servicio en
+ * `GET /projects/:id/automations/catalog`, y lo que queda aquí son **tipos
+ * abiertos**: `string` en vez de una unión cerrada. Es a propósito — una unión
+ * cerrada en el cliente vuelve a ser una copia que envejece.
+ */
+export type AutomationTriggerType = string;
+export type AutomationActionType = string;
+export type AutomationConditionOperator = string;
+
+/**
+ * `ENABLED`/`DISABLED` son los únicos que puede mandar el cliente.
+ * `PAUSED_SYSTEM` e `INVALID` los pone el sistema — enviarlos da 400.
+ */
+export const AUTOMATION_RULE_STATUSES = ['ENABLED', 'DISABLED'] as const;
+export type AutomationRuleStatus = (typeof AUTOMATION_RULE_STATUSES)[number];
+/** Los dos únicos que puede tener una regla ya guardada, sin poder enviarse. */
+export type AutomationRuleStatusReadOnly = 'PAUSED_SYSTEM' | 'INVALID';
+
+export const AUTOMATION_EXECUTION_STATUSES = ['RUNNING', 'SUCCEEDED', 'SKIPPED', 'FAILED'] as const;
+export type AutomationExecutionStatus = (typeof AUTOMATION_EXECUTION_STATUSES)[number];
+
+export interface AutomationTrigger {
+  type: AutomationTriggerType;
+  config: Record<string, unknown>;
+}
+
+export interface AutomationCondition {
+  /** Depende del trigger: ver el catálogo en `lib/automation-catalog.ts` de projects-front. */
+  field: string;
+  operator: string;
+  value: unknown;
+  position: number;
+}
+
+export interface AutomationAction {
+  type: AutomationActionType;
+  config: Record<string, unknown>;
+  position: number;
+}
+
+export interface AutomationRule {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string | null;
+  status: AutomationRuleStatus | AutomationRuleStatusReadOnly;
+  version: number;
+  createdBy: string;
+  trigger: AutomationTrigger;
+  conditions: AutomationCondition[];
+  actions: AutomationAction[];
+  /**
+   * Por qué el sistema la pausó, si lo hizo.
+   *
+   * ⚠️ Sin esto, una regla en `PAUSED_SYSTEM` se ve apagada y parece que
+   * alguien la desactivó a mano — así que se vuelve a activar y se vuelve a
+   * pausar en la siguiente ejecución.
+   */
+  pausedAt?: string | null;
+  pauseReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** El resultado de una acción dentro de una ejecución. Reintenta una vez. */
+export type AutomationActionResult =
+  | { status: 'SUCCEEDED'; attempts: number; value: unknown }
+  | { status: 'FAILED'; attempts: number; error: { message: string } };
+
+/**
+ * Una fila de auditoría.
+ *
+ * ⚠️ **`subjectTitle` y `triggerType` llegan copiados, no referenciados.** La
+ * tarea puede renombrarse o borrarse después, y una auditoría que cambia cuando
+ * cambia el presente no es una auditoría. Son opcionales porque las filas
+ * anteriores a que existieran siguen ahí: se pintan sin ellos.
+ */
+export interface AutomationExecution {
+  id: string;
+  ruleId: string;
+  rule: { name: string };
+  status: AutomationExecutionStatus;
+  /** Qué disparó esta ejecución. */
+  triggerType?: string | null;
+  /** Sobre qué tarea actuó, y cómo se llamaba entonces. */
+  subjectId?: string | null;
+  subjectTitle?: string | null;
+  conditionResult: { matched: boolean; context: Record<string, unknown> };
+  actionResults: AutomationActionResult[] | null;
+  startedAt: string;
+  finishedAt: string | null;
+  createdAt: string;
+}
+
+/** Lo que devuelve `POST /projects/:id/automations/review`. */
+export interface AutomationReviewSummary {
+  rules: number;
+  candidates: number;
+  succeeded: number;
+  failed: number;
+  /**
+   * Candidatas que no cumplían las condiciones.
+   *
+   * ⚠️ **Sin esto, «0 acciones» no significa nada.** El resumen decía cuántas
+   * salieron bien y cuántas fallaron, y una revisión con cuarenta candidatas y
+   * ninguna acción se leía igual tanto si las condiciones no se cumplían —la
+   * regla está mal escrita— como si ya se actuó ayer —todo va bien—. Son dos
+   * situaciones opuestas y pedían dos decisiones opuestas.
+   */
+  filtered: number;
+  /** Candidatas cuya causa ya se había atendido antes. */
+  repeated: number;
 }
 
 /*

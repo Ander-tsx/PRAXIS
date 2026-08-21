@@ -104,3 +104,9 @@ docs/TERRAFORM-GCP.md
 infra/terraform/.terraform/
 crash.log
 crash.*.log
+
+.codex
+graphify-out
+.agents
+skills-lock.json
+.claude

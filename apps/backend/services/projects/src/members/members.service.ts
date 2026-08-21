@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 import {
@@ -6,6 +7,7 @@ import {
   NotificationType,
   RemoveMemberDto,
 } from '@praxis/contracts';
+import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectRolesService } from '../project-roles/project-roles.service';
@@ -15,6 +17,7 @@ const LIST_CACHE_TTL = 60;
 
 @Injectable()
 export class MembersService {
+  private readonly domainOutbox = new ProjectDomainOutboxFactory();
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -59,6 +62,9 @@ export class MembersService {
   }
 
   async removeMember(dto: RemoveMemberDto) {
+    if (!dto.requesterId) {
+      throw new RpcException({ statusCode: 400, message: 'Falta actor confiable' });
+    }
     const member = await this.prisma.projectMember.findUnique({
       where: { projectId_userId: { projectId: dto.projectId, userId: dto.userId } },
     });
@@ -73,7 +79,25 @@ export class MembersService {
       select: { name: true },
     });
 
-    await this.prisma.projectMember.delete({ where: { id: member.id } });
+    const correlationId = dto.correlationId ?? randomUUID();
+    await this.prisma.$transaction(async (tx) => {
+      const snapshot = await tx.projectMember.findUniqueOrThrow({ where: { id: member.id } });
+      if (snapshot.projectId !== dto.projectId || snapshot.userId !== dto.userId) {
+        throw new RpcException({ statusCode: 403, message: 'Forbidden' });
+      }
+      await tx.projectMember.delete({ where: { id: snapshot.id } });
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: snapshot.projectId,
+          subject: { type: 'PROJECT_MEMBER', id: snapshot.id },
+          actor: { type: 'USER', id: dto.requesterId },
+          correlationId,
+          causationId: dto.causationId,
+        },
+        { type: 'project.member-removed.v1', payload: { userId: snapshot.userId } },
+      );
+    });
     await this.redis.del(`members:project:${dto.projectId}`);
     // El detalle cacheado trae _count.members: si no, el contador se queda viejo.
     await this.redis.del(`project:${dto.projectId}`);

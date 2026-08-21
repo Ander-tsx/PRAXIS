@@ -18,6 +18,7 @@ import { ProjectPermissionsController } from './project-permissions.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectsController } from './projects.controller';
 import { TaskPurgeService } from './task-purge.service';
+import { AutomationPurgeService } from './automation-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
@@ -66,6 +67,18 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
           },
         }),
       },
+      {
+        name: 'AUTOMATION_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('AUTOMATION_SERVICE_HOST'),
+            port: config.get<number>('AUTOMATION_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
   ],
   controllers: [
@@ -84,6 +97,24 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     ProjectChatController,
     DirectChatController,
   ],
-  providers: [ColumnStatusSyncService, TaskPurgeService, MentionablesService],
+  providers: [
+    ColumnStatusSyncService,
+    TaskPurgeService,
+    AutomationPurgeService,
+    MentionablesService,
+  ],
+  /**
+   * ⚠️ **Las dos purgas se exportan porque administración también borra.**
+   *
+   * Borrar un proyecto tiene que arrastrar sus tareas y sus reglas, que viven en
+   * otros microservicios y no las alcanza ningún cascade. Eso lo sabían estos
+   * dos servicios y solo los veía este módulo, así que `AdminModule` los
+   * inyectaba y Nest no arrancaba —«Nest can't resolve dependencies»— con un
+   * volcado que nombra la clase pero no dice que le falta el `exports`.
+   *
+   * Se exportan en vez de copiarse: dos sitios que purgan es un sitio que
+   * olvidar cuando aparezca un tercer servicio con datos de proyecto.
+   */
+  exports: [TaskPurgeService, AutomationPurgeService],
 })
 export class ProjectsModule {}

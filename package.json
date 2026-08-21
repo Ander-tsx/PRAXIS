@@ -6,7 +6,7 @@
     "dev:frontend": "turbo run dev --filter=\"./apps/frontend/*\"",
     "dev:cli": "node scripts/dev-cli/index.mjs",
     "build": "turbo run build",
-    "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability run build",
+    "build:shared": "pnpm --filter @praxis/contracts --filter @praxis/observability --filter @praxis/domain-events run build",
     "lint": "turbo run lint",
     "test": "turbo run test --filter=!@praxis/e2e",
     "format": "biome format --write .",

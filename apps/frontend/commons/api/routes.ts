@@ -82,7 +82,12 @@ export function reportPath(project: ConSlug): string {
  */
 export interface ProjectParams {
   /** Pestaña activa. La página cae en «espacios» si no reconoce el valor. */
-  tab?: 'espacios' | 'chat' | 'equipo' | 'etiquetas' | 'roles';
+  /**
+   * ⚠️ `automation` es el nombre vigente de la sección de automatización.
+   * `reglas` y `automatizaciones` siguen resolviendo —la página los trata como
+   * alias— pero no se escriben en enlaces nuevos.
+   */
+  tab?: 'espacios' | 'chat' | 'equipo' | 'etiquetas' | 'roles' | 'automation';
   /** Espacio de trabajo a abrir. */
   ws?: string;
   /** Tablero donde vive la tarea: sin él se aterriza en el primer espacio. */

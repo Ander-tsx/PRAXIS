@@ -14,6 +14,7 @@ import {
   READ_ONLY_PROJECT_PERMISSIONS,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
+import { PROJECT_ANY_PERMISSIONS_KEY } from '../decorators/require-any-project-permission.decorator';
 import { PROJECT_PERMISSION_KEY } from '../decorators/require-project-permission.decorator';
 
 /** Forma de un UUID. Lo que no la tenga en la ruta se trata como slug. */
@@ -84,9 +85,30 @@ export class ProjectPermissionGuard implements CanActivate {
       PROJECT_PERMISSION_KEY,
       context.getHandler(),
     );
+    const anyPermissions = this.reflector.get<ProjectPermission[]>(
+      PROJECT_ANY_PERMISSIONS_KEY,
+      context.getHandler(),
+    );
+    const hasAnyPermissions = anyPermissions !== undefined;
 
-    // Si no se requiere permiso específico, deja pasar
-    if (!requiredPermission) return true;
+    // Las rutas deben declarar un permiso exacto o una alternativa de lectura,
+    // nunca ambos. Preferir silenciosamente OR podría relajar una escritura.
+    if (requiredPermission && hasAnyPermissions) return false;
+
+    // Aunque el decorador rechaza este caso, se falla cerrado si metadata ajena
+    // o una futura refactorización deja una lista OR vacía.
+    if (hasAnyPermissions && (!Array.isArray(anyPermissions) || anyPermissions.length === 0)) {
+      return false;
+    }
+
+    const requiredPermissions = hasAnyPermissions
+      ? anyPermissions
+      : requiredPermission
+        ? [requiredPermission]
+        : [];
+
+    // Si no se requiere permiso específico, deja pasar.
+    if (requiredPermissions.length === 0) return true;
 
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.userId;
@@ -206,20 +228,25 @@ export class ProjectPermissionGuard implements CanActivate {
     }
 
     if (project?.status && project.status !== 'ACTIVE') {
-      this.exigirEstadoQueDejePasar(project.status, project.suspendedReason, requiredPermission);
+      this.exigirEstadoQueDejePasar(project.status, project.suspendedReason, requiredPermissions);
     }
 
     if (project?.ownerId === userId) return true;
 
     // 2. Consultar projects-service por el permiso granular
     try {
-      const { allowed } = await firstValueFrom(
-        this.projectsClient.send(
-          { cmd: 'project_check_permission' },
-          { userId, projectId, permission: requiredPermission },
-        ),
+      const permissions = await Promise.all(
+        requiredPermissions.map(async (permission) => {
+          const { allowed } = await firstValueFrom(
+            this.projectsClient.send(
+              { cmd: 'project_check_permission' },
+              { userId, projectId, permission },
+            ),
+          );
+          return !!allowed;
+        }),
       );
-      return !!allowed;
+      return permissions.some(Boolean);
     } catch {
       return false;
     }
@@ -250,14 +277,18 @@ export class ProjectPermissionGuard implements CanActivate {
   private exigirEstadoQueDejePasar(
     status: string,
     reason: string | null | undefined,
-    requiredPermission: ProjectPermission,
+    requiredPermissions: readonly ProjectPermission[],
   ): void {
     if (status === 'DELETED') {
       throw new NotFoundException('Proyecto no encontrado');
     }
 
     if (status === 'SUSPENDED') {
-      if (READ_ONLY_PROJECT_PERMISSIONS.includes(requiredPermission)) return;
+      if (
+        requiredPermissions.some((permission) => READ_ONLY_PROJECT_PERMISSIONS.includes(permission))
+      ) {
+        return;
+      }
 
       throw new ForbiddenException({
         code: PROJECT_SUSPENDED_CODE,

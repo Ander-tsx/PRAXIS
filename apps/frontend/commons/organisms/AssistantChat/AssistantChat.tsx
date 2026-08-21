@@ -68,6 +68,22 @@ interface Mensaje {
    * conversaciones viejas donde PRAX comenta un documento del que no queda nada.
    */
   attachments?: AssistantAttachment[];
+  /**
+   * Solo en los del asistente: esta burbuja **no la escribió el modelo**.
+   *
+   * 🔴 **PRAX tiene que contestar siempre, también cuando no puede pensar.**
+   * Antes, un fallo de Gemini borraba la pregunta del hilo, la devolvía al
+   * campo de texto y dejaba una línea roja debajo del compositor. Visto desde
+   * fuera eso no se lee como «el proveedor está saturado»: se lee como que
+   * escribir a PRAX no hace nada — y con «Hola» de primer mensaje, como que el
+   * asistente no funciona en absoluto.
+   *
+   * Con esta marca la pregunta se queda donde estaba, la explicación aparece
+   * en su sitio —una burbuja de PRAX— y el reintento es un botón, no volver a
+   * escribirlo todo. No se guarda en el hilo: al recargar no está, porque de
+   * verdad no pasó nada.
+   */
+  degradado?: boolean;
 }
 
 export interface AssistantChatProps {
@@ -445,6 +461,20 @@ export function AssistantChat({
   const [texto, setTexto] = useState('');
   const [pendiente, setPendiente] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * El turno que se puede volver a mandar tal cual, si el último falló.
+   *
+   * Guarda **los tres datos que hacen falta para que reintentar no duplique
+   * nada**: el texto, la burbuja de la pregunta y la del aviso. Al reintentar se
+   * quitan las dos y se vuelve a enviar, así que el hilo queda como si el fallo
+   * no hubiera ocurrido — que es justo lo que la persona espera de un botón que
+   * dice «Reintentar».
+   */
+  const [reintento, setReintento] = useState<{
+    texto: string;
+    preguntaId: string;
+    avisoId: string;
+  } | null>(null);
   const [cuota, setCuota] = useState<AssistantQuota | null>(cuotaInicial);
 
   const hiloRef = useRef<HTMLDivElement>(null);
@@ -566,6 +596,23 @@ export function AssistantChat({
     void cargar(conversacionInicial);
   }, [conversacionInicial]);
 
+  /**
+   * Volver a mandar el turno que falló, sin que quede rastro del intento.
+   *
+   * Se quitan la pregunta y el aviso antes de reenviar: `enviar` vuelve a
+   * pintar la pregunta, y dejar las de antes las duplicaría. Los archivos ya
+   * están de vuelta en el compositor desde el fallo, así que van solos.
+   */
+  function reintentar() {
+    if (!reintento || pendiente) return;
+    const { texto: pregunta, preguntaId, avisoId } = reintento;
+    setReintento(null);
+    setMensajes((previos) =>
+      previos.filter((mensaje) => mensaje.id !== preguntaId && mensaje.id !== avisoId),
+    );
+    void enviar(pregunta);
+  }
+
   async function enviar(pregunta: string) {
     const limpio = pregunta.trim();
     /**
@@ -659,18 +706,38 @@ export function AssistantChat({
     if (respuesta.conversationId) setConversationId(respuesta.conversationId);
 
     if (respuesta.error || !respuesta.reply) {
-      setError(respuesta.error ?? 'El asistente no ha respondido nada.');
-      /* El mensaje se queda escrito en el hilo pero vuelve al campo: si el fallo
-         fue de red, reintentarlo no debería obligar a escribirlo otra vez. */
-      setTexto(limpio);
-      /* Los archivos vuelven también, y ahora sale gratis: siguen subidos y sin
-         reclamar por ningún mensaje, así que reintentar no los vuelve a subir.
-         Obligar a elegirlos otra vez tras un fallo de red es el peor momento
-         para pedirle nada a nadie. */
+      /**
+       * 🔴 **El fallo se cuenta en la conversación, no fuera de ella.**
+       *
+       * Esto quitaba la pregunta del hilo, la devolvía al campo y pintaba una
+       * línea roja bajo el compositor. Tres cosas mal a la vez: la persona
+       * perdía de vista lo que había preguntado, el hilo quedaba mudo como si
+       * no hubiera pasado nada, y el aviso aparecía lejos de donde estaba
+       * mirando.
+       *
+       * Ahora la pregunta se queda, PRAX responde en su burbuja lo que de
+       * verdad ha ocurrido —el backend ya manda el motivo bueno desde que
+       * `GeminiError` sale como 502— y el reintento es un botón ahí mismo.
+       *
+       * Los archivos sí vuelven al compositor: siguen subidos y sin reclamar,
+       * así que reintentar no los sube otra vez.
+       */
       setAdjuntos(enviados);
-      setMensajes((previos) => previos.filter((mensaje) => mensaje.id !== mio.id));
+      const idDegradado = crypto.randomUUID();
+      setMensajes((previos) => [
+        ...previos,
+        {
+          id: idDegradado,
+          role: 'model',
+          text: respuesta.error ?? 'No he podido responder a esto. Vuelve a intentarlo.',
+          degradado: true,
+        },
+      ]);
+      setReintento({ texto: limpio, preguntaId: mio.id, avisoId: idDegradado });
       return;
     }
+
+    setReintento(null);
 
     setMensajes((previos) => [
       ...previos,
@@ -692,7 +759,9 @@ export function AssistantChat({
    */
   const animo: PraxMood = pendiente
     ? 'thinking'
-    : error
+    : /* Un turno fallido ya no pinta una línea roja, así que la cara es lo único
+         que queda para reconocer que algo ha ido mal. */
+      error || reintento
       ? 'oops'
       : mensajes.length > 0
         ? 'happy'
@@ -966,7 +1035,16 @@ export function AssistantChat({
               >
                 {mensajes.map((mensaje) => (
                   <div key={mensaje.id} className="flex flex-col gap-3">
-                    <Burbuja mensaje={mensaje} gatewayPath={gatewayPath} />
+                    <Burbuja
+                      mensaje={mensaje}
+                      gatewayPath={gatewayPath}
+                      onReintentar={
+                        mensaje.degradado && reintento?.avisoId === mensaje.id
+                          ? reintentar
+                          : undefined
+                      }
+                      reintentando={pendiente}
+                    />
 
                     {(mensaje.proposals ?? []).length > 0 && (
                       /* Cuántas quedan sin decidir lo lleva el propio grupo: cada
@@ -1130,7 +1208,6 @@ export function AssistantChat({
                                 proposalId={propuesta.id}
                                 estadoGuardado={propuesta.status}
                                 propuesta={propuesta.args}
-                                onAbrir={(creado) => onElegirProyecto?.(creado, conversationId)}
                               />
                             );
                           }
@@ -1594,7 +1671,18 @@ function Sugerencia({
  * aquí: `StoredMessage` lo trae y el estado del chat lo descarta al construir sus
  * `Mensaje`. Cuando haga falta, el arreglo es propagarlo; mientras tanto, nada.
  */
-function Burbuja({ mensaje, gatewayPath }: { mensaje: Mensaje; gatewayPath: string }) {
+function Burbuja({
+  mensaje,
+  gatewayPath,
+  onReintentar,
+  reintentando,
+}: {
+  mensaje: Mensaje;
+  gatewayPath: string;
+  /** Solo en la burbuja de un turno que falló, y solo si es el último. */
+  onReintentar?: (() => void) | undefined;
+  reintentando?: boolean | undefined;
+}) {
   const mio = mensaje.role === 'user';
   const adjuntos = mensaje.attachments ?? [];
   /* Hoy todo turno lleva texto —ver `enviar`—, pero los hilos de antes de esa
@@ -1616,15 +1704,29 @@ function Burbuja({ mensaje, gatewayPath }: { mensaje: Mensaje; gatewayPath: stri
           mio ? 'rounded-br-md' : 'rounded-bl-md',
         ].join(' ')}
         style={{
-          background: mio
-            ? `color-mix(in srgb, ${colors.primary} 16%, ${colors.background})`
-            : colors.surfaceElevated,
+          /* La degradada no es del modelo, así que no puede parecerlo: el tinte
+             de aviso la separa de una respuesta de verdad sin sacarla del hilo. */
+          background: mensaje.degradado
+            ? `color-mix(in srgb, ${colors.warning} 14%, ${colors.background})`
+            : mio
+              ? `color-mix(in srgb, ${colors.primary} 16%, ${colors.background})`
+              : colors.surfaceElevated,
         }}
       >
         {adjuntos.map((adjunto) => (
           <AdjuntoEnLaBurbuja key={adjunto.id} adjunto={adjunto} gatewayPath={gatewayPath} />
         ))}
         {conTexto && <ModelText texto={mensaje.text} />}
+        {onReintentar && (
+          <button
+            type="button"
+            onClick={onReintentar}
+            disabled={reintentando}
+            className="self-start rounded-lg px-2.5 py-1 font-sans text-xs font-semibold text-warning transition-colors hover:bg-warning-muted disabled:opacity-50"
+          >
+            {reintentando ? 'Reintentando…' : 'Reintentar'}
+          </button>
+        )}
       </div>
     </div>
   );

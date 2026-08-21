@@ -420,7 +420,8 @@ no hay membresía y por tanto no hay permisos — no basta con estar invitado.
   canCreateBoard?, canEditBoard?, canDeleteBoard?,
   canCreateColumn?, canEditColumn?, canDeleteColumn?,
   canManageLabels?, canManageMembers?, canManageRoles?,
-  canEditProject?, canDeleteProject?
+  canManageAutomations?, canManageIntegrations?,
+  canEditProject?, canViewReports?, canDeleteProject?
 }
 ```
 
@@ -429,26 +430,23 @@ no hay membresía y por tanto no hay permisos — no basta con estar invitado.
 > único consumidor. `reorder` sigue pidiendo `canCreateColumn`
 > (PENDIENTES-BACKEND §8).
 
-### 🔴 Un array se acepta con 201 y no concede NADA
+### 🔴 `permissions` debe ser un diccionario de booleanos
 
-`permissions` **tiene que ser el objeto de booleanos**. Si mandas un array, el
-gateway responde `201` con un cuerpo de aspecto normal y el rol queda creado —
-pero vacío. El guard evalúa `permisos[clave]`, y sobre un array eso es
-`undefined`.
+`permissions` **tiene que ser el objeto de booleanos**. El gateway rechaza un
+array, claves desconocidas o valores no booleanos con `400`. Los roles creados
+antes de esa validación que conservan un array se normalizan al leer para no
+dejarles permisos vacíos en silencio.
 
 ```ts
-// ❌ 201, y quien tenga este rol no podrá hacer nada
+// ❌ 400
 { name: 'Colaborador', permissions: ['canEditBoard'] }
 
 // ✅
 { name: 'Colaborador', permissions: { canEditBoard: true } }
 ```
 
-Verificado con dos cuentas: el mismo miembro obtiene **403** con el rol guardado
-como array y **200** con el mismo permiso como diccionario.
-
-Tampoco se validan las claves: `{ canHackearTodo: true }` devuelve 201. Valida
-tú contra la lista de arriba antes de enviar. Ver PENDIENTES-BACKEND §11.
+Valida también en el cliente contra la lista de arriba para señalar el campo
+antes de que el gateway responda.
 
 ### Jerarquía implícita — refléjala en la interfaz
 
@@ -464,13 +462,12 @@ Al evaluar, el backend expande los permisos hacia abajo
 | `canDeleteTask` | `canEditTask`, `canMoveTask`, `canComment`, `canCreateTask` |
 | `canEditTask` | `canMoveTask`, `canComment`, `canCreateTask` |
 | `canDeleteProject` | `canDeleteBoard`, `canEditBoard`, `canCreateBoard`, `canEditProject` |
+| `canManageRoles` | `canManageAutomations`, `canManageIntegrations` |
 
-`canManageMembers` y `canManageRoles` no arrastran nada.
+`canManageMembers` no arrastra permisos adicionales.
 
-⚠️ **`expandPermissions` recorre la tabla una sola vez**, así que la expansión no
-es transitiva por sí sola: hoy sale bien porque el orden de inserción va de mayor
-a menor alcance. Por eso `canEditProject` está escrito en las **tres** entradas
-que deben concederlo, aunque quede repetido.
+`expandPermissions` itera hasta un punto fijo, por lo que las implicaciones son
+transitivas y no dependen del orden de la tabla.
 
 No hace falta guardar los implicados: el backend los deduce al comprobar. Pero
 el formulario de roles **debe enseñarlo** —marcar "eliminar" implica "editar" y
@@ -1470,6 +1467,75 @@ server error». Todas las cuentas se castean a `::int` en el propio SQL. Si aña
 una consulta agregada nueva, hazlo también.
 
 ---
+
+## Automatizaciones académicas 🔒
+
+Todas exigen `canManageAutomations` y usan el `projectId` resuelto por la ruta.
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/projects/:projectId/automations` | Lista reglas |
+| POST | `/projects/:projectId/automations` | Crea una regla |
+| GET | `/projects/:projectId/automations/:id` | Obtiene una regla |
+| PATCH | `/projects/:projectId/automations/:id` | Sustituye definición y estado |
+| DELETE | `/projects/:projectId/automations/:id` | Elimina una regla |
+| POST | `/projects/:projectId/automations/review` | Ejecuta la revisión manual de la demo |
+| GET | `/projects/:projectId/automations/executions` | Últimas 20 evaluaciones |
+
+El MVP admite solo `TASK_DUE_SOON` con `{ leadTimeMinutes }` y `TASK_STALE` con
+`{ days }`. Ambos ejecutan `CREATE_NOTIFICATION`: el primero usa
+`recipientSelector: 'ASSIGNEES'`; el segundo, `'PROJECT_OWNER'`. Las condiciones
+se combinan por `AND`, hay un máximo de cinco acciones secuenciales y cada acción
+se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofrece
+“Revisar ahora” para que la demostración no dependa del reloj ni de una cola.
+
+### El catálogo real es más estrecho que el enum
+
+⚠️ **`AutomationTriggerType` y `AutomationActionType` (`@praxis/contracts`) no
+son el catálogo.** El enum declara `GITHUB_PULL_REQUEST_OPENED`, `MOVE_TASK` y
+`SEND_EMAIL` porque vienen del diseño original; el validador de
+`rule-definition.ts` los rechaza con «no soportado en el MVP académico». Quien
+construya contra el contrato debe seguir al validador, no al enum — verificado
+en runtime, `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
+
+| Trigger | Config admitida | Condiciones (`field`) | Acción y destinatario |
+|---|---|---|---|
+| `TASK_DUE_SOON` | `{ leadTimeMinutes }`, entero ≥ 1, **obligatorio** | `priority` (texto), `dueDate` (`YYYY-MM-DD`), `assigneeCount` (entero ≥ 0) | `CREATE_NOTIFICATION` → `ASSIGNEES` |
+| `TASK_STALE` | `{ days }`, entero ≥ 1, **opcional**, por defecto 7 | `staleDays` (entero ≥ 0), `overdue` (booleano), `withoutHistory` (booleano) | `CREATE_NOTIFICATION` → `PROJECT_OWNER` |
+
+Operadores: `EQUALS`, `NOT_EQUALS`, `IN`. `IN` exige una **lista no vacía**; los
+otros dos, un **valor escalar** — un array o un objeto con `EQUALS`/`NOT_EQUALS`
+da 400, igual que un escalar con `IN`.
+
+`priority` se compara con `===` contra `task.priority`: el validador solo exige
+«texto no vacío», así que un valor fuera de `LOW`/`MEDIUM`/`HIGH`/`URGENT` **se
+guarda sin error y no coincide nunca** con ninguna tarea.
+
+Cinco trampas que ya mordieron construyendo la interfaz:
+
+1. ⚠️ **`hasOnlyKeys` es estricto en `trigger.config` y en `action.config`.**
+   Una clave de más —aunque el valor sea válido— da 400, igual que el
+   `forbidNonWhitelisted: true` del gateway con el body entero.
+2. ⚠️ **`recipientSelector` lo decide el trigger, no quien llama.** Mandar
+   `PROJECT_OWNER` con `TASK_DUE_SOON` (o al revés) da 400. No es una opción de
+   formulario: es una consecuencia del trigger elegido.
+3. ⚠️ **`status` desde el cliente solo admite `ENABLED` o `DISABLED`.**
+   `PAUSED_SYSTEM` e `INVALID` existen en el enum pero los pone el sistema;
+   enviarlos da 400 con «Solo el sistema puede pausar o invalidar una regla».
+4. 🔴 **`PATCH` es reemplazo total, no parcial.**
+   `UpdateAutomationRuleBodyDto extends CreateAutomationRuleBodyDto`: `name`,
+   `trigger`, `conditions` y `actions` son obligatorios en cada `PATCH`, incluso
+   para cambiar solo `status`. No hay forma de desactivar una regla sin
+   revalidarla entera — y una regla guardada antes de un endurecimiento del
+   validador puede quedar **imposible de desactivar** por esa vía. Ver
+   PENDIENTES-BACKEND-AUTOMATIZACION.md §2.
+5. ⚠️ **`GET /automations` y `GET /automations/executions` no son la misma
+   forma de tarea.** El primero trae `trigger`/`conditions`/`actions`
+   embebidos y ordenados por `position`; el segundo, en `conditionResult`,
+   solo trae `context` con los campos de condición — nunca `taskId` ni
+   `taskTitle` de forma legible (`causeKey` los lleva incrustados en una
+   cadena de deduplicación, no para leerse). Ver
+   PENDIENTES-BACKEND-AUTOMATIZACION.md §3.
 
 ## Asistente 🔒
 

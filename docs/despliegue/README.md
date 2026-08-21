@@ -28,7 +28,7 @@ y avisa de lo que va a parecer roto sin estarlo.
                        ▼
         ┌──────────────────────────────┐
         │  Grupo BACKEND (autoescala)  │  gateway :3000
-        │  1 → 3 máquinas              │  + 7 microservicios :3001-3007
+        │  1 → 3 máquinas              │  + 8 microservicios :3001-3008
         └───────┬──────────────┬───────┘
                 ▼              ▼
         ┌───────────────┐  ┌──────────┐

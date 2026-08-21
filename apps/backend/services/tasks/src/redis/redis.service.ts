@@ -1,6 +1,9 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
 
+/** Cuántos hechos se conservan en el stream de dominio. Ver `xadd`. */
+const DOMAIN_STREAM_MAXLEN = 50_000;
+
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client!: Redis;
@@ -25,5 +28,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async del(key: string): Promise<void> {
     await this.client.del(key);
+  }
+
+  /**
+   * Añade un hecho al stream, **con tope**.
+   *
+   * 🔴 **Sin `MAXLEN` esto no se libera nunca.** Un `XACK` saca la entrada de
+   * los pendientes del grupo, pero **no la borra del stream**: cada movimiento
+   * de cada tarea de cada proyecto se quedaba ahí para siempre. Es una fuga
+   * lenta y silenciosa, y cara — este Redis es también el de las sesiones, así
+   * que llenarlo echa a todo el mundo.
+   *
+   * El `~` hace el recorte aproximado: Redis corta por nodos enteros cuando le
+   * conviene, así que puede quedarse algo por encima. Es lo que se quiere — el
+   * número exacto no importa, que no crezca sin fin sí.
+   */
+  async xadd(stream: string, fields: Record<string, string>): Promise<string | null> {
+    return this.client.xadd(
+      stream,
+      'MAXLEN',
+      '~',
+      DOMAIN_STREAM_MAXLEN,
+      '*',
+      ...Object.entries(fields).flat(),
+    );
   }
 }

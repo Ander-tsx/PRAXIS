@@ -65,10 +65,27 @@ export class ProjectsController {
       status: dto.status,
       reason: dto.reason,
       actorId: dto.actorId,
+      correlationId: dto.correlationId,
+      causationId: dto.causationId,
     });
   }
 
   /** El inventario del panel: todos los proyectos, archivados incluidos. */
+  /**
+   * Los proyectos de los que esta cuenta es **dueña**, sin paginar.
+   *
+   * ⚠️ **No es `project_find_by_member`.** Ser miembro se resuelve borrando la
+   * membresía; ser dueña, no: `ownerId` es lo que resuelve los permisos y lo
+   * que decide a quién avisan las automatizaciones. Existe para que
+   * administración pueda negarse a borrar una cuenta que dejaría proyectos sin
+   * nadie que los administre, y por eso devuelve el nombre: el mensaje tiene
+   * que decir **cuáles**.
+   */
+  @MessagePattern({ cmd: 'project_find_owned' })
+  findOwned(@Payload() dto: { ownerId: string }) {
+    return this.projectsService.findOwned(dto.ownerId);
+  }
+
   @MessagePattern({ cmd: 'project_find_all_admin' })
   findAllForAdmin(
     @Payload()

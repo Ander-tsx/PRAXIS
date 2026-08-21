@@ -509,6 +509,66 @@ function Descripcion({ notification, who }: { notification: AppNotification; who
           {quien} te quitó de {tarea} en {proyecto}.
         </>
       );
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return (
+        <>
+          {tarea} vencerá pronto en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_STALE':
+      return (
+        <>
+          {tarea} lleva varios días sin movimiento en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_OVERDUE':
+      return (
+        <>
+          {tarea} ha pasado su fecha de vencimiento en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_UNASSIGNED':
+      return (
+        <>
+          {tarea} sigue sin encargado en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_CREATED':
+      return (
+        <>
+          Se ha creado {tarea} en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_MOVED':
+      return (
+        <>
+          {tarea} ha cambiado de columna en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_COMPLETED':
+      return (
+        <>
+          {tarea} se ha dado por terminada en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_REOPENED':
+      return (
+        <>
+          {tarea} se ha vuelto a abrir en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
+      return (
+        <>
+          Han cambiado los encargados de {tarea} en {proyecto}.
+        </>
+      );
+    case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
+      return (
+        <>
+          Ha cambiado el vencimiento de {tarea} en {proyecto}.
+        </>
+      );
   }
 }
 
@@ -536,6 +596,26 @@ function describirTexto(notification: AppNotification, who: string): string {
       return `${who} te asignó ${task} en ${project}`;
     case 'TASK_UNASSIGNED':
       return `${who} te quitó de ${task} en ${project}`;
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return `${task} vencerá pronto en ${project}`;
+    case 'AUTOMATION_TASK_STALE':
+      return `${task} lleva varios días sin movimiento en ${project}`;
+    case 'AUTOMATION_TASK_OVERDUE':
+      return `${task} ha pasado su fecha de vencimiento en ${project}`;
+    case 'AUTOMATION_TASK_UNASSIGNED':
+      return `${task} sigue sin encargado en ${project}`;
+    case 'AUTOMATION_TASK_CREATED':
+      return `Se ha creado ${task} en ${project}`;
+    case 'AUTOMATION_TASK_MOVED':
+      return `${task} ha cambiado de columna en ${project}`;
+    case 'AUTOMATION_TASK_COMPLETED':
+      return `${task} se ha dado por terminada en ${project}`;
+    case 'AUTOMATION_TASK_REOPENED':
+      return `${task} se ha vuelto a abrir en ${project}`;
+    case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
+      return `Han cambiado los encargados de ${task} en ${project}`;
+    case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
+      return `Ha cambiado el vencimiento de ${task} en ${project}`;
   }
 }
 
@@ -571,6 +651,22 @@ const TYPE_TONE: Record<NotificationType, string> = {
   MEMBER_REMOVED: colors.error,
   TASK_ASSIGNED: colors.primary,
   TASK_UNASSIGNED: colors.textSecondary,
+  /**
+   * ⚠️ **El rojo es para lo que está mal, no para lo que es automático.**
+   * `AUTOMATION_TASK_STALE` estaba en `error` y salía igual de alarmante que
+   * «te sacaron del proyecto». Solo lo vencido y lo parado tiran a aviso; lo
+   * demás son hechos del proyecto y van en el tono neutro de siempre.
+   */
+  AUTOMATION_TASK_DUE_SOON: colors.warning,
+  AUTOMATION_TASK_STALE: colors.warning,
+  AUTOMATION_TASK_OVERDUE: colors.error,
+  AUTOMATION_TASK_UNASSIGNED: colors.warning,
+  AUTOMATION_TASK_CREATED: colors.primary,
+  AUTOMATION_TASK_MOVED: colors.primary,
+  AUTOMATION_TASK_COMPLETED: colors.success,
+  AUTOMATION_TASK_REOPENED: colors.warning,
+  AUTOMATION_TASK_ASSIGNEES_CHANGED: colors.primary,
+  AUTOMATION_TASK_DUE_DATE_CHANGED: colors.primary,
 };
 
 function TypeIcon({ type, pequeno = false }: { type: NotificationType; pequeno?: boolean }) {
@@ -585,6 +681,24 @@ function TypeIcon({ type, pequeno = false }: { type: NotificationType; pequeno?:
     stroke: 'currentColor',
     strokeWidth: pequeno ? 3 : 2,
   } as const;
+
+  /**
+   * 🔴 **Un aviso de automatización salía con el icono de un sobre.**
+   *
+   * Las ramas de abajo miran el prefijo del tipo, y `AUTOMATION_TASK_CREATED`
+   * no empieza por `TASK_` ni por `MEMBER_`: caía al icono por defecto, que es
+   * el del correo. Un aviso que nadie envió, con un sobre y en rojo.
+   *
+   * Va primero porque `AUTOMATION_TASK_…` **también** contiene `TASK_`: con la
+   * comprobación al revés, seguiría sin verse nunca.
+   */
+  if (type.startsWith('AUTOMATION_')) {
+    return (
+      <svg {...props} aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    );
+  }
 
   if (type.startsWith('TASK_')) {
     return (

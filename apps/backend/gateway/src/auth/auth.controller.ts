@@ -6,6 +6,7 @@ import {
   Logger,
   Post,
   Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
@@ -194,6 +195,8 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'No autorizado' })
   async logout(@Request() req: Express.Request, @Body() body?: LogoutBodyDto) {
     this.logger.log('POST /auth/logout → credentials-service');
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException();
     /**
      * El `refreshToken` es **opcional y sirve para cerrar solo esta sesión**.
      *
@@ -207,7 +210,7 @@ export class AuthController {
     return firstValueFrom(
       this.credentialsClient.send(
         { cmd: 'auth_logout' },
-        { userId: req.user!.userId, refreshToken: body?.refreshToken },
+        { userId, refreshToken: body?.refreshToken },
       ),
     );
   }

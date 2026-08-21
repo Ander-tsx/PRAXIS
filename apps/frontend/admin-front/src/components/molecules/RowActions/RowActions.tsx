@@ -99,10 +99,33 @@ export function RowActions({ actions, label }: RowActionsProps) {
         className="flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         style={abierto ? { background: colors.surface, color: colors.textPrimary } : undefined}
       >
-        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <circle cx="12" cy="5" r="1.7" />
-          <circle cx="12" cy="12" r="1.7" />
-          <circle cx="12" cy="19" r="1.7" />
+        {/**
+         * ⚠️ **Era un botón de tres puntos, y tres puntos no dicen nada.**
+         *
+         * Es la convención de «hay más» en una app de móvil, donde el espacio
+         * obliga; en una tabla de administración lo que hay detrás son acciones
+         * sobre una cuenta o un proyecto, y quien llega a esta pantalla por
+         * primera vez tiene que abrirlo para averiguar si es eso o un menú de
+         * columnas.
+         *
+         * Un engranaje lo dice antes de pulsarlo. El nombre accesible ya
+         * decía «Acciones sobre …», así que aquí no cambia nada para quien usa
+         * un lector de pantalla: cambia para quien mira.
+         */}
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.9}
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1.08-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1.08 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"
+          />
         </svg>
       </button>
 

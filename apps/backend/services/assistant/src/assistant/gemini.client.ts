@@ -63,6 +63,16 @@ export class GeminiError extends Error {
   constructor(
     message: string,
     readonly status?: number,
+    /**
+     * Si volver a intentarlo tiene alguna posibilidad de salir bien.
+     *
+     * ⚠️ **No todos los fallos se parecen, y tratarlos igual es el error.** Un
+     * 503 de «modelo sobrecargado» se pasa en dos segundos; un tope de gasto
+     * agotado no se pasa hoy, y reintentar contra él es gastar la espera de
+     * quien pregunta para llegar al mismo sitio. Lo mismo un bloqueo de
+     * seguridad: la respuesta a la misma pregunta va a ser la misma.
+     */
+    readonly reintentable = false,
   ) {
     super(message);
     this.name = 'GeminiError';
@@ -72,15 +82,41 @@ export class GeminiError extends Error {
 /** Más de esto y la espera deja de parecer una espera. */
 const TIMEOUT_MS = 45_000;
 
+/**
+ * Cuántas veces se llama a Gemini antes de rendirse, contando la primera.
+ *
+ * Tres y no más: cada intento se paga en segundos de espera de una persona que
+ * está mirando la pantalla, y a partir del tercero lo que falla ya no es
+ * transitorio.
+ */
+const MAX_INTENTOS = 3;
+
+/** Espera entre intentos, creciente y con ruido para no sincronizar reintentos. */
+function esperaDelIntento(intento: number): number {
+  const base = 400 * 2 ** (intento - 1);
+  return base + Math.floor(Math.random() * 250);
+}
+
 @Injectable()
 export class GeminiClient {
   private readonly log = new Logger(GeminiClient.name);
   private readonly apiKey: string;
   private readonly model: string;
+  /**
+   * El modelo al que se cae cuando el principal no contesta ni tras los
+   * reintentos.
+   *
+   * ⚠️ **Vacío por defecto, y es a propósito.** Un respaldo mal elegido cambia
+   * la voz de PRAX y la calidad de las propuestas sin que nadie se entere de
+   * por qué; que haya que ponerlo a mano obliga a decidirlo. Si no está, se
+   * agotan los reintentos contra el principal y se falla con el motivo real.
+   */
+  private readonly modelFallback: string | null;
 
   constructor(config: ConfigService) {
     this.apiKey = config.getOrThrow<string>('GEMINI_API_KEY');
     this.model = config.get<string>('GEMINI_MODEL') ?? 'gemini-flash-latest';
+    this.modelFallback = config.get<string>('GEMINI_MODEL_FALLBACK')?.trim() || null;
   }
 
   /**
@@ -128,6 +164,61 @@ export class GeminiClient {
     maxOutputTokens?: number;
   }): Promise<GeminiReply> {
     /**
+     * Un turno son varios intentos, y eso es nuevo.
+     *
+     * 🔴 **Antes era una llamada y punto.** Un 503 de «modelo sobrecargado» —que
+     * `gemini-flash-latest` devuelve a ratos y sin avisar— salía como un error
+     * rojo en la cara de quien preguntaba, y el mismo mensaje reenviado a mano
+     * treinta segundos después funcionaba. Desde fuera eso no se lee como «el
+     * proveedor va lento»: se lee como que el asistente está roto.
+     *
+     * Solo se reintenta lo que puede salir distinto ({@link GeminiError.reintentable}).
+     */
+    const modelos = this.modelFallback ? [this.model, this.modelFallback] : [this.model];
+    let ultimo: GeminiError | null = null;
+
+    for (const modelo of modelos) {
+      for (let intento = 1; intento <= MAX_INTENTOS; intento += 1) {
+        try {
+          const respuesta = await this.intentar(modelo, params);
+          if (ultimo) {
+            this.log.log(
+              `gemini_recuperado modelo=${modelo} intento=${intento} tras=${ultimo.status ?? 'red'}`,
+            );
+          }
+          return respuesta;
+        } catch (error) {
+          const fallo =
+            error instanceof GeminiError
+              ? error
+              : new GeminiError('El asistente no ha podido responder. Vuelve a intentarlo.');
+          ultimo = fallo;
+          this.log.warn(
+            `gemini_intento_fallido modelo=${modelo} intento=${intento}/${MAX_INTENTOS} ` +
+              `status=${fallo.status ?? 'red'} reintentable=${fallo.reintentable} ${fallo.message}`,
+          );
+          /* Lo que no es transitorio no mejora esperando, ni cambiando de
+             modelo: la clave, la cuota y el bloqueo de seguridad son del
+             proyecto entero, no de un modelo concreto. */
+          if (!fallo.reintentable) throw fallo;
+          if (intento < MAX_INTENTOS) await this.esperar(esperaDelIntento(intento));
+        }
+      }
+    }
+
+    throw ultimo ?? new GeminiError('El asistente no ha podido responder. Vuelve a intentarlo.');
+  }
+
+  private esperar(milisegundos: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milisegundos));
+  }
+
+  /** Una sola llamada a la API. Los reintentos los pone {@link chat}. */
+  private async intentar(
+    modelo: string,
+    params: Parameters<GeminiClient['chat']>[0],
+  ): Promise<GeminiReply> {
+    /**
      * ⚠️ **Los archivos solo van en el turno actual, nunca en el historial.**
      *
      * El hilo se lee de la base y allí solo hay **texto**. La alternativa
@@ -172,7 +263,7 @@ export class GeminiClient {
       body.tools = [{ functionDeclarations: params.tools }];
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
 
     let response: Response;
     try {
@@ -187,13 +278,22 @@ export class GeminiClient {
          mensaje que se pueda leer: el usuario no puede hacer nada con un
          `ETIMEDOUT`, pero sí con «vuelve a intentarlo». */
       this.log.warn(`Gemini no respondio: ${(error as Error).message}`);
-      throw new GeminiError('El asistente no responde ahora mismo. Vuelve a intentarlo.');
+      /* Red caída o timeout: transitorio por definición, así que se reintenta. */
+      throw new GeminiError(
+        'El asistente no responde ahora mismo. Vuelve a intentarlo.',
+        undefined,
+        true,
+      );
     }
 
     if (!response.ok) {
       const detalle = await response.text().catch(() => '');
       this.log.warn(`Gemini ${response.status}: ${detalle.slice(0, 500)}`);
-      throw new GeminiError(this.mensajeDelFallo(response.status, detalle), response.status);
+      throw new GeminiError(
+        this.mensajeDelFallo(response.status, detalle),
+        response.status,
+        this.esTransitorio(response.status, detalle),
+      );
     }
 
     const json = (await response.json()) as {
@@ -202,6 +302,8 @@ export class GeminiClient {
     };
 
     if (json.promptFeedback?.blockReason) {
+      /* No se reintenta: la misma pregunta va a dar el mismo bloqueo. */
+      this.log.warn(`gemini_bloqueado modelo=${modelo} razon=${json.promptFeedback.blockReason}`);
       throw new GeminiError('El asistente ha rechazado la peticion.');
     }
 
@@ -213,7 +315,9 @@ export class GeminiClient {
        registra para poder verlo en los logs; el texto que haya llegado se
        devuelve igual, porque medio párrafo útil vale más que nada. */
     if (candidato?.finishReason && !['STOP', 'MAX_TOKENS'].includes(candidato.finishReason)) {
-      this.log.warn(`Gemini corto la respuesta por ${candidato.finishReason}`);
+      this.log.warn(
+        `gemini_corte modelo=${modelo} finishReason=${candidato.finishReason} partes=${parts.length}`,
+      );
     }
 
     /* La respuesta puede traer texto y llamadas a la vez, o solo llamadas: con
@@ -254,7 +358,41 @@ export class GeminiClient {
    * quien usa PRAXIS no puede arreglar el presupuesto de la plataforma. Lo que
    * necesita saber es que no es culpa suya y que no gane tiempo reintentando.
    */
+  /**
+   * Si este fallo de la API puede salir bien al volver a intentarlo.
+   *
+   * La familia 5xx es el caso claro: `UNAVAILABLE` cuando el modelo está
+   * sobrecargado, `INTERNAL` cuando algo se les cayó a ellos. Las dos se pasan
+   * solas en segundos y son, con diferencia, lo que más veces deja a alguien sin
+   * respuesta.
+   *
+   * ⚠️ **El 429 se parte en dos, igual que su mensaje.** El de límite por minuto
+   * también se pasa solo, pero no en los dos segundos que dura un backoff — así
+   * que reintentarlo solo sirve para que la espera sea más larga antes del mismo
+   * error. El del tope de gasto no se pasa hoy. Ninguno se reintenta.
+   *
+   * Un 4xx cualquiera —clave inválida, clave restringida, modelo que no existe
+   * para esta clave— **tampoco**: son configuración, y la configuración no
+   * cambia entre dos intentos separados por medio segundo. Ese es justo el caso
+   * de la versión desplegada, y reintentarlo solo escondería el diagnóstico
+   * detrás de tres veces más de espera.
+   */
+  private esTransitorio(status: number, _detalle: string): boolean {
+    return status >= 500;
+  }
+
   private mensajeDelFallo(status: number, detalle: string): string {
+    /**
+     * ⚠️ **Un 400 o un 403 de Gemini no es un fallo pasajero: es la
+     * configuración de la plataforma.** Clave inválida, clave restringida por
+     * IP o por API, o un modelo que esa clave no puede usar. Decirle a quien
+     * pregunta «vuelve a intentarlo» lo manda a reintentar para siempre contra
+     * algo que solo puede arreglar quien administra el despliegue — que es
+     * exactamente lo que pasó con la versión desplegada.
+     */
+    if (status === 400 || status === 401 || status === 403) {
+      return 'El asistente no está bien configurado en esta instalación. Avisa a quien la administra.';
+    }
     if (status !== 429) return 'El asistente no ha podido responder. Vuelve a intentarlo.';
 
     const texto = detalle.toLowerCase();

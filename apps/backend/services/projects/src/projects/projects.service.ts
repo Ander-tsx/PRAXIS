@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { RpcException } from '@nestjs/microservices';
 
+import { ProjectDomainOutboxFactory } from '../domain-events/project-domain-outbox.factory';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -33,6 +35,8 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, boolean> = {
   canDeleteTask: true,
   canManageMembers: true,
   canManageRoles: true,
+  canManageAutomations: true,
+  canManageIntegrations: true,
   canComment: true,
   canManageLabels: true,
   canDeleteProject: true,
@@ -47,6 +51,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 @Injectable()
 export class ProjectsService {
+  private readonly domainOutbox = new ProjectDomainOutboxFactory();
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -472,17 +477,14 @@ export class ProjectsService {
     status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
     reason?: string;
     actorId?: string;
+    correlationId?: string;
+    causationId?: string;
   }) {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.id },
       select: {
         id: true,
         ownerId: true,
-        /* El estado **anterior** viaja de vuelta al gateway: es lo único que
-           distingue reactivar un suspendido de recuperar un archivado, y son dos
-           entradas distintas del registro de actividad. El estado nuevo no basta,
-           los dos terminan en ACTIVE. */
-        status: true,
         members: { select: { userId: true } },
       },
     });
@@ -490,27 +492,61 @@ export class ProjectsService {
     if (!project) {
       throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
     }
+    if (!dto.actorId) {
+      throw new RpcException({ statusCode: 400, message: 'Falta actor confiable' });
+    }
 
     const volviendoAActivo = dto.status === 'ACTIVE';
-
-    const updated = await this.prisma.project.update({
-      where: { id: dto.id },
-      data: {
-        status: dto.status,
-        /* Al reactivar se limpian los tres campos: dejar el motivo de una
-           suspensión pasada haría que la pantalla siguiera enseñando el aviso. */
-        suspendedAt: volviendoAActivo ? null : new Date(),
-        suspendedBy: volviendoAActivo ? null : (dto.actorId ?? null),
-        suspendedReason: volviendoAActivo ? null : (dto.reason ?? null),
-      },
-      include: { _count: { select: { members: true, workspaces: true } } },
+    const correlationId = dto.correlationId ?? randomUUID();
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.project.findUnique({
+        where: { id: dto.id },
+        select: { status: true },
+      });
+      if (!current) throw new RpcException({ statusCode: 404, message: 'Proyecto no encontrado' });
+      if (current.status === dto.status) {
+        const saved = await tx.project.findUniqueOrThrow({
+          where: { id: dto.id },
+          include: { _count: { select: { members: true, workspaces: true } } },
+        });
+        return { saved, previousStatus: current.status };
+      }
+      const saved = await tx.project.update({
+        where: { id: dto.id },
+        data: {
+          status: dto.status,
+          suspendedAt: volviendoAActivo ? null : new Date(),
+          suspendedBy: volviendoAActivo ? null : dto.actorId,
+          suspendedReason: volviendoAActivo ? null : (dto.reason ?? null),
+        },
+        include: { _count: { select: { members: true, workspaces: true } } },
+      });
+      await this.domainOutbox.persist(
+        tx,
+        {
+          projectId: saved.id,
+          subject: { type: 'PROJECT', id: saved.id },
+          actor: { type: 'USER', id: dto.actorId },
+          correlationId,
+          causationId: dto.causationId,
+        },
+        {
+          type: 'project.status-changed.v1',
+          payload: {
+            previousStatus: current.status,
+            status: saved.status,
+            reason: dto.reason ?? null,
+          },
+        },
+      );
+      return { saved, previousStatus: current.status };
     });
 
     await this.redis.del(`project:${dto.id}`);
 
     await this.invalidarListasDe([project.ownerId, ...project.members.map((m) => m.userId)]);
 
-    return { ...updated, previousStatus: project.status };
+    return { ...updated.saved, previousStatus: updated.previousStatus };
   }
 
   /**
@@ -525,6 +561,21 @@ export class ProjectsService {
    * Incluye los archivados: para el panel son visibles, es el único sitio donde lo
    * son, y sin ellos no habría forma de recuperarlos.
    */
+  /**
+   * Los proyectos de los que alguien es dueño, con lo mínimo para nombrarlos.
+   *
+   * ⚠️ Los `DELETED` **cuentan igual**: siguen en la base con su `ownerId`, así
+   * que borrar la cuenta los dejaría igual de huérfanos aunque no se vean en
+   * ningún listado.
+   */
+  async findOwned(ownerId: string) {
+    return this.prisma.project.findMany({
+      where: { ownerId },
+      select: { id: true, name: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
   async findAllForAdmin(dto: {
     page?: number;
     limit?: number;

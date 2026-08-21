@@ -1,18 +1,23 @@
 'use server';
 
 import type {
+  AutomationRuleState,
   BoardState,
   ColumnState,
   DeleteProjectState,
   MemberState,
   ProjectFieldState,
+  ReviewState,
   RoleState,
   TaskState,
   WorkspaceState,
 } from '@/lib/action-state';
+import type { AutomationCatalog } from '@/lib/automation-catalog';
+import { bodyFromDraft, draftFromFormData } from '@/lib/automation-draft';
 import {
   normalizeMultiline,
   validateAttachment,
+  validateAutomationDraft,
   validateBoard,
   validateChatMessage,
   validateChecklistItem,
@@ -27,6 +32,8 @@ import {
 } from '@/lib/validation';
 import {
   ApiError,
+  type AutomationReviewSummary,
+  type AutomationRule,
   type Board,
   CHAT_ATTACHMENT_MAX_BYTES,
   type ChatAttachment,
@@ -34,6 +41,7 @@ import {
   type ChecklistItem,
   type Column,
   type Label,
+  PROJECT_SUSPENDED_CODE,
   type Paginated,
   type PermissionMap,
   type ProjectDetail,
@@ -82,6 +90,214 @@ async function requireApi() {
  */
 function revalidateProject(projectId: string) {
   revalidatePath(`/${projectId}`);
+}
+
+/**
+ * Crea o edita una regla desde el constructor guiado.
+ *
+ * Reconstruye el borrador desde los arrays paralelos que emite
+ * `ConditionsSection` (D4), valida con el mismo criterio que
+ * `rule-definition.ts` antes de gastar una petición, arma el cuerpo exacto
+ * con `bodyFromDraft` y confirma contra el `data` de la respuesta — D6: que
+ * exista `id` y que el nombre sea el que se pidió, no que el status HTTP
+ * haya sido 200.
+ */
+export async function saveAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = formData.get('ruleId');
+
+  /**
+   * El catálogo, otra vez y desde el servidor.
+   *
+   * ⚠️ **No se acepta el que mande el cliente**, y no es paranoia barata: el
+   * catálogo decide qué campos existen, qué operadores valen y qué claves de
+   * configuración se aceptan. Recibirlo del navegador sería dejar que quien
+   * envía el formulario redefina las reglas con las que se valida su propio
+   * formulario. Pedirlo aquí cuesta una llamada por guardado y el gateway ya
+   * lo cachea; el servicio lo devuelve de memoria.
+   */
+  const catalog = await api
+    .get<AutomationCatalog>(`/projects/${projectId}/automations/catalog`)
+    .catch(() => null);
+  if (!catalog) {
+    return { error: 'No se ha podido comprobar la regla. Inténtalo otra vez.', done: null };
+  }
+
+  const draft = draftFromFormData(catalog, formData);
+
+  /* El `FormData` no es de fiar aunque el cliente ya haya validado, así que se
+     vuelve a comprobar aquí. Del ámbito no se hace nada: quien lo usa para
+     colocar el mensaje es el formulario, y aquí solo hay un sitio donde
+     ponerlo. */
+  const clientError = validateAutomationDraft(catalog, draft);
+  if (clientError) return { error: clientError.mensaje, done: null };
+
+  const body = bodyFromDraft(draft);
+
+  try {
+    const saved = ruleId
+      ? await api.patch<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`, body)
+      : await api.post<AutomationRule>(`/projects/${projectId}/automations`, body);
+
+    /* Los tres campos que nombra D6: que exista, que se llame como pedimos y
+       que sea del trigger que pedimos. El `trigger` importa porque el `PATCH`
+       es reemplazo total: un guardado que lo cambiara no dejaría ninguna otra
+       señal. */
+    if (!saved?.id || saved.name !== body.name || saved.trigger?.type !== body.trigger.type) {
+      return { error: 'El servidor no guardó la regla. Inténtalo de nuevo.', done: null };
+    }
+  } catch (error) {
+    if (error instanceof ApiError && error.validationErrors.length > 0) {
+      return { error: error.validationErrors.join(' '), done: null };
+    }
+    if (error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE) {
+      return {
+        error: 'El proyecto está suspendido: no se pueden crear ni editar reglas mientras tanto.',
+        done: null,
+      };
+    }
+    return { error: describe(error, 'No se pudo guardar la regla.'), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: body.name };
+}
+
+/**
+ * «Revisar ahora»: evalúa las reglas activas contra las tareas candidatas.
+ *
+ * El resumen que devuelve el servidor —`{ rules, candidates, succeeded,
+ * failed }`— viajaba hasta ahora directo a la papelera: se pedía y se
+ * descartaba. Se transporta en el estado para que la interfaz pueda decir qué
+ * pasó, sin inventar `skipped` ni `deduped`, que el backend no manda (hueco 4
+ * de `PENDIENTES-BACKEND-AUTOMATIZACION.md`) — el detalle de esos dos casos
+ * se lee fila por fila en la lista de ejecuciones, donde `SKIPPED` sí aparece.
+ */
+export async function reviewAutomationsAction(
+  _prev: ReviewState,
+  formData: FormData,
+): Promise<ReviewState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', summary: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+
+  try {
+    const summary = await api.post<AutomationReviewSummary>(
+      `/projects/${projectId}/automations/review`,
+      {},
+    );
+    if (!summary || typeof summary.candidates !== 'number') {
+      return { error: 'El servidor no devolvió un resumen de la revisión.', summary: null };
+    }
+    revalidateProject(projectId);
+    return { error: null, summary };
+  } catch (error) {
+    if (error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE) {
+      return {
+        error: 'El proyecto está suspendido: no se pueden revisar las reglas mientras tanto.',
+        summary: null,
+      };
+    }
+    return { error: describe(error, 'No se pudo revisar las reglas.'), summary: null };
+  }
+}
+
+/**
+ * Habilita o deshabilita una regla.
+ *
+ * ⚠️ **`PATCH` es reemplazo total, no parcial** — hueco 2 de
+ * `PENDIENTES-BACKEND-AUTOMATIZACION.md`: no existe una ruta para cambiar
+ * solo `status`, así que hay que leer la regla entera y reenviarla con el
+ * único campo cambiado. Confirma contra `data.status`, no contra el código
+ * de estado: un 200 con el estado de siempre sería un cambio que no cambió
+ * nada.
+ */
+export async function toggleAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = String(formData.get('ruleId') ?? '');
+  const nextStatus = String(formData.get('nextStatus') ?? '');
+
+  try {
+    const rule = await api.get<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`);
+
+    const saved = await api.patch<AutomationRule>(`/projects/${projectId}/automations/${ruleId}`, {
+      name: rule.name,
+      ...(rule.description != null && { description: rule.description }),
+      status: nextStatus,
+      trigger: { type: rule.trigger.type, config: rule.trigger.config },
+      conditions: rule.conditions.map(({ field, operator, value }) => ({ field, operator, value })),
+      actions: rule.actions.map(({ type, config }) => ({ type, config })),
+    });
+
+    if (saved.status !== nextStatus) {
+      return {
+        error: 'El servidor no cambió el estado de la regla. Inténtalo de nuevo.',
+        done: null,
+      };
+    }
+  } catch (error) {
+    return { error: describeAutomationToggleError(error), done: null };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: nextStatus };
+}
+
+export async function deleteAutomationRuleAction(
+  _prev: AutomationRuleState,
+  formData: FormData,
+): Promise<AutomationRuleState> {
+  const api = await requireApi();
+  if (!api) return { error: 'Tu sesión ha caducado.', done: null };
+
+  const projectId = String(formData.get('projectId') ?? '');
+  const ruleId = String(formData.get('ruleId') ?? '');
+
+  try {
+    await api.delete(`/projects/${projectId}/automations/${ruleId}`);
+  } catch (error) {
+    return {
+      error:
+        error instanceof ApiError && error.code === PROJECT_SUSPENDED_CODE
+          ? 'El proyecto está suspendido: no se puede eliminar ninguna regla mientras tanto.'
+          : describe(error, 'No se pudo eliminar la regla.'),
+      done: null,
+    };
+  }
+
+  revalidateProject(projectId);
+  return { error: null, done: 'eliminada' };
+}
+
+/**
+ * El 400 de `toggleAutomationRuleAction` no es «campo inválido»: es que la
+ * regla se reenvía entera y el catálogo pudo endurecerse desde que se
+ * guardó — hueco 2. El mensaje genérico de `describe()` hablaría de un campo
+ * que nadie tocó.
+ */
+function describeAutomationToggleError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === PROJECT_SUSPENDED_CODE) {
+      return 'El proyecto está suspendido: no se puede activar ni desactivar ninguna regla mientras tanto.';
+    }
+    if (error.status === 400) {
+      return 'Esta regla ya no es válida con el catálogo actual: ábrela y corrígela antes de cambiar su estado.';
+    }
+  }
+  return describe(error, 'No se pudo cambiar el estado de la regla.');
 }
 
 /**
@@ -170,7 +386,9 @@ export async function projectInventoryAction(projectId: string): Promise<Project
 
   return {
     // Si algún tablero falló no se puede sumar: el total sería más bajo del real.
-    tasks: taskTotals.includes(null) ? null : taskTotals.reduce((a, b) => a! + b!, 0),
+    tasks: taskTotals.every((total): total is number => total !== null)
+      ? taskTotals.reduce((sum, total) => sum + total, 0)
+      : null,
     pendingInvitations: invitations,
   };
 }
@@ -907,8 +1125,9 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   const invalid = validateTask(title);
   if (invalid) return { error: invalid, done: null };
 
+  let creada: Task;
   try {
-    const created = await api.post<Task>(`/boards/${boardId}/tasks`, {
+    creada = await api.post<Task>(`/boards/${boardId}/tasks`, {
       columnId,
       title,
       status,
@@ -919,7 +1138,7 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
       ...(labelIds.length > 0 && { labelIds }),
     });
 
-    if (!created?.id || created.title !== title) {
+    if (!creada?.id || creada.title !== title) {
       return { error: 'El servidor no guardó la tarea.', done: null };
     }
   } catch (error) {
@@ -927,7 +1146,15 @@ export async function createTaskAction(_prev: TaskState, formData: FormData): Pr
   }
 
   revalidateProject(projectId);
-  return { error: null, done: 'created' };
+  /**
+   * ⚠️ **Devuelve el id, no la cadena `'created'`.**
+   *
+   * El alta rápida solo pide el título, así que lo siguiente que quiere hacer
+   * quien la usa es rellenar el resto — y para abrir el panel de la tarea hace
+   * falta su id. Confirmar con una cadena fija obligaba a buscarla después por
+   * el título, que ni siquiera es único.
+   */
+  return { error: null, done: creada.id };
 }
 
 export async function updateTaskAction(_prev: TaskState, formData: FormData): Promise<TaskState> {

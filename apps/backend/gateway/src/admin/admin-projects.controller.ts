@@ -8,6 +8,7 @@ import {
   Inject,
   Param,
   ParseUUIDPipe,
+  Delete,
   Patch,
   Query,
   Request,
@@ -27,6 +28,8 @@ import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RequireGlobalRole } from '../common/decorators/require-global-role.decorator';
 import { GlobalRoleGuard } from '../common/guards/global-role.guard';
+import { AutomationPurgeService } from '../projects/automation-purge.service';
+import { TaskPurgeService } from '../projects/task-purge.service';
 import { AdminActivityRecorder } from './admin-activity.recorder';
 
 interface ProyectoCrudo {
@@ -121,6 +124,12 @@ export class AdminProjectsController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     private readonly actividad: AdminActivityRecorder,
+    /* Las tareas y las automatizaciones viven en otros microservicios: el
+       cascade de Prisma no llega hasta ellas. Es la misma purga que hace el
+       `DELETE` del dueño, y por eso se reutilizan sus servicios en vez de
+       repetir las llamadas. */
+    private readonly taskPurge: TaskPurgeService,
+    private readonly automationPurge: AutomationPurgeService,
   ) {}
 
   /**
@@ -236,6 +245,57 @@ export class AdminProjectsController {
    * pantalla de proyecto. Sin él vería un proyecto donde ningún botón funciona y
    * ni una palabra que lo explique — y abriría un ticket en vez de entenderlo.
    */
+  /**
+   * Borra un proyecto de verdad, con su purga en los otros servicios.
+   *
+   * ## ⚠️ No es `PROJECT_ARCHIVED`, y la diferencia importa
+   *
+   * Archivar es un **estado**: el proyecto sigue ahí, responde 404 a todo el
+   * mundo menos a administración, y se deshace. Esto quita la fila y arrastra
+   * sus espacios, tableros, columnas, roles, miembros y chat por el cascade —
+   * más las tareas y las reglas, que están en otros esquemas y hay que purgar a
+   * mano—. No se deshace.
+   *
+   * Existe porque archivar no basta para lo que administración necesita de vez
+   * en cuando: un proyecto de prueba, uno duplicado, o el que bloquea el borrado
+   * de una cuenta.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borra un proyecto y purga sus datos (solo administradores)' })
+  @ApiResponse({ status: 200, description: 'Proyecto borrado' })
+  @ApiResponse({ status: 404, description: 'Ese proyecto ya no existe' })
+  async delete(@Request() req: Express.Request, @Param('id', ParseUUIDPipe) id: string) {
+    const actorId = req.user!.userId;
+
+    /* Antes de borrar: después no hay a quién preguntarle cómo se llamaba, y el
+       registro se quedaría con un UUID. */
+    const proyecto = await firstValueFrom(
+      this.projectsClient.send<ProyectoCrudo>({ cmd: 'project_find_one_admin' }, { id }),
+    );
+
+    const resultado = await firstValueFrom(
+      this.projectsClient.send({ cmd: 'project_delete' }, { id }),
+    );
+
+    await Promise.all([
+      this.taskPurge.afterProjectDeleted(id),
+      this.automationPurge.afterProjectDeleted(id),
+    ]);
+
+    await this.actividad.record({
+      actorId,
+      actorLabel: await this.etiquetaDe(actorId),
+      action: AdminActionType.PROJECT_DELETED,
+      targetType: AdminTargetType.PROJECT,
+      targetId: id,
+      targetLabel: proyecto?.name,
+      metadata: { slug: proyecto?.slug, ownerId: proyecto?.ownerId },
+    });
+
+    return resultado;
+  }
+
   @Patch(':id/status')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cambia el estado de un proyecto (solo administradores)' })

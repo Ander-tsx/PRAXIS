@@ -8,6 +8,7 @@ import {
   type UserProfile,
   alpha,
   colors,
+  PERSONA_ELIMINADA,
   personLabel,
   useAccion,
 } from '@praxis/commons';
@@ -42,7 +43,7 @@ export function PendingInvitations({
       <ul className="flex flex-col gap-2">
         {invitations.map((invitation) => {
           const user = usersById.get(invitation.userId);
-          const label = user ? personLabel(user) : invitation.userId;
+          const label = user ? personLabel(user) : PERSONA_ELIMINADA;
 
           return (
             /* Se apila en móvil por lo mismo que las filas del equipo: dos
