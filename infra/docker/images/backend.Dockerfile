@@ -40,7 +40,12 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY apps/backend/gateway/package.json                  apps/backend/gateway/
 COPY apps/backend/commons/contracts/package.json        apps/backend/commons/contracts/
 COPY apps/backend/commons/observability/package.json    apps/backend/commons/observability/
+# ⚠️ Este paquete es nuevo: lleva el publicador del buzón de salida, que antes
+# estaba duplicado en tasks y projects. Sin esta línea, `pnpm install` no lo
+# enlaza y los dos servicios fallan al importarlo.
+COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
 COPY apps/backend/services/alexa/package.json           apps/backend/services/alexa/
+COPY apps/backend/services/automation/package.json      apps/backend/services/automation/
 COPY apps/backend/services/assistant/package.json       apps/backend/services/assistant/
 COPY apps/backend/services/credentials/package.json     apps/backend/services/credentials/
 COPY apps/backend/services/permissions/package.json     apps/backend/services/permissions/
@@ -94,7 +99,7 @@ FROM base AS runtime
 
 ENV NODE_ENV=production
 
-# pm2 supervisa los 8 procesos: reinicia el que muera y mantiene el contenedor
+# pm2 supervisa los 9 procesos: reinicia el que muera y mantiene el contenedor
 # atado al ciclo de vida del grupo, en vez de a un `node` suelto.
 RUN npm install --global pm2@5 && npm cache clean --force
 

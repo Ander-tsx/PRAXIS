@@ -281,7 +281,7 @@ llegar al puerto.
 Quita `--con-seeds` si no quieres los datos de ejemplo.
 
 > Si da error de que el contenedor no existe, la máquina aún está bajándose la
-> imagen. Espera un par de minutos: son 550 MB y 8 procesos que levantar.
+> imagen. Espera un par de minutos: son 550 MB y 9 procesos que levantar.
 
 ---
 
@@ -352,7 +352,7 @@ gcloud compute ssh NOMBRE-VM --tunnel-through-iap --zone ZONA \
   --command "sudo journalctl -u praxis-backend -n 100 --no-pager"
 ```
 
-Y el estado de los 8 procesos:
+Y el estado de los 9 procesos:
 
 ```bash
 gcloud compute ssh NOMBRE-VM --tunnel-through-iap --zone ZONA \
@@ -398,7 +398,7 @@ Si el crédito aprieta, en orden de cuánto ahorras:
    Para volver, el mismo comando con 1 y 3.
 
 2. **Máquinas más pequeñas** (`e2-small`, ~12/mes cada una): ahorra ~24. Ojo —
-   en el backend corren 8 procesos Node a ~150 MB cada uno; con 2 GB va justo y
+   en el backend corren 9 procesos Node a ~150 MB cada uno; con 2 GB va justo y
    un pico de memoria mata procesos sin dar un error claro.
 
 3. **Destruirlo todo entre entregas.** Reconstruirlo son 30 minutos y los datos

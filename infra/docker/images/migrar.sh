@@ -66,7 +66,13 @@ url_para() {
 #
 # El orden importa para los seeds: permissions y credentials primero, porque
 # projects y tasks referencian lo que crean.
-SERVICIOS=(permissions credentials projects tasks assistant alexa)
+#
+# ⚠️ **`automation` entró tarde y este script no lo sabía.** El servicio existe
+# desde la rama de automatizaciones y tiene su propio schema con cinco
+# migraciones; sin esta línea, el despliegue arranca con `automation.*` sin
+# crear y el servicio muere en bucle contra una tabla que no existe — con la
+# sección de Automatización caída y ningún otro síntoma.
+SERVICIOS=(permissions credentials projects tasks assistant alexa automation)
 
 echo "──────────────────────────────────────────────"
 echo " Migraciones contra $POSTGRES_HOST/$POSTGRES_DB"

@@ -1,5 +1,5 @@
 /**
- * Los 8 procesos del backend dentro del contenedor.
+ * Los 9 procesos del backend dentro del contenedor.
  *
  * Este archivo es la traducción a producción de lo que en desarrollo hacen los
  * `.env` sueltos de cada servicio. La lista de puertos y de variables sale de
@@ -113,9 +113,14 @@ const rutas = {
   ASSISTANT_SERVICE_PORT: 3006,
   ALEXA_SERVICE_HOST: LOCAL,
   ALEXA_SERVICE_PORT: 3007,
+  /* ⚠️ Sin esto el gateway levanta igual y responde 500 en las siete rutas de
+     `/automations`: `ClientsModule` no falla al registrarse contra un host
+     `undefined`, falla al primer `send`. */
+  AUTOMATION_SERVICE_HOST: LOCAL,
+  AUTOMATION_SERVICE_PORT: 3008,
 };
 
-/** Valores por defecto de pm2 comunes a los 8 procesos. */
+/** Valores por defecto de pm2 comunes a los 9 procesos. */
 function proceso(name, cwd, env) {
   return {
     name,
@@ -219,6 +224,24 @@ module.exports = {
       VOICE_JWT_SECRET,
       CREDENTIALS_SERVICE_HOST: rutas.CREDENTIALS_SERVICE_HOST,
       CREDENTIALS_SERVICE_PORT: rutas.CREDENTIALS_SERVICE_PORT,
+      PROJECTS_SERVICE_HOST: rutas.PROJECTS_SERVICE_HOST,
+      PROJECTS_SERVICE_PORT: rutas.PROJECTS_SERVICE_PORT,
+      TASKS_SERVICE_HOST: rutas.TASKS_SERVICE_HOST,
+      TASKS_SERVICE_PORT: rutas.TASKS_SERVICE_PORT,
+    }),
+
+    /* Automatización. Lee el flujo de hechos de dominio de Redis y habla con
+       projects y tasks para evaluar y ejecutar las reglas.
+
+       ⚠️ **Necesita Redis por partida doble**: el stream `praxis:domain-events`
+       del que consume, y el mismo cliente para el grupo de consumo. Sin
+       `REDIS_URL` arranca y no atiende ni un hecho — las reglas reactivas se
+       quedan mudas y no hay ningún error que lo diga. */
+    proceso('automation', '/app/apps/backend/services/automation', {
+      ...comun,
+      TCP_PORT: 3008,
+      DATABASE_URL: databaseUrl('automation'),
+      REDIS_URL,
       PROJECTS_SERVICE_HOST: rutas.PROJECTS_SERVICE_HOST,
       PROJECTS_SERVICE_PORT: rutas.PROJECTS_SERVICE_PORT,
       TASKS_SERVICE_HOST: rutas.TASKS_SERVICE_HOST,
