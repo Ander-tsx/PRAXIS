@@ -43,6 +43,13 @@ export interface Presentacion {
   autopilot: { expand: number; collapse: number };
   /** El texto del botón, si el aviso lleva a algún sitio. */
   accion?: string;
+  /**
+   * El icono de la insignia, si lleva uno propio.
+   *
+   * Es una **clave**, no el icono: esta tabla es un módulo de datos y el icono
+   * es JSX. Lo resuelve `LiveNotices`, que sí es un componente.
+   */
+  icono?: 'rayo';
 }
 
 /** Lo que se enseña cuando llega un tipo que este navegador no conoce todavía. */
@@ -128,19 +135,19 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
   /**
    * Los diez de automatización.
    *
-   * ⚠️ **No valía un `startsWith('AUTOMATION_')`.** Los diez comparten origen
-   * —una regla— pero no urgencia: una tarea vencida es un aviso amarillo que
-   * tiene que quedarse, y una tarea recién creada es un dato que pasa. Con una
-   * sola entrada para todos, o las diez se quedan doce segundos en pantalla o
-   * la vencida desaparece antes de leerla. Esta tabla existe precisamente para
-   * este caso.
+   * **El ámbar y el rayo los llevan los diez**: lo que tienen en común no es
+   * la urgencia, es el origen —nadie los mandó, los disparó una regla—, y eso
+   * es justo lo que hay que reconocer de un vistazo antes de leer el texto. El
+   * estado `warning` de `sileo` es el token `--color-warning` de la casa
+   * (`#fbbf24` en oscuro, `#a16207` en claro), y tiñe insignia, título y botón
+   * de una vez.
    *
-   * ⚠️ **El rayo no viaja al toast, y no es un olvido.** `sileo.show()` no
-   * admite icono: la píldora solo tiene estado de color y etiqueta. Así que lo
-   * que distingue a un aviso de automatización aquí es el **título**, que
-   * nombra el hecho —«Vencida», «Sin encargado»— en lugar del genérico
-   * «Aviso» al que caían. El rayo sigue estando en la bandeja del panel
-   * (`TypeIcon`), que es donde lleva el botón.
+   * ⚠️ **Lo que no comparten es el ritmo, y por eso siguen siendo diez
+   * entradas.** Una tarea vencida tiene que quedarse en pantalla; una tarea
+   * recién creada es un dato que pasa. Con una sola entrada para todos, o las
+   * diez se quedan diez segundos o la vencida desaparece antes de leerse. El
+   * título también es propio: nombra el hecho —«Vencida», «Sin encargado»— en
+   * vez del genérico «Aviso» al que caían todos.
    */
   AUTOMATION_TASK_OVERDUE: {
     tipo: 'warning',
@@ -148,6 +155,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
     duracion: 10000,
     autopilot: { expand: 600, collapse: 8500 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_DUE_SOON: {
     tipo: 'warning',
@@ -155,6 +163,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_STALE: {
     tipo: 'warning',
@@ -162,6 +171,7 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_UNASSIGNED: {
     tipo: 'warning',
@@ -169,13 +179,15 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
     duracion: 8000,
     autopilot: { expand: 450, collapse: 6500 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_COMPLETED: {
-    tipo: 'success',
+    tipo: 'warning',
     titulo: 'Terminada',
     duracion: 6500,
     autopilot: { expand: 400, collapse: 5000 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   /* Volver a abrir algo dado por hecho merece mirarse: amarillo, y un poco más
      de tiempo que los que solo informan. */
@@ -185,34 +197,39 @@ export const PRESENTACION_POR_TIPO: Record<NotificationType, Presentacion> = {
     duracion: 7000,
     autopilot: { expand: 450, collapse: 5500 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_CREATED: {
-    tipo: 'info',
+    tipo: 'warning',
     titulo: 'Nueva tarea',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_MOVED: {
-    tipo: 'info',
+    tipo: 'warning',
     titulo: 'Movida',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_ASSIGNEES_CHANGED: {
-    tipo: 'info',
+    tipo: 'warning',
     titulo: 'Encargados',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
+    icono: 'rayo',
   },
   AUTOMATION_TASK_DUE_DATE_CHANGED: {
-    tipo: 'info',
+    tipo: 'warning',
     titulo: 'Vencimiento',
     duracion: 5500,
     autopilot: { expand: 350, collapse: 4200 },
     accion: 'Ver',
+    icono: 'rayo',
   },
 };
 

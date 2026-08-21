@@ -652,21 +652,31 @@ const TYPE_TONE: Record<NotificationType, string> = {
   TASK_ASSIGNED: colors.primary,
   TASK_UNASSIGNED: colors.textSecondary,
   /**
+   * **Los diez de automatización, en ámbar.**
+   *
    * ⚠️ **El rojo es para lo que está mal, no para lo que es automático.**
-   * `AUTOMATION_TASK_STALE` estaba en `error` y salía igual de alarmante que
-   * «te sacaron del proyecto». Solo lo vencido y lo parado tiran a aviso; lo
-   * demás son hechos del proyecto y van en el tono neutro de siempre.
+   * `AUTOMATION_TASK_STALE` estuvo en `error` y salía igual de alarmante que
+   * «te sacaron del proyecto». Pero repartirlos luego por urgencia —vencido en
+   * aviso, creado en violeta, terminado en verde— tenía el mismo problema al
+   * revés: el color decía qué había pasado, que ya lo dice la frase, y no decía
+   * lo único que no se puede leer de un vistazo — que **esto lo hizo una
+   * regla**, no una persona.
+   *
+   * Así que el ámbar es de la automatización entera, y va con el rayo. Es el
+   * mismo color que llevan estos avisos en el toast (`LiveNotices/styles.ts`):
+   * el que aparece en pantalla y el que queda en la bandeja tienen que
+   * reconocerse como lo mismo.
    */
   AUTOMATION_TASK_DUE_SOON: colors.warning,
   AUTOMATION_TASK_STALE: colors.warning,
-  AUTOMATION_TASK_OVERDUE: colors.error,
+  AUTOMATION_TASK_OVERDUE: colors.warning,
   AUTOMATION_TASK_UNASSIGNED: colors.warning,
-  AUTOMATION_TASK_CREATED: colors.primary,
-  AUTOMATION_TASK_MOVED: colors.primary,
-  AUTOMATION_TASK_COMPLETED: colors.success,
+  AUTOMATION_TASK_CREATED: colors.warning,
+  AUTOMATION_TASK_MOVED: colors.warning,
+  AUTOMATION_TASK_COMPLETED: colors.warning,
   AUTOMATION_TASK_REOPENED: colors.warning,
-  AUTOMATION_TASK_ASSIGNEES_CHANGED: colors.primary,
-  AUTOMATION_TASK_DUE_DATE_CHANGED: colors.primary,
+  AUTOMATION_TASK_ASSIGNEES_CHANGED: colors.warning,
+  AUTOMATION_TASK_DUE_DATE_CHANGED: colors.warning,
 };
 
 function TypeIcon({ type, pequeno = false }: { type: NotificationType; pequeno?: boolean }) {

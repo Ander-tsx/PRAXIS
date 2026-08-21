@@ -14,6 +14,34 @@ import { projectHref } from '../../api/routes';
  * pero conviene saberlo.
  */
 const BANDEJA_DE_AVISOS = '/dashboard#avisos';
+
+/**
+ * El rayo de la insignia de un aviso de automatización.
+ *
+ * Sin color propio: `sileo` pinta la insignia con `color: var(--sileo-tone)`,
+ * que sale del estado del aviso —`warning`, o sea el ámbar de la casa—, así que
+ * `currentColor` lo hereda y el icono nunca se desalinea del título ni del
+ * botón.
+ */
+function RayoDeAutomatizacion() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ width: '100%', height: '100%' }}
+    >
+      {/* El mismo trazo que el de la bandeja (`TypeIcon`): el aviso que
+          aparece en pantalla y el que queda guardado tienen que reconocerse
+          como el mismo. */}
+      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  );
+}
 import { useCurrentTheme, useRefrescoAgrupado } from '../../hooks';
 import { marcarHiloPendiente, useLiveEvent, useReconnection } from '../../realtime';
 import type { ChatMessageEvent, NoticeEvent } from '../../realtime';
@@ -126,6 +154,9 @@ export function LiveNotices() {
       sileo.show({
         type: presentacion.tipo,
         title: presentacion.titulo,
+        /* La tabla guarda la clave y el icono se resuelve aquí: `styles.ts` es
+           un módulo de datos y esto es JSX. */
+        ...(presentacion.icono === 'rayo' ? { icon: <RayoDeAutomatizacion /> } : {}),
         description: descripcion,
         duration: presentacion.duracion,
         autopilot: presentacion.autopilot,

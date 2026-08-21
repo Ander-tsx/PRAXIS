@@ -90,15 +90,23 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
             Ejecuciones
           </h3>
           <span className="shrink-0 font-light text-text-disabled">/</span>
+          {/* ⚠️ **«Las de barrido se lanzan desde aquí» no explicaba nada.**
+              «Barrido» es como se llama por dentro; quien lee esto solo quiere
+              saber qué pasa si pulsa el botón de al lado. */}
           <p className="truncate font-sans text-sm text-text-secondary">
-            Qué hizo cada regla, sobre qué tarea y cuándo. Las de barrido se lanzan desde aquí.
+            Qué hizo cada regla, sobre qué tarea y cuándo.
           </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <form action={formAction}>
             <input type="hidden" name="projectId" value={projectId} />
-            <Button type="submit" variant="secondary" isLoading={pending}>
+            <Button
+              type="submit"
+              variant="secondary"
+              isLoading={pending}
+              title="Comprueba ahora las reglas que vigilan un estado —vence pronto, lleva parada, ya venció, sigue sin encargado— contra las tareas del proyecto. Las que reaccionan a un hecho (se crea, se mueve, se completa…) no lo necesitan: saltan solas."
+            >
               Revisar ahora
             </Button>
           </form>
@@ -236,8 +244,7 @@ export function RuleExecutions({ projectId, executions, catalog, proyecto }: Rul
        */}
       {executions !== null && executions.total > executions.items.length && (
         <p className="font-sans text-xs text-text-secondary">
-          Se ven las últimas {executions.items.length} de {executions.total}. El histórico
-          completo todavía no se puede recorrer desde aquí.
+          Se ven las últimas {executions.items.length} de {executions.total}.
         </p>
       )}
     </section>
