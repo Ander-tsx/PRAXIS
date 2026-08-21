@@ -65,11 +65,34 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
   const [rows, setRows] = useState<ConditionRow[]>(() =>
     rule ? rowsFromConditions(rule.conditions) : [],
   );
-  /** Con qué se abrió, para saber si hay algo que perder al cerrar. */
-  const [referencia] = useState(() =>
-    JSON.stringify({ draft: inicial(), rows: rule ? rowsFromConditions(rule.conditions) : [] }),
-  );
+  /**
+   * Con qué se abrió, para saber si hay algo que perder al cerrar.
+   *
+   * 🔴 **Se congela el estado inicial, no se vuelve a construir.** Esto llamaba
+   * otra vez a `inicial()` y a `rowsFromConditions()`, y esa segunda llamada no
+   * devuelve lo mismo: cada fila de condición nace con un `crypto.randomUUID()`
+   * propio. Así que la referencia difería del estado desde el primer render y
+   * **toda regla abierta para editar se creía modificada**: pulsar «Cancelar»
+   * sin haber tocado nada preguntaba si descartar los cambios, y quien lo veía
+   * no tenía forma de saber que no había ninguno.
+   */
+  const [referencia] = useState(() => JSON.stringify({ draft, rows }));
   const [confirmandoCierre, setConfirmandoCierre] = useState(false);
+
+  /**
+   * Cuántas condiciones se llevó por delante el último cambio de disparador.
+   *
+   * 🔴 **Descartarlas en silencio es perder lo que alguien acaba de escribir.**
+   * Antes había un `confirm()` del navegador, que se retiró con el resto de
+   * diálogos del sistema (D4) — y con él se fue el aviso entero, no solo la
+   * ventana. Cambiar de disparador vaciaba la sección «Si» sin decir nada, y
+   * quien tuviera la sección plegada ni siquiera lo veía.
+   *
+   * No se pregunta antes, se cuenta después: preguntar obliga a decidir sobre
+   * algo que todavía no se ve, y aquí deshacer es elegir el disparador de
+   * antes.
+   */
+  const [condicionesDescartadas, setCondicionesDescartadas] = useState(0);
   const [errorCliente, setErrorCliente] = useState<{
     ambito: AutomationErrorScope;
     mensaje: string;
@@ -193,6 +216,7 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
             actions: draft.actions,
             status: draft.status,
           });
+          setCondicionesDescartadas(rows.length);
           setRows([]);
         }}
         onChangeConfig={(key, value) =>
@@ -200,12 +224,28 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
         }
       />
 
+      {condicionesDescartadas > 0 && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-xl bg-warning-muted px-3.5 py-2.5 font-sans text-sm text-text-primary"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+          {condicionesDescartadas === 1
+            ? 'Se descartó la condición que tenías: los campos de este disparador son otros.'
+            : `Se descartaron las ${condicionesDescartadas} condiciones que tenías: los campos de este disparador son otros.`}
+        </p>
+      )}
+
       {trigger && (
         <ConditionsSection
           catalog={catalog}
           trigger={trigger}
           rows={rows}
-          onChange={setRows}
+          onChange={(nuevas) => {
+            setRows(nuevas);
+            /* Tocar las condiciones es haber leído el aviso. */
+            setCondicionesDescartadas(0);
+          }}
           proyecto={proyecto}
         />
       )}
