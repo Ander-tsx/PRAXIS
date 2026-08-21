@@ -288,7 +288,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
    * crudo — el mismo síntoma que ya tuvieron las invitaciones pendientes.
    */
   const idsDePersonas =
-    activeTab === 'equipo' || activeTab === 'espacios'
+    activeTab === 'equipo' || activeTab === 'espacios' || activeTab === 'automation'
       ? [
           ...new Set([
             ...members.map((m) => m.userId),
