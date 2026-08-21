@@ -174,6 +174,72 @@ variable "gemini_api_key" {
   default     = ""
 }
 
+variable "stripe_secret_key" {
+  description = <<-EOT
+    Clave secreta de Stripe para el cobro del plan PRO (`sk_test_…` o `sk_live_…`).
+
+    Vacía = **la facturación queda desactivada y nada se rompe**: el gateway lo
+    detecta al arrancar, `GET /me/billing/estado` responde que no está
+    disponible y la interfaz no ofrece ningún botón de compra. Es deliberado —
+    un despliegue sin claves tiene que seguir funcionando.
+
+    ⚠️ Una clave de **sandbox** cobra dinero de mentira. Para cobrar de verdad
+    hay que rehacer el producto, el precio y el webhook en la cuenta real: un
+    sandbox y la cuenta real no comparten absolutamente nada.
+
+    Se saca en dashboard.stripe.com → Desarrolladores → Claves de API.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_pro" {
+  description = <<-EOT
+    El id del **precio** del plan PRO en Stripe (`price_…`).
+
+    ⚠️ El del precio, no el del producto. Con un `prod_…` el checkout falla al
+    abrirse, y el error solo se ve al pulsar el botón.
+
+    No es un secreto —viaja en la llamada de creación del checkout— pero va por
+    Secret Manager con los demás para no repartir la configuración de Stripe
+    entre dos sitios.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  description = <<-EOT
+    El secreto de firma del webhook de Stripe (`whsec_…`).
+
+    Es **la única autenticación** de `POST /api/webhooks/stripe`: sin él el
+    gateway rechaza todos los eventos con 400, y como el plan lo concede el
+    webhook y solo el webhook, nadie llegaría nunca a PRO por bien que
+    funcionara el pago.
+
+    ⚠️ **Cada punto de conexión tiene el suyo, y el de `stripe listen` no vale
+    aquí.** El de producción sale al crear el endpoint en el panel apuntando a
+    `https://<dominio>/api/webhooks/stripe`; el de local lo imprime la CLI. Son
+    valores distintos y mezclarlos deja el webhook rechazando todo.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "precio_pro" {
+  description = <<-EOT
+    Lo que se enseña como precio del PRO en la página de planes, sin símbolo.
+
+    ⚠️ Es **cartelería**. El precio que se cobra es el del `price_…` de Stripe;
+    si los dos discrepan manda Stripe y aquí solo queda una cifra que engaña.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "google_client_id" {
   description = <<-EOT
     ID de cliente de OAuth para la entrada con Google.

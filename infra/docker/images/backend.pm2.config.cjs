@@ -40,6 +40,12 @@ const {
      recuperar la contraseña. Sin `MAIL_API_KEY` el servicio arranca igual y
      escribe los enlaces en el log en vez de mandarlos. */
   MAIL_API_KEY = '',
+  /* Stripe. Vacías = facturación apagada, y el gateway lo detecta al arrancar:
+     `GET /me/billing/estado` responde que no está disponible y la interfaz no
+     ofrece comprar. Un despliegue sin claves tiene que seguir funcionando. */
+  STRIPE_SECRET_KEY = '',
+  STRIPE_PRICE_PRO = '',
+  STRIPE_WEBHOOK_SECRET = '',
   MAIL_FROM = 'PRAXIS <no-reply@usepraxis.space>',
   /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
      desarrollo, cada confirmación apuntaría a la máquina de quien la abre. */
@@ -265,6 +271,16 @@ module.exports = {
          simplemente no llegan nunca. En desarrollo funcionaba porque allí el
          valor por defecto resulta ser el correcto. */
       REDIS_URL,
+      /* El cobro del plan PRO vive entero en el gateway: el checkout, el portal
+         y el webhook. Ningún microservicio habla con Stripe.
+
+         ⚠️ `STRIPE_WEBHOOK_SECRET` es la **única** autenticación de
+         `/api/webhooks/stripe`. Sin ella el gateway rechaza todos los eventos
+         con 400 y, como el plan lo concede el webhook y solo el webhook, nadie
+         llega nunca a PRO por bien que funcione el pago. */
+      STRIPE_SECRET_KEY,
+      STRIPE_PRICE_PRO,
+      STRIPE_WEBHOOK_SECRET,
       ...rutas,
     }),
   ],
