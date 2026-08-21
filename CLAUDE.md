@@ -13,7 +13,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md](docs/frontend/PENDIENTES-BACKEND-AUTOMATIZACION.md) | Lo mismo, acotado al MVP de automatizaciones (Reglas) |
 | [docs/frontend/GUION-DEMO-REGLAS.md](docs/frontend/GUION-DEMO-REGLAS.md) | Para enseñar el apartado Reglas: qué sembrar, qué pulsar, qué debe verse — y qué no se puede demostrar en vivo |
 | [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | Etapa de pulido. Cerrada; se conserva por el registro de qué se arregló y por qué |
-| [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | **Etapa de rediseño en curso** — Panel, Administración, Asistente y Análisis. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
+| [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | Etapa de rediseño. Cerrada; se conserva por las decisiones y el registro |
+| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | **Etapa en curso** — motor reactivo, el asistente que siempre responde y administración con más poder. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
@@ -186,6 +187,23 @@ transición. Explicación entera en ESTADO-ACTUAL §35.
 refresco entra en esa misma cola, y tenerla ocupada es lo que destapa el fallo de
 arriba.
 
+🔴 **Un `<form action={…}>` se resetea solo en React 19, y no avisa.**
+`startHostTransition` llama a `requestFormReset` **antes** de ejecutar la acción,
+así que al terminar el envío cada campo vuelve a su `defaultValue` /
+`defaultChecked`. En un formulario de alta es justo lo que quieres —la caja se
+vacía sola—; en uno de **edición con campos no controlados** significa que la
+pantalla vuelve a los valores que tenía la copia de los datos que hay en
+memoria, que no siempre es la recién guardada.
+
+Costó un fallo feo: el panel de una tarea guardaba a su encargado, se reseteaba
+a una copia vieja que no lo tenía, y al abrir otra tarea el autoguardado del
+desmontaje mandaba esa lista vacía — al encargado le llegaba un aviso de que lo
+habían quitado (`734855a`, con e2e en `08-panel-de-tarea`).
+
+Si el formulario **edita** algo, se envía con `onSubmit` + `preventDefault()` y
+el `FormData` a mano; `useAccion` acepta un `FormData` construido así justo para
+esto. `action={…}` se reserva para lo que quiera vaciarse al enviar.
+
 **El asistente propone; nunca ejecuta.** Vale para todo lo que se le añada,
 incluida la plantilla de arranque de un proyecto: devuelve parámetros para
 funciones que ya existen, y quien las llama es el frontend, una a una, con la
@@ -236,7 +254,7 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007 · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
@@ -264,15 +282,15 @@ arrancado. Exige TTY, así que para scripts y CI van los comandos sueltos:
 pnpm install
 pnpm docker:up            # Postgres + Redis
 pnpm build:shared         # contracts + observability
-pnpm prisma:generate      # los 6 servicios con Prisma
+pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
 pnpm prisma:seed          # 4 seeds, en su orden de dependencia
-pnpm dev:backend          # gateway + los 7 microservicios
+pnpm dev:backend          # gateway + los 8 microservicios
 pnpm dev:frontend         # las 7 zonas
 ```
 
 ⚠️ **`prisma:reset` borra las tablas.** Es `migrate reset --force`: recrea el
-esquema de los 6 servicios con Prisma y siembra encima. Para aplicar una migración
+esquema de los 7 servicios con Prisma y siembra encima. Para aplicar una migración
 nueva sin perder datos, `prisma:deploy`.
 
 ⚠️ `build:shared` no está en el README y es imprescindible: `contracts` y

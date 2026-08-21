@@ -8,12 +8,12 @@
 > Escrita por el equipo de frontend; **no modificamos `apps/backend/`** salvo
 > autorización explícita y cambios mecánicos sin decisión de negocio.
 >
-> Última revisión: 2026-08-19 · gateway en `localhost:3000` · verificado contra
+> Última revisión: 2026-08-20 · gateway en `localhost:3000` · verificado contra
 > el stack levantado con `e2e/tests/api/15-automatizaciones-academicas.spec.ts`.
 >
-> **Estado: 0 de 6 resueltos.** Ninguno bloquea el apartado Reglas: el frontend
-> tiene una forma de trabajar mientras tanto para cada uno, descrita en su
-> propio punto.
+> **Estado: 4 de 6 resueltos** (§1, §3, §4 y §5, en `4a2f26a`). Los dos que
+> quedan no bloquean nada: el §2 obliga a un rodeo —lee-modifica-escribe para
+> activar o desactivar— y el §6 deja `TASK_STALE` sin prueba de punta a punta.
 
 ---
 
@@ -37,9 +37,14 @@ al final con su severidad en el título.
 
 Los cinco primeros son de 2026-08-19, detectados al construir el apartado
 Reglas de automatización (`.planning/PLAN-FRONTEND-REGLAS-IMPLEMENTACION.md`,
-Bloque 1). Ninguno bloquea: el 1 y el 2 obligan a un rodeo (catálogo duplicado
-en el frontend, lee-modifica-escribe para activar/desactivar); el 3 al 5 son
-huecos de auditoría, que se muestra recortada mientras tanto.
+Bloque 1). Ninguno bloqueaba: el 1 y el 2 obligaban a un rodeo (catálogo
+duplicado en el frontend, lee-modifica-escribe para activar/desactivar); el 3 al
+5 eran huecos de auditoría, que se mostraba recortada mientras tanto.
+
+**El 1, el 3, el 4 y el 5 los cerró la etapa de automatización** (`4a2f26a`,
+S2.9 a S2.11 de [PLAN-AUTOMATIZACION.md](PLAN-AUTOMATIZACION.md)), y con
+autorización para tocar `apps/backend/` — igual que el resto de esa etapa. Cada
+uno lo explica en su punto.
 
 El 6 es de 2026-08-20 y salió al revisar el apartado terminado
 (`.planning/PLAN-CORRECCION-REGLAS.md`, corrección C3): `TASK_STALE` no se
@@ -56,7 +61,18 @@ hicimos en `apps/backend/`, con autorización», fila `57f33d4`.
 
 ---
 
-## 🟡 1. No hay endpoint de catálogo para triggers, condiciones y acciones de automatización
+## ✅ 1. ~~No hay endpoint de catálogo para triggers, condiciones y acciones de automatización~~
+
+> **Resuelto** en `4a2f26a`. `GET /projects/:projectId/automations/catalog`, con
+> `canManageAutomations`, servido desde `catalog.ts` del propio servicio — el
+> mismo módulo que leen el validador y el motor, no una copia. El frontend
+> retiró su catálogo quemado y lo pide al abrir la sección.
+>
+> Lo que se llevó por delante: la correspondencia hecho → disparador vivía en
+> tres sitios que tenían que coincidir sin que nada lo comprobara, y **estaba
+> mal escrita** —`TASK_DUE_SOON` figuraba como reactivo cuando es de barrido—.
+> Ahora hay una prueba que cruza los `eventType` del catálogo contra lo que
+> `tasks-service` emite de verdad.
 
 El catálogo real —qué triggers existen, qué campos de condición admite cada
 uno, con qué tipo y qué operadores, y qué acciones acepta— vive **solo dentro
@@ -107,7 +123,14 @@ desactivar**, porque el reenvío completo la vuelve a validar entera y da 400.
 Mientras tanto el frontend conserva el lee-modifica-escribe, centralizado en
 una sola acción, con un mensaje propio para el 400 de revalidación.
 
-## 🟡 3. Una ejecución de automatización no dice sobre qué tarea fue
+## ✅ 3. ~~Una ejecución de automatización no dice sobre qué tarea fue~~
+
+> **Resuelto** en `4a2f26a`. `RuleExecution` guarda `triggerType`, `subjectId` y
+> `subjectTitle`, y la pantalla de ejecuciones los despliega por fila.
+>
+> El título va **copiado, no referenciado**: la tarea puede renombrarse o
+> borrarse, y una auditoría que cambia cuando cambia el presente no es una
+> auditoría.
 
 `RuleExecution.conditionResult` guarda `{ matched, context }`, y `context`
 solo trae los campos de condición del trigger (`priority`/`dueDate`/… o
@@ -130,7 +153,15 @@ Mientras tanto el frontend muestra regla, estado, momento y un resumen del
 `context` con las etiquetas del catálogo («prioridad Alta, vence
 2026-08-21»), y no vuelve a intentar leer `taskTitle`.
 
-## 🔵 4. El resumen de «Revisar ahora» no distingue por qué no hubo avisos
+## ✅ 4. ~~El resumen de «Revisar ahora» no distingue por qué no hubo avisos~~
+
+> **Resuelto** en `4a2f26a`. El resumen trae `filtered` —candidatas que no
+> cumplían las condiciones— y `repeated` —candidatas cuya causa ya se había
+> atendido—, además de `rules`, `candidates`, `succeeded` y `failed`.
+>
+> Sin esos dos, «0 acciones» se leía igual con la regla mal escrita que con todo
+> funcionando y ya actuado ayer: dos situaciones opuestas que piden decisiones
+> opuestas.
 
 `reviewProject` devuelve `{ rules, candidates, succeeded, failed }`. Las
 evaluaciones `SKIPPED` (condiciones no cumplidas) y las descartadas por
@@ -150,7 +181,15 @@ contarlas.
 Mientras tanto el frontend muestra los cuatro números que hay, sin inventar la
 interpretación, y deja el detalle por regla en la lista de ejecuciones.
 
-## 🔵 5. Cada ejecución arrastra un volcado completo de la regla que nadie usa
+## ✅ 5. ~~Cada ejecución arrastra un volcado completo de la regla que nadie usa~~
+
+> **Resuelto** en `4a2f26a`. `ruleSnapshot` pasa a ser el resumen que
+> `resumenDeRegla()` compone —id, nombre, versión, disparador y los tipos de
+> acción—, no la definición entera.
+>
+> Se conserva el campo y no se retira: sin *algo* de la regla, una ejecución de
+> hace un mes no se puede leer después de editarla, que es justo cuando hace
+> falta mirarla.
 
 `RuleExecution.ruleSnapshot` guarda la regla entera en cada fila, y
 `GET /automations/executions` lo devuelve tal cual — 20 volcados completos en

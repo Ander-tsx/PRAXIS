@@ -509,15 +509,20 @@ no dejaría rastro o se confundiría con archivar.
 
 ## S6 — Cierre
 
-- [ ] **S6.1** ESTADO-ACTUAL, CONTRATO-API y CLAUDE.md al día. La línea de
+- [x] **S6.1** ESTADO-ACTUAL, CONTRATO-API y CLAUDE.md al día. La línea de
       puertos de CLAUDE.md todavía no menciona `automation :3008`; el README sí.
-- [ ] **S6.2** Marcar en PENDIENTES-BACKEND-AUTOMATIZACION lo que este plan
+- [x] **S6.2** Marcar en PENDIENTES-BACKEND-AUTOMATIZACION lo que este plan
       resuelve.
 - [ ] **S6.3** e2e actualizadas: las 24 de Automatización buscan el texto
       «Reglas», y hay dos ficheros con el prefijo `15-`.
-- [ ] **S6.4** Revertir el `.gitignore` que se coló en la rama: ignora `.claude`
-      y saca `skills-lock.json` del control de versiones, y no tiene nada que ver
-      con automatizaciones.
+- [x] **S6.4** ~~Revertir~~ **acotar** el `.gitignore` que se coló en la rama.
+      No se revierte, y se decidió a la vista de la historia: quien añadió
+      `.claude`, `.codex`, `.agents` y `skills-lock.json` lo hizo a propósito y
+      lo dijo en su propio commit —«no subo las skills porsiacaso»—, así que
+      revertirlo subiría al repositorio la configuración local de cada máquina.
+      Lo que faltaba era decirlo: el bloque lleva su comentario, `.claude/` se
+      escribe como carpeta y `.claude/.gitkeep` queda exceptuado, que estaba
+      versionado y el patrón anterior lo ocultaba.
 - [ ] **S6.5** Separar las specs de integración de las unitarias. Desde esta
       rama exigen Postgres y Redis vivos y están en el mismo `jest`, así que
       `pnpm test` dejó de correr en seco — en `main` no había ninguna.
@@ -535,9 +540,9 @@ _(se rellena conforme se trabaja)_
 > hecho** y **lo que cuesta**, porque dos de los cinco eran preguntas y una ya
 > estaba resuelta a medias.
 
-### S7.1 — El rayo y el color, también en el toast
+### S7.1 — El rayo y el color, también en el toast ✅
 
-- [ ] Los diez tipos `AUTOMATION_*` en `PRESENTACION_POR_TIPO`
+- [x] Los diez tipos `AUTOMATION_*` en `PRESENTACION_POR_TIPO`
       (`commons/organisms/LiveNotices/styles.ts`).
 
 **Estado: medio hecho, y la otra mitad es barata.** En la **bandeja** del panel
@@ -556,6 +561,18 @@ creada es `info` y pasa. Son diez entradas de cuatro líneas, y por eso el fiche
 es un diccionario y no un `switch`: es exactamente el caso para el que existe.
 
 **Coste: bajo.** Un archivo, sin migración, sin contrato.
+
+**Hecho** (`87dbb2f`). Con dos apuntes que salieron al escribirlo:
+
+- **El rayo no viaja al toast, y no por olvido.** `sileo.show()` no admite
+  icono: la píldora solo tiene estado de color y etiqueta. Lo que distingue un
+  aviso de automatización aquí es el **título**, que nombra el hecho
+  —«Vencida», «Sin encargado»— en vez del genérico «Aviso». El rayo sigue en la
+  bandeja del panel, que es a donde lleva el botón.
+- **La tabla pasa a `Record<NotificationType, Presentacion>`.** Faltando una
+  entrada no falla nada —sale un toast soso—, que es exactamente por lo que
+  esto llevaba diez tipos sin cubrir sin que nadie se enterara. Ahora lo dice
+  `tsc`.
 
 ### S7.2 — La lista de reglas no tiene límite
 
