@@ -70,9 +70,20 @@ export type UserStatusName = (typeof USER_STATUSES)[number];
  *
  * Espejo de `ASSISTANT_LIMITS` en `@praxis/contracts`. El gratuito da para
  * probarlo, no para trabajar: cada pregunta cuesta una llamada real a Gemini.
+ *
+ * ⚠️ **Es una copia, y hay que moverla a la vez que la otra.** El frontend no
+ * puede importar de `@praxis/contracts` —es un paquete del backend—, así que
+ * este espejo es la convención de la casa, la misma que `NOTIFICATION_TYPES`.
+ * Nada comprueba que coincidan: cuando el gratuito pasó de 5 a 13, este archivo
+ * se quedó en 5 y la pantalla de administración enseñaba un límite que el
+ * servidor no aplicaba.
+ *
+ * Lo que ve quien usa el chat **no sale de aquí**: sale de `cuota.limite`, que
+ * lo manda el servidor. Esta copia la usan el panel de administración y la
+ * página de planes para describir los planes.
  */
 export const ASSISTANT_PLAN_LIMITS = {
-  FREE: 5,
+  FREE: 13,
   PRO: 250,
 } as const;
 

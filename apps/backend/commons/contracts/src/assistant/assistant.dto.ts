@@ -31,11 +31,23 @@ import {
  * una cuenta recién creada no puede vaciar la cuota de todos. Con 50 bastaba
  * una tarde para agotarla.
  *
- * PRO se asigna a mano desde el panel de administración —no hay pasarela de
- * pago— y es lo que se le da a quien tiene que usarlo de verdad.
+ * **Trece y no cinco.** Con cinco no se llega a ver de qué es capaz: dos
+ * preguntas para entender qué hace, una que sale mal, y se acabó el mes. Trece
+ * dan para una sesión de trabajo entera —que es lo que convence de pagar— y
+ * siguen sin dar para usarlo a diario.
+ *
+ * ⚠️ **Este número está aquí y en ningún otro sitio.** Lo leen el servicio, la
+ * cuota y la interfaz; un `5` escrito en una frase de pantalla es un error que
+ * se borra, no un segundo sitio que actualizar. Y subirlo **regala mensajes a
+ * quien ya se había quedado sin ellos este mes**: el límite se lee al consultar
+ * la cuota, no se copia en la fila de consumo.
+ *
+ * PRO se concede por el webhook de Stripe al pagar —y se puede poner a mano
+ * desde el panel de administración—, y es lo que se le da a quien tiene que
+ * usarlo de verdad.
  */
 export const ASSISTANT_LIMITS = {
-  FREE: 5,
+  FREE: 13,
   PRO: 250,
 } as const;
 
