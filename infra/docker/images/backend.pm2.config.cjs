@@ -45,6 +45,12 @@ const {
      ofrece comprar. Un despliegue sin claves tiene que seguir funcionando. */
   STRIPE_SECRET_KEY = '',
   STRIPE_PRICE_PRO = '',
+  /* Los cuatro precios nuevos de la etapa Enterprise. Vacíos por defecto: sin
+     ellos el plan correspondiente no se puede contratar y la pantalla no lo
+     ofrece, en vez de ofrecer un botón que responde 503. */
+  STRIPE_PRICE_PLUS = '',
+  STRIPE_PRICE_TEAM = '',
+  STRIPE_PRICE_BUSINESS = '',
   STRIPE_WEBHOOK_SECRET = '',
   MAIL_FROM = 'PRAXIS <no-reply@usepraxis.space>',
   /* ⚠️ La base de los enlaces de los correos. Con el valor por defecto de
@@ -124,6 +130,8 @@ const rutas = {
      `undefined`, falla al primer `send`. */
   AUTOMATION_SERVICE_HOST: LOCAL,
   AUTOMATION_SERVICE_PORT: 3008,
+  BILLING_SERVICE_HOST: LOCAL,
+  BILLING_SERVICE_PORT: 3009,
 };
 
 /** Valores por defecto de pm2 comunes a los 9 procesos. */
@@ -254,6 +262,18 @@ module.exports = {
       TASKS_SERVICE_PORT: rutas.TASKS_SERVICE_PORT,
     }),
 
+    /* Planes, organizaciones y cuotas.
+
+       ⚠️ **No habla con nadie**, y por eso su bloque de entorno es el más corto
+       de los nueve: contesta qué plan tiene cada cual y qué da ese plan; quien
+       cuenta proyectos y quien niega es el gateway. Si algún día aparece aquí un
+       `*_SERVICE_HOST`, es que se ha invertido el reparto. */
+    proceso('billing', '/app/apps/backend/services/billing', {
+      ...comun,
+      TCP_PORT: 3009,
+      DATABASE_URL: databaseUrl('billing'),
+    }),
+
     /* Lo único que escucha fuera del contenedor. El health check del
        balanceador pega en `/api` — con el prefijo global, no en `/`. */
     proceso('gateway', '/app/apps/backend/gateway', {
@@ -280,6 +300,9 @@ module.exports = {
          llega nunca a PRO por bien que funcione el pago. */
       STRIPE_SECRET_KEY,
       STRIPE_PRICE_PRO,
+      STRIPE_PRICE_PLUS,
+      STRIPE_PRICE_TEAM,
+      STRIPE_PRICE_BUSINESS,
       STRIPE_WEBHOOK_SECRET,
       ...rutas,
     }),

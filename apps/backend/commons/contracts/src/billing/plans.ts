@@ -320,3 +320,38 @@ export interface QuotaExceededDetails {
   /** Solo en `IA_MENSUAL`: cuándo vuelve a cero, en ISO. */
   reiniciaEn?: string;
 }
+
+/**
+ * El orden de los planes, de menos a más.
+ *
+ * ⚠️ **Es un orden declarado, no una comparación de cuotas.** Se intentó
+ * deducirlo —«mejor es el que da más»— y no sale: `TEAM` da los mismos 250
+ * mensajes que `PRO` y más proyectos, así que no hay un orden total, y elegir
+ * «el mayor por cada eje» construiría un plan que no se vende. Con un orden
+ * escrito, `mejorPlan` devuelve siempre uno del catálogo.
+ */
+export const PLAN_RANK: Record<PlanTier, number> = {
+  [PlanTier.FREE]: 0,
+  [PlanTier.PLUS]: 1,
+  [PlanTier.PRO]: 2,
+  [PlanTier.TEAM]: 3,
+  [PlanTier.BUSINESS]: 4,
+};
+
+/**
+ * El plan que vale para alguien que pertenece a varias organizaciones.
+ *
+ * **El mejor de todos, y no el de una elegida.** Alguien puede estar en su
+ * organización personal (FREE) y a la vez en la de su empresa (BUSINESS): si el
+ * plan dependiera de cuál mira en ese momento, la misma acción se permitiría o
+ * se negaría según en qué pantalla esté, que es imposible de explicar. Si tu
+ * empresa paga BUSINESS, tienes BUSINESS.
+ */
+export function mejorPlan(tiers: (PlanTier | string | null | undefined)[]): PlanTier {
+  let mejor = PLAN_POR_DEFECTO;
+  for (const tier of tiers) {
+    const candidato = PLANS[tier as PlanTier]?.tier;
+    if (candidato && PLAN_RANK[candidato] > PLAN_RANK[mejor]) mejor = candidato;
+  }
+  return mejor;
+}
