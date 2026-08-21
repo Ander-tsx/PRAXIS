@@ -38,7 +38,7 @@ export interface AppHeaderProps {
  * vez de recibirla por props a través de media aplicación.
  */
 export function AppHeader({ title, headerSlot, lleno = false, children }: AppHeaderProps) {
-  const { openMenu } = useAppShell();
+  const { openMenu, cuentaSlot } = useAppShell();
   /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
      libera ~184px que esta columna nunca reclama —se queda en el margen
      lateral en vez de dárselos al contenido— y en una pantalla ancha, plegar
@@ -70,7 +70,22 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
           <h1 className="truncate font-display text-lg text-text-primary">{title}</h1>
         </div>
 
-        {headerSlot && <div className="flex shrink-0 items-center gap-3">{headerSlot}</div>}
+        {/**
+         * La derecha lleva dos cosas, y en este orden.
+         *
+         * Primero la acción de la pantalla —lo que se viene a hacer aquí— y
+         * después quién eres, pegado al borde: el rol y el plan se consultan de
+         * reojo y su sitio es la esquina, no delante del botón principal.
+         *
+         * `cuentaSlot` lo pone el armazón, así que sale en **todas** las
+         * pantallas de la zona sin que cada página tenga que acordarse.
+         */}
+        {(headerSlot || cuentaSlot) && (
+          <div className="flex shrink-0 items-center gap-3">
+            {headerSlot}
+            {cuentaSlot}
+          </div>
+        )}
       </header>
 
       {/**

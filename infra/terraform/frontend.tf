@@ -44,6 +44,7 @@ resource "google_compute_instance_template" "frontend" {
       region       = var.region
       imagen       = local.imagen_frontend
       gateway_host = google_compute_address.gateway.address
+      precio_pro   = var.precio_pro
     })
   }
 

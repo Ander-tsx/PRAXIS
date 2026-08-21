@@ -85,6 +85,17 @@ export interface AppShellProps {
    * desplegada y se plegaría a la vista en cada navegación.
    */
   plegadaInicial?: boolean;
+  /**
+   * Quién eres, para la esquina derecha de **todas** las cabeceras de la zona.
+   *
+   * Va por el armazón y no por cada página porque el rol y el plan no cambian
+   * al navegar: puesto aquí, Next conserva el layout entre pantallas y esto se
+   * resuelve una vez por visita a la zona en lugar de una por pantalla.
+   *
+   * Viaja hasta `AppHeader` por contexto —igual que la apertura del cajón
+   * móvil— porque la cabecera es otro componente y otra parte del árbol.
+   */
+  cuentaSlot?: ReactNode;
   children: ReactNode;
 }
 
@@ -106,7 +117,11 @@ export interface AppShellProps {
  * parte del árbol, así que la apertura del cajón viaja por contexto. Es la única
  * pieza de estado que cruza esa frontera.
  */
-const AppShellContext = createContext<{ openMenu: () => void; plegada: boolean } | null>(null);
+const AppShellContext = createContext<{
+  openMenu: () => void;
+  plegada: boolean;
+  cuentaSlot?: ReactNode;
+} | null>(null);
 
 /** Lo usa `AppHeader` para su botón de menú en móvil. */
 export function useAppShell() {
@@ -207,6 +222,7 @@ function ArmazonInterno({
   zonePath,
   user,
   estadoSlot,
+  cuentaSlot,
   plegadaInicial = false,
   children,
 }: AppShellProps) {
@@ -270,7 +286,9 @@ function ArmazonInterno({
   );
 
   return (
-    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
+    <AppShellContext.Provider
+      value={{ openMenu: () => setMobileMenuOpen(true), plegada, cuentaSlot }}
+    >
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside

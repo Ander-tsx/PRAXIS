@@ -36,6 +36,10 @@ write_files:
       NODE_ENV=production
       GATEWAY_URL=http://${gateway_host}:3000
       JWT_SECRET=$(secreto "${prefijo}-jwt-secret")
+      # Cartelería del plan PRO. La lee la página de planes, que es un
+      # componente de servidor, así que basta con tenerla aquí: no hace falta
+      # reconstruir la imagen para cambiar la cifra.
+      NEXT_PUBLIC_PRECIO_PRO=${precio_pro}
       ENV
 
       chmod 600 /run/praxis.env

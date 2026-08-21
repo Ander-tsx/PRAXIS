@@ -4,7 +4,7 @@ import { BillingSummary } from '@/components/organisms/BillingSummary';
 import { VoiceLinking } from '@/components/organisms/VoiceLinking';
 import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import type { VoiceLink } from '@/lib/voice';
-import { AppHeader, GlobalRoleBadges, ThemeToggle } from '@praxis/commons';
+import { AppHeader, ThemeToggle } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
@@ -50,7 +50,7 @@ export default async function SettingsPage() {
   /* Cada `catch` deja su bloque en el estado «no se pudo cargar» en vez de
      tumbar la pantalla entera: que alexa-service esté caído no es motivo para
      no poder cambiar el tema. */
-  const [{ roles }, theme, quota, voiceLinks, billing] = await Promise.all([
+  const [, theme, quota, voiceLinks, billing] = await Promise.all([
     loadCurrentUser(),
     getTheme(),
     createServerApiClient()
@@ -66,8 +66,11 @@ export default async function SettingsPage() {
       .catch(() => null),
   ]);
 
+  /* Sin `headerSlot`: el rol —y ahora también el plan— los pone el armazón en
+     todas las pantallas de todas las zonas (`cuentaSlot`). Dejarlo aquí los
+     pintaba dos veces. */
   return (
-    <AppHeader title="Configuración" headerSlot={<GlobalRoleBadges roles={roles} />}>
+    <AppHeader title="Configuración">
       {/* Sin «← Volver al panel»: quien navega es la barra lateral, y un enlace
           de vuelta junto a su propia entrada resaltada sobra. */}
       <div className="flex flex-col gap-4">

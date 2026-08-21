@@ -48,6 +48,14 @@ locals {
     "password-sql"     = random_password.password_sql.result
     "gemini-api-key"   = var.gemini_api_key
     "mail-api-key"     = var.mail_api_key
+
+    /* Stripe. Van los tres juntos porque los tres se leen en el mismo sitio —el
+       gateway— y repartirlos entre Secret Manager y metadatos dejaría media
+       configuración de pago en un lado y media en otro. El `price_…` no es
+       secreto, pero tampoco gana nada estando aparte. */
+    "stripe-secret-key"     = var.stripe_secret_key
+    "stripe-price-pro"      = var.stripe_price_pro
+    "stripe-webhook-secret" = var.stripe_webhook_secret
   }
 }
 

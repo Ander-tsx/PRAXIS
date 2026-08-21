@@ -57,6 +57,11 @@ write_files:
       VOICE_JWT_SECRET=$(secreto "${prefijo}-voice-jwt-secret")
       GEMINI_API_KEY=$(secreto "${prefijo}-gemini-api-key")
       MAIL_API_KEY=$(secreto "${prefijo}-mail-api-key")
+      # Stripe. Sin estas tres la facturación queda apagada y el resto funciona
+      # igual: el gateway lo detecta al arrancar y la interfaz no ofrece comprar.
+      STRIPE_SECRET_KEY=$(secreto "${prefijo}-stripe-secret-key")
+      STRIPE_PRICE_PRO=$(secreto "${prefijo}-stripe-price-pro")
+      STRIPE_WEBHOOK_SECRET=$(secreto "${prefijo}-stripe-webhook-secret")
       GOOGLE_CLIENT_ID=${google_client_id}
       MAIL_FROM=${mail_from}
       # ⚠️ La base de los enlaces de los correos. Sin ella apuntarían a
