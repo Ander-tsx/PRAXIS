@@ -112,6 +112,10 @@ crash.*.log
 # tiene por qué estar publicado en el repositorio.
 docs/frontend/PLAN-PRAX-AUTOMATIZA.md
 
+# El guion de la expo: lleva comandos contra producción y una contraseña de
+# administración. No tiene por qué estar publicado.
+docs/frontend/GUION-EXPO.md
+
 # Configuración local de agentes de código.
 #
 # No es deuda ni un descuido: son ajustes de la máquina de cada quien —claves de
