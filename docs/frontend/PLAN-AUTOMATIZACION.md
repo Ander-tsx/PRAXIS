@@ -523,14 +523,49 @@ no dejaría rastro o se confundiría con archivar.
       Lo que faltaba era decirlo: el bloque lleva su comentario, `.claude/` se
       escribe como carpeta y `.claude/.gitkeep` queda exceptuado, que estaba
       versionado y el patrón anterior lo ocultaba.
-- [ ] **S6.5** Separar las specs de integración de las unitarias. Desde esta
+- [x] **S6.5** Separar las specs de integración de las unitarias. Desde esta
       rama exigen Postgres y Redis vivos y están en el mismo `jest`, así que
       `pnpm test` dejó de correr en seco — en `main` no había ninguna.
 - [ ] **S6.6** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
 
 ### Apuntes
 
-_(se rellena conforme se trabaja)_
+**`pnpm test` vuelve a correr en seco** (S6.5). `testPathIgnorePatterns` deja
+fuera los `*.integration.spec.ts` y `test:int` corre solo esos, en `tasks`, en
+`automation` y desde la raíz. Automation: 91 unitarias y 8 de integración;
+tasks: 1 y 19.
+
+**Las 24 pruebas de Automatización no estaban «desfasadas por el renombre»: la
+interfaz que describen ya no existe** (S6.3). El constructor dejó de ser un
+modal, así que `getByRole('dialog')` no encuentra nada; el aviso de cambios sin
+guardar dejó de ser un `confirm()` del navegador; la confirmación de borrado se
+mudó a la fila; el disparador se elige con botones y no con un desplegable; y
+las etiquetas y las frases las manda ahora el catálogo del servidor. Se
+reescribieron contra la interfaz de hoy.
+
+**Y arreglando el spec salieron tres fallos de la propia interfaz:**
+
+1. 🔴 **El resumen de toda regla que avisa decía «avisa a a los encargados de la
+   tarea»**, con la «a» repetida. `describeAction` concatena el `sentence` de la
+   acción —«avisa a»— con la etiqueta del valor, y la etiqueta del catálogo
+   traía la preposición otra vez. Lo llamativo es que la prueba unitaria de
+   `describeRule` **ya esperaba el texto correcto**: su catálogo de mentira
+   decía «Los encargados», el de verdad decía «A los encargados», y nadie
+   comparaba los dos.
+2. 🔴 **Cambiar de disparador descartaba las condiciones en silencio.** Antes lo
+   preguntaba con un `confirm()`, y al retirar los diálogos del sistema (D4) se
+   fue la ventana **y el aviso entero**. Ahora se cuenta después, dentro del
+   formulario y con la sección «Si» ya vacía a la vista.
+3. ⚠️ **El constructor no se puede guardar sin elegir «A quién»**, y el error lo
+   dice bien —«Avisar: falta «A quién».»—, pero es un paso nuevo: antes el
+   destinatario salía del disparador. No se cambia —elegir a quién se avisa no
+   debería tener un valor por defecto silencioso— pero queda escrito, porque es
+   lo que rompía media suite.
+
+**Un fallo más, en la prueba de API** (`15-automatizaciones-academicas`): exigía
+un 400 al cruzar `recipientSelector` con el disparador. Dejó de ser un error
+cuando el motivo del aviso pasó a salir del disparador y el destinatario de la
+regla, así que ahora exige el 201.
 
 ---
 
