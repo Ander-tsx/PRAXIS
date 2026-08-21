@@ -23,7 +23,7 @@ import {
   personLabel,
   useAccion,
 } from "@praxis/commons";
-import { type FocusEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { GestorDeEtiquetas } from "./GestorDeEtiquetas";
 import { TaskAttachments } from "./TaskAttachments";
 import { TaskChecklist } from "./TaskChecklist";
@@ -62,6 +62,21 @@ export interface TaskDialogProps {
 }
 
 /**
+ * Firma de todo lo que este formulario manda, para saber si ha cambiado algo.
+ *
+ * Se ordena porque el orden en que un `FormData` enumera los campos no
+ * significa nada —dos casillas marcadas al revés son la misma lista de
+ * encargados— y `taskId` viaja dentro, así que dos tareas distintas nunca dan
+ * la misma firma aunque tengan los mismos valores.
+ */
+function formSignature(form: HTMLFormElement): string {
+  return Array.from(new FormData(form).entries())
+    .map(([name, value]) => `${name}=${String(value)}`)
+    .sort()
+    .join("\n");
+}
+
+/**
  * Detalle de una tarea: todo lo que no cabe en la tarjeta.
  *
  * **Ya no crea tareas.** Lo hacía, y abrir esta ventana entera para escribir un
@@ -82,18 +97,17 @@ export interface TaskDialogProps {
  * distinguiera unos campos de otros. Es el mismo razonamiento que ya seguía el
  * desplegable de rol en el equipo (`MemberRoleSelect`).
  *
- * El reparto no es uniforme, y a propósito:
- *
- * - **Al cambiar** los campos de opciones cerradas —prioridad, fecha, etiquetas,
- *   encargados—. Elegir ya es haber terminado de decidir.
- * - **Al salir del campo** el título y la descripción. Guardar en cada tecla
- *   sería una petición por pulsación, y con varias en vuelo la última en salir
- *   no es la última en llegar.
+ * Se guarda **al cerrar el panel y al cambiar de tarea**, no en cada tecla:
+ * guardar por pulsación sería una petición por letra, y con varias en vuelo la
+ * última en salir no es la última en llegar.
  *
  * Se envía el formulario entero cada vez, no el campo suelto: `updateTaskAction`
  * ya manda la tarea completa —los encargados y las etiquetas *tienen* que ir
  * enteros o se borrarían los que no viajen—, así que reutilizarlo evita
  * inventar un segundo camino de escritura que se desincronizaría con el primero.
+ *
+ * Y **solo si algo cambió** (`saveIfChanged`): mandar la tarea entera cuando
+ * nadie la ha tocado la marca como editada para todo lo que escucha.
  */
 export function TaskDialog({
   open,
@@ -138,16 +152,77 @@ export function TaskDialog({
     if (!open) setConfirmingDelete(false);
   }, [open]);
 
-  /** Guarda los cambios de la tarea actual antes de cambiar a otra */
+  /**
+   * Lo último que se sabe guardado, como firma del formulario.
+   *
+   * Empieza valiendo lo que el servidor acaba de pintar, así que abrir y cerrar
+   * sin tocar nada no escribe.
+   */
+  const savedSignature = useRef<string | null>(null);
+
+  /**
+   * Guarda, pero solo si el formulario ya no dice lo mismo que la última vez.
+   *
+   * El panel se guarda solo —al cerrarse y al cambiar de tarea—, así que sin
+   * esta comprobación cada apertura mandaba un `PATCH` completo, con
+   * encargados y etiquetas incluidos. Eso no es un envío de más y ya está: el
+   * backend lo lee como una edición, avisa a quien entre o salga de la tarea y,
+   * desde que el motor de automatización reacciona a hechos, despierta a las
+   * reglas de esa tarea.
+   */
+  const saveIfChanged = useCallback(
+    (form: HTMLFormElement) => {
+      if (!canEdit) return;
+      const signature = formSignature(form);
+      if (signature === savedSignature.current) return;
+      savedSignature.current = signature;
+      /* El `FormData` va suelto y no por `requestSubmit()`: esto también se
+         llama desde el desmontaje, y entonces el formulario ya no está en el
+         DOM y `requestSubmit()` falla. */
+      formAction(new FormData(form));
+    },
+    [canEdit, formAction],
+  );
+
+  /** Un guardado que falló no está guardado: se olvida la firma para reintentar. */
+  useEffect(() => {
+    if (state.error) savedSignature.current = null;
+  }, [state.error]);
+
+  /**
+   * Anota lo que hay al abrir una tarea, y guarda lo que quede pendiente antes
+   * de cambiar a otra.
+   */
   useEffect(() => {
     const form = formRef.current;
+    if (form) savedSignature.current = formSignature(form);
     return () => {
-      if (canEdit && form) {
-        // Enviar FormData directamente, porque form.requestSubmit() falla si el formulario ya no está en el DOM
-        formAction(new FormData(form));
-      }
+      if (form) saveIfChanged(form);
     };
-  }, [task.id, canEdit, formAction]);
+  }, [task.id, saveIfChanged]);
+
+  /**
+   * ⚠️ **`onSubmit` en vez de `action={…}`, y no es una preferencia de estilo.**
+   *
+   * React 19 **resetea el formulario en cada envío** hecho por `<form action>`:
+   * `startHostTransition` llama a `requestFormReset` antes de ejecutar la
+   * acción. Con campos no controlados —que es como está montado este panel—
+   * eso devuelve cada casilla a su `defaultChecked`, y esos defaults salen de
+   * la tarea que el panel tiene cargada, que al cerrarse deja de refrescarse.
+   *
+   * El resultado era una avería silenciosa y fea: asignabas a alguien, cerrabas
+   * —se guardaba bien—, y el formulario se quedaba en pantalla diciendo que la
+   * tarea no tenía encargados. Al abrir otra tarea, el guardado del desmontaje
+   * mandaba esa lista vacía a la tarea anterior, y a quien acababas de asignar
+   * le llegaba un aviso de que lo habías quitado.
+   *
+   * Enviando el `FormData` a mano no hay reset, y lo que se ve sigue siendo lo
+   * que se guardó.
+   */
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    saveIfChanged(event.currentTarget);
+  };
 
   const handleClose = () => {
     if (canEdit && formRef.current && !pending) {
@@ -183,7 +258,7 @@ export function TaskDialog({
       <form
         key={task.id}
         ref={formRef}
-        action={formAction}
+        onSubmit={handleSubmit}
         className="flex flex-col gap-4"
         noValidate
       >
