@@ -4997,3 +4997,219 @@ candidata no produjo aviso se lee fila por fila, donde `SKIPPED` sí aparece.
 Y hay una acción por trigger, sin botón de «añadir»: el modelo admite cinco, pero
 con el catálogo actual dos acciones serían dos avisos idénticos a las mismas
 personas. El botón aparecerá solo cuando el catálogo ofrezca una variante más.
+
+---
+
+## 46. Automatización: de dos disparadores a un motor que reacciona
+
+Lo que la §45 describe —el apartado **Reglas**, dos disparadores, una acción y un
+botón de «Revisar ahora»— sigue siendo cierto en su forma y ha dejado de serlo en
+casi todo lo demás. Esta sección cuenta qué cambió y **por qué cada cosa estaba
+mal**, que es lo que evita que vuelva.
+
+Plan de la etapa en [PLAN-AUTOMATIZACION.md](PLAN-AUTOMATIZACION.md).
+
+### 46.1 La tubería estaba construida y desconectada
+
+`tasks-service` y `projects-service` escriben cada hecho en un `DomainOutbox`
+dentro de la misma transacción que lo provoca; un publicador lo vuelca en el
+stream de Redis `praxis:domain-events`; `InboundEventConsumer` lo copia a
+`automation.inbound_events` con deduplicación por hash canónico, reclamo de
+mensajes huérfanos y todo lo que hace falta.
+
+**Y esa tabla no la leía nadie.** Ni una consulta en todo el repositorio. Las
+reglas solo corrían cuando alguien pulsaba «Revisar ahora», así que el outbox
+transaccional de dos servicios, el grupo de consumo y el `XAUTOCLAIM` entregaban
+a un archivo muerto.
+
+Ya está conectada. El consumidor guarda y, **en un paso aparte**, evalúa las
+reglas contra lo que haya pendiente en la tabla.
+
+⚠️ **Los dos pasos son dos a propósito.** Guardar es rápido y local; actuar habla
+con dos servicios y puede tardar. Si fueran lo mismo, un `tasks-service` lento
+bloquearía la lectura del stream, el `XACK` no llegaría, Redis daría el mensaje
+por huérfano y **otro consumidor lo reclamaría mientras el primero sigue
+ejecutando acciones**. Separarlos hace que el stream se vacíe siempre y que la
+tabla haga de cola, con reintentos y un techo (`EVENT_MAX_ATTEMPTS`).
+
+### 46.2 El catálogo, y por qué ya no hay tres copias
+
+`automation-service/src/rules/catalog.ts` declara los disparadores, de qué
+familia es cada uno, qué campos admite filtrar, con qué operadores, y qué
+acciones existen con el permiso que exigen. Lo leen el validador, el motor y —por
+`GET /projects/:id/automations/catalog`— el frontend.
+
+🔴 **Antes vivía en tres sitios**: un `switch` en el validador, otro en el motor y
+una copia a mano en `projects-front/src/lib/automation-catalog.ts`. Las tres
+tenían que coincidir sin que nada lo comprobara, y cuando el servidor pasó de dos
+disparadores a diez, el cliente siguió ofreciendo dos. **No falla ninguna
+compilación cuando un formulario ofrece de menos.**
+
+### 46.3 Dos familias de disparador, y no es una distinción interna
+
+| Familia | Qué describe | Cuándo se evalúa |
+|---|---|---|
+| `sweep` | Un **estado** («vence pronto», «lleva parada») | Al pulsar «Revisar ahora» |
+| `reactive` | Un **hecho** («la han movido») | Sola, por el flujo de eventos |
+
+⚠️ **El mapa anterior decía que `TASK_DUE_SOON` reaccionaba a cinco hechos.** Es
+de barrido: no hay un instante en que ocurra. Con el flujo conectado, esa entrada
+habría hecho saltar «va a vencer» al crear cualquier tarea, tuviera fecha o no.
+Hay una prueba que cruza los `eventType` del catálogo contra lo que
+`tasks-service` emite de verdad — un nombre inventado se guarda, se ve habilitado
+y **no se dispara nunca**, sin un solo error en ningún log.
+
+Y la distinción se enseña: el constructor agrupa los disparadores en «pasa solo»
+y «al revisar», porque del nombre no se deduce.
+
+### 46.4 La identidad de una acción
+
+Una regla se ejecuta sin nadie mirando, así que hay que decidir en nombre de
+quién escribe. Se decidió «actor sistema»… y al implementarlo apareció algo
+mejor, que además ya estaba: **`tasks-service` comprueba permisos por
+`requesterId` en cada escritura** (`assertPermission` → `project_check_permission`).
+No es el gateway quien los aplica: es el propio servicio.
+
+Así que las acciones viajan con `requesterId = rule.createdBy`, y eso da tres
+cosas gratis: una regla no puede hacer nada que su autor no pudiera hacer a mano;
+la auditoría dice la verdad; y la comprobación ocurre **en el momento**, no
+cuando se guardó. Si el autor pierde el permiso, la acción responde 403 y la
+regla **se pausa sola** con `PAUSED_SYSTEM` y un `pauseReason` que la pantalla
+enseña — sin ese texto, la regla se ve apagada, alguien la reactiva y se vuelve a
+pausar.
+
+El candado al guardar sigue existiendo, pero como aviso temprano: enterarse al
+pulsar «Guardar» es mejor que enterarse tres días después.
+
+### 46.5 El freno de bucle
+
+Una regla que mueve una tarea produce un `task.moved.v1`, que despierta a las
+reglas de movimiento. Dos reglas que se empujan —«si llega a Revisión, muévela a
+Hecho» y «si llega a Hecho y no tiene encargado, muévela a Revisión»— giran para
+siempre, y **la idempotencia por causa no las para**: cada vuelta tiene un
+contexto distinto, así que es una causa distinta de verdad.
+
+No hay forma barata de detectar el ciclo —`causationId` no sobrevive al salto por
+RPC— así que hay un techo de 20 automatizaciones por tarea y hora. **No es
+correctitud, es un fusible**, y cuando salta lo deja escrito en la ejecución.
+
+### 46.6 El aviso lo decide el disparador, no el destinatario
+
+🔴 El tipo de aviso salía de `recipientSelector`. Con dos disparadores coincidía
+por casualidad —«a los encargados» con «va a vencer», «a quien lleva el proyecto»
+con «lleva parada»—. Con diez dejó de coincidir: **«cuando se cree una tarea,
+avisa a quien lleva el proyecto» mandaba un aviso que decía «lleva varios días
+sin movimiento» sobre una tarea de un segundo antes.** El texto describía a quién
+se le contaba, no lo que había pasado.
+
+Hay un tipo por disparador y lo empareja el catálogo, así que uno nuevo sin el
+suyo no compila.
+
+En la misma tarjeta había otras dos: el icono era **un sobre** —las ramas de
+`TypeIcon` miran el prefijo del tipo y `AUTOMATION_TASK_CREATED` no empieza por
+`TASK_` ni por `MEMBER_`, así que caía al icono por defecto, que es el del
+correo— y el tono era **rojo**, igual de alarmante que «te sacaron del proyecto».
+
+⚠️ **Y un aviso de automatización lleva a la bandeja, no a la tarea.** Los demás
+cuentan algo que hizo una persona y la tarea explica el resto; este cuenta algo
+que hizo una regla, y la tarea no dice nada de la regla.
+
+### 46.7 Tres depósitos que solo crecían
+
+| Qué | Qué le pasaba | Qué se hizo |
+|---|---|---|
+| `domain_outbox` | `publishedAt` se ponía y la fila se quedaba para siempre | Purga a los 7 días |
+| `inbound_events` | Igual, y encima con el rastro de proyectos borrados | Purga a los 7 días, y `purgeProject` se los lleva |
+| El stream de Redis | `xadd` sin `MAXLEN` | `MAXLEN ~ 50000` |
+
+🔴 **Un `XACK` no borra del stream**: saca la entrada de los pendientes del grupo
+y ya. Cada movimiento de cada tarea de cada proyecto se quedaba ahí, y **este
+Redis es también el de las sesiones** — llenarlo echa a todo el mundo.
+
+### 46.8 El race del `causeKey`
+
+`direct-execution.ts` hacía `findUnique` y después `create`. Entre las dos
+consultas cabe otra revisión entera: dos pestañas, un doble clic en «Revisar
+ahora» o dos instancias del servicio, y las dos leen «no existe», las dos crean, y
+la segunda revienta contra `@@unique([ruleId, causeKey])` con un P2002 que nadie
+capturaba. Por fuera: **un 500 por pulsar un botón dos veces**.
+
+La restricción única ya era el árbitro; la lectura previa solo añadía una carrera
+y una consulta por candidata.
+
+### 46.9 Lo que la interfaz dejó de hacer
+
+- **«Reglas» → «Automatización»**, y `?tab=automation`. Los dos nombres
+  anteriores siguen resolviendo: un enlace compartido no puede morir por un
+  renombre.
+- **El constructor no es un modal.** Un modal tapa la lista que estás intentando
+  complementar, secuestra el foco y el `Esc`, y obliga a resolver el cierre con
+  cambios sin guardar en un `confirm()` del navegador encima de otra ventana
+  encima de la página. Ahora se despliega dentro de la sección, y tanto el aviso
+  de cambios sin guardar como la confirmación de borrado viven dentro del
+  elemento que los provoca.
+- **Servicio caído ≠ «no tienes reglas».** La página pedía con `.catch(() => [])`
+  y una lista vacía ya significaba otra cosa: con automation parado, quien
+  tuviera diez reglas veía la pantalla de bienvenida. Ahora llega `null` y se
+  dice.
+- **Los ids se resuelven a nombres.** «Columna es 3f2a…-9c11» es cierto y no
+  sirve para comprobar nada. El catálogo dice de qué lista sale cada campo
+  (`source`) y la página pone los valores con lo que ya tenía en pantalla —
+  ninguna consulta nueva.
+- **Las ejecuciones son filas desplegables**, y guardan `subjectTitle` y
+  `triggerType` **copiados**: la tarea puede renombrarse o borrarse, y una
+  auditoría que cambia cuando cambia el presente no es una auditoría.
+
+### 46.10 🔴 La animación que no existía
+
+Los paneles desplegables de Equipo y Roles usaban `animate-in
+slide-in-from-top-4 fade-in duration-300`, del plugin `tailwindcss-animate`,
+**que este repositorio no tiene instalado**. Tailwind no genera nada para una
+utilidad que no conoce y **no avisa**: llevaban meses apareciendo de golpe
+mientras el código decía que se deslizaban.
+
+Es la misma clase de fallo que el de los `@source` (`ba94057`) y el de `@theme
+static`: Tailwind descarta en silencio lo que no reconoce. Ahora hay
+`.animate-desplegar-panel` en `theme.css`, que anima `grid-template-rows` de
+`0fr` a `1fr` — abre hasta el alto real del contenido sin medirlo en JavaScript
+ni fijar un `max-height` a ojo.
+
+### 46.11 Administración puede borrar de verdad
+
+`DELETE /admin/users/:id` y `DELETE /admin/projects/:id`, cada uno con su verbo
+en el registro (`USER_DELETED`, `PROJECT_DELETED`) para no confundirse con
+desactivar ni con archivar, que son estados y se deshacen.
+
+⚠️ **Borrar una cuenta no borra su trabajo.** Las tareas, los mensajes y la
+actividad viven en otros esquemas sin clave foránea: borrarlos dejaría huecos en
+tableros de proyectos que no tienen nada que ver con esa persona. Se quedan, y la
+interfaz los lee como `PERSONA_ELIMINADA` — antes caía al UUID, y en pantalla eso
+es «3f2a…-9c11 salió del proyecto».
+
+⚠️ **Y se niega si todavía es dueña de algún proyecto**, diciendo cuáles. Un
+proyecto sin dueño sí rompe: `ownerId` resuelve los permisos, decide a quién
+avisan las automatizaciones y es lo que la propia pantalla de administración
+enseña. Un id que no existe deja ese proyecto sin nadie que pueda administrarlo y
+sin forma de arreglarlo desde la interfaz.
+
+La confirmación pide **escribir el nombre** y enumera lo que se lleva **y lo que
+se queda**. Lo segundo es la mitad del mensaje: sin ello, quien administra cree
+que borrar una cuenta vacía los tableros donde esa persona trabajó, y no borra
+nunca.
+
+### 46.12 El asistente, de paso
+
+🔴 `chat()` capturaba cualquier cosa que no fuera `RpcException` y la sustituía
+por un `500 'Error del asistente.'`. Un `GeminiError` **nunca** es una
+`RpcException`, así que caía ahí siempre — y con él el trabajo entero de
+`mensajeDelFallo()`, que distingue un límite por minuto de un tope de gasto y de
+una clave mal configurada. El remate: `describe()` en el cliente devuelve el
+mensaje del servidor salvo en los 5xx que no son 502, así que ese 500 salía como
+«El asistente no ha podido responder. Inténtalo otra vez.» para las tres causas.
+
+Ahora pasa por `comoRpc()` (502 con su mensaje), hay reintento con espera
+creciente **solo para lo transitorio**, y si aun así falla **PRAX responde en su
+burbuja** en vez de borrar la pregunta del hilo. Detalle en el plan de la etapa.
+
+Y `ModelText` gana tablas y una gráfica de barras, con el mismo método de
+siempre: sin librería de markdown y sin un solo `dangerouslySetInnerHTML`.
