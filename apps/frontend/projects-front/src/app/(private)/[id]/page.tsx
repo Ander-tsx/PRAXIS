@@ -204,28 +204,33 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
   const can = effective.permissions;
 
   /**
-   * Reglas de automatización y ejecuciones recientes.
+   * Reglas de automatización, ejecuciones y catálogo.
    *
-   * Solo se piden con la pestaña abierta y el permiso presente: pedirlas sin
-   * poder verlas sería una petición que siempre da 403. Un fallo del servicio
-   * de automatización cae a lista vacía — no se lleva por delante el proyecto.
+   * Nada de esto se pide sin el permiso: sería una petición que siempre da 403.
+   *
+   * ⚠️ **Las reglas se piden siempre; lo caro, solo con la pestaña abierta.**
+   *
+   * Se pedían las tres cosas solo dentro de la pestaña, y eso dejaba el
+   * contador de la pestaña **a cero mientras no estuvieras dentro de ella** —
+   * justo cuando sirve para algo, que es para saber si hay reglas sin entrar a
+   * mirar. La lista es una fila por regla y ninguna la tiene por decenas; las
+   * ejecuciones y el catálogo sí pesan, y esos siguen esperando a que se abra.
    */
-  const [automationRules, automationExecutions, automationCatalog] =
+  /**
+   * 🔴 **`null` y no `[]` cuando el servicio no responde.**
+   *
+   * Esto caía a lista vacía, y una lista vacía **ya significa otra cosa**: «no
+   * tienes ninguna regla». Con el servicio caído, quien tuviera diez reglas
+   * veía la pantalla de bienvenida diciéndole que no había ninguna — el recorte
+   * mudo que este repositorio prohíbe en cualquier otro sitio.
+   */
+  const automationRules = can.canManageAutomations
+    ? await api.get<AutomationRule[]>(`/projects/${project.id}/automations`).catch(() => null)
+    : [];
+
+  const [automationExecutions, automationCatalog] =
     activeTab === 'automation' && can.canManageAutomations
       ? await Promise.all([
-          /**
-           * 🔴 **`null` y no `[]` cuando el servicio no responde.**
-           *
-           * Esto caía a lista vacía, y una lista vacía **ya significa otra
-           * cosa**: «no tienes ninguna regla». Con el servicio caído, quien
-           * tuviera diez reglas veía la pantalla de bienvenida diciéndole que
-           * no había ninguna — el recorte mudo que este repositorio prohíbe en
-           * cualquier otro sitio. Ahora la sección distingue las dos cosas y
-           * lo dice.
-           */
-          api
-            .get<AutomationRule[]>(`/projects/${project.id}/automations`)
-            .catch(() => null),
           api
             .get<AutomationExecution[]>(`/projects/${project.id}/automations/executions`)
             .catch(() => null),
@@ -235,7 +240,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             .get<AutomationCatalog>(`/projects/${project.id}/automations/catalog`)
             .catch(() => null),
         ])
-      : [[] as AutomationRule[], [] as AutomationExecution[], null];
+      : [[] as AutomationExecution[], null];
 
   /**
    * ¿Está suspendido?
