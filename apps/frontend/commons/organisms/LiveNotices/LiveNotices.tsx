@@ -3,6 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toaster, sileo } from 'sileo';
 import { projectHref } from '../../api/routes';
+
+/**
+ * La bandeja del panel, en su ancla.
+ *
+ * ⚠️ **El ancla la pone `dashboard-front`** (`id="avisos"` en su sección de la
+ * bandeja) y esto vive en `commons`, así que la constante está escrita a mano:
+ * no hay forma de importarla sin que `commons` dependa de una zona. Si allí se
+ * renombra el ancla, esto lleva al panel pero sin desplazarse — degrada bien,
+ * pero conviene saberlo.
+ */
+const BANDEJA_DE_AVISOS = '/dashboard#avisos';
 import { useCurrentTheme, useRefrescoAgrupado } from '../../hooks';
 import { marcarHiloPendiente, useLiveEvent, useReconnection } from '../../realtime';
 import type { ChatMessageEvent, NoticeEvent } from '../../realtime';
@@ -341,6 +352,34 @@ function describir(evento: NoticeEvent): string {
       return quien
         ? `${quien} te ha quitado de «${tarea}»${donde}.`
         : `Te han quitado de «${tarea}»${donde}.`;
+    /**
+     * ⚠️ **Los de automatización sí tienen texto, y antes no.**
+     *
+     * Caían al `default` —«Tienes un aviso nuevo»— porque este `switch` se
+     * escribió cuando solo existían los de equipo y tarea. Un aviso que no dice
+     * qué ha pasado obliga a abrirlo para averiguarlo, que es justo lo que un
+     * aviso viene a evitar.
+     */
+    case 'AUTOMATION_TASK_DUE_SOON':
+      return `«${tarea}» vencerá pronto${donde}.`;
+    case 'AUTOMATION_TASK_STALE':
+      return `«${tarea}» lleva varios días sin movimiento${donde}.`;
+    case 'AUTOMATION_TASK_OVERDUE':
+      return `«${tarea}» ha pasado su fecha de vencimiento${donde}.`;
+    case 'AUTOMATION_TASK_UNASSIGNED':
+      return `«${tarea}» sigue sin encargado${donde}.`;
+    case 'AUTOMATION_TASK_CREATED':
+      return `Se ha creado «${tarea}»${donde}.`;
+    case 'AUTOMATION_TASK_MOVED':
+      return `«${tarea}» ha cambiado de columna${donde}.`;
+    case 'AUTOMATION_TASK_COMPLETED':
+      return `«${tarea}» se ha dado por terminada${donde}.`;
+    case 'AUTOMATION_TASK_REOPENED':
+      return `«${tarea}» se ha vuelto a abrir${donde}.`;
+    case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
+      return `Han cambiado los encargados de «${tarea}»${donde}.`;
+    case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
+      return `Ha cambiado el vencimiento de «${tarea}»${donde}.`;
     default:
       return 'Tienes un aviso nuevo.';
   }
@@ -358,6 +397,20 @@ function describir(evento: NoticeEvent): string {
  * mejor una URL fea que una tarjeta que no lleva a ningún sitio.
  */
 function destinoDeAviso(evento: NoticeEvent): string | null {
+  /**
+   * 🔴 **Un aviso de automatización lleva a la bandeja, no a la tarea.**
+   *
+   * Los demás avisos cuentan algo que hizo una persona y la tarea explica el
+   * resto: «te asignó esta tarea» y la tarea delante se entiende. Un aviso de
+   * automatización cuenta algo que hizo **una regla**, y la tarea no dice nada
+   * de la regla: abrirla dejaba a quien pulsó mirando una tarjeta normal, sin
+   * la frase que explicaba por qué le habían avisado — que era lo único que
+   * daba sentido al aviso.
+   *
+   * La bandeja del panel sí la conserva, con su texto y su fecha.
+   */
+  if (evento.type.startsWith('AUTOMATION_')) return BANDEJA_DE_AVISOS;
+
   const identificador = evento.projectSlug || evento.projectId;
   if (!identificador) return null;
 
