@@ -15,7 +15,9 @@ describe('AutomationPurgeService', () => {
   });
 
   it('no convierte un fallo de purga en un borrado exitoso silencioso', async () => {
-    const service = new AutomationPurgeService({ send: () => throwError(() => new Error('down')) } as never);
+    const service = new AutomationPurgeService({
+      send: () => throwError(() => new Error('down')),
+    } as never);
 
     await expect(service.afterProjectDeleted('project-a')).rejects.toThrow('down');
   });

@@ -103,5 +103,18 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
     AutomationPurgeService,
     MentionablesService,
   ],
+  /**
+   * ⚠️ **Las dos purgas se exportan porque administración también borra.**
+   *
+   * Borrar un proyecto tiene que arrastrar sus tareas y sus reglas, que viven en
+   * otros microservicios y no las alcanza ningún cascade. Eso lo sabían estos
+   * dos servicios y solo los veía este módulo, así que `AdminModule` los
+   * inyectaba y Nest no arrancaba —«Nest can't resolve dependencies»— con un
+   * volcado que nombra la clase pero no dice que le falta el `exports`.
+   *
+   * Se exportan en vez de copiarse: dos sitios que purgan es un sitio que
+   * olvidar cuando aparezca un tercer servicio con datos de proyecto.
+   */
+  exports: [TaskPurgeService, AutomationPurgeService],
 })
 export class ProjectsModule {}

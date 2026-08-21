@@ -4,6 +4,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
 import { AdminActivityController } from './admin-activity.controller';
+import { ProjectsModule } from '../projects/projects.module';
 import { AdminActivityRecorder } from './admin-activity.recorder';
 import { AdminProjectsController } from './admin-projects.controller';
 import { AdminUsersController } from './admin-users.controller';
@@ -37,6 +38,10 @@ import { AdminUsersController } from './admin-users.controller';
   imports: [
     AuthModule,
     GlobalRolesModule,
+    /* Por `TaskPurgeService` y `AutomationPurgeService`: borrar un proyecto
+       desde administración arrastra sus tareas y sus reglas igual que el
+       `DELETE` del dueño, y es el mismo código. */
+    ProjectsModule,
     ClientsModule.registerAsync([
       {
         name: 'ALEXA_SERVICE',

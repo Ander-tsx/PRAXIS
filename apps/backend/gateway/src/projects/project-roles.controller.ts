@@ -66,7 +66,10 @@ export class ProjectRolesController {
   @ApiResponse({ status: 200, description: 'Rol eliminado exitosamente' })
   delete(@Param('id', ParseUUIDPipe) id: string, @Request() req: Express.Request) {
     return firstValueFrom(
-      this.projectsClient.send({ cmd: 'project_role_delete' }, { id, projectId: req.projectId, requesterId: req.user!.userId }),
+      this.projectsClient.send(
+        { cmd: 'project_role_delete' },
+        { id, projectId: req.projectId, requesterId: req.user!.userId },
+      ),
     );
   }
 }
