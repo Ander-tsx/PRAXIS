@@ -105,8 +105,15 @@ infra/terraform/.terraform/
 crash.log
 crash.*.log
 
+# Configuración local de agentes de código.
+#
+# No es deuda ni un descuido: son ajustes de la máquina de cada quien —claves de
+# herramientas, skills instaladas, planes a medio escribir— y quien los subió lo
+# dijo en su propio commit («no subo las skills porsiacaso»). `.claude/.gitkeep`
+# sí se versiona, para que la carpeta exista en un árbol recién clonado.
 .codex
 graphify-out
 .agents
 skills-lock.json
-.claude
+.claude/
+!.claude/.gitkeep
