@@ -1,8 +1,5 @@
 <div align="center">
 
-![Praxis Banner](docs/assets/praxis-banner.png)
-<!-- docs/assets/praxis-banner.png | Logo de PRAXIS centrado sobre fondo oscuro limpio, tipografía sans-serif moderna | 1280×640, horizontal | Imagen estática PNG -->
-
 # PRAXIS
 
 **Gestión de proyectos ágil con tableros Kanban, reportes predictivos y asistente de voz.**
@@ -51,10 +48,10 @@ PRAXIS es una plataforma de gestión de proyectos construida sobre una arquitect
 
 El frontend se organiza como **7 microfrontends Multi-Zone** de Next.js 16 más el `web-shell` que los sirve: cada zona es una aplicación independiente con su propio `basePath`, servida a través del shell mediante `rewrites()`. El backend son **8 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
 
-Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho en su *outbox*, un publicador lo vuelca en un stream de Redis y `automation` lo consume y evalúa las reglas del proyecto. Diez disparadores —cuatro de barrido y seis reactivos— y siete acciones que escriben por los mismos endpoints que usa la interfaz, con los permisos de quien escribió la regla. Ninguna regla abre una ruta de escritura nueva.
+Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho en su *outbox*, un publicador lo vuelca en un stream de Redis y `automation` lo consume y evalúa las reglas del proyecto. Diez disparadores —cuatro de barrido y seis reactivos— y seis acciones que escriben por los mismos endpoints que usa la interfaz, con los permisos de quien escribió la regla. Ninguna regla abre una ruta de escritura nueva.
 
-![Demo del producto](docs/assets/product-demo.gif)
-<!-- docs/assets/product-demo.gif | Recorrido corto: login → dashboard con métricas → abrir proyecto → tablero Kanban con drag-and-drop → vista de reportes | 1280×720, horizontal | GIF animado (~15 s) -->
+> [!TIP]
+> Hay capturas de cada pantalla al final, en [Capturas de pantalla](#-capturas-de-pantalla).
 
 ---
 
@@ -99,7 +96,7 @@ flowchart TB
         RepS["reports :3005\nAgregador · Monte Carlo"]
         Asst["assistant :3006\nGemini · Propuestas"]
         Alex["alexa :3007\nSolo lectura · Voz"]
-        Automation["automation :3008\nMotor reactivo · 10 disparadores · 7 acciones"]
+        Automation["automation :3008\nMotor reactivo · 10 disparadores · 6 acciones"]
     end
 
     subgraph data["Datos"]
@@ -235,7 +232,7 @@ El camino más rápido es el CLI interactivo, pero si prefieres control total, s
 ## Opción A: CLI interactivo (recomendado)
 
 ```bash
-git clone https://github.com/tu-org/praxis.git && cd praxis
+git clone https://github.com/Ander-tsx/PRAXIS.git && cd PRAXIS
 pnpm install
 pnpm dev:cli
 ```
@@ -246,7 +243,7 @@ El asistente levanta Docker, compila las librerías compartidas, genera los clie
 
 ```bash
 # 1. Clonar e instalar
-git clone https://github.com/tu-org/praxis.git && cd praxis
+git clone https://github.com/Ander-tsx/PRAXIS.git && cd PRAXIS
 pnpm install
 
 # 2. Levantar infraestructura local
@@ -344,8 +341,8 @@ Hay **cuatro clases de prueba**, y cada una responde a una pregunta distinta:
 | **E2E de navegador** | Que la pantalla se pinta y el recorrido funciona de verdad, en Chromium | stack + seeds | `pnpm e2e:ui` |
 
 ```bash
-pnpm test             # 39 suites unitarias, en seco
-pnpm test:int         # 4 suites de integración (Postgres + Redis vivos)
+pnpm test             # 38 suites · 322 casos unitarios, en seco
+pnpm test:int         # 4 suites · 27 casos de integración (Postgres + Redis vivos)
 
 # E2E — requiere el stack levantado y los seeds
 pnpm e2e              # 245 casos en 25 ficheros
@@ -459,7 +456,7 @@ gcloud builds submit --config=infra/ci/cloudbuild.yaml .
 
 1. Crea un branch desde `main`: `git checkout -b feature/tu-cambio`
 2. Sigue **Conventional Commits** en español: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, etc.
-3. Asegúrate de que `pnpm format` y `pnpm lint` pasen — Husky los valida en el pre-commit.
+3. Asegúrate de que `pnpm format` y `pnpm lint` pasen antes de commitear.
 4. Ejecuta `pnpm e2e:regresion` antes del PR. Debe estar en verde.
 5. Abre el Pull Request contra `main`.
 

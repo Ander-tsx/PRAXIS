@@ -80,16 +80,27 @@ test.describe('Panel de detalle de una tarea', () => {
     const etiqueta = companero.email.split('@')[0];
 
     /**
-     * ⚠️ **`force`, porque la casilla va `sr-only`.**
+     * ⚠️ **Se pulsa la etiqueta, no la casilla, y no es un capricho de estilo.**
      *
      * El interruptor de encargado es un `<input type="checkbox">` de verdad
-     * escondido dentro de su `<label>`: mide un píxel, y lo que se ve —y lo que
-     * recibe el clic— es el cuadro dibujado al lado. Sin `force`, Playwright
-     * comprueba que el punto del clic pertenece al propio input y aborta. El
-     * `toBeChecked` de después es lo que confirma que el clic hizo su efecto.
+     * escondido dentro de su `<label>`: va `sr-only` —un píxel, recortado y
+     * fuera de flujo— y lo que se ve, y lo que recibe el clic de una persona,
+     * es el cuadro dibujado al lado.
+     *
+     * Esto hacía `check({ force: true })`. `force` se salta las comprobaciones
+     * de accionabilidad, pero **no** el cálculo del punto del clic: Playwright
+     * sigue necesitando que la caja del elemento caiga dentro del viewport, y
+     * la de un `sr-only` no se mueve al desplazar el panel. Funcionaba en la
+     * primera casilla y fallaba en la segunda —ya con el panel de otra tarea
+     * abierto y desplazado— con «Element is outside of the viewport», que no
+     * menciona por ningún sitio que el problema sea el `sr-only`.
+     *
+     * Pulsar la `<label>` que lo envuelve es además lo que hace una persona, y
+     * sobrevive a cualquier rediseño del cuadro. El `toBeChecked` de después
+     * sigue siendo lo que confirma que el clic hizo su efecto.
      */
     const casillaAnterior = page.getByRole('checkbox', { name: etiqueta });
-    await casillaAnterior.check({ force: true });
+    await page.locator('label').filter({ has: casillaAnterior }).click();
     await expect(casillaAnterior).toBeChecked();
 
     await page.getByRole('button', { name: 'Cerrar panel' }).click();
@@ -136,7 +147,9 @@ test.describe('Panel de detalle de una tarea', () => {
 
     const casillaSiguiente = page.getByRole('checkbox', { name: etiqueta });
     await expect(casillaSiguiente).not.toBeChecked();
-    await casillaSiguiente.check({ force: true });
+    /* Por la etiqueta, igual que arriba: es aquí donde el `check({ force })`
+       moría por la posición del `sr-only`. */
+    await page.locator('label').filter({ has: casillaSiguiente }).click();
     await page.getByRole('button', { name: 'Cerrar panel' }).click();
 
     await expect

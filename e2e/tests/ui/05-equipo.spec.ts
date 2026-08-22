@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
+import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
 
 /**
  * La pestaña Equipo de un proyecto.
@@ -24,7 +24,7 @@ test.describe('Equipo del proyecto', () => {
        un enlace cuyo texto arranca con su nombre, y llamarlo así lo volvía
        ambiguo con el enlace de la pestaña Equipo. */
     const nombre = `Rediseño ${Date.now().toString(36)}`;
-    await crearProyectoEnLaInterfaz(page, nombre);
+    await crearProyectoParaLaPrueba(page, nombre);
 
     /* ⚠️ **Crear un proyecto no lleva a su ficha**: el diálogo se cierra y la
        rejilla se refresca, así que hay que entrar a mano. Es lo mismo que hace
