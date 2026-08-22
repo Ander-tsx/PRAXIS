@@ -23,6 +23,7 @@
 | E4 | Las cuotas, comprobadas donde se escribe | ✅ **hecho** (2026-08-21) |
 | E5 | El frontend: precios, portal e invitaciones | ✅ **hecho** (2026-08-21) |
 | E6 | Cierre: correo, recuperación del 402, e2e, ESTADO-ACTUAL | ⬜ **pendiente** |
+| E7 | Revisión del dueño del producto: navegación, copia y diseño | 🟡 **a medias** |
 
 ### Registro
 
@@ -32,7 +33,10 @@
 | 2026-08-21 | E2 | `7e8af94` | `billing-service`: cuatro tablas, once comandos y ni un cliente hacia otro servicio |
 | 2026-08-21 | E3 | (pendiente) | `QuotaService`, la traducción de fallos, `me/billing` y `organizations/:id` |
 | 2026-08-21 | E4 | (pendiente) | 402 al crear proyecto, al meter miembro y al invitar; el tope de IA viajando en cada turno |
-| 2026-08-21 | E5 | (pendiente) | Los cinco planes, el portal de la organización, las invitaciones y la tarjeta de Configuración |
+| 2026-08-21 | E5 | `fe26c18` | Los cinco planes, el portal de la organización, las invitaciones y la tarjeta de Configuración |
+| 2026-08-21 | E7 | `9c48d9f` | El mes gratis no dejaba fecha y la insignia de la cabecera decía FREE a quien paga |
+| 2026-08-21 | E7 | `941876b` | Configuración pasa a desplegable; facturación deja de estar en dos sitios |
+| 2026-08-21 | E7 | `6b47c24` | El portal y el vacío explican qué da una organización; gramática de los botones |
 
 ---
 
@@ -358,12 +362,53 @@ Lo que falta, por orden de lo que más duele:
 5. ⚠️ **No hay traspaso de dueño de una organización.** Está bloqueado a
    propósito —hay un dueño y es quien paga— pero no tiene ruta, así que hoy una
    organización muere con su creador.
-6. **Los componentes siguen en español**: `components/organisms/Planes/` y
-   `.../Organizaciones/`. Renombrarlos es seguro (son `PascalCase` inequívocos),
-   pero se dejó fuera para no mezclarlo con el arreglo de rutas.
-7. **El webhook en local necesita `stripe listen --forward-to
+6. **El webhook en local necesita `stripe listen --forward-to
    localhost:3000/api/webhooks/stripe`.** Sin él se paga y el plan no se aplica
-   — que es el comportamiento correcto, pero hay que saberlo.
+   — que es el comportamiento correcto, pero hay que saberlo, y ya mordió: tres
+   suscripciones cobradas en Stripe y la base sin enterarse. Se reconcilian con
+   `stripe events resend <id>`, que es para lo que existe `billing_events`.
+
+---
+
+## E7 — La revisión del dueño del producto *(a medias)*
+
+Lo que salió de mirarlo por primera vez con ojos de quien lo va a usar. Hecho:
+la navegación —Configuración como desplegable con Facturación y Praxis Voice—,
+la fusión de las dos pantallas de plan, la copia del portal y del vacío de
+organizaciones, y la gramática de los botones de compra.
+
+### 🔴 Lo que quedó abierto, y es una pregunta de producto
+
+**Un plan de empresa no es hoy un espacio de trabajo, es una suscripción por
+volumen.** Lo que otorga a quien entra son las **cuotas** del plan en sus
+propios proyectos, vía `mejorPlan`. Y ya. `Project` **no tiene
+`organizationId`**: los proyectos siguen colgando de su dueño.
+
+De ahí salen las tres preguntas que hizo el dueño del producto y que este plan
+todavía no contesta:
+
+1. ¿Los proyectos deberían pertenecer a la organización?
+2. Si pertenecen, ¿el tope de proyectos se cuenta por organización en vez de por
+   persona?
+3. ¿Quién administra la organización ve o entra en sus proyectos? Hoy **no**, y
+   está escrito así en D8 a propósito: el plan no es una llave maestra. Si los
+   proyectos pasan a ser de la organización, esa decisión hay que volver a
+   tomarla — y es la que más puede sorprender a alguien.
+
+⚠️ **No se ha implementado nada de esto por su cuenta.** Cambia el modelo de
+datos, el conteo de cuotas y el modelo de permisos a la vez, y las tres
+decisiones son de producto, no de implementación.
+
+### Y lo que se vio de camino
+
+- **Invitar a alguien sin cuenta no está probado.** El enlace lleva a una ruta
+  privada: quien no tenga cuenta pasa por el registro, tiene que verificar el
+  correo y volver al enlace. La invitación va por dirección de correo, así que
+  *debería* funcionar — pero nadie lo ha recorrido entero.
+- `commons` no compila limpio, y **viene de `main`**: dos errores de
+  `exactOptionalPropertyTypes` en `assistant/actions.ts` y `AssistantChat.tsx`.
+  No son de esta etapa; están apuntados aquí porque cualquiera que corra `tsc`
+  sobre commons los va a ver y va a pensar que sí.
 
 ---
 
