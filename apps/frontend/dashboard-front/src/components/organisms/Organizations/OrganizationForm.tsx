@@ -21,7 +21,7 @@ import { useEffect, useId, useState } from 'react';
  * aquí: es lo honesto —todavía no ha pagado nadie— y evita la sorpresa de
  * invitar a diez personas y descubrir que el tope sigue siendo el de siempre.
  */
-export function FormularioDeOrganizacion({
+export function OrganizationForm({
   planes,
   tierInicial,
 }: {

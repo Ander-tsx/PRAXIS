@@ -17,7 +17,7 @@ import { useEffect } from 'react';
  * Por eso lo único que viaja es el token, y por eso este botón exige sesión: no
  * hay forma de aceptar sin cuenta, y decirlo antes ahorra el viaje.
  */
-export function AceptarInvitacion({ token }: { token: string }) {
+export function AcceptInvitation({ token }: { token: string }) {
   const router = useRouter();
   const [state, formAction, pending] = useAccion(
     aceptarInvitacionAction,

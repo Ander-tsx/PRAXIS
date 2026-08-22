@@ -19,7 +19,7 @@ import { useId, useState } from 'react';
  * un 403 con `SIN_PERMISO`. Apagarlos aquí es para no ofrecer lo que se va a
  * negar, que es distinto de impedirlo.
  */
-export function PanelDeMiembros({
+export function MembersPanel({
   organizationId,
   miembros,
   miPapel,
@@ -37,9 +37,12 @@ export function PanelDeMiembros({
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-sans text-lg font-semibold text-text-primary">Miembros</h2>
+        {/* ⚠️ Una sola expresión y no dos pegadas: un salto de línea entre
+            `{…}` y `{…}` en JSX se convierte en **un espacio**, y salía
+            «asientos ocupados , quedan 8». Se ve y no da ningún error. */}
         <p className="font-sans text-sm text-text-secondary">
-          {asientos.ocupados} de {asientos.contratados} asientos ocupados
-          {quedan > 0 ? `, quedan ${quedan}` : ', no queda ninguno'}
+          {`${asientos.ocupados} de ${asientos.contratados} asientos ocupados` +
+            (quedan > 0 ? `, quedan ${quedan} libres.` : ', no queda ninguno libre.')}
         </p>
       </div>
 

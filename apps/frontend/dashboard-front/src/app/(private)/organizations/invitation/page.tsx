@@ -1,4 +1,4 @@
-import { AceptarInvitacion } from '@/components/organisms/Organizaciones';
+import { AcceptInvitation } from '@/components/organisms/Organizations';
 import { AppHeader } from '@praxis/commons';
 import type { Metadata } from 'next';
 
@@ -23,7 +23,7 @@ export default async function InvitacionPage({
   return (
     <AppHeader title="Invitación a una organización">
       {token ? (
-        <AceptarInvitacion token={token} />
+        <AcceptInvitation token={token} />
       ) : (
         <p className="font-sans text-sm text-text-secondary">
           Este enlace no trae el código de la invitación. Pide que te lo vuelvan a enviar: el

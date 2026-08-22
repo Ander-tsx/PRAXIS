@@ -1,4 +1,4 @@
-import { FormularioDeOrganizacion } from '@/components/organisms/Organizaciones';
+import { OrganizationForm } from '@/components/organisms/Organizations';
 import { AppHeader } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { CatalogoDePlanes, PlanTier } from '@praxis/commons/billing/planes';
@@ -45,7 +45,7 @@ export default async function NuevaOrganizacionPage({
 
   return (
     <AppHeader title="Nueva organización">
-      <FormularioDeOrganizacion planes={planes} tierInicial={elegido} />
+      <OrganizationForm planes={planes} tierInicial={elegido} />
     </AppHeader>
   );
 }

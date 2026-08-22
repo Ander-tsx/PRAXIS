@@ -18,7 +18,7 @@ import { useId, useState } from 'react';
  * error del servidor trae el número ocupado dentro, que es lo que hace falta
  * para saber a cuánto sí se puede bajar.
  */
-export function PanelDeAsientos({
+export function SeatsPanel({
   organizationId,
   contratados,
   ocupados,
