@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@praxis/commons';
-import { abrirPagoProAction, abrirPortalAction } from '@praxis/commons/billing/actions';
+import { abrirPagoAction, abrirPortalAction } from '@praxis/commons/billing/actions';
+import type { PlanTier } from '@praxis/commons/billing/planes';
 import { useState } from 'react';
 
 /**
@@ -23,10 +24,19 @@ import { useState } from 'react';
  */
 export function BotonDeCompra({
   destino,
+  tier,
+  seats,
+  organizationId,
   children,
 }: {
   /** `checkout` abre el pago; `portal`, la gestión de una suscripción que ya existe. */
   destino: 'checkout' | 'portal';
+  /** Qué plan se compra. Obligatorio en `checkout` y de sobra en `portal`. */
+  tier?: PlanTier;
+  /** Asientos, solo en los planes de empresa. */
+  seats?: number;
+  /** Quién paga, solo en los planes de empresa. */
+  organizationId?: string;
   children: React.ReactNode;
 }) {
   const [abriendo, setAbriendo] = useState(false);
@@ -37,7 +47,9 @@ export function BotonDeCompra({
     setError(null);
 
     const { url, error: fallo } =
-      destino === 'checkout' ? await abrirPagoProAction() : await abrirPortalAction();
+      destino === 'checkout' && tier
+        ? await abrirPagoAction({ tier, seats, organizationId })
+        : await abrirPortalAction();
 
     if (url) {
       if (destino === 'portal') {

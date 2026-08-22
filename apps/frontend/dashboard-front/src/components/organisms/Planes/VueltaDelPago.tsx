@@ -1,7 +1,8 @@
 'use client';
 
 import { Button, alpha, colors } from '@praxis/commons';
-import { cuotaPropiaAction } from '@praxis/commons/billing/actions';
+import { resumenDeFacturacionAction } from '@praxis/commons/billing/actions';
+import type { PlanTier } from '@praxis/commons/billing/planes';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -19,10 +20,14 @@ import { useEffect, useState } from 'react';
  * durante esos segundos el servidor sigue diciendo FREE a alguien que acaba de
  * pagar. Decírselo tal cual sería mentir con la verdad.
  *
- * Así que esto pregunta por la cuota hasta que diga PRO, y mientras tanto
+ * Así que esto pregunta por el plan hasta que **cambie**, y mientras tanto
  * cuenta lo que de verdad está pasando: el pago se hizo y se está confirmando.
  * Si tras varios intentos sigue sin llegar, tampoco se acusa a nadie: el cobro
  * está hecho y el plan aparecerá — recargar más tarde lo resolverá.
+ *
+ * ⚠️ **Se espera a que el plan cambie, no a que sea uno concreto.** Desde que
+ * hay cinco, esperar «PRO» dejaría a quien compra Plus mirando el mensaje de
+ * confirmación hasta agotar los intentos, con el plan ya aplicado por detrás.
  *
  * ## Por qué un contador de intentos y no un `setInterval` eterno
  *
@@ -35,30 +40,40 @@ import { useEffect, useState } from 'react';
 const ESPERA_MS = 2_000;
 const INTENTOS = 10;
 
-export function VueltaDelPago({ planActual }: { planActual: 'FREE' | 'PRO' }) {
+export function VueltaDelPago({
+  planActual,
+  nombreDelPlan,
+}: {
+  /** El plan que el servidor decía al pintar la página. */
+  planActual: PlanTier;
+  /** Cómo se llama el plan ya confirmado, para escribirlo en la enhorabuena. */
+  nombreDelPlan?: string | null;
+}) {
   const router = useRouter();
-  const [plan, setPlan] = useState(planActual);
+  const [plan, setPlan] = useState<PlanTier>(planActual);
+  const [nombre, setNombre] = useState<string | null>(nombreDelPlan ?? null);
   const [intentos, setIntentos] = useState(0);
 
-  const confirmado = plan === 'PRO';
+  const confirmado = plan !== planActual;
   const esperando = !confirmado && intentos < INTENTOS;
 
   useEffect(() => {
     if (!esperando) return;
 
     const temporizador = window.setTimeout(async () => {
-      const cuota = await cuotaPropiaAction();
+      const resumen = await resumenDeFacturacionAction();
       setIntentos((cuantos) => cuantos + 1);
-      if (cuota?.plan === 'PRO') {
-        setPlan('PRO');
-        /* Que el resto de la página —el contador, la tarjeta del plan— deje de
-           decir FREE también. */
+      if (resumen && resumen.tier !== planActual) {
+        setPlan(resumen.tier);
+        setNombre(resumen.tier);
+        /* Que el resto de la página —el consumo, la tarjeta del plan— deje de
+           decir lo de antes también. */
         router.refresh();
       }
     }, ESPERA_MS);
 
     return () => window.clearTimeout(temporizador);
-  }, [esperando, intentos, router]);
+  }, [esperando, intentos, planActual, router]);
 
   if (confirmado) {
     return (
@@ -68,7 +83,7 @@ export function VueltaDelPago({ planActual }: { planActual: 'FREE' | 'PRO' }) {
         style={{ background: alpha(colors.success, 10), borderColor: alpha(colors.success, 35) }}
       >
         <h2 className="font-sans text-lg font-semibold text-text-primary">
-          ¡Enhorabuena! Ya tienes PRAXIS PRO
+          ¡Enhorabuena! Ya tienes {nombre ? `PRAXIS ${nombre}` : 'tu nuevo plan'}
         </h2>
         <p className="font-sans text-sm text-text-secondary">
           Tu plan está activo desde ya. El asistente vuelve a estar disponible con todos sus
@@ -96,9 +111,7 @@ export function VueltaDelPago({ planActual }: { planActual: 'FREE' | 'PRO' }) {
         className="flex flex-col gap-2 rounded-2xl border px-5 py-4"
         style={{ background: alpha(colors.primary, 8), borderColor: alpha(colors.primary, 30) }}
       >
-        <h2 className="font-sans text-lg font-semibold text-text-primary">
-          Confirmando tu pago…
-        </h2>
+        <h2 className="font-sans text-lg font-semibold text-text-primary">Confirmando tu pago…</h2>
         <p className="font-sans text-sm text-text-secondary">
           El cobro se ha hecho. Estamos esperando la confirmación de Stripe para activar tu plan;
           suele tardar unos segundos.

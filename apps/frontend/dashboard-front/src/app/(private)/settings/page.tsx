@@ -2,10 +2,13 @@ import { setThemeAction } from '@/app/(private)/settings/actions';
 import { PanelCard } from '@/components/molecules/PanelCard';
 import { BillingSummary } from '@/components/organisms/BillingSummary';
 import { VoiceLinking } from '@/components/organisms/VoiceLinking';
-import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import type { VoiceLink } from '@/lib/voice';
 import { AppHeader, ThemeToggle } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import type {
+  CatalogoDePlanes,
+  BillingSummary as ResumenDeFacturacion,
+} from '@praxis/commons/billing/planes';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 
@@ -50,21 +53,24 @@ export default async function SettingsPage() {
   /* Cada `catch` deja su bloque en el estado «no se pudo cargar» en vez de
      tumbar la pantalla entera: que alexa-service esté caído no es motivo para
      no poder cambiar el tema. */
-  const [, theme, quota, voiceLinks, billing] = await Promise.all([
+  const [, theme, voiceLinks, resumen, catalogo] = await Promise.all([
     loadCurrentUser(),
     getTheme(),
     createServerApiClient()
-      .get<AssistantQuota>('/me/assistant/quota')
-      .catch(() => null),
-    createServerApiClient()
       .get<VoiceLink[]>('/alexa/links')
       .catch(() => null),
-    /* `null` se trata como apagado en `BillingSummary`: si no se puede
-       preguntar si hay pasarela, no se ofrece comprar. */
+    /* `null` se trata como «no se pudo leer» en `BillingSummary`: si no se
+       puede saber el plan, tampoco se ofrece comprar nada. */
     createServerApiClient()
-      .get<EstadoDeFacturacion>('/me/billing/estado')
+      .get<ResumenDeFacturacion>('/me/billing/resumen')
+      .catch(() => null),
+    /* Solo para escribir el nombre del plan. Los topes ya vienen en el resumen. */
+    createServerApiClient()
+      .get<CatalogoDePlanes>('/me/billing/planes')
       .catch(() => null),
   ]);
+
+  const spec = catalogo?.planes.find((plan) => plan.tier === resumen?.tier) ?? null;
 
   /* Sin `headerSlot`: el rol —y ahora también el plan— los pone el armazón en
      todas las pantallas de todas las zonas (`cuentaSlot`). Dejarlo aquí los
@@ -86,11 +92,11 @@ export default async function SettingsPage() {
 
           <PanelCard
             title="Facturación"
-            description="Tu plan del asistente de IA y cuántos mensajes te quedan este mes."
+            description="Tu plan, lo que llevas gastado y cuándo vuelve a empezar."
             icon={<IconoFacturacion />}
             className="lg:col-span-5"
           >
-            <BillingSummary quota={quota} billing={billing} />
+            <BillingSummary resumen={resumen} spec={spec} />
           </PanelCard>
         </div>
 

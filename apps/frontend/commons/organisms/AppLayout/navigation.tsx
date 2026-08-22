@@ -160,6 +160,55 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
+     * Los planes y lo que se lleva cada uno.
+     *
+     * 🔴 **Estaba sin entrada, y era el fallo más caro de toda la etapa.** La
+     * pantalla existía desde la etapa del asistente y solo se llegaba a ella
+     * por un enlace dentro de la tarjeta de Configuración y por el aviso del
+     * chat al agotar la cuota: o sea, **solo tropezando con un límite**. Una
+     * tabla de precios a la que hay que llegar chocando no vende nada, y aquí
+     * es además el sitio donde se enseña que el plan intermedio da un mes
+     * gratis.
+     */
+    label: 'Planes',
+    href: '/dashboard/plans',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
+     * Las organizaciones de empresa: sus asientos, su gente y su plan.
+     *
+     * ⚠️ **Sale para todo el mundo, y es a propósito.** No es una pantalla de
+     * administración de la plataforma —eso es la de abajo, que sí se filtra por
+     * rol— sino la de *tu* plan: quien no pertenece a ninguna llega a una
+     * pantalla que le explica qué es una organización y le deja crear la
+     * primera, que es justo lo que hay que poder encontrar sin que te lo digan.
+     *
+     * Va junto a Configuración porque es de la misma familia —tu cuenta— y no
+     * entre los tableros, que es donde se trabaja.
+     */
+    label: 'Organizaciones',
+    href: '/dashboard/organizations',
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 21h16.5M4.5 3h9a.75.75 0 01.75.75V21H3.75V3.75A.75.75 0 014.5 3zm9.75 6h5.25a.75.75 0 01.75.75V21h-6V9zM7 7.5h3M7 11h3M7 14.5h3"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
      * El panel de administración de la plataforma.
      *
      * ⚠️ **No sale para todo el mundo.** `loadAppNavItems` la descarta si la

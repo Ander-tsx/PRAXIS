@@ -67,3 +67,49 @@ export const VOICE_LINK_INITIAL_STATE: VoiceLinkState = {
   phrase: null,
   expiresAt: null,
 };
+
+/* ─── Organizaciones ───────────────────────────────────────────────────────
+ *
+ * Todas comparten forma —`error` y algo que confirma el servidor— porque las
+ * consume el mismo patrón: `useAccion`, un botón y un mensaje debajo. Lo que
+ * cambia es qué se confirma, y ahí sí son distintas: una invitación devuelve un
+ * enlace que hay que poder copiar, y un cambio de asientos, el número que quedó.
+ */
+
+export interface CrearOrganizacionState {
+  error: string | null;
+  /** El id de la que se acaba de crear, para llevar hasta su portal. */
+  creada: string | null;
+}
+
+export const CREAR_ORGANIZACION_INITIAL_STATE: CrearOrganizacionState = {
+  error: null,
+  creada: null,
+};
+
+export interface InvitarMiembroState {
+  error: string | null;
+  /**
+   * El enlace de la invitación, que **solo llega una vez**.
+   *
+   * ⚠️ En la base queda su hash, así que si se pierde no hay forma de volver a
+   * verlo: hay que cancelar la invitación y volver a invitar. Por eso la
+   * pantalla lo deja a la vista y copiable en vez de enseñar un «hecho».
+   */
+  enlace: string | null;
+  email: string | null;
+}
+
+export const INVITAR_MIEMBRO_INITIAL_STATE: InvitarMiembroState = {
+  error: null,
+  enlace: null,
+  email: null,
+};
+
+/** Las que solo dicen si salió bien: sacar a alguien, cambiar rol o asientos. */
+export interface OrganizacionState {
+  error: string | null;
+  done: string | null;
+}
+
+export const ORGANIZACION_INITIAL_STATE: OrganizacionState = { error: null, done: null };
