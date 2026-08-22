@@ -78,6 +78,21 @@ export class StripeWebhookController {
         await this.onCheckoutCompleted(event.data.object, event.id);
         break;
 
+      /**
+       * 🔴 **`created` también, y no estaba.**
+       *
+       * `checkout.session.completed` llega sin la suscripción expandida, así que
+       * de ahí no se puede saber si hay periodo de prueba —y ante la duda se
+       * asume que no, porque prometer gratis lo que se cobra es peor que lo
+       * contrario—. La consecuencia era que un plan con mes gratis se guardaba
+       * como `ACTIVE` **sin `trialEndsAt`**, y la pantalla no podía avisar de
+       * cuándo llega el cobro: justo la trampa 3 del encargo.
+       *
+       * `customer.subscription.created` llega un instante después con el estado
+       * real, el precio, la cantidad y `trial_end`. Sin escucharlo había que
+       * esperar a la primera renovación para corregir la fila.
+       */
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         await this.onSubscriptionChanged(event.data.object, event.id);

@@ -138,7 +138,7 @@ export class StripeService {
        sobre un precio por unidad, cincuenta asientos costarían lo que uno. */
     const cantidad = spec.porAsiento ? Math.max(data.seats ?? spec.asientosMinimos, 1) : 1;
 
-    const vuelta = data.volverA ?? '/dashboard/plans';
+    const vuelta = data.volverA ?? '/dashboard/billing';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -204,7 +204,7 @@ export class StripeService {
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${this.appUrl}${volverA ?? '/dashboard/settings'}`,
+      return_url: `${this.appUrl}${volverA ?? '/dashboard/billing'}`,
     });
 
     return { url: session.url };
