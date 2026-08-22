@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PlanTier, SubscriptionStatus } from '@praxis/contracts';
-import { OrganizationsService } from '../organizations/organizations.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -24,10 +23,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class SubscriptionsService {
   private readonly log = new Logger(SubscriptionsService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly organizaciones: OrganizationsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Deja el plan de una organización como dice Stripe.
@@ -102,26 +98,28 @@ export class SubscriptionsService {
   /**
    * El cliente de Stripe de alguien, para reabrir el portal o reutilizarlo.
    *
-   * Mira su organización personal **y** las de empresa donde es dueño: son los
-   * dos sitios donde puede haber pagado él.
+   * Mira **todas las organizaciones de las que es dueño** —la personal y las de
+   * empresa—, que son los sitios donde puede haber pagado él.
+   *
+   * ⚠️ **No crea la organización personal, y antes sí lo hacía.** Esto lo llama
+   * cada carga de `/me/billing/resumen` y de la tarjeta de Configuración: crear
+   * la fila aquí convertía en escritura una pantalla que solo mira, para todas
+   * las cuentas del sistema. Sin fila no hay cliente de Stripe, que es
+   * exactamente la respuesta correcta.
    */
   async clienteDe(userId: string) {
-    const organizacion = await this.organizaciones.personalDe(userId);
-    if (organizacion.subscription?.stripeCustomerId) {
-      return {
-        organizationId: organizacion.id,
-        stripeCustomerId: organizacion.subscription.stripeCustomerId,
-      };
-    }
-
     const propia = await this.prisma.organization.findFirst({
       where: { ownerUserId: userId, subscription: { stripeCustomerId: { not: null } } },
       include: { subscription: true },
+      /* Si hubiera varias, la personal primero: es la que abre el portal de un
+         plan individual, que es el caso de casi todo el mundo que llega aquí. */
+      orderBy: { kind: 'asc' },
     });
 
-    return propia?.subscription?.stripeCustomerId
-      ? { organizationId: propia.id, stripeCustomerId: propia.subscription.stripeCustomerId }
-      : { organizationId: organizacion.id, stripeCustomerId: null };
+    return {
+      organizationId: propia?.id ?? null,
+      stripeCustomerId: propia?.subscription?.stripeCustomerId ?? null,
+    };
   }
 
   /**

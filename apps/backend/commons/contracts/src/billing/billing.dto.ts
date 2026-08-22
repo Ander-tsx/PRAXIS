@@ -55,7 +55,16 @@ export function estaVigente(status: SubscriptionStatus | string | null | undefin
  * enseñar el límite sin lo gastado no deja saber si queda.
  */
 export interface BillingSummary {
-  organizationId: string;
+  /**
+   * De qué organización sale el plan que vale.
+   *
+   * ⚠️ **`null` cuando no hay ninguna suscripción**, que es el caso de casi
+   * todo el mundo: la organización personal se crea la primera vez que hace
+   * falta guardar algo, no al registrarse, y pintar esta pantalla no es hacer
+   * falta. Sin fila el plan ya es FREE — crearla aquí convertiría cada carga en
+   * una escritura para todas las cuentas del sistema.
+   */
+  organizationId: string | null;
   tier: PlanTier;
   status: SubscriptionStatus;
   quotas: PlanQuotas;
