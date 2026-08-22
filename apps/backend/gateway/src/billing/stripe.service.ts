@@ -1,9 +1,10 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PLANS, PlanAudience, PlanTier } from '@praxis/contracts';
 import Stripe from 'stripe';
 
 /**
- * El cobro del plan PRO, contra Stripe.
+ * El cobro, contra Stripe.
  *
  * ## Checkout alojado, no un formulario nuestro
  *
@@ -19,35 +20,53 @@ import Stripe from 'stripe';
  * de pago responden 503 con un mensaje claro en vez de fallar de forma rara, y
  * el arranque lo avisa una vez. Es la misma decisión que ya toma `MailService`
  * con `MAIL_API_KEY`.
+ *
+ * ⚠️ **Y cada precio que falte apaga solo su plan.** Desde que hay cinco, un
+ * despliegue puede tener PRO configurado y los de empresa no; la pantalla de
+ * precios pregunta cuáles se pueden contratar (`planesDisponibles`) y no ofrece
+ * los otros, en vez de ofrecer un botón que responde 503 al pulsarlo.
  */
 @Injectable()
 export class StripeService {
   private readonly log = new Logger(StripeService.name);
   private readonly stripe?: Stripe;
-  private readonly proPrice?: string;
   private readonly webhookSecret?: string;
   private readonly appUrl: string;
+  /** Plan → id de precio. Solo entran los que tienen su variable puesta. */
+  private readonly precios = new Map<PlanTier, string>();
 
   constructor(private readonly config: ConfigService) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY') || undefined;
-    this.proPrice = this.config.get<string>('STRIPE_PRICE_PRO') || undefined;
     this.webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET') || undefined;
     this.appUrl = this.config.get<string>('PUBLIC_APP_URL') || 'http://localhost:4100';
 
-    if (!secretKey || !this.proPrice) {
-      this.log.warn(
-        'STRIPE_SECRET_KEY o STRIPE_PRICE_PRO no están definidas: la facturación queda desactivada.',
-      );
+    for (const plan of Object.values(PLANS)) {
+      if (!plan.envPrecio) continue;
+      const precio = this.config.get<string>(plan.envPrecio);
+      if (precio) this.precios.set(plan.tier, precio);
+    }
+
+    if (!secretKey) {
+      this.log.warn('STRIPE_SECRET_KEY no está definida: la facturación queda desactivada.');
       return;
     }
 
     this.stripe = new Stripe(secretKey);
 
+    const sinPrecio = Object.values(PLANS)
+      .filter((plan) => plan.envPrecio && !this.precios.has(plan.tier))
+      .map((plan) => plan.envPrecio);
+    if (sinPrecio.length > 0) {
+      /* Se avisa por plan y no en bloque: «falta STRIPE_PRICE_TEAM» se arregla;
+         «faltan precios» hay que ir a buscarlo. */
+      this.log.warn(`Sin precio configurado, esos planes no se ofrecen: ${sinPrecio.join(', ')}.`);
+    }
+
     if (!this.webhookSecret) {
       /**
        * ⚠️ Sin este secreto **no se puede verificar quién manda el webhook**, y
        * ese endpoint es público por necesidad. Aceptarlo sin firma sería dejar
-       * que cualquiera se regale el plan PRO con un `curl`, así que el manejador
+       * que cualquiera se regale un plan con un `curl`, así que el manejador
        * rechaza todo mientras falte. Se avisa al arrancar y no media hora antes
        * de una demo.
        */
@@ -63,6 +82,19 @@ export class StripeService {
     return this.stripe !== undefined;
   }
 
+  /**
+   * Qué planes se pueden contratar **en este despliegue**.
+   *
+   * FREE siempre: no se contrata, se es. Los demás, solo si su precio está
+   * configurado. Es lo que separa «este plan no existe» de «este plan no está
+   * enchufado aquí», que para quien mira la pantalla es lo mismo pero para quien
+   * despliega no.
+   */
+  planesDisponibles(): PlanTier[] {
+    if (!this.enabled) return [PlanTier.FREE];
+    return [PlanTier.FREE, ...this.precios.keys()];
+  }
+
   private requireStripe(): Stripe {
     if (!this.stripe) {
       throw new ServiceUnavailableException('El cobro no está configurado en este entorno.');
@@ -73,25 +105,45 @@ export class StripeService {
   /**
    * Abre un pago y devuelve a dónde mandar a la persona.
    *
-   * `client_reference_id` lleva **nuestro** `userId`. Es lo único que ata el
-   * pago a una cuenta de PRAXIS: Stripe no conoce nuestras cuentas, así que sin
-   * esto el webhook llegaría sin saber a quién darle el plan.
+   * `client_reference_id` lleva **el id de la organización**, no el de la
+   * persona. Es lo único que ata el pago a algo de PRAXIS —Stripe no conoce
+   * nuestras cuentas— y es la organización porque es la que paga: en un plan
+   * individual será la personal de quien compra, y en uno de empresa, la suya.
+   * Sin esto el webhook llegaría sin saber a quién darle el plan.
    *
    * ⚠️ La URL de éxito **no concede nada**. Es una página que dice «gracias» y
    * poco más: quien decide el plan es el webhook. Cualquiera puede escribir esa
-   * URL en la barra de direcciones, y si diera PRO, PRO sería gratis.
+   * URL en la barra de direcciones, y si diera un plan, el plan sería gratis.
    */
   async createCheckout(data: {
-    userId: string;
+    organizationId: string;
+    tier: PlanTier;
+    seats?: number;
     email?: string;
     stripeCustomerId?: string | null;
+    /** A dónde volver. La pantalla de planes o el portal de la organización. */
+    volverA?: string;
   }): Promise<{ url: string }> {
     const stripe = this.requireStripe();
+    const spec = PLANS[data.tier];
+    const precio = this.precios.get(data.tier);
+
+    if (!spec || !precio) {
+      throw new ServiceUnavailableException(
+        `El plan ${spec?.nombre ?? data.tier} no está disponible en este entorno.`,
+      );
+    }
+
+    /* En los de asiento la cantidad **es** lo que se cobra. Con `quantity: 1`
+       sobre un precio por unidad, cincuenta asientos costarían lo que uno. */
+    const cantidad = spec.porAsiento ? Math.max(data.seats ?? spec.asientosMinimos, 1) : 1;
+
+    const vuelta = data.volverA ?? '/dashboard/plans';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: this.proPrice as string, quantity: 1 }],
-      client_reference_id: data.userId,
+      line_items: [{ price: precio, quantity: cantidad }],
+      client_reference_id: data.organizationId,
       /* Se reutiliza el cliente si ya existe; si no, se le pasa el correo para
          que Stripe cree uno y esa persona no acabe con varios clientes sueltos
          cuyos recibos Stripe no relaciona entre sí. */
@@ -100,10 +152,37 @@ export class StripeService {
         : data.email
           ? { customer_email: data.email }
           : {}),
-      /* A la página de planes, no a Configuración: es donde está la
-         enhorabuena, y es la pantalla que ya sabe esperar al webhook. */
-      success_url: `${this.appUrl}/dashboard/planes?pago=ok`,
-      cancel_url: `${this.appUrl}/dashboard/planes?pago=cancelado`,
+      /**
+       * ⚠️ **El plan viaja también en los metadatos, además del precio.**
+       *
+       * El webhook tiene que saber qué plan conceder, y deducirlo del id del
+       * precio obliga a que el gateway que atiende el webhook tenga configuradas
+       * exactamente las mismas variables que el que abrió el checkout. Con el
+       * plan escrito en la sesión, un despliegue al que le falte una variable
+       * sigue aplicando bien el pago que ya se hizo.
+       */
+      metadata: { tier: data.tier, seats: String(cantidad) },
+      subscription_data: {
+        /**
+         * 🔴 **El mes gratis, y solo aquí.**
+         *
+         * Lo aplica Stripe, no un temporizador nuestro: el cobro llega al
+         * segundo mes porque Stripe lo programa, con sus reintentos y sus
+         * recibos.
+         *
+         * ⚠️ Si además se configura un periodo de prueba **en el propio precio**
+         * dentro del panel de Stripe, los dos se suman y quedarían dos meses
+         * gratis. No da ningún error y no se nota hasta el recibo que no llega.
+         */
+        ...(spec.diasDePrueba > 0 ? { trial_period_days: spec.diasDePrueba } : {}),
+        /* ⚠️ Y aquí también, no solo en la sesión: los eventos de
+           `customer.subscription.*` **no traen los metadatos de la sesión**, así
+           que sin esto una renovación o una baja llegaría sin saber de qué plan
+           ni de qué organización habla. */
+        metadata: { tier: data.tier, organizationId: data.organizationId },
+      },
+      success_url: `${this.appUrl}${vuelta}?pago=ok`,
+      cancel_url: `${this.appUrl}${vuelta}?pago=cancelado`,
     });
 
     if (!session.url) {
@@ -120,15 +199,59 @@ export class StripeService {
    * significaría reimplementar prorrateos, reintentos y recibos, y todo eso ya
    * existe ahí.
    */
-  async createPortal(stripeCustomerId: string): Promise<{ url: string }> {
+  async createPortal(stripeCustomerId: string, volverA?: string): Promise<{ url: string }> {
     const stripe = this.requireStripe();
 
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${this.appUrl}/dashboard/settings`,
+      return_url: `${this.appUrl}${volverA ?? '/dashboard/settings'}`,
     });
 
     return { url: session.url };
+  }
+
+  /**
+   * Cambia los asientos de una suscripción viva.
+   *
+   * ⚠️ **Es lo único de este archivo que cobra sin pasar por una página de
+   * Stripe**, así que quien llame tiene que haber comprobado el papel de quien
+   * pide. `proration_behavior` en `create_prorations` es lo que hace que subir
+   * de tres a diez a mitad de mes cueste la parte proporcional y no un mes
+   * entero — al revés sería cobrar dos veces por los mismos días.
+   */
+  async cambiarAsientos(stripeSubscriptionId: string, seats: number): Promise<void> {
+    const stripe = this.requireStripe();
+
+    const suscripcion = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+    const linea = suscripcion.items.data[0];
+    if (!linea) {
+      throw new ServiceUnavailableException('Esa suscripción no tiene ninguna línea que ajustar.');
+    }
+
+    await stripe.subscriptions.update(stripeSubscriptionId, {
+      items: [{ id: linea.id, quantity: seats }],
+      proration_behavior: 'create_prorations',
+    });
+  }
+
+  /**
+   * De qué plan es un precio.
+   *
+   * Es el camino de vuelta de `precios`, y se usa **solo como respaldo**: lo
+   * normal es que el plan venga en los metadatos de la suscripción. Ver la nota
+   * de `createCheckout`.
+   */
+  planDePrecio(priceId: string | null | undefined): PlanTier | null {
+    if (!priceId) return null;
+    for (const [tier, precio] of this.precios) {
+      if (precio === priceId) return tier;
+    }
+    return null;
+  }
+
+  /** ¿Este plan crea una organización con miembros? */
+  esDeEmpresa(tier: PlanTier): boolean {
+    return PLANS[tier]?.audience === PlanAudience.ENTERPRISE;
   }
 
   /**

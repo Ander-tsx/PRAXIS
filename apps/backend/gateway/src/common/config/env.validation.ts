@@ -73,6 +73,10 @@ export const envValidationSchema = Joi.object({
   AUTOMATION_SERVICE_HOST: Joi.string().default('localhost'),
   AUTOMATION_SERVICE_PORT: Joi.number().default(3008),
 
+  // billing-service — TCP 3009. Quién paga, qué plan y qué da ese plan.
+  BILLING_SERVICE_HOST: Joi.string().default('localhost'),
+  BILLING_SERVICE_PORT: Joi.number().default(3009),
+
   /**
    * Stripe. Las tres **opcionales**, y a propósito.
    *
@@ -88,8 +92,18 @@ export const envValidationSchema = Joi.object({
    * única superficie pública que tiene el sistema es el gateway.
    */
   STRIPE_SECRET_KEY: Joi.string().optional().allow(''),
-  /** El precio recurrente del plan PRO, `price_...`. Sin él no hay qué cobrar. */
+  /**
+   * Un precio recurrente por plan de pago, `price_...`.
+   *
+   * ⚠️ **Cada uno que falte apaga solo su plan**, no el cobro entero: la
+   * pantalla de precios pregunta cuáles se pueden contratar y no ofrece los
+   * demás. Así se puede desplegar PRO —que ya está en producción— antes que los
+   * de empresa, sin dejar un botón que responde 503 al pulsarlo.
+   */
+  STRIPE_PRICE_PLUS: Joi.string().optional().allow(''),
   STRIPE_PRICE_PRO: Joi.string().optional().allow(''),
+  STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
+  STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),
   /**
    * El secreto con el que se firma el webhook, `whsec_...`.
    *
