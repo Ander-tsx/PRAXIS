@@ -24,6 +24,7 @@
 | E5 | El frontend: precios, portal e invitaciones | ✅ **hecho** (2026-08-21) |
 | E6 | Cierre: correo, recuperación del 402, e2e, ESTADO-ACTUAL | ⬜ **pendiente** |
 | E7 | Revisión del dueño del producto: navegación, copia y diseño | 🟡 **a medias** |
+| E8 | La organización pasa a ser el espacio de trabajo | ⬜ **decidido, sin empezar** |
 
 ### Registro
 
@@ -409,6 +410,65 @@ decisiones son de producto, no de implementación.
   `exactOptionalPropertyTypes` en `assistant/actions.ts` y `AssistantChat.tsx`.
   No son de esta etapa; están apuntados aquí porque cualquiera que corra `tsc`
   sobre commons los va a ver y va a pensar que sí.
+
+---
+
+## E8 — La organización pasa a ser el espacio de trabajo *(decidido, sin empezar)*
+
+Las dos decisiones que tomó el dueño del producto el 2026-08-21, al ver la etapa
+funcionando por primera vez. Cierran la pregunta abierta en E7.
+
+### D11 — Un proyecto pertenece a una organización
+
+**Decidido: sí.** Hoy un plan de empresa es una suscripción por volumen —repartes
+cuotas más altas entre tu gente— y la pregunta *«¿qué nos da estar dentro?»* no
+tenía respuesta buena. Con esto la tiene: la organización es **el sitio donde
+está el trabajo del equipo**, no una bolsa de topes.
+
+Lo que arrastra, y por eso es la pieza más grande de la etapa:
+
+1. **`Project.organizationId`**, con migración. Nullable al principio: los
+   proyectos que ya existen son de la organización personal de su dueño, y
+   rellenarlos exige crear esas filas — que es justo lo que D1 evita hacer en
+   masa. Se decide al migrar si se rellenan o se leen como personales.
+2. **Al crear un proyecto hay que elegir de quién es**, y solo aparece el
+   selector si perteneces a más de una organización. Con una sola, no hay
+   pregunta que hacer.
+3. 🔴 **El tope de proyectos pasa a contarse por organización.** Es la mitad que
+   hace que el plan tenga sentido: cien proyectos **para el equipo**, no cien
+   para cada persona. Cambia `QuotaService.exigirProyecto`, que hoy cuenta por
+   dueño, y cambia lo que significa el número de la tabla de precios.
+4. ⚠️ **Y hay que volver a decidir D8.** Está escrito que el plan no abre
+   ninguna puerta: ser dueño de la organización no da ni un permiso en un
+   tablero. Con los proyectos colgando de la organización esa decisión ya no es
+   obvia — y es la que más puede sorprender a alguien que creía que su tablero
+   era suyo. **Sigue abierta**: hay que elegir entre que administración vea la
+   lista y no entre, que entre con permiso de lectura, o que no cambie nada.
+
+⚠️ **Ninguno de los cuatro puntos se puede hacer suelto.** Poner la columna sin
+cambiar el conteo deja un plan que promete cien proyectos por equipo y sigue
+dando cien por persona.
+
+### D12 — La invitación se manda por correo
+
+**Decidido: sí**, y deroga D9. Devolver un enlace para copiar era deuda
+consciente y no la forma final: *«pongo sus correos y se les envía un email»* es
+lo que espera quien invita.
+
+Lo que hay que respetar al hacerlo:
+
+- ⚠️ **Un comando acotado en `credentials-service`, no un envío libre.** Es el
+  único servicio con `MailService`, y abrirle al gateway una ruta de «manda este
+  HTML a esta dirección» es un relé de correo con otro nombre. El comando recibe
+  el destinatario, el nombre de la organización, quién invita y el token — y la
+  plantilla vive allí.
+- ⚠️ **El enlace se sigue devolviendo en la respuesta.** El correo se pierde en
+  no deseados el día de la demostración, y el token en claro solo existe una
+  vez. Que se pueda copiar además de enviarse no cuesta nada.
+- ⚠️ **Falta probar el camino de quien no tiene cuenta**: el enlace lleva a una
+  ruta privada, así que pasa por registro, verificación de correo y vuelta. La
+  invitación va por dirección, así que *debería* funcionar y nadie lo ha
+  recorrido entero.
 
 ---
 
