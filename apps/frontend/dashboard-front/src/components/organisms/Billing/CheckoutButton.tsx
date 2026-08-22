@@ -22,11 +22,12 @@ import { useState } from 'react';
  * aplicación, así que la pestaña tiene que ir allí de verdad. Un `redirect()`
  * en el servidor lo seguiría la propia Server Function.
  */
-export function BotonDeCompra({
+export function CheckoutButton({
   destino,
   tier,
   seats,
   organizationId,
+  variante,
   children,
 }: {
   /** `checkout` abre el pago; `portal`, la gestión de una suscripción que ya existe. */
@@ -37,6 +38,16 @@ export function BotonDeCompra({
   seats?: number;
   /** Quién paga, solo en los planes de empresa. */
   organizationId?: string;
+  /**
+   * Con qué peso se pinta.
+   *
+   * Por defecto lo decide el destino —comprar es primario, gestionar es
+   * secundario— porque en la tabla de precios cada tarjeta tiene un solo botón.
+   * Se puede forzar cuando hay **dos compras seguidas**: en el portal de una
+   * organización sin plan salen Equipo y Empresa una al lado de la otra, y dos
+   * botones primarios no dicen cuál es el camino corto.
+   */
+  variante?: 'primary' | 'secondary';
   children: React.ReactNode;
 }) {
   const [abriendo, setAbriendo] = useState(false);
@@ -86,7 +97,7 @@ export function BotonDeCompra({
         type="button"
         onClick={abrir}
         isLoading={abriendo}
-        variant={destino === 'checkout' ? 'primary' : 'secondary'}
+        variant={variante ?? (destino === 'checkout' ? 'primary' : 'secondary')}
       >
         {children}
       </Button>

@@ -197,7 +197,7 @@ export class BillingController {
       seats: body.seats,
       email,
       stripeCustomerId: suscripcion?.stripeCustomerId ?? null,
-      volverA: deEmpresa ? `/dashboard/organizations/${organizationId}` : '/dashboard/plans',
+      volverA: deEmpresa ? `/dashboard/organizations/${organizationId}` : '/dashboard/billing',
     });
   }
 

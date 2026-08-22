@@ -40,7 +40,7 @@ import { useEffect, useState } from 'react';
 const ESPERA_MS = 2_000;
 const INTENTOS = 10;
 
-export function VueltaDelPago({
+export function PaymentReturn({
   planActual,
   nombreDelPlan,
 }: {

@@ -26,6 +26,20 @@ export interface AppNavItem {
    * pasa; la lista canónica no sabe contar.
    */
   badge?: number;
+  /**
+   * Las páginas que cuelgan de esta entrada.
+   *
+   * Una entrada con hijos **no navega**: es un desplegable. Existe porque
+   * «Configuración» dejó de ser una pantalla con tarjetas sueltas —facturación
+   * por un lado, voz por otro— y pasó a ser una sección con dos páginas. Meter
+   * las dos en la lista plana las habría puesto al mismo nivel que Proyectos,
+   * que es lo que uno abre a diario, y esto no.
+   *
+   * ⚠️ **Un solo nivel.** No hay nietos y no debería haberlos: una barra lateral
+   * con dos niveles ya obliga a plegar y desplegar para llegar a algo, y con
+   * tres deja de ser navegación para ser un árbol.
+   */
+  children?: AppNavItem[];
 }
 
 /**
@@ -160,30 +174,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
-     * Los planes y lo que se lleva cada uno.
-     *
-     * 🔴 **Estaba sin entrada, y era el fallo más caro de toda la etapa.** La
-     * pantalla existía desde la etapa del asistente y solo se llegaba a ella
-     * por un enlace dentro de la tarjeta de Configuración y por el aviso del
-     * chat al agotar la cuota: o sea, **solo tropezando con un límite**. Una
-     * tabla de precios a la que hay que llegar chocando no vende nada, y aquí
-     * es además el sitio donde se enseña que el plan intermedio da un mes
-     * gratis.
-     */
-    label: 'Planes',
-    href: '/dashboard/plans',
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    ),
-  },
-  {
-    /**
      * Las organizaciones de empresa: sus asientos, su gente y su plan.
      *
      * ⚠️ **Sale para todo el mundo, y es a propósito.** No es una pantalla de
@@ -237,14 +227,24 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     /**
-     * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
-     * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
-     * enlazarla: una pantalla que solo llevara a otra es un salto de más.
+     * Ajustes de la cuenta, **como sección y no como pantalla**.
      *
-     * Va la última a propósito: es la entrada a la que se vuelve de vez en
-     * cuando, no una por la que se pasa a diario.
+     * Era una sola página con tres tarjetas sueltas —la voz, el plan y el tema—
+     * que no tienen nada que ver entre sí, y encima el plan salía **dos veces**:
+     * un resumen aquí y la tabla de precios en otra entrada del menú. Quien
+     * quería cambiar de plan tenía que adivinar cuál de las dos era la buena.
+     *
+     * Ahora es un desplegable con las dos páginas que sí existen. La entrada no
+     * navega a ninguna parte: navegan sus hijas.
+     *
+     * Va la última a propósito: es a donde se vuelve de vez en cuando, no una
+     * por la que se pasa a diario.
      */
     label: 'Configuración',
+    /* Sin destino propio. `NavList` lo trata como grupo por tener `children`;
+       el `href` se queda como identidad de la entrada —es la clave de la lista
+       y lo que compara el resaltado— y como destino de reserva en la barra
+       plegada, donde un desplegable de 64 px de ancho no cabe. */
     href: '/dashboard/settings',
     icon: (
       <svg {...iconProps} aria-hidden="true">
@@ -260,5 +260,50 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
+    children: [
+      {
+        /**
+         * El plan, el consumo y los precios, **en una sola página**.
+         *
+         * 🔴 Antes eran dos sitios: un resumen en Configuración y una tabla en
+         * una entrada llamada «Planes» a la que, además, no se llegaba desde el
+         * menú —solo tropezando con un límite—. Se llama Facturación y no
+         * Planes porque aquí también está lo que ya pagas, no solo lo que
+         * podrías pagar.
+         */
+        label: 'Facturación',
+        href: '/dashboard/billing',
+        icon: (
+          <svg {...iconProps} aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
+            />
+          </svg>
+        ),
+      },
+      {
+        /**
+         * La vinculación con Alexa y, con ella, la apariencia.
+         *
+         * ⚠️ **El tema vive aquí y no en una página propia**, que es lo que
+         * pidió quien lo usa. Un interruptor no da para una pantalla, y la
+         * alternativa —dejarlo huérfano en una Configuración que ya no tiene
+         * cuerpo— era peor: una entrada de menú para una sola casilla.
+         */
+        label: 'Praxis Voice',
+        href: '/dashboard/voice',
+        icon: (
+          <svg {...iconProps} aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
+            />
+          </svg>
+        ),
+      },
+    ],
   },
 ];
