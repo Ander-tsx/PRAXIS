@@ -49,7 +49,7 @@
 
 PRAXIS es una plataforma de gestión de proyectos construida sobre una arquitectura SOFEA (Service-Oriented Front-End Architecture). Combina tableros Kanban interactivos, un sistema de permisos granular de tres capas, reportes con pronósticos Monte Carlo, chat en tiempo real con SSE, automatizaciones que reaccionan a lo que pasa en el tablero, facturación con Stripe y un asistente conversacional impulsado por Gemini — accesible también por voz a través de una skill de Alexa.
 
-El frontend se organiza como **7 microfrontends Multi-Zone** de Next.js 16 más el `web-shell` que los sirve: cada zona es una aplicación independiente con su propio `basePath`, servida a través del shell mediante `rewrites()`. El backend son **8 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
+El frontend se organiza como **7 microfrontends Multi-Zone** de Next.js 16 más el `web-shell` que los sirve: cada zona es una aplicación independiente con su propio `basePath`, servida a través del shell mediante `rewrites()`. El backend son **9 microservicios NestJS** que se comunican por TCP nativo detrás de un API Gateway único.
 
 Las automatizaciones no son un botón: `tasks` y `projects` escriben cada hecho en su *outbox*, un publicador lo vuelca en un stream de Redis y `automation` lo consume y evalúa las reglas del proyecto. Diez disparadores —cuatro de barrido y seis reactivos— y siete acciones que escriben por los mismos endpoints que usa la interfaz, con los permisos de quien escribió la regla. Ninguna regla abre una ruta de escritura nueva.
 
@@ -100,10 +100,11 @@ flowchart TB
         Asst["assistant :3006\nGemini · Propuestas"]
         Alex["alexa :3007\nSolo lectura · Voz"]
         Automation["automation :3008\nMotor reactivo · 10 disparadores · 7 acciones"]
+        Bill["billing :3009\nFacturación · Pagos · Suscripciones"]
     end
 
     subgraph data["Datos"]
-        PG[("PostgreSQL 16\n7 schemas aislados")]
+        PG[("PostgreSQL 16\n8 schemas aislados")]
         Redis[("Redis 7\nSesiones · Caché · SSE · Stream de hechos")]
     end
 
@@ -112,7 +113,7 @@ flowchart TB
     zones -->|proxy autenticado| gw
     AlexaDevice -->|Lambda → voiceToken| gw
     gw -->|TCP| services
-    Cred & Perm & ProjS & Task & Alex & Asst & Automation --> PG
+    Cred & Perm & ProjS & Task & Alex & Asst & Automation & Bill --> PG
     RepS -.->|"sin BD propia"| Task & ProjS
     Cred & ProjS & Automation --> Redis
     Task & ProjS -.->|"outbox → stream de hechos"| Automation
@@ -133,7 +134,7 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 
 | Componente | Recurso GCP | Detalle |
 | :--- | :--- | :--- |
-| Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa los 9 procesos Node.js: el gateway y los 8 microservicios |
+| Backend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa los 10 procesos Node.js: el gateway y los 9 microservicios |
 | Frontend | MIG regional (e2-medium, 1–3 réplicas) | PM2 supervisa las 8 apps Next.js: el shell y las 7 zonas |
 | Base de datos | Cloud SQL PostgreSQL 16 (IP privada) | Backups 7 días, acceso exclusivo por VPC |
 | Caché/Sesiones | VM e2-micro con Redis 7 | Firewall solo desde el backend |
@@ -154,8 +155,8 @@ La plataforma se despliega en **Google Cloud Platform**. Consulta el esquema com
 | **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js_16-000?style=flat-square&logo=next.js&logoColor=white) ![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black) | 8 microfrontends Multi-Zone con Server Components |
 | **Estilos** | ![Tailwind](https://img.shields.io/badge/Tailwind_v4-38B2AC?style=flat-square&logo=tailwindcss&logoColor=white) | `@theme static` en CSS, sin `tailwind.config` |
 | **3D / Animación** | ![Three.js](https://img.shields.io/badge/Three.js-000?style=flat-square&logo=three.js&logoColor=white) ![GSAP](https://img.shields.io/badge/GSAP-88CE02?style=flat-square&logoColor=black) | Landing page interactiva del web-shell |
-| **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 8 microservicios TCP |
-| **ORM** | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) | 7 schemas aislados, migraciones por servicio |
+| **Backend** | ![NestJS](https://img.shields.io/badge/NestJS_11-E0234E?style=flat-square&logo=nestjs&logoColor=white) | Gateway REST + 9 microservicios TCP |
+| **ORM** | ![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white) | 8 schemas aislados, migraciones por servicio |
 | **Base de datos** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?style=flat-square&logo=postgresql&logoColor=white) | Una instancia, schemas separados por dominio |
 | **Caché** | ![Redis](https://img.shields.io/badge/Redis_7-DC382D?style=flat-square&logo=redis&logoColor=white) | Sesiones JWT, caché de boards, SSE pub/sub |
 | **Pagos** | ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white) | Checkout, portal de cliente, webhooks |
@@ -194,7 +195,8 @@ PRAXIS/
 │   │   │   ├── reports/        # :3005 — agregador sin BD, Monte Carlo
 │   │   │   ├── assistant/      # :3006 — Gemini, cuotas, propuestas
 │   │   │   ├── alexa/          # :3007 — solo lectura para skill de voz
-│   │   │   └── automation/     # :3008 — motor de reglas: hechos → condiciones → acciones
+│   │   │   ├── automation/     # :3008 — motor de reglas: hechos → condiciones → acciones
+│   │   │   └── billing/        # :3009 — facturación, pagos, suscripciones
 │   │   └── commons/
 │   │       ├── contracts/      # DTOs y patrones TCP compartidos → dist/
 │   │       └── observability/  # Logger Pino compartido → dist/
@@ -265,7 +267,7 @@ pnpm prisma:deploy
 pnpm prisma:seed
 
 # 7. Arrancar todo
-pnpm dev:backend    # gateway + 8 microservicios
+pnpm dev:backend    # gateway + 9 microservicios
 pnpm dev:frontend   # web-shell + 7 zonas
 ```
 
@@ -285,7 +287,7 @@ pnpm dev:frontend   # web-shell + 7 zonas
 ## Desarrollo
 | Comando | Descripción |
 | :--- | :--- |
-| `pnpm dev:backend` | Gateway + 8 microservicios |
+| `pnpm dev:backend` | Gateway + 9 microservicios |
 | `pnpm dev:frontend` | Web-shell + 7 microfrontends |
 | `pnpm build` | Build de producción completo |
 | `pnpm build:shared` | Compila `contracts` + `observability` |
@@ -296,7 +298,7 @@ pnpm dev:frontend   # web-shell + 7 zonas
 | :--- | :--- |
 | `pnpm docker:up` | Levanta PostgreSQL 16 + Redis 7 |
 | `pnpm docker:down` | Detiene los contenedores |
-| `pnpm prisma:generate` | Genera los clientes de Prisma (7 servicios; `reports` no tiene tablas) |
+| `pnpm prisma:generate` | Genera los clientes de Prisma (8 servicios; `reports` no tiene tablas) |
 | `pnpm prisma:deploy` | Aplica migraciones pendientes (sin perder datos) |
 | `pnpm prisma:seed` | Siembra datos en orden: permissions → credentials → projects → tasks |
 | `pnpm prisma:reset` | ⚠️ Borra y recrea todo |
