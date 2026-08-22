@@ -50,6 +50,7 @@ import {
   prismaGenerate,
   prismaReset,
   prismaSeed,
+  resolverClavesCompartidas,
   revisarEnvFaltantes,
 } from './lib/steps.mjs';
 import {
@@ -612,8 +613,14 @@ async function main() {
   }
 
   if (respuestas.env) {
+    /* Primero lo que tiene que valer lo mismo en todos —`JWT_SECRET`—, y una
+       sola vez. Si se deja al bucle de abajo, cada servicio lo pregunta por su
+       cuenta y basta con una respuesta distinta para que esa zona redirija al
+       login para siempre sin un solo error. Ver `resolverClavesCompartidas`. */
+    const compartidas = await resolverClavesCompartidas(objetivosDeEnv);
+
     const resultados = [];
-    for (const svc of objetivosDeEnv) resultados.push(await completarEnv(svc));
+    for (const svc of objetivosDeEnv) resultados.push(await completarEnv(svc, compartidas));
 
     const completados = resultados.filter((r) => r.estado === 'completado');
     const sinPlantilla = resultados.filter((r) => r.estado === 'sin-plantilla');

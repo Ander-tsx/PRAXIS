@@ -329,6 +329,8 @@ para que un rojo esperado no tape uno nuevo. Detalle en el README.
 
 ## Convenciones de repo
 
-- Commits: Conventional Commits en español (`feat:`, `fix:`), validados por commitlint + husky.
+- Commits: Conventional Commits en español (`feat:`, `fix:`). `commitlint.config.cjs` fija
+  los tipos permitidos, pero **no hay husky instalado**: hoy no se valida en el commit,
+  se respeta a mano.
 - Rama por feature (`feature/<nombre>`) → PR a `main`.
 - Formato: Biome en la raíz (2 espacios, ancho 100), ESLint solo en `web-shell`. `pnpm format` ya no reescribe el repo: config y código coinciden.

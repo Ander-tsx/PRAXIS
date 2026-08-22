@@ -1,6 +1,6 @@
 import { request as contextoDePeticion, expect, test } from '@playwright/test';
 import { nombreUnico, registrar } from '../../fixtures/api';
-import { crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
+import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
 
 /**
  * El diálogo de invitar, invitando **dos veces seguidas**.
@@ -32,7 +32,7 @@ test.describe('Invitar al proyecto', () => {
     await crearCuentaYEntrar(page);
 
     const proyecto = nombreUnico('Invitaciones');
-    await crearProyectoEnLaInterfaz(page, proyecto);
+    await crearProyectoParaLaPrueba(page, proyecto);
 
     await page.getByRole('link', { name: proyecto }).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
@@ -40,11 +40,28 @@ test.describe('Invitar al proyecto', () => {
     /* Las pestañas son enlaces con `?tab=`, no `role="tab"`. */
     await page.goto(`${new URL(page.url()).pathname}?tab=equipo`);
 
-    const dialogo = page.getByRole('dialog');
+    /**
+     * ⚠️ **El panel de invitar no es un `role="dialog"`, y hace tiempo que no lo
+     * es.**
+     *
+     * `InviteMemberDialog` conserva el nombre pero ya no se pinta como una capa
+     * encima: `ProjectMembers` lo despliega **en línea** dentro de la pestaña,
+     * debajo de la cabecera del equipo. No hay `role="dialog"` en ninguna parte,
+     * así que `getByRole('dialog')` no resolvía nunca y la prueba moría en la
+     * primera vuelta con «element(s) not found» — un mensaje que suena a que la
+     * pantalla no cargó, no a que el componente cambió de forma.
+     *
+     * Se ancla en su encabezado, que es lo que una persona usa para saber que el
+     * panel está abierto, y sobrevive a que vuelva a cambiar de contenedor.
+     */
+    const panelDeInvitar = page.getByRole('heading', { name: 'Invitar al proyecto' });
 
     for (const [vuelta, invitado] of [primera, segunda].entries()) {
       await page.getByRole('button', { name: 'Invitar persona' }).click();
-      await expect(dialogo, `el diálogo debería abrirse en la vuelta ${vuelta + 1}`).toBeVisible();
+      await expect(
+        panelDeInvitar,
+        `el panel debería abrirse en la vuelta ${vuelta + 1}`,
+      ).toBeVisible();
 
       await page.getByRole('searchbox', { name: 'Buscar persona' }).fill(invitado.email);
       await page.getByRole('button', { name: 'Buscar' }).click();
@@ -57,11 +74,11 @@ test.describe('Invitar al proyecto', () => {
 
       /**
        * Lo que se comprueba. En la vuelta 2 es donde fallaba: la invitación se
-       * creaba —aparece abajo como pendiente— pero el diálogo seguía encima.
+       * creaba —aparece abajo como pendiente— pero el panel seguía abierto.
        */
       await expect(
-        dialogo,
-        `el diálogo tiene que cerrarse solo en la vuelta ${vuelta + 1}`,
+        panelDeInvitar,
+        `el panel tiene que cerrarse solo en la vuelta ${vuelta + 1}`,
       ).not.toBeVisible({ timeout: 10_000 });
 
       /* Y la invitación tiene que estar de verdad, con su correo: es la otra
