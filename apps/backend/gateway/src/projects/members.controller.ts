@@ -24,6 +24,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -32,7 +33,10 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/members')
 export class MembersController {
-  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly quota: QuotaService,
+  ) {}
 
   /**
    * Lista todos los miembros de un proyecto.
@@ -67,13 +71,23 @@ export class MembersController {
     );
   }
 
-  /** Agrega un miembro a un proyecto (requiere canManageMembers) */
+  /**
+   * Agrega un miembro a un proyecto (requiere canManageMembers).
+   *
+   * ⚠️ **El tope de miembros lo pone el plan del DUEÑO del proyecto**, no el de
+   * quien invita: es su tablero el que crece, y al revés alguien con plan grande
+   * podría meter gente en el proyecto de quien paga el pequeño. Responde 402 con
+   * `QUOTA_EXCEEDED`.
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Agrega un miembro a un proyecto' })
   @ApiResponse({ status: 201, description: 'Miembro agregado exitosamente' })
-  add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
+  @ApiResponse({ status: 402, description: 'El plan del proyecto no da para otro miembro' })
+  async add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
+    await this.quota.exigirMiembroDeProyecto(req.projectId!);
+
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_add' }, { projectId: req.projectId, ...body }),
     );

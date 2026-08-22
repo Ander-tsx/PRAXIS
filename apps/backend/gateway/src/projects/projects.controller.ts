@@ -22,10 +22,11 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
-import { TaskPurgeService } from './task-purge.service';
 import { AutomationPurgeService } from './automation-purge.service';
+import { TaskPurgeService } from './task-purge.service';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -36,15 +37,27 @@ export class ProjectsController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly taskPurge: TaskPurgeService,
     private readonly automationPurge: AutomationPurgeService,
+    private readonly quota: QuotaService,
   ) {}
 
-  /** Crea un nuevo proyecto (el ownerId viene del token) */
+  /**
+   * Crea un nuevo proyecto (el ownerId viene del token).
+   *
+   * ⚠️ **El tope del plan se comprueba aquí, antes de escribir**, y responde
+   * **402** con `QUOTA_EXCEEDED` — no 403. Un 403 se arregla pidiéndole permiso
+   * a alguien; esto se arregla borrando un proyecto o ampliando el plan, y
+   * ofrecer «pídeselo a quien administra» a quien administra es la peor ayuda
+   * posible. La pantalla apaga el botón antes; quien decide es esto.
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Crea un nuevo proyecto' })
   @ApiResponse({ status: 201, description: 'Proyecto creado exitosamente' })
+  @ApiResponse({ status: 402, description: 'Tu plan no da para otro proyecto' })
   @ApiResponse({ status: 409, description: 'Ya existe un proyecto con ese nombre' })
-  create(@Request() req: Express.Request, @Body() body: CreateProjectBodyDto) {
+  async create(@Request() req: Express.Request, @Body() body: CreateProjectBodyDto) {
+    await this.quota.exigirProyecto(req.user!.userId);
+
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'project_create' },

@@ -50,6 +50,15 @@ interface ChatPayload {
    */
   conversationId?: string;
   history?: { role: string; text: string }[];
+  /**
+   * Cuántos mensajes al mes da su plan. Lo resuelve el gateway contra billing.
+   *
+   * ⚠️ **Ausente significa «usa el valor por defecto», no «sin límite».** Desde
+   * la etapa Enterprise hay cinco planes y el de alguien puede venir de la
+   * organización de su empresa, que este servicio no conoce. Ver
+   * `QuotaService.limite`.
+   */
+  limiteMensual?: number | null;
   /** Mapa efectivo, ya expandido por jerarquía. Lo resuelve el gateway. */
   permisos: Record<string, boolean>;
   miembros: { userId: string; nombre: string }[];
@@ -226,8 +235,8 @@ export class AssistantService {
   }
 
   /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */
-  estadoCuota(userId: string) {
-    return this.quota.estado(userId);
+  estadoCuota(userId: string, limiteMensual?: number | null) {
+    return this.quota.estado(userId, limiteMensual);
   }
 
   /**
@@ -284,7 +293,7 @@ export class AssistantService {
    * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
    */
   async chat(payload: ChatPayload): Promise<AssistantChatResult> {
-    const cuotaPrevia = await this.quota.estado(payload.userId);
+    const cuotaPrevia = await this.quota.estado(payload.userId, payload.limiteMensual);
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
       /* 429 y no 403: no es que no pueda, es que ya no le quedan. El mensaje
@@ -381,7 +390,7 @@ export class AssistantService {
         ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
       });
 
-      cuota = await this.quota.consumir(payload.userId);
+      cuota = await this.quota.consumir(payload.userId, payload.limiteMensual);
     } catch (error) {
       if (error instanceof RpcException) {
         const details = (error.getError() as any).details || {};
@@ -559,8 +568,10 @@ export class AssistantService {
     ajuste?: string;
     /** El plan anterior en JSON, tal cual se le devolvió al cliente. */
     previa?: string;
+    /** El tope mensual de su plan. Ver `ChatPayload.limiteMensual`. */
+    limiteMensual?: number | null;
   }) {
-    const cuotaPrevia = await this.quota.estado(payload.userId);
+    const cuotaPrevia = await this.quota.estado(payload.userId, payload.limiteMensual);
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
       throw new RpcException({
@@ -600,7 +611,7 @@ export class AssistantService {
     });
 
     /* Si Gemini falló, `chat` ya lanzó: la cuota no se toca. Ver `GeminiError`. */
-    const cuota = await this.quota.consumir(payload.userId);
+    const cuota = await this.quota.consumir(payload.userId, payload.limiteMensual);
 
     /**
      * La primera llamada válida, y solo esa.

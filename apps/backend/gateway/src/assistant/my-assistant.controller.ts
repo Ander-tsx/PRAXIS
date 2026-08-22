@@ -40,6 +40,7 @@ import {
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 
 /**
  * Lo del asistente que **no tiene proyecto detrás**.
@@ -95,6 +96,7 @@ export class MyAssistantController {
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    private readonly cuotas: QuotaService,
   ) {}
 
   /**
@@ -135,9 +137,10 @@ export class MyAssistantController {
   async chat(@Request() req: Express.Request, @Body() body: AssistantChatBodyDto) {
     const userId = req.user!.userId;
 
-    const [proyectos, quien] = await Promise.all([
+    const [proyectos, quien, limiteMensual] = await Promise.all([
       this.proyectosQuePuedeAbrir(userId),
       this.nombreDe(userId),
+      this.cuotas.limiteDeIa(userId),
     ]);
 
     return firstValueFrom(
@@ -158,6 +161,9 @@ export class MyAssistantController {
              es lo que el prompt necesita para llamarle por su nombre. */
           miembros: quien ? [quien] : [],
           proyectos,
+          /* El tope de su plan. Ver la nota de la ruta de proyecto: quien cuenta
+             es assistant-service, quien sabe cuánto da el plan es billing. */
+          limiteMensual,
         },
       ),
     );
@@ -441,9 +447,12 @@ export class MyAssistantController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama, sin proyecto' })
   @ApiResponse({ status: 200, description: 'plan, usados, limite, periodo y fecha de reinicio' })
-  quota(@Request() req: Express.Request) {
+  async quota(@Request() req: Express.Request) {
+    const userId = req.user!.userId;
+    const limiteMensual = await this.cuotas.limiteDeIa(userId);
+
     return firstValueFrom(
-      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId: req.user!.userId }),
+      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId, limiteMensual }),
     );
   }
 
@@ -471,15 +480,19 @@ export class MyAssistantController {
   @ApiResponse({ status: 200, description: 'La plantilla propuesta y la cuota restante' })
   @ApiResponse({ status: 429, description: 'Cuota mensual agotada' })
   @ApiResponse({ status: 502, description: 'El asistente no devolvió una plantilla utilizable' })
-  borradorDeProyecto(@Request() req: Express.Request, @Body() body: ProjectDraftBodyDto) {
+  async borradorDeProyecto(@Request() req: Express.Request, @Body() body: ProjectDraftBodyDto) {
+    const userId = req.user!.userId;
+    const limiteMensual = await this.cuotas.limiteDeIa(userId);
+
     return firstValueFrom(
       this.assistantClient.send(
         { cmd: 'assistant_project_draft' },
         {
-          userId: req.user!.userId,
+          userId,
           brief: body.brief,
           ajuste: body.ajuste,
           previa: body.previa,
+          limiteMensual,
         },
       ),
     );
