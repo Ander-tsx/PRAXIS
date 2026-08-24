@@ -991,6 +991,6 @@ export async function aceptarPlantillaAction(plantilla: ProjectTemplate): Promis
  * no a las 00:00. Sin esto, «para el viernes» vence el jueves por la noche.
  */
 function toIsoDueDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number);
+  const [year = 0, month = 1, day = 1] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
 }

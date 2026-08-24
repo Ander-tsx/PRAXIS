@@ -148,7 +148,7 @@ export interface ProposalCardProps {
    * tarjeta funciona igual, solo que su decisión no queda anotada y al releer
    * volverá a ofrecer sus botones.
    */
-  proposalId?: string;
+  proposalId?: string | undefined;
   /**
    * Lo que se decidió la última vez, si esto viene de una conversación vieja.
    *
@@ -377,7 +377,7 @@ function CambioSobreTarea({
   porQue?: string;
   ejecutar: () => Promise<AceptarSobreTareaState>;
   projectId: string;
-  proposalId?: string;
+  proposalId?: string | undefined;
   estadoGuardado?: EstadoPropuesta;
   children: React.ReactNode;
 }) {
