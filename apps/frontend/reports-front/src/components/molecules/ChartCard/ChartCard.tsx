@@ -131,3 +131,34 @@ export function NotEnoughData({
     </div>
   );
 }
+
+/**
+ * El aviso de que todo se cuenta en **días de calendario**.
+ *
+ * ⚠️ **Es la trampa 1 de R9 y estaba sin decir en casi toda la sección.** Ni un
+ * solo número de esta pantalla descuenta fines de semana ni festivos, así que
+ * una tarea que entra el viernes por la tarde arrastra dos días que nadie
+ * trabajó. Mientras la sección solo enseñaba totales y medianas gruesas eso era
+ * ruido; desde que hay percentiles, distribuciones y tiempo por columna **mueve
+ * la mediana**, y una columna de paso rápido puede aparecer con el doble de
+ * espera de la que tiene.
+ *
+ * Se dice en vez de arreglarse, y es una decisión: contar días laborables exige
+ * saber el calendario de cada equipo —festivos, zona horaria, jornada—, que es
+ * un dato que PRAXIS no tiene y que no se puede adivinar sin equivocarse. Un
+ * número honesto con su límite escrito vale más que uno ajustado con una
+ * suposición invisible. Es la misma regla del recorte mudo: si el dato lleva un
+ * criterio dentro, el criterio se enseña.
+ *
+ * Vive aquí y no copiado en cada widget porque son seis sitios y la frase tiene
+ * que ser la misma: en cuanto se escribe a mano, la mitad dice otra cosa.
+ */
+export function NotaDeDiasNaturales({ matiz }: { matiz?: ReactNode }) {
+  return (
+    <p>
+      Se cuentan <strong>días naturales</strong>: no se descuentan fines de semana ni festivos, así
+      que una tarea que entra el viernes por la tarde arrastra el fin de semana entero.{' '}
+      {matiz ?? 'En tramos de horas eso mueve la mediana; en los de semanas, apenas.'}
+    </p>
+  );
+}

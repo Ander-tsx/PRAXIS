@@ -14,7 +14,7 @@ import {
   TiemposWidget,
 } from '@/components/organisms/ReportWidgets';
 import { AnalysisScreen } from '@/components/templates/AnalysisScreen';
-import { avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
+import { avisoDeDiasNaturales, avisoDeSemanaIncompleta, construirDatos } from '@/lib/generado';
 import {
   type ReportBlocked,
   type ReportColumnTime,
@@ -457,14 +457,19 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
           { snapshot, people, blocked, flow, weekly, dynamics, columnTime, matrices, cycle },
           { personas: nombres, etiquetas: nombresDeEtiquetas },
         );
-        /* El aviso de la semana a medias viaja con el gráfico, no dentro de
-           `construirDatos`: es algo que hay que decir sobre el dato, no una
-           forma de recortarlo. */
+        /* Los avisos viajan con el gráfico, no dentro de `construirDatos`: son
+           algo que hay que decir sobre el dato, no una forma de recortarlo.
+
+           Se encadenan con `??` y no se concatenan porque **no pueden coincidir
+           nunca**: uno es de las métricas semanales y el otro de las que miden
+           tiempo, y ninguna está en las dos listas. Si algún día lo estuviera,
+           esto se queda con el primero en silencio — y entonces hay que pasar a
+           una lista de avisos. */
         const aviso =
-          widget.grafico.metrica === 'cierres_por_semana' ||
+          (widget.grafico.metrica === 'cierres_por_semana' ||
           widget.grafico.metrica === 'creadas_por_semana'
             ? avisoDeSemanaIncompleta(weekly)
-            : null;
+            : null) ?? avisoDeDiasNaturales(widget.grafico.metrica);
         return <GeneratedChart datos={datos} forma={widget.grafico.forma} aviso={aviso} />;
       }
       default:
