@@ -220,6 +220,23 @@ export class QuotaService {
     return plan.quotas.iaMensualPorPersona;
   }
 
+  /**
+   * El tope **y el plan del que sale**, en una sola resolución.
+   *
+   * ⚠️ Existe porque el 402 de la IA necesita las dos cosas y `planDe` cuesta un
+   * viaje TCP: pedir el tope por un lado y el plan por otro serían dos, y —peor—
+   * dos lecturas que pueden discrepar si alguien cambia de plan entre medias, con
+   * el resultado de un mensaje que dice «tu plan Pro llega hasta 13».
+   *
+   * Lo consumen las dos rutas que **gastan** cuota (el chat y la plantilla de
+   * arranque). Las que solo la **leen** siguen con `limiteDeIa`: ahí el plan no
+   * hace falta y traerlo sería ancho de banda por nada.
+   */
+  async iaDe(userId: string): Promise<{ tier: PlanTier; limite: Tope }> {
+    const plan = await this.planDe(userId);
+    return { tier: plan.tier, limite: plan.quotas.iaMensualPorPersona };
+  }
+
   /* ─── El motor ─────────────────────────────────────────────────────────── */
 
   /**

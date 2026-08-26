@@ -114,6 +114,9 @@ export function ProjectMembers({
               projectId={projectId}
               roles={roles}
               excluirIds={excluirIds}
+              /* El tope de miembros lo pone el plan del dueño: quien no lo es no
+                 arregla nada ampliando el suyo. */
+              soyDueño={ownerId === currentUserId}
               onClose={() => setIsInviting(false)}
             />
           </div>

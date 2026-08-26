@@ -1,6 +1,7 @@
 import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '../api/domain';
 import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
+import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
 import { createServerApiClient } from '../auth/server-client';
 
 /**
@@ -36,6 +37,7 @@ export async function pedirBorrador(
       resultado: null,
       error: `Cuéntale un poco más: al menos ${TEMPLATE_BRIEF_MIN} caracteres.`,
       sinCuota: false,
+      cuota: null,
     };
   }
 
@@ -44,6 +46,7 @@ export async function pedirBorrador(
       resultado: null,
       error: `Son ${texto.length} caracteres y el máximo es ${TEMPLATE_BRIEF_MAX}.`,
       sinCuota: false,
+      cuota: null,
     };
   }
 
@@ -68,17 +71,23 @@ export async function pedirBorrador(
         resultado: null,
         error: 'El asistente no ha sabido proponer una plantilla. Prueba a contarle algo más.',
         sinCuota: false,
+        cuota: null,
       };
     }
 
-    return { resultado, error: null, sinCuota: false };
+    return { resultado, error: null, sinCuota: false, cuota: null };
   } catch (error) {
     const apiError = error instanceof ApiError ? error : null;
 
     return {
       resultado: null,
       error: apiError?.message ?? 'No se pudo hablar con el asistente. Vuelve a intentarlo.',
-      sinCuota: apiError?.status === 429,
+      /* 🔴 Se miraba `status === 429`, que es también el del límite de
+         peticiones del gateway: un throttle en mitad de una tanda se leía como
+         «se te acabó el mes». La cuota tiene código propio desde que habla en
+         402. Ver `TemplateDraftState.sinCuota`. */
+      sinCuota: apiError?.code === QUOTA_EXCEEDED_CODE,
+      cuota: detallesDeCuota(apiError),
     };
   }
 }

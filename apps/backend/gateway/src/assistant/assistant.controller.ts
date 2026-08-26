@@ -124,7 +124,7 @@ export class AssistantController {
    * validación de siempre.
    *
    * Códigos que puede devolver, además de los normales:
-   * - **429** cuota agotada, con la cuota en `details` para que el chat la pinte;
+   * - **402** `QUOTA_EXCEEDED`, con el detalle del tope y la cuota en `details`;
    * - **502** Gemini no respondió. En ese caso **no se ha consumido cuota**.
    */
   @Post('chat')
@@ -132,7 +132,7 @@ export class AssistantController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Un turno de conversación con el asistente del proyecto' })
   @ApiResponse({ status: 200, description: 'Respuesta, propuestas pendientes de aceptar y cuota' })
-  @ApiResponse({ status: 429, description: 'Cuota mensual agotada' })
+  @ApiResponse({ status: 402, description: 'Cuota mensual agotada (QUOTA_EXCEEDED)' })
   @ApiResponse({ status: 502, description: 'Gemini no respondió. No se ha consumido cuota' })
   async chat(
     @Param('projectId', ParseUUIDPipe) projectId: string,
@@ -141,11 +141,13 @@ export class AssistantController {
   ) {
     const userId = req.user!.userId;
 
-    const [permisos, miembros, chat, limiteMensual] = await Promise.all([
+    const [permisos, miembros, chat, ia] = await Promise.all([
       this.permisosEfectivos(userId, projectId),
       this.miembrosConNombre(projectId),
       this.chatReciente(projectId, userId),
-      this.cuotas.limiteDeIa(userId),
+      /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
+         acabar en un 402 que tiene que decir qué plan puso ese tope. */
+      this.cuotas.iaDe(userId),
     ]);
 
     return firstValueFrom(
@@ -166,7 +168,8 @@ export class AssistantController {
           permisos,
           miembros,
           chat,
-          limiteMensual,
+          limiteMensual: ia.limite,
+          planTier: ia.tier,
         },
       ),
     );

@@ -4,6 +4,7 @@ import type { CreateProjectState } from '@/lib/action-state';
 import { validateProject } from '@/lib/validation';
 import { ApiError } from '@praxis/commons';
 import type { Project, ProjectTemplate, TemplateDraftState, TemplateResult } from '@praxis/commons';
+import { detallesDeCuota } from '@praxis/commons/billing/planes';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/template';
 import { revalidatePath } from 'next/cache';
@@ -30,7 +31,11 @@ export async function createProjectAction(
 ): Promise<CreateProjectState> {
   const session = await getSession();
   if (!session) {
-    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', createdName: null };
+    return {
+      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+      createdName: null,
+      cuota: null,
+    };
   }
 
   const name = String(formData.get('name') ?? '').trim();
@@ -38,7 +43,7 @@ export async function createProjectAction(
 
   const invalid = validateProject({ name, description });
   if (invalid) {
-    return { error: invalid, createdName: null };
+    return { error: invalid, createdName: null, cuota: null };
   }
 
   const api = createServerApiClient();
@@ -63,17 +68,21 @@ export async function createProjectAction(
         return {
           error: `${error.message} Los nombres son únicos en toda la plataforma, así que prueba con uno más específico.`,
           createdName: null,
+          cuota: null,
         };
       }
       if (error.status >= 500) {
         return {
           error: 'No se pudo crear el proyecto. Inténtalo de nuevo en un momento.',
           createdName: null,
+          cuota: null,
         };
       }
-      return { error: error.message, createdName: null };
+      /* El 402 sale por su propia puerta: el diálogo necesita el detalle para
+         ofrecer una salida, no solo la frase. Ver `QuotaNotice`. */
+      return { error: error.message, createdName: null, cuota: detallesDeCuota(error) };
     }
-    return { error: 'No se pudo crear el proyecto.', createdName: null };
+    return { error: 'No se pudo crear el proyecto.', createdName: null, cuota: null };
   }
 
   // Confirmación real: que exista el id y que el nombre sea el que mandamos.
@@ -81,6 +90,7 @@ export async function createProjectAction(
     return {
       error: 'El servidor respondió correctamente pero no guardó el proyecto. Inténtalo de nuevo.',
       createdName: null,
+      cuota: null,
     };
   }
 
@@ -88,7 +98,7 @@ export async function createProjectAction(
   // app, y ahí el panel es `/`, no `/dashboard`.
   revalidatePath('/');
 
-  return { error: null, createdName: created.name };
+  return { error: null, createdName: created.name, cuota: null };
 }
 
 /**
@@ -105,7 +115,7 @@ export async function borradorDePlantillaAction(
 ): Promise<TemplateDraftState> {
   const session = await getSession();
   if (!session) {
-    return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false };
+    return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false, cuota: null };
   }
   return pedirBorrador(brief, ajuste);
 }

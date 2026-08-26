@@ -695,6 +695,8 @@ export function AssistantChat({
         reply: null,
         proposals: [],
         cuota: null,
+        /* Una conexión perdida sí se reintenta: no es una cuota. */
+        topeAgotado: null,
         conversationId: null,
         error: 'Se ha perdido la conexión con el servidor. Inténtalo otra vez.',
       };
@@ -734,7 +736,17 @@ export function AssistantChat({
           degradado: true,
         },
       ]);
-      setReintento({ texto: limpio, preguntaId: mio.id, avisoId: idDegradado });
+      /**
+       * ⚠️ **Una cuota agotada no ofrece reintento, y es la única excepción.**
+       * El botón no puede funcionar hasta el día 1: quien lo ve lo pulsa tres o
+       * cuatro veces antes de entender que el problema no es de red. La salida
+       * de este caso ya está montada y es otra —`ProUpsell`, que aparece sola
+       * en cuanto el contador llega al tope—, así que aquí basta con no poner un
+       * botón que compite con ella y no lleva a ninguna parte.
+       */
+      if (!respuesta.topeAgotado) {
+        setReintento({ texto: limpio, preguntaId: mio.id, avisoId: idDegradado });
+      }
       return;
     }
 

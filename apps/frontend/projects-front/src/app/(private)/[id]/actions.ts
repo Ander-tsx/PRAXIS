@@ -53,6 +53,7 @@ import {
   type Workspace,
 } from '@praxis/commons';
 import { type LinkPreview, obtenerPreviewDeEnlace } from '@praxis/commons/api/link-preview';
+import { detallesDeCuota } from '@praxis/commons/billing/planes';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -648,7 +649,15 @@ export async function inviteMemberAction(
       return { error: 'El servidor no registró la invitación.', done: null };
     }
   } catch (error) {
-    return { error: describe(error, 'No se pudo enviar la invitación.'), done: null };
+    /* ⚠️ Una invitación puede chocar con el tope de miembros del plan **del
+       dueño del proyecto**, no con el de quien invita. El detalle sale aparte
+       para que el diálogo pueda decir de quién depende el tope en vez de
+       mandar a pagar a alguien cuyo plan no cambia nada. Ver `QuotaNotice`. */
+    return {
+      error: describe(error, 'No se pudo enviar la invitación.'),
+      done: null,
+      cuota: detallesDeCuota(error),
+    };
   }
 
   revalidateProject(projectId);

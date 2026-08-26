@@ -11,6 +11,7 @@
  * para que no digan cosas distintas.
  */
 
+import type { QuotaExceededDetails } from '../../billing/planes';
 import type { ProjectTemplate, TemplateDraftState, TemplateResult } from '../../api/domain';
 
 export const PROJECT_NAME_MIN = 2;
@@ -49,11 +50,22 @@ export function validateProject({ name, description }: ProjectInput): string | n
 export interface CreateProjectState {
   error: string | null;
   createdName: string | null;
+  /**
+   * El detalle del 402 cuando el plan se quedó sin proyectos.
+   *
+   * ⚠️ **Va aparte de `error` y no dentro de él.** `error` es una frase; esto
+   * es el dato con el que se pinta la salida —el tope, cuánto llevas y qué plan
+   * lo pone— y sin él el diálogo solo puede enseñar una línea roja más, que es
+   * justo lo que dejaba a esta pantalla siendo un callejón. `error` se rellena
+   * igualmente para quien solo quiera el texto.
+   */
+  cuota: QuotaExceededDetails | null;
 }
 
 export const CREATE_PROJECT_INITIAL_STATE: CreateProjectState = {
   error: null,
   createdName: null,
+  cuota: null,
 };
 
 /**

@@ -4,6 +4,8 @@
  * y en algún caso mienten sobre la salida (ver PENDIENTES-BACKEND.md §10).
  */
 
+import type { QuotaExceededDetails } from '../billing/planes';
+
 /** `GET /api/users/:id` */
 export interface UserProfile {
   id: string;
@@ -1314,9 +1316,25 @@ export interface TemplateDraftState {
    *
    * Se distingue del resto porque **no se arregla reintentando**, y la pantalla
    * tiene que decir otra cosa: con un «vuelve a intentarlo» genérico la gente
-   * pulsa el botón otras cinco veces contra un 429.
+   * pulsa el botón otras cinco veces contra un límite que no se mueve.
+   *
+   * 🔴 **Se decidía por `status === 429` a secas, y eso mezclaba dos cosas.** El
+   * gateway limita a 300 peticiones por minuto y por cuenta, y responde con ese
+   * mismo 429: un throttle en mitad de una tanda se leía como «se te acabó el
+   * mes» y mandaba a alguien a la pantalla de planes por algo que se arregla
+   * esperando quince segundos. Ahora la cuota viaja como **402
+   * `QUOTA_EXCEEDED`**, igual que las otras dos del plan, y esto se decide por
+   * el código.
    */
   sinCuota: boolean;
+  /**
+   * El detalle del 402, cuando lo hay.
+   *
+   * Es lo que permite ofrecer la salida —qué tope, cuánto llevas y cuándo
+   * vuelve— en vez de una frase. `null` también cuando `sinCuota` es `true` y
+   * el detalle no vino con forma válida: ver `detallesDeCuota`.
+   */
+  cuota: QuotaExceededDetails | null;
 }
 
 /** Lo que devuelve materializar una plantilla aceptada. */

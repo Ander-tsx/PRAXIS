@@ -148,3 +148,63 @@ export function fechaCorta(iso: string | null): string | null {
     year: 'numeric',
   }).format(fecha);
 }
+
+/* ─── Cuotas agotadas ──────────────────────────────────────────────────────
+ *
+ * El 402. Es lo que llega cuando una escritura no cabe en el plan, y lo que
+ * permite ofrecer una salida en vez de un callejón.
+ */
+
+/**
+ * Qué tope se agotó. Espejo de `QuotaKind` en `@praxis/contracts`.
+ *
+ * ⚠️ **No es decoración del mensaje: decide qué se ofrece.** Quien se queda sin
+ * proyectos puede borrar uno y seguir; quien se queda sin mensajes de IA no
+ * puede hacer nada hasta el día 1 salvo ampliar; y quien se queda sin sitio en
+ * un tablero depende de que lo saque otro. Tres salidas distintas, y una frase
+ * genérica las trata igual.
+ */
+export type QuotaKind = 'proyectos' | 'ia_mensual' | 'miembros_por_proyecto';
+
+/** El código del sobre. Espejo de `QUOTA_EXCEEDED_CODE` en `@praxis/contracts`. */
+export const QUOTA_EXCEEDED_CODE = 'QUOTA_EXCEEDED';
+
+/** Lo que acompaña a un 402. Espejo de `QuotaExceededDetails`. */
+export interface QuotaExceededDetails {
+  kind: QuotaKind;
+  tier: PlanTier;
+  tope: number;
+  actual: number;
+  /** Solo en `ia_mensual`: cuándo vuelve a cero, en ISO. */
+  reiniciaEn?: string;
+}
+
+const QUOTA_KINDS: QuotaKind[] = ['proyectos', 'ia_mensual', 'miembros_por_proyecto'];
+
+/**
+ * ¿Este error es una cuota agotada? Y si lo es, ¿cuál?
+ *
+ * Recibe `unknown` y no un `ApiError` a propósito: lo llaman Server Actions
+ * dentro de un `catch`, donde lo que hay es `unknown` de verdad, y obligar a
+ * cada una a hacer el `instanceof` antes acabaría con la mitad mirando solo el
+ * `message`.
+ *
+ * ⚠️ **Se comprueba la forma, no solo el código.** El `details` cruza la red y
+ * un 402 sin detalle —de una versión vieja del gateway, o de un intermediario
+ * que se comió el cuerpo— devolvería un objeto con `undefined` dentro, que la
+ * pantalla pintaría como «0 de 0». Sin forma válida esto devuelve `null` y quien
+ * llama se queda con el mensaje del servidor, que siempre es correcto.
+ */
+export function detallesDeCuota(error: unknown): QuotaExceededDetails | null {
+  if (!error || typeof error !== 'object') return null;
+
+  const { code, details } = error as { code?: unknown; details?: unknown };
+  if (code !== QUOTA_EXCEEDED_CODE) return null;
+  if (!details || typeof details !== 'object') return null;
+
+  const detalle = details as Partial<QuotaExceededDetails>;
+  if (!QUOTA_KINDS.includes(detalle.kind as QuotaKind)) return null;
+  if (typeof detalle.tope !== 'number' || typeof detalle.actual !== 'number') return null;
+
+  return detalle as QuotaExceededDetails;
+}

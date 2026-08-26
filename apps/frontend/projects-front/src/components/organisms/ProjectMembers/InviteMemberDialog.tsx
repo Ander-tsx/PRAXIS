@@ -7,6 +7,7 @@ import {
   Dialog,
   Input,
   type Paginated,
+  QuotaNotice,
   type ProjectRole,
   Select,
   type UserProfile,
@@ -23,6 +24,15 @@ export interface InviteMemberDialogProps {
   roles: ProjectRole[];
   /** Quiénes no deben salir: miembros, invitados sin responder y el dueño. */
   excluirIds: string[];
+  /**
+   * Si quien invita es el dueño del proyecto.
+   *
+   * ⚠️ **Solo se usa para el tope de miembros, y ahí importa mucho.** El tope lo
+   * pone el plan del **dueño**, así que ofrecerle «ver planes» a un invitado que
+   * administra el equipo sería mandarle a pagar por algo que no arregla su caso:
+   * su plan no toca este proyecto.
+   */
+  soyDueño?: boolean;
   onClose?: () => void;
 }
 
@@ -48,7 +58,13 @@ const MAX_RESULTS = 6;
  * tanto, buscar solo encontraba a quien cupiera en las primeras cien cuentas de
  * **toda la plataforma** — o sea, a casi nadie en cuanto hubo cuentas de verdad.
  */
-export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: InviteMemberDialogProps) {
+export function InviteMemberDialog({
+  projectId,
+  roles,
+  excluirIds,
+  soyDueño = false,
+  onClose,
+}: InviteMemberDialogProps) {
   const [state, formAction, pending] = useAccion(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
@@ -243,7 +259,12 @@ export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: In
           </div>
         </div>
 
-          {state.error && (
+        {/* Quedarse sin sitio en el plan no es un fallo del formulario: hay
+              una salida y hay que enseñarla. Ver `QuotaNotice`. */}
+        {state.cuota ? (
+          <QuotaNotice detalle={state.cuota} mensaje={state.error ?? ''} ampliarSirve={soyDueño} />
+        ) : (
+          state.error && (
             <p
               role="alert"
               className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
@@ -254,17 +275,18 @@ export function InviteMemberDialog({ projectId, roles, excluirIds, onClose }: In
             >
               {state.error}
             </p>
-          )}
+          )
+        )}
 
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={reset}>
-              Cancelar
-            </Button>
-            <Button type="submit" isLoading={pending} disabled={!selected || !roleId}>
-              Enviar invitación
-            </Button>
-          </div>
-        </form>
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="ghost" onClick={reset}>
+            Cancelar
+          </Button>
+          <Button type="submit" isLoading={pending} disabled={!selected || !roleId}>
+            Enviar invitación
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }

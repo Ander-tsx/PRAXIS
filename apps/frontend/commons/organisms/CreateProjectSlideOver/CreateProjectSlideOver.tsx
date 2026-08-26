@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Button, Input, Sparkle, Textarea, iniciales } from '../../atoms';
 import { useAccion } from '../../hooks';
-import { SlideOver } from '../../molecules';
+import { QuotaNotice, SlideOver } from '../../molecules';
 import { alpha, colors } from '../../tokens';
 import { MockMiniChat } from './MockMiniChat';
 import {
@@ -293,17 +293,31 @@ export function CreateProjectSlideOver({
               </div>
             </div>
 
-            {state.error && (
-              <p
-                role="alert"
-                className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-                style={{
-                  background: alpha(colors.error, 10),
-                  borderColor: alpha(colors.error, 30),
-                }}
-              >
-                {state.error}
-              </p>
+            {/**
+             * Un tope del plan no es un error del formulario, y no se pinta
+             * igual.
+             *
+             * 🔴 Antes sí: el 402 salía como una línea roja idéntica a la de un
+             * nombre duplicado, sin decir qué plan lo resuelve ni cómo llegar a
+             * él. Es el sitio exacto donde alguien decidiría pagar, y era un
+             * callejón. El detalle ya viajaba en la respuesta; solo faltaba
+             * enseñarlo.
+             */}
+            {state.cuota ? (
+              <QuotaNotice detalle={state.cuota} mensaje={state.error ?? ''} />
+            ) : (
+              state.error && (
+                <p
+                  role="alert"
+                  className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
+                  style={{
+                    background: alpha(colors.error, 10),
+                    borderColor: alpha(colors.error, 30),
+                  }}
+                >
+                  {state.error}
+                </p>
+              )
             )}
 
             <div className="flex justify-end gap-3">
