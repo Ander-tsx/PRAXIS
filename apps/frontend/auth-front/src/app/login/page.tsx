@@ -1,8 +1,8 @@
 'use client';
 
+import { AuthPanel } from '@/components/organisms/AuthPanel';
 import { BotonGoogle } from '@/components/organisms/BotonGoogle';
 import { navigateAfterAuth } from '@/lib/navigation';
-import { alpha, colors } from '@praxis/commons';
 import { Button, Input } from '@praxis/commons/atoms';
 import { AuthForm } from '@praxis/commons/molecules';
 import Link from 'next/link';
@@ -134,8 +134,9 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+    <AuthPanel>
       <AuthForm
+        bare
         title="Iniciar sesión"
         subtitle="Bienvenido de vuelta a PRAXIS."
         errorMessage={globalError}
@@ -205,7 +206,7 @@ export default function LoginPage() {
           required
         />
       </AuthForm>
-    </main>
+    </AuthPanel>
   );
 }
 
@@ -238,17 +239,20 @@ function AvisoDeConfirmacion({ email }: { email: string }) {
   }
 
   return (
-    <div
-      className="mb-4 rounded-lg border border-warning/30 p-4"
-      style={{ background: alpha(colors.warning, 8) }}
-    >
-      <p className="font-sans text-sm font-medium text-text-primary">Confirma tu correo</p>
-      <p className="mt-1 font-sans text-xs leading-relaxed text-text-secondary">
+    // Raya punteada arriba y un punto de color en vez de una caja rellena —
+    // el mismo dispositivo que usa el resto del sistema para una nota
+    // secundaria, no una alerta de manual de estilos.
+    <div className="mb-5 flex flex-col gap-2 border-t border-dotted border-border pt-4">
+      <div className="flex items-center gap-2">
+        <span className="h-1.5 w-1.5 flex-none rounded-full bg-warning" aria-hidden="true" />
+        <p className="font-sans text-sm font-medium text-text-primary">Confirma tu correo</p>
+      </div>
+      <p className="font-sans text-xs leading-relaxed text-text-secondary">
         Te mandamos un enlace a {email} cuando creaste la cuenta. Ábrelo y vuelve a entrar.
       </p>
 
       {enviado ? (
-        <p className="mt-3 font-sans text-xs" style={{ color: colors.success }}>
+        <p className="font-sans text-xs text-success">
           Listo, te lo hemos vuelto a mandar. Revisa también la carpeta de spam.
         </p>
       ) : (
@@ -256,7 +260,7 @@ function AvisoDeConfirmacion({ email }: { email: string }) {
           type="button"
           onClick={reenviar}
           disabled={enviando}
-          className="mt-3 cursor-pointer font-sans text-xs font-semibold text-primary underline underline-offset-2 disabled:opacity-50"
+          className="w-fit cursor-pointer font-sans text-xs font-semibold text-primary underline underline-offset-2 disabled:opacity-50"
         >
           {enviando ? 'Mandando…' : 'Mandármelo otra vez'}
         </button>

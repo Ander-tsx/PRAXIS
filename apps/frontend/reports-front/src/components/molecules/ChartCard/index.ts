@@ -1,2 +1,2 @@
-export { ChartCard, NotEnoughData, Stat } from './ChartCard';
+export { ChartCard, NotEnoughData, NotaDeDiasNaturales, Stat } from './ChartCard';
 export { HowToRead } from './HowToRead';

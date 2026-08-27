@@ -616,6 +616,38 @@ export function avisoDeSemanaIncompleta(weekly: ReportWeekly | null | undefined)
 }
 
 /**
+ * Las métricas del constructor cuyo número **es un tiempo**.
+ *
+ * No es la lista de las que aceptan un rango de días: `cierres_por_semana`
+ * también se acota por fechas y su número son tareas, no días. Aquí están solo
+ * aquellas en las que lo que se dibuja es una duración, que son las que heredan
+ * el sesgo del calendario.
+ */
+const METRICAS_EN_TIEMPO: Metrica[] = [
+  'tiempo_en_columna',
+  'espera_actual_por_columna',
+  'distribucion_de_entrega',
+  /* `paradas_por_columna` cuenta tareas, pero el umbral que decide cuáles están
+     paradas se mide en días, así que el sesgo entra por ahí. */
+  'paradas_por_columna',
+];
+
+/**
+ * ⚠️ Todo se cuenta en **días de calendario**, y el gráfico tiene que decirlo.
+ *
+ * Es la trampa 1 de R9. Los widgets del catálogo lo explican en su «cómo se lee
+ * esto»; un gráfico del constructor no tiene esa vuelta, así que el aviso viaja
+ * al lado del dato por la misma vía que el de la semana a medias.
+ *
+ * Viaja aparte y no dentro de `construirDatos` por el mismo motivo que aquel:
+ * es algo que hay que **decir** sobre el dato, no una forma de recortarlo.
+ */
+export function avisoDeDiasNaturales(metrica: Metrica): string | null {
+  if (!METRICAS_EN_TIEMPO.includes(metrica)) return null;
+  return 'Se cuentan días naturales: no se descuentan fines de semana ni festivos.';
+}
+
+/**
  * Cuántos tramos tiene un histograma de tiempos de entrega.
  *
  * ⚠️ **No es una preferencia estética: sin esto el gráfico es ilegible.** La

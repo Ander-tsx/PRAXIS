@@ -3,10 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import inquirer from 'inquirer';
 import {
+  ALWAYS_ASK_KEYS,
   DOCKER_COMPOSE_FILE,
+  GENERAR_SI_VACIO,
   ROOT,
   SENSITIVE_KEY_RE,
   SHARED_BUILD_PACKAGES,
+  SHARED_KEYS,
 } from '../config/index.mjs';
 import { aviso, azul, gris, ok, rojo, spinner } from './ui.mjs';
 
@@ -224,6 +227,156 @@ function leerEnv(contenido) {
 const escribirEnv = (mapa) => `${[...mapa.entries()].map(([k, v]) => `${k}=${v}`).join('\n')}\n`;
 
 /**
+ * Lee de un `.env.example` y de su destino qué servicios declaran una clave y
+ * qué valor tienen puesto ahora mismo.
+ */
+function declarantesDe(clave, servicios) {
+  const encontrados = [];
+
+  for (const svc of servicios) {
+    const dir = path.join(ROOT, svc.dir);
+    const ejemploPath = path.join(dir, '.env.example');
+    if (!fs.existsSync(ejemploPath)) continue;
+
+    const ejemplo = leerEnv(fs.readFileSync(ejemploPath, 'utf8'));
+    if (!ejemplo.has(clave)) continue;
+
+    const destino = path.join(dir, svc.envFile ?? '.env');
+    const actual = fs.existsSync(destino) ? leerEnv(fs.readFileSync(destino, 'utf8')) : new Map();
+
+    encontrados.push({ svc, destino, valor: actual.get(clave) || null });
+  }
+
+  return encontrados;
+}
+
+/** El valor que propone el `.env.example` del primero que declare la clave. */
+function plantillaDe(clave, declarantes) {
+  for (const { svc } of declarantes) {
+    const ejemploPath = path.join(ROOT, svc.dir, '.env.example');
+    if (!fs.existsSync(ejemploPath)) continue;
+    const ejemplo = leerEnv(fs.readFileSync(ejemploPath, 'utf8'));
+    if (ejemplo.has(clave)) return ejemplo.get(clave);
+  }
+  return '';
+}
+
+/** `a1b2c3d4…` — lo justo para distinguir dos secretos sin escupirlos enteros. */
+const resumir = (valor) => (valor.length > 12 ? `${valor.slice(0, 8)}…(${valor.length})` : valor);
+
+/**
+ * Resuelve **una sola vez** cada clave que tiene que valer lo mismo en todos los
+ * servicios, antes de tocar ningún archivo.
+ *
+ * ## Qué arreglaba esto
+ *
+ * `JWT_SECRET` está declarado en diez archivos de entorno —gateway, credentials
+ * y las ocho zonas— y `SENSITIVE_KEY_RE` lo casa, así que el asistente lo
+ * preguntaba **diez veces seguidas**, con el mismo enunciado, sin valor por
+ * defecto y sin decir en ningún momento que las diez respuestas tenían que
+ * coincidir. Teclear uno distinto en una sola zona no da ningún error: esa zona
+ * no puede verificar la cookie, trata la sesión como anónima y redirige al login
+ * para siempre. Se diagnostica comparando diez archivos a mano.
+ *
+ * ## Los tres casos
+ *
+ * 1. **Nadie lo tiene** — clon nuevo. Se pregunta una vez, con un secreto
+ *    generado como valor por defecto: pulsar Enter es la respuesta correcta.
+ * 2. **Todos coinciden** — se reutiliza en silencio para los que falten. No hay
+ *    nada que preguntar, y preguntarlo invitaría a romperlo.
+ * 3. **Divergen** — es el fallo, y ya está puesto. Se dice quién tiene qué y se
+ *    ofrece unificar; es el único caso en el que este paso **reescribe** un
+ *    valor que ya existía, y por eso se confirma.
+ */
+export async function resolverClavesCompartidas(servicios) {
+  const resueltos = new Map();
+
+  for (const { clave, generar } of SHARED_KEYS) {
+    const declarantes = declarantesDe(clave, servicios);
+    if (declarantes.length === 0) continue;
+
+    const distintos = [...new Set(declarantes.map((d) => d.valor).filter(Boolean))];
+    const sinValor = declarantes.filter((d) => !d.valor);
+
+    // ── 1. Clon nuevo: nadie lo tiene ───────────────────────────────────────
+    if (distintos.length === 0) {
+      console.log(
+        `\n  ${azul(clave)} ${gris(`· lo comparten ${declarantes.length} servicios y debe ser el mismo en todos`)}`,
+      );
+      /* Un secreto se propone generado —pulsar Enter es la respuesta correcta—.
+         Lo que no lo es se propone con lo que diga la plantilla, y puede quedar
+         vacío a propósito: es lo que apaga esa función. */
+      const porDefecto = generar ? generar() : plantillaDe(clave, declarantes);
+
+      const { valor } = await inquirer.prompt([
+        {
+          type: 'input',
+          name: 'valor',
+          message: `    ${clave}${generar ? gris(' (Enter = generado)') : ''}`,
+          default: porDefecto,
+          validate: (v) => (!generar || v.trim().length > 0 ? true : 'No puede quedar vacío'),
+        },
+      ]);
+      resueltos.set(clave, valor.trim());
+      continue;
+    }
+
+    // ── 2. Ya está y todos coinciden ────────────────────────────────────────
+    if (distintos.length === 1) {
+      resueltos.set(clave, distintos[0]);
+      if (sinValor.length > 0) {
+        ok(
+          `${clave} · reutilizando el valor que ya existe para ${sinValor.length} servicio(s) que no lo tenían`,
+        );
+      }
+      continue;
+    }
+
+    // ── 3. Divergen: el fallo silencioso, ya presente ───────────────────────
+    aviso(`${clave} NO coincide entre servicios — la sesión no funcionará en todas las zonas`);
+    for (const valor of distintos) {
+      const quienes = declarantes.filter((d) => d.valor === valor).map((d) => d.svc.key);
+      console.log(gris(`    ${resumir(valor)}  →  ${quienes.join(', ')}`));
+    }
+
+    const { elegido } = await inquirer.prompt([
+      {
+        type: 'select',
+        name: 'elegido',
+        message: `    ¿Con cuál se quedan todos?`,
+        choices: [
+          ...distintos.map((valor) => ({
+            name: `${resumir(valor)} ${gris(`(${declarantes.filter((d) => d.valor === valor).length} servicios)`)}`,
+            value: valor,
+          })),
+          { name: gris('generar uno nuevo'), value: '__nuevo__' },
+          { name: gris('dejarlo como está — sé lo que hago'), value: '__nada__' },
+        ],
+      },
+    ]);
+
+    if (elegido === '__nada__') continue;
+
+    const valor = elegido === '__nuevo__' ? generarSecreto() : elegido;
+    resueltos.set(clave, valor);
+
+    /* Reescribir un valor que ya existía es lo único destructivo de todo este
+       paso: solo se hace tras responder a la pregunta de arriba, y solo sobre
+       los archivos que discrepan. */
+    for (const { destino, valor: actualValor } of declarantes) {
+      if (actualValor === valor || !fs.existsSync(destino)) continue;
+      const contenido = leerEnv(fs.readFileSync(destino, 'utf8'));
+      contenido.set(clave, valor);
+      fs.writeFileSync(destino, escribirEnv(contenido));
+    }
+
+    ok(`${clave} unificado en ${declarantes.length} servicios`);
+  }
+
+  return resueltos;
+}
+
+/**
  * Completa el archivo de entorno de un servicio desde su `.env.example`.
  *
  * ⚠️ El nombre del archivo sale de `svc.envFile`, que en el frontend es
@@ -231,7 +384,7 @@ const escribirEnv = (mapa) => `${[...mapa.entries()].map(([k, v]) => `${k}=${v}`
  * archivo era escribir uno que nadie abre; el síntoma llegaba mucho después,
  * como un `GATEWAY_URL` undefined en la primera petición.
  */
-export async function completarEnv(svc) {
+export async function completarEnv(svc, compartidas = new Map()) {
   const dir = path.join(ROOT, svc.dir);
   const ejemploPath = path.join(dir, '.env.example');
   const destino = path.join(dir, svc.envFile ?? '.env');
@@ -253,9 +406,23 @@ export async function completarEnv(svc) {
   for (const clave of faltan) {
     const porDefecto = ejemplo.get(clave);
 
-    if (SENSITIVE_KEY_RE.test(clave)) {
+    /* Ya se preguntó una sola vez para todos, arriba. Volver a preguntarla aquí
+       es lo que dejaba diez JWT_SECRET distintos. */
+    if (compartidas.has(clave)) {
+      actual.set(clave, compartidas.get(clave));
+    } else if (SENSITIVE_KEY_RE.test(clave) || ALWAYS_ASK_KEYS.has(clave)) {
+      /* Un secreto propio se propone generado. Ofrecerlo vacío es lo que empuja
+         a pegar el que ya tienes a mano — ver `GENERAR_SI_VACIO`. */
+      const generar = !porDefecto && GENERAR_SI_VACIO.get(clave);
+      const sugerido = generar ? generar() : porDefecto;
+
       const { valor } = await inquirer.prompt([
-        { type: 'input', name: 'valor', message: `    ${clave}`, default: porDefecto },
+        {
+          type: 'input',
+          name: 'valor',
+          message: `    ${clave}${generar ? gris(' (Enter = generado)') : ''}`,
+          default: sugerido,
+        },
       ]);
       actual.set(clave, valor);
     } else {

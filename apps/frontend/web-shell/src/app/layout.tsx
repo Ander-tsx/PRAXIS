@@ -1,6 +1,7 @@
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
-import { Inter, Lora } from 'next/font/google';
+import { Archivo, Fraunces, Inter, Lora } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 /* ── Google Fonts ──────────────────────────────────────────── */
@@ -17,6 +18,55 @@ const lora = Lora({
   display: 'swap',
   weight: ['400', '500', '600', '700'],
   style: ['normal', 'italic'],
+});
+
+/**
+ * Solo para la landing pública — no toca `--font-display` de
+ * `commons/theme.css` (Redaction 50), que sigue siendo la voz del producto
+ * dentro de la aplicación. La landing necesita un registro más serio y
+ * editorial que el que Redaction 50 —pensado para dentro de la app— podía
+ * dar en titulares a tamaño de cartel.
+ */
+const fraunces = Fraunces({
+  variable: '--font-fraunces',
+  subsets: ['latin'],
+  display: 'swap',
+  weight: 'variable',
+  style: ['normal', 'italic'],
+  axes: ['opsz', 'SOFT'],
+});
+
+/**
+ * Solo para el logotipo "Praxis" — navbar y el cierre del footer. Kyloo pinta
+ * su propio nombre con Khteka, una fuente de estudio con licencia comercial
+ * que no está en Google Fonts; Archivo en 800 y tracking cerrado busca el
+ * mismo carácter — grotesca, geométrica, confiada — para el nombre de
+ * Praxis en concreto, que no es el mismo producto que Kyloo y no debería
+ * llevar la tipografía de otro estudio como si fuera la suya propia.
+ */
+const grotesk = Archivo({
+  variable: '--font-grotesk',
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['700', '800'],
+});
+
+/**
+ * Khteka en sí — la fuente de estudio de Kyloo, copiada tal cual de su
+ * propio repo (`KylooPage/src/app/fonts/khteka-medium.woff2`). A diferencia
+ * de "Praxis" arriba, aquí SÍ es la fuente real: el wordmark del cierre del
+ * footer no dice "Praxis" con letras prestadas, dice "Kyloo" — es la marca
+ * de Kyloo citándose a sí misma como autora, y las dos propiedades son del
+ * mismo estudio. Si esa relación cambiara, este es el único sitio que
+ * dejaría de tener sentido.
+ */
+const khteka = localFont({
+  src: './fonts/khteka-medium.woff2',
+  weight: '500',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-khteka',
+  fallback: ['Arial', 'sans-serif'],
 });
 
 export const metadata: Metadata = {
@@ -37,26 +87,17 @@ export const metadata: Metadata = {
 };
 
 /**
- * El shell **sí** lee la cookie de tema, igual que las otras cuatro zonas.
+ * El shell lee la cookie de tema (`praxis_theme`, la misma que las otras
+ * zonas) y estampa `data-theme` en el `<html>` — pero ya no es para la
+ * landing: es monocroma y fija (ver `globals.css`, clases `.landing` /
+ * `.landing-light`), sin selector propio, sea cual sea el tema con el que
+ * alguien entre a la aplicación.
  *
- * ## Por qué antes no lo hacía
- *
- * Estuvo fijado a `data-theme="dark"` y era la decisión correcta entonces: los
- * organismos del landing llevaban **noventa y dos colores incrustados**, y la
- * mitad eran blancos con alfa que hacían de texto, de borde y de superficie
- * sobre fondo oscuro. Heredar `light` los dejaba invisibles sobre blanco, así
- * que se prefirió un landing oscuro a uno roto.
- *
- * Ya no aplica: los seis organismos pasaron a `colors`/`alpha()` de
- * `commons/tokens`, así que el landing responde al tema como cualquier otra
- * pantalla. Y como es la única zona pública, trae su propio selector en
- * `PublicNavbar` — quien entra sin cuenta no tiene una Configuración donde
- * elegirlo.
- *
- * ⚠️ La cookie es **la misma** (`praxis_theme`, `path=/`): cambiar el tema en el
- * landing lo cambia también dentro de la aplicación, y al revés. Es lo que se
- * espera de un selector de tema, y lo que evita que entrar en sesión te cambie
- * el aspecto sin haber tocado nada.
+ * ¿Entonces por qué seguir leyéndola aquí? Porque `web-shell` también sirve
+ * `not-found.tsx`, y porque el `data-theme` del `<html>` es lo que ve el
+ * navegador un instante entre que sale de la landing y carga la siguiente
+ * zona — quitarlo aquí produciría un parpadeo de tema en esa transición
+ * aunque la propia landing no lo use para nada.
  */
 export default async function RootLayout({
   children,
@@ -66,7 +107,11 @@ export default async function RootLayout({
   const theme = await getTheme();
 
   return (
-    <html lang="es" data-theme={theme} className={`${inter.variable} ${lora.variable} h-full`}>
+    <html
+      lang="es"
+      data-theme={theme}
+      className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable} h-full`}
+    >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );

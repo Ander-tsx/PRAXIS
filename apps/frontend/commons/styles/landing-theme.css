@@ -1,0 +1,171 @@
+/* ============================================================
+   Paleta monocromática de marca — Kyloo/Praxis
+
+   Beige/negro, medida sobre el proyecto real de Kyloo (kyloo-design/
+   SKILL.md §2). Nació en la landing pública (`web-shell`) y ahora la
+   comparte cualquier zona que necesite una superficie con el mismo aspecto
+   fijo, sin selector de tema, con zonas claras y oscuras alternando como
+   hace Kyloo para separar tramos de una página — la landing en sí, y el
+   panel de acceso de `auth-front` (ver `AuthPanel`).
+
+   `.landing` es oscuro por defecto; `.landing-light` redefine las mismas
+   variables dentro de la sección que lo lleve — el mismo patrón que
+   `.theme-light` en el sitio de Kyloo, en cascada normal de CSS.
+
+   Cada bloque hace DOS cosas a la vez:
+   1. Declara los siete tokens `--l-*`, que consumen los componentes propios
+      de este sistema (Reveal, RollCta, las filas con raya punteada…).
+   2. Sobrescribe los tokens del tema general (`--color-*`, `--radius-*`,
+      de `theme.css`) para que los átomos normales — `Input`, `Button`,
+      cualquier cosa que use `bg-surface`/`text-text-primary`/`rounded-lg` —
+      caigan en monocromo sin que su código sepa que existe esta paleta. Es
+      el mismo truco que usa `theme.css` para `:root[data-theme="light"]`:
+      redefinir la variable en un selector más específico, no tocar la
+      utilidad que la consume.
+   ============================================================ */
+.landing {
+  --l-bg: #080807;
+  --l-fg: #e8e8e3;
+  --l-fg-muted: #938f8a;
+  --l-card: #181715;
+  --l-border: #393632;
+  --l-primary: #e8e8e3;
+  --l-primary-foreground: #080807;
+
+  --color-background: var(--l-bg);
+  --color-surface: var(--l-card);
+  --color-surface-elevated: #221f1c;
+  --color-overlay: #050504;
+
+  --color-primary: var(--l-primary);
+  --color-primary-hover: #c9c9c2;
+  --color-primary-muted: rgba(232, 232, 227, 0.12);
+  --color-primary-foreground: var(--l-primary-foreground);
+
+  --color-text-primary: var(--l-fg);
+  --color-text-secondary: var(--l-fg-muted);
+  --color-text-disabled: #5c5850;
+  --color-text-inverse: var(--l-bg);
+
+  --color-border: var(--l-border);
+  --color-border-subtle: #262421;
+  --color-border-strong: #4f4b45;
+
+  /* Los cuatro estados semánticos, fijos aquí y no heredados de
+     `:root[data-theme]` — la landing y `AuthPanel` no dependen de la
+     cookie `praxis_theme`, así que un error/aviso tampoco debería: si el
+     visitante tuviera esa cookie en oscuro, `--color-error` heredado
+     seguiría siendo el tono pensado para fondo oscuro, aunque la landing
+     ya sea siempre oscura de por sí — aquí queda explícito en vez de
+     confiar en que coincida por casualidad. Mismos valores que
+     `theme.css` usa para su tema oscuro. */
+  --color-success: #4ade80;
+  --color-success-muted: rgba(74, 222, 128, 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(251, 191, 36, 0.12);
+  --color-error: #f87171;
+  --color-error-muted: rgba(248, 113, 113, 0.12);
+  --color-info: #60a5fa;
+  --color-info-muted: rgba(96, 165, 250, 0.12);
+
+  /* `font-display` es Redaction 50 en el resto de la app (theme.css); aquí
+     pasa a Fraunces, la voz de titular de la landing, para que un molde
+     genérico como `AuthForm` —que usa la clase `font-display` sin saber
+     nada de esto— herede el registro editorial sin tocar su código. */
+  --font-display: var(--font-fraunces, Georgia), Georgia, serif;
+
+  /* El único radio del sistema — nada de píldoras ni esquinas muy
+     redondeadas, ni siquiera en un <Input> genérico que llegue con
+     `rounded-lg` de fábrica. */
+  --radius-sm: 0.35rem;
+  --radius-md: 0.35rem;
+  --radius-lg: 0.35rem;
+  --radius-xl: 0.35rem;
+  --radius-2xl: 0.35rem;
+}
+
+/* Variante fría — mismo mecanismo que `.landing-light`, tonos distintos.
+   El beige cálido (`--l-bg: #e8e8e3`) es el de las secciones editoriales de
+   la landing, con texto y rayas punteadas apoyándolo; en una superficie de
+   formulario sin ese apoyo se lee como un blanco sucio. `.cold` va SIEMPRE
+   junto a `.landing-light` (nunca sola) y sube de especificidad para pisar
+   los mismos tokens con un blanco de verdad y grises neutros — sin el
+   matiz cálido. Úsala en cualquier superficie de formulario o utilitaria
+   que necesite el lenguaje monocromo sin la calidez editorial: por ahora,
+   solo `AuthPanel`. */
+.landing-light.cold {
+  --l-bg: #ffffff;
+  --l-fg: #101114;
+  --l-fg-muted: #6b7280;
+  --l-card: #f4f5f7;
+  --l-border: #e5e7eb;
+  --l-primary: #101114;
+  --l-primary-foreground: #ffffff;
+
+  --color-background: var(--l-bg);
+  --color-surface: var(--l-card);
+  --color-surface-elevated: #eceef1;
+  --color-overlay: var(--l-fg);
+
+  --color-primary: var(--l-primary);
+  --color-primary-hover: #2b2d33;
+  --color-primary-muted: rgba(16, 17, 20, 0.06);
+  --color-primary-foreground: var(--l-primary-foreground);
+
+  --color-text-primary: var(--l-fg);
+  --color-text-secondary: var(--l-fg-muted);
+  --color-text-disabled: #a4a9b2;
+  --color-text-inverse: var(--l-bg);
+
+  --color-border: var(--l-border);
+  --color-border-subtle: #eef0f2;
+  --color-border-strong: #cfd3d9;
+}
+
+.landing-light {
+  --l-bg: #e8e8e3;
+  --l-fg: #080807;
+  --l-fg-muted: #6b645c;
+  --l-card: #ddddd5;
+  --l-border: #bfbfb1;
+  --l-primary: #080807;
+  --l-primary-foreground: #e8e8e3;
+
+  --color-background: var(--l-bg);
+  --color-surface: var(--l-card);
+  --color-surface-elevated: #d2d2c8;
+  --color-overlay: var(--l-fg);
+
+  --color-primary: var(--l-primary);
+  --color-primary-hover: #2b2926;
+  --color-primary-muted: rgba(8, 8, 7, 0.08);
+  --color-primary-foreground: var(--l-primary-foreground);
+
+  --color-text-primary: var(--l-fg);
+  --color-text-secondary: var(--l-fg-muted);
+  --color-text-disabled: #a19a8e;
+  --color-text-inverse: var(--l-bg);
+
+  --color-border: var(--l-border);
+  --color-border-subtle: #d5d5c9;
+  --color-border-strong: #9c9686;
+
+  /* Los cuatro estados, tuneados para fondo claro — los usa también
+     `.cold` (AuthPanel) por herencia, ver el comentario en `.landing`. */
+  --color-success: #15803d;
+  --color-success-muted: rgba(21, 128, 61, 0.1);
+  --color-warning: #a16207;
+  --color-warning-muted: rgba(161, 98, 7, 0.1);
+  --color-error: #dc2626;
+  --color-error-muted: rgba(220, 38, 38, 0.1);
+  --color-info: #2563eb;
+  --color-info-muted: rgba(37, 99, 235, 0.1);
+
+  --font-display: var(--font-fraunces, Georgia), Georgia, serif;
+
+  --radius-sm: 0.35rem;
+  --radius-md: 0.35rem;
+  --radius-lg: 0.35rem;
+  --radius-xl: 0.35rem;
+  --radius-2xl: 0.35rem;
+}

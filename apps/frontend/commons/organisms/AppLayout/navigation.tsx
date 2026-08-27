@@ -27,20 +27,19 @@ export interface AppNavItem {
    */
   badge?: number;
   /**
-   * Las páginas que cuelgan de esta entrada.
-   *
-   * Una entrada con hijos **no navega**: es un desplegable. Existe porque
-   * «Configuración» dejó de ser una pantalla con tarjetas sueltas —facturación
-   * por un lado, voz por otro— y pasó a ser una sección con dos páginas. Meter
-   * las dos en la lista plana las habría puesto al mismo nivel que Proyectos,
-   * que es lo que uno abre a diario, y esto no.
-   *
-   * ⚠️ **Un solo nivel.** No hay nietos y no debería haberlos: una barra lateral
-   * con dos niveles ya obliga a plegar y desplegar para llegar a algo, y con
-   * tres deja de ser navegación para ser un árbol.
+   * El grupo al que pertenece, con la etiqueta ya en español — `NavList` la
+   * pinta tal cual encima de la primera entrada de cada grupo nuevo. Items
+   * consecutivos con la misma `section` no repiten la etiqueta.
    */
-  children?: AppNavItem[];
+  section: string;
 }
+
+const SECTION_PRINCIPAL = 'Principal';
+/** Exportada: `commons/auth/nav.ts` la usa para esconder el grupo entero a
+ * quien no administra, en vez de comparar tres `href` sueltos. */
+export const SECTION_ADMINISTRACION = 'Administración';
+const SECTION_GESTION = 'Gestión';
+const SECTION_CONFIGURACION = 'Configuración';
 
 /**
  * `aria-hidden` va escrito en cada `<svg>` y no aquí: son iconos decorativos
@@ -67,6 +66,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Panel',
     href: '/dashboard',
+    section: SECTION_PRINCIPAL,
     /**
      * ⚠️ **Era una cuadrícula de cuatro celdas, y ya la usaba otra cosa.** Es
      * el mismo dibujo que marca «Espacios» dentro de un proyecto, así que en la
@@ -88,6 +88,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Proyectos',
     href: '/projects',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -111,6 +112,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     label: 'Mensajes',
     href: '/chat',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -124,6 +126,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Análisis',
     href: '/reports',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -133,8 +136,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
-    /* Estuvo apagado con «Pronto» desde el principio porque no había backend.
-       Ya lo hay: reports-service en el 3005 y la zona en el 4104. */
   },
   {
     /**
@@ -159,6 +160,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     label: 'Asistente',
     href: '/assistant',
+    section: SECTION_PRINCIPAL,
     /**
      * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
      * miniatura. Un bocadillo con una chispa —que es lo que había— decía
@@ -172,21 +174,84 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     icon: <PraxSidebarIcon />,
   },
+
+  /**
+   * Administración de la plataforma, en tres pantallas — no una.
+   *
+   * ⚠️ **Las tres rutas ya existían** (`/admin`, `/admin/projects`,
+   * `/admin/actividad`) pero solo la primera tenía entrada en la barra: las
+   * otras dos eran alcanzables solo escribiendo la URL a mano, sin un solo
+   * enlace real hacia ellas en ninguna pantalla. Esto no divide una pantalla
+   * en tres, expone tres que ya estaban.
+   *
+   * `loadAppNavItems` descarta las tres a la vez si la cuenta no administra
+   * (`commons/auth/nav.ts`) — esconderlas es cortesía, no seguridad: las
+   * cuatro rutas de `/api/admin` exigen el rol en el gateway.
+   */
+  {
+    label: 'Cuentas',
+    href: '/admin',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M15 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1M11 8a3 3 0 11-6 0 3 3 0 016 0zm7 11v-1a3.5 3.5 0 00-2.5-3.36M14.5 7.13a3 3 0 010 5.74"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Proyectos',
+    href: '/admin/projects',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v1H4V6zM4 9h16v9a2 2 0 01-2 2H6a2 2 0 01-2-2V9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Actividad',
+    href: '/admin/actividad',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8v4l2.5 2.5M21 12a9 9 0 11-9-9 9 9 0 019 9z"
+        />
+      </svg>
+    ),
+  },
+
+  /**
+   * Gestión.
+   *
+   * ⚠️ **Ya no están las tres apagadas.** Nacieron con «Pronto» porque no había
+   * backend detrás de ninguna; desde 2026-08-26 hay organizaciones con asientos
+   * y una tabla de precios de verdad, así que esas dos se encienden. Las que
+   * siguen apagadas lo siguen estando por el mismo criterio de entonces: que la
+   * estructura del producto se entienda sin prometer una pantalla que daría 404.
+   */
   {
     /**
-     * Las organizaciones de empresa: sus asientos, su gente y su plan.
+     * Las organizaciones: sus asientos, su gente y su plan.
      *
-     * ⚠️ **Sale para todo el mundo, y es a propósito.** No es una pantalla de
-     * administración de la plataforma —eso es la de abajo, que sí se filtra por
-     * rol— sino la de *tu* plan: quien no pertenece a ninguna llega a una
-     * pantalla que le explica qué es una organización y le deja crear la
-     * primera, que es justo lo que hay que poder encontrar sin que te lo digan.
-     *
-     * Va junto a Configuración porque es de la misma familia —tu cuenta— y no
-     * entre los tableros, que es donde se trabaja.
+     * ⚠️ **Sale para todo el mundo, y es a propósito.** No es administración de
+     * la plataforma —eso es la sección de arriba, que sí se filtra por rol— sino
+     * *tu* espacio: desde 2026-08-26 hasta quien trabaja solo tiene una, y es
+     * donde viven sus proyectos. Quien no encuentre esto no encuentra su trabajo.
      */
     label: 'Organizaciones',
     href: '/dashboard/organizations',
+    section: SECTION_GESTION,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -198,54 +263,70 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    /**
-     * El panel de administración de la plataforma.
-     *
-     * ⚠️ **No sale para todo el mundo.** `loadAppNavItems` la descarta si la
-     * cuenta no tiene rol de administración, y por eso la lista canónica la trae
-     * y el filtro vive allí: aquí no hay forma de saber quién está mirando.
-     *
-     * Esconderla es **cortesía, no seguridad**: quien escriba `/admin` a mano
-     * llega a una pantalla que se lo explica, y las cuatro rutas de
-     * `/api/admin` exigen el rol en el gateway. Si esta línea se colara para
-     * todos, el resultado sería una entrada que no lleva a ninguna parte, no una
-     * fuga.
-     *
-     * Va antes de Configuración porque Configuración es siempre la última.
-     */
-    label: 'Administración',
-    href: '/admin',
+    /* Sigue apagada: los papeles de la organización ya existen en el servidor,
+       pero su pantalla es O6. Encenderla ahora llevaría a un 404. */
+    label: 'Roles y permisos',
+    href: '/dashboard/roles',
+    section: SECTION_GESTION,
+    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+          d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM10 12l1.5 1.5L14.5 10"
         />
       </svg>
     ),
   },
   {
     /**
-     * Ajustes de la cuenta, **como sección y no como pantalla**.
+     * El plan, el consumo y la tabla de precios.
      *
-     * Era una sola página con tres tarjetas sueltas —la voz, el plan y el tema—
-     * que no tienen nada que ver entre sí, y encima el plan salía **dos veces**:
-     * un resumen aquí y la tabla de precios en otra entrada del menú. Quien
-     * quería cambiar de plan tenía que adivinar cuál de las dos era la buena.
+     * ⚠️ **La ruta va en inglés** (`/dashboard/billing`), como el resto del
+     * repositorio: nombres de fichero y de ruta en inglés, lo que lee una
+     * persona en español. Nació aquí como `/dashboard/facturacion` cuando era un
+     * marcador y no llevaba a ninguna parte.
      *
-     * Ahora es un desplegable con las dos páginas que sí existen. La entrada no
-     * navega a ninguna parte: navegan sus hijas.
-     *
-     * Va la última a propósito: es a donde se vuelve de vez en cuando, no una
-     * por la que se pasa a diario.
+     * 🔴 **Y tiene entrada propia a propósito.** Antes solo se llegaba
+     * tropezando con un límite; una tabla de precios a la que se llega chocando
+     * no vende nada.
      */
-    label: 'Configuración',
-    /* Sin destino propio. `NavList` lo trata como grupo por tener `children`;
-       el `href` se queda como identidad de la entrada —es la clave de la lista
-       y lo que compara el resaltado— y como destino de reserva en la barra
-       plegada, donde un desplegable de 64 px de ancho no cabe. */
+    label: 'Facturación y suscripción',
+    href: '/dashboard/billing',
+    section: SECTION_GESTION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+        <path strokeLinecap="round" d="M3 10h18M6.5 14.5h3" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Integraciones',
+    href: '/dashboard/integraciones',
+    section: SECTION_GESTION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 3v4M15 3v4M6 7h12l-1 5a5 5 0 01-10 0L6 7zM9 21v-4M15 21v-4"
+        />
+      </svg>
+    ),
+  },
+
+  {
+    /**
+     * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
+     * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
+     * enlazarla: una pantalla que solo llevara a otra es un salto de más.
+     */
+    label: 'Configuración del sistema',
     href: '/dashboard/settings',
+    section: SECTION_CONFIGURACION,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -260,50 +341,35 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
-    children: [
-      {
-        /**
-         * El plan, el consumo y los precios, **en una sola página**.
-         *
-         * 🔴 Antes eran dos sitios: un resumen en Configuración y una tabla en
-         * una entrada llamada «Planes» a la que, además, no se llegaba desde el
-         * menú —solo tropezando con un límite—. Se llama Facturación y no
-         * Planes porque aquí también está lo que ya pagas, no solo lo que
-         * podrías pagar.
-         */
-        label: 'Facturación',
-        href: '/dashboard/billing',
-        icon: (
-          <svg {...iconProps} aria-hidden="true">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
-            />
-          </svg>
-        ),
-      },
-      {
-        /**
-         * La vinculación con Alexa y, con ella, la apariencia.
-         *
-         * ⚠️ **El tema vive aquí y no en una página propia**, que es lo que
-         * pidió quien lo usa. Un interruptor no da para una pantalla, y la
-         * alternativa —dejarlo huérfano en una Configuración que ya no tiene
-         * cuerpo— era peor: una entrada de menú para una sola casilla.
-         */
-        label: 'Praxis Voice',
-        href: '/dashboard/voice',
-        icon: (
-          <svg {...iconProps} aria-hidden="true">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-            />
-          </svg>
-        ),
-      },
-    ],
+  },
+  {
+    label: 'Centro de ayuda',
+    href: '/dashboard/ayuda',
+    section: SECTION_CONFIGURACION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-1.8 1.8-2.3 2.9-.1.3-.2.6-.2 1M12 17h.01M21 12a9 9 0 11-9-9 9 9 0 019 9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Soporte al cliente',
+    href: '/dashboard/soporte',
+    section: SECTION_CONFIGURACION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 13v-1a8 8 0 0116 0v1M4 13v4a2 2 0 002 2h1v-6H5a1 1 0 00-1 1zm16 0v4a2 2 0 01-2 2h-1v-6h1a1 1 0 011 1z"
+        />
+      </svg>
+    ),
   },
 ];

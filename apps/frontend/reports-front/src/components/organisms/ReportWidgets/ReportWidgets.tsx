@@ -1,4 +1,9 @@
-import { HowToRead, NotEnoughData, Stat } from '@/components/molecules/ChartCard';
+import {
+  HowToRead,
+  NotEnoughData,
+  NotaDeDiasNaturales,
+  Stat,
+} from '@/components/molecules/ChartCard';
 import { CycleTimeScatter, DistributionBars, FlowChart } from '@/components/organisms/Charts';
 import {
   PRIORITY_COLOR,
@@ -215,6 +220,7 @@ export function TiemposWidget({ cycle }: { cycle: ReportCycleTime | null }) {
           Observa <strong>la dispersión</strong>, no solo las líneas. Dos equipos con la misma
           mediana y distinta dispersión no ofrecen la misma previsibilidad.
         </p>
+        <NotaDeDiasNaturales matiz="Con percentiles eso no es ruido: una tarea de dos días abierta un viernes se mide como cuatro, y la mediana lo nota." />
       </HowToRead>
     </div>
   );
@@ -258,6 +264,7 @@ export function CicloWidget({ cycle }: { cycle: ReportCycleTime | null }) {
           Si la entrega supera con mucho al ciclo, el margen de mejora está en cuándo se abren las
           tareas, no en la velocidad de ejecución.
         </p>
+        <NotaDeDiasNaturales matiz="Los dos números arrastran el mismo sesgo, así que la diferencia entre ambos sí es comparable." />
       </HowToRead>
     </div>
   );
@@ -308,6 +315,7 @@ export function PrediccionWidget({ forecast }: { forecast: ReportForecast | null
           Asume que el ritmo se mantiene. Un cambio de equipo, un periodo de vacaciones o una
           variación de alcance la invalidan.
         </p>
+        <NotaDeDiasNaturales matiz="La fecha que sale de aquí es una fecha de calendario, y ya lleva dentro los fines de semana que el equipo no trabaja." />
       </HowToRead>
     </div>
   );
@@ -675,11 +683,7 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
           esa columna. Lo de después es lo que llevan <strong>ahora</strong> las tareas abiertas que
           están ahí, y solo se puede juzgar contra la referencia — por eso van en la misma línea.
         </p>
-        <p>
-          Se cuentan <strong>días naturales</strong>, así que una tarea que entra el viernes por la
-          tarde arrastra el fin de semana. En columnas de paso rápido eso mueve la mediana; en las
-          de días, apenas.
-        </p>
+        <NotaDeDiasNaturales matiz="En columnas de paso rápido eso mueve la mediana; en las de días, apenas." />
         <p>
           Una tarea cerrada <strong>no sigue contando</strong> el tiempo que lleva en la columna de
           «Hecho»: ahí no espera nada. Y todo esto empieza donde empieza el historial del proyecto.

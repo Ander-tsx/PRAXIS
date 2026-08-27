@@ -1,6 +1,10 @@
 import { hasAdminRole } from '../api/domain';
 import type { NotificationPage } from '../api/domain';
-import { APP_NAV_ITEMS, type AppNavItem } from '../organisms/AppLayout/navigation';
+import {
+  APP_NAV_ITEMS,
+  type AppNavItem,
+  SECTION_ADMINISTRACION,
+} from '../organisms/AppLayout/navigation';
 import { type CurrentUser, loadCurrentUser } from './current-user';
 import { createServerApiClient } from './server-client';
 
@@ -16,9 +20,6 @@ import { createServerApiClient } from './server-client';
  * desajuste no da error, simplemente deja la insignia a cero para siempre.
  */
 const AVISOS_HREF = '/dashboard';
-
-/** Href del panel de administración, que solo ven quienes administran. */
-const ADMIN_HREF = '/admin';
 
 /** Href de los mensajes directos, que llevan su propia insignia. */
 const CHAT_HREF = '/chat';
@@ -85,7 +86,9 @@ async function loadChatUnreadCount(): Promise<number> {
  * Dos ajustes, y los dos tienen que pasar aquí y no en `APP_NAV_ITEMS`, que no
  * sabe quién está delante:
  *
- * - la entrada de administración se cae si la cuenta no administra;
+ * - el grupo de administración entero se cae si la cuenta no administra —las
+ *   tres pantallas (`Cuentas`, `Proyectos`, `Actividad`) comparten sección, así
+ *   que se filtra por `section` y no comparando tres `href` sueltos;
  * - la insignia de avisos solo aparece con algo sin leer, porque una insignia que
  *   enseña un cero es una insignia que enseña nada.
  */
@@ -96,15 +99,15 @@ function buildNavItems({
 }: { roles: readonly string[]; unread: number; mensajes: number }) {
   const puedeAdministrar = hasAdminRole(roles);
 
-  return APP_NAV_ITEMS.filter((item) => item.href !== ADMIN_HREF || puedeAdministrar).map(
-    (item) => {
-      if (item.href === AVISOS_HREF && unread > 0) return { ...item, badge: unread };
-      /* Los mensajes llevan la suya, y por el mismo criterio: sin nada sin leer no
+  return APP_NAV_ITEMS.filter(
+    (item) => item.section !== SECTION_ADMINISTRACION || puedeAdministrar,
+  ).map((item) => {
+    if (item.href === AVISOS_HREF && unread > 0) return { ...item, badge: unread };
+    /* Los mensajes llevan la suya, y por el mismo criterio: sin nada sin leer no
        hay insignia, porque una que enseña un cero no informa de nada. */
-      if (item.href === CHAT_HREF && mensajes > 0) return { ...item, badge: mensajes };
-      return item;
-    },
-  );
+    if (item.href === CHAT_HREF && mensajes > 0) return { ...item, badge: mensajes };
+    return item;
+  });
 }
 
 /**

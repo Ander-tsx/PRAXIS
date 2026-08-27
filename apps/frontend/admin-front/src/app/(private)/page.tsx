@@ -78,8 +78,17 @@ export default async function UsersPage({ searchParams }: PageProps) {
 
   const api = createServerApiClient();
 
-  const [{ items, total }, enTotal, suspendidas, bajas] = await Promise.all([
-    api.get<AdminUserPage>(`/admin/users?${params.toString()}`),
+  const [listado, enTotal, suspendidas, bajas] = await Promise.all([
+    /**
+     * ⚠️ **Con su propio `catch`, igual que las tres cifras.** Sin él, que
+     * admin-service estuviera caído tumbaba la pantalla entera con un 500 en
+     * vez de enseñar la tabla vacía con un aviso — la misma trampa que ya
+     * evitaban las tres cifras de al lado, pero se había colado justo en la
+     * consulta principal.
+     */
+    api
+      .get<AdminUserPage>(`/admin/users?${params.toString()}`)
+      .catch(() => null),
     /* `limit=1`: de estas tres solo se mira el `total`. Y cada una con su propio
        `catch`: que no se pueda contar una no puede llevarse a las otras ni, mucho
        menos, tumbar el listado. */
@@ -87,6 +96,9 @@ export default async function UsersPage({ searchParams }: PageProps) {
     contar(api, '/admin/users?status=SUSPENDED&limit=1'),
     contar(api, '/admin/users?status=INACTIVE&limit=1'),
   ]);
+
+  const items = listado?.items ?? [];
+  const total = listado?.total ?? 0;
 
   /** Conserva los filtros al cambiar de página: perderlos es el fallo clásico. */
   const hrefFor = (destino: number) => {
@@ -102,7 +114,6 @@ export default async function UsersPage({ searchParams }: PageProps) {
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
         <AdminHeader
-          activo="cuentas"
           titulo="Cuentas"
           descripcion="Quién puede entrar, con qué rol y con qué plan. Suspender es reversible; borrar no existe aquí."
           cifras={[
@@ -126,7 +137,11 @@ export default async function UsersPage({ searchParams }: PageProps) {
           nombrePlural="cuentas"
         />
 
-        {items.length === 0 ? (
+        {listado === null ? (
+          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+            No se pudieron cargar las cuentas. Vuelve a intentarlo.
+          </p>
+        ) : items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
             {busqueda || estadoFiltro
               ? 'Ninguna cuenta encaja con lo que buscas.'

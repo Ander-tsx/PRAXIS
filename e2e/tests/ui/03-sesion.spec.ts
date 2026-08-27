@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { request as contextoDePeticion } from '@playwright/test';
 import { registrar } from '../../fixtures/api';
-import { campos, crearCuentaYEntrar, crearProyectoEnLaInterfaz } from '../../fixtures/ui';
+import { campos, crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
 
 /**
  * El recorrido completo en navegador: crear cuenta, entrar, moverse entre zonas
@@ -160,7 +160,7 @@ test.describe('Proyectos desde la interfaz', () => {
     await crearCuentaYEntrar(page);
 
     const nombre = `Proyecto UI ${Date.now().toString(36)}`;
-    await crearProyectoEnLaInterfaz(page, nombre);
+    await crearProyectoParaLaPrueba(page, nombre);
 
     await expect(page.getByText(nombre)).toBeVisible({ timeout: 30_000 });
   });
@@ -175,7 +175,7 @@ test.describe('Proyectos desde la interfaz', () => {
     await crearCuentaYEntrar(page);
 
     const nombre = `Rediseño del panel ${Date.now().toString(36)}`;
-    await crearProyectoEnLaInterfaz(page, nombre);
+    await crearProyectoParaLaPrueba(page, nombre);
 
     /* Por rol y no por texto: la tarjeta del proyecto es un enlace, y
        `getByText` casaba también con el campo del diálogo que se está cerrando
@@ -220,7 +220,7 @@ test.describe('Las personas de un proyecto', () => {
     const email = await crearCuentaYEntrar(page);
 
     const nombre = `Proyecto con gente ${Date.now().toString(36)}`;
-    await crearProyectoEnLaInterfaz(page, nombre);
+    await crearProyectoParaLaPrueba(page, nombre);
     /* Por rol y no por texto: la tarjeta del proyecto es un enlace, y
        `getByText` casaba también con el campo del diálogo que se está cerrando
        —el clic caía en la nada y la página se quedaba en `/projects`—. Buscar

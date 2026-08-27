@@ -11,10 +11,8 @@ import { MyInvitations } from '@/components/organisms/MyInvitations';
 import { NotificationList } from '@/components/organisms/NotificationList';
 import { QuickAccess } from '@/components/organisms/QuickAccess';
 import { TaskAlerts } from '@/components/organisms/TaskAlerts';
-import { VoiceCallout } from '@/components/organisms/VoiceCallout';
 import { WorkPulse } from '@/components/organisms/WorkPulse';
 import { agruparPorDia } from '@/lib/notifications';
-import { type VoiceLink, estaActiva } from '@/lib/voice';
 import { MAX_TAREAS_DEL_PANEL, splitWork } from '@/lib/work';
 import {
   AppHeader,
@@ -158,7 +156,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const paginaAvisos = Math.max(1, Number.parseInt(String(params[PARAM_PAGINA] ?? '1'), 10) || 1);
   const soloSinLeer = params[PARAM_FILTRO] === SIN_LEER;
 
-  const [page, invitations, voiceLinks, misTareas, inbox] = await Promise.all([
+  const [page, invitations, misTareas, inbox] = await Promise.all([
     /**
      * Ya viene filtrado por el backend: proyectos donde el usuario es **dueño o
      * miembro**. Antes había que filtrar aquí por `ownerId` porque `GET /projects`
@@ -170,11 +168,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     api
       .get<MyInvitation[]>('/me/invitations')
       .catch(() => [] as MyInvitation[]),
-    /* Si alexa-service no responde no se enseña el aviso: es mejor no decir
-       nada que invitar a vincular contra un servicio que está caído. */
-    api
-      .get<VoiceLink[]>('/alexa/links')
-      .catch(() => [] as VoiceLink[]),
     /**
      * Tu trabajo abierto, **de una sola petición**.
      *
@@ -233,11 +226,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   );
 
   const name = displayName(profile);
-
-  /* El aviso de voz solo mientras no haya ninguna vinculación viva. Una
-     revocada o caducada no cuenta: si la única que había se revocó, volver a
-     ofrecerlo es justo lo que toca. */
-  const sinVoz = !voiceLinks.some(estaActiva);
 
   /**
    * Las caras de esta pantalla, en **una sola** petición.
@@ -373,10 +361,6 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 espacios={totals.workspaces}
                 miembros={totals.members}
               />
-
-              {/* Detrás de los accesos: aquello se usa a diario y esto es una
-                  función que descubrir una vez. */}
-              {sinVoz && <VoiceCallout />}
             </aside>
           </div>
         )}

@@ -357,7 +357,26 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
+    /**
+     * ⚠️ **Se espera al catálogo antes de tocar nada dentro del panel.**
+     *
+     * El panel dibuja «Añadir condición» de inmediato, pero los campos que una
+     * condición puede usar salen del catálogo que pide por API. Un clic en esa
+     * ventana añade una fila sin metadatos, y cuando el catálogo aterriza el
+     * panel reinicializa su estado y la fila desaparece: el fallo sale como un
+     * timeout esperando el desplegable de una condición que sí se pidió, y no
+     * menciona el catálogo por ningún lado.
+     *
+     * «Margen de aviso» es la señal porque **es** catálogo: es el campo de
+     * configuración del disparador por defecto, así que no existe hasta que ha
+     * llegado. Las demás pruebas de este archivo se libran por casualidad —
+     * `rellenarReglaMinima` gasta tres interacciones antes de llegar aquí—.
+     */
+    await expect(page.getByRole('spinbutton', { name: /^Margen de aviso/ })).toBeVisible();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
+    /* Y se confirma que la fila está: si el clic se pierde otra vez, el fallo
+       lo dice aquí en vez de tres líneas más abajo hablando de un combobox. */
+    await expect(page.getByRole('combobox', { name: 'Campo' })).toBeVisible();
     await page.getByRole('combobox', { name: 'Campo' }).click();
     await page.getByRole('option', { name: 'Número de encargados' }).click();
 
@@ -395,7 +414,26 @@ test.describe('Reglas del proyecto', () => {
     await page.goto(`/projects/${mundo.proyecto.id}?tab=reglas`);
 
     await page.getByRole('button', { name: 'Nueva regla' }).click();
+    /**
+     * ⚠️ **Se espera al catálogo antes de tocar nada dentro del panel.**
+     *
+     * El panel dibuja «Añadir condición» de inmediato, pero los campos que una
+     * condición puede usar salen del catálogo que pide por API. Un clic en esa
+     * ventana añade una fila sin metadatos, y cuando el catálogo aterriza el
+     * panel reinicializa su estado y la fila desaparece: el fallo sale como un
+     * timeout esperando el desplegable de una condición que sí se pidió, y no
+     * menciona el catálogo por ningún lado.
+     *
+     * «Margen de aviso» es la señal porque **es** catálogo: es el campo de
+     * configuración del disparador por defecto, así que no existe hasta que ha
+     * llegado. Las demás pruebas de este archivo se libran por casualidad —
+     * `rellenarReglaMinima` gasta tres interacciones antes de llegar aquí—.
+     */
+    await expect(page.getByRole('spinbutton', { name: /^Margen de aviso/ })).toBeVisible();
     await page.getByRole('button', { name: 'Añadir condición' }).click();
+    /* Y se confirma que la fila está: si el clic se pierde otra vez, el fallo
+       lo dice aquí en vez de tres líneas más abajo hablando de un combobox. */
+    await expect(page.getByRole('combobox', { name: 'Campo' })).toBeVisible();
 
     /* «Prioridad» es un enum: comparaciones de igualdad y pertenencia, sin
        mayor/menor. */

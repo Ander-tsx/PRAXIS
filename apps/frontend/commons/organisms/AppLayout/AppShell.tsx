@@ -7,6 +7,7 @@ import { Avatar } from '../../atoms/Avatar';
 import { LivePresences, LiveSource } from '../../realtime';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
+import { KylooWordmark } from '../KylooWordmark';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
 import type { AppNavItem } from './navigation';
@@ -312,15 +313,26 @@ function ArmazonInterno({
            * esta franja cuando está plegada.
            */}
           <div
-            className={`flex h-16 items-center border-b border-border ${
-              plegada ? 'justify-center px-0' : 'justify-between px-6'
+            className={`flex items-center border-b border-border ${
+              plegada ? 'h-16 justify-center px-0' : 'justify-between px-6 py-4'
             }`}
           >
-            {!plegada && <Wordmark />}
+            {!plegada && (
+              <div className="flex flex-col items-start gap-1.5">
+                <Wordmark />
+                <ByKyloo />
+              </div>
+            )}
             <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
-          <div className={`flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}>
+          <div className={plegada ? 'px-2 pt-4' : 'px-4 pt-4'}>
+            <OrgSwitcher name={user.name} plegada={plegada} />
+          </div>
+
+          <div
+            className={`scrollbar-none flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}
+          >
             <NavList
               navItems={navItemsVivos}
               activePath={activePathDeSecciones}
@@ -408,8 +420,11 @@ function ArmazonInterno({
 
             <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-surface p-4">
               <div className="flex flex-col gap-6">
-                <div className="flex items-center justify-between">
-                  <Wordmark />
+                <div className="flex items-start justify-between">
+                  <div className="flex flex-col items-start gap-1.5">
+                    <Wordmark />
+                    <ByKyloo />
+                  </div>
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(false)}
@@ -428,6 +443,8 @@ function ArmazonInterno({
                     </svg>
                   </button>
                 </div>
+
+                <OrgSwitcher name={user.name} plegada={false} />
 
                 <NavList
                   navItems={navItemsVivos}
@@ -503,11 +520,96 @@ function UserCard({
   );
 }
 
+/**
+ * El mismo logotipo que navbar/footer de la landing — `var(--font-grotesk)`
+ * (Archivo 800), no `font-display` (Redaction 50, la voz del resto de la
+ * app): el nombre de Praxis es una marca, no un titular, y las dos zonas
+ * donde aparece tienen que decir lo mismo. Morado (`text-primary`) porque
+ * aquí, a diferencia de la landing, la aplicación sí tiene color de marca.
+ */
 function Wordmark() {
   return (
-    <span className="select-none font-serif text-xl font-black tracking-tight text-primary">
-      PRAXIS
+    <span
+      className="select-none text-lg font-extrabold tracking-tight text-primary"
+      style={{ fontFamily: 'var(--font-grotesk)' }}
+    >
+      Praxis
     </span>
+  );
+}
+
+/**
+ * "By Kyloo" — el mismo lettermark real que el cierre del footer de la
+ * landing y `AuthPanel` (`kyloo-design/SKILL.md` §8, §12), a escala de
+ * esquina de barra lateral. Cada zona que monta `AppShell` tiene que cargar
+ * Archivo y Khteka en su propio `layout.tsx` — sin la variable, el texto cae
+ * a su *fallback* en silencio, no revienta.
+ */
+function ByKyloo() {
+  return (
+    <span className="flex items-center gap-1.5 text-text-disabled">
+      <span className="font-mono text-[0.55rem] uppercase tracking-[0.18em]">By</span>
+      <KylooWordmark className="h-2.5 w-auto" />
+    </span>
+  );
+}
+
+/**
+ * El selector de organización — **solo visual, por ahora**. Organizaciones
+ * no existe todavía a nivel de backend, así que no hay nada real a lo que
+ * cambiar: un desplegable que se abre y no lleva a ninguna parte sería peor
+ * que no tener desplegable. Cuando exista el concepto, este componente pasa
+ * a ser interactivo sin cambiar de sitio en el armazón.
+ *
+ * Plegada, se reduce al cuadrado con la inicial — mismo criterio que la
+ * ficha de usuario del pie.
+ */
+function OrgSwitcher({ name, plegada }: { name: string; plegada: boolean }) {
+  const primerNombre = name.trim().split(' ')[0];
+  const orgName = primerNombre ? `Organización de ${primerNombre}` : 'Mi organización';
+  const inicial = (primerNombre || 'P').charAt(0).toUpperCase();
+
+  const cuadro = (
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm"
+      style={{ background: colors.primary, color: colors.primaryForeground }}
+      aria-hidden="true"
+    >
+      {inicial}
+    </span>
+  );
+
+  if (plegada) {
+    return (
+      <div className="flex justify-center" title={`${orgName} — Plan gratuito`}>
+        {cuadro}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5"
+      title="Cambiar de organización — próximamente"
+    >
+      {cuadro}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="font-sans text-[10px] text-text-secondary">Plan gratuito</span>
+        <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
+          {orgName}
+        </span>
+      </div>
+      <svg
+        className="h-4 w-4 shrink-0 text-text-disabled"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+      </svg>
+    </div>
   );
 }
 

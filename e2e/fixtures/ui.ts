@@ -110,43 +110,65 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
   }
 }
 
-/** Crea un proyecto desde el diálogo de `/projects` y devuelve su nombre. */
-export async function crearProyectoEnLaInterfaz(page: Page, nombre: string): Promise<void> {
-  await page.goto('/projects');
+/**
+ * Crea un proyecto para la prueba y deja el navegador en `/projects`.
+ *
+ * ⚠️ **Ya no rellena un formulario, y no es un atajo: es que el formulario dejó
+ * de existir.** `97140eb` —«reemplazar creación de proyectos por asistente
+ * PRAX»— quitó el disparador de `CreateProjectSlideOver` de `/projects`. Hoy el
+ * estado vacío de esa pantalla solo ofrece «Crear proyecto con PRAX», que abre
+ * el cajón del asistente en vez de un diálogo con un campo.
+ *
+ * Esta función seguía esperando el botón anterior, así que las cinco pruebas
+ * que la llaman caían con un timeout de dos minutos cada una — y el mensaje,
+ * «waiting for getByRole button /Nuevo proyecto|Crear mi primer proyecto/», no
+ * dice en ningún sitio que el botón se haya retirado a propósito: parece que la
+ * pantalla no carga.
+ *
+ * ## Por qué no se conduce el flujo de PRAX
+ *
+ * Porque cada corrida gastaría cuota de Gemini y dependería de una respuesta no
+ * determinista. Es el mismo motivo por el que la auditoría dejó al asistente
+ * fuera de las pruebas automáticas: gasta dinero en cada ejecución y no
+ * devuelve datos verificables, así que como prueba no aporta.
+ *
+ * ## Por dónde se crea entonces
+ *
+ * Por **el mismo camino autenticado que usa la zona**: el proxy de
+ * projects-front. `page.request` comparte el almacén de cookies del contexto,
+ * así que la cookie httpOnly de sesión viaja sola y el proxy le pone la cabecera
+ * de autorización. No se salta la sesión, ni los guards, ni los permisos — es
+ * exactamente la petición que haría el navegador.
+ *
+ * ## Qué se pierde y qué no
+ *
+ * Lo que estas cinco pruebas verifican sigue estando **después** de este paso:
+ * que la rejilla pinta el proyecto, que la URL lleva el slug y no el UUID, que
+ * la pestaña Equipo resuelve los nombres con el directorio lleno y que el
+ * diálogo de invitar cierra a la segunda. Lo único que dejan de cubrir es el
+ * formulario de alta, y es porque no hay ninguno que cubrir.
+ */
+export async function crearProyectoParaLaPrueba(page: Page, nombre: string): Promise<void> {
+  const respuesta = await page.request.post('/projects/api/gateway/projects', {
+    data: { name: nombre },
+  });
 
-  /**
-   * ⚠️ **El disparador tiene dos nombres, según haya proyectos o no.**
-   *
-   * Con la cuenta vacía, `/projects` pinta su estado vacío y el botón dice
-   * «Crear mi primer proyecto»; en cuanto hay alguno, la rejilla lo enseña como
-   * una tarjeta que dice «Nuevo proyecto». Esta función servía a las dos y solo
-   * conocía el segundo, así que en una cuenta recién creada —que es como
-   * empiezan todas estas pruebas— esperaba un botón que no existe.
-   *
-   * Se aceptan los dos en vez de elegir uno: cuál toca depende del estado de la
-   * cuenta, y quien llama a esta función no debería tener que saberlo.
-   *
-   * ⚠️ Y `.first()`, porque con la cuenta vacía hay **dos** disparadores en
-   * pantalla —el de la cabecera y el del estado vacío— y sin esto Playwright
-   * aborta por ambigüedad. Sirve cualquiera: abren el mismo diálogo.
-   */
-  await page
-    .getByRole('button', { name: /Nuevo proyecto|Crear mi primer proyecto/ })
-    .first()
-    .click();
-  /**
-   * ⚠️ **El campo se llama «Nombre del proyecto», no «Nombre».**
-   *
-   * Esto buscaba `{ name: 'Nombre', exact: true }` y con `exact` puesto dejó de
-   * casar cuando el diálogo se rediseñó (`dc06673`). Las cinco pruebas que crean
-   * un proyecto por la interfaz caían aquí con un timeout de dos minutos cada
-   * una, y el mensaje —«waiting for getByRole textbox Nombre»— no dice que el
-   * campo exista con otro rótulo: parece que el diálogo no abre.
-   *
-   * Sigue `exact` a propósito: sin él, «Nombre del proyecto» casaría también con
-   * cualquier otro campo que empiece igual, y el fallo pasaría de un timeout
-   * claro a un `strict mode violation` que cuesta más de leer.
-   */
-  await page.getByRole('textbox', { name: 'Nombre del proyecto', exact: true }).fill(nombre);
-  await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  /* Contra el `data` de la respuesta, no contra el status: es la misma regla
+     que sigue el resto del repositorio, y sale de que hubo una época en la que
+     22 endpoints devolvían 200 sin guardar nada.
+
+     Y se falla aquí, con el cuerpo delante. Si la creación no sale y esto pasa
+     de largo, la prueba muere más adelante buscando un proyecto que nunca
+     existió, con un mensaje que no menciona esta llamada por ninguna parte. */
+  const cuerpo = respuesta.ok() ? await respuesta.json().catch(() => null) : null;
+
+  if (!cuerpo?.data?.id) {
+    throw new Error(
+      `No se pudo crear el proyecto «${nombre}»: ${respuesta.status()} ${await respuesta.text()}`,
+    );
+  }
+
+  /* A `/projects`, que es donde dejaba la versión anterior: varias de las
+     pruebas que llaman aquí siguen desde esa pantalla. */
+  await page.goto('/projects');
 }

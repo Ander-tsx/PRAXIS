@@ -14,4 +14,6 @@ export * from './CreateProjectSlideOver';
 export * from './TemplatePlanReview';
 export * from './LogoutButton';
 export * from './NotFound';
+export * from './KylooWordmark';
 export * from './ProjectCard';
+export * from './ShaderCanvas';

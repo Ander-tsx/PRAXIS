@@ -72,13 +72,18 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   /* Las tres de contexto salen en paralelo con la principal, con `limit=1`
      —solo se mira el `total`— y cada una degrada por su cuenta. Ver la nota
-     equivalente en la pantalla de Cuentas. */
-  const [{ items, total }, enTotal, suspendidos, archivados] = await Promise.all([
-    api.get<AdminProjectPage>(`/admin/projects?${params.toString()}`),
+     equivalente en la pantalla de Cuentas.
+     ⚠️ La principal también lleva su propio `catch`, por la misma razón que
+     ahí: sin él, admin-service caído tumbaba la pantalla entera con un 500. */
+  const [listado, enTotal, suspendidos, archivados] = await Promise.all([
+    api.get<AdminProjectPage>(`/admin/projects?${params.toString()}`).catch(() => null),
     contar(api, '/admin/projects?limit=1'),
     contar(api, '/admin/projects?status=SUSPENDED&limit=1'),
     contar(api, '/admin/projects?status=DELETED&limit=1'),
   ]);
+
+  const items = listado?.items ?? [];
+  const total = listado?.total ?? 0;
 
   /** Conserva los filtros al cambiar de página: perderlos es el fallo clásico. */
   const hrefFor = (destino: number) => {
@@ -94,7 +99,6 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
     <AppHeader title="Administración">
       <div className="flex flex-col gap-6">
         <AdminHeader
-          activo="proyectos"
           titulo="Proyectos"
           descripcion="El inventario completo, archivados incluidos. Suspender y archivar son reversibles; el borrado de verdad es del dueño y no vive aquí."
           cifras={[
@@ -116,7 +120,11 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
           nombrePlural="proyectos"
         />
 
-        {items.length === 0 ? (
+        {listado === null ? (
+          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+            No se pudieron cargar los proyectos. Vuelve a intentarlo.
+          </p>
+        ) : items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
             {busqueda || estadoFiltro
               ? 'Ningún proyecto encaja con lo que buscas.'

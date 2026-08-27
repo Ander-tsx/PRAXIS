@@ -1,178 +1,252 @@
 # Estructura del proyecto
 
-Este documento explica para qué sirve cada carpeta y qué tipo de archivos viven dentro. Está pensado como referencia rápida: antes de crear un archivo nuevo, revisa aquí dónde debería ir.
+Para qué sirve cada carpeta y qué vive dentro. Es la referencia que se consulta
+**antes de crear un archivo nuevo**, para no abrir una carpeta paralela a una que
+ya existe.
+
+> Este documento describe el repositorio **como está**, no como se planeó. Si
+> encuentras una discrepancia, gana el repositorio: corrige este archivo.
 
 ---
 
-## Raíz del proyecto
+## Raíz
 
 ```
-proyecto/
-├── apps/         → todo el código que se ejecuta (frontend, backend, mobile)
-├── packages/     → código compartido entre varias apps
-├── infra/        → configuración de servidores, Docker, CI/CD
-├── agents/       → reglas y guías para que la IA ayude mejor al equipo
-├── docs/         → documentación oficial del proyecto
-├── scripts/      → scripts de automatización del repo
-├── stubs/        → plantillas para generar nuevas apps o módulos
-├── .agents/      → skills de agentes (Cursor, Claude Code)
-├── .claude/      → configuración de Claude Code para este proyecto
-├── .husky/       → validaciones automáticas antes de hacer commit
-└── .planning/    → planificación del proyecto (fases, milestones)
+PRAXIS/
+├── apps/            → todo el código que se ejecuta
+├── packages/        → configuración compartida entre apps
+├── infra/           → Docker, Terraform y Cloud Build
+├── e2e/             → las pruebas de punta a punta (Playwright)
+├── scripts/         → automatización del repositorio
+├── docs/            → documentación técnica
+├── stubs/           → plantillas de scaffolding
+├── security/        → reservado (vacío)
+├── .planning/       → planificación por etapas
+├── .claude/         → configuración de Claude Code para este repositorio
+├── CLAUDE.md        → contexto de trabajo: convenciones y trampas conocidas
+├── STRUCTURE.md     → este archivo
+├── README.md        → presentación, instalación y comandos
+├── turbo.json       → grafo de tareas del monorepo
+├── biome.json       → formato y linting (2 espacios, ancho 100)
+└── pnpm-workspace.yaml
 ```
 
 ---
 
-## `apps/` — El código que se ejecuta
+## `apps/` — el código que se ejecuta
 
-Todo lo que corre como aplicación vive aquí, separado por capa.
+### `apps/frontend/` — ocho aplicaciones Next.js 16
 
-### `apps/frontend/`
+**Multi-Zones, no Module Federation.** Cada zona es una app de Next independiente
+con su propio `basePath`, su propio `package.json` y su propio puerto. El
+`web-shell` las sirve todas bajo un único origen mediante `rewrites()`. Cada una
+se puede levantar sola.
 
-El frontend está dividido en piezas independientes llamadas **microfrontends**. Cada uno es una mini-aplicación de Next.js que se carga dentro del shell principal.
+| Carpeta | Ruta pública | Puerto | Qué es |
+|---|---|---|---|
+| `web-shell/` | `/` | 4100 | La cáscara: landing pública, `rewrites()` y renovación de sesión. **No sirve páginas de negocio.** |
+| `auth-front/` | `/auth` | 4101 | Entrar, registrarse, Google OAuth, verificación de correo |
+| `dashboard-front/` | `/dashboard` | 4102 | Panel, avisos, invitaciones, ajustes, vinculación con Alexa |
+| `projects-front/` | `/projects` | 4103 | Catálogo, tablero Kanban, tareas, miembros, reglas |
+| `reports-front/` | `/reports` | 4104 | Análisis: lienzo de gráficos y pronóstico Monte Carlo |
+| `admin-front/` | `/admin` | 4105 | Administración de la plataforma (rol global) |
+| `chat-front/` | `/chat` | 4106 | Mensajería en tiempo real por SSE |
+| `assistant-front/` | `/assistant` | 4107 | PRAX, el asistente conversacional |
 
-| Carpeta | Qué es |
+Dentro de cada zona:
+
+```
+<zona>/src/
+├── app/                     → rutas del App Router. Aquí vive la lógica de negocio
+│   └── api/gateway/[...path]/route.ts   → el proxy autenticado de la zona
+├── components/
+│   ├── organisms/           → piezas con estructura, propias del dominio de la zona
+│   └── templates/           → composición de una pantalla
+├── lib/                     → utilidades de la zona
+└── proxy.ts                 → el guard de la zona
+```
+
+### `apps/frontend/commons/` — lo que comparten las ocho zonas
+
+| Carpeta | Qué contiene |
 |---|---|
-| `web-shell/` | La app principal de Next.js. Maneja la navegación, el login y carga los microfrontends. Es el "contenedor". |
-| `commons/` | Componentes, hooks y utilidades que comparten todos los microfrontends (botones, formularios, cliente de API, etc.). |
-| `*-front/` | Cada microfrontend de negocio (ej: `pagos-front/`, `usuarios-front/`). Se crean cuando se necesitan. |
+| `atoms/` | Piezas sin estructura: `Button`, `Input`, `Avatar`, `Badge`, `Select`… |
+| `molecules/` | Composiciones reutilizables: `AuthForm`, `DataTable`, `Dialog`, `ThemeToggle`… |
+| `organisms/` | Solo lo que usan **≥2 zonas**: `AppLayout`, `ChatPanel`, `LiveNotices`… |
+| `api/` | Cliente del gateway, rutas (`routes.ts`) y tipos de dominio |
+| `auth/` | Sesión y cliente de servidor. **Código de servidor: nunca se importa desde un componente cliente** |
+| `hooks/` | `useAccion`, `useRefrescoAgrupado` y demás |
+| `tokens/` | Colores y espaciados como valores de TypeScript |
+| `styles/` | `theme.css` — los tokens de Tailwind v4, declarados **una sola vez** |
+| `realtime/`, `assistant/`, `billing/`, `theme/`, `template/` | Piezas de cada dominio transversal |
 
-> **Archivos típicos:** componentes `.tsx`, páginas en `app/`, estilos `.css`, tests `.spec.tsx`
+> **Atomic Design con una regla de ascenso:** un organismo sube a
+> `commons/organisms/` solo cuando lo usan dos zonas o más. Antes de eso vive en
+> la zona que lo usa.
 
----
+> **La lógica de negocio (fetch, estado, validación) vive solo en las pages.**
+> Moléculas y organismos reciben slots `ReactNode` y props.
 
-### `apps/backend/`
+### `apps/backend/` — un gateway y ocho microservicios
 
-El backend está dividido en **microservicios**: procesos independientes que cada uno hace una sola cosa.
+```
+apps/backend/
+├── gateway/                 → :3000 · la única puerta HTTP pública
+└── services/
+    ├── credentials/         → :3001 · identidad, contraseñas, JWT, sesiones
+    ├── permissions/         → :3002 · roles globales y de proyecto, auditoría
+    ├── projects/            → :3003 · proyectos, espacios, tableros, chat, SSE
+    ├── tasks/               → :3004 · tareas, checklists, etiquetas, adjuntos
+    ├── reports/             → :3005 · agregador. Sin tablas propias
+    ├── assistant/           → :3006 · el único que habla con Gemini
+    ├── alexa/               → :3007 · solo lectura, para la skill de voz
+    └── automation/          → :3008 · motor de reglas
+```
 
-| Carpeta | Qué es |
+Los servicios **no se hablan por HTTP**: el gateway les habla por **TCP nativo de
+NestJS** (`Transport.TCP`). Redis es para sesiones, caché y el stream de hechos,
+no para el transporte entre servicios.
+
+Dentro de un servicio:
+
+```
+services/<x>/
+├── prisma/
+│   ├── schema.prisma        → su schema de PostgreSQL, aislado del resto
+│   ├── migrations/          → sus migraciones, independientes
+│   └── seed.ts              → sus datos de arranque
+└── src/
+    ├── main.ts              → arranque del microservicio TCP
+    ├── app.module.ts
+    ├── <dominio>/           → módulo, controlador (patrones TCP) y servicio
+    └── generated/           → cliente Prisma. NO versionado: `pnpm prisma:generate`
+```
+
+### `apps/backend/commons/` — librerías internas del backend
+
+| Paquete | Qué publica |
 |---|---|
-| `gateway/` | El punto de entrada. Recibe todas las peticiones HTTP del frontend, valida el token de sesión y las redirige al microservicio correcto. |
-| `commons/contracts/` | Los "contratos" entre servicios: define la forma de los datos que se envían y reciben (DTOs). Si un servicio le manda datos a otro, la estructura se declara aquí. |
-| `commons/observability/` | Logger y trazas compartidas. Todos los servicios usan esto para registrar lo que hacen. |
-| `commons/security/` | Guards de autenticación y utilidades de criptografía compartidas. |
-| `services/` | Cada microservicio de negocio vive aquí en su propia subcarpeta (ej: `services/pagos/`, `services/usuarios/`). |
-| `test/` | Tests de integración que prueban varios servicios juntos, no uno solo. |
+| `contracts/` | Los DTOs y los patrones de mensaje TCP. Es **el contrato entre servicios** |
+| `observability/` | El logger Pino compartido |
+| `domain-events/` | El tipo y la validación de un hecho de dominio |
 
-> **Archivos típicos:** módulos `.module.ts`, controladores `.controller.ts`, servicios `.service.ts`, DTOs `.dto.ts`, tests `.spec.ts`
+> Los tres publican `dist/`. Por eso `pnpm build:shared` es obligatorio antes de
+> arrancar el backend: sin él, los servicios mueren con
+> `Cannot find module '@praxis/contracts'`.
 
----
+### `apps/PraxisSkill/` — la skill de Alexa
 
-### `apps/frontend/commons/` y `apps/backend/commons/`
-
-Son librerías internas. La diferencia con `packages/` es que estas son exclusivas de su capa: `frontend/commons` solo la usan los microfrontends, `backend/commons` solo la usan los microservicios.
-
----
-
-### `apps/mobile/`
-
-La app móvil en Flutter. Misma idea que el frontend web: un shell que carga plugins de negocio.
-
-| Carpeta | Qué es |
-|---|---|
-| `app-shell/` | App Flutter principal: navegación, login, permisos del dispositivo. |
-| `commons/` | Design system y utilidades compartidas entre plugins. |
-| `plugins/` | Cada funcionalidad de negocio como plugin independiente. |
-
----
-
-### `apps/e2e/`
-
-Tests end-to-end: simulan un usuario real usando la aplicación completa (frontend + backend). No testean partes sueltas, testean flujos enteros como "el usuario se registra y ve su dashboard".
-
-> **Archivos típicos:** tests de Playwright o Cypress (`.spec.ts`)
-
----
+La Lambda, el modelo de interacción (`es-MX` y `en-US`) y la plantilla de
+CloudFormation. Habla con el gateway por `voiceToken`, nunca con la base.
 
 ### `apps/addons/project-dev-stack/`
 
-Un CLI interno para levantar todo el entorno local con un solo comando (`pnpm dev:stack`). En lugar de iniciar manualmente la base de datos, el gateway y cada servicio, este script lo hace por ti.
+Vacío (`.gitkeep`). El CLI de desarrollo acabó viviendo en `scripts/dev-cli/`.
 
 ---
 
-## `packages/` — Código compartido entre frontend y backend
-
-A diferencia de `commons/`, estos paquetes pueden ser usados por cualquier app del monorepo, sin importar si es frontend, backend o mobile.
+## `packages/` — configuración compartida
 
 | Carpeta | Qué contiene |
 |---|---|
-| `shared-schemas/` | Definiciones de estructura de datos en JSON Schema u OpenAPI que tanto el frontend como el backend entienden. |
-| `shared-protos/` | Definiciones de gRPC para comunicación entre microservicios (si se usa). |
-| `shared-devtools/` | Configuraciones compartidas de TypeScript, Biome (linter), y generadores de código. |
+| `shared-devtools/tsconfig/` | Las bases de TypeScript: `base`, `nestjs`, `nextjs` |
+| `shared-devtools/database/` | Utilidades de base compartidas |
+| `shared-protos/`, `shared-schemas/` | Vacíos (`.gitkeep`). Reservados |
 
-> Regla práctica: si un archivo lo necesitan dos apps de capas distintas → va en `packages/`. Si solo lo necesita el backend → va en `apps/backend/commons/`.
+> Regla: si lo necesitan dos apps de **capas distintas** → `packages/`. Si solo
+> lo necesita el backend → `apps/backend/commons/`.
 
 ---
 
-## `infra/` — Infraestructura
+## `infra/` — infraestructura
 
-Todo lo relacionado con cómo se despliega y opera el sistema. El equipo de desarrollo normalmente no toca esto en las primeras etapas.
+| Carpeta | Qué contiene | Estado |
+|---|---|---|
+| `docker/compose/` | `docker-compose.yml`: PostgreSQL 16 y Redis 7 para local | **En uso** |
+| `docker/images/` | Los `Dockerfile` multi-etapa | **En uso** |
+| `terraform/` | El aprovisionamiento completo de GCP: red, Cloud SQL, Redis, MIGs, secretos | **En uso** |
+| `ci/` | `cloudbuild.yaml` y `cloudbuild-main.yaml` | **En uso** |
+| `k8s/`, `observability/`, `ci/jenkins/` | Vacíos (`.gitkeep`) | Reservados |
+
+El despliegue real es **GCP con Cloud Build y MIGs**, no Kubernetes.
+
+---
+
+## `e2e/` — pruebas de punta a punta
+
+Playwright, en la raíz y no dentro de `apps/`, porque no es una aplicación: es la
+suite que cruza todas.
+
+```
+e2e/
+├── tests/api/               → 17 ficheros · el contrato del gateway, sin navegador
+├── tests/ui/                → 8 ficheros · recorridos reales en Chromium
+├── fixtures/                → altas, sesiones, sembrado y el manejo del 429 de login
+├── limpieza.ts              → barrido de las cuentas que crea cada corrida
+└── playwright.config.ts     → dos proyectos: `api` primero, `ui` después
+```
+
+---
+
+## `scripts/` — automatización del repositorio
+
+| Archivo | Qué hace |
+|---|---|
+| `dev-cli/` | `pnpm dev:cli`: el asistente que levanta el entorno y **espera a que cada puerto responda** |
+| `grant-superadmin.sql` | Concede el rol global de administración. Idempotente |
+| `bootstrap_scaffolding.sh` | El script que generó el esqueleto inicial |
+
+---
+
+## `docs/` — documentación técnica
 
 | Carpeta | Qué contiene |
 |---|---|
-| `docker/compose/` | Archivos `docker-compose.yml` para levantar el sistema localmente o en QA. |
-| `docker/images/` | `Dockerfile` de cada servicio. |
-| `k8s/` | Manifiestos de Kubernetes para producción. |
-| `ci/jenkins/` | Pipeline de integración continua (build, test, deploy automático). |
-| `observability/` | Configuración de métricas (Prometheus), dashboards (Grafana) y trazas (OpenTelemetry). |
+| `frontend/` | `ESTADO-ACTUAL` (arquitectura y deuda), `CONTRATO-API`, `PENDIENTES-BACKEND`, los planes de cada etapa |
+| `backend/` | Modelo de permisos y contratos de cada servicio |
+| `despliegue/` | La guía de GCP, paso a paso |
+| `assets/` | Capturas y diagramas |
+| `AUDITORIA.md` | El registro de la auditoría de seguridad y corrección |
 
 ---
 
-## `agents/` — Guías para trabajar con IA
+## `stubs/` y `security/`
 
-Aquí vive la "memoria institucional" del equipo para que herramientas como Cursor o Claude Code ayuden de forma consistente.
+Vacíos (`.gitkeep`). `stubs/next-ts/` está reservado para la plantilla de una
+zona nueva; el procedimiento real está escrito en ESTADO-ACTUAL §17.7.
 
-| Carpeta | Qué contiene |
+---
+
+## `.planning/` y `.claude/`
+
+`.planning/` guarda la planificación por etapas. `.claude/` es la configuración
+de Claude Code para este repositorio. Ninguno de los dos entra en el build.
+
+---
+
+## Convenciones que atraviesan todo el árbol
+
+**El código en inglés, los comentarios en español.** No es un punto medio: es la
+convención.
+
+| Qué | Idioma |
 |---|---|
-| `rules/` | Reglas de arquitectura, seguridad y estilo que la IA debe seguir. |
-| `checklists/` | Listas de verificación para PRs, releases y revisiones de seguridad. |
-| `prompts/` | Prompts reutilizables para tareas comunes (ej: generar un módulo, corregir un hallazgo de Sonar). |
-| `templates/` | Plantillas de documentos: ADRs (decisiones de arquitectura), contratos de módulo, READMEs. |
-| `development-flow.md` | El flujo oficial del equipo: cómo se pasa de una tarea a un PR mergeado. |
+| Variables, funciones, tipos, props, constantes, nombres de fichero | **Inglés** |
+| Comentarios, JSDoc, documentos y mensajes de commit | **Español** |
+| Textos que ve el usuario y descripciones de Swagger | **Español** |
 
----
+Un identificador es una interfaz: lo lee quien llama, muchas veces sin abrir el
+cuerpo. Un comentario es una explicación: lo lee quien ya está dentro.
 
-## `docs/` — Documentación
-
-Documentación técnica del proyecto: diagramas de arquitectura, decisiones importantes (ADRs), guías de onboarding, y contratos de API.
-
-> No es para notas personales ni borradores. Solo va lo que el equipo completo necesita consultar.
-
----
-
-## `scripts/` — Automatización del repo
-
-Scripts de bash o Node que automatizan tareas del proyecto completo: verificaciones de seguridad, cierre de milestones, validaciones de esquemas. No confundir con los scripts de cada app (esos van en su propio `package.json`).
-
----
-
-## `stubs/` — Plantillas de scaffolding
-
-Plantillas para generar nuevas apps o módulos con la estructura correcta desde el inicio. En lugar de copiar y pegar una carpeta existente (y olvidar cambiar algo), se usa el stub como base.
-
-| Carpeta | Para generar... |
-|---|---|
-| `next-ts/` | Un nuevo microfrontend en Next.js + TypeScript |
-
----
-
-## `.husky/` — Validaciones automáticas de Git
-
-Contiene dos scripts que corren automáticamente cuando haces `git commit`:
-
-- **`pre-commit`**: corre el linter antes de guardar el commit. Si hay errores de formato, el commit no se crea.
-- **`commit-msg`**: valida que el mensaje del commit siga el formato acordado (ej: `feat: agregar login`, `fix: corregir error en pagos`).
-
-> No se editan estos archivos a menos que se quiera cambiar las reglas de validación del equipo.
-
----
-
-## `.planning/`
-
-Archivos de planificación del proyecto: fases, milestones, objetivos por sprint. Son documentos de texto o markdown, no código.
+**Los `.env` no se versionan.** Cada app trae su `.env.example` con todas las
+variables documentadas. El del frontend es `.env.local`, no `.env`: Next no lee
+el segundo en desarrollo.
 
 ---
 
 ## Regla de oro
 
-> **¿No sabes dónde va un archivo?** Pregúntate: ¿es código que se ejecuta → `apps/`? ¿Es compartido entre capas → `packages/`? ¿Es documentación → `docs/`? ¿Es infraestructura → `infra/`?
+> ¿No sabes dónde va un archivo? ¿Es código que se ejecuta → `apps/`? ¿Lo
+> comparten dos capas → `packages/`? ¿Es documentación → `docs/`? ¿Es
+> infraestructura → `infra/`? ¿Lo usan dos zonas del frontend →
+> `apps/frontend/commons/`?

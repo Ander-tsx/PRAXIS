@@ -4,6 +4,12 @@
    Ver apps/frontend/commons/styles/theme.css */
 @import "../../../commons/styles/theme.css";
 
+/* La paleta monocromática de marca (.landing/.landing-light) — la usa
+   AuthPanel para que login/signup se vean como el resto de la superficie
+   pública. Nació en web-shell (kyloo-design/SKILL.md §2), ver el
+   comentario en el propio archivo. */
+@import "../../../commons/styles/landing-theme.css";
+
 /* Solo el código de esta zona: los de commons vienen en theme.css */
 @source "../**/*.tsx";
 
