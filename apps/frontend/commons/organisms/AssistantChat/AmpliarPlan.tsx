@@ -86,7 +86,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
      * el degradado es del primario de la casa a un 12 %, no un cartel.
      */
     <div
-      className="mt-auto flex shrink-0 flex-col gap-4 overflow-hidden rounded-2xl border p-5"
+      className="mt-auto flex shrink-0 flex-col gap-4 overflow-hidden rounded-sm border p-5"
       style={{
         borderColor: alpha(colors.primary, 40),
         background: `linear-gradient(135deg, ${alpha(colors.primary, 12)} 0%, ${alpha(colors.accent, 8)} 100%)`,
@@ -96,7 +96,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+          className="flex size-9 shrink-0 items-center justify-center rounded-sm"
           style={{ background: alpha(colors.primary, 18), color: colors.primary }}
         >
           <svg
@@ -163,7 +163,7 @@ function AvisoDeCuota({ limite, reinicio }: { limite: number; reinicio: string }
   return (
     <p
       role="note"
-      className="mt-auto shrink-0 rounded-xl border px-4 py-3 font-sans text-sm text-warning"
+      className="mt-auto shrink-0 rounded-sm border px-4 py-3 font-sans text-sm text-warning"
       style={{ background: alpha(colors.warning, 8), borderColor: alpha(colors.warning, 30) }}
     >
       Has gastado los <strong>{limite}</strong> mensajes de este mes. Vuelven el{' '}

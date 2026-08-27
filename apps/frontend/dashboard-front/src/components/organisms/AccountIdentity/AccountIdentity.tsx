@@ -125,7 +125,7 @@ export function AccountIdentity({
   const estadoActual = presenceOf(presencia);
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-surface">
+    <section className="overflow-hidden rounded-sm border border-border bg-surface">
       {/**
        * La franja de color.
        *
@@ -138,10 +138,7 @@ export function AccountIdentity({
         aria-hidden="true"
         className="h-24 w-full sm:h-28"
         style={{
-          background: `linear-gradient(115deg, ${alpha(colors.primary, 34)} 0%, ${alpha(
-            colors.primary,
-            10,
-          )} 42%, ${alpha(colors.accent, 22)} 100%)`,
+          background: `linear-gradient(115deg, ${alpha(colors.border, 30)} 0%, ${alpha(colors.borderSubtle, 10)} 100%)`,
         }}
       >
         {/* Una trama diagonal muy suave: sin ella, el degradado a 1400 px de
@@ -252,8 +249,8 @@ export function AccountIdentity({
             className="rounded-lg border px-3 py-2 font-sans text-sm"
             style={{
               color: colors.error,
-              background: alpha(colors.error, 10),
-              borderColor: alpha(colors.error, 30),
+              background: 'transparent',
+              borderColor: colors.error,
             }}
           >
             {error}

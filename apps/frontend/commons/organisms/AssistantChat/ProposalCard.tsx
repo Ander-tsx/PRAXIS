@@ -1488,7 +1488,7 @@ function Marco({
   if (estado === 'pendiente' && decididaAntes) {
     return (
       <article
-        className="flex flex-col gap-3 rounded-xl border border-dashed px-4 py-3"
+        className="flex flex-col gap-3 rounded-sm border border-dashed px-4 py-3"
         style={{ borderColor: colors.border }}
       >
         <header className="flex items-center gap-2">
@@ -1509,7 +1509,7 @@ function Marco({
 
   if (estado === 'descartada') {
     return (
-      <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-disabled">
+      <p className="rounded-sm border border-dashed border-border px-4 py-3 font-sans text-sm text-text-disabled">
         {/* «No se ha creado nada» solo valía para la tarea nueva: al descartar
             un cambio de encargado no había nada que crear. */}
         Propuesta descartada. No se ha aplicado nada.
@@ -1522,7 +1522,7 @@ function Marco({
 
   return (
     <article
-      className="flex flex-col gap-3 rounded-xl border p-4"
+      className="flex flex-col gap-3 rounded-sm border p-4"
       style={{
         borderColor: alpha(acento, tono === 'destructivo' ? 45 : 30),
         background: alpha(acento, 6),

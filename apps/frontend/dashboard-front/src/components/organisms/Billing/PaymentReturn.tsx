@@ -79,7 +79,7 @@ export function PaymentReturn({
     return (
       <div
         role="status"
-        className="flex flex-col gap-2 rounded-2xl border px-5 py-4"
+        className="flex flex-col gap-2 rounded-sm border px-5 py-4"
         style={{ background: alpha(colors.success, 10), borderColor: alpha(colors.success, 35) }}
       >
         <h2 className="font-sans text-lg font-semibold text-text-primary">
@@ -108,7 +108,7 @@ export function PaymentReturn({
       <div
         role="status"
         aria-live="polite"
-        className="flex flex-col gap-2 rounded-2xl border px-5 py-4"
+        className="flex flex-col gap-2 rounded-sm border px-5 py-4"
         style={{ background: alpha(colors.primary, 8), borderColor: alpha(colors.primary, 30) }}
       >
         <h2 className="font-sans text-lg font-semibold text-text-primary">Confirmando tu pago…</h2>
@@ -126,7 +126,7 @@ export function PaymentReturn({
   return (
     <div
       role="status"
-      className="flex flex-col gap-2 rounded-2xl border px-5 py-4"
+      className="flex flex-col gap-2 rounded-sm border px-5 py-4"
       style={{ background: alpha(colors.warning, 8), borderColor: alpha(colors.warning, 30) }}
     >
       <h2 className="font-sans text-lg font-semibold text-text-primary">

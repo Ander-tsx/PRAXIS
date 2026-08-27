@@ -799,7 +799,7 @@ export function AssistantChat({
                  scroll se lo queda la página entera, que es justo lo que se
                  quiere evitar en un chat. */
               `flex min-h-0 flex-1 flex-col gap-4 ${enCajon ? 'p-4' : ''}`
-            : 'flex flex-col gap-4 rounded-2xl border p-5'
+            : 'flex flex-col gap-4 rounded-sm border p-5'
         }
         style={
           aPantalla
@@ -942,7 +942,7 @@ export function AssistantChat({
                 aria-label="Empezar una conversación nueva"
                 title="Conversación nueva"
                 disabled={mensajes.length === 0}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-text-secondary transition-colors enabled:hover:bg-surface-elevated enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border text-text-secondary transition-colors enabled:hover:bg-surface-elevated enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 style={{ borderColor: colors.border }}
               >
                 <svg
@@ -972,7 +972,7 @@ export function AssistantChat({
                líneas (~32 px de alto) y un icono suelto de 16 px quedaba
                diminuto y descolgado. Con este tamaño los dos bloques pesan lo
                mismo y la cabecera se lee simétrica. */
-              className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 vista === 'historial'
                   ? 'bg-surface-elevated text-text-primary'
                   : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
@@ -1486,7 +1486,7 @@ export function AssistantChat({
                  * queden abajo con el cursor en vez de subir con el borde.
                  */}
                 <div
-                  className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
+                  className="flex items-end gap-2 rounded-sm border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
                   style={{ background: colors.surfaceElevated }}
                 >
                   <textarea
@@ -1704,7 +1704,7 @@ function Burbuja({
              `ModelText` devuelve bloques —párrafos, listas, código— el salto de
              línea lo pone el propio bloque. Manteniendo los dos, cada párrafo
              quedaba separado dos veces. */
-          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-2xl px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
+          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-sm px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
           /* La esquina de dentro, cuadrada: es lo que da el pico hacia quien
              habla sin necesidad de dibujar ninguno. Igual que en Mensajes. */
           mio ? 'rounded-br-md' : 'rounded-bl-md',

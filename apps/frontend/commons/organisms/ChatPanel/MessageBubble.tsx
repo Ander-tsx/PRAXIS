@@ -706,7 +706,7 @@ export function MessageBubble({
           )}
 
           <div
-            className="flex items-center gap-2 rounded-2xl px-3.5 py-2.5"
+            className="flex items-center gap-2 rounded-sm px-3.5 py-2.5"
             style={{ background: alpha(colors.textSecondary, 10) }}
           >
             <svg
@@ -860,7 +860,7 @@ export function MessageBubble({
              lo que revela las dos asas. Con nombre porque dentro hay otro grupo
              —el del reproductor de vídeo— y `group-hover` a secas se los
              confundiría. */
-          className={`group/burbuja relative min-w-0 max-w-full rounded-2xl ${
+          className={`group/burbuja relative min-w-0 max-w-full rounded-sm ${
             /* ⚠️ **Solo un medio: relleno igual por los cuatro lados.** El de
                un mensaje de texto (`px-3.5 py-2`) es más ancho que alto a
                propósito —así se lee mejor una línea— pero alrededor de una foto
@@ -1208,7 +1208,7 @@ export function MessageBubble({
               {menuAbierto && (
                 <div
                   role="menu"
-                  className={`absolute z-50 flex w-52 flex-col overflow-hidden rounded-xl border py-1 ${
+                  className={`absolute z-50 flex w-52 flex-col overflow-hidden rounded-sm border py-1 ${
                     menuArriba ? 'bottom-full mb-1' : 'top-full mt-1'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
@@ -1866,7 +1866,7 @@ function AttachmentCard({
           type="button"
           onClick={() => setAmpliada(true)}
           aria-label={`Ver ${adjunto.filename} a tamaño completo`}
-          className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-border"
+          className="block w-full cursor-zoom-in overflow-hidden rounded-sm border border-border"
         >
           <img
             src={href}
@@ -1898,7 +1898,7 @@ function AttachmentCard({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex w-full max-w-xs items-center gap-2.5 rounded-xl border border-border px-2.5 py-2 transition-colors hover:border-primary"
+      className="flex w-full max-w-xs items-center gap-2.5 rounded-sm border border-border px-2.5 py-2 transition-colors hover:border-primary"
       style={{ background: alpha(colors.border, 22) }}
     >
       <span
@@ -2108,7 +2108,7 @@ function ReproductorVideo({ href }: { href: string }) {
       className={`group/video relative overflow-hidden bg-black ${
         aPantallaCompleta
           ? 'flex h-full w-full items-center justify-center'
-          : 'rounded-xl border border-border'
+          : 'rounded-sm border border-border'
       }`}
     >
       {/* biome-ignore lint/a11y/useMediaCaption: los adjuntos los sube quien escribe y no hay pista de subtítulos que ofrecer */}
@@ -2307,7 +2307,7 @@ function LinkPreviewCard({ preview, mine }: { preview: LinkPreview; mine: boolea
       href={preview.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`mt-1.5 flex max-w-xs flex-col overflow-hidden rounded-xl border border-border transition-colors hover:border-primary ${
+      className={`mt-1.5 flex max-w-xs flex-col overflow-hidden rounded-sm border border-border transition-colors hover:border-primary ${
         mine ? 'items-end' : ''
       }`}
       style={{ background: alpha(colors.border, 22) }}

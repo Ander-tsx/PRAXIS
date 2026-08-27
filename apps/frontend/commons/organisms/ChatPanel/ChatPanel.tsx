@@ -1800,7 +1800,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              */}
             {busquedaAbierta && (
               <div
-                className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-xl border border-border p-3"
+                className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-sm border border-border p-3"
                 style={{ background: colors.background }}
               >
                 <div className="flex shrink-0 items-center gap-2">

@@ -265,7 +265,7 @@ function Ajuste({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+    <div className="flex flex-col gap-2 rounded-sm border border-border p-3">
       <label className="font-sans text-xs font-semibold uppercase tracking-wide text-text-secondary">
         ¿Le cambiarías algo?
       </label>

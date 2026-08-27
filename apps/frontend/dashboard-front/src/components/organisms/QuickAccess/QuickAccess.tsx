@@ -70,7 +70,7 @@ export function QuickAccess({ roles, proyectos, espacios, miembros }: QuickAcces
 
   return (
     <section
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5"
+      className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-5"
       aria-labelledby="titulo-accesos"
     >
       <h2 id="titulo-accesos" className="font-display text-xl text-text-primary">
@@ -149,13 +149,13 @@ function Acceso({
   sameZone?: boolean;
 }) {
   const clase =
-    'group flex items-center gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+    'group flex items-center gap-3 rounded-sm px-2.5 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
   const contenido = (
     <>
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm"
         style={{ background: alpha(tone, 12), color: tone }}
       >
         {icon}

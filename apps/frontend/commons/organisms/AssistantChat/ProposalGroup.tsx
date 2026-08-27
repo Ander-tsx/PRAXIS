@@ -88,7 +88,7 @@ export function ProposalGroup({ children }: ProposalGroupProps) {
   return (
     <section
       aria-label={`${total} propuestas del asistente`}
-      className="flex flex-col gap-3 rounded-2xl border p-3"
+      className="flex flex-col gap-3 rounded-sm border p-3"
       style={{ borderColor: alpha(colors.primary, 22), background: alpha(colors.primary, 4) }}
     >
       <header className="flex flex-wrap items-center gap-2 px-1">

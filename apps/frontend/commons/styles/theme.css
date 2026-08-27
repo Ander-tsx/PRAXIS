@@ -42,15 +42,15 @@
    variables del bloque siempre, las use o no un `className`. */
 @theme static {
   /* ── FONDOS ─────────────────────────────────────────────── */
-  --color-background: #0d0f14; /* Fondo base de la app */
-  --color-surface: #161b27; /* Cards, modales, panels */
-  --color-surface-elevated: #1e2535; /* Elevado sobre surface */
-  --color-overlay: #080a0f; /* Overlays, drawers */
+  --color-background: #080807; /* Fondo base de la app */
+  --color-surface: #181715; /* Cards, modales, panels */
+  --color-surface-elevated: #393632; /* Elevado sobre surface */
+  --color-overlay: #080807; /* Overlays, drawers */
   /* Sombra hacia dentro del lienzo del tablero (BoardStrip): a diferencia de
      overlay, que se queda oscuro en los dos temas porque es un scrim, esta sí
      cambia — un hundido oscuro en tema claro se ve como suciedad, no como
      profundidad. */
-  --color-canvas-shadow: #080a0f;
+  --color-canvas-shadow: #080807;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #6c63ff; /* Botones, links activos, estados */
@@ -75,15 +75,15 @@
   --color-accent-foreground: #0d0f14; /* Texto sobre accent */
 
   /* ── TEXTO ───────────────────────────────────────────────── */
-  --color-text-primary: #e8eaf0; /* Texto principal */
-  --color-text-secondary: #9aa0b4; /* Texto secundario, placeholders */
-  --color-text-disabled: #4a5168; /* Texto deshabilitado */
-  --color-text-inverse: #0d0f14; /* Texto sobre fondos claros */
+  --color-text-primary: #e8e8e3; /* Texto principal */
+  --color-text-secondary: #938f8a; /* Texto secundario, placeholders */
+  --color-text-disabled: #524d47; /* Texto deshabilitado */
+  --color-text-inverse: #080807; /* Texto sobre fondos claros */
 
   /* ── BORDES ─────────────────────────────────────────────── */
-  --color-border: #2a3045; /* Bordes normales */
-  --color-border-subtle: #1e2535; /* Bordes muy sutiles */
-  --color-border-strong: #3d4a6b; /* Bordes con énfasis */
+  --color-border: #393632; /* Bordes normales */
+  --color-border-subtle: #181715; /* Bordes muy sutiles */
+  --color-border-strong: #6b645c; /* Bordes con énfasis */
 
   /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
   --color-success: #4ade80;
@@ -126,21 +126,26 @@
   /* display  → titulos hero, nombre del producto, highlights grandes */
   /* serif    → subtitulos de sección importantes, citas, detalles */
   /* sans     → body, labels, navegacion, botones, todo lo demás    */
-  --font-display: "Redaction 50", "Georgia", "Times New Roman", serif;
-  /* Las variables --font-inter y --font-lora las define `next/font` en el
-     layout de cada zona. Llevan fallback DENTRO del var() a propósito: si una
-     zona se olvida de cargarlas, `var(--font-lora)` sin fallback invalida toda
-     la declaración y la tipografía se cae entera, en vez de degradar. */
-  --font-serif: var(--font-lora, Georgia), "Georgia", serif;
-  --font-sans: var(--font-inter, system-ui), system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  /* Las variables --font-khteka, --font-animo y --font-suisse-mono las define
+     `next/font` en el layout de CADA zona, y este archivo lo comparten las
+     ocho. Llevan fallback DENTRO del var() a propósito: si una zona se olvida
+     de cargarlas, `var(--font-animo)` sin fallback no deja la declaración a
+     medias — la invalida entera (IACVT), y `font-sans` deja de existir en toda
+     la zona sin un solo error. Estuvo a punto de colarse al traer Kyloo: los
+     tres nombres son nuevos —ninguna zona los tenía— y el rediseño los cargó
+     solo en dashboard-front. Las otras siete se habrían quedado con la
+     tipografía por defecto del navegador, compilando y sin avisar. */
+  --font-display: var(--font-khteka, Georgia), "Redaction 50", serif;
+  --font-serif: var(--font-khteka, Georgia), "Georgia", serif;
+  --font-sans: var(--font-animo, system-ui), system-ui, sans-serif;
+  --font-mono: var(--font-suisse-mono, monospace), "JetBrains Mono", monospace;
 
   /* ── RADIOS ──────────────────────────────────────────────── */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
   --radius-full: 9999px;
 }
 
@@ -167,11 +172,11 @@
    ============================================================ */
 :root[data-theme="light"] {
   /* ── FONDOS ─────────────────────────────────────────────── */
-  --color-background: #f3f4f9;
-  --color-surface: #ffffff;
-  --color-surface-elevated: #eceef5;
-  --color-overlay: #0d0f14;
-  --color-canvas-shadow: #ffffff;
+  --color-background: #e8e8e3;
+  --color-surface: #ddddd5;
+  --color-surface-elevated: #d1d1c7;
+  --color-overlay: #181715;
+  --color-canvas-shadow: #d1d1c7;
 
   /* ── MARCA / COLOR PRIMARIO ─────────────────────────────── */
   --color-primary: #5b52e0;
@@ -191,15 +196,15 @@
   --color-accent-foreground: #ffffff;
 
   /* ── TEXTO ───────────────────────────────────────────────── */
-  --color-text-primary: #171922;
-  --color-text-secondary: #565c72;
-  --color-text-disabled: #a4a9ba;
-  --color-text-inverse: #ffffff;
+  --color-text-primary: #080807;
+  --color-text-secondary: #524d47;
+  --color-text-disabled: #938f8a;
+  --color-text-inverse: #e8e8e3;
 
   /* ── BORDES ─────────────────────────────────────────────── */
-  --color-border: #dde1ea;
-  --color-border-subtle: #eceef3;
-  --color-border-strong: #c3c9d9;
+  --color-border: #d1d1c7;
+  --color-border-subtle: #ddddd5;
+  --color-border-strong: #bfbfb1;
 
   /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
   --color-success: #15803d;

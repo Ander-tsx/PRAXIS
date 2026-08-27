@@ -55,7 +55,7 @@ export function PanelCard({
 
   return (
     <section
-      className={`flex h-full flex-col gap-5 rounded-2xl border bg-surface p-5 sm:p-6 ${className}`}
+      className={`flex h-full flex-col gap-5 rounded-sm border bg-surface p-5 sm:p-6 ${className}`}
       style={{ borderColor: peligro ? alpha(colors.error, 35) : colors.border }}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -63,10 +63,10 @@ export function PanelCard({
           {icon && (
             <span
               aria-hidden="true"
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm"
               style={{
-                background: peligro ? alpha(colors.error, 12) : alpha(colors.primary, 12),
-                color: peligro ? colors.error : colors.primary,
+                background: 'transparent', border: `1px solid ${colors.border}`,
+                color: peligro ? colors.error : colors.textPrimary,
               }}
             >
               {icon}
