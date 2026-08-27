@@ -58,18 +58,16 @@ export class ProjectInvitationsController {
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Invitar a alguien al proyecto' })
   @ApiResponse({ status: 201, description: 'Invitación enviada, pendiente de respuesta' })
-  @ApiResponse({ status: 402, description: 'El plan del proyecto no da para otro miembro' })
+  @ApiResponse({ status: 403, description: 'Esa persona no tiene asiento en la organización' })
   @ApiResponse({ status: 409, description: 'Ya es miembro o ya tiene una invitación pendiente' })
   async invite(
     @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Body() body: InviteMemberBodyDto,
   ) {
-    /* 🕳️ Aquí iba `exigirMiembroDeProyecto`, que se retiró el 2026-08-26 con el
-       tope de miembros por proyecto. Lo que lo sustituye —comprobar que la
-       persona tiene asiento en la organización del proyecto— necesita
-       `Project.organizationId`, que llega en O3. Hasta entonces esto no tiene
-       límite, y es a sabiendas. Ver quota.service.ts y PLAN-ORGANIZACIONES O3.7. */
+    /* Misma regla que al añadir directamente: sin asiento en la organización del
+       proyecto no se entra. Ver `exigirAsientoEnProyecto`. */
+    await this.quota.exigirAsientoEnProyecto(projectId, body.userId);
 
     return firstValueFrom(
       this.projectsClient.send(

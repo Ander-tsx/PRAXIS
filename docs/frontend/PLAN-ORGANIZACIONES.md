@@ -34,8 +34,8 @@ que quien lo usa solo con dos amigos pierda nada.
 |---|---|---|
 | O1 | Contratos: cuatro planes, papeles y códigos de error | ✅ **hecho** (2026-08-26) |
 | O2 | `billing-service`: papeles, plantillas y traspaso | ✅ **hecho** (2026-08-26) |
-| O3 | `Project.organizationId`, y las semillas | ⬜ pendiente |
-| O4 | El gateway: resolver la organización y contar por ella | ⬜ pendiente |
+| O3 | `Project.organizationId`, y las semillas | 🟡 **casi** — falta O3.5 y probarlo |
+| O4 | El gateway: resolver la organización y contar por ella | 🟡 **el núcleo hecho** — O4.2, O4.3 y O4.7 |
 | O5 | Frontend: el selector del sidebar y el portal | ⬜ pendiente |
 | O6 | Frontend: roles, plantillas y el 402 con dos caras | ⬜ pendiente |
 | O7 | Gobierno del equipo | ⬜ pendiente |
@@ -50,7 +50,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-26 | O2 | (pendiente) | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
+| 2026-08-26 | O3+O4 | (pendiente) | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |
+| 2026-08-26 | O2 | `048fc42` | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
 | 2026-08-26 | O1 | `122cfeb` | Cuatro planes en una escalera, el vocabulario de papeles de organización, `NOT_IN_ORG`, y el tope de miembros por proyecto retirado con el hueco señalado |
 
 ---
@@ -511,16 +512,16 @@ stack que era el peligroso pasa a ser el más barato — y **cambia cuál es la 
 correcta de hacerlo**: la columna nace `NOT NULL` desde el primer día y el trabajo
 se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 
-- [ ] **O3.1** `Project.organizationId String` **`NOT NULL`** con índice, en una
+- [x] **O3.1** `Project.organizationId String` **`NOT NULL`** con índice, en una
       sola migración. Sin fase nullable, sin relleno, sin segunda migración que
       apriete la restricción.
-- [ ] **O3.2** Las semillas al día: cada cuenta sembrada nace con su organización
+- [x] **O3.2** Las semillas al día: cada cuenta sembrada nace con su organización
       personal de un asiento (D6), y cada proyecto sembrado nace dentro de una.
-- [ ] **O3.3** ⚠️ **El orden de las semillas importa**, y ahora son cinco: `billing`
+- [x] **O3.3** ⚠️ **El orden de las semillas importa**, y ahora son cinco: `billing`
       tiene que correr antes que `projects`, o el proyecto no tiene organización a la
       que apuntar. `prisma:seed` ya las encadena en orden de dependencia; hay que
       meter la nueva en su sitio, no al final.
-- [ ] **O3.4** 🔴 **La semilla de `credentials` tiene que seguir marcando
+- [x] **O3.4** 🔴 **La semilla de `credentials` tiene que seguir marcando
       `emailVerifiedAt`.** Ya mordió: sin eso, tras un `prisma:reset` **nadie puede
       entrar**, ni la cuenta de administración, porque el login responde 403
       `EMAIL_NOT_VERIFIED`. Verificarlo explícitamente después del primer reset de
@@ -528,19 +529,44 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 - [ ] **O3.5** Huérfanos: qué pasa con los proyectos de una organización borrada. No
       hay clave foránea entre servicios. Precedente a copiar: `purgeProject`, que ya
       recorre los servicios al borrar un proyecto.
-- [ ] **O3.6** `POST /projects` acepta `organizationId`. **El selector solo aparece si
+- [x] **O3.6** `POST /projects` acepta `organizationId`. **El selector solo aparece si
       perteneces a más de una** — con una sola no hay pregunta que hacer.
-- [ ] **O3.7** Añadir a alguien a un proyecto exige asiento (D2): la comprobación en
+- [x] **O3.7** Añadir a alguien a un proyecto exige asiento (D2): la comprobación en
       `POST /projects/:id/members` y en `POST /projects/:id/invitations`, con
       `403 NOT_IN_ORG`.
-- [ ] **O3.8** El despliegue se rehace con `migrar.sh --arranque-limpio`, que ya
+- [x] **O3.8** El despliegue se rehace con `migrar.sh --arranque-limpio`, que ya
       existe y ya deja una sola cuenta de administración. ⚠️ **No uses en el
       superadministrador el correo con el que te vas a registrar después**: el
       registro por la interfaz chocaría con esa cuenta.
 
 ### Apuntes
 
-_(vacío)_
+- **La quinta semilla existe y va tercera**: permissions → credentials →
+  **billing** → projects → tasks. Siembra tres espacios personales y una
+  organización de equipo, «Estudio Nordeste», que es donde vive el proyecto de
+  demostración — para que al entrar se vea el caso que importa, un equipo
+  compartiendo un tablero, y no tres espacios sueltos.
+- ⚠️ **Los identificadores de organización van escritos a mano en las dos
+  semillas.** La de `projects` necesita el de «Estudio Nordeste» y no se lo puede
+  preguntar a billing: son dos esquemas y dos procesos. Es el mismo trato que ya
+  tienen los `ADMIN_USER_ID` y compañía — si cambia allí, cambia aquí.
+- ⚠️ **`organizationId` es opcional en el cuerpo y obligatorio en el payload
+  interno.** Quien no lo manda cae en su organización personal, que es lo correcto
+  para quien solo tiene una: la pantalla ni siquiera enseña el selector. Pero si
+  llegara vacío al servicio, el proyecto se guardaría con una cadena vacía y no
+  saldría en ningún listado **sin que nada fallara**.
+- **El `DEFAULT` de la migración se quita acto seguido.** Existe solo para poder
+  aplicar el `NOT NULL`; dejarlo puesto haría que un proyecto creado sin
+  organización acabara en silencio en una que no existe, que es justo el fallo que
+  la columna viene a impedir.
+- 🔴 **El orden en `POST /projects` no es intercambiable.** Primero se resuelve
+  **dónde** va el proyecto —con las dos comprobaciones, pertenencia y permiso— y
+  solo después si cabe. Contar antes de saber en qué organización se cuenta daría
+  el tope de la personal a quien está creando en la de su empresa.
+- **O3.5 (huérfanos) sigue pendiente**: qué pasa con los proyectos de una
+  organización borrada. No hay clave foránea entre servicios, y hoy una
+  organización no se puede borrar por ninguna ruta, así que no es urgente — pero
+  en cuanto exista esa ruta, lo es.
 
 ---
 
@@ -551,10 +577,10 @@ _(vacío)_
       como ya se hace con los permisos. Sin esto cada ruta de proyecto gana una
       llamada: §41.4 bajó una pantalla de `1 + 12 + K` peticiones a 2, y esto lo
       desharía en silencio.
-- [ ] **O4.2** `QuotaService.exigirProyecto` pasa a contar **por organización**, no
+- [x] **O4.2** `QuotaService.exigirProyecto` pasa a contar **por organización**, no
       por dueño. Los `DELETED` siguen sin contar: cobrar por algo que ya no se ve es
       la clase de cuota que parece una avería.
-- [ ] **O4.3** Retirar `exigirMiembroDeProyecto` (D2) y sustituirlo por la
+- [x] **O4.3** Retirar `exigirMiembroDeProyecto` (D2) y sustituirlo por la
       comprobación de asiento.
 - [ ] **O4.4** Los topes nuevos donde ocurre la escritura: automatizaciones al
       guardar una regla, almacenamiento al subir un adjunto, historial al consultar
@@ -577,7 +603,22 @@ _(vacío)_
 
 ### Apuntes
 
-_(vacío)_
+- **Hecho el núcleo: O4.2 y O4.3.** El conteo de proyectos pasa a ser por
+  organización (`project_find_by_organization`), y el hueco que O1 dejó abierto
+  queda tapado: `exigirAsientoEnProyecto` comprueba que quien entra en un
+  proyecto tiene asiento en su organización, con **403 `NOT_IN_ORG`** — no un 402,
+  porque no se ha agotado nada: esa persona no está dentro, y la salida es darle
+  asiento, no ampliar el plan.
+- 🔴 **O4.1 sigue pendiente y es el riesgo de rendimiento de la etapa.** Hoy la
+  resolución de organización solo ocurre en dos escrituras poco frecuentes —crear
+  proyecto y meter a alguien—, así que las llamadas TCP de más no se notan. **En
+  cuanto entre en una ruta de lectura**, hay que cachearlo en Redis como los
+  permisos: §41.4 bajó una pantalla de `1 + 12 + K` peticiones a 2, y esto lo
+  desharía en silencio.
+- ⚠️ **`GET /api/projects` todavía filtra por dueño-o-miembro, no por
+  organización** (O4.5). No está roto —ves los proyectos en los que estás— pero el
+  selector de organización del sidebar no significará nada hasta que esto cambie,
+  así que O4.5 y O5.2 van juntos.
 
 ---
 

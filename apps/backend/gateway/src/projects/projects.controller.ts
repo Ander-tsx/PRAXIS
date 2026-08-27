@@ -56,7 +56,16 @@ export class ProjectsController {
   @ApiResponse({ status: 402, description: 'Tu plan no da para otro proyecto' })
   @ApiResponse({ status: 409, description: 'Ya existe un proyecto con ese nombre' })
   async create(@Request() req: Express.Request, @Body() body: CreateProjectBodyDto) {
-    await this.quota.exigirProyecto(req.user!.userId);
+    /* El orden importa y no es intercambiable: primero **dónde** va el proyecto
+       —con las dos comprobaciones de pertenencia y permiso— y solo después si
+       cabe. Contar antes de saber en qué organización se cuenta daría el tope de
+       la personal a quien está creando en la de su empresa. */
+    const organizationId = await this.quota.resolverOrganizacionParaProyecto({
+      userId: req.user!.userId,
+      organizationId: body.organizationId,
+    });
+
+    await this.quota.exigirProyecto(req.user!.userId, organizationId);
 
     return firstValueFrom(
       this.projectsClient.send(
@@ -64,6 +73,7 @@ export class ProjectsController {
         {
           ...body,
           ownerId: req.user!.userId,
+          organizationId,
         },
       ),
     );

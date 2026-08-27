@@ -86,6 +86,12 @@ export class ProjectsController {
     return this.projectsService.findOwned(dto.ownerId);
   }
 
+  /** Los de una organización. Lo que cuenta la cuota, y lo que lista el portal. */
+  @MessagePattern({ cmd: 'project_find_by_organization' })
+  findByOrganization(@Payload() dto: { organizationId: string }) {
+    return this.projectsService.findByOrganization(dto.organizationId);
+  }
+
   @MessagePattern({ cmd: 'project_find_all_admin' })
   findAllForAdmin(
     @Payload()

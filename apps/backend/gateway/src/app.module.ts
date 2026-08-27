@@ -8,11 +8,11 @@ import { IdentityThrottlerGuard } from './common/guards/identity-throttler.guard
 
 import { AdminModule } from './admin/admin.module';
 import { AlexaModule } from './alexa/alexa.module';
-import { AutomationModule } from './automation/automation.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
+import { AutomationModule } from './automation/automation.module';
 import { BillingModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PermissionsModule } from './permissions/permissions.module';

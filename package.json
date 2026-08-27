@@ -18,7 +18,7 @@
     "prisma:deploy": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate deploy",
     "prisma:generate": "pnpm --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma generate",
     "prisma:reset": "pnpm --parallel --filter \"@praxis/*-service\" --filter \"!@praxis/reports-service\" exec prisma migrate reset --force --skip-seed && pnpm prisma:seed",
-    "prisma:seed": "pnpm --filter @praxis/permissions-service exec prisma db seed && pnpm --filter @praxis/credentials-service exec prisma db seed && pnpm --filter @praxis/projects-service exec prisma db seed && pnpm --filter @praxis/tasks-service exec prisma db seed",
+    "prisma:seed": "pnpm --filter @praxis/permissions-service exec prisma db seed && pnpm --filter @praxis/credentials-service exec prisma db seed && pnpm --filter @praxis/billing-service exec prisma db seed && pnpm --filter @praxis/projects-service exec prisma db seed && pnpm --filter @praxis/tasks-service exec prisma db seed",
     "e2e": "pnpm --filter @praxis/e2e run test",
     "e2e:api": "pnpm --filter @praxis/e2e run test:api",
     "e2e:ui": "pnpm --filter @praxis/e2e run test:ui",

@@ -44,5 +44,8 @@
     "testPathIgnorePatterns": ["/node_modules/", "\\.integration\\.spec\\.ts$"],
     "transform": { "^.+\\.(t|j)s$": "ts-jest" },
     "testEnvironment": "node"
+  },
+  "prisma": {
+    "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   }
 }

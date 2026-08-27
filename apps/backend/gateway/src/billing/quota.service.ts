@@ -1,6 +1,15 @@
-import { HttpException, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
+  NOT_IN_ORG_CODE,
+  OrganizationPermission,
   PLANS,
   type PlanQuotas,
   PlanTier,
@@ -94,38 +103,95 @@ export class QuotaService {
   /* ─── Proyectos ────────────────────────────────────────────────────────── */
 
   /**
-   * ¿Puede crear un proyecto más?
+   * En qué organización va a caer un proyecto, y si quien lo crea puede.
    *
-   * ⚠️ **Cuenta los que sostiene, no en los que participa.** Si contara la
-   * pertenencia, cualquiera podría dejarte sin poder crear proyectos
-   * invitándote a los suyos.
+   * Tres comprobaciones seguidas, y **cada una falla distinto** porque cada una
+   * se arregla de otra forma:
    *
-   * ⚠️ Y **no cuenta los `DELETED`**, que sí siguen en la base con su dueño
-   * (ver `findOwned`). Un proyecto borrado no ocupa sitio en el plan: cobrar por
-   * algo que ya no se ve es exactamente la clase de cuota que parece una avería.
+   * 1. **¿Estás dentro?** — `403 NOT_IN_ORG`. Se arregla con un asiento.
+   * 2. **¿Puedes crear aquí?** — `403 FORBIDDEN`. Se arregla con un papel.
+   * 3. **¿Queda sitio?** — `402 QUOTA_EXCEEDED`. Se arregla pagando o borrando.
+   *
+   * 🔴 **Sin organización elegida cae en la personal**, que es lo correcto para
+   * quien solo tiene una: la pantalla ni siquiera enseña el selector en ese
+   * caso. Lo que **no** puede pasar es aceptar la que venga en el cuerpo sin
+   * comprobar nada — sería meter un proyecto en la organización de cualquiera
+   * escribiendo su identificador.
    */
-  async exigirProyecto(userId: string): Promise<void> {
+  async resolverOrganizacionParaProyecto(datos: {
+    userId: string;
+    organizationId?: string;
+    /** Para poder nombrar la organización personal si hay que crearla. */
+    nombre?: string;
+    email?: string;
+  }): Promise<string> {
+    if (!datos.organizationId) {
+      const personal = await firstValueFrom(
+        this.billingClient.send<{ id: string }>(
+          { cmd: 'billing_personal_org' },
+          { userId: datos.userId, name: datos.nombre, email: datos.email },
+        ),
+      );
+      return personal.id;
+    }
+
+    const permisos = await firstValueFrom(
+      this.billingClient.send<{ permisos: Record<string, boolean> } | null>(
+        { cmd: 'billing_org_permissions' },
+        { organizationId: datos.organizationId, userId: datos.userId },
+      ),
+    ).catch(() => null);
+
+    if (!permisos) {
+      throw new ForbiddenException({
+        code: NOT_IN_ORG_CODE,
+        message: 'No perteneces a esa organización.',
+      });
+    }
+    if (!permisos.permisos[OrganizationPermission.CAN_CREATE_PROJECT]) {
+      throw new ForbiddenException(
+        'Tu papel en esta organización no permite crear proyectos aquí.',
+      );
+    }
+
+    return datos.organizationId;
+  }
+
+  /**
+   * ¿Cabe un proyecto más en esta organización?
+   *
+   * 🔴 **Por organización, no por persona, y ese es el cambio de 2026-08-26.**
+   * Antes contaba los que sostenía cada cuenta, y con el plan prometiendo
+   * «veinticinco proyectos» eso significaba veinticinco **para cada miembro** en
+   * vez de veinticinco para el equipo. Poner la columna sin mover este contador
+   * habría dejado un plan que promete una cosa y da otra, sin que nada fallara.
+   *
+   * ⚠️ **No cuenta los `DELETED`.** Cobrar por algo que ya no se ve es
+   * exactamente la clase de cuota que parece una avería.
+   *
+   * ⚠️ Y si **no se puede contar**, se deja pasar y se registra: negar una
+   * creación por no haber podido contar es un falso positivo que quien lo sufre
+   * no puede resolver de ninguna manera. Es la asimetría de siempre — un
+   * proyecto de más se borra.
+   */
+  async exigirProyecto(userId: string, organizationId: string): Promise<void> {
     const plan = await this.planDe(userId);
     const tope = plan.quotas.proyectos;
     if (tope === null) return;
 
-    const propios = await firstValueFrom(
+    const deLaOrganizacion = await firstValueFrom(
       this.projectsClient.send<{ id: string; status: string }[]>(
-        { cmd: 'project_find_owned' },
-        { ownerId: userId },
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
       ),
     ).catch(() => null);
 
-    if (propios === null) {
-      /* No se pudo contar. Se deja pasar y se registra: negar una creación por
-         no haber podido contar es un falso positivo que la persona no puede
-         resolver de ninguna manera, y el tope se volverá a comprobar la próxima
-         vez. Es la asimetría de siempre — un proyecto de más se borra. */
-      this.log.error(`No se pudieron contar los proyectos de ${userId}: se deja crear.`);
+    if (deLaOrganizacion === null) {
+      this.log.error(`No se pudieron contar los proyectos de ${organizationId}: se deja crear.`);
       return;
     }
 
-    const vivos = propios.filter((proyecto) => proyecto.status !== 'DELETED').length;
+    const vivos = deLaOrganizacion.filter((proyecto) => proyecto.status !== 'DELETED').length;
     this.exigir(cabe(vivos, tope), {
       kind: QuotaKind.PROYECTOS,
       tier: plan.tier,
@@ -136,30 +202,59 @@ export class QuotaService {
 
   /* ─── Miembros de un proyecto ──────────────────────────────────────────── */
 
-  /*
-   * 🕳️ **Aquí había un tope de miembros por proyecto, y se retiró el
-   * 2026-08-26 — pero lo que lo sustituye todavía no existe.**
+  /**
+   * ¿Puede esta persona estar en este proyecto?
    *
-   * El tope vivía en `PlanQuotas.miembrosPorProyecto` y lo ponía el plan del
-   * dueño del proyecto. Se retiró porque desde que **quien está en un proyecto
-   * tiene que estar en la organización**, el techo de un tablero ya lo pone el
-   * asiento: un segundo tope por proyecto era una cifra más que explicar y que
-   * vigilar, midiendo algo que el asiento ya mide.
+   * 🔴 **Tiene que tener asiento en la organización del proyecto**, y esta es la
+   * regla que sostiene todo el modelo de precios. Si se pudiera meter a alguien
+   * de fuera, nadie compraría un asiento nunca: se invitaría a todo el mundo
+   * como «externo» y el plan sería decorativo.
    *
-   * ⚠️ **Lo que lo sustituye es la comprobación de asiento**, y no se puede
-   * escribir todavía: necesita `Project.organizationId`, que llega en O3. Hasta
-   * entonces **no hay ningún límite** en `POST /projects/:id/members` ni en
-   * `POST /projects/:id/invitations`, y está escrito aquí y en los dos
-   * controladores en vez de quedarse en silencio.
+   * ⚠️ **Sustituye al tope de miembros por proyecto**, que se retiró en O1. Aquel
+   * lo ponía el plan del dueño del proyecto y medía algo que el asiento ya mide;
+   * este mide lo que de verdad cuesta dinero.
    *
-   * Lo que hay que poner, cuando exista la columna:
-   *   1. Sacar la organización del proyecto.
-   *   2. Preguntar a billing si esa persona tiene asiento activo en ella.
-   *   3. Si no, **403 con `NOT_IN_ORG_CODE`** — no un 402: no se ha agotado
-   *      nada, es que no está dentro.
+   * ⚠️ **Es un `403 NOT_IN_ORG`, no un `402`.** No se ha agotado nada: esa
+   * persona no está dentro. La salida es darle un asiento, que es otra pantalla
+   * y otra conversación que «amplía el plan».
    *
-   * Ver PLAN-ORGANIZACIONES.md, O3.7 y O4.3.
+   * ⚠️ Y si **no se puede comprobar**, se deja pasar y se registra. Misma
+   * asimetría que el resto: negar por no haber podido preguntar es un falso
+   * positivo que quien lo sufre no puede resolver, y a un miembro de más se le
+   * saca.
    */
+  async exigirAsientoEnProyecto(projectId: string, userId: string): Promise<void> {
+    const proyecto = await firstValueFrom(
+      this.projectsClient.send<{ organizationId?: string } | null>(
+        { cmd: 'project_find_one' },
+        { id: projectId },
+      ),
+    ).catch(() => null);
+
+    if (!proyecto?.organizationId) {
+      this.log.error(`No se supo de qué organización es ${projectId}: se deja invitar.`);
+      return;
+    }
+
+    const dentro = await firstValueFrom(
+      this.billingClient.send<boolean>(
+        { cmd: 'billing_org_is_member' },
+        { organizationId: proyecto.organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    if (dentro === null) {
+      this.log.error(`billing-service no contestó por ${userId}: se deja invitar.`);
+      return;
+    }
+    if (!dentro) {
+      throw new ForbiddenException({
+        code: NOT_IN_ORG_CODE,
+        message:
+          'Esa persona no tiene asiento en la organización de este proyecto. Dale uno antes de añadirla.',
+      });
+    }
+  }
 
   /* ─── El asistente ─────────────────────────────────────────────────────── */
 

@@ -75,22 +75,23 @@ export class MembersController {
    * Agrega un miembro a un proyecto (requiere canManageMembers).
    *
    * ⚠️ **El tope de miembros lo pone el plan del DUEÑO del proyecto**, no el de
-   * quien invita: es su tablero el que crece, y al revés alguien con plan grande
-   * podría meter gente en el proyecto de quien paga el pequeño. Responde 402 con
-   * `QUOTA_EXCEEDED`.
+   * ⚠️ **Ya no hay un tope de miembros por proyecto**: lo sustituyó el asiento.
+   * Lo que se comprueba es que quien entra tenga uno en la organización del
+   * proyecto, y falla con **403 `NOT_IN_ORG`** — la salida es darle asiento, no
+   * ampliar el plan.
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Agrega un miembro a un proyecto' })
   @ApiResponse({ status: 201, description: 'Miembro agregado exitosamente' })
-  @ApiResponse({ status: 402, description: 'El plan del proyecto no da para otro miembro' })
+  @ApiResponse({ status: 403, description: 'Esa persona no tiene asiento en la organización' })
   async add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
-    /* 🕳️ Aquí iba `exigirMiembroDeProyecto`, que se retiró el 2026-08-26 con el
-       tope de miembros por proyecto. Lo que lo sustituye —comprobar que la
-       persona tiene asiento en la organización del proyecto— necesita
-       `Project.organizationId`, que llega en O3. Hasta entonces esto no tiene
-       límite, y es a sabiendas. Ver quota.service.ts y PLAN-ORGANIZACIONES O3.7. */
+    /* 🔴 Quien está en un proyecto tiene que estar en su organización. Sin esta
+       línea nadie compraría un asiento nunca: se metería a todo el mundo como
+       «externo» y el plan sería decorativo. Responde 403 con `NOT_IN_ORG`, que
+       **no** es un 402: no se ha agotado nada, esa persona no está dentro. */
+    await this.quota.exigirAsientoEnProyecto(req.projectId!, body.userId);
 
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_add' }, { projectId: req.projectId, ...body }),

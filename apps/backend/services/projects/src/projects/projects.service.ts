@@ -94,6 +94,7 @@ export class ProjectsService {
             slug,
             description: dto.description,
             ownerId: dto.ownerId,
+            organizationId: dto.organizationId,
           },
         });
 
@@ -572,6 +573,24 @@ export class ProjectsService {
     return this.prisma.project.findMany({
       where: { ownerId },
       select: { id: true, name: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Los proyectos de una organización.
+   *
+   * 🔴 **Es lo que cuenta la cuota desde 2026-08-26**, y sustituye a contar por
+   * dueño: el plan promete proyectos **para el equipo**, no para cada persona.
+   *
+   * ⚠️ Devuelve también los `DELETED` y quien llama los descarta. No se filtran
+   * aquí porque el mismo comando sirve para contar cuota —donde no cuentan— y
+   * para el inventario de administración —donde sí hay que verlos—.
+   */
+  async findByOrganization(organizationId: string) {
+    return this.prisma.project.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, status: true, ownerId: true },
       orderBy: { createdAt: 'asc' },
     });
   }
