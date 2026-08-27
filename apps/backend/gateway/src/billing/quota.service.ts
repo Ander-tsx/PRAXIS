@@ -335,8 +335,12 @@ export class QuotaService {
  * de las dos tiene arreglo por la vía barata.
  */
 const MENSAJES: Record<QuotaKind, (tope: number) => string> = {
+  /* ⚠️ Dice «esta organización» y no «ya tienes», porque desde 2026-08-26 el
+     tope se cuenta **por organización**: quien ve el mensaje puede no ser quien
+     puede resolverlo. Un «ya tienes 3 proyectos» a alguien que no tiene ninguno
+     suyo se lee como una avería. */
   [QuotaKind.PROYECTOS]: (tope) =>
-    `Ya tienes ${tope} proyectos, que es todo lo que caben. Borra uno o amplía el plan.`,
+    `Esta organización ya tiene ${tope} proyectos, que es todo lo que caben. Borra uno o amplía el plan.`,
   [QuotaKind.IA_MENSUAL]: (tope) =>
     `Has gastado los ${tope} mensajes de este mes. Vuelven el día 1, o amplía el plan.`,
   [QuotaKind.ASIENTOS]: (tope) =>
