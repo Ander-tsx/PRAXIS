@@ -34,7 +34,8 @@ import { getSidebarPlegada } from '@praxis/commons/theme';
  * las tablas vacías y un error — no los datos.
  */
 export default async function PrivateLayout({ children }: { children: React.ReactNode }) {
-  const { profile, roles, navItems, organizaciones, organizacionActivaId } = await loadPrivateChrome();
+  const { profile, roles, navItems, organizaciones, organizacionActivaId } =
+    await loadPrivateChrome();
   /* La cookie del pliegue, leída en el servidor: sin esto la barra se
      serviría desplegada y se plegaría al hidratar, parpadeando en cada
      navegación —y en Multi-Zones cada cambio de zona es una carga entera. */

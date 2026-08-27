@@ -22,6 +22,7 @@ import {
   quotasDe,
 } from '@praxis/contracts';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 
 /**
  * El error que este servicio devuelve cuando algo no se puede hacer.
@@ -49,6 +50,18 @@ export function esFallo(valor: unknown): valor is Fallo {
   return typeof valor === 'object' && valor !== null && 'codigo' in valor && 'error' in valor;
 }
 
+/**
+ * Cuánto vive lo cacheado.
+ *
+ * ⚠️ **Treinta segundos, el mismo orden que permissions-service.** No es una
+ * cifra elegida al azar: es lo que se tarda en no notar la caché navegando, y lo
+ * poco que se tarda en notar un permiso que ya no debería estar. Con invalidación
+ * explícita en cada escritura, el TTL solo cubre lo que la invalidación no
+ * alcance —otro proceso, un Redis que parpadeó— y por eso es corto.
+ */
+const PERMISOS_TTL = 30;
+const ORGS_TTL = 30;
+
 @Injectable()
 export class OrganizationsService {
   private readonly log = new Logger(OrganizationsService.name);
@@ -56,6 +69,7 @@ export class OrganizationsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
     config: ConfigService,
   ) {
     this.inviteTtlHoras = Number(config.get('INVITE_TTL_HOURS') ?? 168);
@@ -266,6 +280,14 @@ export class OrganizationsService {
    * a esa persona sin poder llegar a los suyos.
    */
   async organizacionesDe(userId: string) {
+    /* Lo pide `loadPrivateChrome` en **cada carga de cada zona** para pintar el
+       selector de la barra lateral. Sin caché, eso es una consulta con tres
+       `include` por navegación para una lista que cambia cuando alguien crea o
+       acepta algo. */
+    const clave = `billing:user:${userId}:orgs`;
+    const cacheado = await this.redis.get<unknown[]>(clave);
+    if (cacheado) return cacheado;
+
     const membresias = await this.prisma.organizationMember.findMany({
       where: { userId, status: MembershipStatus.ACTIVE },
       include: {
@@ -275,7 +297,11 @@ export class OrganizationsService {
       orderBy: [{ organization: { kind: 'asc' } }, { invitedAt: 'asc' }],
     });
 
-    return membresias.map((membresia) => this.vista(membresia.organization, membresia, userId));
+    const vistas = membresias.map((membresia) =>
+      this.vista(membresia.organization, membresia, userId),
+    );
+    await this.redis.set(clave, vistas, ORGS_TTL);
+    return vistas;
   }
 
   /** Una, con la comprobación de que quien pregunta está dentro. */
@@ -608,6 +634,7 @@ export class OrganizationsService {
       },
     });
 
+    await this.olvidar(datos.organizationId);
     await this.registrar(datos.organizationId, 'miembro_invitado', { email, papel: papel.name });
 
     return { email, token, expiraEn: expira.toISOString() };
@@ -653,6 +680,10 @@ export class OrganizationsService {
       },
     });
 
+    /* 🔴 Aquí la invalidación es lo que hace que entrar funcione: sin ella,
+       quien acaba de aceptar sigue treinta segundos sin ver su organización en
+       el selector, que se lee como que la invitación no ha servido. */
+    await this.olvidar(invitacion.organizationId, datos.userId);
     await this.registrar(invitacion.organizationId, 'invitacion_aceptada', {
       email: invitacion.email,
     });
@@ -714,6 +745,7 @@ export class OrganizationsService {
       where: { id: miembro.id },
       data: { roleId: papel.id },
     });
+    await this.olvidar(datos.organizationId, datos.userId);
     await this.registrar(datos.organizationId, 'papel_asignado', {
       userId: datos.userId,
       papel: papel.name,
@@ -770,6 +802,7 @@ export class OrganizationsService {
     }
 
     await this.prisma.organizationMember.delete({ where: { id: miembro.id } });
+    await this.olvidar(datos.organizationId, miembro.userId ?? undefined);
     await this.registrar(datos.organizationId, 'miembro_retirado', {
       email: miembro.email,
       userId: miembro.userId,
@@ -799,6 +832,22 @@ export class OrganizationsService {
     esDueno: boolean;
     roleName: string | null;
   } | null> {
+    /* 🔴 **Cacheado, y no por gusto.** Esto se pregunta en cada escritura que
+       toca una organización y en cada carga del armazón de las siete zonas: sin
+       caché, cada navegación paga una ida a Postgres para responder algo que
+       cambia una vez al mes.
+
+       ⚠️ **Treinta segundos y ni uno más**, y con invalidación en cada escritura
+       que reparte permisos. Un papel editado que tarda en aplicarse es un
+       permiso que sigue abierto después de habérselo quitado a alguien. */
+    const clave = `billing:org:${organizationId}:permisos:${userId}`;
+    const cacheado = await this.redis.get<{
+      permisos: OrganizationPermissions;
+      esDueno: boolean;
+      roleName: string | null;
+    } | null>(clave);
+    if (cacheado) return cacheado;
+
     const [organizacion, membresia] = await Promise.all([
       this.prisma.organization.findUnique({ where: { id: organizationId } }),
       this.prisma.organizationMember.findFirst({
@@ -807,16 +856,22 @@ export class OrganizationsService {
       }),
     ]);
 
+    /* ⚠️ El «no estás dentro» **no se cachea**: es el caso que cambia en cuanto
+       alguien acepta una invitación, y guardarlo treinta segundos sería dejar a
+       quien acaba de entrar fuera de su propia organización. */
     if (!organizacion || !membresia) return null;
 
-    if (organizacion.ownerUserId === userId) {
-      return { permisos: permisosDeDueno(), esDueno: true, roleName: null };
-    }
-    return {
-      permisos: normalizarPermisosOrg(membresia.role.permissions),
-      esDueno: false,
-      roleName: membresia.role.name,
-    };
+    const resuelto =
+      organizacion.ownerUserId === userId
+        ? { permisos: permisosDeDueno(), esDueno: true, roleName: null }
+        : {
+            permisos: normalizarPermisosOrg(membresia.role.permissions),
+            esDueno: false,
+            roleName: membresia.role.name,
+          };
+
+    await this.redis.set(clave, resuelto, PERMISOS_TTL);
+    return resuelto;
   }
 
   /** ¿Tiene asiento activo aquí? Lo que pregunta el gateway en cada escritura. */
@@ -930,6 +985,7 @@ export class OrganizationsService {
         permissions: pedidos as never,
       },
     });
+    await this.olvidar(datos.organizationId);
     await this.registrar(datos.organizationId, 'papel_creado', { name, roleId: creado.id });
 
     return {
@@ -974,6 +1030,7 @@ export class OrganizationsService {
       where: { id: papel.id },
       data: { name: datos.name.trim(), permissions: pedidos as never },
     });
+    await this.olvidar(datos.organizationId);
     await this.registrar(datos.organizationId, 'papel_editado', { roleId: papel.id });
 
     return {
@@ -1027,6 +1084,7 @@ export class OrganizationsService {
     }
 
     await this.prisma.organizationRole.delete({ where: { id: papel.id } });
+    await this.olvidar(datos.organizationId);
     await this.registrar(datos.organizationId, 'papel_borrado', { name: papel.name });
     return { ok: true };
   }
@@ -1208,11 +1266,29 @@ export class OrganizationsService {
       }
     });
 
+    await this.olvidar(datos.organizationId, datos.porUserId);
+    await this.olvidar(datos.organizationId, datos.userId);
     await this.registrar(datos.organizationId, 'organizacion_traspasada', {
       de: datos.porUserId,
       a: datos.userId,
     });
     return { ok: true };
+  }
+
+  /**
+   * Olvida lo cacheado de una organización, y de una persona si se dice cuál.
+   *
+   * 🔴 **Va en toda escritura que cambia quién puede qué**, y no es una
+   * optimización: sin ella, un permiso retirado sigue abierto hasta que venza el
+   * TTL. Treinta segundos no es «un poco de retraso», es un agujero con reloj.
+   *
+   * ⚠️ Nunca falla hacia fuera: si Redis no responde, lo que quede vive como
+   * mucho un TTL y se sigue. Una caché que puede tumbar una escritura es peor
+   * que no tener caché.
+   */
+  private async olvidar(organizationId: string, userId?: string) {
+    await this.redis.olvidarOrganizacion(organizationId);
+    if (userId) await this.redis.olvidarUsuario(userId);
   }
 
   /** Una línea en el registro. Nunca falla hacia fuera: es prueba, no camino. */

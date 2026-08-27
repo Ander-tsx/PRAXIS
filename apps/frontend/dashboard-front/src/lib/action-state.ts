@@ -76,6 +76,8 @@ export interface InvitarMiembroState {
    */
   enlace: string | null;
   email: string | null;
+  /** Si el correo salió. El enlace se enseña igual, pero se dice cuál de los dos. */
+  correoEnviado?: boolean;
 }
 
 export const INVITAR_MIEMBRO_INITIAL_STATE: InvitarMiembroState = {

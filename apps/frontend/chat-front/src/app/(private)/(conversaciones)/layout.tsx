@@ -6,8 +6,8 @@ import {
   resolveProfiles,
 } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
-import { cookies } from 'next/headers';
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 
 export const metadata: Metadata = {
   title: 'Mensajes directos',

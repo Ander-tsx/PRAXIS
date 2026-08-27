@@ -20,6 +20,26 @@ import { JwtGuard } from './jwt.guard';
           },
         }),
       },
+      /**
+       * Solo para crear el espacio personal al registrarse.
+       *
+       * ⚠️ Se registra **aquí** y no se importa de `BillingModule` porque ese
+       * módulo importa a este: cruzarlos daría una dependencia circular. Nest
+       * resuelve el cliente en el módulo que lo declara, y declararlo dos veces
+       * no cuesta nada — es la misma configuración leída del mismo `.env`.
+       */
+      {
+        name: 'BILLING_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('BILLING_SERVICE_HOST'),
+            port: config.get<number>('BILLING_SERVICE_PORT'),
+          },
+        }),
+      },
     ]),
 
     JwtModule.registerAsync({

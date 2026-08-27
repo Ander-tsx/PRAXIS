@@ -350,24 +350,15 @@ export class CreateOrganizationBodyDto {
   @MaxLength(80)
   name: string;
 
-  /**
-   * Con qué plan nace.
-   *
-   * ⚠️ Se valida contra los cinco y **se vuelve a comprobar que sea de
-   * `ENTERPRISE`** en el servicio: `@IsIn(PLAN_TIERS)` acepta `PRO`, que es un
-   * plan real y no vale aquí. Un `@IsIn` con la lista corta habría bastado, pero
-   * entonces el mensaje de error diría «debe ser TEAM o BUSINESS» sin decir por
-   * qué, y quien lo lea desde fuera no sabe que hay dos familias.
-   */
-  @ApiProperty({ enum: [PlanTier.TEAM, PlanTier.BUSINESS] })
-  @IsIn([PlanTier.TEAM, PlanTier.BUSINESS])
-  tier: PlanTier;
+  /* 🔴 **Ni `tier` ni `seats`, y es de 2026-08-27.** El cuerpo pedía con qué
+     plan de empresa nacía y cuántos asientos se compraban: una decisión
+     comercial exigida **antes** de que la organización existiera, a alguien que
+     todavía no sabe qué es. Y era mentira además — el plan lo concede el webhook
+     de Stripe, nunca esta llamada, así que aceptar `tier: 'BUSINESS'` aquí no
+     daba BUSINESS: creaba una organización gratuita con una promesa dentro.
 
-  @ApiProperty({ description: 'Asientos con los que se contrata', example: 5 })
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  seats: number;
+     Ahora nace en `FREE` con los asientos del plan gratuito, y se amplía desde
+     su portal el día que el equipo o los proyectos no quepan. */
 }
 
 export class RenameOrganizationBodyDto {

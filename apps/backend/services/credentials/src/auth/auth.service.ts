@@ -704,4 +704,20 @@ export class AuthService {
 
     return { userId, accessToken, refreshToken };
   }
+  /**
+   * Manda el correo de una invitación. Ver el comando `mail_send_invitation`.
+   *
+   * ⚠️ **No falla hacia fuera.** Si el correo no sale, la invitación ya existe y
+   * su enlace se devolvió en la respuesta para poder pasarlo a mano — que es la
+   * razón por la que se sigue devolviendo aunque ya haya correo.
+   */
+  async enviarInvitacion(datos: {
+    email: string;
+    organizacion: string;
+    invitaPor: string | null;
+    enlace: string;
+  }): Promise<{ enviado: boolean }> {
+    const enviado = await this.tokens.enviarInvitacion({ ...datos, horas: 168 }).catch(() => false);
+    return { enviado };
+  }
 }

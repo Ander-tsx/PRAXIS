@@ -56,8 +56,6 @@ export async function crearOrganizacionAction(
   try {
     const creada = await createServerApiClient().post<OrganizationView>('/me/organizations', {
       name,
-      tier: 'FREE',
-      seats: 3,
     });
     if (!creada?.id) return { error: 'El servidor no devolvió la organización.', creada: null };
 
@@ -74,12 +72,13 @@ export async function crearOrganizacionAction(
 }
 
 /**
- * Invita a alguien y devuelve el enlace.
+ * Invita a alguien: manda el correo **y** devuelve el enlace.
  *
- * ⚠️ **El enlace se devuelve porque hoy no hay correo que lo lleve.** Mandarlo
- * exigiría abrirle al gateway una ruta de envío arbitrario en
- * credentials-service, que es el único que tiene `MailService`; mientras eso no
- * se decida, quien invita copia el enlace. Está anotado en el controlador.
+ * ⚠️ **Las dos cosas, y no una.** Desde 2026-08-27 sale un correo con la
+ * invitación, pero el enlace se sigue devolviendo: un correo se pierde en no
+ * deseados el día que hay que enseñarlo, y el token en claro **solo existe en
+ * esa respuesta** —en la base queda su hash—. Que se pueda copiar además de
+ * enviarse no cuesta nada y salva el caso.
  */
 export async function invitarMiembroAction(
   _prev: InvitarMiembroState,
@@ -98,7 +97,11 @@ export async function invitarMiembroAction(
   }
 
   try {
-    const invitacion = await createServerApiClient().post<{ enlace: string; email: string }>(
+    const invitacion = await createServerApiClient().post<{
+      enlace: string;
+      email: string;
+      correoEnviado: boolean;
+    }>(
       `/organizations/${organizationId}/members`,
       /* Sin `roleId` entra con el papel que la organización tenga por defecto,
          que al crearse es «Miembro». Mandar la clave vacía daría 400: el DTO no
@@ -110,7 +113,12 @@ export async function invitarMiembroAction(
     }
 
     revalidatePath(`/organizations/${organizationId}`);
-    return { error: null, enlace: invitacion.enlace, email: invitacion.email };
+    return {
+      error: null,
+      enlace: invitacion.enlace,
+      email: invitacion.email,
+      correoEnviado: invitacion.correoEnviado,
+    };
   } catch (error) {
     return {
       error: error instanceof ApiError ? error.message : 'No se pudo enviar la invitación.',

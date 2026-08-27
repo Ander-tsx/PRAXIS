@@ -60,9 +60,7 @@ export class QuotaService {
    * siempre falso — o sea, mensajes infinitos y ni un error.
    */
   private limite(plan: AssistantPlanName, desdeFuera?: number | null): number {
-    return typeof desdeFuera === 'number' && desdeFuera >= 0
-      ? desdeFuera
-      : ASSISTANT_LIMITS[plan];
+    return typeof desdeFuera === 'number' && desdeFuera >= 0 ? desdeFuera : ASSISTANT_LIMITS[plan];
   }
 
   /**

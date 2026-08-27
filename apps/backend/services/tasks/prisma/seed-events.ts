@@ -325,7 +325,7 @@ async function main() {
   }
 
   /* Espacio, tableros y columnas: se recrean solo si no están. */
-  let boards = await prisma.$queryRaw<{ id: string; name: string }[]>`
+  const boards = await prisma.$queryRaw<{ id: string; name: string }[]>`
     SELECT b.id, b.name FROM projects.boards b
       JOIN projects.workspaces w ON w.id = b."workspaceId"
      WHERE w."projectId" = ${projectId}::text
@@ -338,18 +338,18 @@ async function main() {
 
   if (boards.length < 2) {
     await prisma.$executeRaw`DELETE FROM projects.workspaces WHERE "projectId" = ${projectId}::text`;
-    
+
     const ws = await prisma.$queryRaw<{ id: string }[]>`
       INSERT INTO projects.workspaces (id, name, "projectId", "createdAt")
       VALUES (gen_random_uuid(), 'Engineering', ${projectId}::text, ${arranque}) RETURNING id
     `;
-    
+
     const devBoard = await prisma.$queryRaw<{ id: string }[]>`
       INSERT INTO projects.boards (id, name, "workspaceId", "createdAt")
       VALUES (gen_random_uuid(), 'Development', ${ws[0].id}::text, ${arranque}) RETURNING id
     `;
     devBoardId = devBoard[0].id;
-    
+
     const qaBoard = await prisma.$queryRaw<{ id: string }[]>`
       INSERT INTO projects.boards (id, name, "workspaceId", "createdAt")
       VALUES (gen_random_uuid(), 'QA', ${ws[0].id}::text, ${arranque}) RETURNING id
@@ -367,10 +367,10 @@ async function main() {
       `;
     }
   } else {
-    devBoardId = boards.find(b => b.name === 'Development')?.id ?? boards[0].id;
-    qaBoardId = boards.find(b => b.name === 'QA')?.id ?? boards[1].id;
+    devBoardId = boards.find((b) => b.name === 'Development')?.id ?? boards[0].id;
+    qaBoardId = boards.find((b) => b.name === 'QA')?.id ?? boards[1].id;
   }
-  
+
   devColumnas = await prisma.$queryRaw`
     SELECT id, name, "order" FROM projects.board_columns
      WHERE "boardId" = ${devBoardId}::text ORDER BY "order"
@@ -433,7 +433,9 @@ async function main() {
     const currentCierre = currentColumnas[currentColumnas.length - 1];
 
     const llegaAlFinal = Math.random() < 0.66;
-    const hasta = llegaAlFinal ? currentColumnas.length : 1 + Math.floor(entre(1, currentColumnas.length - 1));
+    const hasta = llegaAlFinal
+      ? currentColumnas.length
+      : 1 + Math.floor(entre(1, currentColumnas.length - 1));
     const paradas = currentColumnas.slice(1, hasta);
     const eventos: {
       type: string;
@@ -473,9 +475,11 @@ async function main() {
     if (numEncargados > personas.length) numEncargados = personas.length;
     if (sinAsignar) numEncargados = 0;
 
-    const seleccionados = [...personas].sort(() => 0.5 - Math.random()).slice(0, Math.max(1, numEncargados));
+    const seleccionados = [...personas]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, Math.max(1, numEncargados));
     const encargadoPrincipal = seleccionados[0];
-    const indiceEncargado = personas.findIndex(p => p.userId === encargadoPrincipal.userId);
+    const indiceEncargado = personas.findIndex((p) => p.userId === encargadoPrincipal.userId);
 
     const reparto = ESPECIALIDAD[indiceEncargado % ESPECIALIDAD.length];
 
@@ -488,9 +492,15 @@ async function main() {
       if (Math.random() < 0.25) etiquetas.add(azarConPesos(reparto));
     }
 
-    const asignaciones = sinAsignar ? undefined : {
-      create: seleccionados.map(enc => ({ userId: enc.userId, assignedBy: dueno, assignedAt: nacida }))
-    };
+    const asignaciones = sinAsignar
+      ? undefined
+      : {
+          create: seleccionados.map((enc) => ({
+            userId: enc.userId,
+            assignedBy: dueno,
+            assignedAt: nacida,
+          })),
+        };
 
     const tarea = await prisma.task.create({
       data: {

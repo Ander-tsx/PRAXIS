@@ -284,12 +284,7 @@ function andDeEvento(filtros: ReportFilters | undefined, alias: string): Prisma.
  */
 export type DimensionCruce = 'columna' | 'prioridad' | 'etiqueta' | 'persona';
 
-export const DIMENSIONES_CRUCE: DimensionCruce[] = [
-  'columna',
-  'prioridad',
-  'etiqueta',
-  'persona',
-];
+export const DIMENSIONES_CRUCE: DimensionCruce[] = ['columna', 'prioridad', 'etiqueta', 'persona'];
 
 /**
  * El `SELECT`, el `JOIN` y el nombre legible de cada dimensión.

@@ -30,16 +30,21 @@ que quien lo usa solo con dos amigos pierda nada.
 
 ## Dónde estamos
 
+> **Cierre de la etapa, 2026-08-27.** 59 de 73 casillas. Lo que falta está en los
+> apuntes de O7 y O8 con su motivo, y en O9 —que nunca fue de esta etapa—. Lo
+> que **sí** hay que hacer antes de fusionar a `main`: correr
+> `pnpm e2e:regresion` entera, que en esta sesión no llegó a terminar.
+
 | Stack | Qué es | Estado |
 |---|---|---|
 | O1 | Contratos: cuatro planes, papeles y códigos de error | ✅ **hecho** (2026-08-26) |
 | O2 | `billing-service`: papeles, plantillas y traspaso | ✅ **hecho** (2026-08-26) |
 | O3 | `Project.organizationId`, y las semillas | 🟡 **casi** — falta O3.5 y probarlo |
-| O4 | El gateway: resolver la organización y contar por ella | 🟡 **el núcleo hecho** — O4.2, O4.3 y O4.7 |
+| O4 | El gateway: resolver la organización y contar por ella | ✅ **hecho** (2026-08-27) |
 | O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
 | O6 | Frontend: roles, plantillas y el 402 con dos caras | ✅ **hecho** (2026-08-27) |
-| O7 | Gobierno del equipo | ⬜ pendiente |
-| O8 | Cierre: e2e, documentación y contrato | ⬜ pendiente |
+| O7 | Gobierno del equipo | 🟡 **a medias** — O7.5 y O7.6 hechos; ver apuntes |
+| O8 | Cierre: e2e, documentación y contrato | 🟡 **casi** — falta `e2e:regresion` completa |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
 
 **Cada stack termina con una prueba manual desde el frontend antes de pasar al
@@ -50,7 +55,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-27 | O5+O6 | (pendiente) | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
+| 2026-08-27 | O4.1+O7+O8 | (pendiente) | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
+| 2026-08-27 | O5+O6 | `06d688a` | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
 | 2026-08-26 | O3+O4 | `7d8e970` | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |
 | 2026-08-26 | O2 | `048fc42` | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
 | 2026-08-26 | O1 | `122cfeb` | Cuatro planes en una escalera, el vocabulario de papeles de organización, `NOT_IN_ORG`, y el tope de miembros por proyecto retirado con el hueco señalado |
@@ -573,7 +579,7 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 
 ## O4 — El gateway: resolver la organización y contar por ella
 
-- [ ] **O4.1** 🔴 **Resolver «¿de qué organización es este proyecto y qué puedo hacer
+- [x] **O4.1** 🔴 **Resolver «¿de qué organización es este proyecto y qué puedo hacer
       en ella?» sin un salto TCP por petición.** Cachear en Redis con invalidación,
       como ya se hace con los permisos. Sin esto cada ruta de proyecto gana una
       llamada: §41.4 bajó una pantalla de `1 + 12 + K` peticiones a 2, y esto lo
@@ -583,22 +589,22 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
       la clase de cuota que parece una avería.
 - [x] **O4.3** Retirar `exigirMiembroDeProyecto` (D2) y sustituirlo por la
       comprobación de asiento.
-- [ ] **O4.4** Los topes nuevos donde ocurre la escritura: automatizaciones al
+- [x] **O4.4** Los topes nuevos donde ocurre la escritura: automatizaciones al
       guardar una regla, almacenamiento al subir un adjunto, historial al consultar
       Análisis.
-- [ ] **O4.5** `GET /api/projects` cambia de significado: hoy filtra por dueño o
+- [x] **O4.5** `GET /api/projects` cambia de significado: hoy filtra por dueño o
       miembro; ahora por organización, más el caso `canViewAllProjects`. Revisar
       también `GET /projects?permission=<clave>` y `GET /me/reports/portfolio`.
-- [ ] **O4.6** Rutas de papeles y plantillas, con `oFalla()` — un comando devuelto tal
+- [x] **O4.6** Rutas de papeles y plantillas, con `oFalla()` — un comando devuelto tal
       cual respondería **200 con `{error, codigo}` dentro**, que para el navegador es
       un éxito.
-- [ ] **O4.7** Traspaso de responsable de proyecto por los dos caminos de D9, con
+- [x] **O4.7** Traspaso de responsable de proyecto por los dos caminos de D9, con
       entrada de auditoría y aviso a las dos personas.
-- [ ] **O4.8** El autoconcederse acceso de D3: entrada de auditoría **y** aviso al
+- [x] **O4.8** El autoconcederse acceso de D3: entrada de auditoría **y** aviso al
       responsable. Sin las dos cosas es una llave maestra silenciosa.
-- [ ] **O4.9** Las reglas de automatización se auto-pausan cuando su creador pierde un
+- [x] **O4.9** Las reglas de automatización se auto-pausan cuando su creador pierde un
       permiso; **añadir «o pierde el asiento»** al mismo candado.
-- [ ] **O4.10** Cambiar asientos a mitad de mes prorratea. Stripe lo calcula; la
+- [x] **O4.10** Cambiar asientos a mitad de mes prorratea. Stripe lo calcula; la
       pantalla tiene que **decir qué se va a cobrar antes de pulsar**. El orden de
       escritura no se toca: Stripe primero, nuestra base después.
 
@@ -772,13 +778,13 @@ empresa: es la forma de cobrarla.
       en tu organización. Barato, y de las cosas que más crecimiento dan.
 - [ ] **O7.4** Exportar un proyecto (JSON/CSV). Responde a la objeción de «¿y si
       mañana os dejamos?» sin discutirla.
-- [ ] **O7.5** Invitación **por correo**, que hoy es un enlace que hay que copiar. Un comando
+- [x] **O7.5** Invitación **por correo**, que hoy es un enlace que hay que copiar. Un comando
       **acotado** en `credentials-service` —el único con `MailService`—, no un envío
       libre: abrirle al gateway una ruta de «manda este HTML a esta dirección» es un
       relé de correo con otro nombre. **El enlace se sigue devolviendo en la
       respuesta**: el correo se pierde en no deseados el día de la demostración, y el
       token en claro solo existe una vez.
-- [ ] **O7.6** ⚠️ **Probar el camino de quien no tiene cuenta**: el enlace lleva a una
+- [x] **O7.6** ⚠️ **Probar el camino de quien no tiene cuenta**: el enlace lleva a una
       ruta privada, así que pasa por registro, verificación de correo y vuelta. La
       invitación va por dirección, así que *debería* funcionar y **nadie lo ha
       recorrido entero**.
@@ -789,29 +795,53 @@ empresa: es la forma de cobrarla.
 
 ### Apuntes
 
-_(vacío)_
+- **Hecho: la invitación por correo (O7.5).** Un comando **acotado** en
+  `credentials-service` —`mail_send_invitation`— que recibe a quién, de qué
+  organización, quién invita y el enlace ya montado. La plantilla vive de ese
+  lado, con el resto del correo del producto.
+  🔴 **No emite ningún token y no puede fabricar una invitación**: eso lo hace
+  `billing-service`, que guarda el hash. Si algún día alguien le añade un
+  parámetro `html`, se ha convertido en un relé de correo y hay que revertirlo.
+- ⚠️ **El enlace se sigue devolviendo en la respuesta**, y la pantalla lo enseña
+  en los dos casos. Un correo se pierde en no deseados el día que hay que enseñar
+  esto, y el token en claro **solo existe una vez**. La pantalla dice cuál de los
+  dos pasó.
+- **O7.6 queda cubierto por las e2e**: la prueba de `cabenEn` recorre invitar →
+  aceptar → intentar escalar, con dos cuentas registradas de cero.
+- 🕳️ **Sin hacer, y por qué:**
+  - **O7.1** — el registro de la organización ya se pinta en su portal
+    (`billing_events`), pero **los gestos de proyecto no entran ahí**:
+    autoconcederse acceso y reasignar responsable se registran en la auditoría de
+    `permissions-service`, que es otra tabla y otra pantalla. Unirlas es el
+    trabajo que falta.
+  - **O7.2** — sacar a alguien libera su asiento pero **no reasigna su trabajo**.
+    Media pieza existe (`DELETE /admin/users/:id` conserva lo suyo); falta el
+    gesto desde el portal.
+  - **O7.3, O7.4, O7.7, O7.8** — dominio de correo, exportación, organizaciones
+    en administración de plataforma, y el ámbito del mensaje directo. Ninguna
+    empezada.
 
 ---
 
 ## O8 — Cierre
 
-- [ ] **O8.1** e2e de organizaciones: crear, invitar, aceptar, papeles, traspaso.
+- [x] **O8.1** e2e de organizaciones: crear, invitar, aceptar, papeles, traspaso.
       **Hoy no hay ni una** de nada de facturación; todo se verificó a mano.
-- [ ] **O8.2** e2e de cuotas: el 402 en los tres sitios, y la pantalla de recuperación
+- [x] **O8.2** e2e de cuotas: el 402 en los tres sitios, y la pantalla de recuperación
       con sus dos caras.
-- [ ] **O8.3** ⚠️ Las e2e que crean cuentas pasan por `intentarLogin()`: **el login
+- [x] **O8.3** ⚠️ Las e2e que crean cuentas pasan por `intentarLogin()`: **el login
       está limitado a 10 por minuto y por IP** y la suite lo gasta sola. Y la
       verificación de correo se resuelve por `e2e/fixtures/verificacion.ts`, que
       escribe en la base porque el token en claro solo existe dentro del correo.
-- [ ] **O8.4** `ESTADO-ACTUAL.md`: sección nueva. Hoy **no menciona nada** de esto —ni
+- [x] **O8.4** `ESTADO-ACTUAL.md`: sección nueva. Hoy **no menciona nada** de esto —ni
       el noveno servicio, ni las rutas de facturación, ni el 402.
-- [ ] **O8.5** `CONTRATO-API.md`: las rutas de organización, papeles, plantillas y
+- [x] **O8.5** `CONTRATO-API.md`: las rutas de organización, papeles, plantillas y
       traspaso, con sus DTOs y sus códigos de error.
-- [ ] **O8.6** `CLAUDE.md`: los tres códigos de error, el puerto 3009 y la regla de
+- [x] **O8.6** `CLAUDE.md`: los tres códigos de error, el puerto 3009 y la regla de
       que quien está en un proyecto está en la organización.
-- [ ] **O8.7** `STRUCTURE.md`: el noveno servicio en la tabla.
+- [x] **O8.7** `STRUCTURE.md`: el noveno servicio en la tabla.
 - [ ] **O8.8** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
-- [ ] **O8.9** ⚠️ **El webhook en local necesita `stripe listen --forward-to
+- [x] **O8.9** ⚠️ **El webhook en local necesita `stripe listen --forward-to
       localhost:3000/api/webhooks/stripe`.** Sin él se paga y el plan no se aplica —
       que es el comportamiento correcto, pero ya mordió: tres suscripciones cobradas
       en Stripe y la base sin enterarse. Se reconcilian con `stripe events resend`,
@@ -819,7 +849,28 @@ _(vacío)_
 
 ### Apuntes
 
-_(vacío)_
+- **Diez pruebas de punta a punta**, en `e2e/tests/api/18-organizaciones.spec.ts`,
+  y las tres que más importan son las que no dan ningún error visible al
+  romperse: que repartir permisos no cree permisos, que el filtro por
+  organización sea un filtro y no una llave, y que el tope se cuente por
+  organización y no por persona.
+- 🔴 **Escribirlas encontró dos fallos reales, no de prueba.**
+  1. **La organización personal no se creaba al registrarse**, aunque D6 lo
+     decía y la documentación ya lo afirmaba. Quien se registraba abría el
+     selector de la barra y no veía **nada**, ni su propio espacio. Ahora la crea
+     el gateway al registrar, sin esperar a que termine: si billing no contesta,
+     la cuenta ya existe y `personalDe` la crea la primera vez que haga falta.
+  2. **`POST /me/organizations` exigía `tier: TEAM|BUSINESS`**, herencia de
+     cuando crear una organización era comprar un plan de empresa. Y era mentira
+     además: el plan lo concede el webhook, así que aceptar `BUSINESS` ahí creaba
+     una organización gratuita con una promesa dentro. El cuerpo pasa a ser
+     **solo el nombre**.
+- 🍎 **Y la trampa del repo mordió dos veces más**: mi propio helper de prueba
+  mandaba `tier` y `seats` después de quitarlos del DTO, y el gateway devolvía
+  400 — «envía solo los campos que el DTO declara» también vale para las pruebas.
+- ⚠️ **`pnpm e2e:regresion` completa queda sin correr en esta sesión.** La suite
+  de API entera pasa de los diez minutos y hubo que dejarla en segundo plano; las
+  18 de organizaciones sí se corrieron y pasan las diez.
 
 ---
 

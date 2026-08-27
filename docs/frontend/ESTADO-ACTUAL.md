@@ -5213,3 +5213,219 @@ burbuja** en vez de borrar la pregunta del hilo. Detalle en el plan de la etapa.
 
 Y `ModelText` gana tablas y una gráfica de barras, con el mismo método de
 siempre: sin librería de markdown y sin un solo `dangerouslySetInnerHTML`.
+
+---
+
+## 47. La organización pasa a contener los proyectos
+
+> Etapa de organizaciones, 2026-08-26 y 27, rama `feature/organizaciones`.
+> El plan, con las once decisiones y sus apuntes, en
+> [PLAN-ORGANIZACIONES.md](PLAN-ORGANIZACIONES.md).
+
+### 47.1 El cambio, en una frase
+
+**Un proyecto ya no cuelga de una persona: pertenece a una organización.** Antes
+la organización era una suscripción por volumen —repartía topes más altos entre
+su gente— y la pregunta *«¿qué nos da estar dentro?»* no tenía buena respuesta:
+cuando alguien se iba de la empresa, su trabajo se iba con él.
+
+De ahí sale todo lo demás. `Project.organizationId` es `NOT NULL`, el tope de
+proyectos se cuenta **por organización**, y quien está en un proyecto tiene que
+tener **asiento** en la organización que lo contiene.
+
+### 47.2 El noveno servicio
+
+`billing-service` en el **3009**, esquema `billing`. Seis tablas:
+`organizations`, `organization_members`, `organization_roles`,
+`project_role_templates`, `subscriptions` y `billing_events`.
+
+⚠️ **No habla con ningún otro servicio, y esa invariante sigue en pie.** Contesta
+*qué plan tienes, qué da, quién está dentro y qué puede*. Quien cuenta proyectos
+y mensajes es el gateway, que ya tiene delante los clientes de `projects`,
+`tasks` y `assistant`. Si aparece un `*_SERVICE_HOST` en su `.env`, se ha
+invertido el reparto.
+
+**Redis sí**, desde 2026-08-27, y no rompe esa regla: es infraestructura, igual
+que Postgres, y es lo que ya usa `permissions-service` para lo mismo. Cachea 30 s
+`permisosDe` y `organizacionesDe` —las dos lecturas calientes— con invalidación
+explícita en las nueve escrituras que cambian quién puede qué. El TTL solo cubre
+lo que la invalidación no alcance.
+
+### 47.3 Cuatro planes en una escalera
+
+`FREE` · `TEAM` · `BUSINESS` · `ENTERPRISE`. `PLUS` y `PRO` **se borraron**, del
+enum de TypeScript y del de Postgres: lo desplegado eran cuentas de prueba y no
+había a quién conservarle un escalón.
+
+⚠️ **Desapareció la distinción individual/empresa.** Desde que la organización
+contiene los proyectos, «individual» no es una categoría: es una organización de
+un asiento. Todos los planes de pago van **por asiento** y se contratan **para
+una organización** — `POST /me/billing/checkout` exige `organizationId` siempre.
+
+Los topes viven en `contracts/src/billing/plans.ts` y **en ningún otro sitio**.
+
+### 47.4 Los papeles de organización, que son la tercera capa hecha datos
+
+Eran un enum de tres valores (`OWNER`/`ADMIN`/`MEMBER`) y se quedó corto en
+cuanto una empresa quiso decidir *quién crea proyectos* aparte de *quién invita*.
+Ahora cada organización define los suyos con un **diccionario de booleanos**,
+exactamente igual que un proyecto define sus roles.
+
+🔴 **Ser dueño no es un papel.** Se resuelve contra `Organization.ownerUserId`
+**antes** de mirar ninguno, igual que `ownerId` en un proyecto. Guardarlo como
+fila permitiría quitarse permisos a uno mismo y dejar la organización sin nadie
+que la administre y sin salida.
+
+Los nueve permisos:
+
+```
+canManageOrganization   canCreateProject      canViewAllProjects
+canManageAllProjects    canInviteMembers      canManageMembers
+canManageRoleTemplates  canManageBilling      canViewAuditLog
+```
+
+🔴 **`cabenEn`: repartir permisos no puede crear permisos.** Sin esa regla, quien
+tiene `canManageMembers` se crea un papel con `canManageBilling`, se lo asigna, y
+está tocando la tarjeta de la empresa. Se aplica en los **cuatro** sitios donde
+se reparte: crear papel, editar papel, asignar papel e **invitar** —esa última es
+la puerta trasera que se olvida—.
+
+⚠️ **«Administración» NO lleva `canManageBilling`** al crearse. Quien lleva el
+equipo no toca la tarjeta salvo que el dueño se lo dé a propósito.
+
+### 47.5 El puente: plantillas de rol de proyecto
+
+Cada organización define los roles con los que **nacen** sus proyectos. Resuelve
+el problema más molesto que tenía PRAXIS: cada proyecto inventaba sus roles desde
+cero, y con quince proyectos eso es el mismo trabajo quince veces hecho distinto.
+
+⚠️ **El puente va en una sola dirección.** Cambiar una plantilla **no** reescribe
+los proyectos que ya existen: sería borrar el trabajo de quien los ajustó, desde
+una pantalla que habla de otra cosa. La pantalla lo dice, porque nadie lo supone.
+
+⚠️ Y son permisos **de proyecto** (`ProjectPermission`), no de organización. Son
+dos vocabularios distintos: `canCreateTask` no significa nada arriba y
+`canManageBilling` no significa nada dentro de un tablero. Por eso son **dos
+pantallas**.
+
+### 47.6 Tres códigos de error, tres salidas
+
+| Código | Status | Qué pasó | Cómo se arregla |
+|---|---|---|---|
+| `FORBIDDEN` | 403 | No tienes el permiso | Pedírselo a quien administra el proyecto |
+| `NOT_IN_ORG` | 403 | No tienes asiento en la organización | Que te den uno |
+| `QUOTA_EXCEEDED` | 402 | Se agotó un tope del plan | Pagar, o borrar algo |
+
+🔴 **`NOT_IN_ORG` no es un `402`**: no se ha agotado nada, esa persona no está
+dentro. Y no es un `FORBIDDEN` normal: la salida es un **asiento**, que es otra
+pantalla y otro coste.
+
+⚠️ El tope de `miembrosPorProyecto` **se retiró**: lo sustituyó el asiento. Si
+vuelve a aparecer un límite por proyecto, es señal de que alguien reabrió la
+puerta a los invitados externos.
+
+### 47.7 El 402 tiene dos caras
+
+🔴 **Con el tope contado por organización, quien ve el mensaje puede no ser quien
+puede resolverlo.** En un equipo de diez, nueve no tocan la tarjeta de la
+empresa. El gateway resuelve `canManageBilling` **solo en el camino del fallo**
+—una llamada TCP de más cuando ya se va a negar la escritura, cero en el camino
+normal— y lo manda en `details.puedeAmpliar`.
+
+Con él, la pantalla ofrece los planes; sin él, «avísale a quien administra». Un
+botón de pagar delante de quien no puede pagar se lee como una avería, y una
+avería no se paga: se abandona.
+
+⚠️ **Ausente significa «no se sabe», y entonces se ofrece la salida.** Esconderle
+el camino a quien sí puede pagar cuesta más que enseñárselo a quien no.
+
+### 47.8 La organización activa vive en una cookie
+
+`praxis_org`, junto a `praxis_theme` y `praxis_sidebar` y por el mismo motivo: el
+servidor tiene que conocerla **al pintar**, o la lista de proyectos sale entera y
+se recorta tras hidratar — un parpadeo en cada carga, y en Multi-Zones cada
+cambio de zona es una carga completa.
+
+🔴 **Es un filtro, nunca un permiso.** No es `httpOnly` y cualquiera puede
+escribir ahí lo que quiera: el servidor la **suma** al filtro de «dueño o
+miembro» que ya aplicaba. Poner una organización ajena devuelve **cero**
+proyectos, no los suyos. Verificado.
+
+⚠️ Sin cookie significa **todas**, no «la personal»: quien nunca ha tocado el
+selector sigue viendo lo que veía antes de que esto existiera.
+
+⚠️ **El selector recarga la página, no hace `router.refresh()`.** La cookie la
+leen los siete `layout.tsx` en el servidor, y un refresco del App Router no
+vuelve a ejecutar el layout de una zona ya montada: el sidebar se quedaría
+marcando la organización vieja mientras la lista de abajo enseña la nueva.
+
+### 47.9 La organización personal dejó de ser invisible
+
+Era `PERSONAL`, sin nombre, creada perezosamente y escondida de todas las
+pantallas. Tenía sentido mientras solo repartía topes; desde que **contiene** los
+proyectos, una organización que no se ve es un sitio donde no se puede meter
+nada.
+
+Ahora tiene nombre, sale en el selector y en la lista, y **se crea al
+registrarse**. Sigue habiendo como mucho una por cuenta, con el índice único
+parcial (`WHERE kind = 'PERSONAL'`) escrito a mano en la migración porque Prisma
+no sabe expresarlo.
+
+### 47.10 Las pantallas, en el lenguaje de Kyloo desde el primer trazo
+
+Seis pantallas nuevas o rehechas, todas con el dispositivo de
+[`kyloo-design/SKILL.md`](../../kyloo-design/SKILL.md) §4 —filas con raya
+punteada, número a la izquierda, botones como texto subrayado— y sobre los tokens
+`--color-*`, **no** los `--l-*` de la landing, porque estas responden al tema
+(§13).
+
+| Pantalla | Ruta |
+|---|---|
+| Tus organizaciones | `/dashboard/organizations` |
+| Crear una | `/dashboard/organizations/new` |
+| El portal de una | `/dashboard/organizations/:id` |
+| Papeles y plantillas | `/dashboard/organizations/:id/roles` |
+| La entrada del sidebar | `/dashboard/roles` → redirige a la activa |
+| Planes y consumo | `/dashboard/billing` |
+
+🔴 **El portal empieza por sus proyectos, y ese fue el arreglo que importaba.**
+Empezaba por los asientos y el plan, y se leía **vacío** — con razón: eso es una
+factura, no un sitio de trabajo. Lo que hay dentro de una organización es el
+trabajo del equipo, así que va primero; el plan es una línea al final.
+
+🔴 **Crear una organización dejó de preguntar el plan y los asientos.** Era una
+decisión comercial pedida a alguien que todavía no sabe qué es esto. Pide un
+nombre, explica las tres cosas que cambian, y nace en gratuito.
+
+### 47.11 Cinco trampas nuevas, todas verificadas
+
+1. 🔴 **Un campo declarado solo en el DTO interno da 400 en la URL.** El
+   `ValidationPipe` del gateway rechaza lo que el DTO de query no declara, y el
+   síntoma fue **una lista vacía**, no un error visible. Es la trampa de «envía
+   solo los campos que el DTO declara» leída al revés.
+2. 🔴 **`QuotaService.exigir()` reconstruía el detalle del 402 con cuatro campos
+   fijos** y tiraba el resto en silencio. Añadir un dato compilaba, llegaba al
+   helper y no salía por la respuesta.
+3. 🔴 **Editar una migración ya aplicada no la vuelve a ejecutar.** Se editó la
+   inicial de `billing` para quitar dos valores de un enum; la base de quien ya
+   tenía el esquema se quedó con `PLUS` y `PRO` vivos y **sin `ENTERPRISE`**,
+   mientras el código creía lo contrario. Editar en su sitio solo vale cuando
+   todo el mundo parte de cero.
+4. 🍎 **Compilar un servicio con `nest start --watch` en marcha deja `dist/` a
+   medias**, con un `MODULE_NOT_FOUND` que no se arregla recompilando. Es lo que
+   CLAUDE.md documenta para `prisma:generate`, y vale igual para un `build`:
+   parar, borrar `dist/`, reconstruir y arrancar en frío.
+5. 🍎 **El `sed` de macOS no entiende `\b`.** Un `sed -i '' 's/\bX\b/Y/g'` se
+   ejecuta, sale con código 0 y **no cambia nada**. Para renombrar, Python.
+
+### 47.12 Lo que no está hecho
+
+- **Sin pruebas end-to-end de facturación ni de organizaciones.** Todo se
+  verificó a mano y por API contra el stack levantado.
+- **Huérfanos**: qué pasa con los proyectos de una organización borrada. Hoy no
+  hay ruta que borre una, así que no es urgente — en cuanto exista, lo es.
+- **Administración de plataforma no ve las organizaciones.** Tiene cuentas,
+  proyectos y actividad.
+- **Dominio de correo propio y exportación de un proyecto**, que son las dos
+  piezas de gobierno que más venden y no están.
+- **El mensaje directo sigue sin ámbito**: hoy se puede escribir a cualquiera.

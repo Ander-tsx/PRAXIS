@@ -29,6 +29,8 @@ import {
   type OrganizationMemberView,
   OrganizationRoleBodyDto,
   type OrganizationView,
+  PLANS,
+  PlanTier,
   ProjectRoleTemplateBodyDto,
   RenameOrganizationBodyDto,
   TransferOrganizationBodyDto,
@@ -98,7 +100,16 @@ export class MyOrganizationsController {
       await firstValueFrom(
         this.billingClient.send<OrganizationView>(
           { cmd: 'billing_org_create' },
-          { ownerUserId: userId, ownerEmail, name: body.name, tier: body.tier, seats: body.seats },
+          {
+            ownerUserId: userId,
+            ownerEmail,
+            name: body.name,
+            /* Nace gratuita. El plan lo concede el webhook de Stripe y solo el
+               webhook: mandar aquí un `tier` de pago crearía una organización
+               con una promesa dentro que nadie ha cobrado. */
+            tier: PlanTier.FREE,
+            seats: PLANS[PlanTier.FREE].quotas.asientos ?? 1,
+          },
         ),
       ),
     );
@@ -257,6 +268,8 @@ export class OrganizationsController {
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
     @Body() body: InviteOrganizationMemberBodyDto,
   ) {
+    const organizacion = await this.leer(organizationId, req.user!.userId).catch(() => null);
+
     const invitacion = oFalla(
       await firstValueFrom(
         this.billingClient.send<{ email: string; token: string; expiraEn: string }>(
@@ -271,10 +284,38 @@ export class OrganizationsController {
       ),
     );
 
+    const enlace = `${this.appUrl}/dashboard/organizations/invitation?token=${invitacion.token}`;
+
+    /* 🔴 **El correo se manda, y el enlace se sigue devolviendo.** Las dos
+       cosas: un correo se pierde en no deseados el día de la demostración, y el
+       token en claro solo existe en esta respuesta —en la base queda su hash—.
+       Que se pueda copiar además de enviarse no cuesta nada y salva el caso.
+
+       ⚠️ **No se espera a que salga.** Si el envío falla, la invitación ya está
+       creada y el enlace está delante: tumbar la petición por el correo sería
+       perder el token para siempre por un problema de otro sistema. */
+    const nombre = await this.nombreDe(req.user!.userId);
+    const enviado = await firstValueFrom(
+      this.credentialsClient.send<{ enviado: boolean }>(
+        { cmd: 'mail_send_invitation' },
+        {
+          email: invitacion.email,
+          organizacion: organizacion?.name ?? 'PRAXIS',
+          invitaPor: nombre,
+          enlace,
+        },
+      ),
+    ).catch((error: Error) => {
+      this.log.warn(`No se pudo mandar la invitación a ${invitacion.email}: ${error.message}`);
+      return { enviado: false };
+    });
+
     return {
       email: invitacion.email,
       expiraEn: invitacion.expiraEn,
-      enlace: `${this.appUrl}/dashboard/organizations/invitation?token=${invitacion.token}`,
+      enlace,
+      /** Si el correo salió. La pantalla enseña el enlace igual, pero lo dice. */
+      correoEnviado: enviado.enviado,
     };
   }
 
@@ -633,6 +674,22 @@ export class OrganizationsController {
         { organizationId, userId },
       ),
     );
+  }
+
+  /**
+   * Cómo se llama quien invita, para que el correo lo diga.
+   *
+   * ⚠️ **`null` si no se puede resolver**, y el correo se manda igual con «Te
+   * han invitado». Un envío que falla por no saber un nombre es peor que un
+   * correo que dice menos.
+   */
+  private async nombreDe(userId: string): Promise<string | null> {
+    const perfiles = await firstValueFrom(
+      this.credentialsClient.send<Perfil[]>({ cmd: 'user_find_by_ids' }, { ids: [userId] }),
+    ).catch(() => [] as Perfil[]);
+
+    const nombre = [perfiles[0]?.firstName, perfiles[0]?.lastName].filter(Boolean).join(' ').trim();
+    return nombre || null;
   }
 
   /** Los correos de la lista, con el nombre de quien ya tiene cuenta. */

@@ -146,8 +146,13 @@ function Invitar({
            seleccionarlo entero sin arrastrar media frase con él. */
         <div className="flex flex-col gap-2 border-l-2 border-success py-1 pl-4">
           <p className="font-sans text-sm text-text-primary">
-            Invitación creada para <strong>{state.email}</strong>. Pásale este enlace: es lo único
-            que le deja entrar, y no se puede volver a ver.
+            {state.correoEnviado
+              ? `Le hemos mandado un correo a ${state.email}.`
+              : `Invitación creada para ${state.email}, pero el correo no salió.`}{' '}
+            {/* ⚠️ El enlace se enseña **en los dos casos**: el token en claro
+                solo existe aquí —en la base queda su hash— y un correo se pierde
+                en no deseados el día que hay que enseñarlo. */}
+            Este enlace también sirve, y no se puede volver a ver:
           </p>
           <code className="block break-all font-mono text-xs text-text-secondary">
             {state.enlace}

@@ -345,7 +345,6 @@ const TABLEROS: TableroDef[] = [
   },
 ];
 
-
 const PRIORIDADES = ['LOW', 'MEDIUM', 'MEDIUM', 'HIGH', 'HIGH', 'URGENT'] as const;
 
 const entre = (min: number, max: number) => min + Math.random() * (max - min);
@@ -733,8 +732,9 @@ async function main() {
     console.log(`  ${tablero.espacio} / ${tablero.nombre}: ${tablero.tareas.length} tareas`);
   }
 
-
-  console.log(`\n  ${creadas} tareas, ${cerradas} cerradas (${Math.round((cerradas / creadas) * 100)} %).`);
+  console.log(
+    `\n  ${creadas} tareas, ${cerradas} cerradas (${Math.round((cerradas / creadas) * 100)} %).`,
+  );
   console.log(`  ${SEMANAS} semanas de historial · ${TABLEROS.length} tableros en «${ESPACIO}».`);
   console.log(`  Proyecto: ${NOMBRE_PROYECTO} (${projectId})`);
   console.log(`  Dueño: ${dueno.nombre} <${correoDueno}>`);

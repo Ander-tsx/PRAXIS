@@ -13,6 +13,9 @@ import * as Joi from 'joi';
  * servicio que solo tiene que saber quién paga.
  */
 export const billingEnvValidationSchema = Joi.object({
+  /* La caché de lecturas. Opcional: sin ella cada lectura va a Postgres y todo
+     sigue funcionando más despacio, que es como falla una caché bien puesta. */
+  REDIS_URL: Joi.string().optional().allow(''),
   DATABASE_URL: Joi.string().required(),
   /**
    * ⚠️ **3009, y `valid()` en vez de un `default`.** Mismo patrón que los otros
