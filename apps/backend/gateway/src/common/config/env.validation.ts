@@ -100,8 +100,6 @@ export const envValidationSchema = Joi.object({
    * demás. Así se puede desplegar PRO —que ya está en producción— antes que los
    * de empresa, sin dejar un botón que responde 503 al pulsarlo.
    */
-  STRIPE_PRICE_PLUS: Joi.string().optional().allow(''),
-  STRIPE_PRICE_PRO: Joi.string().optional().allow(''),
   STRIPE_PRICE_TEAM: Joi.string().optional().allow(''),
   STRIPE_PRICE_BUSINESS: Joi.string().optional().allow(''),
   /**

@@ -18,7 +18,6 @@ import {
   type OrganizationView,
   PLANS,
   PLAN_LIST,
-  PlanAudience,
   PlanTier,
   type SubscriptionStatus,
 } from '@praxis/contracts';
@@ -161,30 +160,26 @@ export class BillingController {
   async checkout(@Request() req: Express.Request, @Body() body: CheckoutBodyDto) {
     const userId = req.user!.userId;
     const spec = PLANS[body.tier];
-    const deEmpresa = spec.audience === PlanAudience.ENTERPRISE;
 
-    if (deEmpresa && !body.organizationId) {
+    /* ⚠️ **La organización es obligatoria en todos los planes**, y desde
+       2026-08-26 no hay excepción. Antes los planes «individuales» iban sin ella
+       —a la organización personal, que era invisible— y los de empresa la
+       exigían: dos caminos, y una rama en cada sitio que resolviera una cuota.
+       Ahora la personal es una organización normal de un asiento, así que
+       siempre se paga *para* una y quien la elige es quien paga, no el
+       servidor. */
+    if (!body.organizationId) {
       throw new BadRequestException(
-        `El plan ${spec.nombre} se contrata para una organización: créala antes de pagar.`,
+        `El plan ${spec.nombre} se contrata para una organización: elige cuál.`,
       );
     }
-    if (!deEmpresa && body.organizationId) {
-      /* ⚠️ No se ignora en silencio. Un plan individual va siempre a la
-         organización personal de quien paga; aceptar el parámetro y no usarlo
-         dejaría a alguien creyendo que le ha comprado el plan a su empresa. */
-      throw new BadRequestException(
-        `El plan ${spec.nombre} es individual: no se contrata para una organización.`,
-      );
-    }
-    if (deEmpresa && (body.seats ?? 0) < spec.asientosMinimos) {
+    if ((body.seats ?? 0) < spec.asientosMinimos) {
       throw new BadRequestException(
         `El plan ${spec.nombre} empieza en ${spec.asientosMinimos} asientos.`,
       );
     }
 
-    const organizationId = body.organizationId
-      ? await this.organizacionPropia(body.organizationId, userId)
-      : await this.organizacionPersonal(userId);
+    const organizationId = await this.organizacionPropia(body.organizationId, userId);
 
     const [suscripcion, email] = await Promise.all([
       this.suscripcion(organizationId),
@@ -197,7 +192,7 @@ export class BillingController {
       seats: body.seats,
       email,
       stripeCustomerId: suscripcion?.stripeCustomerId ?? null,
-      volverA: deEmpresa ? `/dashboard/organizations/${organizationId}` : '/dashboard/billing',
+      volverA: `/dashboard/organizations/${organizationId}`,
     });
   }
 

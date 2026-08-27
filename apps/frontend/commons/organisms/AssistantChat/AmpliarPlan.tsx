@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { type AssistantQuota, formatoReinicio } from '../../api/assistant';
-import { ASSISTANT_PLAN_LIMITS } from '../../api/domain';
 import { Button } from '../../atoms';
-import { abrirPagoProAction, estadoDeFacturacionAction } from '../../billing/actions';
+import { estadoDeFacturacionAction } from '../../billing/actions';
 import { alpha, colors } from '../../tokens';
 
 /**
@@ -20,19 +19,17 @@ import { alpha, colors } from '../../tokens';
  *
  * ## Cuándo NO se enseña esto
  *
- * - **A quien ya tiene PRO.** Si alguien agotó 250 mensajes, venderle PRO es
- *   ridículo: ahí el aviso de «vuelven el día 1» es la respuesta correcta y es
- *   lo que se enseña.
+ * - **A quien ya paga.** Si alguien agotó la cuota de un plan de pago,
+ *   ofrecerle que lo compre es ridículo: ahí el aviso de «vuelven el día 1» es
+ *   la respuesta correcta y es lo que se enseña.
  * - **Si la instalación no tiene claves de Stripe.** `GET /me/billing/estado`
  *   lo dice, y el navegador no puede saberlo por su cuenta. Sin claves el pago
  *   responde 503, y un botón que falla al pulsarlo es peor que no tenerlo.
  *
  * En los dos casos se cae al aviso de siempre, que sigue siendo verdad.
  */
-export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
+export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
   const [disponible, setDisponible] = useState<boolean | null>(null);
-  const [abriendo, setAbriendo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   /**
    * Se pregunta al montarse, no al cargar el chat.
@@ -56,10 +53,6 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
   }, []);
 
   const reinicio = formatoReinicio(cuota.reinicia);
-  /* Solo cartelería, igual que en la página de planes: el precio de verdad es
-     el `price_…` de Stripe. El respaldo evita que quede un hueco si la zona que
-     monta el chat no declara la variable. */
-  const precio = process.env.NEXT_PUBLIC_PRECIO_PRO || '120';
 
   /* Mientras no se sabe si hay pago, se enseña el aviso de siempre: parpadear
      entre dos mensajes distintos es peor que tardar un segundo en ofrecer. */
@@ -67,17 +60,19 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
     return <AvisoDeCuota limite={cuota.limite} reinicio={reinicio} />;
   }
 
-  async function comprar() {
-    setAbriendo(true);
-    setError(null);
-    const { url, error: fallo } = await abrirPagoProAction();
-    if (url) {
-      /* Navegación dura: Stripe está fuera de la aplicación. */
-      window.location.href = url;
-      return;
-    }
-    setError(fallo ?? 'No se pudo abrir la página de pago.');
-    setAbriendo(false);
+  /**
+   * Lleva a la tabla de precios, y **no abre el pago desde aquí**.
+   *
+   * ⚠️ Antes sí lo abría, con el plan escrito a pelo en esta llamada. Dejó de
+   * poder hacerlo cuando todo plan pasó a contratarse **para una organización**:
+   * quién paga es una elección, y este componente no puede tomarla — vive en el
+   * chat, que se monta en cinco zonas y no sabe en qué organización estás.
+   *
+   * Navegación dura porque cruza de zona: cada una tiene su `basePath` y un
+   * `Link` de aquí a `/dashboard` no lo resuelve.
+   */
+  function verPlanes() {
+    window.location.href = '/dashboard/billing';
   }
 
   return (
@@ -119,10 +114,13 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
 
         <div className="flex min-w-0 flex-col gap-1">
           <p className="font-sans text-base font-semibold text-text-primary">
-            Con PRO no esperas
+            Con un plan de pago no esperas
           </p>
+          {/* ⚠️ Ni una cifra escrita aquí: los topes y los precios los sirve el
+              catálogo, y repetirlos en un componente que vive en cinco zonas es
+              garantizar que un día prometan lo que el servidor niega. */}
           <p className="font-sans text-sm text-text-secondary">
-            Obtén acceso a {ASSISTANT_PLAN_LIMITS.PRO} mensajes al mes desde {precio}$ pesos.
+            Amplía los mensajes al mes para ti y para quien trabaje contigo.
           </p>
         </div>
       </div>
@@ -135,15 +133,9 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
         <Ventaja>Lee los archivos que le adjuntes y te contesta sobre ellos.</Ventaja>
       </ul>
 
-      {error && (
-        <p role="alert" className="font-sans text-xs" style={{ color: colors.error }}>
-          {error}
-        </p>
-      )}
-
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" onClick={comprar} isLoading={abriendo}>
-          Pasar a PRO
+        <Button type="button" onClick={verPlanes}>
+          Ver los planes
         </Button>
         {/* ⚠️ Se dice que se renueva, y se dice aquí. Cobrar un segundo mes a
             quien creía estar comprando uno suelto es la peor reseña posible. */}

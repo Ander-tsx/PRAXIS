@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
-import { PlanTier } from './plans';
+import { PLANES_AUTOSERVICIO, PlanTier } from './plans';
 import type { PlanQuotas, QuotaKind, Tope } from './plans';
 
 /**
@@ -110,12 +110,17 @@ export class CheckoutBodyDto {
    * ⚠️ **`FREE` no está**: no se contrata, se es. Pedirlo tendría que
    * significar «dame de baja», y dar de baja desde el mismo endpoint que cobra
    * es la clase de ambigüedad que acaba en una baja accidental.
+   *
+   * ⚠️ **`ENTERPRISE` tampoco**, y por el motivo contrario: se paga, pero no
+   * tiene precio en Stripe porque se negocia. Aceptarlo aquí abriría un checkout
+   * contra un precio que no existe, y el fallo saldría al pulsar. La lista sale
+   * de `PLANES_AUTOSERVICIO`, que es justo la que sabe distinguir los dos casos.
    */
-  @ApiProperty({ enum: [PlanTier.PLUS, PlanTier.PRO, PlanTier.TEAM, PlanTier.BUSINESS] })
-  @IsIn([PlanTier.PLUS, PlanTier.PRO, PlanTier.TEAM, PlanTier.BUSINESS])
+  @ApiProperty({ enum: PLANES_AUTOSERVICIO.map((plan) => plan.tier) })
+  @IsIn(PLANES_AUTOSERVICIO.map((plan) => plan.tier))
   tier: PlanTier;
 
-  /** Solo en los de asiento. En los individuales sobra y da 400. */
+  /** Cuántos asientos se contratan. Todos los planes de pago van por asiento. */
   @ApiPropertyOptional({ example: 5 })
   @IsOptional()
   @IsInt()

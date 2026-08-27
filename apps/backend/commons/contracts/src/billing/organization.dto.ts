@@ -40,20 +40,46 @@ import { PlanTier } from './plans';
  * para todo el mundo antes de que sirva de algo es una migración disfrazada.
  */
 export enum OrganizationKind {
-  /** La de una persona. Invisible, un miembro, no admite más. */
+  /**
+   * La de una persona: un asiento, y la que se crea al registrarse.
+   *
+   * ⚠️ **Ya no es invisible, y el cambio es de 2026-08-26.** Mientras una
+   * organización solo repartía topes, una sin nombre que no salía en ninguna
+   * pantalla tenía sentido. Desde que **contiene** los proyectos, una
+   * organización que no se ve es un sitio donde no se puede meter nada: tiene
+   * nombre, sale en el selector del sidebar y es donde viven los proyectos de
+   * quien trabaja solo.
+   *
+   * Lo que sí sigue en pie es el índice único parcial: **una sola `PERSONAL` por
+   * cuenta**, y varias `ENTERPRISE` del mismo dueño sí. Va a mano en la
+   * migración con un `WHERE kind = 'PERSONAL'`, porque Prisma no sabe
+   * expresarlo — sin él, dos peticiones simultáneas crean dos y la segunda se
+   * queda con las cuotas.
+   */
   PERSONAL = 'PERSONAL',
   /** La que se contrata con nombre, asientos y quien la administre. */
   ENTERPRISE = 'ENTERPRISE',
 }
 
 /**
- * Los tres papeles dentro de una organización.
+ * Los papeles de arranque de una organización.
  *
- * ⚠️ **No tienen nada que ver con los roles de proyecto ni con el rol global.**
- * Ser `OWNER` de la organización no da ni un permiso dentro de un tablero: son
- * las dos primeras capas y esta es la tercera. Un `OWNER` que no sea miembro de
- * un proyecto de su propia organización **no lo ve**, y es a propósito — el plan
- * paga la plataforma, no abre las puertas de dentro.
+ * ⚠️ **Son la semilla, no el catálogo cerrado.** Desde 2026-08-26 una
+ * organización define sus propios papeles con un diccionario de
+ * `OrganizationPermission`, igual que un proyecto define sus roles. Estos tres
+ * son los que se crean con ella para que nunca esté sin ninguno; `OWNER` además
+ * es especial y no se toca (ver `PERMISOS_DE_DUENO`).
+ *
+ * ⚠️ **Siguen sin tener nada que ver con los roles de proyecto ni con el rol
+ * global.** Son tres capas, y esta es la tercera.
+ *
+ * 🔴 **Lo que cambió, y el comentario anterior decía al revés:** un papel de la
+ * organización **sí** puede abrir la puerta de un proyecto —`canViewAllProjects`
+ * enseña la lista, `canManageAllProjects` deja entrar autoconcediéndose el
+ * acceso—, y solo dejando rastro en el registro de auditoría y avisando a quien
+ * es responsable del proyecto. Lo que sigue sin abrir nada es **el plan**: pagar
+ * no da permisos. Sin esto, una empresa no tiene forma de recuperar un proyecto
+ * cuando su responsable se va, que es exactamente por lo que paga.
  */
 export enum OrganizationRole {
   /** Quien la creó. Paga, y es el único que puede disolverla. */
@@ -65,6 +91,142 @@ export enum OrganizationRole {
 }
 
 export const ORGANIZATION_ROLES = Object.values(OrganizationRole);
+
+/**
+ * Lo que se puede hacer **a** una organización.
+ *
+ * ⚠️ **Es un vocabulario distinto del de proyecto, no el mismo a otra escala.**
+ * `canCreateTask` no significa nada aquí y `canManageBilling` no significa nada
+ * dentro de un tablero. Por eso son dos listas y dos pantallas: juntarlas
+ * obligaría a un selector de proyecto que repite la navegación que ya existe.
+ */
+export enum OrganizationPermission {
+  /** Crear proyectos dentro de la organización. */
+  CAN_CREATE_PROJECT = 'canCreateProject',
+  /** Ver la lista de todos los proyectos — **no** entrar en ellos. */
+  CAN_VIEW_ALL_PROJECTS = 'canViewAllProjects',
+  /** Archivar, suspender y reasignar responsable de cualquiera. Deja rastro. */
+  CAN_MANAGE_ALL_PROJECTS = 'canManageAllProjects',
+  /** Mandar invitaciones, que ocupan asiento desde que se mandan. */
+  CAN_INVITE_MEMBERS = 'canInviteMembers',
+  /** Cambiar papeles y sacar gente. */
+  CAN_MANAGE_MEMBERS = 'canManageMembers',
+  /** Editar las plantillas con que nacen los proyectos nuevos. */
+  CAN_MANAGE_ROLE_TEMPLATES = 'canManageRoleTemplates',
+  /** Plan, asientos y facturas. */
+  CAN_MANAGE_BILLING = 'canManageBilling',
+  /** El registro de auditoría de la organización. */
+  CAN_VIEW_AUDIT_LOG = 'canViewAuditLog',
+}
+
+export const ORGANIZATION_PERMISSIONS = Object.values(OrganizationPermission);
+
+/**
+ * Los permisos de un papel.
+ *
+ * 🔴 **Un diccionario de booleanos, nunca un array.** Es la misma forma que los
+ * roles de proyecto, y allí se aprendió tarde: los roles creados antes del
+ * validador siguen guardados como array y hay que normalizarlos al leer. Aquí el
+ * validador va desde el primer día — `normalizarPermisosOrg` es la única puerta
+ * de entrada, y acepta el array solo para no tragarse un dato viejo en silencio.
+ */
+export type OrganizationPermissions = Record<OrganizationPermission, boolean>;
+
+/** Un diccionario con todo a `false`. El punto de partida de un papel nuevo. */
+export function permisosOrgVacios(): OrganizationPermissions {
+  return Object.fromEntries(
+    ORGANIZATION_PERMISSIONS.map((clave) => [clave, false]),
+  ) as OrganizationPermissions;
+}
+
+/**
+ * Lo que puede quien es dueño de la organización: todo, y no se puede editar.
+ *
+ * ⚠️ **No es un papel guardado en la base.** Es una constante, y se resuelve
+ * antes de mirar ningún papel — igual que `ownerId` en un proyecto es un bypass
+ * y no un rol. Guardarlo como fila permitiría dejarse sin permisos a uno mismo,
+ * que es la forma más rápida de dejar una organización sin nadie que la
+ * administre y sin salida.
+ */
+export function permisosDeDueno(): OrganizationPermissions {
+  return Object.fromEntries(
+    ORGANIZATION_PERMISSIONS.map((clave) => [clave, true]),
+  ) as OrganizationPermissions;
+}
+
+/** Lo que trae el papel «Administración» al crearse la organización. */
+export function permisosDeAdministracion(): OrganizationPermissions {
+  return {
+    ...permisosOrgVacios(),
+    [OrganizationPermission.CAN_CREATE_PROJECT]: true,
+    [OrganizationPermission.CAN_VIEW_ALL_PROJECTS]: true,
+    [OrganizationPermission.CAN_MANAGE_ALL_PROJECTS]: true,
+    [OrganizationPermission.CAN_INVITE_MEMBERS]: true,
+    [OrganizationPermission.CAN_MANAGE_MEMBERS]: true,
+    [OrganizationPermission.CAN_MANAGE_ROLE_TEMPLATES]: true,
+    [OrganizationPermission.CAN_VIEW_AUDIT_LOG]: true,
+  };
+}
+
+/**
+ * Lo que trae el papel «Miembro» al crearse la organización.
+ *
+ * Solo crear proyectos. Es lo que hace que entrar en una organización sirva de
+ * algo el primer día sin que nadie tenga que configurar nada.
+ */
+export function permisosDeMiembro(): OrganizationPermissions {
+  return {
+    ...permisosOrgVacios(),
+    [OrganizationPermission.CAN_CREATE_PROJECT]: true,
+  };
+}
+
+/**
+ * Deja un diccionario utilizable venga como venga.
+ *
+ * ⚠️ **Toda lectura pasa por aquí.** Una clave que falte se lee como `false`, no
+ * como `undefined`: comparar `undefined` con `===  true` da `false` igualmente,
+ * pero pintarlo en una pantalla da una casilla en estado indeterminado y un
+ * `Select` sin valor. Y una clave que sobre se descarta — un permiso que se
+ * retiró del vocabulario no puede seguir concediendo nada desde una fila vieja.
+ */
+export function normalizarPermisosOrg(bruto: unknown): OrganizationPermissions {
+  const base = permisosOrgVacios();
+
+  // Un array es el formato viejo de los roles de proyecto: la lista de las
+  // claves que están a `true`. No debería llegar nunca por aquí, pero tragarlo
+  // en silencio como «ningún permiso» sería peor que entenderlo.
+  if (Array.isArray(bruto)) {
+    for (const clave of bruto) {
+      if (typeof clave === 'string' && clave in base) {
+        base[clave as OrganizationPermission] = true;
+      }
+    }
+    return base;
+  }
+
+  if (bruto && typeof bruto === 'object') {
+    for (const [clave, valor] of Object.entries(bruto as Record<string, unknown>)) {
+      if (clave in base) base[clave as OrganizationPermission] = valor === true;
+    }
+  }
+
+  return base;
+}
+
+/**
+ * El código de un 403 por no tener asiento en la organización.
+ *
+ * ⚠️ **Es un 403 distinto, y por eso tiene código propio.** Un `FORBIDDEN`
+ * normal se arregla pidiéndole el permiso a quien administra el proyecto; este
+ * se arregla dándole un **asiento** a la persona, que es otra conversación, con
+ * otra pantalla y otro coste. Y no es un `QUOTA_EXCEEDED`: no se ha agotado
+ * nada, es que esa persona no está dentro.
+ *
+ * Tercer código del mismo patrón, con `PROJECT_SUSPENDED_CODE` y
+ * `QUOTA_EXCEEDED_CODE`. Tres puertas, tres salidas distintas en la interfaz.
+ */
+export const NOT_IN_ORG_CODE = 'NOT_IN_ORG';
 
 /**
  * En qué estado está alguien dentro de la organización.

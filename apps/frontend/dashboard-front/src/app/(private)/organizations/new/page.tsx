@@ -29,7 +29,7 @@ export default async function NuevaOrganizacionPage({
     .get<CatalogoDePlanes>('/me/billing/planes')
     .catch(() => null);
 
-  const planes = (catalogo?.planes ?? []).filter((plan) => plan.audience === 'ENTERPRISE');
+  const planes = (catalogo?.planes ?? []).filter((plan) => plan.contratacion === 'AUTOSERVICIO');
 
   if (planes.length === 0) {
     return (

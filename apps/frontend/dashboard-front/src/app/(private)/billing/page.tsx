@@ -20,8 +20,6 @@ export const metadata: Metadata = {
 function preciosDelEntorno(): Partial<Record<PlanTier, string>> {
   return {
     FREE: '0',
-    ...(process.env.NEXT_PUBLIC_PRECIO_PLUS ? { PLUS: process.env.NEXT_PUBLIC_PRECIO_PLUS } : {}),
-    ...(process.env.NEXT_PUBLIC_PRECIO_PRO ? { PRO: process.env.NEXT_PUBLIC_PRECIO_PRO } : {}),
     ...(process.env.NEXT_PUBLIC_PRECIO_TEAM ? { TEAM: process.env.NEXT_PUBLIC_PRECIO_TEAM } : {}),
     ...(process.env.NEXT_PUBLIC_PRECIO_BUSINESS
       ? { BUSINESS: process.env.NEXT_PUBLIC_PRECIO_BUSINESS }
@@ -86,7 +84,7 @@ export default async function BillingPage({
              confirmación — no en la misma fila que los botones de comprar. */
           if (plan.tier === 'FREE') return null;
 
-          if (plan.audience === 'ENTERPRISE') {
+          if (plan.contratacion === 'AUTOSERVICIO') {
             /* ⚠️ No abre el pago: **hace falta la organización antes**, porque
                es ella quien paga y quien lleva los asientos. El checkout de un
                plan de equipo sin `organizationId` responde 400, así que lo que

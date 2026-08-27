@@ -6,7 +6,6 @@ import {
   OrganizationKind,
   OrganizationRole,
   PLANS,
-  PlanAudience,
   PlanTier,
   SubscriptionStatus,
   estaVigente,
@@ -237,11 +236,13 @@ export class OrganizationsService {
     seats: number;
   }) {
     const spec = PLANS[datos.tier];
-    if (!spec || spec.audience !== PlanAudience.ENTERPRISE) {
-      return {
-        error: 'Ese plan no crea una organización: es individual.',
-        codigo: 'NO_VALE',
-      } as Fallo;
+    /* ⚠️ **Ya no se rechaza ningún plan por «ser individual»**, porque desde
+       2026-08-26 no existe esa categoría: una persona sola es una organización
+       de un asiento. Lo único que se comprueba aquí es el suelo de asientos del
+       plan; cuántas organizaciones puedes tener lo decide la cuota, y eso lo
+       mira el gateway, que es quien sabe contar. */
+    if (!spec) {
+      return { error: 'Ese plan no existe.', codigo: 'NO_VALE' } as Fallo;
     }
     if (datos.seats < spec.asientosMinimos) {
       return {

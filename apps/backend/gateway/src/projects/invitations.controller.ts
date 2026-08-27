@@ -65,7 +65,11 @@ export class ProjectInvitationsController {
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Body() body: InviteMemberBodyDto,
   ) {
-    await this.quota.exigirMiembroDeProyecto(projectId);
+    /* 🕳️ Aquí iba `exigirMiembroDeProyecto`, que se retiró el 2026-08-26 con el
+       tope de miembros por proyecto. Lo que lo sustituye —comprobar que la
+       persona tiene asiento en la organización del proyecto— necesita
+       `Project.organizationId`, que llega en O3. Hasta entonces esto no tiene
+       límite, y es a sabiendas. Ver quota.service.ts y PLAN-ORGANIZACIONES O3.7. */
 
     return firstValueFrom(
       this.projectsClient.send(

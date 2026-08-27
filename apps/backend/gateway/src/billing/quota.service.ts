@@ -136,70 +136,30 @@ export class QuotaService {
 
   /* ─── Miembros de un proyecto ──────────────────────────────────────────── */
 
-  /**
-   * ¿Cabe otro miembro en este proyecto?
+  /*
+   * 🕳️ **Aquí había un tope de miembros por proyecto, y se retiró el
+   * 2026-08-26 — pero lo que lo sustituye todavía no existe.**
    *
-   * ⚠️ **El tope lo pone el plan del DUEÑO del proyecto, no el de quien
-   * invita.** Es su proyecto el que crece, y al revés un invitado con plan
-   * grande podría meter gente en el tablero de alguien que paga el pequeño.
+   * El tope vivía en `PlanQuotas.miembrosPorProyecto` y lo ponía el plan del
+   * dueño del proyecto. Se retiró porque desde que **quien está en un proyecto
+   * tiene que estar en la organización**, el techo de un tablero ya lo pone el
+   * asiento: un segundo tope por proyecto era una cifra más que explicar y que
+   * vigilar, midiendo algo que el asiento ya mide.
+   *
+   * ⚠️ **Lo que lo sustituye es la comprobación de asiento**, y no se puede
+   * escribir todavía: necesita `Project.organizationId`, que llega en O3. Hasta
+   * entonces **no hay ningún límite** en `POST /projects/:id/members` ni en
+   * `POST /projects/:id/invitations`, y está escrito aquí y en los dos
+   * controladores en vez de quedarse en silencio.
+   *
+   * Lo que hay que poner, cuando exista la columna:
+   *   1. Sacar la organización del proyecto.
+   *   2. Preguntar a billing si esa persona tiene asiento activo en ella.
+   *   3. Si no, **403 con `NOT_IN_ORG_CODE`** — no un 402: no se ha agotado
+   *      nada, es que no está dentro.
+   *
+   * Ver PLAN-ORGANIZACIONES.md, O3.7 y O4.3.
    */
-  async exigirMiembro(datos: {
-    ownerUserId: string;
-    miembrosActuales: number;
-  }): Promise<void> {
-    const plan = await this.planDe(datos.ownerUserId);
-    const tope = plan.quotas.miembrosPorProyecto;
-
-    this.exigir(cabe(datos.miembrosActuales, tope), {
-      kind: QuotaKind.MIEMBROS_POR_PROYECTO,
-      tier: plan.tier,
-      tope,
-      actual: datos.miembrosActuales,
-    });
-  }
-
-  /**
-   * ¿Cabe otro miembro en este proyecto? Contando por él mismo.
-   *
-   * Es la versión que usan los controladores: sabe sacar el dueño y la cuenta a
-   * partir del proyecto, para que la comprobación sea una sola línea allí donde
-   * se escribe.
-   *
-   * ⚠️ **Las invitaciones pendientes cuentan.** Es la misma razón por la que un
-   * asiento invitado ocupa asiento: si no contaran, se podrían mandar veinte
-   * sobre un tope de cinco y el límite se rompería en el momento de aceptarlas
-   * —con el proyecto ya por encima del plan y nadie que haya hecho nada mal—.
-   *
-   * ⚠️ Y si no se puede contar, **se deja pasar** y se registra. Negar por no
-   * haber podido contar es un falso positivo que quien lo sufre no puede
-   * resolver de ninguna manera; un miembro de más se saca.
-   */
-  async exigirMiembroDeProyecto(projectId: string): Promise<void> {
-    const [proyecto, miembros, invitaciones] = await Promise.all([
-      firstValueFrom(
-        this.projectsClient.send<{ ownerId: string } | null>(
-          { cmd: 'project_find_one' },
-          { id: projectId },
-        ),
-      ).catch(() => null),
-      firstValueFrom(
-        this.projectsClient.send<unknown[]>({ cmd: 'member_find_all' }, { projectId }),
-      ).catch(() => null),
-      firstValueFrom(
-        this.projectsClient.send<unknown[]>({ cmd: 'invitation_find_for_project' }, { projectId }),
-      ).catch(() => []),
-    ]);
-
-    if (!proyecto?.ownerId || miembros === null) {
-      this.log.error(`No se pudo contar la gente de ${projectId}: se deja invitar.`);
-      return;
-    }
-
-    await this.exigirMiembro({
-      ownerUserId: proyecto.ownerId,
-      miembrosActuales: miembros.length + (invitaciones?.length ?? 0),
-    });
-  }
 
   /* ─── El asistente ─────────────────────────────────────────────────────── */
 
@@ -284,6 +244,12 @@ const MENSAJES: Record<QuotaKind, (tope: number) => string> = {
     `Ya tienes ${tope} proyectos, que es todo lo que caben. Borra uno o amplía el plan.`,
   [QuotaKind.IA_MENSUAL]: (tope) =>
     `Has gastado los ${tope} mensajes de este mes. Vuelven el día 1, o amplía el plan.`,
-  [QuotaKind.MIEMBROS_POR_PROYECTO]: (tope) =>
-    `Este proyecto ya tiene ${tope} miembros, que es todo lo que caben. Saca a alguien o amplía el plan.`,
+  [QuotaKind.ASIENTOS]: (tope) =>
+    `Tu organización ya tiene ${tope} asientos ocupados. Libera uno o amplía el plan.`,
+  [QuotaKind.ORGANIZACIONES]: (tope) =>
+    `Ya tienes ${tope} organizaciones, que es todo lo que caben en tu plan.`,
+  [QuotaKind.AUTOMATIZACIONES]: (tope) =>
+    `Este proyecto ya tiene ${tope} automatizaciones activas. Pausa una o amplía el plan.`,
+  [QuotaKind.ALMACENAMIENTO]: (tope) =>
+    `Los adjuntos de tu organización ocupan los ${tope} MB del plan. Borra alguno o amplía.`,
 };

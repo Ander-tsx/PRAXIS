@@ -52,8 +52,11 @@ export function PlanCatalog({
 }) {
   const actual = resumen?.tier ?? 'FREE';
   const spec = planes.find((plan) => plan.tier === actual) ?? null;
-  const individuales = planes.filter((plan) => plan.audience === 'INDIVIDUAL');
-  const empresa = planes.filter((plan) => plan.audience === 'ENTERPRISE');
+  /* ⚠️ **Una sola lista desde 2026-08-26.** Antes eran dos —«Para ti» y «Para
+     un equipo»— porque había dos escaleras de planes. Desde que la organización
+     contiene los proyectos, quien trabaja solo es una organización de un
+     asiento: partir la tabla obligaba a quien la mira a decidir primero en cuál
+     de las dos está, que es una pregunta que nadie sabe contestar. */
 
   return (
     <div className="flex flex-col gap-10">
@@ -67,9 +70,20 @@ export function PlanCatalog({
           entradilla="Los topes se aplican en el servidor, no en esta pantalla: lo que veas aquí es exactamente lo que se te va a permitir."
         />
 
-        <Subtitulo texto="Para ti" />
-        <div className="grid gap-4 lg:grid-cols-3">
-          {individuales.map((plan) => (
+        {/* ⚠️ Se dice aquí y no en la letra pequeña: todo plan de pago lo
+            contrata una **organización**, no una persona. Se elige cuál, se
+            eligen los asientos y se paga desde su portal — que es también donde
+            se invita a la gente y queda el registro de lo cobrado. Un botón de
+            «pagar» que responde 400 por no haber elegido organización es la
+            clase de callejón que nadie sabe deshacer. */}
+        <p className="max-w-3xl font-sans text-sm text-text-secondary">
+          Todos los planes de pago van{' '}
+          <strong className="text-text-primary">por asiento</strong> y los contrata una
+          organización. Si trabajas solo, la tuya tiene un asiento y funciona igual.
+        </p>
+
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          {planes.map((plan) => (
             <TarjetaDePlan
               key={plan.tier}
               plan={plan}
@@ -77,31 +91,6 @@ export function PlanCatalog({
               esElTuyo={plan.tier === actual}
               seVende={disponibles.includes(plan.tier)}
               accion={plan.tier === actual ? accionPortal : accionDe(plan)}
-            />
-          ))}
-        </div>
-
-        <Subtitulo texto="Para un equipo" />
-        {/* ⚠️ Se dice aquí y no en la letra pequeña: un plan de equipo **no se
-            compra desde esta pantalla**, porque quien paga es la organización y
-            hay que crearla antes. Un botón de «pagar» que responde 400 por no
-            tener organización es la clase de callejón que nadie sabe deshacer. */}
-        <p className="max-w-3xl font-sans text-sm text-text-secondary">
-          Estos planes los contrata una <strong className="text-text-primary">organización</strong>,
-          no una persona: se crea con un nombre, se eligen los asientos y se paga desde su portal.
-          Ahí es donde se invita a la gente, se cambian los asientos y queda el registro de lo que
-          se ha cobrado. Cada miembro pasa a tener los topes del plan en sus propios proyectos.
-        </p>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {empresa.map((plan) => (
-            <TarjetaDePlan
-              key={plan.tier}
-              plan={plan}
-              precio={precios[plan.tier] ?? null}
-              esElTuyo={plan.tier === actual}
-              seVende={disponibles.includes(plan.tier)}
-              accion={accionDe(plan)}
-              porAsiento
             />
           ))}
         </div>
@@ -259,15 +248,14 @@ function TarjetaDePlan({
   esElTuyo,
   seVende,
   accion,
-  porAsiento = false,
 }: {
   plan: PlanSpec;
   precio: string | null;
   esElTuyo: boolean;
   seVende: boolean;
   accion: ReactNode;
-  porAsiento?: boolean;
 }) {
+  const porAsiento = plan.contratacion !== 'NINGUNA';
   const destacada = plan.diasDePrueba > 0 && !esElTuyo;
 
   return (
@@ -295,15 +283,15 @@ function TarjetaDePlan({
           {precio === null ? '—' : `$${precio}`}
         </span>
         <span className="font-sans text-sm text-text-secondary">
-          {porAsiento ? ' por asiento al mes' : ' al mes'}
+          {porAsiento ? ' por asiento al mes' : ''}
         </span>
       </p>
 
       <ul className="flex flex-col gap-2">
-        <Ventaja texto={frase(plan.quotas.proyectos, 'proyectos tuyos')} />
+        <Ventaja texto={frase(plan.quotas.asientos, 'personas en la organización')} />
+        <Ventaja texto={frase(plan.quotas.proyectos, 'proyectos de la organización')} />
         <Ventaja texto={frase(plan.quotas.iaMensualPorPersona, 'mensajes a PRAX al mes')} />
-        <Ventaja texto={frase(plan.quotas.miembrosPorProyecto, 'miembros por proyecto')} />
-        {porAsiento && <Ventaja texto={`Mínimo ${plan.asientosMinimos} asientos`} />}
+        {porAsiento && <Ventaja texto={`Desde ${plan.asientosMinimos} asientos`} />}
       </ul>
 
       <div className="mt-auto flex flex-col gap-2 pt-2">

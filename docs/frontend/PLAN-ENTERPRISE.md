@@ -1,5 +1,27 @@
 # Plan Enterprise — planes, cuotas y la organización que paga
 
+> # 🚫 DEPRECADO — 2026-08-26
+>
+> **Este documento ya no es una fuente de verdad y no se marca ni se continúa.**
+> Lo reemplaza [PLAN-ORGANIZACIONES.md](PLAN-ORGANIZACIONES.md), que toma las
+> decisiones de producto que aquí quedaron abiertas (E7) o solo apuntadas (E8).
+>
+> **Tres de sus decisiones están explícitamente revocadas** — si lees una de
+> estas aquí, la buena es la del plan nuevo:
+>
+> | Aquí decía | Ahora es |
+> |---|---|
+> | D1 — la organización personal es invisible y se crea perezosamente | Es una organización normal de un asiento, con nombre, creada al registrarse |
+> | D2 — cinco planes en dos escaleras (individual / empresa) | Cuatro en una sola: `FREE` · `TEAM` · `BUSINESS` · `ENTERPRISE`. `PLUS` y `PRO` se borran |
+> | D8 — el plan no abre ninguna puerta dentro de un proyecto | Sigue siendo cierto del *plan*; un **papel de la organización** sí abre, y dejando rastro |
+>
+> Y el tope `miembrosPorProyecto` se retira entero: lo sustituye el asiento.
+>
+> **Lo que sí conserva valor es la descripción del código que ya existe** —
+> `billing-service`, Stripe, el webhook, las organizaciones y las pantallas de
+> E1–E5 están construidos y son el punto de partida. Los apuntes de cada stack
+> explican por qué están hechos como están, y eso no caduca.
+
 > Etapa abierta el 2026-08-21 sobre `feature/enterprise`, a partir de
 > [ENCARGO-ENTERPRISE.md](ENCARGO-ENTERPRISE.md), que es lo que dictó el dueño
 > del producto antes de irse a dormir y **lo único que él decidió**. Todo lo

@@ -14,9 +14,17 @@
  * precios prometa lo que el servidor niega, sin un solo error de compilación.
  */
 
-export type PlanTier = 'FREE' | 'PLUS' | 'PRO' | 'TEAM' | 'BUSINESS';
+export type PlanTier = 'FREE' | 'TEAM' | 'BUSINESS' | 'ENTERPRISE';
 
-export type PlanAudience = 'INDIVIDUAL' | 'ENTERPRISE';
+/**
+ * Cómo se contrata un plan.
+ *
+ * ⚠️ **`FREE` y `ENTERPRISE` no tienen precio, y por razones opuestas**: al
+ * primero no se le puede pagar, al segundo hay que escribirle. Deducirlo de un
+ * `envPrecio` vacío deja a la pantalla enseñando el botón equivocado sin dar
+ * ningún error, así que el motivo viaja explícito.
+ */
+export type PlanContratacion = 'NINGUNA' | 'AUTOSERVICIO' | 'CONTACTO';
 
 export type SubscriptionStatus = 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED';
 
@@ -36,20 +44,30 @@ export type MembershipStatus = 'INVITED' | 'ACTIVE';
 export type Tope = number | null;
 
 export interface PlanQuotas {
+  /** Cuánta gente cabe en la organización. Una invitación sin aceptar ocupa. */
+  asientos: Tope;
+  /** Proyectos **de la organización**, no de la persona. Los borrados no cuentan. */
   proyectos: Tope;
+  /** Organizaciones de las que se es dueño. Estar invitado en otras no cuenta. */
+  organizacionesPropias: Tope;
   iaMensualPorPersona: Tope;
-  miembrosPorProyecto: Tope;
+  automatizacionesPorProyecto: Tope;
+  /** Lo que suman los adjuntos de la organización, en megabytes. */
+  almacenamientoOrgMb: Tope;
+  /** Hasta dónde llega hacia atrás el historial de Análisis, en días. */
+  historialAnalisisDias: Tope;
 }
 
 export interface PlanSpec {
   tier: PlanTier;
-  audience: PlanAudience;
   nombre: string;
   resumen: string;
+  /** A quién va dirigido, en una línea. Para la cabecera de su columna. */
+  paraQuien: string;
   quotas: PlanQuotas;
+  contratacion: PlanContratacion;
   diasDePrueba: number;
   envPrecio: string | null;
-  porAsiento: boolean;
   asientosMinimos: number;
 }
 

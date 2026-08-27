@@ -1,6 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PLANS, PlanAudience, PlanTier } from '@praxis/contracts';
+import { PLANS, PlanTier } from '@praxis/contracts';
 import Stripe from 'stripe';
 
 /**
@@ -134,9 +134,11 @@ export class StripeService {
       );
     }
 
-    /* En los de asiento la cantidad **es** lo que se cobra. Con `quantity: 1`
-       sobre un precio por unidad, cincuenta asientos costarían lo que uno. */
-    const cantidad = spec.porAsiento ? Math.max(data.seats ?? spec.asientosMinimos, 1) : 1;
+    /* La cantidad **es** lo que se cobra: con `quantity: 1` sobre un precio por
+       unidad, cincuenta asientos costarían lo que uno. Ya no hay planes a tanto
+       alzado — desde 2026-08-26 todos van por asiento, y uno solo es el caso de
+       quien trabaja en su organización personal. */
+    const cantidad = Math.max(data.seats ?? spec.asientosMinimos, 1);
 
     const vuelta = data.volverA ?? '/dashboard/billing';
 
@@ -247,11 +249,6 @@ export class StripeService {
       if (precio === priceId) return tier;
     }
     return null;
-  }
-
-  /** ¿Este plan crea una organización con miembros? */
-  esDeEmpresa(tier: PlanTier): boolean {
-    return PLANS[tier]?.audience === PlanAudience.ENTERPRISE;
   }
 
   /**

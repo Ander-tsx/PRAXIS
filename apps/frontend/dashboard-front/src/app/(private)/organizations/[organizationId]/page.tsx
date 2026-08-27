@@ -65,7 +65,7 @@ export default async function OrganizationPage({
   const sinPlan = organizacion.tier === 'FREE';
 
   const contratables = (catalogo?.planes ?? []).filter(
-    (plan) => plan.audience === 'ENTERPRISE' && catalogo?.disponibles.includes(plan.tier),
+    (plan) => plan.contratacion === 'AUTOSERVICIO' && catalogo?.disponibles.includes(plan.tier),
   );
 
   return (
@@ -182,9 +182,9 @@ function loQueDa(spec: PlanSpec): string {
       ? 'mensajes a PRAX sin límite'
       : `${spec.quotas.iaMensualPorPersona} mensajes a PRAX al mes cada uno`;
   const miembros =
-    spec.quotas.miembrosPorProyecto === null
-      ? 'miembros por proyecto sin límite'
-      : `hasta ${spec.quotas.miembrosPorProyecto} miembros por proyecto`;
+    spec.quotas.asientos === null
+      ? 'sitio para toda la gente que haga falta'
+      : `hasta ${spec.quotas.asientos} personas en la organización`;
 
   return `Mientras estén dentro, sus miembros tienen ${proyectos}, ${mensajes} y ${miembros}.`;
 }

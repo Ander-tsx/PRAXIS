@@ -33,7 +33,7 @@ import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
-import { ProUpsell } from './ProUpsell';
+import { AmpliarPlan } from './AmpliarPlan';
 import { ModelText } from './ModelText';
 import {
   AccionDelLienzo,
@@ -740,7 +740,7 @@ export function AssistantChat({
        * ⚠️ **Una cuota agotada no ofrece reintento, y es la única excepción.**
        * El botón no puede funcionar hasta el día 1: quien lo ve lo pulsa tres o
        * cuatro veces antes de entender que el problema no es de red. La salida
-       * de este caso ya está montada y es otra —`ProUpsell`, que aparece sola
+       * de este caso ya está montada y es otra —`AmpliarPlan`, que aparece sola
        * en cuanto el contador llega al tope—, así que aquí basta con no poner un
        * botón que compite con ella y no lleva a ninguna parte.
        */
@@ -1401,10 +1401,10 @@ export function AssistantChat({
              * escrito, y de ahí sale la propuesta de montarlo.
              */}
             {agotada && cuota ? (
-              /* Quedarse sin mensajes deja de ser un callejón: `ProUpsell`
+              /* Quedarse sin mensajes deja de ser un callejón: `AmpliarPlan`
                  decide si ofrece PRO o si enseña el aviso de siempre — no lo
                  ofrece a quien ya lo tiene ni donde no hay pasarela. */
-              <ProUpsell cuota={cuota} />
+              <AmpliarPlan cuota={cuota} />
             ) : (
               <form
                 /* `shrink-0` y `mt-auto`: el compositor se queda pegado abajo

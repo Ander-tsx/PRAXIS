@@ -17,10 +17,9 @@ datasource db {
 /// Aquí solo está el identificador, que es lo único que hay que guardar.
 enum PlanTier {
   FREE
-  PLUS
-  PRO
   TEAM
   BUSINESS
+  ENTERPRISE
 
   @@schema("billing")
 }

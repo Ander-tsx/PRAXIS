@@ -1,12 +1,14 @@
 import {
-  PLANES_ENTERPRISE,
-  PLANES_INDIVIDUALES,
+  PLANES_AUTOSERVICIO,
   PLANS,
   PLAN_LIST,
-  PlanAudience,
+  PLAN_RANK,
+  PlanContratacion,
+  type PlanQuotas,
   PlanTier,
   SIN_TOPE,
   cabe,
+  mejorPlan,
   quedan,
   quotasDe,
 } from './plans';
@@ -66,51 +68,81 @@ describe('cuotas de un plan', () => {
   });
 
   describe('el catálogo', () => {
-    it('todo plan de pago sabe de qué variable sale su precio', () => {
-      for (const plan of PLAN_LIST) {
-        if (plan.tier === PlanTier.FREE) continue;
+    it('todo plan que se compre solo sabe de qué variable sale su precio', () => {
+      for (const plan of PLANES_AUTOSERVICIO) {
         expect(plan.envPrecio).toBeTruthy();
       }
     });
 
-    it('FREE no se contrata y por eso no tiene precio', () => {
+    it('los que no se compran solos no tienen precio, y dicen por qué', () => {
+      /* Los dos tienen `envPrecio: null` por razones opuestas: a FREE no se le
+         puede pagar, y a ENTERPRISE hay que escribirle. Deducirlo de la
+         ausencia del precio deja a la pantalla enseñando el botón equivocado y
+         no da ningún error: por eso el motivo va en `contratacion`. */
       expect(PLANS[PlanTier.FREE].envPrecio).toBeNull();
+      expect(PLANS[PlanTier.FREE].contratacion).toBe(PlanContratacion.NINGUNA);
+
+      expect(PLANS[PlanTier.ENTERPRISE].envPrecio).toBeNull();
+      expect(PLANS[PlanTier.ENTERPRISE].contratacion).toBe(PlanContratacion.CONTACTO);
     });
 
-    it('solo el intermedio individual da el mes gratis', () => {
+    it('solo el primer peldaño de pago da el mes gratis', () => {
       const conPrueba = PLAN_LIST.filter((plan) => plan.diasDePrueba > 0);
-      expect(conPrueba.map((plan) => plan.tier)).toEqual([PlanTier.PLUS]);
-      expect(PLANS[PlanTier.PLUS].diasDePrueba).toBe(30);
+      expect(conPrueba.map((plan) => plan.tier)).toEqual([PlanTier.TEAM]);
+      expect(PLANS[PlanTier.TEAM].diasDePrueba).toBe(30);
     });
 
-    it('los planes por asiento son exactamente los de empresa', () => {
-      const porAsiento = PLAN_LIST.filter((plan) => plan.porAsiento).map((plan) => plan.tier);
-      const enterprise = PLANES_ENTERPRISE.map((plan) => plan.tier);
-      expect(porAsiento).toEqual(enterprise);
+    it('el orden declarado y el de la tabla de precios son el mismo', () => {
+      /* Con dos escaleras esto no se podía comprobar —no había orden total— y
+         `PLAN_RANK` tenía que escribirse a mano sin nada que lo vigilara. Con
+         una sola, que los dos se separen es un error de verdad: `mejorPlan`
+         decidiría un plan distinto del que la tabla presenta como superior. */
+      const porRango = [...PLAN_LIST].sort((a, b) => PLAN_RANK[a.tier] - PLAN_RANK[b.tier]);
+      expect(porRango.map((plan) => plan.tier)).toEqual(PLAN_LIST.map((plan) => plan.tier));
     });
 
-    it('las dos familias suman el catálogo entero y no se solapan', () => {
-      expect(PLANES_INDIVIDUALES.length + PLANES_ENTERPRISE.length).toBe(PLAN_LIST.length);
-      for (const plan of PLANES_INDIVIDUALES) {
-        expect(plan.audience).toBe(PlanAudience.INDIVIDUAL);
+    it('cada escalón da al menos tanto como el anterior, en todos los ejes', () => {
+      /* No es una comprobación cosmética: un plan más caro que diera menos de
+         algo se descubre cuando alguien lo contrata y pierde acceso a lo que
+         tenía, que es la peor forma posible de descubrirlo.
+
+         Con una sola escalera se puede comprobar sobre **todas** las claves de
+         golpe, y además que `SIN_TOPE`, una vez aparece, ya no vuelve atrás. */
+      const ejes = Object.keys(PLANS[PlanTier.FREE].quotas) as (keyof PlanQuotas)[];
+
+      for (let i = 1; i < PLAN_LIST.length; i++) {
+        const antes = PLAN_LIST[i - 1];
+        const ahora = PLAN_LIST[i];
+
+        for (const eje of ejes) {
+          const a = antes.quotas[eje];
+          const b = ahora.quotas[eje];
+
+          if (a === SIN_TOPE) {
+            // Quitar un «sin tope» al subir de plan es quitarle algo a quien paga más.
+            expect(b).toBe(SIN_TOPE);
+            continue;
+          }
+          if (b === SIN_TOPE) continue;
+          expect(b).toBeGreaterThanOrEqual(a as number);
+        }
       }
     });
 
-    it('cada escalón de pago da al menos tanto como el anterior', () => {
-      /* No es una comprobación cosmética: un plan más caro que diera menos de
-         algo se descubre cuando alguien lo contrata y pierde acceso a lo que
-         tenía, que es la peor forma posible de descubrirlo. */
-      const escalera = [PlanTier.FREE, PlanTier.PLUS, PlanTier.PRO];
-      for (let i = 1; i < escalera.length; i++) {
-        const antes = PLANS[escalera[i - 1]].quotas;
-        const ahora = PLANS[escalera[i]].quotas;
-        for (const clave of ['proyectos', 'iaMensualPorPersona', 'miembrosPorProyecto'] as const) {
-          const a = antes[clave];
-          const b = ahora[clave];
-          if (b === SIN_TOPE) continue;
-          expect(a).not.toBe(SIN_TOPE);
-          expect(b).toBeGreaterThanOrEqual(a as number);
-        }
+    it('los mínimos de asientos no bajan al subir de plan', () => {
+      for (let i = 1; i < PLAN_LIST.length; i++) {
+        expect(PLAN_LIST[i].asientosMinimos).toBeGreaterThanOrEqual(
+          PLAN_LIST[i - 1].asientosMinimos,
+        );
+      }
+    });
+
+    it('ningún plan permite más asientos de los que exige como mínimo', () => {
+      /* Un mínimo de compra por encima del tope del propio plan es un plan que
+         no se puede contratar: el checkout lo rechazaría y el botón seguiría
+         ahí. */
+      for (const plan of PLAN_LIST) {
+        expect(cabe(plan.asientosMinimos - 1, plan.quotas.asientos)).toBe(true);
       }
     });
   });

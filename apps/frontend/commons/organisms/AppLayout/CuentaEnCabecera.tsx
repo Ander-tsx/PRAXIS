@@ -72,8 +72,7 @@ export async function CuentaEnCabecera({ roles }: { roles: readonly string[] }) 
  */
 const NOMBRE_CORTO: Record<string, string> = {
   FREE: 'Gratis',
-  PLUS: 'Plus',
-  PRO: 'Pro',
   TEAM: 'Equipo',
-  BUSINESS: 'Empresa',
+  BUSINESS: 'Negocio',
+  ENTERPRISE: 'Empresa',
 };

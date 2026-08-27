@@ -1,6 +1,12 @@
 CREATE SCHEMA IF NOT EXISTS "billing";
 
-CREATE TYPE "billing"."PlanTier" AS ENUM ('FREE', 'PLUS', 'PRO', 'TEAM', 'BUSINESS');
+-- ⚠️ Editada en su sitio el 2026-08-26, en vez de añadir una migración que
+-- borre valores del enum. Se pudo porque la base se reinicia: lo desplegado eran
+-- cuentas de prueba. Un `ALTER TYPE` no sabe quitar valores de un enum en
+-- Postgres, así que la alternativa era recrear el tipo con todo lo que cuelga de
+-- él, o dejar 'PLUS' y 'PRO' vivos en la base para siempre diciendo que existen
+-- unos planes que ya no se venden.
+CREATE TYPE "billing"."PlanTier" AS ENUM ('FREE', 'TEAM', 'BUSINESS', 'ENTERPRISE');
 CREATE TYPE "billing"."OrganizationKind" AS ENUM ('PERSONAL', 'ENTERPRISE');
 CREATE TYPE "billing"."OrganizationRole" AS ENUM ('OWNER', 'ADMIN', 'MEMBER');
 CREATE TYPE "billing"."MembershipStatus" AS ENUM ('INVITED', 'ACTIVE');

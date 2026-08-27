@@ -67,103 +67,144 @@ export function quedan(actual: number, tope: Tope): Tope {
   return tope === SIN_TOPE ? SIN_TOPE : Math.max(tope - actual, 0);
 }
 
-/** Los planes que existen. El orden es el de la tabla de precios. */
+/**
+ * Los planes que existen. El orden es el de la tabla de precios.
+ *
+ * ⚠️ **Una sola escalera, y es una decisión de 2026-08-26.** Antes eran cinco en
+ * dos escaleras paralelas —`PLUS`/`PRO` individuales y `TEAM`/`BUSINESS` de
+ * empresa— y se colapsaron: desde que la organización **contiene** los proyectos,
+ * «individual» deja de ser una categoría y pasa a ser una organización de un
+ * asiento. Dos escaleras obligaban a cada pantalla, cada guard y cada correo a
+ * saber en cuál estabas, para siempre.
+ *
+ * `PLUS` y `PRO` se borraron en vez de sobrevivir como heredados porque lo
+ * desplegado eran cuentas de prueba y no había a quién conservarle el escalón.
+ */
 export enum PlanTier {
   /** Lo que tienes sin pagar nada. No se contrata: se es. */
   FREE = 'FREE',
-  /** El intermedio individual. **Un mes gratis**, y al segundo se cobra. */
-  PLUS = 'PLUS',
-  /** El individual completo. */
-  PRO = 'PRO',
-  /** Enterprise pequeño: una organización con asientos. */
+  /** El primer peldaño de pago. **Un mes gratis**, y al segundo se cobra. */
   TEAM = 'TEAM',
-  /** Enterprise grande: sin topes de inventario. */
+  /** Una empresa en marcha, con gente entrando y saliendo. */
   BUSINESS = 'BUSINESS',
-}
-
-/**
- * A quién va dirigido un plan.
- *
- * ⚠️ **No es una etiqueta de marketing: decide dónde se paga y quién manda.**
- * Un plan `INDIVIDUAL` lo contrata una persona para su organización personal,
- * que tiene exactamente un miembro y no admite más. Uno `ENTERPRISE` lo
- * contrata una organización con nombre, tiene asientos y tiene quien la
- * administre. Ofrecer «invitar a alguien» sobre el primero sería ofrecer un
- * botón que responde 400.
- */
-export enum PlanAudience {
-  INDIVIDUAL = 'INDIVIDUAL',
+  /** Organización grande. Sin topes de inventario, y se habla con alguien. */
   ENTERPRISE = 'ENTERPRISE',
 }
 
-/** Lo que da un plan. Los tres topes que pidió el encargo, y nada más. */
+/**
+ * Cómo se contrata un plan.
+ *
+ * ⚠️ **Existe porque `envPrecio: null` era ambiguo.** `FREE` y `ENTERPRISE` no
+ * tienen precio en Stripe, pero por razones opuestas: al primero no se le puede
+ * pagar, y al segundo hay que escribirle. Deducir uno de los dos casos de la
+ * ausencia de un precio deja a la pantalla enseñando el botón equivocado, y no da
+ * ningún error.
+ */
+export enum PlanContratacion {
+  /** No se contrata: se es. Solo `FREE`. */
+  NINGUNA = 'NINGUNA',
+  /** Se compra solo, por Stripe Checkout. */
+  AUTOSERVICIO = 'AUTOSERVICIO',
+  /** Se habla con alguien. No hay precio, hay un formulario. */
+  CONTACTO = 'CONTACTO',
+}
+
+/** Lo que da un plan. */
 export interface PlanQuotas {
   /**
-   * Proyectos **de los que se es dueño**, no en los que se participa.
+   * Asientos de la organización: cuánta gente cabe dentro.
    *
-   * ⚠️ La diferencia es la que hace que el tope sea justo: si contara la
-   * pertenencia, alguien podría dejarte sin poder crear proyectos
-   * invitándote a los suyos. Se cuenta lo que cada organización sostiene.
+   * ⚠️ **Es el tope que sustituyó a `miembrosPorProyecto`.** Desde que quien está
+   * en un proyecto tiene que estar en la organización, el techo de un tablero ya
+   * lo pone el asiento y un segundo tope por proyecto solo era una cifra más que
+   * explicar y que vigilar. Si vuelve a aparecer un límite por proyecto, es señal
+   * de que alguien reabrió la puerta a los invitados externos.
+   *
+   * ⚠️ **Una invitación sin aceptar ocupa el suyo.** Si no lo ocupara se podrían
+   * mandar mil sobre tres y el tope reventaría al aceptarlas, con la organización
+   * ya por encima de lo que paga y sin más salida que echar a alguien.
+   */
+  asientos: Tope;
+  /**
+   * Proyectos de la organización.
+   *
+   * ⚠️ **Por organización, no por persona.** Es la mitad que hace que el plan
+   * tenga sentido: veinticinco proyectos **para el equipo**, no veinticinco para
+   * cada uno. Los `DELETED` no cuentan — cobrar por algo que ya no se ve es la
+   * clase de cuota que parece una avería.
    */
   proyectos: Tope;
+  /**
+   * Organizaciones **de las que se es dueño**.
+   *
+   * ⚠️ La diferencia importa: estar invitado en las de otros no cuenta y no tiene
+   * límite. Si contara, alguien que colabora con tres clientes se quedaría sin
+   * poder tener la suya, que es justo al revés de lo que se quiere.
+   */
+  organizacionesPropias: Tope;
   /**
    * Mensajes al asistente **por persona y por mes natural**.
    *
    * ⚠️ **Por persona, y no también por organización.** Se consideró un segundo
    * tope agregado y se descartó: un límite de equipo se agota por lo que hizo
-   * otro, a media tarde, sin aviso y sin nada que la persona pueda hacer —que
-   * es exactamente el «límite que se agota sin explicación» que la trampa 2 del
-   * encargo manda evitar—. La organización **ve** el agregado en su portal, que
-   * es para lo que sirve saberlo; lo que se niega se niega por lo que tú
-   * gastaste. El techo total sigue acotado: es este número por los asientos.
+   * otro, a media tarde, sin aviso y sin nada que la persona pueda hacer. La
+   * organización **ve** el agregado en su portal, que es para lo que sirve
+   * saberlo; lo que se niega se niega por lo que gastaste tú. El techo total sigue
+   * acotado: es este número por los asientos.
    */
   iaMensualPorPersona: Tope;
+  /** Reglas de automatización activas en un proyecto. Las pausadas no cuentan. */
+  automatizacionesPorProyecto: Tope;
+  /** Lo que suman los adjuntos de la organización, en megabytes. */
+  almacenamientoOrgMb: Tope;
   /**
-   * Miembros de un proyecto, contando al dueño.
+   * Hasta dónde llega hacia atrás el historial de Análisis, en días.
    *
-   * El tope lo pone el plan **del dueño del proyecto**, no el de quien invita:
-   * es su proyecto el que crece.
+   * ⚠️ **No es una cuota que niegue una escritura**, y por eso no tiene su
+   * `QuotaKind`: es una ventana de lectura. Lo que hace es acotar el `from` que
+   * acepta un informe, y la pantalla tiene que **decirlo** — un gráfico que empieza
+   * noventa días atrás sin explicar por qué se lee como un dato incompleto, no
+   * como un plan.
    */
-  miembrosPorProyecto: Tope;
+  historialAnalisisDias: Tope;
 }
 
 /** Una fila del catálogo. */
 export interface PlanSpec {
   tier: PlanTier;
-  audience: PlanAudience;
   /** Como se llama en la pantalla. */
   nombre: string;
   /** La frase de una línea de la tabla de precios. */
   resumen: string;
+  /** A quién va dirigido, en una línea. Para la cabecera de su columna. */
+  paraQuien: string;
   quotas: PlanQuotas;
+  contratacion: PlanContratacion;
   /**
    * Días de prueba antes del primer cobro. `0` si no hay.
    *
-   * 🔴 **Solo lo tiene PLUS, y es una decisión del dueño del producto**, no una
-   * promoción que se pueda mover: «el plan individual intermedio da un mes
-   * gratis; al segundo mes, si no se ha cancelado, llega el cobro». Lo aplica
-   * Stripe con `trial_period_days` —no un `setTimeout` nuestro— y queda
-   * registrado con su instante en `BillingEvent`, porque «no me avisaron» es la
-   * queja más cara de este terreno (trampa 3 del encargo).
+   * 🔴 **Solo lo tiene el primer peldaño de pago, y es una decisión del dueño del
+   * producto**, no una promoción que se pueda mover. Lo aplica Stripe con
+   * `trial_period_days` —no un `setTimeout` nuestro— y queda registrado con su
+   * instante en `BillingEvent`, porque «no me avisaron» es la queja más cara de
+   * este terreno.
    */
   diasDePrueba: number;
   /**
    * La variable de entorno con el precio de Stripe.
    *
-   * No el identificador: **los precios cambian entre la cuenta de pruebas y la
-   * de producción**, y meterlos en el código obligaría a un despliegue para
-   * cambiar una tarifa. `FREE` no tiene ninguna: no se contrata.
+   * No el identificador: **los precios cambian entre la cuenta de pruebas y la de
+   * producción**, y meterlos en el código obligaría a un despliegue para cambiar
+   * una tarifa. `null` en los que no se compran solos — mira `contratacion` para
+   * saber por qué, que no es lo mismo en `FREE` que en `ENTERPRISE`.
    */
   envPrecio: string | null;
   /**
-   * Si se cobra por asiento.
+   * Asientos mínimos al contratar.
    *
-   * Los individuales van a tanto alzado —hay una persona— y los Enterprise por
-   * asiento: es lo que hace que ampliar el equipo cueste algo y que el tope de
-   * IA total esté acotado.
+   * Es lo que hace que ampliar el equipo cueste algo y que el techo total de IA
+   * esté acotado: todos los planes de pago van por asiento.
    */
-  porAsiento: boolean;
-  /** Asientos mínimos al contratar. `0` en los individuales. */
   asientosMinimos: number;
 }
 
@@ -176,73 +217,90 @@ export interface PlanSpec {
  * cuentas están en las letras pequeñas»*. Están puestos para que **nadie los
  * toque en un uso normal** y para que existan de verdad cuando alguien empuja.
  *
- * ⚠️ **`FREE.iaMensualPorPersona` es 13 y `PRO` es 250 porque ya lo eran.**
- * Salen de `ASSISTANT_LIMITS`, que lleva meses en producción; cambiarlos aquí
- * sería recortarle la cuota a gente que ya la tiene, en un commit que habla de
- * otra cosa. Los planes nuevos se colocan alrededor.
+ * ⚠️ **`FREE.iaMensualPorPersona` es 13 porque ya lo era.** Sale de
+ * `ASSISTANT_LIMITS`, que lleva meses en producción; bajarlo aquí sería
+ * recortarle la cuota a gente que ya la tiene, en un commit que habla de otra
+ * cosa.
+ *
+ * ⚠️ **`FREE` da 3 asientos y 3 proyectos** porque el plan gratuito tiene que
+ * seguir sirviendo para lo que sirve hoy: una persona y un par de amigos con sus
+ * proyectos. Un gratuito que no da para eso no es un escalón, es un anuncio.
  */
 export const PLANS: Record<PlanTier, PlanSpec> = {
   [PlanTier.FREE]: {
     tier: PlanTier.FREE,
-    audience: PlanAudience.INDIVIDUAL,
     nombre: 'Gratis',
-    resumen: 'Para probar PRAXIS entero con un par de proyectos.',
-    quotas: { proyectos: 2, iaMensualPorPersona: 13, miembrosPorProyecto: 5 },
+    resumen: 'Tú y dos personas más, con tres proyectos y PRAX para probar.',
+    paraQuien: 'Una persona y dos más',
+    quotas: {
+      asientos: 3,
+      proyectos: 3,
+      organizacionesPropias: 1,
+      iaMensualPorPersona: 13,
+      automatizacionesPorProyecto: 3,
+      almacenamientoOrgMb: 200,
+      historialAnalisisDias: 90,
+    },
+    contratacion: PlanContratacion.NINGUNA,
     diasDePrueba: 0,
     envPrecio: null,
-    porAsiento: false,
-    asientosMinimos: 0,
-  },
-  [PlanTier.PLUS]: {
-    tier: PlanTier.PLUS,
-    audience: PlanAudience.INDIVIDUAL,
-    nombre: 'Plus',
-    resumen: 'El primer mes es gratis. Diez proyectos y PRAX a diario.',
-    quotas: { proyectos: 10, iaMensualPorPersona: 100, miembrosPorProyecto: 15 },
-    diasDePrueba: 30,
-    envPrecio: 'STRIPE_PRICE_PLUS',
-    porAsiento: false,
-    asientosMinimos: 0,
-  },
-  [PlanTier.PRO]: {
-    tier: PlanTier.PRO,
-    audience: PlanAudience.INDIVIDUAL,
-    nombre: 'Pro',
-    resumen: 'Para quien vive aquí: cuarenta proyectos y PRAX sin pensarlo.',
-    quotas: { proyectos: 40, iaMensualPorPersona: 250, miembrosPorProyecto: 50 },
-    diasDePrueba: 0,
-    /* La variable que ya existe y ya está puesta en el despliegue (`8663b53`).
-       Renombrarla a `STRIPE_PRICE_TIER_PRO` habría dejado el entorno de
-       producción apuntando a una variable que nadie define, y el síntoma
-       —«el cobro no está configurado»— aparece lejos de la causa. */
-    envPrecio: 'STRIPE_PRICE_PRO',
-    porAsiento: false,
-    asientosMinimos: 0,
+    asientosMinimos: 1,
   },
   [PlanTier.TEAM]: {
     tier: PlanTier.TEAM,
-    audience: PlanAudience.ENTERPRISE,
     nombre: 'Equipo',
-    resumen: 'Una organización con asientos, y quien la administre.',
-    quotas: { proyectos: 100, iaMensualPorPersona: 250, miembrosPorProyecto: 100 },
-    diasDePrueba: 0,
+    resumen: 'El primer mes es gratis. Veinticinco proyectos y PRAX a diario.',
+    paraQuien: 'Un equipo pequeño que ya trabaja junto',
+    quotas: {
+      asientos: 15,
+      proyectos: 25,
+      organizacionesPropias: 3,
+      iaMensualPorPersona: 100,
+      automatizacionesPorProyecto: 25,
+      almacenamientoOrgMb: 10_240,
+      historialAnalisisDias: 365,
+    },
+    contratacion: PlanContratacion.AUTOSERVICIO,
+    diasDePrueba: 30,
     envPrecio: 'STRIPE_PRICE_TEAM',
-    porAsiento: true,
-    asientosMinimos: 3,
+    asientosMinimos: 1,
   },
   [PlanTier.BUSINESS]: {
     tier: PlanTier.BUSINESS,
-    audience: PlanAudience.ENTERPRISE,
-    nombre: 'Empresa',
-    resumen: 'Sin topes de inventario. Los asientos son el único número.',
+    nombre: 'Negocio',
+    resumen: 'Ciento cincuenta proyectos, cien asientos y el registro completo.',
+    paraQuien: 'Una empresa en marcha, con gente entrando y saliendo',
     quotas: {
-      proyectos: SIN_TOPE,
-      iaMensualPorPersona: 750,
-      miembrosPorProyecto: SIN_TOPE,
+      asientos: 100,
+      proyectos: 150,
+      organizacionesPropias: SIN_TOPE,
+      iaMensualPorPersona: 300,
+      automatizacionesPorProyecto: SIN_TOPE,
+      almacenamientoOrgMb: 102_400,
+      historialAnalisisDias: SIN_TOPE,
     },
+    contratacion: PlanContratacion.AUTOSERVICIO,
     diasDePrueba: 0,
     envPrecio: 'STRIPE_PRICE_BUSINESS',
-    porAsiento: true,
+    asientosMinimos: 5,
+  },
+  [PlanTier.ENTERPRISE]: {
+    tier: PlanTier.ENTERPRISE,
+    nombre: 'Empresa',
+    resumen: 'Sin topes de inventario. Los asientos son el único número.',
+    paraQuien: 'Organización grande, con informática propia',
+    quotas: {
+      asientos: SIN_TOPE,
+      proyectos: SIN_TOPE,
+      organizacionesPropias: SIN_TOPE,
+      iaMensualPorPersona: 1000,
+      automatizacionesPorProyecto: SIN_TOPE,
+      almacenamientoOrgMb: SIN_TOPE,
+      historialAnalisisDias: SIN_TOPE,
+    },
+    contratacion: PlanContratacion.CONTACTO,
+    diasDePrueba: 0,
+    envPrecio: null,
     asientosMinimos: 10,
   },
 };
@@ -250,32 +308,36 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
 /** El catálogo como lista, en el orden de la tabla de precios. */
 export const PLAN_LIST: PlanSpec[] = [
   PLANS[PlanTier.FREE],
-  PLANS[PlanTier.PLUS],
-  PLANS[PlanTier.PRO],
   PLANS[PlanTier.TEAM],
   PLANS[PlanTier.BUSINESS],
+  PLANS[PlanTier.ENTERPRISE],
 ];
 
-/** Los cinco identificadores, para validar un `@IsIn`. */
+/** Los cuatro identificadores, para validar un `@IsIn`. */
 export const PLAN_TIERS = Object.values(PlanTier);
 
-/** Los que puede contratar una persona para sí misma. */
-export const PLANES_INDIVIDUALES = PLAN_LIST.filter(
-  (plan) => plan.audience === PlanAudience.INDIVIDUAL,
-);
-
-/** Los que crean una organización con miembros. */
-export const PLANES_ENTERPRISE = PLAN_LIST.filter(
-  (plan) => plan.audience === PlanAudience.ENTERPRISE,
+/**
+ * Los que se compran solos, y por tanto los únicos que abren un checkout.
+ *
+ * ⚠️ **No es «los de pago».** `ENTERPRISE` se paga y no está aquí: no tiene
+ * precio en Stripe porque se negocia. Ofrecerle un botón de compra sería ofrecer
+ * uno que responde 503 al pulsarlo.
+ */
+export const PLANES_AUTOSERVICIO = PLAN_LIST.filter(
+  (plan) => plan.contratacion === PlanContratacion.AUTOSERVICIO,
 );
 
 /**
  * El plan de quien no tiene ninguno.
  *
- * **Sin fila en la base = FREE.** No se crea nada al registrarse: una tabla que
- * hay que rellenar para todo el mundo antes de que sirva de algo es una
- * migración pendiente disfrazada, y el valor por defecto ya es el correcto. Es
- * la misma decisión que ya tomó `AssistantSubscription`.
+ * **Sin fila en la base = FREE**, y sigue siendo la red aunque desde 2026-08-26
+ * la organización se cree al registrarse: una lectura que no encuentra fila no
+ * puede quedarse sin plan, y el más restrictivo es la única respuesta segura.
+ *
+ * ⚠️ **Antes esto era además una decisión de diseño** —«no crees filas para todo
+ * el mundo antes de que sirvan de algo»— y ya no lo es: desde que la organización
+ * **contiene** los proyectos, sirve desde el minuto uno y sin ella no hay dónde
+ * poner nada. Lo que queda es la defensa, no la política.
  */
 export const PLAN_POR_DEFECTO = PlanTier.FREE;
 
@@ -296,7 +358,10 @@ export function quotasDe(tier: PlanTier | string | null | undefined): PlanQuotas
 export enum QuotaKind {
   PROYECTOS = 'proyectos',
   IA_MENSUAL = 'ia_mensual',
-  MIEMBROS_POR_PROYECTO = 'miembros_por_proyecto',
+  ASIENTOS = 'asientos',
+  ORGANIZACIONES = 'organizaciones',
+  AUTOMATIZACIONES = 'automatizaciones',
+  ALMACENAMIENTO = 'almacenamiento',
 }
 
 /**
@@ -325,17 +390,16 @@ export interface QuotaExceededDetails {
  * El orden de los planes, de menos a más.
  *
  * ⚠️ **Es un orden declarado, no una comparación de cuotas.** Se intentó
- * deducirlo —«mejor es el que da más»— y no sale: `TEAM` da los mismos 250
- * mensajes que `PRO` y más proyectos, así que no hay un orden total, y elegir
- * «el mayor por cada eje» construiría un plan que no se vende. Con un orden
- * escrito, `mejorPlan` devuelve siempre uno del catálogo.
+ * deducirlo —«mejor es el que da más»— y no sale: los ejes no van todos en la misma
+ * dirección (un plan puede dar más proyectos y menos de otra cosa), así que no hay
+ * un orden total, y elegir «el mayor por cada eje» construiría un plan que no se
+ * vende. Con un orden escrito, `mejorPlan` devuelve siempre uno del catálogo.
  */
 export const PLAN_RANK: Record<PlanTier, number> = {
   [PlanTier.FREE]: 0,
-  [PlanTier.PLUS]: 1,
-  [PlanTier.PRO]: 2,
-  [PlanTier.TEAM]: 3,
-  [PlanTier.BUSINESS]: 4,
+  [PlanTier.TEAM]: 1,
+  [PlanTier.BUSINESS]: 2,
+  [PlanTier.ENTERPRISE]: 3,
 };
 
 /**

@@ -112,16 +112,13 @@ export async function abrirPagoAction(datos: {
   }
 }
 
-/**
- * El atajo de PRO, que es de donde viene todo esto.
- *
- * Lo llaman la tarjeta del chat cuando se agota la cuota y el aviso de
- * Configuración: los dos ofrecen **un** plan concreto y no una tabla, así que
- * pedirles el `tier` sería hacerles elegir algo que no eligen.
- */
-export async function abrirPagoProAction(): Promise<AperturaDePago> {
-  return abrirPagoAction({ tier: 'PRO' });
-}
+/* 🕳️ Aquí estaba `abrirPagoProAction`, el atajo que abría el pago de PRO en un
+   clic desde la tarjeta del chat y el aviso de Configuración. Se retiró el
+   2026-08-26 con el plan PRO, y **no tiene sustituto de un solo clic a
+   propósito**: desde que todo plan se contrata para una organización, el
+   checkout necesita saber cuál, y eso es una elección de quien paga. Los dos
+   sitios que lo usaban llevan ahora a la tabla de precios, que sí sabe
+   preguntarlo. */
 
 /**
  * El catálogo y lo que este despliegue puede cobrar.

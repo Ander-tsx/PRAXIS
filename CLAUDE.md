@@ -14,9 +14,11 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/GUION-DEMO-REGLAS.md](docs/frontend/GUION-DEMO-REGLAS.md) | Para enseñar el apartado Reglas: qué sembrar, qué pulsar, qué debe verse — y qué no se puede demostrar en vivo |
 | [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | Etapa de pulido. Cerrada; se conserva por el registro de qué se arregló y por qué |
 | [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | Etapa de rediseño. Cerrada; se conserva por las decisiones y el registro |
-| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | **Etapa en curso** — motor reactivo, el asistente que siempre responde y administración con más poder. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
-| [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal |
-| [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | **Etapa en curso** — planes, cuotas y la organización que paga. Las diez decisiones que no venían del encargo, las invariantes y lo que falta. Se lee al retomar |
+| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | Etapa de automatización — motor reactivo, el asistente que siempre responde y administración con más poder. Cerrada salvo S6/S7 |
+| [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal, y sigue siendo válido |
+| [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
+| [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | **Etapa en curso** — la organización pasa a contener los proyectos, se cobra por asiento y hay papeles de organización. Once decisiones cerradas, invariantes, reglas de interfaz y el orden. Se lee al retomar y se marca al terminar cada tarea |
+| [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** La capa visual: monocromo, tipografía como interfaz, cero tarjetas. §13 es la de dentro de la aplicación, y es donde ya se tropezó |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
