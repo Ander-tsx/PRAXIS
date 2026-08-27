@@ -26,6 +26,17 @@ export class FindProjectsDto {
   @IsUUID('4')
   userId?: string;
 
+  /**
+   * Acota a los proyectos de **una** organización.
+   *
+   * ⚠️ **Se suma a `userId`, no lo sustituye.** Sigues viendo solo los tuyos:
+   * esto es el selector del sidebar, no una llave. Sustituirlo dejaría ver los
+   * proyectos de una organización entera escribiendo su identificador en la URL.
+   */
+  @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
+
   /** Filtro estricto por propietario. Para herramientas de administración. */
   @IsOptional()
   @IsUUID('4')
@@ -103,12 +114,27 @@ export class FindProjectsQueryDto {
   @IsEnum(ProjectPermission)
   permission?: ProjectPermission;
 
+  /**
+   * Solo los de esta organización.
+   *
+   * 🔴 **Tiene que estar declarado aquí, no solo en `FindProjectsDto`.** El
+   * `ValidationPipe` del gateway rechaza lo que el DTO no declara, así que un
+   * campo puesto solo en el payload interno da **400 en la URL** — y el síntoma
+   * es una lista vacía, no un error visible. Es la trampa de «envía solo los
+   * campos que el DTO declara» leída al revés.
+   */
+  @ApiPropertyOptional({ description: 'Solo los de esta organización' })
+  @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
+
   /** `userId` sale del token, nunca de la URL. */
   toFindProjectsDto(userId: string): FindProjectsDto {
     const dto: FindProjectsDto = { userId };
 
     if (this.search) dto.search = this.search;
     if (this.permission) dto.permission = this.permission;
+    if (this.organizationId) dto.organizationId = this.organizationId;
 
     const query: QueryOptionsDto = {};
     if (this.page !== undefined) query.page = this.page;

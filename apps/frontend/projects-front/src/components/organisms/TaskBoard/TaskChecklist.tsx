@@ -112,7 +112,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
           <input type="hidden" name="projectId" value={projectId} />
           <input type="hidden" name="taskId" value={task.id} />
           <input type="hidden" name="order" value={total} />
-          
+
           <input
             name="text"
             placeholder="Añadir un paso…"
@@ -125,8 +125,14 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
             disabled={adding}
             className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-text-inverse transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
           </button>
         </form>

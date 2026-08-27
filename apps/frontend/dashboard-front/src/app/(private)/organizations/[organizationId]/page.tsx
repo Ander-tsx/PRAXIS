@@ -1,38 +1,58 @@
 import { CheckoutButton } from '@/components/organisms/Billing';
 import { MembersPanel, SeatsPanel } from '@/components/organisms/Organizations';
-import { AppHeader, Badge, alpha, colors } from '@praxis/commons';
+import { AppHeader } from '@praxis/commons';
+import { projectHref } from '@praxis/commons/api/routes';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type {
   BillingEventView,
   CatalogoDePlanes,
   OrganizationMemberView,
   OrganizationView,
-  PlanSpec,
 } from '@praxis/commons/billing/planes';
 import { fechaCorta } from '@praxis/commons/billing/planes';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'Organización',
 };
 
+/** Lo que la lista de proyectos necesita saber de cada uno. */
+interface ProyectoDeLaOrganizacion {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  updatedAt: string;
+  _count?: { members: number };
+}
+
 /**
- * El portal de una organización: su plan, su gente y su registro.
+ * El portal de una organización.
  *
- * ## Qué se decide aquí
+ * ## Lo primero que se ve son sus proyectos, y ese es el cambio
  *
- * Qué se ofrece según el papel de quien mira: el dueño ve el plan y los
- * asientos, quien administra ve las invitaciones, y un miembro ve la lista.
- * **Nada de eso protege nada** —quien decide es billing-service, que comprueba
- * el papel en cada comando— y por eso los bloques se piden igual y se apagan
- * aquí solo para no ofrecer lo que se va a negar.
+ * 🔴 Esta pantalla empezaba por los asientos y el plan, y se leía **vacía**:
+ * «tres miembros, tres asientos» y nada más. Con razón — eso es una factura,
+ * no un sitio de trabajo, y era exactamente lo que se decidió no construir.
+ * Desde que un proyecto pertenece a una organización, lo que hay aquí dentro
+ * **es el trabajo del equipo**, y por eso va primero. El plan es una línea al
+ * final, que es la importancia que tiene el día que no estás pagando.
  *
- * ## El registro no es decoración
+ * ## Sin tarjetas
  *
- * 🔴 Es la trampa 3 del encargo hecha pantalla: el mes gratis se cobra al
- * segundo, y «no me avisaron» es la queja más cara de este terreno. Cada cambio
- * de plan está ahí con su instante y con el evento de Stripe que lo causó.
+ * Filas separadas por una raya fina, número a la izquierda, y los botones como
+ * texto subrayado. Es el lenguaje de `kyloo-design/SKILL.md` §4, sobre los
+ * tokens `--color-*` de siempre —no los `--l-*` de la landing— porque esta
+ * pantalla responde al tema claro y oscuro (§13).
+ *
+ * ## Qué se apaga y por qué no protege nada
+ *
+ * Los bloques se piden igual y se apagan según `myPermissions`, que resuelve el
+ * servidor. **Quien decide es billing-service**, que comprueba el permiso en
+ * cada comando: aquí solo se evita ofrecer lo que se va a negar.
  */
 export default async function OrganizationPage({
   params,
@@ -49,20 +69,21 @@ export default async function OrganizationPage({
   /* Cada `catch` degrada su bloque. No poder leer el registro no es motivo para
      no poder invitar a nadie. La organización sí es obligatoria: sin ella no
      hay pantalla que pintar. */
-  const [organizacion, miembros, historial, catalogo] = await Promise.all([
+  const [organizacion, miembros, proyectos, historial, catalogo] = await Promise.all([
     api.get<OrganizationView>(`/organizations/${organizationId}`).catch(() => null),
     api.get<OrganizationMemberView[]>(`/organizations/${organizationId}/members`).catch(() => null),
+    api
+      .get<{ items: ProyectoDeLaOrganizacion[] }>(`/projects?organizationId=${organizationId}`)
+      .catch(() => null),
     api.get<BillingEventView[]>(`/organizations/${organizationId}/history`).catch(() => null),
     api.get<CatalogoDePlanes>('/me/billing/planes').catch(() => null),
   ]);
 
   if (!organizacion) notFound();
 
+  const permisos = organizacion.myPermissions;
   const spec = catalogo?.planes.find((plan) => plan.tier === organizacion.tier) ?? null;
-  const esDueño = organizacion.soyDueno;
-  /* Sin plan pagado: la organización nace en gratuito y el pago viene después.
-     Es el estado normal justo tras crearla, y hay que decirlo. */
-  const sinPlan = organizacion.tier === 'FREE';
+  const lista = proyectos?.items ?? [];
 
   const contratables = (catalogo?.planes ?? []).filter(
     (plan) => plan.contratacion === 'AUTOSERVICIO' && catalogo?.disponibles.includes(plan.tier),
@@ -70,242 +91,248 @@ export default async function OrganizationPage({
 
   return (
     <AppHeader title={organizacion.name ?? 'Organización'}>
-      <div className="flex flex-col gap-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-col">
+        {/* La cabecera dice qué es esto y bajo qué plan, en una línea. Antes
+            eran dos insignias y un bloque de plan arriba del todo, que ponía la
+            factura por delante del trabajo. */}
+        <p className="pb-8 font-serif text-base italic text-text-secondary">
+          {organizacion.kind === 'PERSONAL'
+            ? 'Tu espacio: aquí viven los proyectos que llevas por tu cuenta.'
+            : 'El espacio del equipo. Todo lo que hay dentro es de la organización, no de quien lo creó.'}{' '}
+          Plan {spec?.nombre ?? 'Gratis'}.
+        </p>
+
         {pago === 'ok' && (
           <p
             role="status"
-            className="rounded-2xl border px-5 py-4 font-sans text-sm text-text-secondary"
-            style={{ borderColor: alpha(colors.success, 32), background: alpha(colors.success, 8) }}
+            className="mb-8 border-l-2 border-success py-2 pl-4 font-sans text-sm text-text-secondary"
           >
-            El pago se ha hecho. El plan se activa en cuanto Stripe lo confirma — unos segundos. Si
-            al recargar sigue diciendo lo de antes, es que el aviso de Stripe todavía no ha llegado;
-            no hace falta volver a pagar.
+            Pago recibido. El plan se aplica en cuanto Stripe lo confirma — puede tardar unos
+            segundos, y esta página lo dirá al recargarla.
           </p>
         )}
 
-        <Cabecera organizacion={organizacion} spec={spec} sinPlan={sinPlan} />
+        {/* ─── Lo que hace que esto no esté vacío ──────────────────────── */}
+        <Bloque
+          titulo="Proyectos"
+          entradilla={
+            lista.length > 0
+              ? `${lista.length} en esta organización.`
+              : 'Todavía no hay ninguno aquí dentro.'
+          }
+          accion={
+            permisos.canCreateProject ? (
+              <EnlaceDeTexto href="/projects">Crear un proyecto</EnlaceDeTexto>
+            ) : null
+          }
+        >
+          {lista.length === 0 ? (
+            <Vacio>
+              {permisos.canCreateProject
+                ? 'Un proyecto creado aquí pertenece a la organización, no a ti: si te vas, el equipo lo conserva.'
+                : 'Tu papel en esta organización no permite crear proyectos. Pídeselo a quien la administra.'}
+            </Vacio>
+          ) : (
+            <ol className="flex flex-col">
+              {lista.map((proyecto, i) => (
+                <li key={proyecto.id}>
+                  <Link
+                    href={projectHref(proyecto)}
+                    className="group flex items-baseline gap-5 border-b border-dotted border-border py-5 transition-colors last:border-b-0 hover:border-border-strong"
+                  >
+                    <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-1">
+                      <span className="font-display text-lg text-text-primary transition-colors group-hover:text-primary">
+                        {proyecto.name}
+                      </span>
+                      {proyecto.description && (
+                        <span className="truncate font-sans text-sm text-text-secondary">
+                          {proyecto.description}
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 font-sans text-xs text-text-disabled">
+                      {proyecto._count?.members ?? 1}{' '}
+                      {(proyecto._count?.members ?? 1) === 1 ? 'persona' : 'personas'}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Bloque>
 
-        {sinPlan && esDueño && (
-          <ActivarPlan organizacion={organizacion} contratables={contratables} />
-        )}
+        {/* ─── Quién está dentro ──────────────────────────────────────── */}
+        <Bloque
+          titulo="Equipo"
+          entradilla={`${organizacion.seatsUsed} de ${organizacion.seats} asientos ocupados. Una invitación ocupa el suyo desde que se manda.`}
+        >
+          {miembros ? (
+            <MembersPanel
+              organizationId={organizationId}
+              miembros={miembros}
+              permisos={permisos}
+              asientos={{ contratados: organizacion.seats, ocupados: organizacion.seatsUsed }}
+            />
+          ) : (
+            <Vacio>No se pudo leer la lista de miembros. Vuelve a cargar la página.</Vacio>
+          )}
+        </Bloque>
 
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="flex flex-col gap-6 lg:col-span-8">
-            {miembros === null ? (
-              <p className="rounded-2xl border border-border bg-surface-elevated px-5 py-4 font-sans text-sm text-text-secondary">
-                No se pudo cargar la lista de miembros.
-              </p>
-            ) : (
-              <MembersPanel
-                organizationId={organizacion.id}
-                miembros={miembros}
-                permisos={organizacion.myPermissions}
-                asientos={{ contratados: organizacion.seats, ocupados: organizacion.seatsUsed }}
-              />
-            )}
-          </div>
-
-          <div className="flex flex-col gap-6 lg:col-span-4">
-            {esDueño && (
+        {/* ─── El plan, que es una línea y no una portada ─────────────── */}
+        {permisos.canManageBilling && (
+          <Bloque
+            titulo="Plan y asientos"
+            entradilla={
+              organizacion.tier === 'FREE'
+                ? 'Estás en el plan gratuito. Se amplía cuando el equipo o los proyectos no quepan.'
+                : `Plan ${spec?.nombre}. Los asientos se cambian aquí y se cobran prorrateados.`
+            }
+          >
+            <div className="flex flex-col gap-6">
               <SeatsPanel
-                organizationId={organizacion.id}
+                organizationId={organizationId}
                 contratados={organizacion.seats}
                 ocupados={organizacion.seatsUsed}
               />
+
+              {organizacion.tier === 'FREE' && contratables.length > 0 && (
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                  {contratables.map((plan) => (
+                    <CheckoutButton
+                      key={plan.tier}
+                      destino="checkout"
+                      tier={plan.tier}
+                      organizationId={organizationId}
+                      seats={Math.max(organizacion.seats, plan.asientosMinimos)}
+                    >
+                      {`Pasar a ${plan.nombre}`}
+                    </CheckoutButton>
+                  ))}
+                  <EnlaceDeTexto href="/dashboard/billing">Comparar los planes</EnlaceDeTexto>
+                </div>
+              )}
+            </div>
+          </Bloque>
+        )}
+
+        {/* ─── El registro ────────────────────────────────────────────── */}
+        {permisos.canViewAuditLog && (
+          <Bloque
+            titulo="Registro"
+            entradilla="Todo lo que ha movido el plan o los asientos, con su instante."
+          >
+            {historial && historial.length > 0 ? (
+              <ol className="flex flex-col">
+                {historial.map((evento) => (
+                  <li
+                    key={evento.id}
+                    className="flex items-baseline justify-between gap-4 border-b border-dotted border-border py-3 last:border-b-0"
+                  >
+                    <span className="font-sans text-sm text-text-primary">
+                      {TEXTO_DE_EVENTO[evento.type] ?? evento.type}
+                    </span>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-text-disabled">
+                      {fechaCorta(evento.occurredAt)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              /* 🔴 No es decoración: el mes gratis se cobra al segundo, y «no me
+                 avisaron» es la queja más cara de este terreno. Que esté vacío
+                 se dice, en vez de no pintar nada y parecer que falla. */
+              <Vacio>Todavía no ha pasado nada que registrar.</Vacio>
             )}
-            <Historial eventos={historial} />
-          </div>
-        </div>
+          </Bloque>
+        )}
       </div>
     </AppHeader>
   );
 }
 
-/** El plan, los asientos y qué da — en una banda, antes que nada. */
-function Cabecera({
-  organizacion,
-  spec,
-  sinPlan,
-}: {
-  organizacion: OrganizationView;
-  spec: PlanSpec | null;
-  sinPlan: boolean;
-}) {
-  return (
-    <section
-      className="flex flex-wrap items-start justify-between gap-6 rounded-3xl border p-6 sm:p-7"
-      style={{
-        borderColor: sinPlan ? alpha(colors.warning, 28) : alpha(colors.primary, 28),
-        background: `linear-gradient(160deg, ${alpha(
-          sinPlan ? colors.warning : colors.primary,
-          6,
-        )}, transparent 70%)`,
-      }}
-      aria-label="El plan de la organización"
-    >
-      <div className="flex flex-col gap-2">
-        <span className="font-sans text-xs font-semibold uppercase tracking-widest text-text-secondary">
-          Plan de la organización
-        </span>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <h2 className="font-sans text-2xl font-semibold text-text-primary">
-            {spec?.nombre ?? organizacion.tier}
-          </h2>
-          {sinPlan && <Badge variant="warning">Sin contratar</Badge>}
-        </div>
-        {spec && !sinPlan && (
-          /* Lo que otorga, en concreto y no en abstracto: es la pregunta que trae
-             quien acaba de pagar por su equipo.
-
-             ⚠️ La frase se arma en una función y no a trozos dentro del JSX: cada
-             `{' '}` entre expresiones dejaba **un espacio antes de la coma y antes
-             del punto** —«sin límite , 750 mensajes»— que se ve en el navegador y
-             no da ningún error. */
-          <p className="max-w-lg font-sans text-sm text-text-secondary">{loQueDa(spec)}</p>
-        )}
-      </div>
-
-      <dl className="flex gap-8">
-        <Dato titulo="Asientos" valor={`${organizacion.seatsUsed} / ${organizacion.seats}`} />
-        <Dato titulo="Creada" valor={fechaCorta(organizacion.createdAt) ?? '—'} />
-      </dl>
-    </section>
-  );
-}
-
-/** «Mientras estén dentro, sus miembros tienen X, Y y Z.» */
-function loQueDa(spec: PlanSpec): string {
-  const proyectos =
-    spec.quotas.proyectos === null ? 'proyectos sin límite' : `${spec.quotas.proyectos} proyectos`;
-  const mensajes =
-    spec.quotas.iaMensualPorPersona === null
-      ? 'mensajes a PRAX sin límite'
-      : `${spec.quotas.iaMensualPorPersona} mensajes a PRAX al mes cada uno`;
-  const miembros =
-    spec.quotas.asientos === null
-      ? 'sitio para toda la gente que haga falta'
-      : `hasta ${spec.quotas.asientos} personas en la organización`;
-
-  return `Mientras estén dentro, sus miembros tienen ${proyectos}, ${mensajes} y ${miembros}.`;
-}
-
-function Dato({ titulo, valor }: { titulo: string; valor: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <dt className="font-sans text-xs uppercase tracking-widest text-text-disabled">{titulo}</dt>
-      <dd className="font-sans text-lg font-semibold tabular-nums text-text-primary">{valor}</dd>
-    </div>
-  );
-}
-
 /**
- * El bloque de pago, solo mientras no haya plan y solo para quien paga.
+ * Un bloque de la página: título, una frase, y su contenido debajo.
  *
- * ⚠️ El texto dice **«activar»** y lleva los asientos dentro. Decía «contratar
- * Empresa», que además de sonar raro no dice por cuántos asientos se va a
- * cobrar — que es justo el número que importa en un plan por asiento.
+ * ⚠️ **Una raya fina arriba y nada más** — ni borde, ni fondo, ni esquinas
+ * redondeadas. Es el mismo dispositivo de la pantalla de Configuración y de la
+ * landing: el contenido separa el contenido, no una caja alrededor.
  */
-function ActivarPlan({
-  organizacion,
-  contratables,
+function Bloque({
+  titulo,
+  entradilla,
+  accion,
+  children,
 }: {
-  organizacion: OrganizationView;
-  contratables: PlanSpec[];
+  titulo: string;
+  entradilla?: string;
+  accion?: ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-surface-elevated p-6"
-      aria-label="Contratar un plan"
-    >
-      <div className="flex flex-col gap-1.5">
-        <h2 className="font-sans text-base font-semibold text-text-primary">
-          Esta organización todavía no tiene plan
-        </h2>
-        <p className="max-w-2xl font-sans text-sm text-text-secondary">
-          Funciona con los topes del plan gratuito hasta que se active uno. Ya puedes invitar a la
-          gente: los <strong className="text-text-primary">{organizacion.seats} asientos</strong>{' '}
-          que elegiste están guardados y son los que se cobrarán.
-        </p>
+    <section className="flex flex-col gap-5 border-t border-border py-9 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="font-display text-2xl text-text-primary">{titulo}</h2>
+          {entradilla && (
+            <p className="max-w-xl font-serif text-sm italic text-text-secondary">{entradilla}</p>
+          )}
+        </div>
+        {accion && <div className="shrink-0">{accion}</div>}
       </div>
-
-      <div className="flex flex-wrap gap-3">
-        {contratables.map((plan, indice) => (
-          <CheckoutButton
-            key={plan.tier}
-            destino="checkout"
-            tier={plan.tier}
-            seats={Math.max(organizacion.seats, plan.asientosMinimos)}
-            organizationId={organizacion.id}
-            variante={indice === 0 ? 'primary' : 'secondary'}
-          >
-            Activar {plan.nombre} · {Math.max(organizacion.seats, plan.asientosMinimos)} asientos
-          </CheckoutButton>
-        ))}
-        {contratables.length === 0 && (
-          <p className="font-sans text-sm text-text-disabled">
-            Los planes de equipo todavía no se pueden contratar en esta instalación.
-          </p>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Historial({ eventos }: { eventos: BillingEventView[] | null }) {
-  if (!eventos || eventos.length === 0) return null;
-
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="font-sans text-base font-semibold text-text-primary">Registro</h2>
-      <ol className="flex flex-col">
-        {eventos.map((evento, indice) => (
-          <li key={evento.id} className="flex gap-3">
-            {/* La línea de tiempo: un punto por evento y una guía entre ellos.
-                Una lista de recuadros para siete líneas de texto es marco de
-                más, y aquí lo que importa es el orden. */}
-            <div className="flex flex-col items-center">
-              <span
-                aria-hidden="true"
-                className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                style={{ background: colors.primary }}
-              />
-              {indice < eventos.length - 1 && (
-                <span
-                  aria-hidden="true"
-                  className="w-px flex-1"
-                  style={{ background: colors.borderSubtle }}
-                />
-              )}
-            </div>
-            <div className="flex flex-col pb-4">
-              <span className="font-sans text-sm text-text-primary">
-                {TEXTO_DE_EVENTO[evento.type] ?? evento.type}
-              </span>
-              <span className="font-sans text-xs text-text-disabled">
-                {fechaCorta(evento.occurredAt) ?? evento.occurredAt}
-              </span>
-            </div>
-          </li>
-        ))}
-      </ol>
+      {children}
     </section>
   );
 }
 
 /**
- * Los tipos del registro, en castellano.
+ * Un enlace de acción.
  *
- * ⚠️ **Si aparece uno que no está aquí se enseña tal cual, no se esconde.** El
- * registro es la prueba de lo que pasó: un evento que la pantalla no sabe
- * nombrar sigue siendo un evento, y ocultarlo sería quitarle justo lo que le da
- * valor.
+ * ⚠️ **Texto subrayado, no una píldora con fondo.** Es la tercera fila de la
+ * tabla de §4: un botón dentro de una tarjeta se sustituye por texto con
+ * subrayado condicional. Aquí no hay tarjetas, así que tampoco hay píldoras.
+ */
+function EnlaceDeTexto({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+    >
+      {children}
+    </Link>
+  );
+}
+
+/** Un vacío que dice qué hacer, no que no hay nada. */
+function Vacio({ children }: { children: ReactNode }) {
+  return (
+    <p className="max-w-xl border-l-2 border-border py-1 pl-4 font-sans text-sm text-text-secondary">
+      {children}
+    </p>
+  );
+}
+
+/**
+ * El vocabulario del registro, en español.
+ *
+ * ⚠️ Los tipos los escribe `billing-service` y son texto libre: lo que no esté
+ * aquí se pinta tal cual en vez de quedarse en blanco. Un registro con huecos
+ * es peor que uno con una palabra fea.
  */
 const TEXTO_DE_EVENTO: Record<string, string> = {
   organizacion_creada: 'Se creó la organización',
-  plan_aplicado: 'Se activó un plan',
-  asientos_cambiados: 'Cambiaron los asientos',
+  organizacion_traspasada: 'Cambió de dueño',
   miembro_invitado: 'Se invitó a alguien',
   invitacion_aceptada: 'Alguien aceptó su invitación',
-  miembro_retirado: 'Se sacó a alguien',
-  rol_cambiado: 'Cambió el papel de alguien',
+  miembro_retirado: 'Salió alguien del equipo',
+  papel_creado: 'Se creó un papel',
+  papel_editado: 'Se editó un papel',
+  papel_borrado: 'Se borró un papel',
+  papel_asignado: 'Se cambió el papel de alguien',
+  plantilla_guardada: 'Se guardó una plantilla de rol',
+  plantilla_borrada: 'Se borró una plantilla de rol',
+  plan_aplicado: 'Se aplicó un plan',
+  asientos_cambiados: 'Cambiaron los asientos',
 };

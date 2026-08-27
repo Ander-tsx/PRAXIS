@@ -171,6 +171,12 @@ export class ProjectsService {
       where.OR = [{ ownerId: dto.userId }, memberScope];
     }
 
+    /* ⚠️ **Se suma al filtro de arriba, no lo reemplaza.** Es el selector de
+       organización del sidebar acotando lo que ya puedes ver; si sustituyera al
+       `OR`, escribir un identificador ajeno en la URL enseñaría los proyectos de
+       una empresa entera. */
+    if (dto.organizationId) where.organizationId = dto.organizationId;
+
     /**
      * Los archivados no salen en ningún listado normal, ni para el dueño.
      *

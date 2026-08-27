@@ -1,16 +1,16 @@
 'use client';
-import { useState } from 'react';
 import {
   Badge,
   Button,
+  PERSONA_ELIMINADA,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
   avatarHref,
-  PERSONA_ELIMINADA,
   personLabel,
 } from '@praxis/commons';
+import { useState } from 'react';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { LeaveProjectButton } from './LeaveProjectButton';
 import { MemberAvatar } from './MemberAvatar';

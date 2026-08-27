@@ -17,12 +17,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
-import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { TaskCard } from '../TaskBoard/TaskCard';
+import { TaskDialog } from '../TaskBoard/TaskDialog';
+import { TaskMobileMoveSheet } from '../TaskBoard/TaskMobileMoveSheet';
 import { CURVA } from '../TaskBoard/arrastre';
 import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movimientos';
 import { useArrastreDeTablero } from '../TaskBoard/useArrastreDeTablero';
-import { TaskMobileMoveSheet } from '../TaskBoard/TaskMobileMoveSheet';
 import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
@@ -217,7 +217,9 @@ export function BoardColumns({
   const [columnaExpandidaId, setColumnaExpandidaId] = useState<string | null>(null);
 
   /** Tarea de la que se abrió el menú de mover en versión móvil. */
-  const [mobileMenuTask, setMobileMenuTask] = useState<{ id: string; columnId: string } | null>(null);
+  const [mobileMenuTask, setMobileMenuTask] = useState<{ id: string; columnId: string } | null>(
+    null,
+  );
 
   const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
   const [reorderState, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
@@ -801,24 +803,26 @@ export function BoardColumns({
         />
       )}
 
-      {renderedTask && <TaskDialog
-        open={!!openTask}
-        onClose={handleCloseTask}
-        projectId={projectId}
-        boardId={board.id}
-        task={renderedTask}
-        columnId={renderedTask.columnId}
-        columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
-        members={members}
-        labels={labels}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canToggleChecklist={canMoveTask}
-        canComment={canComment}
-        canManageLabels={canManageLabels}
-        canEdit={canEditTask}
-        canDelete={canDeleteTask}
-      />}
+      {renderedTask && (
+        <TaskDialog
+          open={!!openTask}
+          onClose={handleCloseTask}
+          projectId={projectId}
+          boardId={board.id}
+          task={renderedTask}
+          columnId={renderedTask.columnId}
+          columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
+          members={members}
+          labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canToggleChecklist={canMoveTask}
+          canComment={canComment}
+          canManageLabels={canManageLabels}
+          canEdit={canEditTask}
+          canDelete={canDeleteTask}
+        />
+      )}
     </div>
   );
 }

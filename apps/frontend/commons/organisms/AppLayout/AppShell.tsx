@@ -97,7 +97,29 @@ export interface AppShellProps {
    * móvil— porque la cabecera es otro componente y otra parte del árbol.
    */
   cuentaSlot?: ReactNode;
+  /**
+   * Las organizaciones a las que perteneces, y cuál estás mirando.
+   *
+   * ⚠️ **Lo resuelve el `layout.tsx` de la zona**, igual que `plegadaInicial`:
+   * la organización activa vive en una cookie y hay que conocerla **antes** de
+   * pintar, o la lista de proyectos sale entera y se recorta tras hidratar.
+   *
+   * Ausente, el selector se comporta como antes: enseña el espacio de quien
+   * mira y no ofrece cambiar. Es lo que pasa en las zonas que todavía no lo
+   * pasan, y no rompe nada.
+   */
+  organizaciones?: OrgDelSelector[];
+  organizacionActivaId?: string | null;
   children: ReactNode;
+}
+
+/** Lo poco que el selector necesita saber de una organización. */
+export interface OrgDelSelector {
+  id: string;
+  name: string | null;
+  /** `PERSONAL` se dibuja distinto: es tu espacio, no un equipo. */
+  kind: 'PERSONAL' | 'ENTERPRISE';
+  tier: string;
 }
 
 /**
@@ -225,6 +247,8 @@ function ArmazonInterno({
   estadoSlot,
   cuentaSlot,
   plegadaInicial = false,
+  organizaciones,
+  organizacionActivaId,
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -327,7 +351,13 @@ function ArmazonInterno({
           </div>
 
           <div className={plegada ? 'px-2 pt-4' : 'px-4 pt-4'}>
-            <OrgSwitcher name={user.name} plegada={plegada} />
+            <OrgSwitcher
+              name={user.name}
+              plegada={plegada}
+              organizaciones={organizaciones}
+              activaId={organizacionActivaId ?? null}
+              zonePath={zonePath}
+            />
           </div>
 
           <div
@@ -444,7 +474,13 @@ function ArmazonInterno({
                   </button>
                 </div>
 
-                <OrgSwitcher name={user.name} plegada={false} />
+                <OrgSwitcher
+                  name={user.name}
+                  plegada={false}
+                  organizaciones={organizaciones}
+                  activaId={organizacionActivaId ?? null}
+                  zonePath={zonePath}
+                />
 
                 <NavList
                   navItems={navItemsVivos}
@@ -555,19 +591,63 @@ function ByKyloo() {
 }
 
 /**
- * El selector de organización — **solo visual, por ahora**. Organizaciones
- * no existe todavía a nivel de backend, así que no hay nada real a lo que
- * cambiar: un desplegable que se abre y no lleva a ninguna parte sería peor
- * que no tener desplegable. Cuando exista el concepto, este componente pasa
- * a ser interactivo sin cambiar de sitio en el armazón.
+ * El selector de organización.
  *
- * Plegada, se reduce al cuadrado con la inicial — mismo criterio que la
- * ficha de usuario del pie.
+ * ## Dejó de ser un dibujo
+ *
+ * Nació **solo visual** —icono, «Plan gratuito», un nombre inventado y un
+ * chevron sin `onClick`— porque las organizaciones no existían en el backend, y
+ * un desplegable que se abre y no lleva a ninguna parte era peor que no
+ * tenerlo. Desde 2026-08-26 existen, todo el mundo tiene al menos la suya, y
+ * **es donde viven los proyectos**: ahora abre.
+ *
+ * ## Qué hace al elegir una
+ *
+ * Escribe la cookie `praxis_org` y recarga. No es una llave: el servidor la usa
+ * como **filtro sobre lo que ya puedes ver**, nunca como permiso. Poner ahí la
+ * organización de otro devuelve cero proyectos, no los suyos. Ver
+ * `commons/theme/organizacion.ts`.
+ *
+ * ⚠️ **Recarga dura y no `router.refresh()`.** La cookie la leen los siete
+ * `layout.tsx` en el servidor, y un refresco del App Router no vuelve a
+ * ejecutar el layout de una zona que ya está montada: el sidebar se quedaría
+ * marcando la organización vieja mientras la lista de abajo enseña la nueva.
  */
-function OrgSwitcher({ name, plegada }: { name: string; plegada: boolean }) {
+function OrgSwitcher({
+  name,
+  plegada,
+  organizaciones,
+  activaId,
+  zonePath,
+}: {
+  name: string;
+  plegada: boolean;
+  organizaciones?: OrgDelSelector[];
+  activaId: string | null;
+  zonePath: string;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const lista = organizaciones ?? [];
+  const activa = lista.find((org) => org.id === activaId) ?? null;
+
+  /* Sin ninguna elegida se enseña «Todas», que es lo que de verdad está
+     pasando: se ven los proyectos de todas a las que perteneces. Inventar aquí
+     la personal sería mentir sobre lo que hay debajo. */
   const primerNombre = name.trim().split(' ')[0];
-  const orgName = primerNombre ? `Organización de ${primerNombre}` : 'Mi organización';
-  const inicial = (primerNombre || 'P').charAt(0).toUpperCase();
+  const etiqueta = activa
+    ? (activa.name ?? 'Sin nombre')
+    : lista.length > 0
+      ? 'Todas tus organizaciones'
+      : `Organización de ${primerNombre || 'Praxis'}`;
+  const inicial = (activa?.name ?? primerNombre ?? 'P').charAt(0).toUpperCase();
+  const puedeAbrir = lista.length > 0;
+
+  function elegir(id: string | null) {
+    /* `max-age` y `path=/` a mano: es la misma cookie que leen las siete zonas
+       bajo el único origen del shell. Ver `ORG_COOKIE`. */
+    document.cookie = `praxis_org=${id ?? ''}; path=/; max-age=${id ? 60 * 60 * 24 * 365 : 0}; samesite=lax`;
+    window.location.href = zonePath;
+  }
 
   const cuadro = (
     <span
@@ -581,35 +661,108 @@ function OrgSwitcher({ name, plegada }: { name: string; plegada: boolean }) {
 
   if (plegada) {
     return (
-      <div className="flex justify-center" title={`${orgName} — Plan gratuito`}>
+      <div className="flex justify-center" title={etiqueta}>
         {cuadro}
       </div>
     );
   }
 
   return (
-    <div
-      className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5"
-      title="Cambiar de organización — próximamente"
-    >
-      {cuadro}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="font-sans text-[10px] text-text-secondary">Plan gratuito</span>
-        <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
-          {orgName}
-        </span>
-      </div>
-      <svg
-        className="h-4 w-4 shrink-0 text-text-disabled"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        aria-hidden="true"
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => puedeAbrir && setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-haspopup={puedeAbrir ? 'menu' : undefined}
+        disabled={!puedeAbrir}
+        className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:border-border-strong disabled:cursor-default"
       >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
-      </svg>
+        {cuadro}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-sans text-[10px] text-text-secondary">
+            {activa ? (activa.tier === 'FREE' ? 'Plan gratuito' : `Plan ${activa.tier}`) : 'Viendo'}
+          </span>
+          <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
+            {etiqueta}
+          </span>
+        </span>
+        {puedeAbrir && (
+          <svg
+            className="h-4 w-4 shrink-0 text-text-disabled"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+          </svg>
+        )}
+      </button>
+
+      {abierto && (
+        <>
+          {/* Un fondo transparente para cerrar al pulsar fuera. No es un scrim:
+              no oscurece nada, solo captura el clic. */}
+          <button
+            type="button"
+            aria-label="Cerrar el selector"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => setAbierto(false)}
+          />
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 flex flex-col overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <OpcionDeOrg
+              activa={activaId === null}
+              etiqueta="Todas tus organizaciones"
+              detalle={`${lista.length} en total`}
+              onClick={() => elegir(null)}
+            />
+            {lista.map((org) => (
+              <OpcionDeOrg
+                key={org.id}
+                activa={org.id === activaId}
+                etiqueta={org.name ?? 'Sin nombre'}
+                detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
+                onClick={() => elegir(org.id)}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * Una fila del desplegable.
+ *
+ * ⚠️ **Activa = tono, no caja** (`kyloo-design/SKILL.md` §13): `bg-primary-muted`
+ * y `text-primary`, no un fondo sólido con sombra. Es la misma regla que la
+ * entrada activa de la barra lateral, y por lo mismo — menos contraste de fondo,
+ * más legible.
+ */
+function OpcionDeOrg({
+  activa,
+  etiqueta,
+  detalle,
+  onClick,
+}: {
+  activa: boolean;
+  etiqueta: string;
+  detalle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-baseline justify-between gap-3 px-3 py-2 text-left transition-colors ${
+        activa ? 'bg-primary-muted text-primary' : 'text-text-primary hover:bg-surface-elevated'
+      }`}
+    >
+      <span className="truncate font-sans text-[13px]">{etiqueta}</span>
+      <span className="shrink-0 font-sans text-[10px] text-text-disabled">{detalle}</span>
+    </button>
   );
 }
 

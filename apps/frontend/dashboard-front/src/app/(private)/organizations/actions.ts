@@ -40,22 +40,24 @@ export async function crearOrganizacionAction(
   if (!(await sesionViva())) return { error: SESION_CADUCADA, creada: null };
 
   const name = String(formData.get('name') ?? '').trim();
-  const tier = String(formData.get('tier') ?? '');
-  const seats = Number(formData.get('seats') ?? 0);
 
   if (name.length < 2) return { error: 'Ponle un nombre de al menos dos letras.', creada: null };
-  if (tier !== 'TEAM' && tier !== 'BUSINESS') {
-    return { error: 'Ese plan no crea una organización.', creada: null };
-  }
-  if (!Number.isInteger(seats) || seats < 1) {
-    return { error: 'Los asientos tienen que ser un número entero.', creada: null };
-  }
 
+  /* 🔴 **Nace en gratuito y sin preguntar el plan, y es de 2026-08-26.**
+     Antes el formulario exigía elegir TEAM o BUSINESS y cuántos asientos
+     comprar **antes** de que existiera la organización: una decisión comercial
+     pedida a alguien que todavía no sabe qué es esto. Ahora se crea con nombre
+     y ya; el plan se contrata desde su portal, cuando el equipo o los proyectos
+     no quepan y ampliar signifique algo.
+
+     Los tres asientos son los del plan gratuito, y salen del catálogo del
+     servidor por la vía de siempre: escribir el número aquí sería prometer uno
+     que el guard puede negar. */
   try {
     const creada = await createServerApiClient().post<OrganizationView>('/me/organizations', {
       name,
-      tier,
-      seats,
+      tier: 'FREE',
+      seats: 3,
     });
     if (!creada?.id) return { error: 'El servidor no devolvió la organización.', creada: null };
 

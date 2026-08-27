@@ -2,7 +2,7 @@
 
 import { invitarMiembroAction, quitarMiembroAction } from '@/app/(private)/organizations/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Badge, Button, Input, Select, alpha, colors, useAccion } from '@praxis/commons';
+import { Badge, Button, Input, Select, useAccion } from '@praxis/commons';
 import type {
   OrganizationMemberView,
   OrganizationPermissions,
@@ -33,21 +33,12 @@ export function MembersPanel({
   const quedan = asientos.contratados - asientos.ocupados;
 
   return (
-    <section className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-sans text-lg font-semibold text-text-primary">Miembros</h2>
-        {/* ⚠️ Una sola expresión y no dos pegadas: un salto de línea entre
-            `{…}` y `{…}` en JSX se convierte en **un espacio**, y salía
-            «asientos ocupados , quedan 8». Se ve y no da ningún error. */}
-        <p className="font-sans text-sm text-text-secondary">
-          {`${asientos.ocupados} de ${asientos.contratados} asientos ocupados` +
-            (quedan > 0 ? `, quedan ${quedan} libres.` : ', no queda ninguno libre.')}
-        </p>
-      </div>
-
+    /* Sin título propio: lo pone el bloque que la envuelve en el portal. Antes
+       lo repetía aquí dentro y salían dos «Miembros» seguidos. */
+    <section className="flex flex-col gap-6">
       {puedeGestionar && <Invitar organizationId={organizationId} sinAsientos={quedan <= 0} />}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col">
         {miembros.map((miembro) => (
           <Fila
             key={miembro.userId ?? miembro.email}
@@ -83,10 +74,7 @@ function Invitar({
   const correoId = useId();
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-2xl border p-4"
-      style={{ borderColor: colors.border, background: colors.surfaceElevated }}
-    >
+    <div className="flex flex-col gap-3">
       {/* `action={…}` y no `onSubmit`: este formulario **da de alta**, así que
           el reseteo automático de React 19 es justo lo que se quiere — la caja
           se vacía sola para la siguiente invitación. */}
@@ -138,18 +126,15 @@ function Invitar({
       )}
 
       {state.enlace && (
-        <div
-          className="flex flex-col gap-2 rounded-xl border px-4 py-3"
-          style={{
-            borderColor: alpha(colors.success, 35),
-            background: alpha(colors.success, 8),
-          }}
-        >
+        /* Una raya de color a la izquierda en vez de una caja verde entera: es
+           un aviso, no un panel. El enlace sí se separa, porque hay que poder
+           seleccionarlo entero sin arrastrar media frase con él. */
+        <div className="flex flex-col gap-2 border-l-2 border-success py-1 pl-4">
           <p className="font-sans text-sm text-text-primary">
             Invitación creada para <strong>{state.email}</strong>. Pásale este enlace: es lo único
             que le deja entrar, y no se puede volver a ver.
           </p>
-          <code className="block break-all rounded-lg bg-surface px-3 py-2 font-mono text-xs text-text-secondary">
+          <code className="block break-all font-mono text-xs text-text-secondary">
             {state.enlace}
           </code>
         </div>
@@ -177,12 +162,9 @@ function Fila({
   const seLePuedeTocar = puedeGestionar && !esDueño;
 
   return (
-    <li
-      className="flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3"
-      style={{ borderColor: colors.border, background: colors.surfaceElevated }}
-    >
+    <li className="flex flex-wrap items-center gap-3 border-b border-dotted border-border py-4 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-sans text-sm text-text-primary">
+        <p className="truncate font-display text-base text-text-primary">
           {miembro.name ?? miembro.email}
         </p>
         {miembro.name && (

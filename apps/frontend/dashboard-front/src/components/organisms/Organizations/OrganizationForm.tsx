@@ -2,116 +2,63 @@
 
 import { crearOrganizacionAction } from '@/app/(private)/organizations/actions';
 import { CREAR_ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Input, Select, alpha, colors, useAccion } from '@praxis/commons';
-import type { PlanSpec, PlanTier } from '@praxis/commons/billing/planes';
+import { Button, Input, useAccion } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId } from 'react';
 
 /**
- * Crear la organización que va a pagar un plan de empresa.
+ * Crear una organización. Un campo, y nada más.
  *
- * ## Por qué se crea antes de pagar y no al revés
+ * ## Lo que ya no pregunta
  *
- * Porque el checkout necesita saber **quién paga**: el `client_reference_id` de
- * la sesión de Stripe lleva el id de la organización, y es lo único que ata el
- * pago a algo de PRAXIS. Sin ella, el webhook llegaría sin saber a quién darle
- * el plan.
+ * 🔴 Pedía el **plan** y los **asientos** antes de crearla, porque la etapa
+ * anterior daba por hecho que una organización solo existía para pagar un plan
+ * de empresa. Desde que la organización **contiene** los proyectos —hasta la de
+ * quien trabaja solo— eso dejó de ser cierto: crear una es un gesto de
+ * organización, no de compra. Nace en gratuito y el plan se contrata desde su
+ * portal, el día que el equipo o los proyectos no quepan.
  *
- * ⚠️ **La organización nace sin plan**, con las cuotas de FREE, y eso se dice
- * aquí: es lo honesto —todavía no ha pagado nadie— y evita la sorpresa de
- * invitar a diez personas y descubrir que el tope sigue siendo el de siempre.
+ * ## `action={…}` y no `onSubmit`, a propósito
+ *
+ * ⚠️ Es la excepción de la regla del repositorio: un formulario que **edita** se
+ * envía con `onSubmit` + `preventDefault()` porque React 19 resetea los campos
+ * al terminar la acción. Este **da de alta**, y ahí vaciarse al enviar es justo
+ * lo que se quiere.
  */
-export function OrganizationForm({
-  planes,
-  tierInicial,
-}: {
-  /** Solo los de empresa, ya filtrados por la página. */
-  planes: PlanSpec[];
-  /** El que venía en la URL desde la tabla de precios, si venía alguno. */
-  tierInicial: PlanTier | null;
-}) {
+export function OrganizationForm() {
   const router = useRouter();
   const [state, formAction, pending] = useAccion(
     crearOrganizacionAction,
     CREAR_ORGANIZACION_INITIAL_STATE,
   );
 
-  const elegidoPorDefecto =
-    planes.find((plan) => plan.tier === tierInicial)?.tier ?? planes[0]?.tier ?? 'TEAM';
-
-  const [tier, setTier] = useState<PlanTier>(elegidoPorDefecto);
-  const [seats, setSeats] = useState<number>(
-    planes.find((plan) => plan.tier === elegidoPorDefecto)?.asientosMinimos ?? 3,
-  );
-
   const nombreId = useId();
-  const asientosId = useId();
 
-  const spec = planes.find((plan) => plan.tier === tier);
-  const minimo = spec?.asientosMinimos ?? 1;
-
-  /* Al cambiar de plan, los asientos suben al mínimo del nuevo si se quedaron
-     por debajo: mandar 3 sobre un plan que empieza en 10 es un 400 que la
-     pantalla puede evitar sin quitarle a nadie el número que ya había escrito. */
-  useEffect(() => {
-    setSeats((actuales) => (actuales < minimo ? minimo : actuales));
-  }, [minimo]);
-
+  /* Al crearla se entra directamente en su portal. Dejar a alguien en el
+     formulario vacío tras crear algo obliga a preguntarse si funcionó. */
   useEffect(() => {
     if (state.creada) router.push(`/organizations/${state.creada}`);
   }, [state.creada, router]);
 
   return (
-    <form action={formAction} className="flex max-w-xl flex-col gap-5" noValidate>
+    <form action={formAction} className="flex flex-col gap-5 border-t border-border pt-8">
+      <div className="flex flex-col gap-2">
+        <label htmlFor={nombreId} className="font-display text-xl text-text-primary">
+          ¿Cómo se llama?
+        </label>
+        <p className="font-serif text-sm italic text-text-secondary">
+          El nombre del equipo, del estudio o de la empresa. Se puede cambiar después.
+        </p>
+      </div>
+
       <Input
         id={nombreId}
         name="name"
-        label="Cómo se llama"
         placeholder="Estudio Nordeste"
         maxLength={80}
-        fullWidth
         required
+        autoComplete="organization"
       />
-
-      <Select
-        name="tier"
-        label="Plan"
-        value={tier}
-        onValueChange={(elegido) => setTier(elegido as PlanTier)}
-        options={planes.map((plan) => ({
-          value: plan.tier,
-          label: `${plan.nombre} — desde ${plan.asientosMinimos} asientos`,
-        }))}
-        fullWidth
-      />
-
-      <Input
-        id={asientosId}
-        name="seats"
-        type="number"
-        label="Asientos"
-        min={minimo}
-        max={500}
-        value={String(seats)}
-        onChange={(event) => setSeats(Number(event.target.value))}
-        fullWidth
-      />
-
-      <p className="font-sans text-sm text-text-secondary">
-        {/* ⚠️ Una invitación ocupa asiento desde que se manda, no desde que la
-            aceptan. Decirlo aquí evita contratar justo para la gente que hay y
-            descubrirlo al invitar a la última persona. */}
-        Cada asiento es una persona dentro, contando las invitaciones que estén esperando respuesta.
-        Se pueden cambiar después.
-      </p>
-
-      <div
-        className="rounded-2xl border px-4 py-3 font-sans text-sm text-text-secondary"
-        style={{ borderColor: alpha(colors.primary, 30), background: alpha(colors.primary, 6) }}
-      >
-        La organización se crea ahora y <strong>el plan se paga después</strong>, desde su portal.
-        Hasta que llegue el pago, sus cuotas son las del plan gratuito.
-      </div>
 
       {state.error && (
         <p role="alert" className="font-sans text-sm text-error">
@@ -119,10 +66,16 @@ export function OrganizationForm({
         </p>
       )}
 
-      <div>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
         <Button type="submit" isLoading={pending}>
-          Crear organización
+          Crear la organización
         </Button>
+        {/* ⚠️ Se dice antes de pulsar, no en la letra pequeña de después: nace
+            en gratuito, y alguien que espere haber comprado algo aquí se lleva
+            una sorpresa al invitar a la undécima persona. */}
+        <span className="font-sans text-xs text-text-disabled">
+          Empieza en el plan gratuito · 3 asientos · 3 proyectos
+        </span>
       </div>
     </form>
   );

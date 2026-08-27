@@ -1,9 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { alpha, colors } from '../../tokens';
 import type { QuotaExceededDetails, QuotaKind } from '../../billing/planes';
 import { fechaCorta } from '../../billing/planes';
+import { alpha, colors } from '../../tokens';
 
 /** A dónde lleva «ampliar el plan». Una sola vez, y con el basePath del panel. */
 const RUTA_DE_FACTURACION = '/dashboard/billing';

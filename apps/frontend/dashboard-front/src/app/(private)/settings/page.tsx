@@ -104,7 +104,6 @@ function SettingsRow({
 /* Los iconos de fila, a 18 px y con el mismo trazo que los de la barra
    lateral. Van aquí y no en un átomo nuevo porque los usa solo esta pantalla. */
 
-
 function IconoApariencia() {
   return (
     <svg

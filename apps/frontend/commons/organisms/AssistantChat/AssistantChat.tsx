@@ -31,9 +31,9 @@ import { cargarConversacionAction, preguntarAction } from '../../assistant/actio
 import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
 import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
+import { AmpliarPlan } from './AmpliarPlan';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
-import { AmpliarPlan } from './AmpliarPlan';
 import { ModelText } from './ModelText';
 import {
   AccionDelLienzo,

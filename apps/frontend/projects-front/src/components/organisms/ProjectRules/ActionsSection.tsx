@@ -1,11 +1,11 @@
 'use client';
 
-import type { ActionDraft } from '@/lib/automation-draft';
 import {
   type AutomationCatalog,
   type OpcionesDelProyecto,
   opcionesDe,
 } from '@/lib/automation-catalog';
+import type { ActionDraft } from '@/lib/automation-draft';
 import { Button, Input, Select } from '@praxis/commons';
 import { Plus, X } from 'lucide-react';
 

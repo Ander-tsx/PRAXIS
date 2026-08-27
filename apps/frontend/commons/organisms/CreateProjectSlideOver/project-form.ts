@@ -11,8 +11,8 @@
  * para que no digan cosas distintas.
  */
 
-import type { QuotaExceededDetails } from '../../billing/planes';
 import type { ProjectTemplate, TemplateDraftState, TemplateResult } from '../../api/domain';
+import type { QuotaExceededDetails } from '../../billing/planes';
 
 export const PROJECT_NAME_MIN = 2;
 export const PROJECT_NAME_MAX = 100;

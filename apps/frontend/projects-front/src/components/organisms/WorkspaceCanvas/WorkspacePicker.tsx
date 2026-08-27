@@ -265,7 +265,9 @@ export function WorkspacePicker({
                           ].join(' ')}
                         >
                           <span className="truncate font-sans text-sm">{workspace.name}</span>
-                          <span className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}>
+                          <span
+                            className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}
+                          >
                             {workspace.boards.length}{' '}
                             {workspace.boards.length === 1 ? 'tablero' : 'tableros'}
                           </span>
@@ -319,7 +321,14 @@ export function WorkspacePicker({
                       autoComplete="off"
                       className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-disabled hover:bg-surface-elevated focus:bg-surface-elevated focus:border-border"
                     />
-                    <Button type="submit" size="sm" variant="secondary" isLoading={pending} disabled={!name.trim()} className="h-8 py-0">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="secondary"
+                      isLoading={pending}
+                      disabled={!name.trim()}
+                      className="h-8 py-0"
+                    >
                       Añadir
                     </Button>
                   </div>

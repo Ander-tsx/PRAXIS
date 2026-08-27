@@ -1,4 +1,4 @@
-import { AppHeader, Badge, Button, alpha, colors } from '@praxis/commons';
+import { AppHeader } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { OrganizationView } from '@praxis/commons/billing/planes';
 import type { Metadata } from 'next';
@@ -11,199 +11,140 @@ export const metadata: Metadata = {
 /**
  * Las organizaciones a las que perteneces.
  *
- * ## Esta pantalla tiene que explicar qué es una organización
+ * ## La personal sale, y antes no
  *
- * No es una lista más: para casi todo el mundo es la primera vez que ve la
- * palabra, y la pregunta que trae es «¿esto qué me da?». Si solo enseñara
- * tarjetas, la respuesta sería «no sé» — y quien no sabe qué gana, no contrata.
- * Por eso el vacío es la mitad de la pantalla y dice lo que otorga y lo que no.
+ * ⚠️ Se filtraba por `kind: 'ENTERPRISE'` porque la personal era invisible: no
+ * tenía nombre, no admitía a nadie y no había nada que gestionar en ella.
+ * Desde 2026-08-26 **es donde viven los proyectos de quien trabaja solo**, así
+ * que esconderla dejaba a esa persona sin poder llegar a los suyos. Sale la
+ * primera y se distingue por lo que dice, no por una insignia de color.
  *
- * ⚠️ **La personal no sale, y no es un olvido.** Todo el mundo tiene una —es lo
- * que hace que «¿cuál es tu plan?» tenga una sola forma en todo el sistema—
- * pero no tiene nombre, no admite miembros y no hay nada que gestionar en ella.
+ * ## Sin tarjetas
+ *
+ * Era una rejilla de tarjetas con borde, fondo y esquinas redondeadas para
+ * enseñar dos datos por organización. Ahora son filas con una raya punteada:
+ * el mismo dispositivo de la landing y de Configuración
+ * (`kyloo-design/SKILL.md` §4), sobre los tokens `--color-*` porque esta
+ * pantalla sí responde al tema (§13).
  */
 export default async function OrganizationsPage() {
   const organizaciones = await createServerApiClient()
     .get<OrganizationView[]>('/me/organizations')
     .catch(() => null);
 
-  const vacio = organizaciones !== null && organizaciones.length === 0;
+  const lista = organizaciones ?? [];
+  /* Quien solo tiene la personal está, a efectos de esta pantalla, empezando:
+     no ha creado ninguna con nadie dentro. Se le explica qué gana antes de
+     pedirle que cree una. */
+  const soloLaPersonal = lista.length > 0 && lista.every((o) => o.kind === 'PERSONAL');
 
   return (
     <AppHeader title="Organizaciones">
-      <div className="flex flex-col gap-8">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <p className="max-w-2xl font-sans text-sm text-text-secondary">
-            Una organización es <strong className="text-text-primary">quien paga</strong> un plan de
-            equipo: tiene asientos, gente dentro y su propio registro de lo cobrado. Mientras
-            alguien esté dentro, los topes del plan son los suyos.
+      <div className="mx-auto flex w-full max-w-3xl flex-col">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3 pb-8">
+          <p className="max-w-xl font-serif text-base italic text-text-secondary">
+            Una organización es donde vive el trabajo de un equipo. Los proyectos son de ella, no de
+            quien los creó.
           </p>
-          {!vacio && (
-            <Link href="/organizations/new">
-              <Button type="button">Crear una organización</Button>
-            </Link>
-          )}
+          <Link
+            href="/organizations/new"
+            className="shrink-0 font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+          >
+            Crear una organización
+          </Link>
         </div>
 
         {organizaciones === null && (
-          <p className="rounded-2xl border border-border bg-surface-elevated px-5 py-4 font-sans text-sm text-text-secondary">
+          <p className="border-l-2 border-warning py-1 pl-4 font-sans text-sm text-text-secondary">
             No se pudieron cargar tus organizaciones. Vuelve a intentarlo en un momento.
           </p>
         )}
 
-        {vacio && <Vacio />}
-
-        {organizaciones && organizaciones.length > 0 && (
-          <ul className="grid gap-4 md:grid-cols-2">
-            {organizaciones.map((organizacion) => (
+        {lista.length > 0 && (
+          <ol className="flex flex-col border-t border-border">
+            {lista.map((organizacion, i) => (
               <li key={organizacion.id}>
-                <Tarjeta organizacion={organizacion} />
+                <Link
+                  href={`/organizations/${organizacion.id}`}
+                  className="group flex items-baseline gap-5 border-b border-dotted border-border py-6 transition-colors hover:border-border-strong"
+                >
+                  <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="font-display text-xl text-text-primary transition-colors group-hover:text-primary">
+                      {organizacion.name ?? 'Sin nombre'}
+                    </span>
+                    <span className="font-sans text-sm text-text-secondary">
+                      {organizacion.kind === 'PERSONAL'
+                        ? 'Tu espacio · solo tú'
+                        : `${organizacion.seatsUsed} de ${organizacion.seats} asientos`}
+                      {' · '}
+                      {organizacion.soyDueno
+                        ? 'lo llevas tú'
+                        : (organizacion.myRoleName ?? 'miembro')}
+                    </span>
+                  </span>
+
+                  {/* El plan, en gris y al final: es un dato, no un titular.
+                      Antes iba en una insignia de color arriba de la tarjeta. */}
+                  <span className="shrink-0 font-mono text-xs uppercase tracking-wider text-text-disabled">
+                    {organizacion.tier === 'FREE' ? 'Gratis' : organizacion.tier}
+                  </span>
+                </Link>
               </li>
             ))}
-          </ul>
+          </ol>
         )}
+
+        {soloLaPersonal && <QueDaUnaOrganizacion />}
       </div>
     </AppHeader>
   );
 }
 
 /**
- * Lo que se ve sin ninguna organización.
+ * Qué se gana creando una.
  *
- * ⚠️ **Dice también lo que NO cambia**, y esa frase es la importante: quien lee
- * «organización» piensa que sus proyectos se van a mover de sitio o que alguien
- * va a poder entrar en ellos. No pasa ninguna de las dos cosas —el plan es una
- * capa aparte de los permisos— y callárselo es dejar que lo descubra con miedo.
+ * ⚠️ **No es relleno para tapar un hueco.** Para casi todo el mundo es la
+ * primera vez que ve la palabra, y la pregunta que trae es «¿esto qué me da?».
+ * Sin respuesta, nadie crea ninguna — y las tres de abajo son literalmente lo
+ * que cambia al meter el trabajo en una organización.
  */
-function Vacio() {
+function QueDaUnaOrganizacion() {
   return (
-    <section
-      className="flex flex-col gap-6 rounded-3xl border p-7 sm:p-9"
-      style={{
-        borderColor: alpha(colors.primary, 25),
-        background: `linear-gradient(160deg, ${alpha(colors.primary, 6)}, transparent 70%)`,
-      }}
-    >
-      <div className="flex flex-col gap-2">
-        <h2 className="font-sans text-xl font-semibold text-text-primary">
-          Todavía no perteneces a ninguna
-        </h2>
-        <p className="max-w-2xl font-sans text-sm text-text-secondary">
-          Si te han invitado a una, abre el enlace que te pasaron. Si quieres contratar un plan para
-          tu equipo, empieza creándola.
-        </p>
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Columna
-          titulo="Lo que te da"
-          tono={colors.primary}
-          puntos={[
-            'Un plan que pagas una vez y vale para todo el equipo.',
-            'Asientos: decides cuánta gente entra, y se cobra por eso.',
-            'Invitas por correo y quitas a quien quieras, cuando quieras.',
-            'El registro de todo lo que se ha cobrado, con su fecha.',
-          ]}
+    <section className="flex flex-col gap-5 border-t border-border pt-9">
+      <h2 className="font-display text-2xl text-text-primary">¿Para qué crear una?</h2>
+      <ol className="flex flex-col">
+        <Razon
+          n="01"
+          titulo="El trabajo no se va con quien se va"
+          texto="Si alguien deja el equipo, los proyectos siguen siendo de la organización."
         />
-        <Columna
-          titulo="Lo que NO cambia"
-          tono={colors.textSecondary}
-          puntos={[
-            'Tus proyectos siguen siendo tuyos y donde están.',
-            'Estar dentro no da acceso a ningún tablero: eso son los permisos de cada proyecto.',
-            'Cada persona gasta su propia cuota de PRAX, no una común.',
-            'Al salir del equipo no se borra nada de lo que hiciste.',
-          ]}
+        <Razon
+          n="02"
+          titulo="Se entra una vez, no proyecto por proyecto"
+          texto="Quien tiene asiento puede estar en cualquier proyecto de dentro."
         />
-      </div>
-
-      <div>
-        <Link href="/organizations/new">
-          <Button type="button">Crear una organización</Button>
-        </Link>
-      </div>
+        <Razon
+          n="03"
+          titulo="Los papeles se definen una vez"
+          texto="Quién crea proyectos, quién invita, quién ve el registro. Y las plantillas con las que nacen los proyectos nuevos."
+        />
+      </ol>
     </section>
   );
 }
 
-function Columna({
-  titulo,
-  puntos,
-  tono,
-}: {
-  titulo: string;
-  puntos: string[];
-  tono: string;
-}) {
+function Razon({ n, titulo, texto }: { n: string; titulo: string; texto: string }) {
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="font-sans text-xs font-semibold uppercase tracking-widest text-text-disabled">
-        {titulo}
-      </h3>
-      <ul className="flex flex-col gap-2">
-        {puntos.map((punto) => (
-          <li key={punto} className="flex items-start gap-2.5 font-sans text-sm text-text-primary">
-            <span
-              aria-hidden="true"
-              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ background: tono }}
-            />
-            <span className="min-w-0">{punto}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Tarjeta({ organizacion }: { organizacion: OrganizationView }) {
-  const sinPlan = organizacion.tier === 'FREE';
-  const libres = organizacion.seats - organizacion.seatsUsed;
-  const proporcion = Math.min(organizacion.seatsUsed / Math.max(organizacion.seats, 1), 1);
-
-  return (
-    <Link
-      href={`/organizations/${organizacion.id}`}
-      className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface-elevated p-5 transition-colors hover:border-border-strong"
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="font-sans text-base font-semibold text-text-primary">
-          {organizacion.name ?? 'Sin nombre'}
-        </h2>
-        <Badge variant={organizacion.soyDueno ? 'primary' : 'default'}>
-          {organizacion.soyDueno ? 'Dueño' : (organizacion.myRoleName ?? 'Miembro')}
-        </Badge>
-        {/* ⚠️ Una organización sin plan pagado no se distingue de una con él si
-            solo se enseña el nombre, y la diferencia es que la primera funciona
-            con las cuotas del plan gratuito. Se dice en la tarjeta, no dentro. */}
-        {sinPlan && <Badge variant="warning">Sin plan</Badge>}
-      </div>
-
-      <div className="mt-auto flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between font-sans text-sm">
-          <span className="text-text-secondary">Asientos</span>
-          <span className="tabular-nums text-text-primary">
-            {organizacion.seatsUsed} de {organizacion.seats}
-          </span>
-        </div>
-        <div
-          className="h-1.5 w-full overflow-hidden rounded-full"
-          style={{ background: alpha(colors.textSecondary, 12) }}
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.max(Math.round(proporcion * 100), 3)}%`,
-              background: libres > 0 ? colors.primary : colors.warning,
-            }}
-          />
-        </div>
-        <span className="font-sans text-xs text-text-disabled">
-          {libres > 0
-            ? `Quedan ${libres} libres, contando las invitaciones sin responder.`
-            : 'No queda ninguno libre.'}
-        </span>
-      </div>
-    </Link>
+    <li className="flex items-baseline gap-5 border-b border-dotted border-border py-5 last:border-b-0">
+      <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">{n}</span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="font-display text-lg text-text-primary">{titulo}</span>
+        <span className="font-sans text-sm text-text-secondary">{texto}</span>
+      </span>
+    </li>
   );
 }

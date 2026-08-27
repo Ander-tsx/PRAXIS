@@ -2,15 +2,16 @@
 
 import { cambiarAsientosAction } from '@/app/(private)/organizations/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Input, colors, useAccion } from '@praxis/commons';
+import { Button, Input, useAccion } from '@praxis/commons';
 import { useId, useState } from 'react';
 
 /**
  * Cambiar los asientos contratados.
  *
- * ⚠️ **Solo el dueño**, porque es lo único de este portal que cuesta dinero: un
- * `ADMIN` invita y saca gente, pero no compromete la tarjeta de nadie. El
- * gateway lo comprueba también.
+ * ⚠️ **Exige `canManageBilling`**, porque es lo único de este portal que cuesta
+ * dinero: quien lleva el equipo invita y saca gente, pero no compromete la
+ * tarjeta de nadie salvo que el dueño le dé ese permiso a propósito. El gateway
+ * lo comprueba también — aquí solo se evita ofrecer lo que se va a negar.
  *
  * ⚠️ Y **no se puede bajar por debajo de la gente que ya está**, contando las
  * invitaciones pendientes. La alternativa —echar a alguien automáticamente— es
@@ -32,12 +33,10 @@ export function SeatsPanel({
   const campoId = useId();
 
   return (
-    <section
-      className="flex flex-col gap-3 rounded-2xl border p-5"
-      style={{ borderColor: colors.border, background: colors.surfaceElevated }}
-    >
-      <h2 className="font-sans text-sm font-semibold text-text-primary">Asientos</h2>
-
+    /* Sin caja: la sección que lo envuelve ya tiene su raya y su título. Un
+       borde aquí dentro sería una tarjeta dentro de una fila, que es justo lo
+       que §4 quita. */
+    <section className="flex flex-col gap-3">
       {/* ⚠️ `onSubmit` y no `action={…}`: esto **edita** un valor que ya existe,
           y un `<form action>` se resetea solo en React 19 — el campo volvería a
           su `defaultValue`, que es el número viejo. Ver CLAUDE.md. */}

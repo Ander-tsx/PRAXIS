@@ -1,4 +1,3 @@
-import type { AutomationCatalog } from '@/lib/automation-catalog';
 import { TabIcon } from '@/components/atoms/TabIcon';
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
@@ -8,6 +7,7 @@ import { ProjectRoles } from '@/components/organisms/ProjectRoles';
 import { ProjectRules } from '@/components/organisms/ProjectRules';
 import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
+import type { AutomationCatalog } from '@/lib/automation-catalog';
 import {
   AppHeader,
   type AutomationExecutionPage,
@@ -16,13 +16,13 @@ import {
   type EffectivePermissions,
   type Label,
   type MyInvitation,
+  PERSONA_ELIMINADA,
   type Paginated,
   type ProjectDetail,
   type ProjectInvitation,
   type ProjectMember,
   TabNav,
   type Task,
-  PERSONA_ELIMINADA,
   personLabel,
   projectPath,
   resolveProfiles,
