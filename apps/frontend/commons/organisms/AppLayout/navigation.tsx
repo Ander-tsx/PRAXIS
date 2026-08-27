@@ -26,7 +26,20 @@ export interface AppNavItem {
    * pasa; la lista canónica no sabe contar.
    */
   badge?: number;
+  /**
+   * El grupo al que pertenece, con la etiqueta ya en español — `NavList` la
+   * pinta tal cual encima de la primera entrada de cada grupo nuevo. Items
+   * consecutivos con la misma `section` no repiten la etiqueta.
+   */
+  section: string;
 }
+
+const SECTION_PRINCIPAL = 'Principal';
+/** Exportada: `commons/auth/nav.ts` la usa para esconder el grupo entero a
+ * quien no administra, en vez de comparar tres `href` sueltos. */
+export const SECTION_ADMINISTRACION = 'Administración';
+const SECTION_GESTION = 'Gestión';
+const SECTION_CONFIGURACION = 'Configuración';
 
 /**
  * `aria-hidden` va escrito en cada `<svg>` y no aquí: son iconos decorativos
@@ -53,6 +66,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Panel',
     href: '/dashboard',
+    section: SECTION_PRINCIPAL,
     /**
      * ⚠️ **Era una cuadrícula de cuatro celdas, y ya la usaba otra cosa.** Es
      * el mismo dibujo que marca «Espacios» dentro de un proyecto, así que en la
@@ -74,6 +88,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Proyectos',
     href: '/projects',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -97,6 +112,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     label: 'Mensajes',
     href: '/chat',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -110,6 +126,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     label: 'Análisis',
     href: '/reports',
+    section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -119,8 +136,6 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
         />
       </svg>
     ),
-    /* Estuvo apagado con «Pronto» desde el principio porque no había backend.
-       Ya lo hay: reports-service en el 3005 y la zona en el 4104. */
   },
   {
     /**
@@ -145,6 +160,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     label: 'Asistente',
     href: '/assistant',
+    section: SECTION_PRINCIPAL,
     /**
      * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
      * miniatura. Un bocadillo con una chispa —que es lo que había— decía
@@ -158,45 +174,121 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      */
     icon: <PraxSidebarIcon />,
   },
+
+  /**
+   * Administración de la plataforma, en tres pantallas — no una.
+   *
+   * ⚠️ **Las tres rutas ya existían** (`/admin`, `/admin/projects`,
+   * `/admin/actividad`) pero solo la primera tenía entrada en la barra: las
+   * otras dos eran alcanzables solo escribiendo la URL a mano, sin un solo
+   * enlace real hacia ellas en ninguna pantalla. Esto no divide una pantalla
+   * en tres, expone tres que ya estaban.
+   *
+   * `loadAppNavItems` descarta las tres a la vez si la cuenta no administra
+   * (`commons/auth/nav.ts`) — esconderlas es cortesía, no seguridad: las
+   * cuatro rutas de `/api/admin` exigen el rol en el gateway.
+   */
   {
-    /**
-     * El panel de administración de la plataforma.
-     *
-     * ⚠️ **No sale para todo el mundo.** `loadAppNavItems` la descarta si la
-     * cuenta no tiene rol de administración, y por eso la lista canónica la trae
-     * y el filtro vive allí: aquí no hay forma de saber quién está mirando.
-     *
-     * Esconderla es **cortesía, no seguridad**: quien escriba `/admin` a mano
-     * llega a una pantalla que se lo explica, y las cuatro rutas de
-     * `/api/admin` exigen el rol en el gateway. Si esta línea se colara para
-     * todos, el resultado sería una entrada que no lleva a ninguna parte, no una
-     * fuga.
-     *
-     * Va antes de Configuración porque Configuración es siempre la última.
-     */
-    label: 'Administración',
+    label: 'Cuentas',
     href: '/admin',
+    section: SECTION_ADMINISTRACION,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+          d="M15 19v-1a4 4 0 00-4-4H6a4 4 0 00-4 4v1M11 8a3 3 0 11-6 0 3 3 0 016 0zm7 11v-1a3.5 3.5 0 00-2.5-3.36M14.5 7.13a3 3 0 010 5.74"
         />
       </svg>
     ),
   },
   {
+    label: 'Proyectos',
+    href: '/admin/projects',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v1H4V6zM4 9h16v9a2 2 0 01-2 2H6a2 2 0 01-2-2V9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Actividad',
+    href: '/admin/actividad',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 8v4l2.5 2.5M21 12a9 9 0 11-9-9 9 9 0 019 9z"
+        />
+      </svg>
+    ),
+  },
+
+  /**
+   * Gestión — todavía no hay backend detrás de ninguna de las tres. Salen
+   * apagadas con «Pronto» a propósito, siguiendo el mismo criterio que ya
+   * usaba Análisis antes de tener servicio: que la estructura del producto se
+   * entienda sin prometer una pantalla que daría 404.
+   */
+  {
+    label: 'Roles y permisos',
+    href: '/dashboard/roles',
+    section: SECTION_GESTION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM10 12l1.5 1.5L14.5 10"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Facturación y suscripción',
+    href: '/dashboard/facturacion',
+    section: SECTION_GESTION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
+        <path strokeLinecap="round" d="M3 10h18M6.5 14.5h3" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Integraciones',
+    href: '/dashboard/integraciones',
+    section: SECTION_GESTION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 3v4M15 3v4M6 7h12l-1 5a5 5 0 01-10 0L6 7zM9 21v-4M15 21v-4"
+        />
+      </svg>
+    ),
+  },
+
+  {
     /**
      * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
      * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.
-     *
-     * Va la última a propósito: es la entrada a la que se vuelve de vez en
-     * cuando, no una por la que se pasa a diario.
      */
-    label: 'Configuración',
+    label: 'Configuración del sistema',
     href: '/dashboard/settings',
+    section: SECTION_CONFIGURACION,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -208,6 +300,36 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M14.5 12a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Centro de ayuda',
+    href: '/dashboard/ayuda',
+    section: SECTION_CONFIGURACION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.5 9a2.5 2.5 0 015 .5c0 1.5-1.8 1.8-2.3 2.9-.1.3-.2.6-.2 1M12 17h.01M21 12a9 9 0 11-9-9 9 9 0 019 9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    label: 'Soporte al cliente',
+    href: '/dashboard/soporte',
+    section: SECTION_CONFIGURACION,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 13v-1a8 8 0 0116 0v1M4 13v4a2 2 0 002 2h1v-6H5a1 1 0 00-1 1zm16 0v4a2 2 0 01-2 2h-1v-6h1a1 1 0 011 1z"
         />
       </svg>
     ),

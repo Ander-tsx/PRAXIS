@@ -4,8 +4,24 @@
    Ver apps/frontend/commons/styles/theme.css */
 @import "../../../commons/styles/theme.css";
 
+/* La paleta monocromática de marca (.landing/.landing-light) — compartida
+   con auth-front, ver el comentario en el propio archivo. */
+@import "../../../commons/styles/landing-theme.css";
+
 /* Solo el código de esta zona: los de commons vienen en theme.css */
 @source "../**/*.tsx";
+
+/* Sin barra de scroll visible — el shell solo sirve la landing pública y
+   `not-found.tsx`, así que esto es efectivamente "sin scrollbar en la
+   landing", no una regla de toda la aplicación. El scroll en sí sigue
+   funcionando (rueda, teclado, gestos táctiles, Lenis); solo desaparece el
+   indicador. */
+html {
+  scrollbar-width: none; /* Firefox */
+}
+html::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
 
 /* Redaction 50 — self-hosted. El shell no tiene basePath, así que sus assets
    se sirven desde la raíz. */
@@ -34,40 +50,10 @@
 /* ============================================================
    Animaciones de la landing
    Se quedan aquí y no en theme.css: solo las usan los organismos
-   de esta zona (hero 3D, escenas de las cards, GSAP). `sparkle-spin`
-   sí viaja en theme.css porque lo usa Sparkle desde commons.
+   de esta zona (escenas de las cards). El sistema de reveal por scroll
+   (Reveal/Eyebrow/useInView) vive en commons/styles/theme.css porque es
+   una técnica reutilizable, no algo propio de esta zona.
    ============================================================ */
-@keyframes echo-float {
-  0%,
-  100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-10px) rotate(0.5deg);
-  }
-  75% {
-    transform: translateY(-5px) rotate(-0.5deg);
-  }
-}
-@keyframes led-pulse {
-  0%,
-  100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-@keyframes bubble-in {
-  0% {
-    opacity: 0;
-    transform: translateX(-12px) scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
 /* Inclinación al "arrastrar" una tarjeta entre columnas del Kanban.
    Solo gira: el desplazamiento lo hace la transición de transform. */
 @keyframes kanban-tilt {
@@ -131,55 +117,4 @@
   100% {
     background-position: 200% center;
   }
-}
-@keyframes drift-1 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  33% {
-    transform: translate(15px, -20px);
-  }
-  66% {
-    transform: translate(-10px, 10px);
-  }
-}
-@keyframes drift-2 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  33% {
-    transform: translate(-20px, 15px);
-  }
-  66% {
-    transform: translate(10px, -8px);
-  }
-}
-@keyframes drift-3 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(12px, 18px);
-  }
-}
-
-/* GSAP reveal helpers */
-.gsap-reveal {
-  opacity: 0;
-  transform: translateY(32px);
-}
-.gsap-reveal-left {
-  opacity: 0;
-  transform: translateX(-40px);
-}
-.gsap-reveal-right {
-  opacity: 0;
-  transform: translateX(40px);
-}
-.gsap-scale-in {
-  opacity: 0;
-  transform: scale(0.92);
 }

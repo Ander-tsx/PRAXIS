@@ -4,6 +4,8 @@ export interface LandingTemplateProps {
   navbar: ReactNode;
   hero: ReactNode;
   features: ReactNode;
+  automation: ReactNode;
+  assistant: ReactNode;
   howItWorks: ReactNode;
   cta: ReactNode;
   footer: ReactNode;
@@ -18,16 +20,23 @@ export function LandingTemplate({
   navbar,
   hero,
   features,
+  automation,
+  assistant,
   howItWorks,
   cta,
   footer,
 }: LandingTemplateProps) {
   return (
-    <div className="flex flex-col min-h-screen">
+    // `.landing`: raíz de la paleta monocroma (ver globals.css). Cada
+    // sección decide si se queda en la zona oscura por defecto o pasa a
+    // `.landing-light` — el mismo patrón de zonas de Kyloo.
+    <div className="landing flex min-h-screen flex-col" style={{ background: 'var(--l-bg)' }}>
       {navbar}
       <main className="flex-1">
         {hero}
         {features}
+        {automation}
+        {assistant}
         {howItWorks}
         {cta}
       </main>

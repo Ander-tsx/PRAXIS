@@ -1,6 +1,7 @@
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
-import { Inter, Lora } from 'next/font/google';
+import { Archivo, Fraunces, Inter, Lora } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 /**
@@ -25,6 +26,42 @@ const lora = Lora({
   style: ['normal', 'italic'],
 });
 
+/**
+ * Solo para `AuthPanel` (login/signup) — la misma fuente que la landing
+ * usa para sus titulares (`web-shell/layout.tsx`), necesaria aquí porque el
+ * panel de acceso adopta el mismo lenguaje editorial que la landing pública
+ * en vez del tema de producto habitual.
+ */
+const fraunces = Fraunces({
+  variable: '--font-fraunces',
+  subsets: ['latin'],
+  display: 'swap',
+  weight: 'variable',
+  style: ['normal', 'italic'],
+  axes: ['opsz', 'SOFT'],
+});
+
+/** Solo para el wordmark "Praxis" de `AuthPanel` — la misma fuente que el
+ * logotipo en navbar/footer de la landing, ver el comentario en
+ * `web-shell/layout.tsx`. */
+const grotesk = Archivo({
+  variable: '--font-grotesk',
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['700', '800'],
+});
+
+/** Khteka, copiada del repo de Kyloo — solo para el "By Kyloo" de
+ * `AuthPanel`, mismo razonamiento que en `web-shell/layout.tsx`. */
+const khteka = localFont({
+  src: './fonts/khteka-medium.woff2',
+  weight: '500',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-khteka',
+  fallback: ['Arial', 'sans-serif'],
+});
+
 export const metadata: Metadata = {
   title: 'PRAXIS — Acceso',
   description: 'Inicia sesión o crea tu cuenta en PRAXIS.',
@@ -41,7 +78,7 @@ export default async function RootLayout({
     <html
       lang="es"
       data-theme={theme}
-      className={`${inter.variable} ${lora.variable}`}
+      className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable}`}
       suppressHydrationWarning
     >
       <body>{children}</body>

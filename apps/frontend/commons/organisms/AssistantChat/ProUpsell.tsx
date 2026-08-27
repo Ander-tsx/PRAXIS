@@ -118,9 +118,7 @@ export function ProUpsell({ cuota }: { cuota: AssistantQuota }) {
         </span>
 
         <div className="flex min-w-0 flex-col gap-1">
-          <p className="font-sans text-base font-semibold text-text-primary">
-            Con PRO no esperas
-          </p>
+          <p className="font-sans text-base font-semibold text-text-primary">Con PRO no esperas</p>
           <p className="font-sans text-sm text-text-secondary">
             Obtén acceso a {ASSISTANT_PLAN_LIMITS.PRO} mensajes al mes desde {precio}$ pesos.
           </p>

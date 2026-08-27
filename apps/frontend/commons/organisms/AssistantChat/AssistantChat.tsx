@@ -33,8 +33,8 @@ import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
-import { ProUpsell } from './ProUpsell';
 import { ModelText } from './ModelText';
+import { ProUpsell } from './ProUpsell';
 import {
   AccionDelLienzo,
   type AceptarGrafico,

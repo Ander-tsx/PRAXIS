@@ -1,13 +1,11 @@
 import { setThemeAction } from '@/app/(private)/settings/actions';
-import { PanelCard } from '@/components/molecules/PanelCard';
 import { BillingSummary } from '@/components/organisms/BillingSummary';
-import { VoiceLinking } from '@/components/organisms/VoiceLinking';
 import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
-import type { VoiceLink } from '@/lib/voice';
 import { AppHeader, ThemeToggle } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { getTheme } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 
 export const metadata: Metadata = {
   title: 'Configuración',
@@ -16,48 +14,31 @@ export const metadata: Metadata = {
 /**
  * Configuración: **cómo se comporta la aplicación**, no quién eres.
  *
- * ⚠️ **«Tus datos» ya no está aquí.** Se fue con el resto de lo tuyo —foto,
- * estado, cerrar sesión, eliminar la cuenta— a la pantalla de cuenta
- * (`/dashboard/profile`), a la que se llega pulsando tu propia ficha en la
- * barra lateral. Aquí quedan los ajustes que se consultan: Alexa, apariencia y
- * facturación. La línea que las separa es «quién eres» contra «cómo funciona
- * esto».
+ * «Tus datos» vive en la pantalla de cuenta (`/dashboard/profile`), a la que
+ * se llega pulsando tu propia ficha en la barra lateral. Aquí queda lo que se
+ * consulta de vez en cuando y no es quién eres.
  *
- * ## Por qué ya no es una pila de secciones
+ * ⚠️ **Praxis Voice se quitó de aquí** — ya no existe en el producto (ver
+ * `kyloo-design/SKILL.md`).
  *
- * Era la misma pila que la pantalla de cuenta —título, frase en cursiva, regla
- * horizontal— y aquí se veía todavía peor: **«Apariencia» ocupaba una banda de
- * 1400 px de ancho para un interruptor de 72**, y «Praxis Voice» dejaba media
- * pantalla en blanco a la derecha de una lista de tres pasos. Lo que se veía al
- * entrar era la separación entre bloques, no los bloques.
+ * ## Filas, no tarjetas
  *
- * Ahora son **tres tarjetas repartidas por lo que mide cada una**:
+ * Eran tres `PanelCard` en rejilla: caja, borde, fondo, esquinas redondeadas
+ * por triplicado para tres bloques que no compiten entre sí por espacio, solo
+ * se consultan uno detrás de otro. Ahora es una columna con una raya fina
+ * arriba de cada fila — el mismo lenguaje editorial que ya lleva el resto del
+ * sistema desde la landing (`kyloo-design/SKILL.md` §4): el contenido separa
+ * el contenido, no una caja alrededor.
  *
- * | Bloque | Sitio | Por qué |
- * |---|---|---|
- * | Praxis Voice | fila 1, 7 de 12 | Es lo más alto —pasos, generador y dispositivos— y lo único de esta pantalla que **habilita** algo que no se puede hacer desde ninguna otra parte |
- * | Facturación | fila 1, 5 de 12 | Con los dos planes apilados mide casi lo mismo que Voice, así que la fila queda pareja sin huecos |
- * | Apariencia | fila 2, banda de una fila | Un interruptor no da para una tarjeta alta: título a la izquierda, control a la derecha, y se acabó |
- *
- * La banda de Apariencia no lleva cuerpo: el control entra por `aside` de
- * `PanelCard`, que es justo para esto. Rellenarla con algo para que abultara
- * habría sido cambiar un hueco por relleno.
- *
- * En móvil la rejilla cae a una columna y la banda apila su control bajo el
- * título.
+ * Apariencia se queda sin cuerpo — el control entra por `aside`, a la derecha
+ * del título — porque un interruptor no necesita una fila propia debajo.
  */
 export default async function SettingsPage() {
-  /* Cada `catch` deja su bloque en el estado «no se pudo cargar» en vez de
-     tumbar la pantalla entera: que alexa-service esté caído no es motivo para
-     no poder cambiar el tema. */
-  const [, theme, quota, voiceLinks, billing] = await Promise.all([
+  const [, theme, quota, billing] = await Promise.all([
     loadCurrentUser(),
     getTheme(),
     createServerApiClient()
       .get<AssistantQuota>('/me/assistant/quota')
-      .catch(() => null),
-    createServerApiClient()
-      .get<VoiceLink[]>('/alexa/links')
       .catch(() => null),
     /* `null` se trata como apagado en `BillingSummary`: si no se puede
        preguntar si hay pasarela, no se ofrece comprar. */
@@ -71,63 +52,71 @@ export default async function SettingsPage() {
      pintaba dos veces. */
   return (
     <AppHeader title="Configuración">
-      {/* Sin «← Volver al panel»: quien navega es la barra lateral, y un enlace
-          de vuelta junto a su propia entrada resaltada sobra. */}
-      <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <PanelCard
-            title="Praxis Voice"
-            description="Vincula tu cuenta con Alexa para consultar tus proyectos hablando."
-            icon={<IconoVoz />}
-            className="lg:col-span-7"
-          >
-            <VoiceLinking links={voiceLinks ?? []} sinConexion={voiceLinks === null} />
-          </PanelCard>
-
-          <PanelCard
-            title="Facturación"
-            description="Tu plan del asistente de IA y cuántos mensajes te quedan este mes."
-            icon={<IconoFacturacion />}
-            className="lg:col-span-5"
-          >
-            <BillingSummary quota={quota} billing={billing} />
-          </PanelCard>
-        </div>
-
-        {/* El tema, en una banda: el control vive en el encabezado, a la
-            derecha, y la tarjeta no tiene cuerpo. */}
-        <PanelCard
-          title="Apariencia"
-          description="Elige el tema que quieres para la apariencia de toda la interfaz de Praxis"
+      <div className="mx-auto flex w-full max-w-2xl flex-col">
+        <SettingsRow
           icon={<IconoApariencia />}
+          title="Apariencia"
+          description="Elige el tema para toda la interfaz de Praxis."
           aside={<ThemeToggle initialTheme={theme} onCambiar={setThemeAction} />}
         />
+
+        <SettingsRow
+          icon={<IconoFacturacion />}
+          title="Facturación"
+          description="Tu plan del asistente de IA y cuántos mensajes te quedan este mes."
+        >
+          <BillingSummary quota={quota} billing={billing} />
+        </SettingsRow>
       </div>
     </AppHeader>
   );
 }
 
-/* Los iconos de las tarjetas, a 18 px y con el mismo trazo que los de la barra
-   lateral. Van aquí y no en un átomo nuevo porque los usa solo esta pantalla. */
-
-function IconoVoz() {
+/**
+ * Una fila de Configuración: icono, título, frase, y el control a la derecha
+ * o el contenido debajo — nunca los dos con un borde alrededor. `first:` le
+ * quita la raya de arriba a la primera fila, que no separa nada de encima.
+ */
+function SettingsRow({
+  icon,
+  title,
+  description,
+  aside,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  description?: string;
+  aside?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
-    <svg
-      className="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 4.5a2.5 2.5 0 012.5 2.5v5a2.5 2.5 0 11-5 0V7A2.5 2.5 0 0112 4.5zM6 11.5a6 6 0 0012 0M12 17.5V20"
-      />
-    </svg>
+    <div className="flex flex-col gap-4 border-t border-border py-8 first:border-t-0 first:pt-0">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 shrink-0 text-text-secondary" aria-hidden="true">
+            {icon}
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="font-display text-xl text-text-primary">{title}</h2>
+            {description && (
+              <p className="max-w-md font-serif text-sm italic text-text-secondary">
+                {description}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {aside && <div className="shrink-0">{aside}</div>}
+      </div>
+
+      {children}
+    </div>
   );
 }
+
+/* Los iconos de fila, a 18 px y con el mismo trazo que los de la barra
+   lateral. Van aquí y no en un átomo nuevo porque los usa solo esta pantalla. */
 
 function IconoFacturacion() {
   return (

@@ -1,8 +1,7 @@
 'use server';
 
-import type { UpdateProfileState, VoiceLinkState } from '@/lib/action-state';
+import type { UpdateProfileState } from '@/lib/action-state';
 import { validateProfile } from '@/lib/validation';
-import type { VoiceSeedPhrase } from '@/lib/voice';
 import { ApiError } from '@praxis/commons';
 import type { UserProfile } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
@@ -115,106 +114,4 @@ export async function setThemeAction(theme: ThemeName): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(THEME_COOKIE, theme, themeCookieOptions());
   revalidatePath('/', 'layout');
-}
-
-/**
- * Genera la frase semilla que se le dicta a Praxis Voice.
- *
- * `POST /api/alexa/link` **sin cuerpo**: el usuario sale del token, como en
- * todo lo que cuelga de `/me`. Mandar un `userId` aquí sería, además de un
- * campo de más —y uno de más ya da 400—, dejar que el cliente eligiera de quién
- * es la frase.
- *
- * ⚠️ **La frase solo existe en esta respuesta.** El backend guarda su hash, no
- * el texto, así que no hay ninguna ruta que la vuelva a devolver: si se pierde,
- * se genera otra. Por eso no se revalida ninguna ruta con la frase dentro ni se
- * escribe en caché — viaja al estado del formulario y ahí se queda.
- *
- * Generar una nueva **invalida la anterior sin canjear**, y eso lo hace el
- * propio backend en la misma llamada: nunca hay dos vivas a la vez.
- *
- * Se confirma contra el `data` y no contra el status, como en el resto: un 201
- * con la frase vacía sería una frase que nadie puede dictar.
- */
-export async function generateSeedPhraseAction(
-  _prevState: VoiceLinkState,
-  _formData: FormData,
-): Promise<VoiceLinkState> {
-  const session = await getSession();
-  if (!session) {
-    return {
-      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
-      phrase: null,
-      expiresAt: null,
-    };
-  }
-
-  let generated: VoiceSeedPhrase;
-  try {
-    generated = await createServerApiClient().post<VoiceSeedPhrase>('/alexa/link', {});
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return { error: error.message, phrase: null, expiresAt: null };
-    }
-    return {
-      error: 'No se pudo generar la frase. Inténtalo de nuevo.',
-      phrase: null,
-      expiresAt: null,
-    };
-  }
-
-  if (!generated?.phrase || !generated?.expiresAt) {
-    return {
-      error: 'El servidor respondió correctamente pero no devolvió ninguna frase.',
-      phrase: null,
-      expiresAt: null,
-    };
-  }
-
-  return { error: null, phrase: generated.phrase, expiresAt: generated.expiresAt };
-}
-
-/**
- * Revoca una vinculación de voz concreta, o todas.
- *
- * Sin `linkId` va a `DELETE /alexa/links`, que las tumba todas. Con él, a
- * `DELETE /alexa/links/:id`. Las dos resuelven el usuario desde el token, así
- * que no se puede revocar la de otra persona pasando un id ajeno.
- *
- * Aquí **sí** se revalida: la lista de dispositivos la pinta el Server
- * Component de la pantalla, y sin esto seguiría enseñando el que se acaba de
- * echar.
- */
-export async function revokeVoiceLinkAction(
-  _prevState: VoiceLinkState,
-  formData: FormData,
-): Promise<VoiceLinkState> {
-  const session = await getSession();
-  if (!session) {
-    return {
-      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
-      phrase: null,
-      expiresAt: null,
-    };
-  }
-
-  const linkId = String(formData.get('linkId') ?? '').trim();
-
-  try {
-    await createServerApiClient().delete(linkId ? `/alexa/links/${linkId}` : '/alexa/links');
-  } catch (error) {
-    if (error instanceof ApiError) {
-      return { error: error.message, phrase: null, expiresAt: null };
-    }
-    return {
-      error: 'No se pudo revocar el acceso. Inténtalo de nuevo.',
-      phrase: null,
-      expiresAt: null,
-    };
-  }
-
-  revalidatePath('/settings');
-  revalidatePath('/');
-
-  return { error: null, phrase: null, expiresAt: null };
 }

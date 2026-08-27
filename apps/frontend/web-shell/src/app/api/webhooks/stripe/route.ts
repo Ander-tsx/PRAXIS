@@ -12,8 +12,8 @@ import { type NextRequest, NextResponse } from 'next/server';
  * concede el webhook y solo el webhook, **nadie llega a PRO en producción** por
  * bien que funcione el pago.
  *
- * Es el mismo problema que resolvió el paso de voz (`api/alexa/[...path]`), y
- * por los mismos motivos:
+ * Es el mismo problema que resolvía el antiguo paso de voz de la skill de
+ * Alexa (retirado junto con esa integración), y por los mismos motivos:
  *
  * - **No vale un `rewrite()` de `next.config.ts`.** Next los resuelve al
  *   **construir** y guarda el destino ya cocido en `routes-manifest.json`; con

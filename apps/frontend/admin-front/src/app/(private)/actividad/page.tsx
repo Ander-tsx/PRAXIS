@@ -87,7 +87,6 @@ export default async function ActivityPage({ searchParams }: PageProps) {
             curso, y ese ya lo lleva el paginador. Un «12.480 acciones en total»
             no cambiaría ninguna decisión. */}
         <AdminHeader
-          activo="actividad"
           titulo="Registro de actividad"
           descripcion="Quién hizo qué, sobre quién, cuándo y por qué. No se puede editar ni borrar."
         />

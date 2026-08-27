@@ -147,9 +147,7 @@ export function ProjectPicker({
       </button>
 
       {open && (
-        <div
-          className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-lg"
-        >
+        <div className="absolute left-0 right-0 top-full z-30 mt-2 overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-lg">
           <ul className="max-h-72 overflow-y-auto p-1.5 flex flex-col gap-0.5">
             {projects.map((project) => {
               const isActive = project.id === activeId;
@@ -168,7 +166,9 @@ export function ProjectPicker({
                     style={isActive ? { background: alpha(colors.primary, 10) } : undefined}
                   >
                     <span className="truncate font-sans text-sm">{project.name}</span>
-                    <span className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}>
+                    <span
+                      className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}
+                    >
                       {project._count.members}{' '}
                       {project._count.members === 1 ? 'persona' : 'personas'}
                     </span>

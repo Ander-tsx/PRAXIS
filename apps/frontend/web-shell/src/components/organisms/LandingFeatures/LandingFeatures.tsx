@@ -1,653 +1,143 @@
 'use client';
 
-import { FeatureCard, type FeatureCardData, SectionHeader, alpha, colors } from '@praxis/commons';
-
 /**
- * ⚠️ **Los `rgba()` que quedan en este archivo son acentos de marca, no
- * descuidos.**
+ * Características — un índice editorial, no una rejilla de tarjetas.
  *
- * Lavanda, índigo y ámbar con alfa baja: colores saturados que se leen igual
- * sobre `#0d0f14` y sobre blanco, así que no necesitan token ni versión clara.
- * Lo que sí se migró —y era el problema real del tema claro— son los
- * `rgba(255,255,255,…)`: veintisiete blancos con alfa que hacían de texto, de
- * superficie y de borde, y que sobre fondo claro desaparecían. Todos pasan por
- * `colors.textPrimary`, que se invierte solo entre temas y por eso sirve para
- * los tres papeles a la vez.
- *
- * Las sombras se quedan oscuras en los dos temas, igual que `--color-overlay`:
- * oscurecer por encima de algo claro sigue leyéndose como sombra.
+ * La versión anterior tenía nueve cajas idénticas con una miniatura de
+ * interfaz dentro: mucho adorno, poco argumento. Esta es la lista completa
+ * en tipografía grande, con la descripción al lado — el mismo lenguaje que
+ * ya usa el footer (filas con raya punteada, flecha que entra al pasar el
+ * cursor), así que la página deja de sentirse como secciones distintas
+ * pegadas una tras otra.
  */
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { Reveal } from '@praxis/commons';
+import { useState } from 'react';
 
-/**
- * Escenas de la rejilla de características.
- *
- * Cada una recibe `active` y define su propia animación de hover. Se usan
- * transiciones con `transitionDelay` escalonado en lugar de keyframes: así el
- * gesto se reproduce hacia delante al entrar y se deshace solo al salir, sin
- * animaciones que se queden a medias.
- */
-
-const EASE = 'cubic-bezier(.22,1,.36,1)';
-
-/* ── 1. Tablero Kanban ─────────────────────────────────────────
-   Al pasar el cursor, la tarea se arrastra de "En progreso" a "Hecho":
-   se inclina, se eleva y aterriza en la columna destino. */
-function KanbanScene(active: boolean) {
-  const columns = [
-    {
-      name: 'Por hacer',
-      color: '#7c6cff',
-      tasks: [
-        { title: 'Diseño de login', due: '4 mar' },
-        { title: 'Endpoint tareas', due: '6 mar' },
-      ],
-    },
-    { name: 'En progreso', color: '#f59e0b', tasks: [{ title: 'Filtros', due: '8 mar' }] },
-    { name: 'Hecho', color: '#34d399', tasks: [{ title: 'Autenticación', due: '1 mar' }] },
-  ];
-
-  const card = (title: string, due: string, tone?: string) => (
-    <div
-      className="rounded-lg px-2 py-1.5"
-      style={{
-        background: tone ? `${tone}1c` : alpha(colors.textPrimary, 5),
-        border: `1px solid ${tone ? `${tone}55` : alpha(colors.textPrimary, 8)}`,
-      }}
-    >
-      <div
-        className="truncate font-sans text-[0.58rem] leading-tight"
-        style={{ color: tone ?? alpha(colors.textPrimary, 62) }}
-      >
-        {title}
-      </div>
-      <div className="mt-1 flex items-center gap-1">
-        <svg
-          className="h-2 w-2 flex-shrink-0"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2.5}
-          style={{ color: alpha(colors.textPrimary, 30) }}
-          aria-hidden="true"
-        >
-          <rect x="3" y="5" width="18" height="16" rx="2" />
-          <path d="M8 3v4M16 3v4M3 11h18" />
-        </svg>
-        <span className="font-mono text-[0.5rem]" style={{ color: alpha(colors.textPrimary, 35) }}>
-          {due}
-        </span>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="flex h-full gap-2.5 p-3.5">
-      {columns.map((col, ci) => (
-        <div key={col.name} className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
-              style={{ background: col.color }}
-            />
-            <span
-              className="truncate font-sans text-[0.58rem] font-medium"
-              style={{
-                color: active ? col.color : alpha(colors.textPrimary, 40),
-                transition: 'color 320ms ease',
-              }}
-            >
-              {col.name}
-            </span>
-          </div>
-
-          {col.tasks.map((task) => (
-            <div key={task.title}>{card(task.title, task.due)}</div>
-          ))}
-
-          {/* La tarea arrastrada: vive en "En progreso" y aterriza en "Hecho" */}
-          {ci === 1 && (
-            <div
-              style={{
-                /* Solo horizontal: la tarjeta ya ocupa la segunda ranura de su
-                   columna, así que al desplazarse un ancho exacto aterriza justo
-                   bajo "Autenticación", sin descuadrar el hueco. */
-                transform: active ? 'translateX(calc(100% + 10px))' : 'translateX(0)',
-                filter: active
-                  ? `drop-shadow(0 10px 16px ${alpha(colors.overlay, 55)})`
-                  : 'drop-shadow(0 0 0 transparent)',
-                transition: `transform 700ms ${EASE}, filter 500ms ease`,
-                animation: active ? 'kanban-tilt 700ms ease-in-out' : undefined,
-              }}
-            >
-              {card('Permisos por rol', '11 mar', active ? '#34d399' : '#a5a0ff')}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ── 2. Permisos por rol ───────────────────────────────────────
-   Agrupado por recurso y acción, en lenguaje llano: un rol es un
-   conjunto de permisos, no una fila de interruptores sueltos.
-   Las cuatro filas cubren los 10 permisos reales de ProjectPermission. */
-const PERMISSION_GROUPS = [
-  { resource: 'Tareas', actions: ['Crear', 'Editar', 'Eliminar'] },
-  { resource: 'Tableros', actions: ['Crear', 'Editar', 'Eliminar'] },
-  { resource: 'Columnas', actions: ['Crear', 'Eliminar'] },
-  { resource: 'Equipo', actions: ['Invitar', 'Definir roles'] },
-];
-
-/** Permisos concedidos, como "recurso:acción". El hover pasa de Desarrollo a Scrum Master. */
-const ROLE_GRANTS = {
-  desarrollo: new Set(['Tareas:Crear', 'Tareas:Editar', 'Tableros:Editar', 'Columnas:Crear']),
-  scrumMaster: new Set(
-    PERMISSION_GROUPS.flatMap((g) => g.actions.map((a) => `${g.resource}:${a}`)),
-  ),
-};
-
-function PermissionsScene(active: boolean) {
-  const granted = active ? ROLE_GRANTS.scrumMaster : ROLE_GRANTS.desarrollo;
-  const total = ROLE_GRANTS.scrumMaster.size;
-  const roles = [
-    { name: 'Desarrollo', on: !active },
-    { name: 'Scrum Master', on: active },
-  ];
-
-  let tileIndex = -1;
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-2 px-3.5 py-3">
-      {/* Rol activo */}
-      <div className="flex items-center gap-1.5">
-        {roles.map((role) => (
-          <span
-            key={role.name}
-            className="rounded-full px-2 py-0.5 font-sans text-[0.55rem] font-medium"
-            style={{
-              background: role.on ? 'rgba(167,139,250,0.18)' : alpha(colors.textPrimary, 4),
-              border: `1px solid ${role.on ? 'rgba(167,139,250,0.5)' : alpha(colors.textPrimary, 7)}`,
-              color: role.on ? colors.primary : alpha(colors.textPrimary, 30),
-              transition: 'all 320ms ease',
-            }}
-          >
-            {role.name}
-          </span>
-        ))}
-        <span
-          className="ml-auto font-mono text-[0.52rem]"
-          style={{ color: alpha(colors.textPrimary, 40) }}
-        >
-          {granted.size}/{total}
-        </span>
-      </div>
-
-      {/* Permisos agrupados por recurso */}
-      <div className="flex flex-col gap-1">
-        {PERMISSION_GROUPS.map((group) => (
-          <div key={group.resource} className="flex items-center gap-1.5">
-            <span
-              className="w-14 flex-shrink-0 font-sans text-[0.55rem] font-medium"
-              style={{ color: alpha(colors.textPrimary, 45) }}
-            >
-              {group.resource}
-            </span>
-
-            {group.actions.map((action) => {
-              tileIndex += 1;
-              const on = granted.has(`${group.resource}:${action}`);
-              return (
-                <span
-                  key={action}
-                  className="flex-1 rounded-md py-[3px] text-center font-sans text-[0.5rem] font-medium"
-                  style={{
-                    background: on ? 'rgba(167,139,250,0.22)' : alpha(colors.textPrimary, 3.5),
-                    border: `1px solid ${on ? 'rgba(167,139,250,0.55)' : alpha(colors.textPrimary, 6)}`,
-                    color: on ? colors.primary : alpha(colors.textPrimary, 25),
-                    transition: `all 280ms ${EASE} ${tileIndex * 40}ms`,
-                  }}
-                >
-                  {action}
-                </span>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── 3. Espacios y tableros ────────────────────────────────────
-   Árbol invertido: el proyecto arriba, sus espacios debajo y los
-   tableros colgando de cada espacio. Las ramas se trazan al pasar. */
-function HierarchyScene(active: boolean) {
-  const branches = [
-    { x1: 150, y1: 34, x2: 78, y2: 62 },
-    { x1: 150, y1: 34, x2: 222, y2: 62 },
-    { x1: 78, y1: 82, x2: 42, y2: 110 },
-    { x1: 78, y1: 82, x2: 114, y2: 110 },
-    { x1: 222, y1: 82, x2: 186, y2: 110 },
-    { x1: 222, y1: 82, x2: 258, y2: 110 },
-  ];
-
-  const nodes = [
-    { x: 150, y: 24, w: 92, label: 'Proyecto Aurora', color: '#818cf8', level: 0 },
-    { x: 78, y: 72, w: 74, label: 'Producto', color: '#a5b4fc', level: 1 },
-    { x: 222, y: 72, w: 74, label: 'Diseño', color: '#a5b4fc', level: 1 },
-    { x: 42, y: 120, w: 62, label: 'Sprint 4', color: '#c7d2fe', level: 2 },
-    { x: 114, y: 120, w: 62, label: 'Backlog', color: '#c7d2fe', level: 2 },
-    { x: 186, y: 120, w: 62, label: 'UI Kit', color: '#c7d2fe', level: 2 },
-    { x: 258, y: 120, w: 62, label: 'Research', color: '#c7d2fe', level: 2 },
-  ];
-
-  return (
-    <div className="flex h-full items-center justify-center px-3">
-      <svg
-        viewBox="0 0 300 144"
-        className="h-full w-full"
-        role="img"
-        aria-label="Jerarquía de proyecto"
-      >
-        <title>Proyecto, espacios y tableros</title>
-
-        {branches.map((branch, i) => (
-          <path
-            key={`${branch.x1}-${branch.y1}-${branch.x2}-${branch.y2}`}
-            d={`M ${branch.x1} ${branch.y1} C ${branch.x1} ${(branch.y1 + branch.y2) / 2}, ${branch.x2} ${(branch.y1 + branch.y2) / 2}, ${branch.x2} ${branch.y2}`}
-            fill="none"
-            stroke={active ? 'rgba(129,140,248,0.65)' : 'rgba(129,140,248,0.2)'}
-            strokeWidth="1.2"
-            /* pathLength normaliza cada rama a 1 con independencia de su
-               longitud real: sin esto, un dasharray fijo se repetía en las
-               ramas largas y la línea se cortaba antes de llegar al nodo. */
-            pathLength={1}
-            strokeDasharray="1"
-            strokeDashoffset={active ? 0 : 1}
-            style={{
-              transition: `stroke-dashoffset 520ms ${EASE} ${i < 2 ? 0 : 220}ms, stroke 400ms ease`,
-            }}
-          />
-        ))}
-
-        {nodes.map((node) => (
-          <g
-            key={node.label}
-            style={{
-              opacity: active || node.level === 0 ? 1 : 0.4,
-              transition: `opacity 380ms ease ${node.level * 180}ms`,
-            }}
-          >
-            <rect
-              x={node.x - node.w / 2}
-              y={node.y - 9}
-              width={node.w}
-              height={18}
-              rx={5}
-              fill={active ? `${node.color}20` : alpha(colors.textPrimary, 4)}
-              stroke={active ? `${node.color}70` : alpha(colors.textPrimary, 8)}
-              strokeWidth="1"
-              style={{ transition: 'all 380ms ease' }}
-            />
-            <text
-              x={node.x}
-              y={node.y + 1}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              fontSize="7.5"
-              fontFamily="system-ui, sans-serif"
-              fill={active ? node.color : alpha(colors.textPrimary, 45)}
-              style={{ transition: 'fill 380ms ease' }}
-            >
-              {node.label}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-/* ── 4. Subtareas y checklists ─────────────────────────────────
-   Los ítems se marcan uno a uno y la barra de avance acompaña. */
-function ChecklistScene(active: boolean) {
-  const items = ['Definir el modelo de datos', 'Migraciones aplicadas', 'Endpoint documentado'];
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-2.5 px-4">
-      <div className="flex items-center justify-between">
-        <span className="font-sans text-[0.62rem] font-medium text-white/60">Checklist</span>
-        <span
-          className="font-mono text-[0.58rem]"
-          style={{
-            color: active ? '#34d399' : alpha(colors.textPrimary, 35),
-            transition: 'color 400ms ease 320ms',
-          }}
-        >
-          {active ? '3/3' : '0/3'}
-        </span>
-      </div>
-
-      <div
-        className="h-1 overflow-hidden rounded-full"
-        style={{ background: alpha(colors.textPrimary, 7) }}
-      >
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: active ? '100%' : '0%',
-            background: '#34d399',
-            transition: `width 720ms ${EASE}`,
-          }}
-        />
-      </div>
-
-      {items.map((item, i) => (
-        <div key={item} className="flex items-center gap-2">
-          <span
-            className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-[4px] font-sans text-[0.5rem] font-bold"
-            style={{
-              background: active ? '#34d399' : 'transparent',
-              border: `1px solid ${active ? '#34d399' : alpha(colors.textPrimary, 18)}`,
-              color: '#0d1117',
-              transition: `background 260ms ease ${i * 140}ms, border-color 260ms ease ${i * 140}ms`,
-            }}
-          >
-            <span
-              style={{
-                opacity: active ? 1 : 0,
-                transition: `opacity 200ms ease ${i * 140 + 80}ms`,
-              }}
-            >
-              ✓
-            </span>
-          </span>
-          <span
-            className="font-sans text-[0.6rem]"
-            style={{
-              color: active ? alpha(colors.textPrimary, 35) : alpha(colors.textPrimary, 55),
-              textDecoration: active ? 'line-through' : 'none',
-              transition: `color 260ms ease ${i * 140}ms`,
-            }}
-          >
-            {item}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ── 5. Equipo y roles ─────────────────────────────────────────
-   Los miembros entran escalonados y se revela su rol en el proyecto. */
-function TeamScene(active: boolean) {
-  const members = [
-    { initials: 'AG', name: 'Andrés G.', role: 'Scrum Master', color: '#38bdf8' },
-    { initials: 'JJ', name: 'Juan J.', role: 'Desarrollo', color: '#7c6cff' },
-    { initials: 'CE', name: 'César E.', role: 'QA', color: '#34d399' },
-  ];
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-2 px-3.5">
-      {members.map((member, i) => (
-        <div
-          key={member.initials}
-          className="flex items-center gap-2.5 rounded-lg px-2 py-1.5"
-          style={{
-            background: active ? alpha(colors.textPrimary, 4.5) : 'transparent',
-            opacity: active ? 1 : 0.5,
-            transform: active ? 'translateX(0)' : 'translateX(-8px)',
-            transition: `all 380ms ${EASE} ${i * 90}ms`,
-          }}
-        >
-          <span
-            className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-sans text-[0.55rem] font-bold"
-            style={{
-              background: `${member.color}22`,
-              border: `1px solid ${member.color}55`,
-              color: member.color,
-            }}
-          >
-            {member.initials}
-          </span>
-          <span className="font-sans text-[0.62rem] text-white/70">{member.name}</span>
-          <span
-            className="ml-auto rounded-full px-2 py-0.5 font-sans text-[0.53rem] font-medium"
-            style={{
-              background: `${member.color}18`,
-              color: member.color,
-              opacity: active ? 1 : 0,
-              transform: active ? 'scale(1)' : 'scale(0.85)',
-              transition: `all 300ms ${EASE} ${i * 90 + 140}ms`,
-            }}
-          >
-            {member.role}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ── 6. Control por voz ────────────────────────────────────────
-   La onda de audio cobra vida y aparece la transcripción. */
-function VoiceScene(active: boolean) {
-  const bars = [0.3, 0.55, 0.85, 1, 0.7, 0.95, 0.5, 0.75, 1, 0.6, 0.4, 0.8, 0.55, 0.3];
-
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
-      <div className="flex h-10 items-center justify-center gap-[3px]">
-        {bars.map((height, i) => (
-          <span
-            key={`bar-${i}-${height}`}
-            className="w-[3px] rounded-full"
-            style={{
-              height: active ? `${height * 100}%` : '14%',
-              background: active
-                ? `rgba(245,158,11,${0.45 + height * 0.5})`
-                : alpha(colors.textPrimary, 16),
-              transition: `height 420ms ${EASE} ${i * 32}ms, background 420ms ease ${i * 32}ms`,
-            }}
-          />
-        ))}
-      </div>
-
-      <div
-        className="rounded-full px-3 py-1.5 text-center font-sans text-[0.6rem]"
-        style={{
-          background: active ? 'rgba(245,158,11,0.1)' : alpha(colors.textPrimary, 4),
-          border: `1px solid ${active ? 'rgba(245,158,11,0.35)' : alpha(colors.textPrimary, 7)}`,
-          color: active ? '#f59e0b' : alpha(colors.textPrimary, 40),
-          transition: 'all 400ms ease 200ms',
-        }}
-      >
-        «Alexa, ¿qué tareas tengo hoy?»
-      </div>
-    </div>
-  );
-}
-
-/* ── Iconos ───────────────────────────────────────────────────── */
-function icon(path: ReactNode) {
-  return (
-    <svg
-      className="h-5 w-5"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.7}
-      aria-hidden="true"
-    >
-      {path}
-    </svg>
-  );
-}
-
-/* ── Datos ────────────────────────────────────────────────────── */
-const CARDS: FeatureCardData[] = [
+const FEATURES = [
   {
-    id: 1,
-    accent: '#7c6cff',
-    badge: 'Tableros',
+    n: '01',
     title: 'Tableros Kanban',
-    description:
-      'Columnas configurables por tablero. Mueve una tarea y su estado se actualiza para todo el equipo al instante.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v12a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v6a2.25 2.25 0 01-2.25 2.25h-2.25A2.25 2.25 0 0113.5 12V6z"
-      />,
-    ),
-    visual: KanbanScene,
+    body: 'Columnas configurables por tablero. Mueve una tarea y su estado se actualiza para todo el equipo al instante.',
   },
   {
-    id: 2,
-    accent: '#34d399',
-    badge: 'Detalle',
-    /* Decía «Subtareas y checklists», y las subtareas no se exponen: la landing
-       prometía una función que no existe en ninguna pantalla. §24.5. */
+    n: '02',
     title: 'Checklists por tarea',
-    description:
-      'Divide el trabajo grande en pasos verificables. Cada tarea lleva su propia lista de comprobación, y lo que falta se ve desde el tablero.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />,
-    ),
-    visual: ChecklistScene,
+    body: 'Divide el trabajo grande en pasos verificables. Cada tarea lleva su propia lista, y lo que falta se ve desde el tablero.',
   },
   {
-    id: 3,
-    accent: '#f59e0b',
-    badge: 'Voz',
-    title: 'Consulta por voz con Alexa',
-    description:
-      'Pregunta por el estado de un tablero o crea una tarea sin tocar el teclado, con la skill de Alexa integrada.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"
-      />,
-    ),
-    visual: VoiceScene,
-  },
-  {
-    id: 4,
-    accent: '#818cf8',
-    badge: 'Estructura',
+    n: '03',
     title: 'Espacios y tableros',
-    description:
-      'Una jerarquía clara para que nada quede suelto: agrupa por espacio de trabajo y divide en los tableros que hagan falta.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"
-      />,
-    ),
-    visual: HierarchyScene,
+    body: 'Una jerarquía clara para que nada quede suelto: agrupa por espacio de trabajo y divide en los tableros que hagan falta.',
   },
   {
-    id: 5,
-    accent: '#38bdf8',
-    badge: 'Equipo',
+    n: '04',
     title: 'Equipo y asignaciones',
-    description:
-      'Invita a tu equipo, dale un rol dentro del proyecto y asigna responsables con fecha límite y prioridad.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-      />,
-    ),
-    visual: TeamScene,
+    body: 'Invita a tu equipo, dale un rol dentro del proyecto y asigna responsables con fecha límite y prioridad.',
   },
   {
-    id: 6,
-    accent: '#a78bfa',
-    badge: 'Permisos',
+    n: '05',
     title: 'Permisos por rol',
-    description:
-      'Cada proyecto define sus propios roles y decide, permiso a permiso, quién crea, edita o elimina.',
-    icon: icon(
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-      />,
-    ),
-    visual: PermissionsScene,
+    body: 'Cada proyecto define sus propios roles y decide, permiso a permiso, quién crea, edita o elimina.',
   },
-];
+  {
+    n: '06',
+    title: 'Avisos en tiempo real',
+    body: 'Te asignan, te mencionan o vence tu tarea: el aviso llega a la bandeja al instante y lleva directo a lo que cambió.',
+  },
+  {
+    n: '07',
+    title: 'Chat de equipo',
+    body: 'Un chat por proyecto y conversaciones privadas, con menciones y no leídos — sin salir de Praxis a coordinar.',
+  },
+  {
+    n: '08',
+    title: 'Tu propio lienzo de reportes',
+    body: 'Elige qué widgets ver y en qué orden. El lienzo es tuyo: nadie más lo reorganiza, y arranca vacío hasta que lo montas.',
+  },
+] as const;
 
-/* ── Sección ──────────────────────────────────────────────────── */
-export function LandingFeatures() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const headingRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    gsap.registerPlugin(ScrollTrigger);
-
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        headingRef.current,
-        { y: 40, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: { trigger: headingRef.current, start: 'top 85%' },
-        },
-      );
-
-      if (gridRef.current) {
-        gsap.fromTo(
-          gridRef.current.querySelectorAll('.feature-card-wrapper'),
-          { y: 40, opacity: 0 },
-          {
-            y: 0,
-            opacity: 1,
-            duration: 0.6,
-            stagger: 0.08,
-            ease: 'power3.out',
-            scrollTrigger: { trigger: gridRef.current, start: 'top 82%' },
-          },
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
+function FeatureRow({ feature, index }: { feature: (typeof FEATURES)[number]; index: number }) {
+  const [active, setActive] = useState(false);
 
   return (
-    <section id="features" ref={sectionRef} className="px-6 py-32">
-      <div className="mx-auto max-w-7xl">
-        <div ref={headingRef} className="mb-16 opacity-0">
-          <SectionHeader
-            eyebrow="Características"
-            heading="Todo lo que tu equipo necesita"
-            subtitle="Una plataforma que se adapta a cómo trabaja tu equipo, en lugar de obligarle a cambiar."
-          />
+    <Reveal
+      as="li"
+      delay={(index % 4) * 0.05}
+      duration={0.7}
+      innerClassName="block border-b border-dotted"
+      style={{ borderColor: 'var(--l-border)' }}
+    >
+      <button
+        type="button"
+        className="grid w-full grid-cols-1 items-baseline gap-x-8 gap-y-2 py-8 text-left md:grid-cols-[3rem_1fr_1.1fr] md:py-10"
+        onMouseEnter={() => setActive(true)}
+        onMouseLeave={() => setActive(false)}
+        onFocus={() => setActive(true)}
+        onBlur={() => setActive(false)}
+      >
+        <span
+          className="font-mono text-xs transition-colors duration-300 md:text-sm"
+          style={{ color: active ? 'var(--l-fg)' : 'var(--l-fg-muted)' }}
+        >
+          {feature.n}
+        </span>
+
+        <span
+          className="text-3xl leading-[1.05] transition-transform duration-300 ease-[var(--ease-transition)] md:text-4xl"
+          style={{
+            fontFamily: 'var(--font-fraunces)',
+            fontWeight: 500,
+            color: 'var(--l-fg)',
+            transform: active ? 'translateX(0.4rem)' : 'translateX(0)',
+          }}
+        >
+          {feature.title}
+        </span>
+
+        <span
+          className="max-w-md font-sans text-sm leading-relaxed transition-opacity duration-300 md:text-base"
+          style={{ color: 'var(--l-fg-muted)', opacity: active ? 1 : 0.75 }}
+        >
+          {feature.body}
+        </span>
+      </button>
+    </Reveal>
+  );
+}
+
+export function LandingFeatures() {
+  return (
+    <section
+      id="features"
+      data-theme-section="light"
+      className="landing-light px-6 py-32 md:py-44"
+      style={{ background: 'var(--l-bg)', color: 'var(--l-fg)' }}
+    >
+      <div className="mx-auto max-w-5xl">
+        <div className="mb-16 md:mb-24">
+          <Reveal innerClassName="font-mono text-xs font-medium uppercase tracking-widest">
+            <span style={{ color: 'var(--l-fg-muted)' }}>Características · 01–08</span>
+          </Reveal>
+          <Reveal
+            delay={0.05}
+            className="mt-4"
+            innerClassName="text-4xl md:text-6xl"
+            duration={0.9}
+          >
+            <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
+              Todo lo que tu equipo necesita.
+            </span>
+          </Reveal>
         </div>
 
-        <div ref={gridRef} className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {CARDS.map((card) => (
-            <div key={card.id} className="feature-card-wrapper opacity-0">
-              <FeatureCard card={card} />
-            </div>
+        <ul
+          className="m-0 flex list-none flex-col border-t border-dotted pl-0"
+          style={{ borderColor: 'var(--l-border)' }}
+        >
+          {FEATURES.map((feature, i) => (
+            <FeatureRow key={feature.n} feature={feature} index={i} />
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

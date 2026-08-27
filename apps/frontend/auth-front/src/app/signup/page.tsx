@@ -1,5 +1,6 @@
 'use client';
 
+import { AuthPanel } from '@/components/organisms/AuthPanel';
 import { BotonGoogle } from '@/components/organisms/BotonGoogle';
 import { navigateAfterAuth } from '@/lib/navigation';
 import { Button, Input } from '@praxis/commons/atoms';
@@ -141,10 +142,11 @@ export default function SignupPage() {
 
   if (registrado) {
     return (
-      /* Centrado igual que el formulario: esta pantalla lo sustituye, así que
-         sin el `<main>` la tarjeta saltaba a la esquina al registrarse. */
-      <main className="flex min-h-screen items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
+      /* El mismo panel que el formulario: esta pantalla lo sustituye, y
+         sacarla de `AuthPanel` la dejaría en una página en blanco sin el
+         fondo ambiental ni el cierre. */
+      <AuthPanel>
+        <div className="w-full max-w-md">
           <h1 className="mb-2 font-display text-3xl text-text-primary">Mira tu correo</h1>
           <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
             Hemos mandado un enlace a <strong className="text-text-primary">{email}</strong>. Ábrelo
@@ -159,13 +161,14 @@ export default function SignupPage() {
             </Button>
           </Link>
         </div>
-      </main>
+      </AuthPanel>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-12">
+    <AuthPanel>
       <AuthForm
+        bare
         title="Crear cuenta"
         subtitle="Únete a PRAXIS y empieza a gestionar tus proyectos."
         errorMessage={globalError}
@@ -241,6 +244,6 @@ export default function SignupPage() {
           required
         />
       </AuthForm>
-    </main>
+    </AuthPanel>
   );
 }

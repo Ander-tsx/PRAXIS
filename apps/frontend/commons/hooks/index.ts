@@ -12,3 +12,4 @@
 export { TECHO_DE_ESPERA_MS, useAccion } from './useAccion';
 export { ESPERA_DE_AGRUPACION_MS, useRefrescoAgrupado } from './useRefrescoAgrupado';
 export { type CurrentTheme, useCurrentTheme } from './useCurrentTheme';
+export { useInView, useScrollProgress } from './useInView';

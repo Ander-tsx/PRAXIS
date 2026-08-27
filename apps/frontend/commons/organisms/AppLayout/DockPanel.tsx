@@ -7,8 +7,8 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useState,
   useRef,
+  useState,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { alpha, colors } from '../../tokens';

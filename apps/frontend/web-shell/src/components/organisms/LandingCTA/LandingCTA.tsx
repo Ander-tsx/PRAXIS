@@ -1,11 +1,12 @@
 'use client';
 
-import { Sparkle, alpha, colors } from '@praxis/commons';
+import { RollCta } from '@/components/molecules/RollCta';
+import { Reveal } from '@praxis/commons';
 
 const TRUST_SIGNALS = [
-  '✓ Listo para usar en minutos',
-  '✓ Sin límite de proyectos ni de tableros',
-  '✓ Integración con Alexa incluida',
+  'Listo para usar en minutos',
+  'Sin límite de proyectos ni de tableros',
+  'Asistente y automatización incluidos',
 ];
 
 export interface LandingCTAProps {
@@ -14,124 +15,70 @@ export interface LandingCTAProps {
 
 export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
   return (
-    <section id="pricing" className="py-32 px-6">
-      <div className="max-w-4xl mx-auto text-center">
-        {/* Sparkle row */}
-        <div className="flex items-center justify-center gap-4 mb-6" aria-hidden="true">
-          <Sparkle
-            style={{
-              color: 'var(--color-primary)',
-              animation: 'sparkle-spin 4s linear infinite',
-              opacity: 0.7,
-            }}
-            size={16}
-          />
-          <Sparkle
-            style={{
-              color: 'var(--color-accent)',
-              animation: 'sparkle-spin 6s linear infinite reverse',
-              opacity: 0.5,
-            }}
-            size={10}
-          />
-          <Sparkle
-            style={{ color: '#a78bfa', animation: 'sparkle-spin 5s linear infinite', opacity: 0.6 }}
-            size={12}
-          />
-        </div>
+    <section
+      id="pricing"
+      data-theme-section="light"
+      className="landing-light px-6 py-40 md:py-52"
+      style={{ background: 'var(--l-bg)', color: 'var(--l-fg)' }}
+    >
+      <div className="mx-auto max-w-4xl text-center">
+        <Reveal innerClassName="text-6xl italic md:text-8xl" duration={0.9}>
+          <span style={{ fontFamily: 'var(--font-fraunces)', fontWeight: 500 }}>
+            {isAuthenticated ? 'Continúa donde lo dejaste.' : 'Empieza hoy mismo.'}
+          </span>
+        </Reveal>
 
-        {/* Headline */}
-        <h2 className="font-display text-5xl md:text-6xl text-text-primary italic mb-4">
-          {isAuthenticated ? 'Continúa donde lo dejaste.' : 'Empieza hoy mismo.'}
-        </h2>
-        <p className="font-serif text-lg text-text-secondary italic max-w-md mx-auto mb-10">
-          {isAuthenticated
-            ? 'Tu cuenta ya está lista. Continúa donde lo dejaste.'
-            : 'Crea tu primer proyecto, invita a tu equipo y empieza a repartir el trabajo hoy mismo.'}
-        </p>
+        <Reveal
+          delay={0.08}
+          className="mt-5"
+          innerClassName="mx-auto max-w-md font-serif text-lg italic"
+        >
+          <span style={{ color: 'var(--l-fg-muted)' }}>
+            {isAuthenticated
+              ? 'Tu cuenta ya está lista. Continúa donde lo dejaste.'
+              : 'Crea tu primer proyecto, invita a tu equipo y empieza a repartir el trabajo hoy mismo.'}
+          </span>
+        </Reveal>
 
-        {/* CTA buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-center mb-12">
-          {isAuthenticated ? (
-            <a href="/dashboard">
-              <button
-                type="button"
-                className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
-                style={{
-                  background: 'var(--color-primary)',
-                  color: colors.primaryForeground,
-                  boxShadow: `0 4px 24px ${alpha(colors.primary, 35)}`,
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.boxShadow = `0 4px 48px ${alpha(colors.primary, 65)}`;
-                  el.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLButtonElement;
-                  el.style.boxShadow = `0 4px 24px ${alpha(colors.primary, 35)}`;
-                  el.style.transform = 'translateY(0)';
-                }}
-              >
-                Ir al panel
-              </button>
+        <Reveal
+          delay={0.14}
+          className="mt-11"
+          innerClassName="flex flex-col items-center justify-center gap-5 sm:flex-row"
+        >
+          <RollCta
+            href={isAuthenticated ? '/dashboard' : '/auth/signup'}
+            label={isAuthenticated ? 'Ir al panel' : 'Crear cuenta gratis'}
+            size="lg"
+          />
+          {!isAuthenticated && (
+            <a href="/auth/login" className="font-sans text-sm underline underline-offset-4">
+              Iniciar sesión
             </a>
-          ) : (
-            <>
-              <a href="/auth/signup">
-                <button
-                  type="button"
-                  className="font-sans text-sm font-semibold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer"
-                  style={{
-                    background: 'var(--color-primary)',
-                    color: colors.primaryForeground,
-                    boxShadow: `0 4px 24px ${alpha(colors.primary, 35)}`,
-                  }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = `0 4px 48px ${alpha(colors.primary, 65)}`;
-                    el.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.boxShadow = `0 4px 24px ${alpha(colors.primary, 35)}`;
-                    el.style.transform = 'translateY(0)';
-                  }}
-                >
-                  Crear cuenta gratis
-                </button>
-              </a>
-              <a href="/auth/login">
-                <button
-                  type="button"
-                  className="font-sans text-sm font-medium px-8 py-3.5 rounded-full border transition-all duration-200 cursor-pointer text-text-secondary hover:text-text-primary"
-                  style={{ borderColor: alpha(colors.textPrimary, 12) }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = alpha(
-                      colors.textPrimary,
-                      25,
-                    );
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = alpha(
-                      colors.textPrimary,
-                      12,
-                    );
-                  }}
-                >
-                  Iniciar sesión
-                </button>
-              </a>
-            </>
           )}
-        </div>
+        </Reveal>
 
-        {/* Trust signals */}
-        <div className="flex flex-col sm:flex-row gap-5 items-center justify-center font-sans text-xs text-text-disabled">
-          {TRUST_SIGNALS.map((s) => (
-            <span key={s}>{s}</span>
+        <Reveal
+          delay={0.2}
+          className="mt-14"
+          innerClassName="flex flex-col items-center justify-center gap-3 font-mono text-xs uppercase tracking-widest sm:flex-row sm:gap-6"
+        >
+          {TRUST_SIGNALS.map((signal, i) => (
+            <span
+              key={signal}
+              className="flex items-center gap-2"
+              style={{ color: 'var(--l-fg-muted)' }}
+            >
+              {i > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="hidden h-3 w-px sm:block"
+                  style={{ background: 'var(--l-border)' }}
+                />
+              )}
+              {signal}
+            </span>
           ))}
-        </div>
+        </Reveal>
       </div>
     </section>
   );

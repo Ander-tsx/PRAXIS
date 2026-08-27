@@ -24,6 +24,14 @@ export interface AuthFormProps {
   footer?: ReactNode;
   /** Handler del submit — la page conecta la lógica */
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  /**
+   * Sin tarjeta propia — nada de borde, fondo, sombra ni radio. Para cuando
+   * ya vive dentro de un contenedor que aporta esa superficie (`AuthPanel`);
+   * la tarjeta por defecto duplicaba el contorno del panel y la sombra —
+   * calculada con el overlay del tema oscuro— desentonaba contra un fondo
+   * claro.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -41,11 +49,14 @@ export function AuthForm({
   alternatives,
   footer,
   onSubmit,
+  bare = false,
 }: AuthFormProps) {
   return (
     <div
-      className="w-full max-w-md rounded-2xl border border-border bg-surface p-8"
-      style={{ boxShadow: `0 8px 48px ${alpha(colors.overlay, 40)}` }}
+      className={
+        bare ? 'w-full max-w-md' : 'w-full max-w-md rounded-2xl border border-border bg-surface p-8'
+      }
+      style={bare ? undefined : { boxShadow: `0 8px 48px ${alpha(colors.overlay, 40)}` }}
     >
       {/* Header */}
       <div className="mb-8 flex flex-col gap-1">
@@ -53,16 +64,13 @@ export function AuthForm({
         {subtitle && <p className="font-sans text-sm text-text-secondary">{subtitle}</p>}
       </div>
 
-      {/* Error global */}
+      {/* Error global — un punto y texto, no una caja de color: la misma
+          señal que el resto del sistema (LandingAutomation, por ejemplo),
+          en vez de una alerta de manual de estilos. */}
       {errorMessage && (
-        <div
-          role="alert"
-          className={[
-            'mb-5 rounded-lg border border-error/30 bg-error-muted',
-            'px-4 py-3 font-sans text-sm text-error',
-          ].join(' ')}
-        >
-          {errorMessage}
+        <div role="alert" className="mb-5 flex items-start gap-2.5">
+          <span className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-error" aria-hidden="true" />
+          <p className="font-sans text-sm leading-relaxed text-error">{errorMessage}</p>
         </div>
       )}
 
