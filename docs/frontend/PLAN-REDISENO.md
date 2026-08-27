@@ -11,10 +11,23 @@
 |---|---|
 | **Etapa actual** | R1–R6 y **R9 cerradas**; R7 bloqueada y R8 es futuro |
 | **Última tarea terminada** | R9.4, y la corrección de lectura de R9.3/R9.4 (`155bdda`) |
-| **Siguiente** | **Nada de este plan.** Lo que sigue es [ENCARGO-ENTERPRISE.md](ENCARGO-ENTERPRISE.md), en `feature/enterprise`. R7 sigue esperando presupuesto en la clave de Gemini y R8 a que exista un proyecto grande de verdad |
+| **Siguiente** | **Nada de este plan, y lo de después también se hizo.** El encargo Enterprise se ejecutó en `feature/enterprise` y hoy lo reemplaza [PLAN-ORGANIZACIONES.md](PLAN-ORGANIZACIONES.md), en `feature/organizaciones`, que es la etapa viva. R7 sigue esperando presupuesto en la clave de Gemini y R8 a que exista un proyecto grande de verdad |
 | **Orden de ejecución** | R1 ✅ → R2 ✅ → R3 ✅ → R6 ✅ → R4 ✅ → R5 ✅ → R9 ✅ → R7 (bloqueada por la clave de Gemini) → R8 (futuro). ⚠️ **R6 va antes que R4** aunque esté escrito después: R4.7 mueve el asistente dentro de Análisis, y llegar allí con el organismo ya en su forma final ahorra tocarlo dos veces |
 | **Rama** | ⚠️ **`main`.** `feature/rediseno-panel-admin-analisis` se fusionó por fast-forward y el trabajo sigue en `main` por decisión del 2026-08-19. Un commit por tarea, igual que antes |
-| **Actualizado** | 2026-08-21 |
+| **Actualizado** | 2026-08-27 |
+
+> ⚠️ **Este plan está cerrado. No se retoma por aquí.** Se comprobó el
+> 2026-08-27, contra el código y no contra las casillas: `report_dynamics`,
+> `report_column_time` y `report_matrix` están en los dos controladores
+> —`reports-service` y el gateway—, y el histograma, las apiladas, las
+> divergentes y el mapa de calor están en `GeneratedChart`, `MiniGrafo`,
+> `reports.ts`, `generado.ts` y `widgets.ts` de `reports-front`. R9.1 a R9.4
+> entraron en `461ddd1`, `b35661d`, `963f1d8` y `155bdda`.
+>
+> Lo mismo con el encargo Enterprise: `billing-service` en el 3009, Stripe con
+> su webhook firmado, organizaciones, papeles, plantillas y el 402 con dos caras
+> están en el árbol. La etapa viva es **Organizaciones**, y lo que le queda —tres
+> casillas de 73— está en su propio plan, no aquí.
 
 Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` hecho · `[!]` bloqueado o
 descartado (con motivo escrito al lado)

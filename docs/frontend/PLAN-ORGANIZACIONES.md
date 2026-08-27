@@ -34,6 +34,15 @@ que quien lo usa solo con dos amigos pierda nada.
 > apuntes de O7 y O8 con su motivo, y en O9 —que nunca fue de esta etapa—. Lo
 > que **sí** hay que hacer antes de fusionar a `main`: correr
 > `pnpm e2e:regresion` entera, que en esta sesión no llegó a terminar.
+>
+> **Añadido esa misma noche (`190c85d`): la capa visual de Kyloo.** Estaba sin
+> commitear en el árbol —28 ficheros— y llevaba dentro un fallo que no da error:
+> `theme.css` pasó a nombrar tres fuentes nuevas en `--font-display`,
+> `--font-serif`, `--font-sans` y `--font-mono`, y ese archivo lo comparten las
+> ocho zonas, pero solo dashboard-front las cargaba. Está arreglado por los dos
+> lados —las fuentes en las ocho zonas, y fallback dentro del `var()`—, y las
+> ocho compilan. **Lo que no se ha hecho es mirarlo con los ojos**: los colores y
+> los radios cambiaron enteros y eso solo se juzga viéndolo.
 
 | Stack | Qué es | Estado |
 |---|---|---|
@@ -55,7 +64,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-27 | O4.1+O7+O8 | (pendiente) | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
+| 2026-08-27 | Kyloo | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
+| 2026-08-27 | O4.1+O7+O8 | `0bda922` | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
 | 2026-08-27 | O5+O6 | `06d688a` | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
 | 2026-08-26 | O3+O4 | `7d8e970` | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |
 | 2026-08-26 | O2 | `048fc42` | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
