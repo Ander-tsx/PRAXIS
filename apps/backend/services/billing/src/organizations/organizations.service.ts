@@ -1016,7 +1016,12 @@ export class OrganizationsService {
     }
     if (papel._count.members > 0) {
       return {
-        error: `Ese papel lo llevan ${papel._count.members} personas: cámbialas de papel antes de borrarlo.`,
+        /* El plural se concuerda: «lo llevan 1 personas» es la clase de frase
+           que hace pensar que nadie ha leído la pantalla. */
+        error:
+          papel._count.members === 1
+            ? 'Ese papel lo lleva una persona: cámbiala de papel antes de borrarlo.'
+            : `Ese papel lo llevan ${papel._count.members} personas: cámbialas de papel antes de borrarlo.`,
         codigo: 'EN_USO',
       } as Fallo;
     }

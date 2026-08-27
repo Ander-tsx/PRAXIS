@@ -1,31 +1,32 @@
-import { Badge, alpha, colors } from '@praxis/commons';
 import type { BillingSummary, PlanSpec, PlanTier, Tope } from '@praxis/commons/billing/planes';
-import { TEXTO_DE_ESTADO, fechaCorta, textoDeTope } from '@praxis/commons/billing/planes';
+import { TEXTO_DE_ESTADO, fechaCorta } from '@praxis/commons/billing/planes';
 import type { ReactNode } from 'react';
 
 /**
- * Facturación entera: lo que tienes, lo que llevas gastado y lo que hay.
+ * La tabla de precios.
  *
- * ## Por qué es una sola pantalla y antes eran dos
+ * ## Una sola escalera, y filas en vez de tarjetas
  *
- * Había un resumen del plan en Configuración —«¿cómo voy?»— y una tabla de
- * precios en otra entrada del menú —«¿qué me llevo si pago?»—. Son dos
- * preguntas, sí, pero **se hacen seguidas y por la misma persona**: mirar
- * cuánto te queda es justo lo que te lleva a mirar el plan de al lado. Tenerlas
- * en dos sitios obligaba a adivinar cuál era la buena para cambiar de plan, y
- * el resumen tenía además la mitad de los datos.
+ * Estaba partida en «Para ti» y «Para un equipo», lo que obligaba a quien la
+ * mira a decidir **primero** en cuál de las dos está — una pregunta que nadie
+ * sabe contestar la primera vez. Desde que la organización contiene los
+ * proyectos no hay dos públicos: quien trabaja solo es una organización de un
+ * asiento, así que es una lista y se lee de arriba abajo.
  *
- * ## Los números no se escriben aquí
+ * Y son filas con una raya punteada, no cuatro cajas en rejilla
+ * (`kyloo-design/SKILL.md` §4). Cuatro tarjetas iguales compiten entre sí por la
+ * mirada; cuatro filas se comparan.
  *
- * ⚠️ **Ni uno.** Los topes salen del catálogo que manda el servidor, que los lee
- * de `PLANS`, que es de donde el gateway lee los que aplica. Un «10 proyectos»
- * escrito en esta tabla es una promesa que se queda vieja el día que cambie el
- * plan, y el síntoma sería la tabla prometiendo lo que el servidor niega — sin
- * ningún error.
+ * ## Ninguna cifra se escribe aquí
+ *
+ * 🔴 Los topes salen del catálogo que sirve el servidor, que los lee de `PLANS`
+ * —el mismo sitio del que los lee el guard que niega—. Copiarlos aquí sería
+ * garantizar que un día la tabla prometa lo que el servidor rechaza, **sin un
+ * solo error de compilación**.
  *
  * Los precios son la excepción y tampoco salen de aquí: viven en Stripe, y lo
- * que se enseña es el texto del `.env` de la zona. Si los dos discrepan **manda
- * Stripe**, así que la tarjeta escribe «—» antes que inventarse una cifra.
+ * que se enseña es el texto del entorno. Si los dos discrepan **manda Stripe**,
+ * así que sin precio se escribe «—» antes que inventarse una cifra.
  */
 export function PlanCatalog({
   planes,
@@ -37,11 +38,9 @@ export function PlanCatalog({
   vueltaDelPago,
 }: {
   planes: PlanSpec[];
-  /** Los que este despliegue puede cobrar de verdad. */
+  /** Los que **este** despliegue puede cobrar. */
   disponibles: PlanTier[];
-  /** El plan de quien mira, con lo gastado. `null` si no se pudo leer. */
   resumen: BillingSummary | null;
-  /** Lo que cuesta cada uno, ya escrito. Del `.env` de la zona. */
   precios: Partial<Record<PlanTier, string>>;
   /** El botón de cada plan. La página decide cuál lleva y cuál no. */
   accionDe: (plan: PlanSpec) => ReactNode;
@@ -51,309 +50,154 @@ export function PlanCatalog({
   vueltaDelPago: ReactNode;
 }) {
   const actual = resumen?.tier ?? 'FREE';
-  const spec = planes.find((plan) => plan.tier === actual) ?? null;
-  /* ⚠️ **Una sola lista desde 2026-08-26.** Antes eran dos —«Para ti» y «Para
-     un equipo»— porque había dos escaleras de planes. Desde que la organización
-     contiene los proyectos, quien trabaja solo es una organización de un
-     asiento: partir la tabla obligaba a quien la mira a decidir primero en cuál
-     de las dos está, que es una pregunta que nadie sabe contestar. */
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="mx-auto flex w-full max-w-3xl flex-col">
       {vueltaDelPago}
 
-      {resumen && <PlanActual resumen={resumen} spec={spec} accionPortal={accionPortal} />}
+      <p className="pb-8 font-serif text-base italic text-text-secondary">
+        Todos los planes de pago van por asiento y los contrata una organización. Si trabajas solo,
+        la tuya tiene un asiento y funciona igual.
+      </p>
 
-      <section className="flex flex-col gap-5">
-        <Encabezado
-          titulo="Cambiar de plan"
-          entradilla="Los topes se aplican en el servidor, no en esta pantalla: lo que veas aquí es exactamente lo que se te va a permitir."
-        />
+      {resumen && <TuConsumo resumen={resumen} accionPortal={accionPortal} />}
 
-        {/* ⚠️ Se dice aquí y no en la letra pequeña: todo plan de pago lo
-            contrata una **organización**, no una persona. Se elige cuál, se
-            eligen los asientos y se paga desde su portal — que es también donde
-            se invita a la gente y queda el registro de lo cobrado. Un botón de
-            «pagar» que responde 400 por no haber elegido organización es la
-            clase de callejón que nadie sabe deshacer. */}
-        <p className="max-w-3xl font-sans text-sm text-text-secondary">
-          Todos los planes de pago van <strong className="text-text-primary">por asiento</strong> y
-          los contrata una organización. Si trabajas solo, la tuya tiene un asiento y funciona
-          igual.
-        </p>
+      <ol className="flex flex-col border-t border-border">
+        {planes.map((plan, i) => {
+          const esElTuyo = plan.tier === actual;
+          const seVende = disponibles.includes(plan.tier);
+          const precio = precios[plan.tier] ?? null;
 
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-          {planes.map((plan) => (
-            <TarjetaDePlan
+          return (
+            <li
               key={plan.tier}
-              plan={plan}
-              precio={precios[plan.tier] ?? null}
-              esElTuyo={plan.tier === actual}
-              seVende={disponibles.includes(plan.tier)}
-              accion={plan.tier === actual ? accionPortal : accionDe(plan)}
-            />
-          ))}
-        </div>
-      </section>
+              className="flex flex-col gap-4 border-b border-dotted border-border py-7 last:border-b-0"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+                <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <h2 className="font-display text-2xl text-text-primary">
+                    {plan.nombre}
+                    {esElTuyo && (
+                      /* Tono, no caja: la misma regla que la entrada activa de
+                         la barra lateral (§13). */
+                      <span className="ml-3 font-sans text-[10px] uppercase tracking-wider text-primary">
+                        tu plan
+                      </span>
+                    )}
+                    {plan.diasDePrueba > 0 && !esElTuyo && (
+                      <span className="ml-3 font-sans text-[10px] uppercase tracking-wider text-success">
+                        primer mes gratis
+                      </span>
+                    )}
+                  </h2>
+                  <p className="font-serif text-sm italic text-text-secondary">{plan.paraQuien}</p>
+                </div>
+
+                <div className="shrink-0 text-right">
+                  <span className="font-display text-2xl tabular-nums text-text-primary">
+                    {plan.contratacion === 'NINGUNA'
+                      ? 'Gratis'
+                      : plan.contratacion === 'CONTACTO'
+                        ? 'A medida'
+                        : precio === null
+                          ? '—'
+                          : `$${precio}`}
+                  </span>
+                  {plan.contratacion === 'AUTOSERVICIO' && (
+                    <span className="block font-sans text-[11px] text-text-disabled">
+                      por asiento al mes
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Los cuatro números que de verdad se comparan, en una línea. Una
+                  tabla de dieciséis celdas para cuatro planes se lee peor que
+                  cuatro frases. */}
+              <dl className="flex flex-wrap gap-x-8 gap-y-2 pl-11">
+                <Dato etiqueta="Asientos" valor={tope(plan.quotas.asientos)} />
+                <Dato etiqueta="Proyectos" valor={tope(plan.quotas.proyectos)} />
+                <Dato etiqueta="PRAX al mes" valor={tope(plan.quotas.iaMensualPorPersona)} />
+                <Dato etiqueta="Adjuntos" valor={almacenamiento(plan.quotas.almacenamientoOrgMb)} />
+              </dl>
+
+              <div className="flex flex-wrap items-center gap-4 pl-11">
+                {seVende || plan.contratacion !== 'AUTOSERVICIO' ? (
+                  accionDe(plan)
+                ) : (
+                  /* ⚠️ Se dice por qué no se puede contratar, en vez de enseñar
+                     un botón que responde 503 al pulsarlo. Cada precio que falte
+                     en el entorno apaga **solo su plan**. */
+                  <span className="font-sans text-xs text-text-disabled">
+                    No disponible en esta instalación.
+                  </span>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
 
-/* ─── Lo que ya tienes ─────────────────────────────────────────────────────── */
-
-function PlanActual({
+/** Lo que llevas gastado, arriba y en una línea. */
+function TuConsumo({
   resumen,
-  spec,
   accionPortal,
 }: {
   resumen: BillingSummary;
-  spec: PlanSpec | null;
   accionPortal: ReactNode;
 }) {
-  const finDePrueba = fechaCorta(resumen.pruebaTerminaEn);
-  const finDePlan = fechaCorta(resumen.cancelaEn);
+  const topeIa = resumen.quotas.iaMensualPorPersona;
 
   return (
-    <section
-      className="flex flex-col gap-6 rounded-3xl border p-6 sm:p-7"
-      style={{
-        borderColor: alpha(colors.primary, 28),
-        background: `linear-gradient(160deg, ${alpha(colors.primary, 7)}, transparent 70%)`,
-      }}
-      aria-label="Tu plan"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <span className="font-sans text-xs font-semibold uppercase tracking-widest text-text-secondary">
-            Tu plan
-          </span>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h2 className="font-sans text-2xl font-semibold text-text-primary">
-              {spec?.nombre ?? resumen.tier}
-            </h2>
-            {resumen.status !== 'ACTIVE' && (
-              <Badge variant={resumen.status === 'PAST_DUE' ? 'warning' : 'default'}>
-                {TEXTO_DE_ESTADO[resumen.status]}
-              </Badge>
-            )}
-          </div>
-          {spec && <p className="max-w-md font-sans text-sm text-text-secondary">{spec.resumen}</p>}
-        </div>
-
-        {accionPortal}
-      </div>
-
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Medidor
-          titulo="Proyectos tuyos"
-          usado={resumen.uso.proyectos}
-          tope={resumen.quotas.proyectos}
-          pie="Solo cuentan los que sostienes tú, no en los que participas."
-        />
-        <Medidor
-          titulo="Mensajes a PRAX este mes"
-          usado={resumen.uso.iaMensual}
-          tope={resumen.quotas.iaMensualPorPersona}
-          pie={`Vuelven a cero el ${fechaCorta(resumen.iaReiniciaEn) ?? 'día 1'}.`}
-        />
-      </div>
-
-      {/* 🔴 El mes gratis se cobra al segundo, y este es el sitio donde se avisa.
-          «No me avisaron» es la queja más cara de este terreno, y la fecha está
-          guardada desde el día uno justo para poder escribirla. */}
-      {finDePrueba && (
-        <Aviso tono="primary">
-          Tu mes gratis termina el <strong>{finDePrueba}</strong>. A partir de esa fecha se cobra la
-          mensualidad, salvo que canceles antes desde tu suscripción.
-        </Aviso>
-      )}
-
-      {resumen.status === 'PAST_DUE' && (
-        <Aviso tono="warning">
-          No hemos podido cobrar la última mensualidad. <strong>No pierdes nada por ahora</strong>:
-          se sigue reintentando. Revisa la tarjeta desde tu suscripción.
-        </Aviso>
-      )}
-
-      {finDePlan && (
-        <Aviso tono="warning">
-          Has pedido la baja. El plan sigue valiendo hasta el <strong>{finDePlan}</strong>.
-        </Aviso>
-      )}
-    </section>
-  );
-}
-
-function Aviso({ tono, children }: { tono: 'primary' | 'warning'; children: ReactNode }) {
-  const color = tono === 'warning' ? colors.warning : colors.primary;
-  return (
-    <p
-      className="rounded-xl border px-4 py-3 font-sans text-sm text-text-secondary"
-      style={{ borderColor: alpha(color, 32), background: alpha(color, 8) }}
-    >
-      {children}
-    </p>
-  );
-}
-
-function Medidor({
-  titulo,
-  usado,
-  tope,
-  pie,
-}: {
-  titulo: string;
-  usado: number;
-  tope: Tope;
-  pie: string;
-}) {
-  /* Sin tope no hay barra que llenar: una al 0 % sobre «sin límite» sugiere que
-     queda mucho de algo que no se acaba. */
-  const proporcion = tope === null ? null : Math.min(usado / Math.max(tope, 1), 1);
-  const lleno = proporcion !== null && proporcion >= 1;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-sans text-sm text-text-primary">{titulo}</span>
-        <span className="font-sans text-sm tabular-nums text-text-secondary">
-          <strong className={lleno ? 'text-error' : 'text-text-primary'}>{usado}</strong> de{' '}
-          {textoDeTope(tope)}
-        </span>
-      </div>
-      {proporcion !== null && (
-        <div
-          className="h-2 w-full overflow-hidden rounded-full"
-          style={{ background: alpha(colors.textSecondary, 12) }}
-        >
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${Math.max(Math.round(proporcion * 100), 2)}%`,
-              background: lleno ? colors.error : colors.primary,
-            }}
-          />
-        </div>
-      )}
-      <p className="font-sans text-xs text-text-disabled">{pie}</p>
-    </div>
-  );
-}
-
-/* ─── El catálogo ──────────────────────────────────────────────────────────── */
-
-function TarjetaDePlan({
-  plan,
-  precio,
-  esElTuyo,
-  seVende,
-  accion,
-}: {
-  plan: PlanSpec;
-  precio: string | null;
-  esElTuyo: boolean;
-  seVende: boolean;
-  accion: ReactNode;
-}) {
-  const porAsiento = plan.contratacion !== 'NINGUNA';
-  const destacada = plan.diasDePrueba > 0 && !esElTuyo;
-
-  return (
-    <section
-      className="flex flex-col gap-4 rounded-2xl border p-6 transition-colors"
-      style={
-        esElTuyo
-          ? { borderColor: alpha(colors.primary, 45), background: alpha(colors.primary, 5) }
-          : destacada
-            ? { borderColor: alpha(colors.success, 40), background: colors.surfaceElevated }
-            : { borderColor: colors.border, background: colors.surfaceElevated }
-      }
-      aria-label={`Plan ${plan.nombre}`}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-sans text-lg font-semibold text-text-primary">{plan.nombre}</h3>
-        {esElTuyo && <Badge variant="primary">Tu plan</Badge>}
-        {plan.diasDePrueba > 0 && !esElTuyo && <Badge variant="success">Primer mes gratis</Badge>}
-      </div>
-
-      <p className="min-h-[2.5rem] font-sans text-sm text-text-secondary">{plan.resumen}</p>
-
-      <p className="font-sans text-text-primary">
-        <span className="text-3xl font-semibold tabular-nums">
-          {precio === null ? '—' : `$${precio}`}
-        </span>
-        <span className="font-sans text-sm text-text-secondary">
-          {porAsiento ? ' por asiento al mes' : ''}
-        </span>
-      </p>
-
-      <ul className="flex flex-col gap-2">
-        <Ventaja texto={frase(plan.quotas.asientos, 'personas en la organización')} />
-        <Ventaja texto={frase(plan.quotas.proyectos, 'proyectos de la organización')} />
-        <Ventaja texto={frase(plan.quotas.iaMensualPorPersona, 'mensajes a PRAX al mes')} />
-        {porAsiento && <Ventaja texto={`Desde ${plan.asientosMinimos} asientos`} />}
-      </ul>
-
-      <div className="mt-auto flex flex-col gap-2 pt-2">
-        {seVende
-          ? accion
-          : /* Sin precio configurado no se promete nada: es preferible decir que
-             ahora no se puede a enseñar un botón que responde 503 al pulsarlo. */
-            plan.envPrecio && (
-              <p className="font-sans text-sm text-text-disabled">
-                Todavía no se puede contratar en esta instalación.
-              </p>
-            )}
-        {plan.diasDePrueba > 0 && !esElTuyo && (
-          /* ⚠️ Junto al botón, no en la letra pequeña. */
-          <span className="font-sans text-xs text-text-disabled">
-            No se cobra nada el primer mes. Al siguiente sí, salvo que canceles antes.
-          </span>
+    <section className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3 py-7">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="font-display text-xl text-text-primary">Lo que llevas este mes</h2>
+        <p className="font-sans text-sm text-text-secondary">
+          {resumen.uso.iaMensual} de {topeIa === null ? 'ilimitados' : topeIa} mensajes a PRAX.
+          Vuelven el {fechaCorta(resumen.iaReiniciaEn)}.
+        </p>
+        {/* ⚠️ `PAST_DUE` no dice que se haya perdido nada, porque no se ha
+            perdido: el acceso sigue mientras Stripe reintenta. */}
+        {resumen.status !== 'ACTIVE' && (
+          <p className="font-sans text-xs text-warning">{TEXTO_DE_ESTADO[resumen.status]}</p>
         )}
       </div>
+      <div className="shrink-0">{accionPortal}</div>
     </section>
   );
 }
 
-function Encabezado({ titulo, entradilla }: { titulo: string; entradilla: string }) {
+function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <h2 className="font-sans text-lg font-semibold text-text-primary">{titulo}</h2>
-      <p className="max-w-3xl font-sans text-sm text-text-secondary">{entradilla}</p>
+    <div className="flex flex-col">
+      <dt className="font-sans text-[10px] uppercase tracking-wider text-text-disabled">
+        {etiqueta}
+      </dt>
+      <dd className="font-mono text-sm tabular-nums text-text-secondary">{valor}</dd>
     </div>
-  );
-}
-
-function Subtitulo({ texto }: { texto: string }) {
-  return (
-    <h3 className="font-sans text-xs font-semibold uppercase tracking-widest text-text-disabled">
-      {texto}
-    </h3>
   );
 }
 
 /**
- * «40 proyectos tuyos», o «Proyectos tuyos sin límite».
+ * Un tope, escrito.
  *
- * ⚠️ La cifra **delante** y el «sin límite» **detrás**, y no al revés: pegar el
- * texto de `textoDeTope` por delante daba «Sin límite proyectos tuyos», que se
- * lee como un error de traducción justo en la tarjeta del plan más caro.
+ * ⚠️ `null` es **sin límite**, no «no se pudo leer». Es una constante del
+ * catálogo, no una respuesta que pueda fallar — y por eso aquí se escribe «sin
+ * tope» y no un guion.
  */
-function frase(tope: Tope, que: string): string {
-  return tope === null ? `${mayuscula(que)} sin límite` : `${tope} ${que}`;
+function tope(valor: Tope): string {
+  return valor === null ? 'sin tope' : String(valor);
 }
 
-function mayuscula(texto: string): string {
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
-
-function Ventaja({ texto }: { texto: string }) {
-  return (
-    <li className="flex items-start gap-2 font-sans text-sm text-text-primary">
-      <span aria-hidden="true" style={{ color: colors.primary }}>
-        ✓
-      </span>
-      <span className="min-w-0">{texto}</span>
-    </li>
-  );
+/** Los megabytes, en la unidad que se lee. */
+function almacenamiento(mb: Tope): string {
+  if (mb === null) return 'sin tope';
+  return mb >= 1024 ? `${Math.round(mb / 1024)} GB` : `${mb} MB`;
 }

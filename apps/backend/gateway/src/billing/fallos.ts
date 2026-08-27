@@ -32,6 +32,7 @@ export interface FalloDeBilling {
     | 'SIN_ASIENTOS'
     | 'YA_ESTA'
     | 'NO_VALE'
+    | 'EN_USO'
     | 'INVITACION_INVALIDA';
 }
 
@@ -41,6 +42,10 @@ const ESTADOS: Record<FalloDeBilling['codigo'], HttpStatus> = {
   SIN_PERMISO: HttpStatus.FORBIDDEN,
   SIN_ASIENTOS: HttpStatus.CONFLICT,
   YA_ESTA: HttpStatus.CONFLICT,
+  /* Un papel que todavía lleva gente no es una petición mal formada: es un
+     conflicto con el estado de las cosas, y se arregla moviendo a esa gente. Un
+     400 diría que el cuerpo está mal, que es otra conversación. */
+  EN_USO: HttpStatus.CONFLICT,
   NO_VALE: HttpStatus.BAD_REQUEST,
   INVITACION_INVALIDA: HttpStatus.GONE,
 };

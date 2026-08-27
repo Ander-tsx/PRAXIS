@@ -7,6 +7,7 @@ import type {
   BillingEventView,
   CatalogoDePlanes,
   OrganizationMemberView,
+  OrganizationRoleView,
   OrganizationView,
 } from '@praxis/commons/billing/planes';
 import { fechaCorta } from '@praxis/commons/billing/planes';
@@ -69,7 +70,7 @@ export default async function OrganizationPage({
   /* Cada `catch` degrada su bloque. No poder leer el registro no es motivo para
      no poder invitar a nadie. La organización sí es obligatoria: sin ella no
      hay pantalla que pintar. */
-  const [organizacion, miembros, proyectos, historial, catalogo] = await Promise.all([
+  const [organizacion, miembros, proyectos, historial, catalogo, papeles] = await Promise.all([
     api.get<OrganizationView>(`/organizations/${organizationId}`).catch(() => null),
     api.get<OrganizationMemberView[]>(`/organizations/${organizationId}/members`).catch(() => null),
     api
@@ -77,6 +78,12 @@ export default async function OrganizationPage({
       .catch(() => null),
     api.get<BillingEventView[]>(`/organizations/${organizationId}/history`).catch(() => null),
     api.get<CatalogoDePlanes>('/me/billing/planes').catch(() => null),
+    /* Los papeles, para poder cambiar el de alguien desde la lista de miembros.
+       `[]` si quien mira no puede verlos: entonces no se ofrece cambiar, que es
+       lo correcto — es un mapa del poder interno del equipo. */
+    api
+      .get<OrganizationRoleView[]>(`/organizations/${organizationId}/roles`)
+      .catch(() => [] as OrganizationRoleView[]),
   ]);
 
   if (!organizacion) notFound();
@@ -166,6 +173,13 @@ export default async function OrganizationPage({
 
         {/* ─── Quién está dentro ──────────────────────────────────────── */}
         <Bloque
+          accion={
+            permisos.canManageMembers ? (
+              <EnlaceDeTexto href={`/organizations/${organizationId}/roles`}>
+                Papeles y plantillas
+              </EnlaceDeTexto>
+            ) : null
+          }
           titulo="Equipo"
           entradilla={`${organizacion.seatsUsed} de ${organizacion.seats} asientos ocupados. Una invitación ocupa el suyo desde que se manda.`}
         >
@@ -174,6 +188,7 @@ export default async function OrganizationPage({
               organizationId={organizationId}
               miembros={miembros}
               permisos={permisos}
+              papeles={papeles}
               asientos={{ contratados: organizacion.seats, ocupados: organizacion.seatsUsed }}
             />
           ) : (

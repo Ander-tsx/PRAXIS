@@ -263,12 +263,17 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    /* Sigue apagada: los papeles de la organización ya existen en el servidor,
-       pero su pantalla es O6. Encenderla ahora llevaría a un 404. */
+    /**
+     * Los papeles de la organización y las plantillas de rol de sus proyectos.
+     *
+     * ⚠️ **`/dashboard/roles` no es una pantalla: redirige.** Los papeles
+     * pertenecen a una organización, y la barra no sabe a cuál — lo resuelve
+     * con la misma cookie que el selector. Nació apagada con «Pronto» porque
+     * encenderla sin esa ruta habría dado un 404.
+     */
     label: 'Roles y permisos',
     href: '/dashboard/roles',
     section: SECTION_GESTION,
-    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path

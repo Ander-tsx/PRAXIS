@@ -1,7 +1,12 @@
 import { CheckoutButton, PaymentReturn, PlanCatalog } from '@/components/organisms/Billing';
 import { AppHeader, Button } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
-import type { BillingSummary, CatalogoDePlanes, PlanTier } from '@praxis/commons/billing/planes';
+import type {
+  BillingSummary,
+  CatalogoDePlanes,
+  OrganizationView,
+  PlanTier,
+} from '@praxis/commons/billing/planes';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -52,13 +57,19 @@ export default async function BillingPage({
 
   /* Cada `catch` deja su bloque en «no se pudo cargar» en vez de tumbar la
      pantalla: no poder leer el consumo no es motivo para no poder comparar. */
-  const [catalogo, resumen] = await Promise.all([
+  const [catalogo, resumen, organizaciones] = await Promise.all([
     createServerApiClient()
       .get<CatalogoDePlanes>('/me/billing/planes')
       .catch(() => null),
     createServerApiClient()
       .get<BillingSummary>('/me/billing/resumen')
       .catch(() => null),
+    /* Para saber **dónde** se contrata: con una sola no hay que preguntar
+       nada. `[]` si falla — entonces se ofrece crear una, que es el camino que
+       siempre funciona. */
+    createServerApiClient()
+      .get<OrganizationView[]>('/me/organizations')
+      .catch(() => [] as OrganizationView[]),
   ]);
 
   if (!catalogo) {
@@ -84,25 +95,42 @@ export default async function BillingPage({
              confirmación — no en la misma fila que los botones de comprar. */
           if (plan.tier === 'FREE') return null;
 
+          /* ⚠️ **No abre el pago desde aquí, y no es pereza.** El checkout
+             necesita saber **qué organización** paga —lleva su id en el
+             `client_reference_id` de Stripe, que es lo único que ata el pago a
+             algo de PRAXIS— y eso es una elección de quien paga, no del
+             servidor. Con una sola organización no hay pregunta y se entra
+             directo; con varias, a la lista para elegir. */
           if (plan.contratacion === 'AUTOSERVICIO') {
-            /* ⚠️ No abre el pago: **hace falta la organización antes**, porque
-               es ella quien paga y quien lleva los asientos. El checkout de un
-               plan de equipo sin `organizationId` responde 400, así que lo que
-               se ofrece es el paso que sí existe — y el texto lo dice, en vez
-               de un «contratar» que lleva a un error. */
+            const destino =
+              organizaciones.length === 1
+                ? `/organizations/${organizaciones[0].id}`
+                : organizaciones.length > 1
+                  ? '/organizations'
+                  : '/organizations/new';
+            const texto =
+              organizaciones.length === 1
+                ? `Contratar en ${organizaciones[0].name}`
+                : organizaciones.length > 1
+                  ? 'Elegir en qué organización'
+                  : 'Crear una organización';
+
             return (
-              <Link href={`/organizations/new?tier=${plan.tier}`}>
-                <Button type="button" variant="secondary" fullWidth>
-                  Crear una organización
-                </Button>
+              <Link
+                href={destino}
+                className="font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+              >
+                {texto}
               </Link>
             );
           }
 
+          /* `CONTACTO`: no hay precio en Stripe porque se negocia. Ofrecerle un
+             botón de compra sería ofrecer uno que responde 503 al pulsarlo. */
           return (
-            <CheckoutButton destino="checkout" tier={plan.tier}>
-              Cambiar a {plan.nombre}
-            </CheckoutButton>
+            <span className="font-sans text-xs text-text-disabled">
+              Se acuerda con nosotros. Escríbenos y lo montamos a la medida del equipo.
+            </span>
           );
         }}
         accionPortal={

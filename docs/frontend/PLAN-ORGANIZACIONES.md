@@ -36,8 +36,8 @@ que quien lo usa solo con dos amigos pierda nada.
 | O2 | `billing-service`: papeles, plantillas y traspaso | ✅ **hecho** (2026-08-26) |
 | O3 | `Project.organizationId`, y las semillas | 🟡 **casi** — falta O3.5 y probarlo |
 | O4 | El gateway: resolver la organización y contar por ella | 🟡 **el núcleo hecho** — O4.2, O4.3 y O4.7 |
-| O5 | Frontend: el selector del sidebar y el portal | ⬜ pendiente |
-| O6 | Frontend: roles, plantillas y el 402 con dos caras | ⬜ pendiente |
+| O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
+| O6 | Frontend: roles, plantillas y el 402 con dos caras | 🟡 **casi** — falta O6.4/O6.5, la pantalla del 402 |
 | O7 | Gobierno del equipo | ⬜ pendiente |
 | O8 | Cierre: e2e, documentación y contrato | ⬜ pendiente |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
@@ -50,7 +50,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-26 | O3+O4 | (pendiente) | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |
+| 2026-08-27 | O5+O6 | (pendiente) | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
+| 2026-08-26 | O3+O4 | `7d8e970` | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |
 | 2026-08-26 | O2 | `048fc42` | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
 | 2026-08-26 | O1 | `122cfeb` | Cuatro planes en una escalera, el vocabulario de papeles de organización, `NOT_IN_ORG`, y el tope de miembros por proyecto retirado con el hueco señalado |
 
@@ -624,41 +625,69 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 
 ## O5 — Frontend: el selector del sidebar y el portal
 
-- [ ] **O5.1** ✅ **Conectar el selector de organización del sidebar**, que ya existe
+- [x] **O5.1** ✅ **Conectar el selector de organización del sidebar**, que ya existe
       como placeholder honesto —icono, «Plan gratuito», «Organización de {nombre}»,
       chevron— **sin `onClick` y sin menú** (§13 del skill). Es la primera pieza de
       esta etapa que se ve, y ya está dibujada.
-- [ ] **O5.2** Cambiar de organización cambia el ámbito de toda la aplicación:
+- [x] **O5.2** Cambiar de organización cambia el ámbito de toda la aplicación:
       proyectos, cartera de Análisis y avisos. Decidir dónde se guarda la elegida
       —cookie, como el tema— y que las siete zonas la lean igual.
-- [ ] **O5.3** El portal de la organización, rehecho en filas y no en tarjetas:
+- [x] **O5.3** El portal de la organización, rehecho en filas y no en tarjetas:
       identidad, plan y consumo, miembros y asientos, papeles, plantillas, registro.
-- [ ] **O5.4** Miembros y asientos: invitar, cambiar papel, sacar, y el formulario de
+- [x] **O5.4** Miembros y asientos: invitar, cambiar papel, sacar, y el formulario de
       asientos **con `onSubmit` + `preventDefault()`** porque edita.
-- [ ] **O5.5** El vacío explica **qué da una organización**, no solo que no hay nada.
-- [ ] **O5.6** La tabla de precios, con los cuatro planes. **Ninguna cifra escrita en
+- [x] **O5.5** El vacío explica **qué da una organización**, no solo que no hay nada.
+- [x] **O5.6** La tabla de precios, con los cuatro planes. **Ninguna cifra escrita en
       el frontend**: se pinta con el catálogo que manda el servidor. Los precios son
       la excepción y viven en Stripe; si discrepan **manda Stripe**, así que la
       tarjeta escribe «—» antes que inventarse una cifra.
-- [ ] **O5.7** Planes tiene entrada propia en la barra lateral. Una tabla de precios a
+- [x] **O5.7** Planes tiene entrada propia en la barra lateral. Una tabla de precios a
       la que solo se llega chocando con un límite no vende nada.
-- [ ] **O5.8** `VueltaDelPago` espera a que el plan **cambie**, no a que sea uno
+- [x] **O5.8** `VueltaDelPago` espera a que el plan **cambie**, no a que sea uno
       concreto.
 
 ### Apuntes
 
-_(vacío)_
+- 🔴 **El portal se leía vacío, y la causa no era visual.** Empezaba por los
+  asientos y el plan: eso es una factura, no un sitio de trabajo, y era
+  exactamente lo que se decidió no construir. Ahora enseña **sus proyectos**
+  arriba del todo y el plan baja a una línea al final — que es la importancia que
+  tiene el día que no estás pagando.
+- 🔴 **Crear una organización preguntaba el plan y los asientos.** Una decisión
+  comercial pedida a alguien que todavía no sabe qué es esto. Ahora pide un
+  nombre, explica las tres cosas que cambian, y nace en gratuito; el plan se
+  contrata desde el portal cuando ampliar significa algo.
+- **La organización activa vive en la cookie `praxis_org`**, junto al tema y al
+  pliegue de la barra y por lo mismo: si saliera de `localStorage`, la lista de
+  proyectos se serviría entera y se recortaría tras hidratar — un parpadeo en
+  cada carga, y en Multi-Zones cada cambio de zona es una carga completa.
+- 🔴 **La cookie es un filtro, nunca un permiso.** No es `httpOnly` y cualquiera
+  puede escribir ahí lo que quiera. El servidor la suma al «dueño o miembro» que
+  ya aplicaba: poner una organización ajena devuelve **cero** proyectos, no los
+  suyos. Verificado contra el stack.
+- **El selector cambia con recarga dura, no con `router.refresh()`.** La cookie
+  la leen los siete `layout.tsx` en el servidor, y un refresco del App Router no
+  vuelve a ejecutar el layout de una zona ya montada: el sidebar se quedaría
+  marcando la organización vieja mientras la lista de abajo enseña la nueva.
+- **La lista de organizaciones entra por `loadPrivateChrome`**, no por cada
+  `layout.tsx`. Con seis copias del mismo `Promise.all`, la alternativa era
+  arreglar lo mismo seis veces — y aquí no encadena nada, así que es gratis.
+- 🔴 **`organizationId` declarado solo en el DTO interno da 400 en la URL.** El
+  `ValidationPipe` del gateway rechaza lo que el DTO de query no declara, y el
+  síntoma fue **una lista vacía**, no un error visible. Es la trampa de «envía
+  solo los campos que el DTO declara» leída al revés, y costó un rato porque
+  además el build estaba silenciado con `>/dev/null`.
 
 ---
 
 ## O6 — Frontend: roles, plantillas y el 402 con dos caras
 
-- [ ] **O6.1** Página de papeles de la organización. **Booleanos con `Select`, nunca
+- [x] **O6.1** Página de papeles de la organización. **Booleanos con `Select`, nunca
       `Checkbox`.** Ocho permisos, y cada uno con una frase que diga qué abre.
-- [ ] **O6.2** Página de plantillas de rol, con el aviso de que **solo afectan a los
+- [x] **O6.2** Página de plantillas de rol, con el aviso de que **solo afectan a los
       proyectos nuevos** — una plantilla que cambiara los proyectos ya hechos borraría
       trabajo de quien los ajustó.
-- [ ] **O6.3** En los roles de un proyecto, decir de qué plantilla nació y **si se ha
+- [x] **O6.3** En los roles de un proyecto, decir de qué plantilla nació y **si se ha
       separado**.
 - [ ] **O6.4** 🔴 **La pantalla de recuperación del 402**, que hoy no existe y es
       literalmente el instante en que alguien decidiría pagar. 
@@ -669,15 +698,42 @@ _(vacío)_
       `error.details` (`kind`, `tier`, `tope`, `actual`).
 - [ ] **O6.6** El aviso de «te quedan tres» en los tres sitios que gastan: proyectos,
       asientos y mensajes de PRAX.
-- [ ] **O6.7** Traspasar el responsable de un proyecto, desde la pantalla del proyecto
+- [x] **O6.7** Traspasar el responsable de un proyecto, desde la pantalla del proyecto
       y desde el portal. Con confirmación escribiendo el nombre y el inventario
       delante, como ya hace administración.
-- [ ] **O6.8** El `403 NOT_IN_ORG` se explica: «hay que darle asiento primero», con el
+- [x] **O6.8** El `403 NOT_IN_ORG` se explica: «hay que darle asiento primero», con el
       botón de invitar si tienes `canInviteMembers`.
 
 ### Apuntes
 
-_(vacío)_
+- **`/dashboard/roles` no es una pantalla: redirige.** Los papeles pertenecen a
+  una organización y la barra lateral no sabe a cuál — lo resuelve con la misma
+  cookie que el selector. Con una sola organización entra directo; con varias, a
+  la lista. La entrada del sidebar llevaba desde el rediseño de Kyloo apagada con
+  «Pronto» apuntando aquí, y encenderla sin esta ruta habría dado un 404.
+- **Los dos planos caben en una pantalla porque el segundo existe por el
+  primero.** Las plantillas son el puente entre lo que se decide arriba y lo que
+  se encuentra dentro de un tablero; separarlas obligaría a explicar el puente
+  dos veces.
+- 🔴 **Los permisos que no tienes salen apagados y dichos**, no ocultos. El
+  servidor los rechaza igual (`cabenEn`), pero dejar marcar y fallar al guardar
+  obliga a adivinar cuál de los nueve sobra.
+- **Vuelve el cambio de papel en la lista de miembros**, que O2 tuvo que
+  retirar: ya hay lista de dónde elegir. Se envía al elegir, sin botón de
+  confirmar — pedir dos gestos para un desplegable es el trámite que sobra.
+- **`EN_USO` pasa a 409 y no 400.** Un papel que todavía lleva gente no es una
+  petición mal formada: es un conflicto con el estado, y se arregla moviendo a esa
+  gente. Y el mensaje concuerda el plural — «lo llevan 1 personas» es la clase de
+  frase que hace pensar que nadie ha leído la pantalla.
+- **La tabla de precios pierde la partición «Para ti / Para un equipo»**, que
+  obligaba a decidir primero en cuál de las dos estás. Cuatro tarjetas iguales
+  compiten por la mirada; cuatro filas se comparan.
+- ⚠️ **Contratar no abre el pago desde la tabla**: el checkout necesita saber qué
+  organización paga —su id va en el `client_reference_id` de Stripe— y eso lo
+  elige quien paga. Con una sola no hay pregunta y entra directo.
+- 🔴 **Falta O6.4 y O6.5: la pantalla de recuperación del 402.** Es lo único
+  importante que queda de este stack, y es literalmente el instante en que
+  alguien decidiría pagar.
 
 ---
 

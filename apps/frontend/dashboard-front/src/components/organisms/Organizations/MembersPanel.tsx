@@ -1,11 +1,16 @@
 'use client';
 
-import { invitarMiembroAction, quitarMiembroAction } from '@/app/(private)/organizations/actions';
+import {
+  cambiarRolAction,
+  invitarMiembroAction,
+  quitarMiembroAction,
+} from '@/app/(private)/organizations/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
 import { Badge, Button, Input, Select, useAccion } from '@praxis/commons';
 import type {
   OrganizationMemberView,
   OrganizationPermissions,
+  OrganizationRoleView,
 } from '@praxis/commons/billing/planes';
 import { useId, useState } from 'react';
 
@@ -21,12 +26,21 @@ export function MembersPanel({
   organizationId,
   miembros,
   permisos,
+  papeles,
   asientos,
 }: {
   organizationId: string;
   miembros: OrganizationMemberView[];
   /** Lo que puede hacer quien mira, ya resuelto por el servidor. */
   permisos: OrganizationPermissions;
+  /**
+   * Los papeles de la organización, para poder cambiar el de alguien.
+   *
+   * ⚠️ **Vacío si quien mira no puede verlos**, y entonces no se ofrece cambiar
+   * — que es lo correcto: la lista de papeles es un mapa del poder interno y no
+   * la lee cualquiera con asiento. El servidor lo comprueba igual.
+   */
+  papeles: OrganizationRoleView[];
   asientos: { contratados: number; ocupados: number };
 }) {
   const puedeGestionar = permisos.canManageMembers;
@@ -44,6 +58,7 @@ export function MembersPanel({
             key={miembro.userId ?? miembro.email}
             organizationId={organizationId}
             miembro={miembro}
+            papeles={papeles}
             puedeGestionar={puedeGestionar}
           />
         ))}
@@ -146,16 +161,19 @@ function Invitar({
 function Fila({
   organizationId,
   miembro,
+  papeles,
   puedeGestionar,
 }: {
   organizationId: string;
   miembro: OrganizationMemberView;
+  papeles: OrganizationRoleView[];
   puedeGestionar: boolean;
 }) {
   const [quitar, quitarAction, quitando] = useAccion(
     quitarMiembroAction,
     ORGANIZACION_INITIAL_STATE,
   );
+  const [rol, rolAction, cambiando] = useAccion(cambiarRolAction, ORGANIZACION_INITIAL_STATE);
   const esDueño = miembro.isOwner;
   /* Al dueño no se le saca ni se le cambia el papel: hay uno y es quien paga.
      El backend lo rechaza igualmente; aquí es para no ofrecerlo. */
@@ -177,14 +195,32 @@ function Fila({
       </Badge>
       {miembro.status === 'INVITED' && <Badge variant="warning">Invitación pendiente</Badge>}
 
-      {/* 🕳️ Aquí había un botón que alternaba entre «Administra» y «Miembro»,
-          que era todo lo que se podía hacer cuando los papeles eran un enum de
-          tres valores. Desde que cada organización define los suyos, cambiar de
-          papel es **elegir de una lista**, y esa lista es una pantalla con su
-          propio diseño — va en O6, con el lenguaje de Kyloo. Hasta entonces se
-          puede sacar a alguien pero no cambiarle el papel desde aquí, y está
-          escrito en vez de dejar un botón que solo entiende dos papeles de los
-          que puede haber diez. */}
+      {/* Cambiar de papel es **elegir de una lista**, y por eso este control no
+          existía mientras los papeles eran un enum de tres valores: un botón que
+          alterna entre dos no sirve cuando puede haber diez.
+
+          ⚠️ Se envía al elegir, sin botón de confirmar: es un campo y no un
+          formulario, y pedir dos gestos para un desplegable de dos opciones es
+          justo el trámite que sobra. El servidor rechaza un papel con permisos
+          que quien lo reparte no tiene, y ese error se enseña abajo. */}
+      {seLePuedeTocar && miembro.userId && papeles.length > 0 && (
+        <div className="w-44 shrink-0">
+          <Select
+            value={miembro.roleId ?? ''}
+            disabled={cambiando}
+            onValueChange={(roleId) => {
+              if (!roleId || roleId === miembro.roleId) return;
+              const datos = new FormData();
+              datos.set('organizationId', organizationId);
+              datos.set('userId', miembro.userId as string);
+              datos.set('roleId', roleId);
+              rolAction(datos);
+            }}
+            options={papeles.map((papel) => ({ value: papel.id, label: papel.name }))}
+            fullWidth
+          />
+        </div>
+      )}
 
       {seLePuedeTocar && (
         <form action={quitarAction}>
@@ -198,9 +234,9 @@ function Fila({
         </form>
       )}
 
-      {quitar.error && (
+      {(quitar.error || rol.error) && (
         <p role="alert" className="w-full font-sans text-xs text-error">
-          {quitar.error}
+          {quitar.error ?? rol.error}
         </p>
       )}
     </li>

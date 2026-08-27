@@ -232,3 +232,139 @@ export async function aceptarInvitacionAction(
     };
   }
 }
+
+/* ─── Papeles de la organización ───────────────────────────────────────────
+ *
+ * 🔴 **Repartir permisos no puede crear permisos.** El servidor rechaza un papel
+ * con permisos que quien lo guarda no tiene, y su mensaje es el que se enseña:
+ * traducirlo aquí sería adivinar cuál de los nueve sobra.
+ */
+
+/** Los permisos llegan como casillas del formulario, no como un objeto. */
+function permisosDelFormulario(formData: FormData): Record<string, boolean> {
+  const permisos: Record<string, boolean> = {};
+  for (const [clave, valor] of formData.entries()) {
+    if (clave.startsWith('permiso.')) permisos[clave.slice('permiso.'.length)] = valor === 'true';
+  }
+  return permisos;
+}
+
+export async function guardarPapelAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const roleId = String(formData.get('roleId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+
+  if (name.length < 2) return { error: 'Ponle un nombre de al menos dos letras.', done: null };
+
+  const cuerpo = { name, permissions: permisosDelFormulario(formData) };
+
+  try {
+    const api = createServerApiClient();
+    const guardado = roleId
+      ? await api.patch<{ id: string }>(`/organizations/${organizationId}/roles/${roleId}`, cuerpo)
+      : await api.post<{ id: string }>(`/organizations/${organizationId}/roles`, cuerpo);
+
+    if (!guardado?.id) return { error: 'El servidor no devolvió el papel.', done: null };
+
+    revalidatePath(`/organizations/${organizationId}/roles`);
+    return { error: null, done: guardado.id };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo guardar el papel.',
+      done: null,
+    };
+  }
+}
+
+export async function borrarPapelAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const roleId = String(formData.get('roleId') ?? '');
+
+  try {
+    await createServerApiClient().delete(`/organizations/${organizationId}/roles/${roleId}`);
+    revalidatePath(`/organizations/${organizationId}/roles`);
+    return { error: null, done: roleId };
+  } catch (error) {
+    /* El mensaje del servidor dice **cuánta gente** hay que mover antes de poder
+       borrarlo, que es lo único que hace que se pueda arreglar. */
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo borrar el papel.',
+      done: null,
+    };
+  }
+}
+
+/* ─── Plantillas de rol de proyecto ────────────────────────────────────────
+ *
+ * ⚠️ Solo afectan a los proyectos **nuevos**. Reescribir los roles de los que ya
+ * existen sería borrar el trabajo de quien los ajustó, desde una pantalla que
+ * habla de otra cosa. La pantalla lo dice.
+ */
+
+export async function guardarPlantillaAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const templateId = String(formData.get('templateId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+
+  if (name.length < 2) return { error: 'Ponle un nombre de al menos dos letras.', done: null };
+
+  const cuerpo = { name, permissions: permisosDelFormulario(formData) };
+
+  try {
+    const api = createServerApiClient();
+    const guardada = templateId
+      ? await api.patch<{ id: string }>(
+          `/organizations/${organizationId}/role-templates/${templateId}`,
+          cuerpo,
+        )
+      : await api.post<{ id: string }>(`/organizations/${organizationId}/role-templates`, cuerpo);
+
+    if (!guardada?.id) return { error: 'El servidor no devolvió la plantilla.', done: null };
+
+    revalidatePath(`/organizations/${organizationId}/roles`);
+    return { error: null, done: guardada.id };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo guardar la plantilla.',
+      done: null,
+    };
+  }
+}
+
+export async function borrarPlantillaAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const templateId = String(formData.get('templateId') ?? '');
+
+  try {
+    await createServerApiClient().delete(
+      `/organizations/${organizationId}/role-templates/${templateId}`,
+    );
+    revalidatePath(`/organizations/${organizationId}/roles`);
+    return { error: null, done: templateId };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo borrar la plantilla.',
+      done: null,
+    };
+  }
+}
