@@ -431,9 +431,39 @@ extracto operativo, no el sustituto.
 - [ ] **O2.8** El asiento se libera al cancelar una invitación y al sacar a alguien.
       Verificar que `seatsUsed` sigue contando `INVITED` + `ACTIVE`.
 
-### Apuntes
+### Apuntes — medido antes de empezar (2026-08-26)
 
-_(vacío)_
+- **El radio son ~35 sitios y 32 están en un solo fichero**
+  (`organizations.service.ts`, 620 líneas). Los otros tres:
+  `organizations.controller.ts` del servicio, `commons/billing/planes.ts` y
+  `MembersPanel.tsx`.
+- 🔴 **`exigir(organizationId, userId, admitidos: OrganizationRole[])` es la
+  pieza que hay que dar la vuelta**, y no es mecánico. Hoy son ocho llamadas con
+  la lista de papeles escrita a mano (`[OWNER, ADMIN]`, `[OWNER, ADMIN, MEMBER]`…)
+  y pasan a ser `exigirPermiso(..., OrganizationPermission.X)`. **Elegir qué
+  permiso va en cada sitio es una decisión, no un renombre**: un `[OWNER, ADMIN]`
+  de hoy puede ser `canManageMembers` en un sitio y `canManageBilling` en otro, y
+  un `sed` los igualaría a todos.
+- **`OrganizationMember.role` pasa de columna enum a `roleId` con relación**, y
+  `onDelete: Restrict`: borrar un papel que todavía tiene gente **falla**, en vez
+  de dejarlos sin ninguno. Reasignar primero es lo honesto, y es la misma regla
+  de D11 —nada se borra solo— aplicada a los papeles.
+- **`OWNER` deja de ser un valor de la columna.** Se resuelve comparando con
+  `Organization.ownerUserId` **antes** de mirar ningún papel, igual que `ownerId`
+  en un proyecto. Su membresía sí lleva `roleId` —al papel de administración— para
+  que la columna no sea nullable en ninguna fila; ese papel simplemente no se
+  consulta para él.
+- **Los nombres de los papeles son texto de pantalla, así que van en español**
+  («Administración», «Miembro»), como los roles de proyecto. El enum
+  `OrganizationRole` de contracts desaparece: lo que queda son dos constantes con
+  el nombre de arranque.
+- ⚠️ **La migración va aparte, no editando la inicial.** La de O1 se editó en su
+  sitio porque era quitar dos valores de un enum; esto reestructura tablas y
+  merece su propio archivo con su propia explicación.
+- ✅ Postgres y Redis están levantados y la base es reiniciable, así que
+  `prisma migrate dev` puede generar la migración en vez de escribirla a mano —
+  salvo lo que Prisma no sabe expresar, que aquí es el índice único parcial que ya
+  existe.
 
 ---
 
