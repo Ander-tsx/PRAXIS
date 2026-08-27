@@ -27,8 +27,11 @@ import {
   CreateOrganizationBodyDto,
   InviteOrganizationMemberBodyDto,
   type OrganizationMemberView,
+  OrganizationRoleBodyDto,
   type OrganizationView,
+  ProjectRoleTemplateBodyDto,
   RenameOrganizationBodyDto,
+  TransferOrganizationBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -262,7 +265,7 @@ export class OrganizationsController {
             organizationId,
             porUserId: req.user!.userId,
             email: body.email,
-            role: body.role,
+            roleId: body.roleId,
           },
         ),
       ),
@@ -288,7 +291,7 @@ export class OrganizationsController {
       await firstValueFrom(
         this.billingClient.send(
           { cmd: 'billing_org_member_role' },
-          { organizationId, porUserId: req.user!.userId, userId, role: body.role },
+          { organizationId, porUserId: req.user!.userId, userId, roleId: body.roleId },
         ),
       ),
     );
@@ -412,6 +415,210 @@ export class OrganizationsController {
         this.billingClient.send(
           { cmd: 'billing_org_history' },
           { organizationId, userId: req.user!.userId },
+        ),
+      ),
+    );
+  }
+
+  /* ─── Papeles ──────────────────────────────────────────────────────────── */
+
+  /**
+   * Los papeles de la organización, con cuánta gente lleva cada uno.
+   *
+   * ⚠️ **No es la misma pantalla que los roles de un proyecto**, y no debería
+   * serlo: son dos vocabularios distintos. Ver `OrganizationPermission`.
+   */
+  @Get('roles')
+  @ApiOperation({ summary: 'Los papeles de la organización' })
+  async papeles(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_roles' },
+          { organizationId, userId: req.user!.userId },
+        ),
+      ),
+    );
+  }
+
+  @Post('roles')
+  @ApiOperation({ summary: 'Crea un papel' })
+  @ApiResponse({ status: 403, description: 'No puedes dar un permiso que tú no tienes' })
+  async crearPapel(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() body: OrganizationRoleBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_role_create' },
+          {
+            organizationId,
+            porUserId: req.user!.userId,
+            name: body.name,
+            permissions: body.permissions,
+          },
+        ),
+      ),
+    );
+  }
+
+  @Patch('roles/:roleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Edita un papel' })
+  async editarPapel(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
+    @Body() body: OrganizationRoleBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_role_update' },
+          {
+            organizationId,
+            porUserId: req.user!.userId,
+            roleId,
+            name: body.name,
+            permissions: body.permissions,
+          },
+        ),
+      ),
+    );
+  }
+
+  /** Falla si todavía lo lleva alguien, y dice cuánta gente hay que mover. */
+  @Delete('roles/:roleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borra un papel que ya no lleva nadie' })
+  @ApiResponse({ status: 409, description: 'Ese papel todavía lo lleva alguien' })
+  async borrarPapel(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_role_delete' },
+          { organizationId, porUserId: req.user!.userId, roleId },
+        ),
+      ),
+    );
+  }
+
+  /* ─── Plantillas de rol de proyecto ────────────────────────────────────── */
+
+  @Get('role-templates')
+  @ApiOperation({ summary: 'Los roles con los que nacen los proyectos de aquí' })
+  async plantillas(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_templates' },
+          { organizationId, userId: req.user!.userId },
+        ),
+      ),
+    );
+  }
+
+  /** ⚠️ Solo afecta a los proyectos que se creen a partir de ahora. */
+  @Post('role-templates')
+  @ApiOperation({ summary: 'Crea una plantilla de rol de proyecto' })
+  async crearPlantilla(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() body: ProjectRoleTemplateBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_template_save' },
+          {
+            organizationId,
+            porUserId: req.user!.userId,
+            name: body.name,
+            permissions: body.permissions,
+          },
+        ),
+      ),
+    );
+  }
+
+  @Patch('role-templates/:templateId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Edita una plantilla de rol de proyecto' })
+  async editarPlantilla(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('templateId', ParseUUIDPipe) templateId: string,
+    @Body() body: ProjectRoleTemplateBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_template_save' },
+          {
+            organizationId,
+            porUserId: req.user!.userId,
+            templateId,
+            name: body.name,
+            permissions: body.permissions,
+          },
+        ),
+      ),
+    );
+  }
+
+  @Delete('role-templates/:templateId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Borra una plantilla. No toca ningún proyecto ya creado' })
+  async borrarPlantilla(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Param('templateId', ParseUUIDPipe) templateId: string,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_template_delete' },
+          { organizationId, porUserId: req.user!.userId, templateId },
+        ),
+      ),
+    );
+  }
+
+  /* ─── El traspaso ──────────────────────────────────────────────────────── */
+
+  /**
+   * Le pasa la organización a otra persona.
+   *
+   * 🔴 **Sin esto una organización muere con su creador.** Solo lo hace quien es
+   * dueño —no basta `canManageOrganization`: regalar la suscripción de otro no
+   * es administrar— y quien la recibe tiene que estar ya dentro y activo.
+   */
+  @Post('transfer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Traspasa la organización a otro miembro' })
+  @ApiResponse({ status: 403, description: 'Solo quien es dueño puede traspasarla' })
+  async traspasar(
+    @Request() req: Express.Request,
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+    @Body() body: TransferOrganizationBodyDto,
+  ) {
+    return oFalla(
+      await firstValueFrom(
+        this.billingClient.send(
+          { cmd: 'billing_org_transfer' },
+          { organizationId, porUserId: req.user!.userId, userId: body.userId },
         ),
       ),
     );

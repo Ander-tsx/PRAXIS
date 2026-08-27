@@ -28,7 +28,52 @@ export type PlanContratacion = 'NINGUNA' | 'AUTOSERVICIO' | 'CONTACTO';
 
 export type SubscriptionStatus = 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED';
 
-export type OrganizationRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+/**
+ * Lo que se puede hacer **a** una organización.
+ *
+ * ⚠️ **Es otro vocabulario que el de proyecto**, no el mismo a otra escala:
+ * `canCreateTask` no significa nada aquí y `canManageBilling` no significa nada
+ * dentro de un tablero. Por eso son dos pantallas.
+ *
+ * 🔴 **Ser dueño no está aquí.** No es un permiso ni un papel: se resuelve
+ * comparando con quien paga, y por eso `OrganizationView` trae `soyDueno`
+ * aparte. Un dueño los tiene todos y no se le pueden quitar.
+ */
+export type OrganizationPermission =
+  | 'canManageOrganization'
+  | 'canCreateProject'
+  | 'canViewAllProjects'
+  | 'canManageAllProjects'
+  | 'canInviteMembers'
+  | 'canManageMembers'
+  | 'canManageRoleTemplates'
+  | 'canManageBilling'
+  | 'canViewAuditLog';
+
+/** El diccionario de un papel. Nunca un array. */
+export type OrganizationPermissions = Record<OrganizationPermission, boolean>;
+
+/** Un papel de la organización, tal y como lo pinta el portal. */
+export interface OrganizationRoleView {
+  id: string;
+  name: string;
+  permissions: OrganizationPermissions;
+  isDefault: boolean;
+  /** Cuánta gente lo lleva. Para no ofrecer borrar uno que está en uso. */
+  miembros: number;
+}
+
+/**
+ * Una plantilla de rol de proyecto.
+ *
+ * ⚠️ **Solo afecta a los proyectos nuevos**, y la pantalla tiene que decirlo:
+ * cambiar una plantilla no reescribe los roles de los proyectos que ya existen.
+ */
+export interface ProjectRoleTemplateView {
+  id: string;
+  name: string;
+  permissions: Record<string, boolean>;
+}
 
 export type MembershipStatus = 'INVITED' | 'ACTIVE';
 
@@ -90,7 +135,13 @@ export interface BillingSummary {
   cancelaEn: string | null;
   cobroDisponible: boolean;
   gestionable: boolean;
-  organizaciones: { id: string; name: string; tier: PlanTier; myRole: string }[];
+  organizaciones: {
+    id: string;
+    name: string;
+    tier: PlanTier;
+    soyDueno: boolean;
+    myRoleName: string | null;
+  }[];
 }
 
 export interface OrganizationView {
@@ -100,7 +151,12 @@ export interface OrganizationView {
   slug: string | null;
   ownerUserId: string;
   tier: PlanTier;
-  myRole: OrganizationRole;
+  /** Si eres quien paga. Lo puedes todo, y no se te quita. */
+  soyDueno: boolean;
+  /** Cómo se llama tu papel. `null` en el dueño, que no lleva ninguno. */
+  myRoleName: string | null;
+  /** Lo que puedes hacer aquí dentro, ya resuelto por el servidor. */
+  myPermissions: OrganizationPermissions;
   seats: number;
   /** Asientos gastados: miembros activos **más invitaciones vivas**. */
   seatsUsed: number;
@@ -111,7 +167,11 @@ export interface OrganizationMemberView {
   userId: string | null;
   email: string;
   name: string | null;
-  role: OrganizationRole;
+  /** El papel que lleva. `null` en el dueño, que no lleva ninguno. */
+  roleId: string | null;
+  roleName: string | null;
+  /** Quien paga. Ni se le cambia el papel ni se le saca. */
+  isOwner: boolean;
   status: MembershipStatus;
   invitedAt: string;
   joinedAt: string | null;
@@ -149,10 +209,23 @@ export const TEXTO_DE_ESTADO: Record<SubscriptionStatus, string> = {
   CANCELED: 'Sin plan',
 };
 
-export const TEXTO_DE_PAPEL: Record<OrganizationRole, string> = {
-  OWNER: 'Dueño',
-  ADMIN: 'Administra',
-  MEMBER: 'Miembro',
+/**
+ * Cómo se llama cada permiso en la pantalla de papeles.
+ *
+ * ⚠️ **Cada frase dice qué abre, no repite el identificador.** «Gestionar
+ * proyectos» no le dice a nadie que eso incluye poder entrar en un tablero
+ * ajeno; el texto tiene que decirlo, porque es justo lo que sorprende.
+ */
+export const TEXTO_DE_PERMISO: Record<OrganizationPermission, string> = {
+  canManageOrganization: 'Cambiar el nombre y los ajustes de la organización',
+  canCreateProject: 'Crear proyectos dentro de la organización',
+  canViewAllProjects: 'Ver la lista de todos los proyectos, sin entrar en ellos',
+  canManageAllProjects: 'Archivar, suspender y cambiar de responsable cualquier proyecto',
+  canInviteMembers: 'Invitar gente, ocupando un asiento por invitación',
+  canManageMembers: 'Cambiar papeles y sacar gente',
+  canManageRoleTemplates: 'Editar las plantillas con que nacen los proyectos',
+  canManageBilling: 'Ver y cambiar el plan, los asientos y las facturas',
+  canViewAuditLog: 'Leer el registro de la organización',
 };
 
 /** Una fecha ISO, escrita como la escribe el resto de la aplicación. */

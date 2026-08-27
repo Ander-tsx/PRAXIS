@@ -31,14 +31,6 @@ enum OrganizationKind {
   @@schema("billing")
 }
 
-enum OrganizationRole {
-  OWNER
-  ADMIN
-  MEMBER
-
-  @@schema("billing")
-}
-
 enum MembershipStatus {
   INVITED
   ACTIVE
@@ -81,7 +73,13 @@ model Organization {
   id          String           @id @default(uuid())
   kind        OrganizationKind @default(PERSONAL)
 
-  /// `null` en la personal, que no tiene nombre porque nadie la enseña.
+  /// Cómo se llama.
+  ///
+  /// ⚠️ **La personal también tiene**, desde 2026-08-26. Mientras solo repartía
+  /// topes, una organización sin nombre que no salía en ninguna pantalla tenía
+  /// sentido; desde que **contiene** los proyectos, una que no se ve es un sitio
+  /// donde no se puede meter nada. Sigue siendo anulable por las filas que se
+  /// crearon antes de que el gateway supiera pasar el nombre.
   name        String?
   /// Lo que iría en una URL. Único global, como el de proyecto.
   slug        String?          @unique
@@ -96,6 +94,8 @@ model Organization {
   ownerUserId String
 
   members       OrganizationMember[]
+  roles         OrganizationRole[]
+  roleTemplates ProjectRoleTemplate[]
   subscription  Subscription?
   events        BillingEvent[]
 
@@ -125,7 +125,17 @@ model OrganizationMember {
 
   userId String?
   email  String
-  role   OrganizationRole @default(MEMBER)
+
+  /// El papel que lleva dentro de la organización.
+  ///
+  /// ⚠️ **No es nullable ni siquiera en el dueño.** Su fila también apunta a un
+  /// papel —el de administración— y simplemente no se consulta: `permisosDe`
+  /// resuelve al dueño comparando con `Organization.ownerUserId` **antes** de
+  /// mirar ninguno. Una columna anulable obligaría a tratar el caso `null` en
+  /// cada lectura para un caso que ya está resuelto antes de llegar aquí.
+  roleId String
+  role   OrganizationRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
   status MembershipStatus @default(INVITED)
 
   /// El hash del token del enlace, nunca el token.
@@ -142,8 +152,82 @@ model OrganizationMember {
   @@unique([organizationId, email])
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([roleId])
   @@schema("billing")
   @@map("organization_members")
+}
+
+/// Lo que se puede hacer **a** una organización, y quién.
+///
+/// ## Por qué es una tabla y no un enum
+///
+/// Era un enum de tres valores —`OWNER`, `ADMIN`, `MEMBER`— y se quedó corto en
+/// cuanto una empresa quiso decidir *quién crea proyectos* aparte de *quién
+/// invita*. Ahora cada organización define los suyos, exactamente igual que un
+/// proyecto define sus roles: es el mismo concepto una capa más arriba, y que se
+/// parezcan es lo que hace que se aprenda una sola vez.
+///
+/// ⚠️ **`permissions` es un diccionario de booleanos, nunca un array.** En los
+/// roles de proyecto se aprendió tarde y todavía hay filas guardadas como array
+/// que se normalizan al leer. Aquí el validador va desde el primer día y
+/// `normalizarPermisosOrg` es la única puerta de entrada.
+///
+/// ⚠️ **`OWNER` no está aquí.** Ser dueño no es un papel: se resuelve contra
+/// `Organization.ownerUserId`. Guardarlo como fila permitiría quitarse permisos a
+/// uno mismo y dejar la organización sin quien la administre.
+model OrganizationRole {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  permissions Json
+
+  /// El que se lleva quien entra sin que nadie diga cuál.
+  ///
+  /// ⚠️ Tiene que haber **exactamente uno** por organización: sin ninguno, una
+  /// invitación sin papel no se puede escribir; con dos, cuál se aplica depende
+  /// del orden en que la base los devuelva.
+  isDefault Boolean @default(false)
+
+  members OrganizationMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@schema("billing")
+  @@map("organization_roles")
+}
+
+/// Los roles con los que nace un proyecto de esta organización.
+///
+/// El puente entre los dos planos de permisos, y **va en una sola dirección**:
+/// al crear un proyecto se copian aquí sus roles, y a partir de ahí el proyecto
+/// es dueño de los suyos. Cambiar una plantilla **no** reescribe los proyectos
+/// que ya existen — sería borrar el trabajo de quien los ajustó, desde una
+/// pantalla que habla de otra cosa.
+///
+/// ⚠️ `permissions` son permisos **de proyecto** (`ProjectPermission`), no de
+/// organización. Son dos vocabularios distintos y este es el otro: mezclarlos
+/// daría un rol de proyecto con `canManageBilling` dentro, que no significa nada
+/// y nadie comprobaría.
+model ProjectRoleTemplate {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  permissions Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@schema("billing")
+  @@map("project_role_templates")
 }
 
 /// La suscripción de una organización. Una como mucho.

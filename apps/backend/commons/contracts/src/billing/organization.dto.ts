@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -62,35 +63,26 @@ export enum OrganizationKind {
 }
 
 /**
- * Los papeles de arranque de una organización.
+ * Los dos papeles con los que nace una organización.
  *
- * ⚠️ **Son la semilla, no el catálogo cerrado.** Desde 2026-08-26 una
- * organización define sus propios papeles con un diccionario de
- * `OrganizationPermission`, igual que un proyecto define sus roles. Estos tres
- * son los que se crean con ella para que nunca esté sin ninguno; `OWNER` además
- * es especial y no se toca (ver `PERMISOS_DE_DUENO`).
+ * ⚠️ **Son nombres, no un enum**, y desde 2026-08-26 tampoco son el catálogo: una
+ * organización define los suyos con un diccionario de `OrganizationPermission`,
+ * igual que un proyecto define sus roles. Estos dos se crean con ella para que
+ * nunca esté sin ninguno, y se pueden renombrar y editar como cualquier otro.
  *
- * ⚠️ **Siguen sin tener nada que ver con los roles de proyecto ni con el rol
- * global.** Son tres capas, y esta es la tercera.
+ * ⚠️ **Van en español porque se ven en pantalla.** Es la misma regla que los
+ * roles de proyecto («Administrador», «Scrum Master»): el identificador es
+ * inglés, el nombre que lee una persona no.
  *
- * 🔴 **Lo que cambió, y el comentario anterior decía al revés:** un papel de la
- * organización **sí** puede abrir la puerta de un proyecto —`canViewAllProjects`
- * enseña la lista, `canManageAllProjects` deja entrar autoconcediéndose el
- * acceso—, y solo dejando rastro en el registro de auditoría y avisando a quien
- * es responsable del proyecto. Lo que sigue sin abrir nada es **el plan**: pagar
- * no da permisos. Sin esto, una empresa no tiene forma de recuperar un proyecto
- * cuando su responsable se va, que es exactamente por lo que paga.
+ * 🔴 **`OWNER` ya no está aquí, y no es un olvido.** Ser dueño de la
+ * organización no es un papel: se resuelve comparando con
+ * `Organization.ownerUserId` **antes** de mirar ninguno, igual que `ownerId` en
+ * un proyecto. Guardarlo como fila permitiría quitarse permisos a uno mismo, que
+ * es la forma más rápida de dejar una organización sin nadie que la administre y
+ * sin salida.
  */
-export enum OrganizationRole {
-  /** Quien la creó. Paga, y es el único que puede disolverla. */
-  OWNER = 'OWNER',
-  /** Puede invitar, quitar y ver el consumo. No puede tocar la suscripción. */
-  ADMIN = 'ADMIN',
-  /** Consume el plan y ve cuánto le queda. Nada más. */
-  MEMBER = 'MEMBER',
-}
-
-export const ORGANIZATION_ROLES = Object.values(OrganizationRole);
+export const ORG_ROLE_ADMIN_NAME = 'Administración';
+export const ORG_ROLE_MEMBER_NAME = 'Miembro';
 
 /**
  * Lo que se puede hacer **a** una organización.
@@ -101,6 +93,14 @@ export const ORGANIZATION_ROLES = Object.values(OrganizationRole);
  * obligaría a un selector de proyecto que repite la navegación que ya existe.
  */
 export enum OrganizationPermission {
+  /**
+   * El nombre y los ajustes de la organización.
+   *
+   * ⚠️ Se separó de `canManageMembers` al escribirlo: son dos cosas distintas y
+   * una empresa quiere que quien lleva el equipo pueda arreglar una errata en el
+   * nombre sin poder, además, tocar quién está dentro.
+   */
+  CAN_MANAGE_ORGANIZATION = 'canManageOrganization',
   /** Crear proyectos dentro de la organización. */
   CAN_CREATE_PROJECT = 'canCreateProject',
   /** Ver la lista de todos los proyectos — **no** entrar en ellos. */
@@ -158,6 +158,7 @@ export function permisosDeDueno(): OrganizationPermissions {
 export function permisosDeAdministracion(): OrganizationPermissions {
   return {
     ...permisosOrgVacios(),
+    [OrganizationPermission.CAN_MANAGE_ORGANIZATION]: true,
     [OrganizationPermission.CAN_CREATE_PROJECT]: true,
     [OrganizationPermission.CAN_VIEW_ALL_PROJECTS]: true,
     [OrganizationPermission.CAN_MANAGE_ALL_PROJECTS]: true,
@@ -229,6 +230,54 @@ export function normalizarPermisosOrg(bruto: unknown): OrganizationPermissions {
 export const NOT_IN_ORG_CODE = 'NOT_IN_ORG';
 
 /**
+ * ¿Caben estos permisos dentro de los que tiene quien los reparte?
+ *
+ * 🔴 **Es lo que impide escalar privilegios, y sin esto el modelo se rompe
+ * entero.** Quien tiene `canManageMembers` puede crear papeles y asignarlos; si
+ * pudiera meter en uno un permiso que él no tiene —`canManageBilling`, por
+ * ejemplo— le bastaría con creárselo, asignárselo y ya estaría tocando la
+ * tarjeta de crédito de la empresa. Con esta comprobación, repartir permisos
+ * nunca crea permisos.
+ *
+ * El dueño la pasa siempre, porque los tiene todos: no es una excepción escrita
+ * aparte, sale solo.
+ */
+export function cabenEn(
+  permisos: OrganizationPermissions,
+  losDeQuienReparte: OrganizationPermissions,
+): boolean {
+  return ORGANIZATION_PERMISSIONS.every((clave) => !permisos[clave] || losDeQuienReparte[clave]);
+}
+
+/** Un papel de la organización, tal y como lo pinta el portal. */
+export interface OrganizationRoleView {
+  id: string;
+  name: string;
+  permissions: OrganizationPermissions;
+  /** El que se asigna a quien entra sin decir cuál. Uno por organización. */
+  isDefault: boolean;
+  /** Cuánta gente lo lleva. Para no dejar borrar uno que está en uso. */
+  miembros: number;
+}
+
+/**
+ * Una plantilla de rol de proyecto.
+ *
+ * ⚠️ **Solo afecta a los proyectos nuevos.** Cambiar una plantilla no reescribe
+ * los roles de los proyectos que ya existen: sería borrar el trabajo de quien
+ * los ajustó, en una pantalla que habla de otra cosa. El puente va en una sola
+ * dirección y solo se cruza al crear.
+ *
+ * `permissions` son permisos **de proyecto** (`ProjectPermission`), no de
+ * organización: son los dos vocabularios distintos, y este es el otro.
+ */
+export interface ProjectRoleTemplateView {
+  id: string;
+  name: string;
+  permissions: Record<string, boolean>;
+}
+
+/**
  * En qué estado está alguien dentro de la organización.
  *
  * ⚠️ **Una invitación ocupa asiento.** Si no lo ocupara, se podrían mandar mil
@@ -246,13 +295,31 @@ export enum MembershipStatus {
 export interface OrganizationView {
   id: string;
   kind: OrganizationKind;
-  /** `null` en la personal, que no tiene y no la enseña nadie. */
+  /**
+   * Cómo se llama.
+   *
+   * ⚠️ **Ya no es `null` en la personal.** Desde 2026-08-26 la personal tiene
+   * nombre y sale en el selector del sidebar: una organización que no se ve es
+   * un sitio donde no se puede meter un proyecto. Se sigue tipando anulable
+   * porque el gateway puede no saber el nombre de quien la estrena, y entonces
+   * la pantalla pone uno genérico en vez de dejar un hueco.
+   */
   name: string | null;
   slug: string | null;
   ownerUserId: string;
   tier: PlanTier;
-  /** Tu papel dentro. Lo resuelve el gateway contra quien pregunta. */
-  myRole: OrganizationRole;
+  /** Si quien pregunta es quien paga. Lo puede todo, y no se le quita. */
+  soyDueno: boolean;
+  /** Cómo se llama tu papel. `null` si eres el dueño: no llevas ninguno. */
+  myRoleName: string | null;
+  /**
+   * Lo que puedes hacer aquí dentro, ya resuelto.
+   *
+   * ⚠️ **Viene resuelto y no como el nombre de un papel** para que la pantalla
+   * no tenga que buscarlo en una lista que quizá no ha pedido. Y en el dueño son
+   * todos, sin mirar ninguna fila.
+   */
+  myPermissions: OrganizationPermissions;
   /** Asientos pagados. `1` en la personal. */
   seats: number;
   /** Asientos gastados: miembros activos **más invitaciones vivas**. */
@@ -266,7 +333,11 @@ export interface OrganizationMemberView {
   /** El correo al que se invitó. Es lo único que hay antes de que acepten. */
   email: string;
   name: string | null;
-  role: OrganizationRole;
+  /** El papel que lleva. `null` en el dueño, que no lleva ninguno. */
+  roleId: string | null;
+  roleName: string | null;
+  /** Quien paga. Ni se le cambia el papel ni se le saca. */
+  isOwner: boolean;
   status: MembershipStatus;
   invitedAt: string;
   joinedAt: string | null;
@@ -322,24 +393,77 @@ export class InviteOrganizationMemberBodyDto {
   @MaxLength(160)
   email: string;
 
-  @ApiPropertyOptional({ enum: [OrganizationRole.ADMIN, OrganizationRole.MEMBER] })
+  /**
+   * Con qué papel entra. Si no se dice, el que la organización tenga por
+   * defecto — que al crearse es «Miembro».
+   */
+  @ApiPropertyOptional({ description: 'Id del papel de la organización' })
   @IsOptional()
-  @IsIn([OrganizationRole.ADMIN, OrganizationRole.MEMBER])
-  role?: OrganizationRole;
+  @IsUUID()
+  roleId?: string;
 }
 
 export class ChangeOrganizationMemberRoleBodyDto {
   /**
-   * ⚠️ `OWNER` **no está en la lista**, y no se puede conceder por aquí.
+   * El papel nuevo.
    *
-   * Hay exactamente uno y es quien paga: convertir a otro en dueño es
-   * traspasar la suscripción, que tiene su propia ruta y su propia
-   * confirmación. Dejarlo como un valor más de este desplegable haría que un
-   * `ADMIN` pudiera regalarse la organización con un `PATCH`.
+   * ⚠️ **Ser dueño no es un papel y por eso no se puede conceder por aquí.** Hay
+   * exactamente uno, es quien paga, y convertir a otro en dueño es traspasar la
+   * suscripción — tiene su propia ruta y su propia confirmación. Si fuera un
+   * valor más de este desplegable, quien administra podría regalarse la
+   * organización con un `PATCH`.
+   *
+   * ⚠️ Y **no se puede asignar un papel con permisos que no tengas**: repartir
+   * permisos no puede crear permisos. Lo comprueba `cabenEn` en el servicio.
    */
-  @ApiProperty({ enum: [OrganizationRole.ADMIN, OrganizationRole.MEMBER] })
-  @IsIn([OrganizationRole.ADMIN, OrganizationRole.MEMBER])
-  role: OrganizationRole;
+  @ApiProperty({ description: 'Id del papel de la organización' })
+  @IsUUID()
+  roleId: string;
+}
+
+/** Crear o editar un papel de la organización. */
+export class OrganizationRoleBodyDto {
+  @ApiProperty({ example: 'Coordinación' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  name: string;
+
+  /**
+   * El diccionario de permisos.
+   *
+   * ⚠️ **Diccionario, nunca un array.** Se normaliza al entrar con
+   * `normalizarPermisosOrg`, que descarta lo que no esté en el vocabulario: un
+   * permiso retirado no puede seguir concediendo nada desde un cuerpo viejo.
+   */
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'boolean' } })
+  @IsObject()
+  permissions: Record<string, unknown>;
+}
+
+/** Guardar una plantilla de rol de proyecto. */
+export class ProjectRoleTemplateBodyDto {
+  @ApiProperty({ example: 'QA' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(60)
+  name: string;
+
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'boolean' } })
+  @IsObject()
+  permissions: Record<string, unknown>;
+}
+
+/** A quién se le traspasa la organización. */
+export class TransferOrganizationBodyDto {
+  /**
+   * ⚠️ **Tiene que ser ya miembro activo.** Traspasarla a alguien de fuera
+   * dejaría la organización con un dueño que no está dentro, sin asiento y sin
+   * forma de entrar en su propio portal.
+   */
+  @ApiProperty({ description: 'Quién pasa a ser el dueño' })
+  @IsUUID()
+  userId: string;
 }
 
 export class ChangeSeatsBodyDto {

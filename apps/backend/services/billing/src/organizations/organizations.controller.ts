@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-import type { OrganizationRole, PlanTier, SubscriptionStatus } from '@praxis/contracts';
+import { OrganizationPermission, type PlanTier, type SubscriptionStatus } from '@praxis/contracts';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { OrganizationsService } from './organizations.service';
 
@@ -29,9 +29,15 @@ export class OrganizationsController {
     return this.organizaciones.planEfectivoDe(dto.userId);
   }
 
+  /**
+   * La personal, creándola si hace falta.
+   *
+   * ⚠️ El nombre y el correo los pasa el gateway: aquí no se sabe cómo se llama
+   * nadie, y este servicio no habla con ningún otro a propósito.
+   */
   @MessagePattern({ cmd: 'billing_personal_org' })
-  personal(@Payload() dto: { userId: string }) {
-    return this.organizaciones.personalDe(dto.userId);
+  personal(@Payload() dto: { userId: string; name?: string; email?: string }) {
+    return this.organizaciones.personalDe(dto.userId, { name: dto.name, email: dto.email });
   }
 
   @MessagePattern({ cmd: 'billing_orgs_of' })
@@ -66,7 +72,7 @@ export class OrganizationsController {
   @MessagePattern({ cmd: 'billing_org_invite' })
   invitar(
     @Payload()
-    dto: { organizationId: string; porUserId: string; email: string; role?: OrganizationRole },
+    dto: { organizationId: string; porUserId: string; email: string; roleId?: string },
   ) {
     return this.organizaciones.invitar(dto);
   }
@@ -79,7 +85,7 @@ export class OrganizationsController {
   @MessagePattern({ cmd: 'billing_org_member_role' })
   cambiarRol(
     @Payload()
-    dto: { organizationId: string; porUserId: string; userId: string; role: OrganizationRole },
+    dto: { organizationId: string; porUserId: string; userId: string; roleId: string },
   ) {
     return this.organizaciones.cambiarRol(dto);
   }
@@ -136,23 +142,119 @@ export class OrganizationsController {
     return this.suscripciones.deOrganizacion(dto.organizationId);
   }
 
-  /** Cambiar asientos exige ser dueño: es lo que cuesta dinero. */
+  /** Cambiar asientos exige `canManageBilling`: es lo que cuesta dinero. */
   @MessagePattern({ cmd: 'billing_org_seats' })
   async asientos(@Payload() dto: { organizationId: string; userId: string; seats: number }) {
-    const permiso = await this.organizaciones.exigir(dto.organizationId, dto.userId, [
-      'OWNER' as OrganizationRole,
-    ]);
+    const permiso = await this.organizaciones.exigirPermiso(
+      dto.organizationId,
+      dto.userId,
+      OrganizationPermission.CAN_MANAGE_BILLING,
+    );
     if ('codigo' in permiso) return permiso;
     return this.suscripciones.cambiarAsientos(dto.organizationId, dto.seats);
   }
 
+  /**
+   * El registro de facturación.
+   *
+   * ⚠️ Antes lo veía cualquier `ADMIN`; ahora exige `canViewAuditLog`. Son dos
+   * cosas distintas y por eso se separaron: llevar el equipo no tiene por qué
+   * incluir leer cuánto y cuándo ha pagado la empresa.
+   */
   @MessagePattern({ cmd: 'billing_org_history' })
   async historial(@Payload() dto: { organizationId: string; userId: string; limite?: number }) {
-    const permiso = await this.organizaciones.exigir(dto.organizationId, dto.userId, [
-      'OWNER' as OrganizationRole,
-      'ADMIN' as OrganizationRole,
-    ]);
+    const permiso = await this.organizaciones.exigirPermiso(
+      dto.organizationId,
+      dto.userId,
+      OrganizationPermission.CAN_VIEW_AUDIT_LOG,
+    );
     if ('codigo' in permiso) return permiso;
     return this.suscripciones.historial(dto.organizationId, dto.limite);
+  }
+
+  /* ─── Papeles ──────────────────────────────────────────────────────────── */
+
+  @MessagePattern({ cmd: 'billing_org_roles' })
+  papeles(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.papeles(dto.organizationId, dto.userId);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_role_create' })
+  crearPapel(
+    @Payload()
+    dto: { organizationId: string; porUserId: string; name: string; permissions: unknown },
+  ) {
+    return this.organizaciones.crearPapel(dto);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_role_update' })
+  editarPapel(
+    @Payload()
+    dto: {
+      organizationId: string;
+      porUserId: string;
+      roleId: string;
+      name: string;
+      permissions: unknown;
+    },
+  ) {
+    return this.organizaciones.editarPapel(dto);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_role_delete' })
+  borrarPapel(@Payload() dto: { organizationId: string; porUserId: string; roleId: string }) {
+    return this.organizaciones.borrarPapel(dto);
+  }
+
+  /* ─── Plantillas de rol de proyecto ────────────────────────────────────── */
+
+  @MessagePattern({ cmd: 'billing_org_templates' })
+  plantillas(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.plantillas(dto.organizationId, dto.userId);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_template_save' })
+  guardarPlantilla(
+    @Payload()
+    dto: {
+      organizationId: string;
+      porUserId: string;
+      templateId?: string;
+      name: string;
+      permissions: Record<string, unknown>;
+    },
+  ) {
+    return this.organizaciones.guardarPlantilla(dto);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_template_delete' })
+  borrarPlantilla(
+    @Payload() dto: { organizationId: string; porUserId: string; templateId: string },
+  ) {
+    return this.organizaciones.borrarPlantilla(dto);
+  }
+
+  /* ─── Pertenencia y traspaso ───────────────────────────────────────────── */
+
+  /**
+   * ¿Tiene asiento aquí?
+   *
+   * Es lo que va a preguntar el gateway antes de meter a alguien en un proyecto
+   * de esta organización, cuando exista `Project.organizationId` (O3).
+   */
+  @MessagePattern({ cmd: 'billing_org_is_member' })
+  esMiembro(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.esMiembroDe(dto.organizationId, dto.userId);
+  }
+
+  /** Los permisos de alguien dentro de una organización, ya resueltos. */
+  @MessagePattern({ cmd: 'billing_org_permissions' })
+  permisos(@Payload() dto: { organizationId: string; userId: string }) {
+    return this.organizaciones.permisosDe(dto.organizationId, dto.userId);
+  }
+
+  @MessagePattern({ cmd: 'billing_org_transfer' })
+  traspasar(@Payload() dto: { organizationId: string; porUserId: string; userId: string }) {
+    return this.organizaciones.traspasar(dto);
   }
 }

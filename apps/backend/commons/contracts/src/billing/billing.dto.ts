@@ -91,7 +91,15 @@ export interface BillingSummary {
   /** Si hay cliente en Stripe, y por tanto portal de facturación que abrir. */
   gestionable: boolean;
   /** Enterprise: las organizaciones a las que perteneces. Vacío si ninguna. */
-  organizaciones: { id: string; name: string; tier: PlanTier; myRole: string }[];
+  organizaciones: {
+    id: string;
+    name: string;
+    tier: PlanTier;
+    /** Si eres quien paga. Lo puedes todo dentro, y no se te quita. */
+    soyDueno: boolean;
+    /** Cómo se llama tu papel. `null` en el dueño, que no lleva ninguno. */
+    myRoleName: string | null;
+  }[];
 }
 
 /** Lo que devuelve una comprobación de cuota. */

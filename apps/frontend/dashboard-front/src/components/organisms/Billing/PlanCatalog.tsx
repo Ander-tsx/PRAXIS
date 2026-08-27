@@ -77,9 +77,9 @@ export function PlanCatalog({
             «pagar» que responde 400 por no haber elegido organización es la
             clase de callejón que nadie sabe deshacer. */}
         <p className="max-w-3xl font-sans text-sm text-text-secondary">
-          Todos los planes de pago van{' '}
-          <strong className="text-text-primary">por asiento</strong> y los contrata una
-          organización. Si trabajas solo, la tuya tiene un asiento y funciona igual.
+          Todos los planes de pago van <strong className="text-text-primary">por asiento</strong> y
+          los contrata una organización. Si trabajas solo, la tuya tiene un asiento y funciona
+          igual.
         </p>
 
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">

@@ -1,7 +1,6 @@
 import { AppHeader, Badge, Button, alpha, colors } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import type { OrganizationView } from '@praxis/commons/billing/planes';
-import { TEXTO_DE_PAPEL } from '@praxis/commons/billing/planes';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
@@ -171,8 +170,8 @@ function Tarjeta({ organizacion }: { organizacion: OrganizationView }) {
         <h2 className="font-sans text-base font-semibold text-text-primary">
           {organizacion.name ?? 'Sin nombre'}
         </h2>
-        <Badge variant={organizacion.myRole === 'OWNER' ? 'primary' : 'default'}>
-          {TEXTO_DE_PAPEL[organizacion.myRole]}
+        <Badge variant={organizacion.soyDueno ? 'primary' : 'default'}>
+          {organizacion.soyDueno ? 'Dueño' : (organizacion.myRoleName ?? 'Miembro')}
         </Badge>
         {/* ⚠️ Una organización sin plan pagado no se distingue de una con él si
             solo se enseña el nombre, y la diferencia es que la primera funciona

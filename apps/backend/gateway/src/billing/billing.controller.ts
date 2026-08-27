@@ -117,7 +117,8 @@ export class BillingController {
         id: organizacion.id,
         name: organizacion.name ?? '',
         tier: organizacion.tier,
-        myRole: organizacion.myRole,
+        soyDueno: organizacion.soyDueno,
+        myRoleName: organizacion.myRoleName,
       })),
     };
   }

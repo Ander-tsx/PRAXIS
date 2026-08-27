@@ -1,14 +1,12 @@
 'use client';
 
-import {
-  cambiarRolAction,
-  invitarMiembroAction,
-  quitarMiembroAction,
-} from '@/app/(private)/organizations/actions';
+import { invitarMiembroAction, quitarMiembroAction } from '@/app/(private)/organizations/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
 import { Badge, Button, Input, Select, alpha, colors, useAccion } from '@praxis/commons';
-import type { OrganizationMemberView, OrganizationRole } from '@praxis/commons/billing/planes';
-import { TEXTO_DE_PAPEL } from '@praxis/commons/billing/planes';
+import type {
+  OrganizationMemberView,
+  OrganizationPermissions,
+} from '@praxis/commons/billing/planes';
 import { useId, useState } from 'react';
 
 /**
@@ -22,15 +20,16 @@ import { useId, useState } from 'react';
 export function MembersPanel({
   organizationId,
   miembros,
-  miPapel,
+  permisos,
   asientos,
 }: {
   organizationId: string;
   miembros: OrganizationMemberView[];
-  miPapel: OrganizationRole;
+  /** Lo que puede hacer quien mira, ya resuelto por el servidor. */
+  permisos: OrganizationPermissions;
   asientos: { contratados: number; ocupados: number };
 }) {
-  const puedeGestionar = miPapel === 'OWNER' || miPapel === 'ADMIN';
+  const puedeGestionar = permisos.canManageMembers;
   const quedan = asientos.contratados - asientos.ocupados;
 
   return (
@@ -55,7 +54,6 @@ export function MembersPanel({
             organizationId={organizationId}
             miembro={miembro}
             puedeGestionar={puedeGestionar}
-            puedeCambiarPapel={miPapel === 'OWNER'}
           />
         ))}
       </ul>
@@ -164,20 +162,16 @@ function Fila({
   organizationId,
   miembro,
   puedeGestionar,
-  puedeCambiarPapel,
 }: {
   organizationId: string;
   miembro: OrganizationMemberView;
   puedeGestionar: boolean;
-  puedeCambiarPapel: boolean;
 }) {
   const [quitar, quitarAction, quitando] = useAccion(
     quitarMiembroAction,
     ORGANIZACION_INITIAL_STATE,
   );
-  const [rol, rolAction, cambiando] = useAccion(cambiarRolAction, ORGANIZACION_INITIAL_STATE);
-
-  const esDueño = miembro.role === 'OWNER';
+  const esDueño = miembro.isOwner;
   /* Al dueño no se le saca ni se le cambia el papel: hay uno y es quien paga.
      El backend lo rechaza igualmente; aquí es para no ofrecerlo. */
   const seLePuedeTocar = puedeGestionar && !esDueño;
@@ -196,19 +190,19 @@ function Fila({
         )}
       </div>
 
-      <Badge variant={esDueño ? 'primary' : 'default'}>{TEXTO_DE_PAPEL[miembro.role]}</Badge>
+      <Badge variant={esDueño ? 'primary' : 'default'}>
+        {esDueño ? 'Dueño' : (miembro.roleName ?? 'Sin papel')}
+      </Badge>
       {miembro.status === 'INVITED' && <Badge variant="warning">Invitación pendiente</Badge>}
 
-      {seLePuedeTocar && puedeCambiarPapel && miembro.userId && (
-        <form action={rolAction} className="flex items-center gap-2">
-          <input type="hidden" name="organizationId" value={organizationId} />
-          <input type="hidden" name="userId" value={miembro.userId} />
-          <input type="hidden" name="role" value={miembro.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'} />
-          <Button type="submit" variant="ghost" size="sm" isLoading={cambiando}>
-            {miembro.role === 'ADMIN' ? 'Quitar administración' : 'Hacer que administre'}
-          </Button>
-        </form>
-      )}
+      {/* 🕳️ Aquí había un botón que alternaba entre «Administra» y «Miembro»,
+          que era todo lo que se podía hacer cuando los papeles eran un enum de
+          tres valores. Desde que cada organización define los suyos, cambiar de
+          papel es **elegir de una lista**, y esa lista es una pantalla con su
+          propio diseño — va en O6, con el lenguaje de Kyloo. Hasta entonces se
+          puede sacar a alguien pero no cambiarle el papel desde aquí, y está
+          escrito en vez de dejar un botón que solo entiende dos papeles de los
+          que puede haber diez. */}
 
       {seLePuedeTocar && (
         <form action={quitarAction}>
@@ -222,9 +216,9 @@ function Fila({
         </form>
       )}
 
-      {(quitar.error || rol.error) && (
+      {quitar.error && (
         <p role="alert" className="w-full font-sans text-xs text-error">
-          {quitar.error ?? rol.error}
+          {quitar.error}
         </p>
       )}
     </li>

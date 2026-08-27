@@ -59,7 +59,7 @@ export default async function OrganizationPage({
   if (!organizacion) notFound();
 
   const spec = catalogo?.planes.find((plan) => plan.tier === organizacion.tier) ?? null;
-  const esDueño = organizacion.myRole === 'OWNER';
+  const esDueño = organizacion.soyDueno;
   /* Sin plan pagado: la organización nace en gratuito y el pago viene después.
      Es el estado normal justo tras crearla, y hay que decirlo. */
   const sinPlan = organizacion.tier === 'FREE';
@@ -99,7 +99,7 @@ export default async function OrganizationPage({
               <MembersPanel
                 organizationId={organizacion.id}
                 miembros={miembros}
-                miPapel={organizacion.myRole}
+                permisos={organizacion.myPermissions}
                 asientos={{ contratados: organizacion.seats, ocupados: organizacion.seatsUsed }}
               />
             )}

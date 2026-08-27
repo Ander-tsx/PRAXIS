@@ -33,7 +33,7 @@ que quien lo usa solo con dos amigos pierda nada.
 | Stack | Qué es | Estado |
 |---|---|---|
 | O1 | Contratos: cuatro planes, papeles y códigos de error | ✅ **hecho** (2026-08-26) |
-| O2 | `billing-service`: papeles, plantillas y traspaso | ⬜ pendiente |
+| O2 | `billing-service`: papeles, plantillas y traspaso | ✅ **hecho** (2026-08-26) |
 | O3 | `Project.organizationId`, y las semillas | ⬜ pendiente |
 | O4 | El gateway: resolver la organización y contar por ella | ⬜ pendiente |
 | O5 | Frontend: el selector del sidebar y el portal | ⬜ pendiente |
@@ -50,7 +50,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-26 | O1 | (pendiente) | Cuatro planes en una escalera, el vocabulario de papeles de organización, `NOT_IN_ORG`, y el tope de miembros por proyecto retirado con el hueco señalado |
+| 2026-08-26 | O2 | (pendiente) | Los papeles dejan de ser un enum, las plantillas de rol, el traspaso, y la regla que impide escalar privilegios |
+| 2026-08-26 | O1 | `122cfeb` | Cuatro planes en una escalera, el vocabulario de papeles de organización, `NOT_IN_ORG`, y el tope de miembros por proyecto retirado con el hueco señalado |
 
 ---
 
@@ -375,11 +376,17 @@ extracto operativo, no el sustituto.
   vez aparece, no vuelve atrás; y que el orden declarado y el de la tabla de precios
   son el mismo, porque si se separan `mejorPlan` elige un plan distinto del que la
   tabla presenta como superior.
-- ⚠️ **La migración inicial de `billing` se editó en su sitio** en vez de añadir
-  otra. Postgres no sabe quitar valores de un enum con un `ALTER TYPE`: la
-  alternativa era recrear el tipo con todo lo que cuelga de él, o dejar `PLUS` y
-  `PRO` vivos en la base para siempre. Se pudo porque la base se reinicia; si
-  algún día no se puede, esto **no** es el patrón a copiar.
+- 🔴 **Editar la migración inicial en su sitio estaba mal, y se corrigió en O2.**
+  El razonamiento parecía bueno —Postgres no sabe quitar valores de un enum, y la
+  base se reinicia— pero se le escapaba lo esencial: **una migración ya aplicada
+  no se vuelve a ejecutar**. La base de quien ya tenía el esquema se quedaba con
+  `PLUS` y `PRO` vivos y **sin `ENTERPRISE`**, mientras el código creía lo
+  contrario. Se comprobó contra la base de desarrollo real y estaba justo así. El
+  síntoma habría salido en runtime, la primera vez que alguien eligiera Empresa,
+  con un error de tipo de Postgres lejos de la causa.
+  La inicial se restauró y el cambio vive en `20260826240000_cuatro_planes`, que
+  recrea el tipo. **Editar en su sitio solo vale cuando todo el mundo parte de
+  cero**, y aquí no era el caso ni siquiera con la base reiniciable.
 - 🕳️ **El tope de miembros por proyecto se retiró y su sustituto todavía no
   existe.** Lo que lo reemplaza —comprobar que la persona tiene asiento en la
   organización del proyecto— necesita `Project.organizationId` (O3). Hasta
@@ -411,59 +418,89 @@ extracto operativo, no el sustituto.
 
 ## O2 — `billing-service`: papeles, plantillas y traspaso
 
-- [ ] **O2.1** `OrganizationRole` deja de ser enum. Tabla `organization_roles` con
+- [x] **O2.1** `OrganizationRole` deja de ser enum. Tabla `organization_roles` con
       `permissions Json` (diccionario de booleanos) + validador, por organización.
       `OWNER` se queda como campo de la membresía, no como papel.
-- [ ] **O2.2** Migración de los papeles que ya hay: `ADMIN` y `MEMBER` pasan a ser
+- [x] **O2.2** Migración de los papeles que ya hay: `ADMIN` y `MEMBER` pasan a ser
       dos papeles a medida con su diccionario. Nadie pierde nada.
-- [ ] **O2.3** Tabla `project_role_templates`: las plantillas con que nacen los
+- [x] **O2.3** Tabla `project_role_templates`: las plantillas con que nacen los
       proyectos de la organización. Semilla por defecto al crear una organización.
-- [ ] **O2.4** Comandos de papeles: listar, crear, editar, borrar, asignar. **Los
+- [x] **O2.4** Comandos de papeles: listar, crear, editar, borrar, asignar. **Los
       fallos se devuelven, no se lanzan** — un `RpcException` por TCP llega al otro
       lado como error de transporte y pierde el motivo.
-- [ ] **O2.5** `traspasarPropiedad(organizationId, nuevoUserId)`: el nuevo dueño tiene
+- [x] **O2.5** `traspasarPropiedad(organizationId, nuevoUserId)`: el nuevo dueño tiene
       que ser miembro activo, y nunca puede quedar en cero. Cierra E6.5.
-- [ ] **O2.6** `esMiembroDe(organizationId, userId)` y `permisosDe(...)`, que es lo
+- [x] **O2.6** `esMiembroDe(organizationId, userId)` y `permisosDe(...)`, que es lo
       que va a preguntar el gateway en cada petición (ver O4.1).
-- [ ] **O2.7** Nombre y `slug` obligatorios también en la personal (D6), con el mismo
+- [x] **O2.7** Nombre y `slug` obligatorios también en la personal (D6), con el mismo
       sufijo aleatorio que los proyectos para los choques — nunca un contador, que
       deja enumerar.
-- [ ] **O2.8** El asiento se libera al cancelar una invitación y al sacar a alguien.
+- [x] **O2.8** El asiento se libera al cancelar una invitación y al sacar a alguien.
       Verificar que `seatsUsed` sigue contando `INVITED` + `ACTIVE`.
 
-### Apuntes — medido antes de empezar (2026-08-26)
+### Apuntes
 
-- **El radio son ~35 sitios y 32 están en un solo fichero**
-  (`organizations.service.ts`, 620 líneas). Los otros tres:
-  `organizations.controller.ts` del servicio, `commons/billing/planes.ts` y
-  `MembersPanel.tsx`.
-- 🔴 **`exigir(organizationId, userId, admitidos: OrganizationRole[])` es la
-  pieza que hay que dar la vuelta**, y no es mecánico. Hoy son ocho llamadas con
-  la lista de papeles escrita a mano (`[OWNER, ADMIN]`, `[OWNER, ADMIN, MEMBER]`…)
-  y pasan a ser `exigirPermiso(..., OrganizationPermission.X)`. **Elegir qué
-  permiso va en cada sitio es una decisión, no un renombre**: un `[OWNER, ADMIN]`
-  de hoy puede ser `canManageMembers` en un sitio y `canManageBilling` en otro, y
-  un `sed` los igualaría a todos.
-- **`OrganizationMember.role` pasa de columna enum a `roleId` con relación**, y
-  `onDelete: Restrict`: borrar un papel que todavía tiene gente **falla**, en vez
-  de dejarlos sin ninguno. Reasignar primero es lo honesto, y es la misma regla
-  de D11 —nada se borra solo— aplicada a los papeles.
-- **`OWNER` deja de ser un valor de la columna.** Se resuelve comparando con
-  `Organization.ownerUserId` **antes** de mirar ningún papel, igual que `ownerId`
-  en un proyecto. Su membresía sí lleva `roleId` —al papel de administración— para
-  que la columna no sea nullable en ninguna fila; ese papel simplemente no se
-  consulta para él.
-- **Los nombres de los papeles son texto de pantalla, así que van en español**
-  («Administración», «Miembro»), como los roles de proyecto. El enum
-  `OrganizationRole` de contracts desaparece: lo que queda son dos constantes con
-  el nombre de arranque.
-- ⚠️ **La migración va aparte, no editando la inicial.** La de O1 se editó en su
-  sitio porque era quitar dos valores de un enum; esto reestructura tablas y
-  merece su propio archivo con su propia explicación.
-- ✅ Postgres y Redis están levantados y la base es reiniciable, así que
-  `prisma migrate dev` puede generar la migración en vez de escribirla a mano —
-  salvo lo que Prisma no sabe expresar, que aquí es el índice único parcial que ya
-  existe.
+- 🔴 **El permiso que faltaba: `canManageOrganization`.** Renombrar la
+  organización no encajaba en ninguno de los ocho. Meterlo en `canManageMembers`
+  habría atado dos cosas que no van juntas —una empresa quiere que quien lleva el
+  equipo arregle una errata en el nombre **sin** poder además tocar quién está
+  dentro—. Son nueve.
+- 🔴 **`cabenEn`, y sin esto el modelo se rompe entero.** Al pasar `cambiarRol` de
+  «solo el dueño» a `canManageMembers` apareció el agujero: quien reparte papeles
+  se crea uno con `canManageBilling`, se lo asigna, y ya está tocando la tarjeta
+  de la empresa. La regla es que **repartir permisos no puede crear permisos**, y
+  se aplica en los cuatro sitios donde se reparte: crear papel, editar papel,
+  asignar papel e **invitar** —esa última es la que se olvida, y es una puerta
+  trasera igual de buena—. Trece pruebas nuevas la sostienen.
+- **Las ocho puertas, una por una.** Confirmado que no era un renombre:
+  `renombrar` → `canManageOrganization`; `invitar` → `canInviteMembers`;
+  `cambiarRol` y `quitar` → `canManageMembers`; asientos →
+  `canManageBilling`; historial → `canViewAuditLog`; papeles →
+  `canManageMembers`; plantillas → `canManageRoleTemplates`.
+- ⚠️ **`miembros()` no exige ningún permiso, solo asiento.** Antes admitía los
+  tres papeles, o sea a cualquiera que estuviera dentro. Pedirle
+  `canManageMembers` habría dejado a la mayoría sin poder ver a su propio equipo:
+  saber con quién compartes organización no es una capacidad que se conceda.
+  Ver la lista de **papeles** sí lo exige — eso es un mapa del poder interno.
+- ⚠️ **Crear una organización va en transacción, no en un `create` anidado.** La
+  membresía necesita el id de un papel creado en la misma operación y Prisma no
+  sabe referenciar hacia dentro de un anidado. Sin transacción, un fallo a mitad
+  deja una organización **sin nadie dentro**: nadie la ve, nadie puede entrar, y
+  el índice único parcial impide crear otra. Vale para la personal y para la de
+  empresa.
+- **El primer intento usó un `finally` para crear la membresía aparte.**
+  Funcionaba y era demasiado listo: dejaba media organización escrita si algo
+  fallaba, y quien lo leyera después no vería por qué. La transacción dice lo
+  mismo sin trucos.
+- ⚠️ **`onDelete: Restrict` en el papel.** Borrar uno que todavía lleva gente
+  falla, y el mensaje dice **cuántas personas hay que mover**. Sin ese número no
+  se puede arreglar. Tampoco se borra el papel por defecto: sin él, la siguiente
+  invitación no se puede escribir.
+- ⚠️ **El índice de «un solo papel por defecto» es parcial**, igual que el de la
+  organización personal: `WHERE "isDefault" = true`, a mano en la migración,
+  porque Prisma no sabe expresarlo. Con dos, cuál se aplica depende del orden en
+  que la base los devuelva.
+- **`organizacionesDe` deja de filtrar por `kind: 'ENTERPRISE'`.** La personal ya
+  no es invisible (D6): esconderla del selector dejaría a quien trabaja solo sin
+  poder llegar a sus propios proyectos.
+- **El traspaso no mueve la suscripción de Stripe.** El cliente sigue siendo el
+  mismo allí; lo que cambia es quién manda aquí. Cambiar el `customer` de Stripe
+  es una operación suya y mezclarla haría que un traspaso pudiera fallar a mitad
+  con la organización ya cambiada de manos. Y quien la deja **se queda dentro**
+  con el papel de administración: sacarlo sería una segunda consecuencia de una
+  sola acción, y la segunda no se deshace.
+- 🕳️ **El botón de «Hacer que administre» del panel de miembros se retiró.**
+  Alternaba entre dos valores de un enum que ya no existe. Cambiar de papel es
+  ahora **elegir de una lista**, y esa lista es una pantalla con su propio diseño:
+  va en O6, con el lenguaje de Kyloo. Hasta entonces se puede sacar a alguien pero
+  no cambiarle el papel desde ahí, y está escrito en el componente.
+- 🍎 ⚠️ **`grep -E "error TS"` sobre la salida de `nest build` no encuentra
+  nada**: van con códigos de color ANSI en medio. Un build roto parecía verde.
+  Para comprobarlo, `sed 's/\x1b\[[0-9;]*m//g'` antes del grep.
+- **Falta el `.env` de `billing-service` en el árbol local**, y no se versiona.
+  Se crea con `cp apps/backend/services/billing/.env.example
+  apps/backend/services/billing/.env`. Sin él, `prisma migrate deploy` no
+  encuentra la base y el servicio no arranca.
 
 ---
 

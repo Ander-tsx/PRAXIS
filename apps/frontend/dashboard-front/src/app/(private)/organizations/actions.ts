@@ -89,7 +89,7 @@ export async function invitarMiembroAction(
   const email = String(formData.get('email') ?? '')
     .trim()
     .toLowerCase();
-  const role = String(formData.get('role') ?? 'MEMBER');
+  const roleId = String(formData.get('roleId') ?? '');
 
   if (!email.includes('@')) {
     return { error: 'Escribe una dirección de correo válida.', enlace: null, email: null };
@@ -98,7 +98,10 @@ export async function invitarMiembroAction(
   try {
     const invitacion = await createServerApiClient().post<{ enlace: string; email: string }>(
       `/organizations/${organizationId}/members`,
-      { email, ...(role === 'ADMIN' ? { role: 'ADMIN' } : {}) },
+      /* Sin `roleId` entra con el papel que la organización tenga por defecto,
+         que al crearse es «Miembro». Mandar la clave vacía daría 400: el DTO no
+         declara cadenas vacías y el gateway ya valida los 28 endpoints. */
+      { email, ...(roleId ? { roleId } : {}) },
     );
     if (!invitacion?.enlace) {
       return { error: 'El servidor no devolvió el enlace.', enlace: null, email: null };
@@ -149,17 +152,19 @@ export async function cambiarRolAction(
 
   const organizationId = String(formData.get('organizationId') ?? '');
   const userId = String(formData.get('userId') ?? '');
-  const role = String(formData.get('role') ?? '');
+  const roleId = String(formData.get('roleId') ?? '');
 
-  if (role !== 'ADMIN' && role !== 'MEMBER') {
-    /* ⚠️ `OWNER` no está, y no es un descuido: hay uno y es quien paga.
-       Traspasar la suscripción tiene su propia conversación. */
-    return { error: 'Ese papel no se puede conceder desde aquí.', done: null };
+  if (!roleId) {
+    return { error: 'Hay que decir qué papel se le pone.', done: null };
   }
 
+  /* ⚠️ Ser dueño no es un papel, así que no se puede conceder por aquí: hay uno
+     y es quien paga. Traspasar la organización tiene su propia ruta y su propia
+     confirmación. Y el servidor rechaza además un papel con permisos que quien
+     lo reparte no tiene — repartir permisos no puede crear permisos. */
   try {
     await createServerApiClient().patch(`/organizations/${organizationId}/members/${userId}`, {
-      role,
+      roleId,
     });
     revalidatePath(`/organizations/${organizationId}`);
     return { error: null, done: userId };
