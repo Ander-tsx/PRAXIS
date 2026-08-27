@@ -192,11 +192,34 @@ export class QuotaService {
     }
 
     const vivos = deLaOrganizacion.filter((proyecto) => proyecto.status !== 'DELETED').length;
-    this.exigir(cabe(vivos, tope), {
+    if (cabe(vivos, tope)) return;
+
+    /* 🔴 **Solo en el camino del fallo, y solo por esto.** Quien ve el 402 puede
+       no ser quien puede resolverlo: en un equipo de diez, nueve no tocan la
+       tarjeta de la empresa. La pantalla necesita saberlo para ofrecer «avisa a
+       quien administra» en vez de un botón de pagar que esa persona no puede
+       pulsar — y un botón así se lee como una avería.
+
+       Es una llamada TCP de más, pero solo cuando ya se va a negar la escritura:
+       en el camino normal no cuesta nada. */
+    const permisos = await firstValueFrom(
+      this.billingClient.send<{ permisos: Record<string, boolean> } | null>(
+        { cmd: 'billing_org_permissions' },
+        { organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    this.exigir(false, {
       kind: QuotaKind.PROYECTOS,
       tier: plan.tier,
       tope,
       actual: vivos,
+      /* Sin respuesta se omite, que la pantalla lee como «no se sabe» y ofrece
+         la salida igual. Esconderle el camino a quien sí puede pagar cuesta más
+         que enseñárselo a quien no. */
+      extras: permisos
+        ? { puedeAmpliar: permisos.permisos[OrganizationPermission.CAN_MANAGE_BILLING] === true }
+        : {},
     });
   }
 
@@ -303,7 +326,22 @@ export class QuotaService {
    */
   private exigir(
     permitido: boolean,
-    datos: { kind: QuotaKind; tier: PlanTier; tope: Tope; actual: number },
+    datos: {
+      kind: QuotaKind;
+      tier: PlanTier;
+      tope: Tope;
+      actual: number;
+      /**
+       * Lo que la pantalla necesita además del número.
+       *
+       * ⚠️ **Antes este helper reconstruía el detalle con cuatro campos fijos y
+       * tiraba en silencio todo lo demás.** Añadir un dato al 402 «funcionaba»
+       * —compilaba, y el objeto llegaba hasta aquí— pero no salía por la
+       * respuesta, y el síntoma era una pantalla que se comportaba como si el
+       * dato no existiera. Los extras pasan explícitos.
+       */
+      extras?: Partial<QuotaExceededDetails>;
+    },
   ): void {
     if (permitido) return;
 
@@ -313,6 +351,7 @@ export class QuotaService {
       tier: datos.tier,
       tope: datos.tope ?? 0,
       actual: datos.actual,
+      ...datos.extras,
     };
 
     throw new HttpException(

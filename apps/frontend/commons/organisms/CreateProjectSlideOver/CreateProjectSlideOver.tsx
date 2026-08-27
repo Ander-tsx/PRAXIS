@@ -304,7 +304,13 @@ export function CreateProjectSlideOver({
              * enseñarlo.
              */}
             {state.cuota ? (
-              <QuotaNotice detalle={state.cuota} mensaje={state.error ?? ''} />
+              <QuotaNotice
+                detalle={state.cuota}
+                mensaje={state.error ?? ''}
+                /* La segunda cara: el gateway dice si esta persona puede pagar.
+                   Ausente = no se sabe, y se ofrece la salida igual. */
+                ampliarSirve={state.cuota.puedeAmpliar !== false}
+              />
             ) : (
               state.error && (
                 <p

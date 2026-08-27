@@ -384,6 +384,20 @@ export interface QuotaExceededDetails {
   actual: number;
   /** Solo en `IA_MENSUAL`: cuándo vuelve a cero, en ISO. */
   reiniciaEn?: string;
+  /**
+   * Si quien recibe el 402 puede ampliar el plan por su cuenta.
+   *
+   * 🔴 **Desde que los topes se cuentan por organización, quien ve el mensaje
+   * puede no ser quien puede resolverlo**: en un equipo de diez, nueve no tocan
+   * la tarjeta de la empresa. Sin este dato la pantalla solo puede ofrecer un
+   * botón de pagar a todo el mundo, y delante de quien no puede pagar eso se lee
+   * como una avería — y una avería no se paga, se abandona.
+   *
+   * ⚠️ **Ausente significa «no se sabe», y la pantalla ofrece la salida.** Es la
+   * asimetría de siempre: esconderle el camino a quien sí puede pagar cuesta más
+   * que enseñárselo a quien no.
+   */
+  puedeAmpliar?: boolean;
 }
 
 /**

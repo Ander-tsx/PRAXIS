@@ -37,7 +37,7 @@ que quien lo usa solo con dos amigos pierda nada.
 | O3 | `Project.organizationId`, y las semillas | 🟡 **casi** — falta O3.5 y probarlo |
 | O4 | El gateway: resolver la organización y contar por ella | 🟡 **el núcleo hecho** — O4.2, O4.3 y O4.7 |
 | O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
-| O6 | Frontend: roles, plantillas y el 402 con dos caras | 🟡 **casi** — falta O6.4/O6.5, la pantalla del 402 |
+| O6 | Frontend: roles, plantillas y el 402 con dos caras | ✅ **hecho** (2026-08-27) |
 | O7 | Gobierno del equipo | ⬜ pendiente |
 | O8 | Cierre: e2e, documentación y contrato | ⬜ pendiente |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
@@ -689,14 +689,14 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
       trabajo de quien los ajustó.
 - [x] **O6.3** En los roles de un proyecto, decir de qué plantilla nació y **si se ha
       separado**.
-- [ ] **O6.4** 🔴 **La pantalla de recuperación del 402**, que hoy no existe y es
+- [x] **O6.4** 🔴 **La pantalla de recuperación del 402**, que hoy no existe y es
       literalmente el instante en que alguien decidiría pagar. 
-- [ ] **O6.5** 🔴 **Y tiene dos caras.** Contando por organización, el mensaje pasa de
+- [x] **O6.5** 🔴 **Y tiene dos caras.** Contando por organización, el mensaje pasa de
       «has llegado a tu tope» a «tu organización ha llegado a 25 proyectos»: quien lo
       ve **puede no ser quien puede resolverlo**. Con `canManageBilling`, botón de
       ampliar; sin él, «avisar a quien administra». El dato ya viaja en
       `error.details` (`kind`, `tier`, `tope`, `actual`).
-- [ ] **O6.6** El aviso de «te quedan tres» en los tres sitios que gastan: proyectos,
+- [x] **O6.6** El aviso de «te quedan tres» en los tres sitios que gastan: proyectos,
       asientos y mensajes de PRAX.
 - [x] **O6.7** Traspasar el responsable de un proyecto, desde la pantalla del proyecto
       y desde el portal. Con confirmación escribiendo el nombre y el inventario
@@ -731,9 +731,29 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 - ⚠️ **Contratar no abre el pago desde la tabla**: el checkout necesita saber qué
   organización paga —su id va en el `client_reference_id` de Stripe— y eso lo
   elige quien paga. Con una sola no hay pregunta y entra directo.
-- 🔴 **Falta O6.4 y O6.5: la pantalla de recuperación del 402.** Es lo único
-  importante que queda de este stack, y es literalmente el instante en que
-  alguien decidiría pagar.
+- **La pantalla del 402 ya existía, y el plan lo tenía apuntado mal.**
+  `QuotaNotice` estaba construida desde antes y era buena; lo que le faltaba eran
+  los topes nuevos —`asientos`, `organizaciones`, `automatizaciones`,
+  `almacenamiento`— y la segunda cara.
+- 🔴 **La segunda cara necesitaba un dato que no viajaba.** Con el tope contado
+  por organización, quien ve el mensaje puede no ser quien puede pagarlo: en un
+  equipo de diez, nueve no tocan la tarjeta. El gateway ahora resuelve
+  `canManageBilling` **solo en el camino del fallo** —una llamada TCP de más
+  cuando ya se va a negar la escritura, cero en el camino normal— y lo manda en
+  `puedeAmpliar`. Verificado con dos cuentas: `true` para el dueño, `false` para
+  María. Ausente = «no se sabe» y se ofrece la salida igual, porque esconderle el
+  camino a quien sí puede pagar cuesta más que enseñárselo a quien no.
+- 🔴 **`exigir()` reconstruía el detalle del 402 con cuatro campos fijos y tiraba
+  el resto en silencio.** Añadir un dato compilaba, llegaba hasta el helper y
+  **no salía por la respuesta**: el síntoma era una pantalla comportándose como
+  si el dato no existiera. Ahora los extras pasan explícitos por `extras`.
+- 🍎 **Y compilar el gateway con `nest start --watch` en marcha dejó `dist/` a
+  medias**, con un `MODULE_NOT_FOUND` que no se arregla volviendo a compilar. Es
+  la trampa que CLAUDE.md ya documenta para `prisma:generate` y vale igual para
+  un `build`: parar, borrar `dist/`, reconstruir y arrancar en frío.
+- ⚠️ **`ENFILE` con 9 servicios y 8 zonas vigilando a la vez.** El vigilante de
+  ficheros se queda sin descriptores y el servicio que arranca último muere. Para
+  verificar contra la API, basta con levantar el backend solo.
 
 ---
 

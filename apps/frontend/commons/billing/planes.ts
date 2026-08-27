@@ -251,11 +251,21 @@ export function fechaCorta(iso: string | null): string | null {
  *
  * ⚠️ **No es decoración del mensaje: decide qué se ofrece.** Quien se queda sin
  * proyectos puede borrar uno y seguir; quien se queda sin mensajes de IA no
- * puede hacer nada hasta el día 1 salvo ampliar; y quien se queda sin sitio en
- * un tablero depende de que lo saque otro. Tres salidas distintas, y una frase
- * genérica las trata igual.
+ * puede hacer nada hasta el día 1 salvo ampliar; y quien se queda sin asientos
+ * necesita que alguien salga del equipo. Salidas distintas, y una frase genérica
+ * las trata igual.
+ *
+ * ⚠️ **`miembros_por_proyecto` desapareció el 2026-08-26**: lo sustituyó el
+ * asiento, y meter a alguien sin él ya no es un 402 sino un **403 `NOT_IN_ORG`**
+ * — no se ha agotado nada, esa persona no está dentro.
  */
-export type QuotaKind = 'proyectos' | 'ia_mensual' | 'miembros_por_proyecto';
+export type QuotaKind =
+  | 'proyectos'
+  | 'ia_mensual'
+  | 'asientos'
+  | 'organizaciones'
+  | 'automatizaciones'
+  | 'almacenamiento';
 
 /** El código del sobre. Espejo de `QUOTA_EXCEEDED_CODE` en `@praxis/contracts`. */
 export const QUOTA_EXCEEDED_CODE = 'QUOTA_EXCEEDED';
@@ -268,9 +278,23 @@ export interface QuotaExceededDetails {
   actual: number;
   /** Solo en `ia_mensual`: cuándo vuelve a cero, en ISO. */
   reiniciaEn?: string;
+  /**
+   * Si quien recibe el 402 puede ampliar el plan por su cuenta.
+   *
+   * Ausente = no se sabe, y entonces se ofrece la salida: esconderle el camino a
+   * quien sí puede pagar cuesta más que enseñárselo a quien no.
+   */
+  puedeAmpliar?: boolean;
 }
 
-const QUOTA_KINDS: QuotaKind[] = ['proyectos', 'ia_mensual', 'miembros_por_proyecto'];
+const QUOTA_KINDS: QuotaKind[] = [
+  'proyectos',
+  'ia_mensual',
+  'asientos',
+  'organizaciones',
+  'automatizaciones',
+  'almacenamiento',
+];
 
 /**
  * ¿Este error es una cuota agotada? Y si lo es, ¿cuál?
