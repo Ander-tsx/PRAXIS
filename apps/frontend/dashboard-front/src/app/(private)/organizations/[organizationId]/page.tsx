@@ -348,6 +348,9 @@ const TEXTO_DE_EVENTO: Record<string, string> = {
   papel_asignado: 'Se cambió el papel de alguien',
   plantilla_guardada: 'Se guardó una plantilla de rol',
   plantilla_borrada: 'Se borró una plantilla de rol',
+  asiento_dado: 'Se le dio asiento a alguien desde un proyecto',
+  proyecto_traspasado: 'Un proyecto cambió de responsable',
+  acceso_autoconcedido: 'Administración se dio acceso a un proyecto',
   plan_aplicado: 'Se aplicó un plan',
   asientos_cambiados: 'Cambiaron los asientos',
 };

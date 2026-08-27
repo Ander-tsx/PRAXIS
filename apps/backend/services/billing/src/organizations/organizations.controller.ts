@@ -172,6 +172,12 @@ export class OrganizationsController {
     return this.suscripciones.historial(dto.organizationId, dto.limite);
   }
 
+  /** Todas, para el panel de plataforma. El rol global lo comprueba el gateway. */
+  @MessagePattern({ cmd: 'billing_org_all' })
+  todas(@Payload() dto: { page?: number; limit?: number; search?: string }) {
+    return this.organizaciones.todas(dto);
+  }
+
   /* ─── Papeles ──────────────────────────────────────────────────────────── */
 
   @MessagePattern({ cmd: 'billing_org_roles' })
@@ -251,6 +257,25 @@ export class OrganizationsController {
   @MessagePattern({ cmd: 'billing_org_permissions' })
   permisos(@Payload() dto: { organizationId: string; userId: string }) {
     return this.organizaciones.permisosDe(dto.organizationId, dto.userId);
+  }
+
+  /** Da asiento directamente. Ver `darAsiento`: no es una invitación. */
+  @MessagePattern({ cmd: 'billing_org_seat_grant' })
+  darAsiento(@Payload() dto: { organizationId: string; porUserId: string; userId: string }) {
+    return this.organizaciones.darAsiento(dto);
+  }
+
+  /**
+   * Apunta algo en el registro de una organización.
+   *
+   * ⚠️ **Sin comprobar permisos, y a propósito.** Lo llama el gateway después de
+   * haber hecho la acción, con la comprobación ya pasada: pedirla otra vez aquí
+   * sería una llamada más para repetir lo que ya se decidió, y un registro que
+   * puede negarse a escribir no es un registro.
+   */
+  @MessagePattern({ cmd: 'billing_org_log' })
+  apuntar(@Payload() dto: { organizationId: string; type: string; payload?: unknown }) {
+    return this.organizaciones.apuntar(dto);
   }
 
   @MessagePattern({ cmd: 'billing_org_transfer' })

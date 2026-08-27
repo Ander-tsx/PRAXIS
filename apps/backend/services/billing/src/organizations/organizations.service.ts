@@ -185,6 +185,19 @@ export class OrganizationsService {
             ownerUserId: userId,
             roles: { create: semilla.papeles },
             roleTemplates: { create: semilla.plantillas },
+            /* 🔴 **Con los asientos del plan gratuito, no con uno.**
+               `Subscription.seats` tiene `@default(1)` y sin fila se leía como
+               uno: eso dejaba a quien trabaja solo **sin poder invitar a nadie a
+               su propio proyecto**, porque entrar exige asiento. Y el plan
+               gratuito promete justo lo contrario — «tú y dos personas más». El
+               número sale de `PLANS`, como todos. */
+            subscription: {
+              create: {
+                tier: PlanTier.FREE,
+                status: SubscriptionStatus.ACTIVE,
+                seats: PLANS[PlanTier.FREE].quotas.asientos ?? 1,
+              },
+            },
           },
           include: { subscription: true, roles: true },
         });
@@ -810,6 +823,62 @@ export class OrganizationsService {
     return { ok: true };
   }
 
+  /* ─── Administración de la plataforma ──────────────────────────────────── */
+
+  /**
+   * Todas las organizaciones, para el panel de administración.
+   *
+   * ⚠️ **No comprueba nada aquí**, y es a propósito: el rol global lo resuelve el
+   * gateway con `@RequireGlobalRole`, que es donde vive esa capa. Este servicio
+   * no sabe qué es un administrador de plataforma y no debería — mezclarlo
+   * pondría dos sitios que decidir sobre lo mismo.
+   *
+   * ⚠️ **Sin caché.** Es una pantalla de administración con filtros que cambian
+   * en cada petición, y una entrada recién creada tiene que salir: es el mismo
+   * criterio que ya tiene el registro de actividad.
+   */
+  async todas(datos: { page?: number; limit?: number; search?: string }) {
+    const page = Math.max(1, datos.page ?? 1);
+    const limit = Math.min(100, Math.max(1, datos.limit ?? 20));
+    const busqueda = datos.search?.trim();
+
+    const where = busqueda
+      ? { name: { contains: busqueda, mode: 'insensitive' as const } }
+      : {};
+
+    const [filas, total] = await Promise.all([
+      this.prisma.organization.findMany({
+        where,
+        include: {
+          subscription: true,
+          _count: { select: { members: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.organization.count({ where }),
+    ]);
+
+    return {
+      items: filas.map((fila) => ({
+        id: fila.id,
+        kind: fila.kind,
+        name: fila.name,
+        slug: fila.slug,
+        ownerUserId: fila.ownerUserId,
+        tier: fila.subscription?.tier ?? PlanTier.FREE,
+        status: fila.subscription?.status ?? SubscriptionStatus.ACTIVE,
+        seats: fila.subscription?.seats ?? 1,
+        seatsUsed: fila._count.members,
+        createdAt: fila.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+    };
+  }
+
   /* ─── Permisos ─────────────────────────────────────────────────────────── */
 
   /**
@@ -1183,6 +1252,84 @@ export class OrganizationsService {
     return { ok: true };
   }
 
+  /**
+   * Le da asiento a alguien directamente, sin invitación que aceptar.
+   *
+   * 🔴 **Existe para que invitar a alguien a un proyecto siga siendo un solo
+   * gesto.** Sin esto, la regla de «quien está en un proyecto está en la
+   * organización» dejaba a quien trabaja solo sin poder meter a nadie en su
+   * propio tablero, y el plan gratuito promete «tú y dos personas más».
+   *
+   * ⚠️ **No es una invitación**: no manda correo, no hay token y no hay nada que
+   * aceptar. Esa persona ya está diciendo que sí al entrar en el proyecto — la
+   * invitación por correo sigue existiendo para quien todavía no está aquí.
+   *
+   * ⚠️ **Exige `canInviteMembers` en quien lo pide.** Meter a alguien en la
+   * organización le da el papel por defecto y le enseña la lista del equipo: no
+   * puede ser un efecto secundario que dispare cualquiera con permiso sobre un
+   * tablero.
+   *
+   * ⚠️ **Y ocupa asiento**, con el mismo tope que una invitación. Si no quedan,
+   * falla y quien invita lee por qué.
+   */
+  async darAsiento(datos: { organizationId: string; porUserId: string; userId: string }) {
+    const permiso = await this.exigirPermiso(
+      datos.organizationId,
+      datos.porUserId,
+      OrganizationPermission.CAN_INVITE_MEMBERS,
+    );
+    if (esFallo(permiso)) return permiso;
+
+    const [organizacion, yaEsta, ocupados, papel] = await Promise.all([
+      this.prisma.organization.findUnique({
+        where: { id: datos.organizationId },
+        include: { subscription: true },
+      }),
+      this.prisma.organizationMember.findUnique({
+        where: {
+          organizationId_userId: { organizationId: datos.organizationId, userId: datos.userId },
+        },
+      }),
+      this.prisma.organizationMember.count({ where: { organizationId: datos.organizationId } }),
+      this.prisma.organizationRole.findFirst({
+        where: { organizationId: datos.organizationId, isDefault: true },
+      }),
+    ]);
+
+    if (!organizacion) {
+      return { error: 'Esa organización no existe.', codigo: 'NO_EXISTE' } as Fallo;
+    }
+    if (yaEsta) return { ok: true };
+    if (!papel) {
+      return { error: 'La organización no tiene papel por defecto.', codigo: 'NO_VALE' } as Fallo;
+    }
+
+    const asientos = organizacion.subscription?.seats ?? 1;
+    if (ocupados >= asientos) {
+      return {
+        error: `No quedan asientos: ${ocupados} de ${asientos} ocupados, contando las invitaciones pendientes.`,
+        codigo: 'SIN_ASIENTOS',
+      } as Fallo;
+    }
+
+    await this.prisma.organizationMember.create({
+      data: {
+        organizationId: datos.organizationId,
+        userId: datos.userId,
+        /* Sin correo: entra por el proyecto, no por un mensaje. La cadena vacía
+           miente menos que inventar una dirección. */
+        email: '',
+        roleId: papel.id,
+        status: MembershipStatus.ACTIVE,
+        joinedAt: new Date(),
+      },
+    });
+
+    await this.olvidar(datos.organizationId, datos.userId);
+    await this.registrar(datos.organizationId, 'asiento_dado', { userId: datos.userId });
+    return { ok: true };
+  }
+
   /* ─── El traspaso ──────────────────────────────────────────────────────── */
 
   /**
@@ -1289,6 +1436,12 @@ export class OrganizationsService {
   private async olvidar(organizationId: string, userId?: string) {
     await this.redis.olvidarOrganizacion(organizationId);
     if (userId) await this.redis.olvidarUsuario(userId);
+  }
+
+  /** Apunta un gesto que ocurrió fuera de este servicio. Ver `billing_org_log`. */
+  async apuntar(datos: { organizationId: string; type: string; payload?: unknown }) {
+    await this.registrar(datos.organizationId, datos.type, datos.payload);
+    return { ok: true };
   }
 
   /** Una línea en el registro. Nunca falla hacia fuera: es prueba, no camino. */

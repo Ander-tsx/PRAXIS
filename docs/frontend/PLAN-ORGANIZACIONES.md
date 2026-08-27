@@ -43,7 +43,7 @@ que quien lo usa solo con dos amigos pierda nada.
 | O4 | El gateway: resolver la organización y contar por ella | ✅ **hecho** (2026-08-27) |
 | O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
 | O6 | Frontend: roles, plantillas y el 402 con dos caras | ✅ **hecho** (2026-08-27) |
-| O7 | Gobierno del equipo | 🟡 **a medias** — O7.5 y O7.6 hechos; ver apuntes |
+| O7 | Gobierno del equipo | 🟡 **casi** — falta O7.3, y está bloqueada; ver apuntes |
 | O8 | Cierre: e2e, documentación y contrato | 🟡 **casi** — falta `e2e:regresion` completa |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
 
@@ -622,10 +622,21 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
   cuanto entre en una ruta de lectura**, hay que cachearlo en Redis como los
   permisos: §41.4 bajó una pantalla de `1 + 12 + K` peticiones a 2, y esto lo
   desharía en silencio.
-- ⚠️ **`GET /api/projects` todavía filtra por dueño-o-miembro, no por
-  organización** (O4.5). No está roto —ves los proyectos en los que estás— pero el
-  selector de organización del sidebar no significará nada hasta que esto cambie,
-  así que O4.5 y O5.2 van juntos.
+- 🔴 **O4.7 y O4.8 estuvieron marcadas como hechas sin estarlo.** Se corrigió al
+  buscarlas en el código y no encontrarlas. Marcar una casilla no es hacerla, y
+  un plan que miente es peor que uno incompleto.
+- **O4.7 — el traspaso de responsable, por dos caminos.** Voluntario, con
+  `canDeleteProject` —que el responsable siempre tiene por bypass, y porque
+  regalar un proyecto es de la familia de borrarlo—; y forzado, con
+  `canManageAllProjects` en la organización. Las dos avisan a las dos personas y
+  dejan rastro. El `slug` **no** se regenera: cambia con el nombre, no con la
+  persona, y regenerarlo rompería los enlaces compartidos por un cambio que no se
+  ve desde fuera.
+- **O4.8 — autoconcederse acceso**, que es la única puerta que un papel de
+  organización abre hacia dentro. Se entra con el rol por defecto del proyecto,
+  **no como responsable**: ver un tablero para recuperarlo no es apropiárselo. Y
+  el aviso al responsable es la mitad que lo hace aceptable — sin él,
+  `canManageAllProjects` sería una llave maestra silenciosa.
 
 ---
 
@@ -768,15 +779,15 @@ se va a las semillas, no a un script de relleno que solo se ejecutaría una vez.
 Lo que hace que una empresa **se quede**. Poner topes no es funcionalidad de
 empresa: es la forma de cobrarla.
 
-- [ ] **O7.1** Registro de auditoría de la organización. `permissions-service` ya
+- [x] **O7.1** Registro de auditoría de la organización. `permissions-service` ya
       guarda auditoría; falta enseñarla a este nivel y meter dentro los gestos nuevos
       (autoconcederse acceso, traspasar, cambiar asientos).
-- [ ] **O7.2** Salida de un miembro: sacarlo reasigna sus tareas y libera su asiento
+- [x] **O7.2** Salida de un miembro: sacarlo reasigna sus tareas y libera su asiento
       en un solo gesto. Media pieza existe — administración ya sabe borrar una cuenta
       conservando su trabajo (S5.1).
 - [ ] **O7.3** Dominio de correo propio: quien se registre con `@tuempresa.com` entra
       en tu organización. Barato, y de las cosas que más crecimiento dan.
-- [ ] **O7.4** Exportar un proyecto (JSON/CSV). Responde a la objeción de «¿y si
+- [x] **O7.4** Exportar un proyecto (JSON/CSV). Responde a la objeción de «¿y si
       mañana os dejamos?» sin discutirla.
 - [x] **O7.5** Invitación **por correo**, que hoy es un enlace que hay que copiar. Un comando
       **acotado** en `credentials-service` —el único con `MailService`—, no un envío
@@ -788,38 +799,62 @@ empresa: es la forma de cobrarla.
       ruta privada, así que pasa por registro, verificación de correo y vuelta. La
       invitación va por dirección, así que *debería* funcionar y **nadie lo ha
       recorrido entero**.
-- [ ] **O7.7** `admin-front` gana organizaciones: verlas, ver su plan, suspenderlas.
+- [x] **O7.7** `admin-front` gana organizaciones: verlas, ver su plan, suspenderlas.
       Hoy solo tiene cuentas, proyectos y actividad.
-- [ ] **O7.8** Decidir el ámbito del mensaje directo: hoy no tiene ninguno. Lo
+- [x] **O7.8** Decidir el ámbito del mensaje directo: hoy no tiene ninguno. Lo
       razonable es acotarlo a quien comparte organización contigo.
 
 ### Apuntes
 
-- **Hecho: la invitación por correo (O7.5).** Un comando **acotado** en
-  `credentials-service` —`mail_send_invitation`— que recibe a quién, de qué
-  organización, quién invita y el enlace ya montado. La plantilla vive de ese
-  lado, con el resto del correo del producto.
-  🔴 **No emite ningún token y no puede fabricar una invitación**: eso lo hace
-  `billing-service`, que guarda el hash. Si algún día alguien le añade un
-  parámetro `html`, se ha convertido en un relé de correo y hay que revertirlo.
-- ⚠️ **El enlace se sigue devolviendo en la respuesta**, y la pantalla lo enseña
-  en los dos casos. Un correo se pierde en no deseados el día que hay que enseñar
-  esto, y el token en claro **solo existe una vez**. La pantalla dice cuál de los
-  dos pasó.
-- **O7.6 queda cubierto por las e2e**: la prueba de `cabenEn` recorre invitar →
-  aceptar → intentar escalar, con dos cuentas registradas de cero.
-- 🕳️ **Sin hacer, y por qué:**
-  - **O7.1** — el registro de la organización ya se pinta en su portal
-    (`billing_events`), pero **los gestos de proyecto no entran ahí**:
-    autoconcederse acceso y reasignar responsable se registran en la auditoría de
-    `permissions-service`, que es otra tabla y otra pantalla. Unirlas es el
-    trabajo que falta.
-  - **O7.2** — sacar a alguien libera su asiento pero **no reasigna su trabajo**.
-    Media pieza existe (`DELETE /admin/users/:id` conserva lo suyo); falta el
-    gesto desde el portal.
-  - **O7.3, O7.4, O7.7, O7.8** — dominio de correo, exportación, organizaciones
-    en administración de plataforma, y el ámbito del mensaje directo. Ninguna
-    empezada.
+- **O7.5 — la invitación por correo.** Un comando **acotado** en
+  `credentials-service`: recibe a quién, de qué organización, quién invita y el
+  enlace ya montado. La plantilla vive de ese lado, con el resto del correo del
+  producto.
+  🔴 **No emite tokens y no puede fabricar una invitación**: eso lo hace
+  `billing-service`, que guarda el hash. Si algún día acepta un parámetro `html`,
+  se ha convertido en un relé de correo y hay que revertirlo.
+  ⚠️ El enlace **se sigue devolviendo**: un correo se pierde en no deseados el día
+  que hay que enseñar esto, y el token en claro solo existe una vez.
+- **O7.2 — la salida de un miembro**, con la regla que ya usaba administración:
+  🔴 **se niega si todavía es responsable de algún proyecto de aquí**, y dice de
+  cuáles. Un proyecto sin responsable no lo administra nadie —es el único bypass
+  que existe— y el sistema eligiendo sucesor es lo que el plan prohíbe.
+  ⚠️ **Sus tareas se sueltan, no se reasignan.** Sin encargado la tarea sigue en
+  su columna y cualquiera la recoge; a dedo, alguien se encuentra trabajo que no
+  pidió. Y solo en los proyectos de **esa** organización: se sale de una, no de
+  PRAXIS.
+- **O7.4 — exportar un proyecto**, con `canDeleteProject` y no con
+  `canViewProject`: llevarse el contenido entero de un tablero es de la familia
+  de destruirlo, no de la de mirarlo. Lleva el proyecto, sus tableros y todas sus
+  tareas; **no** los bytes de los adjuntos —viven en Postgres y montar cientos de
+  megas en memoria no es una exportación— ni correos ni nombres, solo `userId`.
+  Y lleva `formato: 1` desde el primer día: un JSON sin versión es un contrato
+  sin fecha.
+- **O7.7 — administración ve las organizaciones**, y **solo lee**. No hay botón
+  de suspender: la palanca que existe es la del proyecto, y suspender una
+  organización entera dejaría a varios equipos sin escribir de un clic sin
+  ninguna pantalla que se lo explique. Cuando haga falta, habrá que diseñar antes
+  qué se les dice — igual que se hizo con `PROJECT_SUSPENDED`.
+- **O7.1 — los gestos de proyecto entran en el registro de la organización.**
+  🔴 Son **dos registros para dos públicos**: el de `permissions-service` responde
+  «¿qué ha hecho la administración de PRAXIS?» y el de la organización, «¿qué ha
+  pasado en mi equipo?». Un traspaso o un acceso autoconcedido le importan al
+  segundo, y hasta ahora no salían en ninguno: solo llegaba un aviso a una
+  persona, que se lee una vez y desaparece.
+- 🔴 **O7.8 estaba mal planteada, y la premisa era mía.** Decía «el mensaje
+  directo hoy no tiene ámbito». Lo tiene, y está aplicado en el servicio: *«solo
+  puedes escribir a quien comparta algún proyecto contigo»*. Y compartir proyecto
+  es una señal **más fuerte** que compartir organización — alguien de tu empresa
+  con quien nunca has trabajado no es necesariamente alguien a quien debas poder
+  escribir. Cambiarlo a ámbito de organización lo **abriría**, no lo cerraría. Se
+  queda como está.
+- 🕳️ **O7.3 — el dominio de correo propio: NO se hace, y no por falta de
+  tiempo.** Está bloqueada por una pieza que el plan no previó: **verificar que
+  quien reclama `empresa.com` controla ese dominio**. Sin eso, cualquiera declara
+  `gmail.com` y absorbe en su organización a todo el que se registre con esa
+  dirección — que es una toma de cuentas ajenas con otro nombre. La verificación
+  se hace con un registro DNS TXT y es una función entera con su pantalla, su
+  reintento y su caducidad. Es lo primero que hay que diseñar si esto se retoma.
 
 ---
 

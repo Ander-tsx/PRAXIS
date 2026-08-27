@@ -593,6 +593,56 @@ export class ProjectsService {
    * aquí porque el mismo comando sirve para contar cuota —donde no cuentan— y
    * para el inventario de administración —donde sí hay que verlos—.
    */
+  /**
+   * Cambia de responsable un proyecto.
+   *
+   * 🔴 **Sin esto, un proyecto muere con quien lo creó.** Ser `ownerId` es el
+   * único bypass total de permisos que existe: si esa persona se va de la
+   * empresa, el proyecto se queda sin nadie que pueda administrarlo del todo, y
+   * no había ninguna ruta que lo arreglara.
+   *
+   * ⚠️ **El nuevo responsable tiene que ser ya miembro del proyecto.** Dárselo a
+   * alguien de fuera lo dejaría con un responsable que ni siquiera lo ve, y sin
+   * nadie que pueda deshacerlo.
+   *
+   * ⚠️ **Y quien lo deja se queda dentro**, con el rol que tuviera. Sacarlo sería
+   * una segunda consecuencia de una sola acción, y la segunda no se deshace.
+   *
+   * ⚠️ El `slug` **no** se regenera: cambia con el nombre, no con la persona.
+   * Regenerarlo aquí rompería todos los enlaces compartidos del proyecto por un
+   * cambio que no se ve desde fuera.
+   */
+  async transferOwnership(dto: { projectId: string; nuevoOwnerId: string }) {
+    const [proyecto, miembro] = await Promise.all([
+      this.prisma.project.findUnique({ where: { id: dto.projectId } }),
+      this.prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: { projectId: dto.projectId, userId: dto.nuevoOwnerId },
+        },
+      }),
+    ]);
+
+    if (!proyecto) {
+      return { error: 'Ese proyecto no existe.', codigo: 'NO_EXISTE' as const };
+    }
+    if (proyecto.ownerId === dto.nuevoOwnerId) {
+      return { error: 'Ya es su responsable.', codigo: 'YA_ESTA' as const };
+    }
+    if (!miembro) {
+      return {
+        error: 'Esa persona tiene que ser miembro del proyecto para poder responder por él.',
+        codigo: 'NO_VALE' as const,
+      };
+    }
+
+    const actualizado = await this.prisma.project.update({
+      where: { id: dto.projectId },
+      data: { ownerId: dto.nuevoOwnerId },
+      select: { id: true, name: true, slug: true, ownerId: true },
+    });
+    return { ...actualizado, anteriorOwnerId: proyecto.ownerId };
+  }
+
   async findByOrganization(organizationId: string) {
     return this.prisma.project.findMany({
       where: { organizationId },

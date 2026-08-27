@@ -67,7 +67,7 @@ export class ProjectInvitationsController {
   ) {
     /* Misma regla que al añadir directamente: sin asiento en la organización del
        proyecto no se entra. Ver `exigirAsientoEnProyecto`. */
-    await this.quota.exigirAsientoEnProyecto(projectId, body.userId);
+    await this.quota.exigirAsientoEnProyecto(projectId, body.userId, req.user!.userId);
 
     return firstValueFrom(
       this.projectsClient.send(

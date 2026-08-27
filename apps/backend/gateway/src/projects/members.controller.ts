@@ -91,7 +91,7 @@ export class MembersController {
        línea nadie compraría un asiento nunca: se metería a todo el mundo como
        «externo» y el plan sería decorativo. Responde 403 con `NOT_IN_ORG`, que
        **no** es un 402: no se ha agotado nada, esa persona no está dentro. */
-    await this.quota.exigirAsientoEnProyecto(req.projectId!, body.userId);
+    await this.quota.exigirAsientoEnProyecto(req.projectId!, body.userId, req.user!.userId);
 
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_add' }, { projectId: req.projectId, ...body }),

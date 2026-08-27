@@ -62,10 +62,10 @@ export class MyOrganizationsController {
   /**
    * Las organizaciones de empresa a las que perteneces.
    *
-   * ⚠️ **La personal no sale**, y no es un olvido: no tiene nombre, no admite
-   * miembros y no hay nada que gestionar en ella. Enseñarla en el selector
-   * obligaría a explicar en la pantalla una fila que existe solo para que el
-   * modelo tenga una sola forma.
+   * ⚠️ **La personal también sale**, desde 2026-08-26. Antes se escondía —no
+   * tenía nombre ni admitía miembros— pero desde que la organización **contiene**
+   * los proyectos, esconderla dejaba a quien trabaja solo sin poder llegar a los
+   * suyos desde el selector.
    */
   @Get()
   @HttpCode(HttpStatus.OK)
@@ -186,6 +186,10 @@ export class OrganizationsController {
     config: ConfigService,
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    /* Los dos que hacen falta para la salida de un miembro: comprobar que no
+       deja proyectos sin responsable, y soltar sus tareas. */
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
   ) {
     this.appUrl = config.get<string>('PUBLIC_APP_URL') || 'http://localhost:4100';
   }
@@ -346,9 +350,34 @@ export class OrganizationsController {
    * en su lugar. Es la misma fila de la tabla, identificada por lo único que se
    * sabe de ella en cada momento.
    */
+  /**
+   * Saca a un miembro, o cancela su invitación.
+   *
+   * ## La salida de alguien no es solo liberar su asiento
+   *
+   * 🔴 **Se niega si todavía es responsable de algún proyecto de aquí**, y dice
+   * de cuáles. Es exactamente lo que ya hace administración al borrar una
+   * cuenta, y por lo mismo: un proyecto sin responsable no lo puede administrar
+   * nadie —el responsable es el único bypass de permisos que existe— y el
+   * sistema eligiendo sucesor por su cuenta es lo que el plan prohíbe. Se
+   * traspasa primero.
+   *
+   * ⚠️ **Y sus tareas se sueltan, no se reasignan.** Elegir a quién le cae el
+   * trabajo de quien se va es una decisión de equipo. Sin encargado la tarea
+   * sigue en su columna y cualquiera la recoge; a dedo, alguien se encuentra
+   * trabajo que no pidió.
+   *
+   * ⚠️ **Solo en los proyectos de ESTA organización.** Se sale de una, no de
+   * PRAXIS.
+   *
+   * ⚠️ Si no se pueden soltar, **se sale igual** y se registra: dejar a alguien
+   * atrapado en un equipo porque tasks-service no contesta es peor que un nombre
+   * de más en una tarjeta, que se quita a mano.
+   */
   @Delete('members/:idOrEmail')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Saca a un miembro o cancela su invitación' })
+  @ApiResponse({ status: 409, description: 'Todavía es responsable de proyectos de aquí' })
   async quitar(
     @Request() req: Express.Request,
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
@@ -356,7 +385,12 @@ export class OrganizationsController {
   ) {
     const esCorreo = idOrEmail.includes('@');
 
-    return oFalla(
+    /* Una invitación sin aceptar no tiene trabajo detrás: se cancela y ya. */
+    if (!esCorreo) {
+      await this.exigirQueNoDejeProyectosHuerfanos(organizationId, idOrEmail);
+    }
+
+    const salida = oFalla(
       await firstValueFrom(
         this.billingClient.send(
           { cmd: 'billing_org_member_remove' },
@@ -368,6 +402,67 @@ export class OrganizationsController {
         ),
       ),
     );
+
+    const soltadas = esCorreo ? 0 : await this.soltarSusTareas(organizationId, idOrEmail);
+    return { ...(salida as object), tareasSoltadas: soltadas };
+  }
+
+  /**
+   * Que no deje ningún proyecto sin responsable al salir.
+   *
+   * Mismo criterio y mismo mensaje que administración al borrar una cuenta: se
+   * dicen **cuáles**, porque sin los nombres no se puede arreglar.
+   */
+  private async exigirQueNoDejeProyectosHuerfanos(organizationId: string, userId: string) {
+    const deLaOrganizacion = await firstValueFrom(
+      this.projectsClient.send<{ id: string; name: string; ownerId: string; status: string }[]>(
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
+      ),
+    ).catch(() => null);
+
+    /* Si no se puede contar, se deja salir: es la asimetría de siempre — un
+       proyecto sin responsable se arregla, y alguien atrapado en un equipo por
+       un servicio caído, no. */
+    if (deLaOrganizacion === null) return;
+
+    const suyos = deLaOrganizacion.filter(
+      (proyecto) => proyecto.ownerId === userId && proyecto.status !== 'DELETED',
+    );
+    if (suyos.length === 0) return;
+
+    throw new ConflictException(
+      `Esta persona todavía es responsable de ${suyos.length} ` +
+        `${suyos.length === 1 ? 'proyecto' : 'proyectos'} de la organización (${suyos
+          .slice(0, 3)
+          .map((proyecto) => proyecto.name)
+          .join(', ')}${suyos.length > 3 ? '…' : ''}). ` +
+        'Traspásalos a otra persona antes de sacarla del equipo.',
+    );
+  }
+
+  /** Suelta sus tareas en los proyectos de esta organización. Nunca falla. */
+  private async soltarSusTareas(organizationId: string, userId: string): Promise<number> {
+    const proyectos = await firstValueFrom(
+      this.projectsClient.send<{ id: string }[]>(
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
+      ),
+    ).catch(() => [] as { id: string }[]);
+
+    if (proyectos.length === 0) return 0;
+
+    const resultado = await firstValueFrom(
+      this.tasksClient.send<{ soltadas: number }>(
+        { cmd: 'task_release_assignments' },
+        { userId, projectIds: proyectos.map((proyecto) => proyecto.id) },
+      ),
+    ).catch((error: Error) => {
+      this.log.warn(`No se pudieron soltar las tareas de ${userId}: ${error.message}`);
+      return { soltadas: 0 };
+    });
+
+    return resultado.soltadas;
   }
 
   /**

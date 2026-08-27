@@ -71,6 +71,20 @@ import { StripeService } from './stripe.service';
           },
         }),
       },
+      /* Para soltar las tareas de quien sale de una organización. Ver
+         `OrganizationsController.quitar`. */
+      {
+        name: 'TASKS_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('TASKS_SERVICE_HOST'),
+            port: config.get<number>('TASKS_SERVICE_PORT'),
+          },
+        }),
+      },
       {
         name: 'CREDENTIALS_SERVICE',
         imports: [ConfigModule],

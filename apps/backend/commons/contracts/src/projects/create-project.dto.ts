@@ -46,3 +46,14 @@ export class CreateProjectDto extends CreateProjectBodyDto {
   @IsUUID()
   declare organizationId: string;
 }
+
+/**
+ * A quién se le pasa la responsabilidad de un proyecto.
+ *
+ * ⚠️ **Tiene que ser ya miembro del proyecto.** Dárselo a alguien de fuera lo
+ * dejaría con un responsable que ni siquiera lo ve.
+ */
+export class TransferProjectBodyDto {
+  @IsUUID()
+  userId: string;
+}

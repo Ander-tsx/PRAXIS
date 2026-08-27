@@ -87,6 +87,12 @@ export class ProjectsController {
   }
 
   /** Los de una organización. Lo que cuenta la cuota, y lo que lista el portal. */
+  /** Cambia de responsable. Ver `transferOwnership`: el destino ha de ser miembro. */
+  @MessagePattern({ cmd: 'project_transfer_ownership' })
+  transferOwnership(@Payload() dto: { projectId: string; nuevoOwnerId: string }) {
+    return this.projectsService.transferOwnership(dto);
+  }
+
   @MessagePattern({ cmd: 'project_find_by_organization' })
   findByOrganization(@Payload() dto: { organizationId: string }) {
     return this.projectsService.findByOrganization(dto.organizationId);

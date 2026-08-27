@@ -223,6 +223,40 @@ export class QuotaService {
     });
   }
 
+  /**
+   * Que quien pide mande sobre los proyectos de una organización.
+   *
+   * ⚠️ **No es `canManageBilling` ni ser dueño**: es `canManageAllProjects`, que
+   * es el papel que se concede a propósito para poder recuperar un tablero.
+   * Pagar no abre puertas dentro; un papel sí, y dejando rastro.
+   */
+  async exigirMandoEnLaOrganizacion(organizationId: string, userId: string): Promise<void> {
+    const permisos = await firstValueFrom(
+      this.billingClient.send<{ permisos: Record<string, boolean> } | null>(
+        { cmd: 'billing_org_permissions' },
+        { organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    if (!permisos?.permisos[OrganizationPermission.CAN_MANAGE_ALL_PROJECTS]) {
+      throw new ForbiddenException(
+        'Tu papel en esa organización no permite administrar sus proyectos.',
+      );
+    }
+  }
+
+  /** ¿Manda sobre los proyectos de esa organización? Sin lanzar. */
+  async mandaEnLaOrganizacion(organizationId: string, userId: string): Promise<boolean> {
+    const permisos = await firstValueFrom(
+      this.billingClient.send<{ permisos: Record<string, boolean> } | null>(
+        { cmd: 'billing_org_permissions' },
+        { organizationId, userId },
+      ),
+    ).catch(() => null);
+
+    return permisos?.permisos[OrganizationPermission.CAN_MANAGE_ALL_PROJECTS] === true;
+  }
+
   /* ─── Miembros de un proyecto ──────────────────────────────────────────── */
 
   /**
@@ -246,7 +280,26 @@ export class QuotaService {
    * positivo que quien lo sufre no puede resolver, y a un miembro de más se le
    * saca.
    */
-  async exigirAsientoEnProyecto(projectId: string, userId: string): Promise<void> {
+  async exigirAsientoEnProyecto(
+    projectId: string,
+    userId: string,
+    /**
+     * Quién está metiendo a esa persona.
+     *
+     * 🔴 **Con él, un asiento libre se ocupa solo**, y sin él la regla del
+     * asiento rompía el producto: quien trabaja solo no podía invitar a nadie a
+     * su propio proyecto, y el plan gratuito promete «tú y dos personas más».
+     * Pedirle dos pasos —«mete a Ana en tu organización, y luego en el
+     * proyecto»— es burocracia para el caso más común de todos.
+     *
+     * ⚠️ **Solo si quien invita puede invitar a la organización**
+     * (`canInviteMembers`). En un equipo grande, meter a alguien en la
+     * organización no es un efecto secundario de invitarlo a un tablero: le da
+     * el papel por defecto y le enseña la lista del equipo. Quien no tenga ese
+     * permiso recibe el 403 y el mensaje dice a quién pedírselo.
+     */
+    porUserId?: string,
+  ): Promise<void> {
     const proyecto = await firstValueFrom(
       this.projectsClient.send<{ organizationId?: string } | null>(
         { cmd: 'project_find_one' },
@@ -270,13 +323,28 @@ export class QuotaService {
       this.log.error(`billing-service no contestó por ${userId}: se deja invitar.`);
       return;
     }
-    if (!dentro) {
-      throw new ForbiddenException({
-        code: NOT_IN_ORG_CODE,
-        message:
-          'Esa persona no tiene asiento en la organización de este proyecto. Dale uno antes de añadirla.',
-      });
+    if (dentro) return;
+
+    /* No tiene asiento. Antes de negar, se intenta darle uno: es lo que hace que
+       «invitar a Ana a mi proyecto» siga siendo un solo gesto. Falla sola si no
+       quedan asientos o si quien invita no puede repartirlos. */
+    if (porUserId) {
+      const ocupado = await firstValueFrom(
+        this.billingClient.send<{ error?: string } | { ok: true }>(
+          { cmd: 'billing_org_seat_grant' },
+          { organizationId: proyecto.organizationId, porUserId, userId },
+        ),
+      ).catch(() => null);
+
+      if (ocupado && !('error' in ocupado)) return;
     }
+
+    throw new ForbiddenException({
+      code: NOT_IN_ORG_CODE,
+      message:
+        'Esa persona no tiene asiento en la organización de este proyecto, y no se le pudo dar uno. ' +
+        'Pídele a quien la administra que la añada, o libera un asiento.',
+    });
   }
 
   /* ─── El asistente ─────────────────────────────────────────────────────── */
