@@ -103,7 +103,7 @@ export function AppHeader({ title, headerSlot, lleno = false, anchoCompleto = fa
        * no un defecto.
        */}
       <main
-        className={`relative flex-1 bg-background motion-safe:scroll-smooth ${
+        className={`relative flex-1 bg-[#080807] motion-safe:scroll-smooth ${
           /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
              hijo, y dejar aquí un scroll de reserva produce dos barras
              anidadas —una que no se mueve nunca— en cuanto el hijo mide justo. */

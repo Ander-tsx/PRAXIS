@@ -8,39 +8,11 @@ export const metadata: Metadata = {
   title: 'Organizaciones',
 };
 
-/**
- * Las organizaciones a las que perteneces.
- *
- * ## La personal sale, y antes no
- *
- * ⚠️ Se filtraba por `kind: 'ENTERPRISE'` porque la personal era invisible: no
- * tenía nombre, no admitía a nadie y no había nada que gestionar en ella.
- * Desde 2026-08-26 **es donde viven los proyectos de quien trabaja solo**, así
- * que esconderla dejaba a esa persona sin poder llegar a los suyos. Sale la
- * primera y se distingue por lo que dice, no por una insignia de color.
- *
- * ## Sin tarjetas
- *
- * Era una rejilla de tarjetas con borde, fondo y esquinas redondeadas para
- * enseñar dos datos por organización. Ahora son filas con una raya punteada:
- * el mismo dispositivo de la landing y de Configuración
- * (`kyloo-design/SKILL.md` §4), sobre los tokens `--color-*` porque esta
- * pantalla sí responde al tema (§13).
- */
 export default async function OrganizationsPage({
   searchParams,
 }: {
   searchParams: Promise<{ elegir?: string }>;
 }) {
-  /**
-   * De dónde viene quien llega aquí sin haberlo pedido.
-   *
-   * ⚠️ **`/dashboard/roles` redirige a esta lista cuando no puede saber de qué
-   * organización hablas** —tienes varias y no hay ninguna elegida en el
-   * selector—. Sin decirlo, ese salto se lee como un enlace roto: pulsas «Roles
-   * y permisos» y apareces en otro sitio. Lo dice aquí, una línea, y desaparece
-   * en cuanto eliges.
-   */
   const { elegir } = await searchParams;
 
   const organizaciones = await createServerApiClient()
@@ -48,76 +20,92 @@ export default async function OrganizationsPage({
     .catch(() => null);
 
   const lista = organizaciones ?? [];
-  /* Quien solo tiene la personal está, a efectos de esta pantalla, empezando:
-     no ha creado ninguna con nadie dentro. Se le explica qué gana antes de
-     pedirle que cree una. */
   const soloLaPersonal = lista.length > 0 && lista.every((o) => o.kind === 'PERSONAL');
 
   return (
-    <AppHeader title="Organizaciones">
-      <div className="mx-auto flex w-full max-w-3xl flex-col">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3 pb-8">
-          <p className="max-w-xl font-serif text-base italic text-text-secondary">
-            Una organización es donde vive el trabajo de un equipo. Los proyectos son de ella, no de
-            quien los creó.
-          </p>
+    <AppHeader title="Organizaciones" anchoCompleto={true}>
+      <div className="w-full max-w-[1200px] mx-auto flex flex-col px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mt-10 mb-12">
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white mb-4">
+              Tus Organizaciones
+            </h1>
+            <p className="text-lg text-white/50 max-w-2xl font-sans">
+              Una organización es donde vive el trabajo de un equipo. Los proyectos pertenecen a ella, no de forma individual a quien los creó.
+            </p>
+          </div>
           <Link
             href="/organizations/new"
-            className="shrink-0 font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+            className="shrink-0 inline-flex items-center justify-center border border-white/20 bg-transparent text-white font-bold py-2.5 px-5 rounded-full hover:bg-white/5 transition-colors"
           >
-            Crear una organización
+            Crear nueva
           </Link>
         </div>
 
         {elegir === 'roles' && (
-          <p className="mb-8 border-l-2 border-primary py-1 pl-4 font-sans text-sm text-text-secondary">
-            Los papeles son de <strong className="text-text-primary">una</strong> organización, y
-            estás mirando todas. Elige cuál para ver quién puede qué dentro.
-          </p>
+          <div className="mb-8 border border-primary/30 bg-primary/10 rounded-2xl p-5 flex items-start gap-4">
+            <svg className="w-6 h-6 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="font-sans text-sm text-white/80 leading-relaxed">
+              Los roles pertenecen a <strong className="text-white">una</strong> organización específica. 
+              Selecciona cuál deseas administrar para ver los permisos de sus miembros.
+            </p>
+          </div>
         )}
 
         {organizaciones === null && (
-          <p className="border-l-2 border-warning py-1 pl-4 font-sans text-sm text-text-secondary">
-            No se pudieron cargar tus organizaciones. Vuelve a intentarlo en un momento.
-          </p>
+          <div className="mb-8 border border-red-500/30 bg-red-500/10 rounded-2xl p-5">
+            <p className="font-sans text-sm text-red-400">
+              No se pudieron cargar tus organizaciones. Vuelve a intentarlo en un momento.
+            </p>
+          </div>
         )}
 
         {lista.length > 0 && (
-          <ol className="flex flex-col border-t border-border">
-            {lista.map((organizacion, i) => (
-              <li key={organizacion.id}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {lista.map((organizacion) => {
+              const isPersonal = organizacion.kind === 'PERSONAL';
+              
+              return (
                 <Link
+                  key={organizacion.id}
                   href={`/organizations/${organizacion.id}`}
-                  className="group flex items-baseline gap-5 border-b border-dotted border-border py-6 transition-colors hover:border-border-strong"
+                  className="group relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 bg-[#080807] border border-white/10 hover:border-white/30 transition-colors overflow-hidden"
                 >
-                  <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="font-display text-xl text-text-primary transition-colors group-hover:text-primary">
-                      {organizacion.name ?? 'Sin nombre'}
+                  
+                  
+                  <div className="flex justify-between items-start mb-10 relative z-10">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-lg font-black text-white">
+                        {isPersonal ? 'M' : organizacion.name?.charAt(0).toUpperCase() ?? 'O'}
+                      </div>
+                      <div>
+                        <h2 className="font-sans text-2xl font-bold text-white group-hover:text-primary transition-colors">
+                          {organizacion.name ?? 'Sin nombre'}
+                        </h2>
+                        <p className="text-sm text-white/50">
+                          {isPersonal ? 'Espacio personal' : `${organizacion.seatsUsed} de ${organizacion.seats} asientos ocupados`}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 bg-white/5 text-white/60 font-mono text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-full">
+                      {organizacion.tier === 'FREE' ? 'Gratis' : organizacion.tier}
                     </span>
-                    <span className="font-sans text-sm text-text-secondary">
-                      {organizacion.kind === 'PERSONAL'
-                        ? 'Tu espacio · solo tú'
-                        : `${organizacion.seatsUsed} de ${organizacion.seats} asientos`}
-                      {' · '}
-                      {organizacion.soyDueno
-                        ? 'lo llevas tú'
-                        : (organizacion.myRoleName ?? 'miembro')}
-                    </span>
-                  </span>
+                  </div>
 
-                  {/* El plan, en gris y al final: es un dato, no un titular.
-                      Antes iba en una insignia de color arriba de la tarjeta. */}
-                  <span className="shrink-0 font-mono text-xs uppercase tracking-wider text-text-disabled">
-                    {organizacion.tier === 'FREE' ? 'Gratis' : organizacion.tier}
-                  </span>
+                  <div className="flex items-center gap-3 relative z-10">
+                    <div className="px-3 py-1.5 rounded-lg bg-black/50 border border-white/5 text-xs text-white/70 flex items-center gap-2">
+                      <svg className="w-3.5 h-3.5 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      {organizacion.soyDueno ? 'Eres el propietario' : (organizacion.myRoleName ?? 'Miembro')}
+                    </div>
+                  </div>
                 </Link>
-              </li>
-            ))}
-          </ol>
+              );
+            })}
+          </div>
         )}
 
         {soloLaPersonal && <QueDaUnaOrganizacion />}
@@ -126,47 +114,51 @@ export default async function OrganizationsPage({
   );
 }
 
-/**
- * Qué se gana creando una.
- *
- * ⚠️ **No es relleno para tapar un hueco.** Para casi todo el mundo es la
- * primera vez que ve la palabra, y la pregunta que trae es «¿esto qué me da?».
- * Sin respuesta, nadie crea ninguna — y las tres de abajo son literalmente lo
- * que cambia al meter el trabajo en una organización.
- */
 function QueDaUnaOrganizacion() {
   return (
-    <section className="flex flex-col gap-5 border-t border-border pt-9">
-      <h2 className="font-display text-2xl text-text-primary">¿Para qué crear una?</h2>
-      <ol className="flex flex-col">
+    <section className="mt-20 pt-16 border-t border-white/5">
+      <h2 className="text-3xl font-black text-white mb-10 text-center">¿Por qué crear un equipo?</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <Razon
-          n="01"
+          icon={
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          }
           titulo="El trabajo no se va con quien se va"
-          texto="Si alguien deja el equipo, los proyectos siguen siendo de la organización."
+          texto="Si alguien deja el equipo, los proyectos y la historia siguen siendo propiedad de la organización de forma segura."
         />
         <Razon
-          n="02"
-          titulo="Se entra una vez, no proyecto por proyecto"
-          texto="Quien tiene asiento puede estar en cualquier proyecto de dentro."
+          icon={
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+            </svg>
+          }
+          titulo="Acceso centralizado e instantáneo"
+          texto="No hace falta invitar proyecto por proyecto. Quien tiene asiento puede colaborar en todo lo que la organización ofrezca."
         />
         <Razon
-          n="03"
-          titulo="Los papeles se definen una vez"
-          texto="Quién crea proyectos, quién invita, quién ve el registro. Y las plantillas con las que nacen los proyectos nuevos."
+          icon={
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          }
+          titulo="Control total de permisos y seguridad"
+          texto="Define roles una sola vez. Tú decides quién crea proyectos, quién invita usuarios y quién accede a la facturación."
         />
-      </ol>
+      </div>
     </section>
   );
 }
 
-function Razon({ n, titulo, texto }: { n: string; titulo: string; texto: string }) {
+function Razon({ icon, titulo, texto }: { icon: React.ReactNode; titulo: string; texto: string }) {
   return (
-    <li className="flex items-baseline gap-5 border-b border-dotted border-border py-5 last:border-b-0">
-      <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-text-disabled">{n}</span>
-      <span className="flex min-w-0 flex-col gap-1">
-        <span className="font-display text-lg text-text-primary">{titulo}</span>
-        <span className="font-sans text-sm text-text-secondary">{texto}</span>
-      </span>
-    </li>
+    <div className="flex flex-col items-center text-center p-8 rounded-3xl bg-[#080807] border border-white/10 relative overflow-hidden group hover:border-white/20 transition-colors">
+      <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white mb-6 group-hover:text-white transition-colors">
+        {icon}
+      </div>
+      <h3 className="text-xl font-bold text-white mb-3">{titulo}</h3>
+      <p className="text-sm text-white/50 leading-relaxed">{texto}</p>
+    </div>
   );
 }

@@ -253,7 +253,7 @@ export default async function OrganizationPage({
                 {historial.map((evento) => (
                   <li
                     key={evento.id}
-                    className="flex items-baseline justify-between gap-4 border-b border-dotted border-border py-3 last:border-b-0"
+                    className="flex items-baseline justify-between gap-4 border-b border-white/5 py-4 last:border-b-0 hover:bg-white/[0.02] transition-colors -mx-4 px-4 rounded-xl"
                   >
                     <span className="font-sans text-sm text-text-primary">
                       {TEXTO_DE_EVENTO[evento.type] ?? evento.type}
@@ -296,12 +296,12 @@ function Bloque({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-5 border-t border-border py-9 first:border-t-0 first:pt-0">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-display text-2xl text-text-primary">{titulo}</h2>
+          <h2 className="text-xl font-bold text-white">{titulo}</h2>
           {entradilla && (
-            <p className="max-w-xl font-serif text-sm italic text-text-secondary">{entradilla}</p>
+            <p className="max-w-xl font-sans text-xs text-white/50">{entradilla}</p>
           )}
         </div>
         {accion && <div className="shrink-0">{accion}</div>}
@@ -344,7 +344,7 @@ function EnlaceDeTexto({
   cruzaDeZona?: boolean;
 }) {
   const clase =
-    'font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary';
+    'inline-flex items-center justify-center border border-white/20 bg-transparent text-white font-bold py-2 px-4 rounded-full hover:bg-white/5 transition-colors text-sm';
 
   if (cruzaDeZona) {
     return (
@@ -364,7 +364,7 @@ function EnlaceDeTexto({
 /** Un vacío que dice qué hacer, no que no hay nada. */
 function Vacio({ children }: { children: ReactNode }) {
   return (
-    <p className="max-w-xl border-l-2 border-border py-1 pl-4 font-sans text-sm text-text-secondary">
+    <p className="max-w-xl bg-[#080807] border border-white/10 p-5 rounded-2xl font-sans text-sm text-white/50">
       {children}
     </p>
   );

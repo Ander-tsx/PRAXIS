@@ -74,7 +74,7 @@ export default async function BillingPage({
 
   if (!catalogo) {
     return (
-      <AppHeader title="Facturación">
+      <AppHeader title="Facturación" anchoCompleto={true}>
         <p className="font-sans text-sm text-text-secondary">
           No se pudo cargar el catálogo de planes. Vuelve a intentarlo en un momento.
         </p>
@@ -83,7 +83,7 @@ export default async function BillingPage({
   }
 
   return (
-    <AppHeader title="Facturación">
+    <AppHeader title="Facturación" anchoCompleto={true}>
       <PlanCatalog
         planes={catalogo.planes}
         disponibles={catalogo.disponibles}
@@ -115,11 +115,12 @@ export default async function BillingPage({
                   ? 'Elegir en qué organización'
                   : 'Crear una organización';
 
+            const btnClass = plan.tier === 'TEAM' 
+              ? "w-full text-center bg-primary text-white font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-all shadow-[0_0_20px_-5px_rgba(139,92,246,0.4)]"
+              : "w-full text-center bg-white/10 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/20 transition-all";
+            
             return (
-              <Link
-                href={destino}
-                className="font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
-              >
+              <Link href={destino} className={btnClass}>
                 {texto}
               </Link>
             );
@@ -128,9 +129,9 @@ export default async function BillingPage({
           /* `CONTACTO`: no hay precio en Stripe porque se negocia. Ofrecerle un
              botón de compra sería ofrecer uno que responde 503 al pulsarlo. */
           return (
-            <span className="font-sans text-xs text-text-disabled">
-              Se acuerda con nosotros. Escríbenos y lo montamos a la medida del equipo.
-            </span>
+            <a href="mailto:ventas@praxis.com" className="w-full text-center border border-white/20 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/5 transition-all">
+              Contactar ventas
+            </a>
           );
         }}
         accionPortal={
