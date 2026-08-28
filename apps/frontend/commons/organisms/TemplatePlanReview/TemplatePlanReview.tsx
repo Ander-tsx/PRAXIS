@@ -107,7 +107,7 @@ export function TemplatePlanReview({
     <div className="flex flex-col gap-6 pr-1">
       {plantilla.porQue && (
         <p
-          className="rounded-xl border px-4 py-3 font-sans text-sm leading-relaxed text-text-secondary"
+          className="rounded-sm border px-4 py-3 font-sans text-sm leading-relaxed text-text-secondary"
           style={{ background: alpha(colors.info, 8), borderColor: alpha(colors.info, 25) }}
         >
           <strong className="text-text-primary">Por qué esta estructura: </strong>
@@ -420,7 +420,7 @@ export function TemplateResultSummary({ resultado }: { resultado: TemplateResult
 
       {fallos.length > 0 && (
         <div
-          className="flex flex-col gap-1 rounded-xl border px-3 py-2"
+          className="flex flex-col gap-1 rounded-sm border px-3 py-2"
           style={{
             background: alpha(colors.warning, 8),
             borderColor: alpha(colors.warning, 30),

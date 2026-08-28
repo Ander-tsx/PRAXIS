@@ -71,3 +71,37 @@ export function correoDeRecuperacion(enlace: string, minutos: number) {
     texto: `Recupera tu contraseña de PRAXIS.\n\nAbre este enlace para elegir una contraseña nueva. Caduca en ${minutos} minutos y solo sirve una vez.\n\n${enlace}\n\nSi no has sido tú, ignora este correo: tu contraseña actual sigue funcionando.`,
   };
 }
+
+/**
+ * La invitación a una organización.
+ *
+ * ⚠️ **Dice quién invita y a qué**, y no solo «te han invitado». Un correo con
+ * un enlace y sin nombre reconocible es indistinguible de un intento de engaño,
+ * y va a parar a la papelera o —peor— se marca como no deseado, que estropea la
+ * entrega de los siguientes.
+ */
+export function correoDeInvitacion(datos: {
+  enlace: string;
+  organizacion: string;
+  invitaPor: string | null;
+  horas: number;
+}) {
+  const quien = datos.invitaPor ? `${datos.invitaPor} te ha invitado` : 'Te han invitado';
+
+  return {
+    asunto: `${quien} a ${datos.organizacion} en PRAXIS`,
+    html: marco(
+      `Únete a ${datos.organizacion}`,
+      `<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#C7CCDB;">
+         ${quien} a trabajar en <strong style="color:#E8EAF0;">${datos.organizacion}</strong>.
+         Al entrar tendrás acceso a los proyectos del equipo en los que te añadan.
+         El enlace caduca en ${datos.horas} horas.
+       </p>${boton(datos.enlace, 'Aceptar la invitación')}
+       <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#9AA0B4;">
+         Si no tienes cuenta, el enlace te llevará a crearla primero. Usa esta misma
+         dirección de correo: la invitación solo vale para ella.
+       </p>`,
+    ),
+    texto: `${quien} a ${datos.organizacion} en PRAXIS.\n\nAbre este enlace para aceptar. Caduca en ${datos.horas} horas.\n\n${datos.enlace}\n\nSi no tienes cuenta, el enlace te llevará a crearla primero, y tienes que usar esta misma dirección de correo.\n\nSi no esperabas este correo, ignóralo.`,
+  };
+}

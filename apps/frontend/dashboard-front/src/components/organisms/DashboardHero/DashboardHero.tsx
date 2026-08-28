@@ -53,7 +53,7 @@ export function DashboardHero({ name, email, roles, resumen }: DashboardHeroProp
 
       {!tieneNombre && (
         <div
-          className="flex flex-col gap-3 rounded-2xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-sm border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
           style={{ background: alpha(colors.primary, 6) }}
         >
           <div className="flex flex-col gap-1">

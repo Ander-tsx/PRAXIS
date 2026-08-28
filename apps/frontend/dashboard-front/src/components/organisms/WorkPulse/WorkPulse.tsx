@@ -139,9 +139,9 @@ function RepartoDelTrabajo({ work }: { work: WorkSplit }) {
   const conDatos = tramos.filter((tramo) => tramo.cuenta > 0);
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-surface px-5 py-4">
+    <div className="flex flex-col gap-2.5 rounded-sm border border-border bg-surface px-5 py-4">
       <div
-        className="flex h-2 w-full gap-0.5 overflow-hidden rounded-full"
+        className="flex h-2 w-full gap-0.5 overflow-hidden rounded-sm"
         role="img"
         aria-label={conDatos
           .map((tramo) => `${tramo.cuenta} ${tramo.etiqueta.toLowerCase()}`)
@@ -171,8 +171,8 @@ function RepartoDelTrabajo({ work }: { work: WorkSplit }) {
           >
             <span
               aria-hidden="true"
-              className="h-2 w-2 rounded-full"
-              style={{ background: tramo.color, boxShadow: `0 0 0 3px ${alpha(tramo.color, 12)}` }}
+              className="h-2 w-2 rounded-sm"
+              style={{ background: tramo.color, boxShadow: 'none' }}
             />
             <span className="font-semibold tabular-nums text-text-primary">{tramo.cuenta}</span>
             {tramo.etiqueta.toLowerCase()}

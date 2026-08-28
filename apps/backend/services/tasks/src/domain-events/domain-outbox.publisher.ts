@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  DomainOutboxPublisher,
   type DomainOutboxPublishStats,
+  DomainOutboxPublisher,
   type OutboxStore,
   type OutboxStream,
 } from '@praxis/domain-events';

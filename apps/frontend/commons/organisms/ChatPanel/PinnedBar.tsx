@@ -192,7 +192,7 @@ export function PinnedBar({
 
       {expandido && (
         <div
-          className="absolute left-2 right-2 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-2xl shadow-2xl border border-transparent"
+          className="absolute left-2 right-2 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-sm shadow-2xl border border-transparent"
           style={{ background: colors.surfaceElevated }}
         >
           {fijados.map((mensaje) => (

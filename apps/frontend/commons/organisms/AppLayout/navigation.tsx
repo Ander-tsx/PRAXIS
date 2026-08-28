@@ -172,11 +172,34 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * iconos de trazo: más grande compite con ellos y deja de leerse como parte
      * de la misma lista.
      */
+    /**
+     * ⚠️ **Este icono provoca un aviso de React en desarrollo, y no está
+     * resuelto.** En cada carga del área privada, dashboard-front y
+     * projects-front escriben:
+     *
+     *   «Each child in a list should have a unique "key" prop. Check the render
+     *   method of `NavList`.»
+     *
+     * Y `NavList` **no** es el culpable: sus dos listas llevan clave desde el
+     * primer día. Es este icono — el único de la lista que es un componente y no
+     * un `<svg>` suelto. Se comprobó a base de anularlo: con `{item.icon}` a
+     * `null` solo en esta entrada, el aviso desaparece; y con el `<svg>` de
+     * `PraxSidebarIcon` reducido a **un** hijo, también.
+     *
+     * Lo que **no** lo arregla, probado y descartado: una `key` en el elemento
+     * (`<PraxSidebarIcon key="prax" />`), y `key` en cada uno de los tres hijos
+     * del `<svg>`. Tampoco eran los comentarios JSX entre ellos.
+     *
+     * Es de desarrollo y no afecta a producción —React no valida claves en la
+     * build—, así que se deja escrito en vez de tapado con algo que no funciona.
+     * Quien lo retome: el siguiente paso es capturar el `owner stack` del aviso
+     * antes de la hidratación, que es lo único que dirá qué array es.
+     */
     icon: <PraxSidebarIcon />,
   },
 
   /**
-   * Administración de la plataforma, en tres pantallas — no una.
+   * Administración de la plataforma, en cuatro pantallas — no una.
    *
    * ⚠️ **Las tres rutas ya existían** (`/admin`, `/admin/projects`,
    * `/admin/actividad`) pero solo la primera tenía entrada en la barra: las
@@ -217,6 +240,28 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
+    /**
+     * Las organizaciones de **toda la instalación**, no las tuyas.
+     *
+     * ⚠️ No se confunde con la entrada de Gestión: aquella abre las tuyas —donde
+     * trabajas— y esta la lista completa de quién ha contratado qué. Son la
+     * misma separación que «Proyectos» de Principal y «Proyectos» de
+     * Administración, que ya conviven con el mismo nombre en dos grupos.
+     */
+    label: 'Organizaciones',
+    href: '/admin/organizations',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 20V7.5L11 4v16M11 20h9V10.5L11 7.5M7 9.5h1M7 13h1M7 16.5h1M14.5 13h1M14.5 16.5h1"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Actividad',
     href: '/admin/actividad',
     section: SECTION_ADMINISTRACION,
@@ -232,16 +277,48 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
 
   /**
-   * Gestión — todavía no hay backend detrás de ninguna de las tres. Salen
-   * apagadas con «Pronto» a propósito, siguiendo el mismo criterio que ya
-   * usaba Análisis antes de tener servicio: que la estructura del producto se
-   * entienda sin prometer una pantalla que daría 404.
+   * Gestión.
+   *
+   * ⚠️ **Ya no están las tres apagadas.** Nacieron con «Pronto» porque no había
+   * backend detrás de ninguna; desde 2026-08-26 hay organizaciones con asientos
+   * y una tabla de precios de verdad, así que esas dos se encienden. Las que
+   * siguen apagadas lo siguen estando por el mismo criterio de entonces: que la
+   * estructura del producto se entienda sin prometer una pantalla que daría 404.
    */
   {
+    /**
+     * Las organizaciones: sus asientos, su gente y su plan.
+     *
+     * ⚠️ **Sale para todo el mundo, y es a propósito.** No es administración de
+     * la plataforma —eso es la sección de arriba, que sí se filtra por rol— sino
+     * *tu* espacio: desde 2026-08-26 hasta quien trabaja solo tiene una, y es
+     * donde viven sus proyectos. Quien no encuentre esto no encuentra su trabajo.
+     */
+    label: 'Organizaciones',
+    href: '/dashboard/organizations',
+    section: SECTION_GESTION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3.75 21h16.5M4.5 3h9a.75.75 0 01.75.75V21H3.75V3.75A.75.75 0 014.5 3zm9.75 6h5.25a.75.75 0 01.75.75V21h-6V9zM7 7.5h3M7 11h3M7 14.5h3"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
+     * Los papeles de la organización y las plantillas de rol de sus proyectos.
+     *
+     * ⚠️ **`/dashboard/roles` no es una pantalla: redirige.** Los papeles
+     * pertenecen a una organización, y la barra no sabe a cuál — lo resuelve
+     * con la misma cookie que el selector. Nació apagada con «Pronto» porque
+     * encenderla sin esa ruta habría dado un 404.
+     */
     label: 'Roles y permisos',
     href: '/dashboard/roles',
     section: SECTION_GESTION,
-    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
@@ -253,10 +330,21 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
+    /**
+     * El plan, el consumo y la tabla de precios.
+     *
+     * ⚠️ **La ruta va en inglés** (`/dashboard/billing`), como el resto del
+     * repositorio: nombres de fichero y de ruta en inglés, lo que lee una
+     * persona en español. Nació aquí como `/dashboard/facturacion` cuando era un
+     * marcador y no llevaba a ninguna parte.
+     *
+     * 🔴 **Y tiene entrada propia a propósito.** Antes solo se llegaba
+     * tropezando con un límite; una tabla de precios a la que se llega chocando
+     * no vende nada.
+     */
     label: 'Facturación y suscripción',
-    href: '/dashboard/facturacion',
+    href: '/dashboard/billing',
     section: SECTION_GESTION,
-    disabled: true,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <rect x="3" y="5.5" width="18" height="13" rx="2.5" />

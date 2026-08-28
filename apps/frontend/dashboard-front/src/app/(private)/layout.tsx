@@ -20,7 +20,8 @@ import { getSidebarPlegada } from '@praxis/commons/theme';
  * envuelva a las pantallas sin tocar sus rutas.
  */
 export default async function PrivateLayout({ children }: { children: React.ReactNode }) {
-  const { profile, roles, navItems } = await loadPrivateChrome();
+  const { profile, roles, navItems, organizaciones, organizacionActivaId } =
+    await loadPrivateChrome();
   /* La cookie del pliegue, leída en el servidor: sin esto la barra se
      serviría desplegada y se plegaría al hidratar, parpadeando en cada
      navegación —y en Multi-Zones cada cambio de zona es una carga entera. */
@@ -31,6 +32,10 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       navItems={navItems}
       zonePath="/dashboard"
       plegadaInicial={plegada}
+      /* El selector de organización de la barra: la lista y cuál se mira. Las
+         dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
+      organizaciones={organizaciones}
+      organizacionActivaId={organizacionActivaId}
       user={{
         name: displayName(profile),
         email: profile.credential.email,

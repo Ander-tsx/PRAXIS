@@ -3,9 +3,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
-import { AdminActivityController } from './admin-activity.controller';
 import { ProjectsModule } from '../projects/projects.module';
+import { AdminActivityController } from './admin-activity.controller';
 import { AdminActivityRecorder } from './admin-activity.recorder';
+import { AdminOrganizationsController } from './admin-organizations.controller';
 import { AdminProjectsController } from './admin-projects.controller';
 import { AdminUsersController } from './admin-users.controller';
 
@@ -67,6 +68,20 @@ import { AdminUsersController } from './admin-users.controller';
           },
         }),
       },
+      /* Para la pantalla de organizaciones de plataforma. Solo lectura: el rol
+         global lo comprueba el guard, no billing-service. */
+      {
+        name: 'BILLING_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('BILLING_SERVICE_HOST'),
+            port: config.get<number>('BILLING_SERVICE_PORT'),
+          },
+        }),
+      },
       /* El plan del asistente vive en assistant-service, con su propia tabla de
          suscripciones. Se registra aquí por lo mismo que ALEXA: su módulo no lo
          exporta. */
@@ -84,7 +99,12 @@ import { AdminUsersController } from './admin-users.controller';
       },
     ]),
   ],
-  controllers: [AdminActivityController, AdminUsersController, AdminProjectsController],
+  controllers: [
+    AdminActivityController,
+    AdminUsersController,
+    AdminProjectsController,
+    AdminOrganizationsController,
+  ],
   providers: [AdminActivityRecorder],
   exports: [AdminActivityRecorder],
 })

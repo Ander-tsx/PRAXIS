@@ -143,6 +143,17 @@ export const BACKEND_SERVICES = [
     color: 92,
     descripcion: 'Automatizaciones · base operativa sin reglas aún',
   },
+  {
+    key: 'billing',
+    pkg: '@praxis/billing-service',
+    dir: 'apps/backend/services/billing',
+    port: 3009,
+    protocolo: 'TCP',
+    prisma: true,
+    seedOrder: null,
+    color: 36,
+    descripcion: 'Planes, organizaciones y cuotas',
+  },
 ];
 
 /**

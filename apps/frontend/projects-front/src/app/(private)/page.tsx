@@ -17,6 +17,7 @@ import {
   type UserProfile,
 } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
+import { getOrganizacionActiva } from '@praxis/commons/theme';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -50,6 +51,11 @@ const POR_PAGINA = 12;
 export default async function ProjectsPage({ searchParams }: PageProps) {
   const { q, page: pageParam } = await searchParams;
   const { userId } = await loadCurrentUser();
+  /* ⚠️ **Se lee en el servidor y no tras hidratar.** Si la organización activa
+     saliera de `localStorage`, esta lista se serviría entera y se recortaría
+     después: un parpadeo en cada carga, y en Multi-Zones cada cambio de zona es
+     una carga completa. Mismo motivo que el tema y el pliegue de la barra. */
+  const organizacionActiva = await getOrganizacionActiva();
   const api = createServerApiClient();
 
   const search = q?.trim() ?? '';
@@ -62,6 +68,10 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
     limit: String(POR_PAGINA),
   });
   if (search) params.set('search', search);
+  /* 🔴 **Es un filtro, nunca un permiso.** El backend lo suma al «dueño o
+     miembro» que ya aplicaba; poner en la cookie la organización de otro
+     devuelve cero proyectos, no los suyos. Ver `commons/theme/organizacion.ts`. */
+  if (organizacionActiva) params.set('organizationId', organizacionActiva);
 
   const page = await api.get<Paginated<Project>>(`/projects?${params}`);
 

@@ -4,6 +4,8 @@
  * y en algún caso mienten sobre la salida (ver PENDIENTES-BACKEND.md §10).
  */
 
+import type { QuotaExceededDetails } from '../billing/planes';
+
 /** `GET /api/users/:id` */
 export interface UserProfile {
   id: string;
@@ -212,6 +214,40 @@ export type ProjectStatusName = (typeof PROJECT_STATUSES)[number];
  * pedirse permisos a sí mismo.
  */
 export const PROJECT_SUSPENDED_CODE = 'PROJECT_SUSPENDED';
+
+/**
+ * El `code` de «esa persona no tiene asiento en la organización de este
+ * proyecto».
+ *
+ * 🔴 **Tercer 403 que no es de permisos**, y el más fácil de confundir: quien lo
+ * recibe suele ser el dueño del proyecto, con todos los permisos, intentando
+ * meter a alguien en un equipo que ya está lleno. Enseñarle «no tienes permiso»
+ * es decirle una mentira sobre sí mismo y esconderle la única salida que hay
+ * —liberar un asiento o ampliar el plan—. Ya pasó: el mensaje del servidor lo
+ * explicaba bien y la pantalla lo tiraba.
+ */
+export const NOT_IN_ORG_CODE = 'NOT_IN_ORG';
+
+/**
+ * Los 403 que **se explican solos** y cuyo mensaje no se puede sustituir.
+ *
+ * ⚠️ **La lista es corta a propósito.** Un 403 normal sí se traduce a una frase
+ * de la pantalla: el mensaje del servidor habla de guards y de permisos, y quien
+ * lo lee necesita saber a quién pedírselo, no cómo se llama la comprobación. Los
+ * de aquí son los que el servidor sabe explicar mejor que nosotros porque
+ * conocen el motivo — un plan lleno, una plataforma que suspendió algo.
+ */
+const CODIGOS_403_QUE_SE_EXPLICAN: readonly string[] = [PROJECT_SUSPENDED_CODE, NOT_IN_ORG_CODE];
+
+/**
+ * ¿Este 403 trae su propia explicación?
+ *
+ * Se usa en los `describe()` de las zonas, que hasta ahora colapsaban **todos**
+ * los 403 en una frase de permisos.
+ */
+export function el403SeExplicaSolo(code: string): boolean {
+  return CODIGOS_403_QUE_SE_EXPLICAN.includes(code);
+}
 
 /** Un elemento de `GET /api/projects` → `{ items, total }` */
 export interface Project {
@@ -1314,9 +1350,25 @@ export interface TemplateDraftState {
    *
    * Se distingue del resto porque **no se arregla reintentando**, y la pantalla
    * tiene que decir otra cosa: con un «vuelve a intentarlo» genérico la gente
-   * pulsa el botón otras cinco veces contra un 429.
+   * pulsa el botón otras cinco veces contra un límite que no se mueve.
+   *
+   * 🔴 **Se decidía por `status === 429` a secas, y eso mezclaba dos cosas.** El
+   * gateway limita a 300 peticiones por minuto y por cuenta, y responde con ese
+   * mismo 429: un throttle en mitad de una tanda se leía como «se te acabó el
+   * mes» y mandaba a alguien a la pantalla de planes por algo que se arregla
+   * esperando quince segundos. Ahora la cuota viaja como **402
+   * `QUOTA_EXCEEDED`**, igual que las otras dos del plan, y esto se decide por
+   * el código.
    */
   sinCuota: boolean;
+  /**
+   * El detalle del 402, cuando lo hay.
+   *
+   * Es lo que permite ofrecer la salida —qué tope, cuánto llevas y cuándo
+   * vuelve— en vez de una frase. `null` también cuando `sinCuota` es `true` y
+   * el detalle no vino con forma válida: ver `detallesDeCuota`.
+   */
+  cuota: QuotaExceededDetails | null;
 }
 
 /** Lo que devuelve materializar una plantilla aceptada. */

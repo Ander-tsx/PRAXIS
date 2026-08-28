@@ -67,6 +67,24 @@ interface Pagina {
 /** El dueño del proyecto y su proyecto: lo único que se comparte entre pruebas. */
 let duenno: Usuario;
 let proyectoId: string;
+/**
+ * La organización personal del dueño, que es de donde salen los asientos.
+ *
+ * 🔴 **Los asientos son el producto, y este archivo los gasta.** Desde la etapa
+ * de organizaciones, entrar en un proyecto exige asiento en la organización que
+ * lo contiene: el plan gratuito da **tres** —el dueño y dos más—, y cada
+ * interlocutor que crea una prueba ocupa uno al darse de alta. Con diecisiete
+ * pruebas sobre el mismo proyecto, a partir de la tercera todas fallaban con
+ * `403 NOT_IN_ORG` por el modelo de precios y no por el chat.
+ *
+ * Por eso se sueltan al terminar cada prueba (ver el `afterEach`): la
+ * conversación de cada una sigue naciendo limpia —que es lo que hace legibles
+ * las de paginación— sin pedirle al plan más de lo que da.
+ */
+let organizacionId: string;
+
+/** Quién ocupa asiento ahora mismo por culpa de la prueba en curso. */
+let prestados: Usuario[] = [];
 
 test.beforeAll(async ({ playwright }) => {
   /* `request` es de ámbito de prueba, así que el montaje compartido necesita su
@@ -78,7 +96,30 @@ test.beforeAll(async ({ playwright }) => {
   duenno = await registrar(contexto);
   proyectoId = (await crearProyecto(contexto, duenno.accessToken)).id;
 
+  const mias = await data<{ id: string; kind: string }[]>(
+    await contexto.get('/api/me/organizations', { headers: comoBearer(duenno.accessToken) }),
+  );
+  const personal = mias.find((organizacion) => organizacion.kind === 'PERSONAL') ?? mias[0];
+  expect(personal, 'Quien se registra tiene su espacio personal desde el primer día').toBeTruthy();
+  organizacionId = personal.id;
+
   await contexto.dispose();
+});
+
+/**
+ * Devuelve los asientos que ha ocupado la prueba que acaba de terminar.
+ *
+ * Sacar a alguien de la organización lo saca también de los proyectos de esa
+ * organización, que es justo lo que se quiere: la prueba ya ha comprobado lo
+ * suyo y la siguiente necesita el hueco.
+ */
+test.afterEach(async ({ request }) => {
+  for (const invitado of prestados) {
+    await request.delete(`/api/organizations/${organizacionId}/members/${invitado.userId}`, {
+      headers: comoBearer(duenno.accessToken),
+    });
+  }
+  prestados = [];
 });
 
 /**
@@ -109,6 +150,9 @@ async function nuevoInterlocutor(request: APIRequestContext): Promise<Usuario> {
     data: { userId: invitado.userId, projectRoleId: (await data<{ id: string }>(rol)).id },
   });
   expect(alta.status(), 'Dar de alta al miembro').toBe(201);
+
+  /* Ocupa un asiento desde este momento. El `afterEach` lo devuelve. */
+  prestados.push(invitado);
 
   return invitado;
 }

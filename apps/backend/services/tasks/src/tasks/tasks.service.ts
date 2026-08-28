@@ -1077,6 +1077,37 @@ export class TasksService {
    * borrado del recurso padre, y para entonces ese recurso ya no existe, así
    * que aquí no habría nada contra lo que comprobar.
    */
+  /**
+   * Suelta a alguien de todas las tareas de unos proyectos.
+   *
+   * 🔴 **Suelta, no reasigna.** Elegir a quién le cae el trabajo de quien se va
+   * es una decisión de equipo, y el sistema tomándola por su cuenta es
+   * exactamente lo que el plan prohíbe —«nada se borra ni se archiva solo»—.
+   * Sin encargado, la tarea sigue ahí, se ve en su columna y cualquiera la
+   * recoge; reasignada a dedo, alguien se encuentra trabajo suyo que no pidió.
+   *
+   * ⚠️ **No toca las tareas de otros proyectos.** Se sale de **una**
+   * organización, no de PRAXIS: lo que esa persona tenga en los proyectos de
+   * otra sigue siendo suyo.
+   *
+   * ⚠️ **Y no emite avisos.** Ya mordió al revés: un autoguardado mandó una lista
+   * de encargados vacía y a alguien le llegó un aviso de que lo habían quitado
+   * de una tarea que nadie había tocado (`734855a`). Aquí quitar es la
+   * consecuencia de haber salido del equipo, no una acción sobre la tarea, y
+   * avisar de cada una sería cincuenta avisos por una sola salida.
+   *
+   * Devuelve cuántas soltó: el mensaje de la pantalla lo necesita para decir qué
+   * ha pasado en vez de un «hecho» sin contenido.
+   */
+  async releaseAssignments(dto: { userId: string; projectIds: string[] }) {
+    if (dto.projectIds.length === 0) return { soltadas: 0 };
+
+    const resultado = await this.prisma.taskAssignee.deleteMany({
+      where: { userId: dto.userId, task: { projectId: { in: dto.projectIds } } },
+    });
+    return { soltadas: resultado.count };
+  }
+
   async purgeTasks(dto: PurgeTasksDto) {
     const where: Prisma.TaskWhereInput | null = dto.projectId
       ? { projectId: dto.projectId }

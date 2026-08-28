@@ -48,8 +48,8 @@ export class AssistantController {
   }
 
   @MessagePattern({ cmd: 'assistant_quota' })
-  quota(@Payload() dto: { userId: string }) {
-    return this.assistant.estadoCuota(dto.userId);
+  quota(@Payload() dto: { userId: string; limiteMensual?: number | null }) {
+    return this.assistant.estadoCuota(dto.userId, dto.limiteMensual);
   }
 
   /**

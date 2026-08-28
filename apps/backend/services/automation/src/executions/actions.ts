@@ -1,8 +1,8 @@
 import { AutomationActionType, NotificationType } from '@praxis/contracts';
 
-import { triggerSpec } from '../rules/catalog';
 import type { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
+import { triggerSpec } from '../rules/catalog';
 
 import type { TaskShape } from './task-context';
 

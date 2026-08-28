@@ -1,5 +1,6 @@
 import { Badge } from '../../atoms/Badge';
 import { createServerApiClient } from '../../auth/server-client';
+import type { BillingSummary } from '../../billing/planes';
 import { GlobalRoleBadges } from '../../molecules/GlobalRoleBadges';
 
 /**
@@ -29,24 +30,49 @@ import { GlobalRoleBadges } from '../../molecules/GlobalRoleBadges';
  *
  * ## Lo que hace cuando algo falla
  *
- * Si la cuota no se puede leer —assistant-service caído— no se pinta ninguna
- * insignia de plan y ya está. Una cabecera sin ese dato es una cabecera normal;
- * una que dijera «FREE» porque no pudo preguntar sería una mentira sobre algo
- * que alguien está pagando.
+ * Si el plan no se puede leer no se pinta ninguna insignia y ya está. Una
+ * cabecera sin ese dato es una cabecera normal; una que dijera «FREE» porque no
+ * pudo preguntar sería una mentira sobre algo que alguien está pagando.
+ *
+ * ## De dónde sale el plan
+ *
+ * ⚠️ **De `/me/billing/resumen`, y antes salía de la cuota del asistente.** Ese
+ * endpoint devuelve el plan de `AssistantSubscription`, que solo conoce FREE y
+ * PRO: desde que hay cinco, a alguien con Plus le ponía «FREE» y a quien tiene
+ * el plan de su empresa, también — la insignia decía que no paga nadie justo en
+ * la esquina que se mira de reojo. El plan efectivo lo resuelve billing, que es
+ * el único que sabe mirar todas tus organizaciones.
  */
 export async function CuentaEnCabecera({ roles }: { roles: readonly string[] }) {
-  const cuota = await createServerApiClient()
-    .get<{ plan: 'FREE' | 'PRO' }>('/me/assistant/quota')
+  const resumen = await createServerApiClient()
+    .get<BillingSummary>('/me/billing/resumen')
     .catch(() => null);
 
   return (
     <>
       <GlobalRoleBadges roles={roles} />
-      {cuota && (
-        /* PRO destaca y FREE no: el plan de pago es la excepción, y una insignia
+      {resumen && (
+        /* Lo de pago destaca y el gratuito no: es la excepción, y una insignia
            que resalta lo que tiene todo el mundo no informa de nada. */
-        <Badge variant={cuota.plan === 'PRO' ? 'accent' : 'primary'}>{cuota.plan}</Badge>
+        <Badge variant={resumen.tier === 'FREE' ? 'primary' : 'accent'}>
+          {NOMBRE_CORTO[resumen.tier]}
+        </Badge>
       )}
     </>
   );
 }
+
+/**
+ * El plan en una palabra, para una insignia de la cabecera.
+ *
+ * ⚠️ **No se pide el catálogo para esto.** El nombre bueno vive en `PLANS`, sí,
+ * pero traerlo aquí sería una llamada más en **cada zona y cada navegación**
+ * para escribir una palabra que no cambia. Si algún día se renombra un plan,
+ * esta tabla es el segundo sitio que hay que tocar y está dicho aquí.
+ */
+const NOMBRE_CORTO: Record<string, string> = {
+  FREE: 'Gratis',
+  TEAM: 'Equipo',
+  BUSINESS: 'Negocio',
+  ENTERPRISE: 'Empresa',
+};

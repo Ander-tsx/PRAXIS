@@ -91,7 +91,7 @@ export function useReposicionAnimada() {
          justo lo que hay que enseñar. El resto se salta si la pasada está sucia
          por un desplazamiento. */
       if (!sembrado && saltarAnimacion) continue;
-      
+
       // Filtro anti-zarandeos: si el movimiento es minúsculo (< 20px), es ruido del
       // DOM reacomodándose (ej. Next.js reinyectando Server Components o HMR).
       // Un cambio de orden real mueve una tarjeta entera (> 100px) o columna (> 250px).

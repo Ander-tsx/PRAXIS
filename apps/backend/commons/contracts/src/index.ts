@@ -3,6 +3,7 @@ export * from './automation';
 export * from './alexa';
 export * from './assistant';
 export * from './auth';
+export * from './billing';
 export * from './credentials';
 export * from './events';
 export * from './notifications';

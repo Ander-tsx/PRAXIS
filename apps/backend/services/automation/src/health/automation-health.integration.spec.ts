@@ -1,8 +1,8 @@
 /// <reference types="jest" />
 
 import { INestMicroservice } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { ClientProxyFactory, MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { Test } from '@nestjs/testing';
 import { firstValueFrom } from 'rxjs';
 import { AutomationHealthModule } from './automation-health.module';
 

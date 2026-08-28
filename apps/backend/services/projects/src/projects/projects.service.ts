@@ -94,6 +94,7 @@ export class ProjectsService {
             slug,
             description: dto.description,
             ownerId: dto.ownerId,
+            organizationId: dto.organizationId,
           },
         });
 
@@ -169,6 +170,12 @@ export class ProjectsService {
 
       where.OR = [{ ownerId: dto.userId }, memberScope];
     }
+
+    /* ⚠️ **Se suma al filtro de arriba, no lo reemplaza.** Es el selector de
+       organización del sidebar acotando lo que ya puedes ver; si sustituyera al
+       `OR`, escribir un identificador ajeno en la URL enseñaría los proyectos de
+       una empresa entera. */
+    if (dto.organizationId) where.organizationId = dto.organizationId;
 
     /**
      * Los archivados no salen en ningún listado normal, ni para el dueño.
@@ -572,6 +579,74 @@ export class ProjectsService {
     return this.prisma.project.findMany({
       where: { ownerId },
       select: { id: true, name: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Los proyectos de una organización.
+   *
+   * 🔴 **Es lo que cuenta la cuota desde 2026-08-26**, y sustituye a contar por
+   * dueño: el plan promete proyectos **para el equipo**, no para cada persona.
+   *
+   * ⚠️ Devuelve también los `DELETED` y quien llama los descarta. No se filtran
+   * aquí porque el mismo comando sirve para contar cuota —donde no cuentan— y
+   * para el inventario de administración —donde sí hay que verlos—.
+   */
+  /**
+   * Cambia de responsable un proyecto.
+   *
+   * 🔴 **Sin esto, un proyecto muere con quien lo creó.** Ser `ownerId` es el
+   * único bypass total de permisos que existe: si esa persona se va de la
+   * empresa, el proyecto se queda sin nadie que pueda administrarlo del todo, y
+   * no había ninguna ruta que lo arreglara.
+   *
+   * ⚠️ **El nuevo responsable tiene que ser ya miembro del proyecto.** Dárselo a
+   * alguien de fuera lo dejaría con un responsable que ni siquiera lo ve, y sin
+   * nadie que pueda deshacerlo.
+   *
+   * ⚠️ **Y quien lo deja se queda dentro**, con el rol que tuviera. Sacarlo sería
+   * una segunda consecuencia de una sola acción, y la segunda no se deshace.
+   *
+   * ⚠️ El `slug` **no** se regenera: cambia con el nombre, no con la persona.
+   * Regenerarlo aquí rompería todos los enlaces compartidos del proyecto por un
+   * cambio que no se ve desde fuera.
+   */
+  async transferOwnership(dto: { projectId: string; nuevoOwnerId: string }) {
+    const [proyecto, miembro] = await Promise.all([
+      this.prisma.project.findUnique({ where: { id: dto.projectId } }),
+      this.prisma.projectMember.findUnique({
+        where: {
+          projectId_userId: { projectId: dto.projectId, userId: dto.nuevoOwnerId },
+        },
+      }),
+    ]);
+
+    if (!proyecto) {
+      return { error: 'Ese proyecto no existe.', codigo: 'NO_EXISTE' as const };
+    }
+    if (proyecto.ownerId === dto.nuevoOwnerId) {
+      return { error: 'Ya es su responsable.', codigo: 'YA_ESTA' as const };
+    }
+    if (!miembro) {
+      return {
+        error: 'Esa persona tiene que ser miembro del proyecto para poder responder por él.',
+        codigo: 'NO_VALE' as const,
+      };
+    }
+
+    const actualizado = await this.prisma.project.update({
+      where: { id: dto.projectId },
+      data: { ownerId: dto.nuevoOwnerId },
+      select: { id: true, name: true, slug: true, ownerId: true },
+    });
+    return { ...actualizado, anteriorOwnerId: proyecto.ownerId };
+  }
+
+  async findByOrganization(organizationId: string) {
+    return this.prisma.project.findMany({
+      where: { organizationId },
+      select: { id: true, name: true, status: true, ownerId: true },
       orderBy: { createdAt: 'asc' },
     });
   }

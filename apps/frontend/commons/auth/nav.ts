@@ -1,10 +1,12 @@
 import { hasAdminRole } from '../api/domain';
 import type { NotificationPage } from '../api/domain';
+import type { OrgDelSelector } from '../organisms/AppLayout/AppShell';
 import {
   APP_NAV_ITEMS,
   type AppNavItem,
   SECTION_ADMINISTRACION,
 } from '../organisms/AppLayout/navigation';
+import { getOrganizacionActiva } from '../theme/organizacion';
 import { type CurrentUser, loadCurrentUser } from './current-user';
 import { createServerApiClient } from './server-client';
 
@@ -87,8 +89,9 @@ async function loadChatUnreadCount(): Promise<number> {
  * sabe quién está delante:
  *
  * - el grupo de administración entero se cae si la cuenta no administra —las
- *   tres pantallas (`Cuentas`, `Proyectos`, `Actividad`) comparten sección, así
- *   que se filtra por `section` y no comparando tres `href` sueltos;
+ *   cuatro pantallas (`Cuentas`, `Proyectos`, `Organizaciones`, `Actividad`)
+ *   comparten sección, así que se filtra por `section` y no comparando `href`
+ *   sueltos, que es lo que habría habido que tocar al añadir la cuarta;
  * - la insignia de avisos solo aparece con algo sin leer, porque una insignia que
  *   enseña un cero es una insignia que enseña nada.
  */
@@ -127,6 +130,16 @@ export async function loadAppNavItems(options: AppNavOptions = {}): Promise<AppN
 
 export interface PrivateChrome extends CurrentUser {
   navItems: AppNavItem[];
+  /**
+   * Las organizaciones a las que perteneces, para el selector de la barra.
+   *
+   * ⚠️ **Vacío si no se pudieron leer**, no `null`. El selector sin lista se
+   * comporta como el marcador de antes: enseña tu espacio y no ofrece cambiar.
+   * Un fallo aquí no puede dejar sin barra lateral a nadie.
+   */
+  organizaciones: OrgDelSelector[];
+  /** Cuál se está mirando. `null` es **todas**, no la personal. */
+  organizacionActivaId: string | null;
 }
 
 /**
@@ -151,11 +164,27 @@ export interface PrivateChrome extends CurrentUser {
 export async function loadPrivateChrome(): Promise<PrivateChrome> {
   /* Las tres en paralelo: ninguna depende de las otras, y encadenarlas pagaría
      dos saltos de red de más en cada zona. */
-  const [user, unread, mensajes] = await Promise.all([
+  /* Las cuatro en paralelo: ninguna depende de las otras, y encadenarlas
+     pagaría saltos de red de más en cada zona.
+
+     ⚠️ La lista de organizaciones entra aquí y no en cada `layout.tsx` por lo
+     mismo que la navegación: con seis copias del mismo `Promise.all` repartidas
+     por las zonas, la alternativa era arreglar lo mismo seis veces. Y aquí es
+     gratis — no encadena nada. */
+  const [user, unread, mensajes, organizaciones, organizacionActivaId] = await Promise.all([
     loadCurrentUser(),
     loadUnreadCount(),
     loadChatUnreadCount(),
+    createServerApiClient()
+      .get<OrgDelSelector[]>('/me/organizations')
+      .catch(() => [] as OrgDelSelector[]),
+    getOrganizacionActiva(),
   ]);
 
-  return { ...user, navItems: buildNavItems({ roles: user.roles, unread, mensajes }) };
+  return {
+    ...user,
+    navItems: buildNavItems({ roles: user.roles, unread, mensajes }),
+    organizaciones,
+    organizacionActivaId,
+  };
 }

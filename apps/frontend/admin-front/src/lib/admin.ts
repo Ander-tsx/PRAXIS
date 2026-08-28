@@ -20,6 +20,35 @@ export interface AdminProjectPage {
   total: number;
 }
 
+/**
+ * Una organización vista desde la administración de la plataforma.
+ *
+ * ⚠️ **No es `OrganizationView`**, que es la del portal: aquella trae *tus*
+ * permisos dentro de ella y esta trae su dueño resuelto por el gateway. Se
+ * parecen y no son la misma, y mezclarlas dejaría a esta pantalla pidiendo
+ * permisos que aquí no significan nada.
+ */
+export interface AdminOrganization {
+  id: string;
+  kind: string;
+  name: string | null;
+  slug: string | null;
+  tier: string;
+  status: string;
+  seats: number;
+  seatsUsed: number;
+  createdAt: string;
+  /** Quien la lleva. `null` si credentials no contestó: ver el controlador. */
+  owner?: { id: string; name: string | null; email: string | null } | null;
+}
+
+export interface AdminOrganizationPage {
+  items: AdminOrganization[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface AdminActivityPage {
   items: AdminActivityEntry[];
   total: number;

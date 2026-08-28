@@ -1,10 +1,10 @@
 'use client';
 
 import { createBoardAction } from '@/app/(private)/[id]/actions';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
 import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useEffect, useId, useRef, useState } from 'react';
 
 export interface CreateBoardButtonProps {
@@ -100,113 +100,125 @@ export function CreateBoardButton({
           {!compacto && 'Nuevo tablero'}
         </button>
       ) : isDesktop ? (
+        <form
+          ref={formRef}
+          action={formAction}
+          noValidate
+          onSubmit={(event) => {
+            setTouched(true);
+            if (clientError || name.trim().length < 2) event.preventDefault();
+          }}
+          className="flex items-center gap-1 rounded-md bg-surface pl-2 pr-1 h-7 border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+        >
+          <input type="hidden" name="workspaceId" value={workspaceId} />
+          <input type="hidden" name="projectId" value={projectId} />
+
+          <input
+            id={nameId}
+            name="name"
+            placeholder="Nuevo tablero..."
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={BOARD_NAME_MAX}
+            autoComplete="off"
+            autoFocus
+            className={`w-32 bg-transparent text-xs font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
+              touched && clientError ? 'text-error' : 'text-text-primary'
+            }`}
+          />
+          <button
+            type="submit"
+            disabled={pending || name.trim().length < 2 || Boolean(clientError)}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
+          >
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setName('');
+              setTouched(false);
+            }}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </form>
+      ) : (
+        <Dialog
+          open={open}
+          onClose={() => setOpen(false)}
+          size="sm"
+          title="Nuevo tablero"
+          description="Dentro irán las columnas y las tareas."
+        >
           <form
-            ref={formRef}
             action={formAction}
             noValidate
             onSubmit={(event) => {
               setTouched(true);
-              if (clientError || name.trim().length < 2) event.preventDefault();
+              if (clientError) event.preventDefault();
             }}
-            className="flex items-center gap-1 rounded-md bg-surface pl-2 pr-1 h-7 border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+            className="flex flex-col gap-4"
           >
             <input type="hidden" name="workspaceId" value={workspaceId} />
             <input type="hidden" name="projectId" value={projectId} />
 
-            <input
+            <Input
               id={nameId}
               name="name"
-              placeholder="Nuevo tablero..."
+              label="Nombre"
+              placeholder="Sprint 1"
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={BOARD_NAME_MAX}
+              variant={touched && clientError ? 'error' : 'default'}
+              message={touched && clientError ? clientError : undefined}
               autoComplete="off"
-              autoFocus
-              className={`w-32 bg-transparent text-xs font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
-                touched && clientError ? 'text-error' : 'text-text-primary'
-              }`}
+              fullWidth
             />
-            <button
-              type="submit"
-              disabled={pending || name.trim().length < 2 || Boolean(clientError)}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                setName('');
-                setTouched(false);
-              }}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+
+            {state.error && (
+              <p
+                role="alert"
+                className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
+                style={{
+                  background: alpha(colors.error, 10),
+                  borderColor: alpha(colors.error, 30),
+                }}
+              >
+                {state.error}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>
+                Crear tablero
+              </Button>
+            </div>
           </form>
-        ) : (
-          <Dialog
-            open={open}
-            onClose={() => setOpen(false)}
-            size="sm"
-            title="Nuevo tablero"
-            description="Dentro irán las columnas y las tareas."
-          >
-            <form
-              action={formAction}
-              noValidate
-              onSubmit={(event) => {
-                setTouched(true);
-                if (clientError) event.preventDefault();
-              }}
-              className="flex flex-col gap-4"
-            >
-              <input type="hidden" name="workspaceId" value={workspaceId} />
-              <input type="hidden" name="projectId" value={projectId} />
-
-              <Input
-                id={nameId}
-                name="name"
-                label="Nombre"
-                placeholder="Sprint 1"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={BOARD_NAME_MAX}
-                variant={touched && clientError ? 'error' : 'default'}
-                message={touched && clientError ? clientError : undefined}
-                autoComplete="off"
-                fullWidth
-              />
-
-              {state.error && (
-                <p
-                  role="alert"
-                  className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-                  style={{
-                    background: alpha(colors.error, 10),
-                    borderColor: alpha(colors.error, 30),
-                  }}
-                >
-                  {state.error}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>
-                  Crear tablero
-                </Button>
-              </div>
-            </form>
-          </Dialog>
-        )}
+        </Dialog>
+      )}
     </>
   );
 }

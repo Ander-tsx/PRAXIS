@@ -31,7 +31,36 @@ model Project {
   slug        String          @unique
 
   description String?
+
+  /// Quién es **responsable** del proyecto.
+  ///
+  /// ⚠️ **Ya no es «el dueño», aunque la columna siga llamándose así.** Desde
+  /// 2026-08-26 el proyecto pertenece a una organización; esta persona es quien
+  /// responde por él, y sigue siendo el **único bypass total** de permisos —ni el
+  /// rol global de plataforma ni ningún rol de proyecto lo alcanzan—. La columna
+  /// no se renombra porque `ownerId` aparece en cuarenta sitios entre servicios
+  /// sin clave foránea que los ate, y un renombre a medias es peor que un nombre
+  /// heredado: lo que se renombró es lo que lee una persona.
+  ///
+  /// Se puede traspasar, por dos caminos: voluntario, o forzado por quien tenga
+  /// `canManageAllProjects` en la organización, y entonces queda en el registro.
   ownerId     String
+
+  /// A qué organización pertenece.
+  ///
+  /// 🔴 **Es la pieza que convierte PRAXIS en un producto de equipos.** Antes el
+  /// proyecto colgaba de una persona y la organización solo repartía topes más
+  /// altos: la pregunta «¿qué nos da estar dentro?» no tenía buena respuesta, y
+  /// cuando alguien se iba de la empresa su trabajo se iba con él.
+  ///
+  /// ⚠️ **`NOT NULL` desde el primer día, y sin fase nullable.** La base se
+  /// reinicia, así que no hay nada que rellenar: lo que habría sido un script de
+  /// relleno que solo se ejecuta una vez está en las semillas, donde se lee.
+  ///
+  /// ⚠️ **No hay clave foránea**: las organizaciones viven en billing-service, en
+  /// otro esquema y bajo otro dueño. Es la regla que ya siguen `ownerId`,
+  /// `assigneeId` y `task_events`.
+  organizationId String
 
   /// Estado administrativo del proyecto. Ver `ProjectStatus`.
   status      ProjectStatus   @default(ACTIVE)
@@ -61,6 +90,7 @@ model Project {
   updatedAt   DateTime        @updatedAt
 
   @@unique([ownerId, name])
+  @@index([organizationId])
   /// El inventario del panel filtra por estado, y los listados normales excluyen
   /// los archivados.
   @@index([status])

@@ -14,7 +14,11 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/GUION-DEMO-REGLAS.md](docs/frontend/GUION-DEMO-REGLAS.md) | Para enseñar el apartado Reglas: qué sembrar, qué pulsar, qué debe verse — y qué no se puede demostrar en vivo |
 | [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | Etapa de pulido. Cerrada; se conserva por el registro de qué se arregló y por qué |
 | [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | Etapa de rediseño. Cerrada; se conserva por las decisiones y el registro |
-| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | **Etapa en curso** — motor reactivo, el asistente que siempre responde y administración con más poder. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
+| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | Etapa de automatización — motor reactivo, el asistente que siempre responde y administración con más poder. Cerrada salvo S6/S7 |
+| [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal, y sigue siendo válido |
+| [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
+| [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | **Etapa en curso** — la organización pasa a contener los proyectos, se cobra por asiento y hay papeles de organización. Once decisiones cerradas, invariantes, reglas de interfaz y el orden. Se lee al retomar y se marca al terminar cada tarea |
+| [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
@@ -136,7 +140,23 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     crea necesita un login. Cualquier `POST /auth/login` en una prueba va por
     `intentarLogin()`, que espera y reintenta; a pelo, una prueba que espera un
     401 recibe un 429 y falla **por el reloj, no por el código**.
-17. ⚠️ **Una constante `process.env.X` en el cuerpo de un módulo NO ve el
+17. 🔴 **Un proyecto pertenece a una organización, y quien entra en él necesita
+    asiento.** `Project.organizationId` es `NOT NULL` desde la etapa de
+    organizaciones. Tres cosas que muerden:
+    - **El tope de proyectos se cuenta por organización**, no por persona. El
+      402 dice «esta organización ya tiene N», y quien lo ve **puede no ser quien
+      puede pagarlo**: `error.details.puedeAmpliar` lo distingue.
+    - **Meter a alguien sin asiento da 403 `NOT_IN_ORG`**, no un 402. No se ha
+      agotado nada: esa persona no está dentro, y la salida es un asiento.
+    - `POST /projects` acepta `organizationId` opcional —sin él, tu organización
+      personal— y el gateway comprueba pertenencia y `canCreateProject` **antes**
+      de contar. Primero dónde va, después si cabe.
+18. ⚠️ **Los papeles de organización son un diccionario de booleanos, y no se
+    puede conceder lo que no se tiene.** `cabenEn` lo comprueba en los cuatro
+    sitios donde se reparte —crear papel, editar, asignar e **invitar**, que es
+    la puerta trasera que se olvida—. Ser dueño no es un papel: se resuelve
+    contra `ownerUserId` antes de mirar ninguno.
+19. ⚠️ **Una constante `process.env.X` en el cuerpo de un módulo NO ve el
     `.env`.** `ConfigModule.forRoot()` lo carga al **inicializar** el módulo, y
     los `import` se evalúan antes. Lo que se lea arriba del archivo solo ve las
     variables del proceso. Si hace falta configurar algo que se usa en un
@@ -254,11 +274,29 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
 ⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm prisma:generate`.
+
+⚠️ **El orden de las semillas no es alfabético y ahora son cinco**: permissions →
+credentials → **billing** → projects → tasks. Sin la de billing, la de projects no
+tiene organización a la que apuntar y falla con una restricción de columna en
+medio de un `create`, no con un mensaje claro.
+
+⚠️ **Compilar un servicio con `dev:backend` corriendo deja `dist/` a medias.** Es
+la misma trampa que `prisma:generate`, y vale igual para un `pnpm --filter …
+build`: sale un `MODULE_NOT_FOUND` que **no se arregla volviendo a compilar**.
+Hay que parar, borrar `dist/` del servicio, reconstruir y arrancar en frío.
+
+⚠️ **Levantar los 9 servicios y las 8 zonas a la vez agota los descriptores de
+archivo** (`ENFILE` en el vigilante de chokidar) y el último en arrancar muere.
+Para verificar contra la API, levanta solo el backend.
+
+🍎 ⚠️ **El `sed` de macOS no entiende `\b`.** Un `sed -i '' 's/\bX\b/Y/g'` se
+ejecuta, sale con código 0 y **no cambia nada**. Para renombrar en este
+repositorio, Python.
 
 ⚠️ **Y si eso pasa con `dev:backend` ya corriendo, `prisma:generate` no basta.** El
 servicio se ejecuta desde `dist/`, y `nest start --watch` copia el cliente allí
@@ -284,8 +322,8 @@ pnpm docker:up            # Postgres + Redis
 pnpm build:shared         # contracts + observability
 pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
-pnpm prisma:seed          # 4 seeds, en su orden de dependencia
-pnpm dev:backend          # gateway + los 8 microservicios
+pnpm prisma:seed          # 5 seeds, en su orden de dependencia
+pnpm dev:backend          # gateway + los 9 microservicios
 pnpm dev:frontend         # las 7 zonas
 ```
 

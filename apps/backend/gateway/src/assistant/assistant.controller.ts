@@ -23,6 +23,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -78,6 +79,7 @@ export class AssistantController {
     @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    private readonly cuotas: QuotaService,
   ) {}
 
   /**
@@ -97,9 +99,19 @@ export class AssistantController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama' })
   @ApiResponse({ status: 200, description: 'plan, usados, limite, periodo y fecha de reinicio' })
-  quota(@Param('projectId', ParseUUIDPipe) _projectId: string, @Request() req: Express.Request) {
+  async quota(
+    @Param('projectId', ParseUUIDPipe) _projectId: string,
+    @Request() req: Express.Request,
+  ) {
+    const userId = req.user!.userId;
+    /* ⚠️ El tope se resuelve aquí y viaja en el payload: assistant-service
+       cuenta los mensajes, pero **no sabe de planes de empresa** —esa tabla es
+       de billing-service— y sin el número usaría su tabla por defecto, que para
+       quien tiene el plan de su organización diría otra cosa que el servidor. */
+    const limiteMensual = await this.cuotas.limiteDeIa(userId);
+
     return firstValueFrom(
-      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId: req.user!.userId }),
+      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId, limiteMensual }),
     );
   }
 
@@ -112,7 +124,7 @@ export class AssistantController {
    * validación de siempre.
    *
    * Códigos que puede devolver, además de los normales:
-   * - **429** cuota agotada, con la cuota en `details` para que el chat la pinte;
+   * - **402** `QUOTA_EXCEEDED`, con el detalle del tope y la cuota en `details`;
    * - **502** Gemini no respondió. En ese caso **no se ha consumido cuota**.
    */
   @Post('chat')
@@ -120,7 +132,7 @@ export class AssistantController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Un turno de conversación con el asistente del proyecto' })
   @ApiResponse({ status: 200, description: 'Respuesta, propuestas pendientes de aceptar y cuota' })
-  @ApiResponse({ status: 429, description: 'Cuota mensual agotada' })
+  @ApiResponse({ status: 402, description: 'Cuota mensual agotada (QUOTA_EXCEEDED)' })
   @ApiResponse({ status: 502, description: 'Gemini no respondió. No se ha consumido cuota' })
   async chat(
     @Param('projectId', ParseUUIDPipe) projectId: string,
@@ -129,10 +141,13 @@ export class AssistantController {
   ) {
     const userId = req.user!.userId;
 
-    const [permisos, miembros, chat] = await Promise.all([
+    const [permisos, miembros, chat, ia] = await Promise.all([
       this.permisosEfectivos(userId, projectId),
       this.miembrosConNombre(projectId),
       this.chatReciente(projectId, userId),
+      /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
+         acabar en un 402 que tiene que decir qué plan puso ese tope. */
+      this.cuotas.iaDe(userId),
     ]);
 
     return firstValueFrom(
@@ -153,6 +168,8 @@ export class AssistantController {
           permisos,
           miembros,
           chat,
+          limiteMensual: ia.limite,
+          planTier: ia.tier,
         },
       ),
     );

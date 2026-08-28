@@ -87,7 +87,7 @@ Dentro de cada zona:
 > **La lógica de negocio (fetch, estado, validación) vive solo en las pages.**
 > Moléculas y organismos reciben slots `ReactNode` y props.
 
-### `apps/backend/` — un gateway y ocho microservicios
+### `apps/backend/` — un gateway y nueve microservicios
 
 ```
 apps/backend/
@@ -100,7 +100,8 @@ apps/backend/
     ├── reports/             → :3005 · agregador. Sin tablas propias
     ├── assistant/           → :3006 · el único que habla con Gemini
     ├── alexa/               → :3007 · solo lectura, para la skill de voz
-    └── automation/          → :3008 · motor de reglas
+    ├── automation/          → :3008 · motor de reglas
+    └── billing/             → :3009 · organizaciones, papeles, asientos y planes
 ```
 
 Los servicios **no se hablan por HTTP**: el gateway les habla por **TCP nativo de

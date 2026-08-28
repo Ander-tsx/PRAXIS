@@ -1,6 +1,4 @@
 import { setThemeAction } from '@/app/(private)/settings/actions';
-import { BillingSummary } from '@/components/organisms/BillingSummary';
-import type { AssistantQuota, EstadoDeFacturacion } from '@/lib/billing';
 import { AppHeader, ThemeToggle } from '@praxis/commons';
 import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
 import { getTheme } from '@praxis/commons/theme';
@@ -32,20 +30,16 @@ export const metadata: Metadata = {
  *
  * Apariencia se queda sin cuerpo — el control entra por `aside`, a la derecha
  * del título — porque un interruptor no necesita una fila propia debajo.
+ *
+ * ⚠️ **La facturación tampoco está ya aquí**, y es de 2026-08-26. Tenía su fila
+ * con el plan y los mensajes restantes, y a la vez existía una pantalla de
+ * planes: el mismo dato en dos sitios que se desincronizan solos. Ahora vive en
+ * `/dashboard/billing`, con entrada propia en la barra lateral — antes solo se
+ * llegaba tropezando con un límite, y una tabla de precios a la que se llega
+ * chocando no vende nada.
  */
 export default async function SettingsPage() {
-  const [, theme, quota, billing] = await Promise.all([
-    loadCurrentUser(),
-    getTheme(),
-    createServerApiClient()
-      .get<AssistantQuota>('/me/assistant/quota')
-      .catch(() => null),
-    /* `null` se trata como apagado en `BillingSummary`: si no se puede
-       preguntar si hay pasarela, no se ofrece comprar. */
-    createServerApiClient()
-      .get<EstadoDeFacturacion>('/me/billing/estado')
-      .catch(() => null),
-  ]);
+  const [, theme] = await Promise.all([loadCurrentUser(), getTheme()]);
 
   /* Sin `headerSlot`: el rol —y ahora también el plan— los pone el armazón en
      todas las pantallas de todas las zonas (`cuentaSlot`). Dejarlo aquí los
@@ -59,14 +53,6 @@ export default async function SettingsPage() {
           description="Elige el tema para toda la interfaz de Praxis."
           aside={<ThemeToggle initialTheme={theme} onCambiar={setThemeAction} />}
         />
-
-        <SettingsRow
-          icon={<IconoFacturacion />}
-          title="Facturación"
-          description="Tu plan del asistente de IA y cuántos mensajes te quedan este mes."
-        >
-          <BillingSummary quota={quota} billing={billing} />
-        </SettingsRow>
       </div>
     </AppHeader>
   );
@@ -117,22 +103,6 @@ function SettingsRow({
 
 /* Los iconos de fila, a 18 px y con el mismo trazo que los de la barra
    lateral. Van aquí y no en un átomo nuevo porque los usa solo esta pantalla. */
-
-function IconoFacturacion() {
-  return (
-    <svg
-      className="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
-      <path strokeLinecap="round" d="M3 10h18M6.5 14.5h3" />
-    </svg>
-  );
-}
 
 function IconoApariencia() {
   return (

@@ -112,7 +112,7 @@ export function ProjectCard({
      `<a>` no son el mismo tipo, y unificarlas obliga a un `any` que se lleva por
      delante la comprobación de la única prop que importa. */
   const clase =
-    'group flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+    'group flex h-full flex-col gap-4 rounded-sm border border-border bg-surface p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
   const cuerpo = (
     <>
@@ -134,9 +134,7 @@ export function ProjectCard({
               tarjeta en una fila de etiquetas — y «de quién es» ya lo dice la
               línea de debajo del nombre, que no gasta insignia. */}
         {suspendido && (
-          <Badge variant="error" className="shrink-0">
-            SUSPENDIDO
-          </Badge>
+          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-text-secondary">SUSPENDIDO</span>
         )}
       </div>
 
@@ -156,8 +154,8 @@ export function ProjectCard({
        */}
       {suspendido && project.suspendedReason && (
         <p
-          className="line-clamp-2 rounded-lg px-2.5 py-1.5 font-sans text-xs"
-          style={{ background: alpha(colors.error, 8), color: colors.error }}
+          className="line-clamp-2 rounded-sm px-2.5 py-1.5 font-sans text-xs"
+          style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textSecondary }}
         >
           {project.suspendedReason}
         </p>

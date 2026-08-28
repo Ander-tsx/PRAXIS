@@ -1,10 +1,7 @@
-"use client";
+'use client';
 
-import {
-  deleteTaskAction,
-  updateTaskAction,
-} from "@/app/(private)/[id]/actions";
-import { TASK_INITIAL_STATE } from "@/lib/action-state";
+import { deleteTaskAction, updateTaskAction } from '@/app/(private)/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
   Button,
   Input,
@@ -22,12 +19,12 @@ import {
   colors,
   personLabel,
   useAccion,
-} from "@praxis/commons";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { GestorDeEtiquetas } from "./GestorDeEtiquetas";
-import { TaskAttachments } from "./TaskAttachments";
-import { TaskChecklist } from "./TaskChecklist";
-import { SECTION_PANEL } from "./section-panel";
+} from '@praxis/commons';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { GestorDeEtiquetas } from './GestorDeEtiquetas';
+import { TaskAttachments } from './TaskAttachments';
+import { TaskChecklist } from './TaskChecklist';
+import { SECTION_PANEL } from './section-panel';
 
 export interface TaskDialogProps {
   open: boolean;
@@ -73,7 +70,7 @@ function formSignature(form: HTMLFormElement): string {
   return Array.from(new FormData(form).entries())
     .map(([name, value]) => `${name}=${String(value)}`)
     .sort()
-    .join("\n");
+    .join('\n');
 }
 
 /**
@@ -127,14 +124,8 @@ export function TaskDialog({
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const [state, formAction, pending] = useAccion(
-    updateTaskAction,
-    TASK_INITIAL_STATE,
-  );
-  const [deleteState, deleteAction, deleting] = useAccion(
-    deleteTaskAction,
-    TASK_INITIAL_STATE,
-  );
+  const [state, formAction, pending] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useAccion(deleteTaskAction, TASK_INITIAL_STATE);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const readOnly = !canEdit;
@@ -249,9 +240,7 @@ export function TaskDialog({
           >
             {columnName}
           </span>
-          <span className="font-sans text-xs">
-            Creada {formatDate(task.createdAt)}
-          </span>
+          <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
         </span>
       }
     >
@@ -282,7 +271,7 @@ export function TaskDialog({
         <Textarea
           name="description"
           label="Descripción"
-          defaultValue={task.description ?? ""}
+          defaultValue={task.description ?? ''}
           placeholder="Contexto, criterios de aceptación, enlaces…"
           rows={4}
           disabled={readOnly}
@@ -327,57 +316,41 @@ export function TaskDialog({
          */}
         <div className="flex flex-col gap-2">
           <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-            <legend className="font-sans text-sm font-medium text-text-primary">
-              Etiquetas
-            </legend>
+            <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
             {labels.length === 0 ? (
               <p className="font-sans text-xs text-text-secondary">
                 Este proyecto no tiene etiquetas todavía.
-                {canManageLabels ? " Crea la primera aquí abajo." : ""}
+                {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
               </p>
             ) : (
-              <div
-                className="flex flex-wrap gap-2 rounded-xl p-3"
-                style={SECTION_PANEL}
-              >
+              <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
                 {labels.map((label) => (
                   <LabelToggle
                     key={label.id}
                     label={label}
-                    defaultChecked={task.labels.some(
-                      (l) => l.labelId === label.id,
-                    )}
+                    defaultChecked={task.labels.some((l) => l.labelId === label.id)}
                   />
                 ))}
               </div>
             )}
           </fieldset>
 
-          {canManageLabels && (
-            <GestorDeEtiquetas projectId={projectId} labels={labels} />
-          )}
+          {canManageLabels && <GestorDeEtiquetas projectId={projectId} labels={labels} />}
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-          <legend className="font-sans text-sm font-medium text-text-primary">
-            Encargados
-          </legend>
+          <legend className="font-sans text-sm font-medium text-text-primary">Encargados</legend>
           {members.length === 0 ? (
             <p className="font-sans text-xs text-text-secondary">
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
-            <div
-              className="flex flex-col gap-0.5 rounded-xl p-2"
-              style={SECTION_PANEL}
-            >
+            <div className="flex flex-col gap-0.5 rounded-xl p-2" style={SECTION_PANEL}>
               {members.map((member) => (
                 <AssigneeToggle
                   key={member.id}
                   member={member}
-                  defaultChecked={task.assignees.some(
-                    (a) => a.userId === member.id,
-                  )}
+                  defaultChecked={task.assignees.some((a) => a.userId === member.id)}
                 />
               ))}
             </div>
@@ -388,11 +361,7 @@ export function TaskDialog({
         </fieldset>
 
         {(state.error || deleteState.error) && (
-          <p
-            role="alert"
-            className="font-sans text-sm"
-            style={{ color: colors.error }}
-          >
+          <p role="alert" className="font-sans text-sm" style={{ color: colors.error }}>
             {state.error ?? deleteState.error}
           </p>
         )}
@@ -424,16 +393,9 @@ export function TaskDialog({
               <input type="hidden" name="taskId" value={task.id} />
               {confirmingDelete ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-sans text-xs text-text-secondary">
-                    ¿Seguro?
-                  </span>
-                  <Button
-                    type="submit"
-                    variant="danger"
-                    size="sm"
-                    disabled={deleting}
-                  >
-                    {deleting ? "Eliminando…" : "Sí, eliminar"}
+                  <span className="font-sans text-xs text-text-secondary">¿Seguro?</span>
+                  <Button type="submit" variant="danger" size="sm" disabled={deleting}>
+                    {deleting ? 'Eliminando…' : 'Sí, eliminar'}
                   </Button>
                   <Button
                     type="button"
@@ -485,10 +447,7 @@ function SaveStatus({
 }) {
   if (saving) {
     return (
-      <span
-        className="font-sans text-xs text-text-secondary"
-        aria-live="polite"
-      >
+      <span className="font-sans text-xs text-text-secondary" aria-live="polite">
         Guardando…
       </span>
     );
@@ -496,11 +455,7 @@ function SaveStatus({
 
   if (failure) {
     return (
-      <span
-        className="font-sans text-xs"
-        style={{ color: colors.error }}
-        aria-live="polite"
-      >
+      <span className="font-sans text-xs" style={{ color: colors.error }} aria-live="polite">
         Sin save
       </span>
     );
@@ -575,11 +530,7 @@ function AssigneeToggle({
           strokeWidth={3}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </span>
 
@@ -642,11 +593,7 @@ function LabelToggle({
           strokeWidth={3.5}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </span>
 
@@ -657,16 +604,16 @@ function LabelToggle({
 
 /** `2026-08-01T23:59:59.000Z` → `2026-08-01`, que es lo que quiere el input. */
 function toDateInput(iso: string | null): string {
-  if (!iso) return "";
+  if (!iso) return '';
   const date = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("es", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+  return new Date(iso).toLocaleDateString('es', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 }

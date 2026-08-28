@@ -20,11 +20,19 @@ export interface FilterBarProps {
   basePath: string;
   busqueda: string;
   placeholder: string;
-  filtros: FilterOption[];
+  /**
+   * Las opciones excluyentes del carril.
+   *
+   * ⚠️ **Opcionales**: hay secciones que solo buscan. Organizaciones es la
+   * primera —no tiene estados que filtrar, porque no se suspenden desde aquí— y
+   * obligarla a declarar un filtro de una sola opción sería pintar un control
+   * segmentado con un único segmento, que no es un control: es ruido.
+   */
+  filtros?: FilterOption[];
   /** El filtro puesto, o `undefined` cuando no hay ninguno. */
   filtroActivo?: string;
   /** El id de la opción «todos», que **no** se escribe en la URL. */
-  idTodos: string;
+  idTodos?: string;
   total: number;
   nombreSingular: string;
   nombrePlural: string;
@@ -81,8 +89,9 @@ export function FilterBar({
   const [texto, setTexto] = useState(busqueda);
   const inputId = useId();
 
+  const hayFiltros = (filtros?.length ?? 0) > 0;
   const activo = filtroActivo ?? idTodos;
-  const filtrando = busqueda.length > 0 || activo !== idTodos;
+  const filtrando = busqueda.length > 0 || (hayFiltros && activo !== idTodos);
 
   function navegar(siguiente: { q?: string; estado?: string }) {
     const params = new URLSearchParams();
@@ -159,30 +168,32 @@ export function FilterBar({
         {/* `<fieldset>` y no un `div` con `role="group"`: es el elemento que
             existe para esto, y el rótulo va en un `<legend>` en vez de en un
             `aria-label` que solo oyen los lectores de pantalla. */}
-        <fieldset
-          className="flex flex-wrap gap-0.5 rounded-xl p-1"
-          style={{ background: alpha(colors.border, 45) }}
-        >
-          <legend className="sr-only">Filtrar por estado</legend>
-          {filtros.map((filtro) => {
-            const puesto = activo === filtro.id;
-            return (
-              <button
-                key={filtro.id}
-                type="button"
-                onClick={() => navegar({ estado: filtro.id })}
-                aria-pressed={puesto}
-                className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
-                  puesto
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
-                }`}
-              >
-                {filtro.etiqueta}
-              </button>
-            );
-          })}
-        </fieldset>
+        {hayFiltros && (
+          <fieldset
+            className="flex flex-wrap gap-0.5 rounded-xl p-1"
+            style={{ background: alpha(colors.border, 45) }}
+          >
+            <legend className="sr-only">Filtrar por estado</legend>
+            {(filtros ?? []).map((filtro) => {
+              const puesto = activo === filtro.id;
+              return (
+                <button
+                  key={filtro.id}
+                  type="button"
+                  onClick={() => navegar({ estado: filtro.id })}
+                  aria-pressed={puesto}
+                  className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
+                    puesto
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                  }`}
+                >
+                  {filtro.etiqueta}
+                </button>
+              );
+            })}
+          </fieldset>
+        )}
 
         <p className="font-sans text-xs text-text-secondary">
           <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}

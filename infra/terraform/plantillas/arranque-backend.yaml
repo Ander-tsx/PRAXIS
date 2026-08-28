@@ -57,10 +57,15 @@ write_files:
       VOICE_JWT_SECRET=$(secreto "${prefijo}-voice-jwt-secret")
       GEMINI_API_KEY=$(secreto "${prefijo}-gemini-api-key")
       MAIL_API_KEY=$(secreto "${prefijo}-mail-api-key")
-      # Stripe. Sin estas tres la facturación queda apagada y el resto funciona
-      # igual: el gateway lo detecta al arrancar y la interfaz no ofrece comprar.
+      # Stripe. Sin la clave secreta la facturación queda apagada y el resto
+      # funciona igual: el gateway lo detecta al arrancar y la interfaz no
+      # ofrece comprar. Cada precio que falte apaga **solo su plan**, no el
+      # cobro entero — así se puede desplegar PRO antes que los de empresa.
       STRIPE_SECRET_KEY=$(secreto "${prefijo}-stripe-secret-key")
       STRIPE_PRICE_PRO=$(secreto "${prefijo}-stripe-price-pro")
+      STRIPE_PRICE_PLUS=$(secreto "${prefijo}-stripe-price-plus")
+      STRIPE_PRICE_TEAM=$(secreto "${prefijo}-stripe-price-team")
+      STRIPE_PRICE_BUSINESS=$(secreto "${prefijo}-stripe-price-business")
       STRIPE_WEBHOOK_SECRET=$(secreto "${prefijo}-stripe-webhook-secret")
       GOOGLE_CLIENT_ID=${google_client_id}
       MAIL_FROM=${mail_from}

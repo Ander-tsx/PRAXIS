@@ -484,7 +484,7 @@ export function Composer({
             role="listbox"
             tabIndex={-1}
             aria-label="Sugerencias"
-            className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-border"
+            className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-sm border border-border"
             style={{
               background: colors.surfaceElevated,
               boxShadow: `0 16px 40px ${alpha(colors.overlay, 55)}`,
@@ -548,7 +548,7 @@ export function Composer({
         )}
 
         <div
-          className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
+          className="flex items-end gap-2 rounded-sm border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
           style={{ background: colors.surfaceElevated }}
         >
           <div className="relative min-w-0 flex-1">

@@ -1,16 +1,16 @@
 'use client';
-import { useState } from 'react';
 import {
   Badge,
   Button,
+  PERSONA_ELIMINADA,
   type ProjectInvitation,
   type ProjectMember,
   type ProjectRole,
   type UserProfile,
   avatarHref,
-  PERSONA_ELIMINADA,
   personLabel,
 } from '@praxis/commons';
+import { useState } from 'react';
 import { InviteMemberDialog } from './InviteMemberDialog';
 import { LeaveProjectButton } from './LeaveProjectButton';
 import { MemberAvatar } from './MemberAvatar';
@@ -114,6 +114,9 @@ export function ProjectMembers({
               projectId={projectId}
               roles={roles}
               excluirIds={excluirIds}
+              /* El tope de miembros lo pone el plan del dueño: quien no lo es no
+                 arregla nada ampliando el suyo. */
+              soyDueño={ownerId === currentUserId}
               onClose={() => setIsInviting(false)}
             />
           </div>

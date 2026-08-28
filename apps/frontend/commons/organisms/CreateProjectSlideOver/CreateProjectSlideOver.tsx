@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Button, Input, Sparkle, Textarea, iniciales } from '../../atoms';
 import { useAccion } from '../../hooks';
-import { SlideOver } from '../../molecules';
+import { QuotaNotice, SlideOver } from '../../molecules';
 import { alpha, colors } from '../../tokens';
 import { MockMiniChat } from './MockMiniChat';
 import {
@@ -114,11 +114,11 @@ export function CreateProjectSlideOver({
           onClick={() => setOpen(true)}
           /* `h-full` y el mismo radio que una tarjeta de proyecto: en la rejilla
              tiene que medir lo que sus vecinas, no lo que ocupa su texto. */
-          className="group flex h-full min-h-[10rem] w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border p-5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="group flex h-full min-h-[10rem] w-full cursor-pointer flex-col items-center justify-center gap-3 rounded-sm border border-dashed border-border p-5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <span
             aria-hidden="true"
-            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-sm transition-colors"
             style={{ background: alpha(colors.primary, 10), color: colors.primary }}
           >
             <IconoMas grande />
@@ -223,7 +223,7 @@ export function CreateProjectSlideOver({
                 escribe. En móvil caen uno debajo del otro. */}
             <div className="flex flex-col gap-6 lg:flex-row">
               <div className="flex min-w-0 flex-1 flex-col gap-6">
-                <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+                <div className="flex flex-col gap-5 rounded-sm border border-border bg-surface p-6 shadow-sm">
                   <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
                     Información Principal
                   </h3>
@@ -268,7 +268,7 @@ export function CreateProjectSlideOver({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
+                <div className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-6 shadow-sm">
                   <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
                     Detalles Adicionales
                   </h3>
@@ -293,17 +293,37 @@ export function CreateProjectSlideOver({
               </div>
             </div>
 
-            {state.error && (
-              <p
-                role="alert"
-                className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-                style={{
-                  background: alpha(colors.error, 10),
-                  borderColor: alpha(colors.error, 30),
-                }}
-              >
-                {state.error}
-              </p>
+            {/**
+             * Un tope del plan no es un error del formulario, y no se pinta
+             * igual.
+             *
+             * 🔴 Antes sí: el 402 salía como una línea roja idéntica a la de un
+             * nombre duplicado, sin decir qué plan lo resuelve ni cómo llegar a
+             * él. Es el sitio exacto donde alguien decidiría pagar, y era un
+             * callejón. El detalle ya viajaba en la respuesta; solo faltaba
+             * enseñarlo.
+             */}
+            {state.cuota ? (
+              <QuotaNotice
+                detalle={state.cuota}
+                mensaje={state.error ?? ''}
+                /* La segunda cara: el gateway dice si esta persona puede pagar.
+                   Ausente = no se sabe, y se ofrece la salida igual. */
+                ampliarSirve={state.cuota.puedeAmpliar !== false}
+              />
+            ) : (
+              state.error && (
+                <p
+                  role="alert"
+                  className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
+                  style={{
+                    background: alpha(colors.error, 10),
+                    borderColor: alpha(colors.error, 30),
+                  }}
+                >
+                  {state.error}
+                </p>
+              )
             )}
 
             <div className="flex justify-end gap-3">
@@ -340,7 +360,7 @@ function ModoOpcion({
       type="button"
       onClick={onClick}
       aria-pressed={activa}
-      className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-colors"
+      className="flex cursor-pointer items-start gap-3 rounded-sm border p-3 text-left transition-colors"
       style={{
         borderColor: activa ? colors.primary : colors.border,
         background: activa ? alpha(colors.primary, 8) : 'transparent',
@@ -396,11 +416,11 @@ function VistaPrevia({
         Así se verá
       </p>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+      <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4">
         <div className="flex items-start gap-3">
           <span
             aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-sans text-sm font-semibold uppercase"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm font-sans text-sm font-semibold uppercase"
             style={
               colorLogo
                 ? {

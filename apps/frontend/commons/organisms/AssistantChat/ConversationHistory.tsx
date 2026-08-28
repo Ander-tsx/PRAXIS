@@ -117,7 +117,7 @@ export function ConversationHistory({
         )}
 
         {listaFiltrada !== null && listaFiltrada.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
+          <div className="rounded-sm border border-dashed border-border px-6 py-10 text-center">
             <p className="font-display text-base text-text-primary">
               Todavía no has hablado con el asistente
             </p>

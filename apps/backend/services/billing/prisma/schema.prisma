@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["billing"]
+  url      = env("DATABASE_URL")
+}
+
+/// Los cinco planes. Lo que da cada uno vive en `@praxis/contracts` (`PLANS`),
+/// **no aquí**: el gateway, la pantalla de precios y el aviso de «te quedan
+/// tres» tienen que leer el mismo número, y un catálogo duplicado en la base
+/// acaba prometiendo lo que el guard niega.
+///
+/// Aquí solo está el identificador, que es lo único que hay que guardar.
+enum PlanTier {
+  FREE
+  TEAM
+  BUSINESS
+  ENTERPRISE
+
+  @@schema("billing")
+}
+
+enum OrganizationKind {
+  PERSONAL
+  ENTERPRISE
+
+  @@schema("billing")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+
+  @@schema("billing")
+}
+
+/// ⚠️ **Cuatro estados, no los ocho de Stripe.** Aquí solo hay que decidir si el
+/// plan vale hoy; los matices de su motor de cobro —`incomplete`,
+/// `incomplete_expired`, `unpaid`, `paused`— no cambian nada de lo que hace esta
+/// aplicación, y guardarlos habría metido su vocabulario en nuestras consultas.
+/// La traducción está en `stripe-webhook.controller.ts`.
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+
+  @@schema("billing")
+}
+
+/// La unidad que paga.
+///
+/// ## Dos clases, y la personal es la que sostiene el modelo
+///
+/// `PERSONAL` es la organización de una persona: sin nombre, un miembro y no
+/// admite más. **No se ve en ninguna pantalla.** Existe para que la pregunta
+/// «¿cuál es tu plan?» tenga una sola forma en todo el sistema, en vez de
+/// bifurcar cada consulta de cuota entre «plan individual» y «plan de empresa».
+///
+/// Se crea sola la primera vez que hace falta, no al registrarse: rellenar una
+/// tabla para todo el mundo antes de que sirva de algo es una migración
+/// pendiente disfrazada. Es la misma decisión que ya tomó
+/// `AssistantSubscription`, y aquí además significa que **sin fila = FREE**.
+///
+/// ⚠️ No hay clave foránea hacia el usuario: las cuentas viven en
+/// credentials-service, en otro esquema y bajo otro dueño. Es la regla que ya
+/// siguen `task_events` y `notifications`.
+model Organization {
+  id          String           @id @default(uuid())
+  kind        OrganizationKind @default(PERSONAL)
+
+  /// Cómo se llama.
+  ///
+  /// ⚠️ **La personal también tiene**, desde 2026-08-26. Mientras solo repartía
+  /// topes, una organización sin nombre que no salía en ninguna pantalla tenía
+  /// sentido; desde que **contiene** los proyectos, una que no se ve es un sitio
+  /// donde no se puede meter nada. Sigue siendo anulable por las filas que se
+  /// crearon antes de que el gateway supiera pasar el nombre.
+  name        String?
+  /// Lo que iría en una URL. Único global, como el de proyecto.
+  slug        String?          @unique
+
+  /// Quien la creó y quien paga. En la personal, la persona.
+  ///
+  /// ⚠️ El índice único es **parcial y no se puede expresar aquí**: solo puede
+  /// haber una `PERSONAL` por usuario, pero varias `ENTERPRISE` del mismo dueño
+  /// son legítimas. Lo crea la migración a mano con un `WHERE kind =
+  /// 'PERSONAL'`; sin él, dos peticiones simultáneas de alguien sin
+  /// organización crean dos y la segunda se queda con las cuotas.
+  ownerUserId String
+
+  members       OrganizationMember[]
+  roles         OrganizationRole[]
+  roleTemplates ProjectRoleTemplate[]
+  subscription  Subscription?
+  events        BillingEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerUserId])
+  @@schema("billing")
+  @@map("organizations")
+}
+
+/// Quién está dentro, y con qué papel.
+///
+/// ⚠️ **`userId` es opcional y `email` no.** Una invitación existe antes de que
+/// exista la cuenta: se invita por correo —que es lo único que sabe quien
+/// invita— y el `userId` se rellena al aceptar. Al revés obligaría a un
+/// endpoint que dice si una dirección tiene cuenta, que es un enumerador de
+/// usuarios con otro nombre.
+///
+/// ⚠️ **Una invitación ocupa asiento.** Si no lo ocupara se podrían mandar mil
+/// sobre tres asientos y el tope se rompería al aceptarlas, con la organización
+/// ya por encima de lo que paga. Por eso `seatsUsed` cuenta `INVITED` + `ACTIVE`.
+model OrganizationMember {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId String?
+  email  String
+
+  /// El papel que lleva dentro de la organización.
+  ///
+  /// ⚠️ **No es nullable ni siquiera en el dueño.** Su fila también apunta a un
+  /// papel —el de administración— y simplemente no se consulta: `permisosDe`
+  /// resuelve al dueño comparando con `Organization.ownerUserId` **antes** de
+  /// mirar ninguno. Una columna anulable obligaría a tratar el caso `null` en
+  /// cada lectura para un caso que ya está resuelto antes de llegar aquí.
+  roleId String
+  role   OrganizationRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  status MembershipStatus @default(INVITED)
+
+  /// El hash del token del enlace, nunca el token.
+  ///
+  /// Mismo criterio que la verificación de correo en credentials-service: en
+  /// claro solo existe dentro del mensaje. Quien lea la base no puede aceptar
+  /// invitaciones ajenas.
+  inviteTokenHash String?   @unique
+  inviteExpiresAt DateTime?
+
+  invitedAt DateTime  @default(now())
+  joinedAt  DateTime?
+
+  @@unique([organizationId, email])
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([roleId])
+  @@schema("billing")
+  @@map("organization_members")
+}
+
+/// Lo que se puede hacer **a** una organización, y quién.
+///
+/// ## Por qué es una tabla y no un enum
+///
+/// Era un enum de tres valores —`OWNER`, `ADMIN`, `MEMBER`— y se quedó corto en
+/// cuanto una empresa quiso decidir *quién crea proyectos* aparte de *quién
+/// invita*. Ahora cada organización define los suyos, exactamente igual que un
+/// proyecto define sus roles: es el mismo concepto una capa más arriba, y que se
+/// parezcan es lo que hace que se aprenda una sola vez.
+///
+/// ⚠️ **`permissions` es un diccionario de booleanos, nunca un array.** En los
+/// roles de proyecto se aprendió tarde y todavía hay filas guardadas como array
+/// que se normalizan al leer. Aquí el validador va desde el primer día y
+/// `normalizarPermisosOrg` es la única puerta de entrada.
+///
+/// ⚠️ **`OWNER` no está aquí.** Ser dueño no es un papel: se resuelve contra
+/// `Organization.ownerUserId`. Guardarlo como fila permitiría quitarse permisos a
+/// uno mismo y dejar la organización sin quien la administre.
+model OrganizationRole {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  permissions Json
+
+  /// El que se lleva quien entra sin que nadie diga cuál.
+  ///
+  /// ⚠️ Tiene que haber **exactamente uno** por organización: sin ninguno, una
+  /// invitación sin papel no se puede escribir; con dos, cuál se aplica depende
+  /// del orden en que la base los devuelva.
+  isDefault Boolean @default(false)
+
+  members OrganizationMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@schema("billing")
+  @@map("organization_roles")
+}
+
+/// Los roles con los que nace un proyecto de esta organización.
+///
+/// El puente entre los dos planos de permisos, y **va en una sola dirección**:
+/// al crear un proyecto se copian aquí sus roles, y a partir de ahí el proyecto
+/// es dueño de los suyos. Cambiar una plantilla **no** reescribe los proyectos
+/// que ya existen — sería borrar el trabajo de quien los ajustó, desde una
+/// pantalla que habla de otra cosa.
+///
+/// ⚠️ `permissions` son permisos **de proyecto** (`ProjectPermission`), no de
+/// organización. Son dos vocabularios distintos y este es el otro: mezclarlos
+/// daría un rol de proyecto con `canManageBilling` dentro, que no significa nada
+/// y nadie comprobaría.
+model ProjectRoleTemplate {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  permissions Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@schema("billing")
+  @@map("project_role_templates")
+}
+
+/// La suscripción de una organización. Una como mucho.
+///
+/// El pago va por **Stripe Checkout alojado**: la página de la tarjeta la sirve
+/// Stripe, así que ningún dato de tarjeta pasa jamás por aquí. Lo que queda son
+/// los identificadores que Stripe devuelve, que no son secretos y no sirven
+/// para cobrar nada.
+///
+/// ⚠️ **Quien decide el plan es el webhook, nunca la vuelta del navegador.** La
+/// URL de éxito la puede escribir cualquiera; si pasar a PRO dependiera de
+/// visitarla, PRO sería gratis.
+model Subscription {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  tier   PlanTier           @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
+
+  /// Asientos pagados. `1` en una personal, y lo que se contrató en una empresa.
+  seats Int @default(1)
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId        String?
+
+  /// 🔴 Cuándo acaba el mes gratis del plan PLUS.
+  ///
+  /// Lo pone Stripe (`trial_end`), no un cálculo nuestro, y viaja hasta la
+  /// pantalla desde el día uno. La trampa 3 del encargo dice por qué: el mes
+  /// gratis se cobra al segundo y «no me avisaron» es la queja más cara de este
+  /// terreno. Sin esta fecha guardada no hay forma de demostrar que se avisó.
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  /// Se pidió la baja y el plan vale hasta aquí. No es lo mismo que `CANCELED`.
+  cancelAt         DateTime?
+  canceledAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("billing")
+  @@map("subscriptions")
+}
+
+/// El registro de todo lo que movió dinero o plan, con su instante.
+///
+/// 🔴 **Existe por la trampa 3 del encargo**, y no es un log: es la prueba. Todo
+/// lo que dependa de fechas de facturación —el mes gratis que se cobra al
+/// segundo, una baja, un cambio de asientos— queda aquí con el instante en que
+/// pasó y con el evento de Stripe que lo causó.
+///
+/// ⚠️ `stripeEventId` es único **y por eso este modelo también es la
+/// idempotencia**. Stripe reintenta hasta recibir un 2xx y manda eventos que se
+/// solapan; escribir aquí primero y dejar que el índice único rechace el
+/// duplicado es más barato y más honesto que comprobarlo antes con un `SELECT`,
+/// que tiene una carrera entre la lectura y la escritura.
+model BillingEvent {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  /// El identificador del evento de Stripe, si vino de ahí. Único.
+  stripeEventId String? @unique
+  /// Qué pasó, en nuestro vocabulario: `plan_aplicado`, `asientos_cambiados`…
+  type          String
+  /// Lo que haga falta para reconstruirlo. Nunca datos de tarjeta.
+  payload       Json?
+
+  occurredAt DateTime @default(now())
+
+  @@index([organizationId, occurredAt])
+  @@schema("billing")
+  @@map("billing_events")
+}

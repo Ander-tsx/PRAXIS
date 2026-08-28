@@ -10,6 +10,7 @@ import {
   type TemplateResult,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { detallesDeCuota } from '@praxis/commons/billing/planes';
 import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/template';
 import { revalidatePath } from 'next/cache';
 
@@ -29,14 +30,18 @@ export async function createProjectAction(
 ): Promise<CreateProjectState> {
   const session = await getSession();
   if (!session) {
-    return { error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.', createdName: null };
+    return {
+      error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+      createdName: null,
+      cuota: null,
+    };
   }
 
   const name = String(formData.get('name') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
 
   const invalid = validateProject({ name, description });
-  if (invalid) return { error: invalid, createdName: null };
+  if (invalid) return { error: invalid, createdName: null, cuota: null };
 
   const api = createServerApiClient();
 
@@ -47,18 +52,25 @@ export async function createProjectAction(
       ...(description ? { description } : {}),
     });
   } catch (error) {
-    return { error: describeProjectError(error), createdName: null };
+    /* El 402 sale por su propia puerta: el diálogo necesita el detalle para
+       ofrecer una salida, no solo la frase. Ver `QuotaNotice`. */
+    return {
+      error: describeProjectError(error),
+      createdName: null,
+      cuota: detallesDeCuota(error),
+    };
   }
 
   if (!created?.id || created.name !== name) {
     return {
       error: 'El servidor respondió correctamente pero no guardó el proyecto.',
       createdName: null,
+      cuota: null,
     };
   }
 
   revalidatePath('/');
-  return { error: null, createdName: created.name };
+  return { error: null, createdName: created.name, cuota: null };
 }
 
 function describeProjectError(error: unknown): string {
@@ -93,7 +105,7 @@ export async function borradorDePlantillaAction(
 ): Promise<TemplateDraftState> {
   const session = await getSession();
   if (!session) {
-    return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false };
+    return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false, cuota: null };
   }
   return pedirBorrador(brief, ajuste);
 }

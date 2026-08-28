@@ -47,13 +47,30 @@ export class QuotaService {
   }
 
   /**
+   * Cuántos mensajes tiene al mes.
+   *
+   * ⚠️ **El tope lo decide billing-service y llega desde fuera; esto es la red
+   * de abajo.** Desde la etapa Enterprise hay cinco planes y el de alguien puede
+   * venir de la organización de su empresa, que este servicio no conoce: el
+   * gateway resuelve el número y lo pasa en el payload.
+   *
+   * `ASSISTANT_LIMITS` se queda como valor por defecto y **no es decorativo**:
+   * es lo que responde si alguien llama a este servicio por TCP sin pasar por el
+   * gateway, y sin él ese camino daría `undefined`, que comparado con `>=` es
+   * siempre falso — o sea, mensajes infinitos y ni un error.
+   */
+  private limite(plan: AssistantPlanName, desdeFuera?: number | null): number {
+    return typeof desdeFuera === 'number' && desdeFuera >= 0 ? desdeFuera : ASSISTANT_LIMITS[plan];
+  }
+
+  /**
    * Cuánto lleva gastado, **sin gastar nada**.
    *
    * Lo pide el chat al abrirse para pintar el contador. No crea la fila de
    * consumo: un mes en el que no se escribió ningún mensaje no tiene por qué
    * dejar rastro.
    */
-  async estado(userId: string): Promise<AssistantQuota> {
+  async estado(userId: string, limiteMensual?: number | null): Promise<AssistantQuota> {
     const period = this.periodo();
     const [plan, uso] = await Promise.all([
       this.plan(userId),
@@ -63,7 +80,7 @@ export class QuotaService {
     return {
       plan,
       usados: uso?.used ?? 0,
-      limite: ASSISTANT_LIMITS[plan],
+      limite: this.limite(plan, limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),
     };
@@ -195,7 +212,7 @@ export class QuotaService {
    * El `upsert` con `increment` deja la suma **en la base**, no en JavaScript:
    * dos pestañas escribiendo a la vez no se pisan el contador.
    */
-  async consumir(userId: string): Promise<AssistantQuota> {
+  async consumir(userId: string, limiteMensual?: number | null): Promise<AssistantQuota> {
     const period = this.periodo();
 
     const uso = await this.prisma.assistantUsage.upsert({
@@ -209,7 +226,7 @@ export class QuotaService {
     return {
       plan,
       usados: uso.used,
-      limite: ASSISTANT_LIMITS[plan],
+      limite: this.limite(plan, limiteMensual),
       periodo: period,
       reinicia: this.reinicio(),
     };

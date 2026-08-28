@@ -66,7 +66,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
             type="button"
             onClick={() => void elegir(clave)}
             aria-pressed={puesta}
-            className="flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex min-w-0 cursor-pointer items-start gap-3 rounded-sm border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               /* El color del estado tiñe la opción elegida: es lo mismo que
                  distingue su punto, así que no hay que aprenderse un segundo

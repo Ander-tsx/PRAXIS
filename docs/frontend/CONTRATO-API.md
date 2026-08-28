@@ -1006,8 +1006,10 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
+| GET | `/me/billing/planes` | — | El catálogo y cuáles se pueden contratar aquí |
+| GET | `/me/billing/resumen` | — | Plan, topes, consumo y organizaciones, en una llamada |
 | GET | `/me/billing/estado` | — | `{ disponible, gestionable }` |
-| POST | `/me/billing/checkout` | — | → `{ url }` de Stripe Checkout |
+| POST | `/me/billing/checkout` | `{ tier, seats, organizationId }` | → `{ url }` de Stripe Checkout |
 | POST | `/me/billing/portal` | — | → `{ url }` del portal. 400 si no eres cliente |
 | POST | `/webhooks/stripe` | crudo | **público, sin JWT**. Su auth es la firma |
 
@@ -1028,6 +1030,76 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
   eventos que se solapan. Todo lo que hace es un `upsert` de estado final.
 - Sin firma válida → **400**. Sin `STRIPE_WEBHOOK_SECRET` configurado rechaza
   **todo**: es su única autenticación.
+- 🔴 **`checkout` exige `organizationId` SIEMPRE**, desde 2026-08-26. Todos los
+  planes de pago van por asiento y los contrata una organización — incluida la
+  personal de quien trabaja solo, que es una organización de un asiento. Antes
+  los «individuales» iban sin él y era la única excepción; ya no hay ninguna.
+- ⚠️ **`ENTERPRISE` no se puede pedir aquí**, y no por falta de dinero: no tiene
+  precio en Stripe porque se negocia. Aceptarlo abriría un checkout contra un
+  precio que no existe. La lista buena es `PLANES_AUTOSERVICIO`.
+- ⚠️ Cada precio que falte en el entorno **apaga solo su plan**, no el cobro
+  entero. `planes.disponibles` dice cuáles se pueden pedir; ofrecer uno que no
+  está da **503** al pulsar.
+
+---
+
+## Organizaciones 🔒
+
+La unidad que paga **y que contiene los proyectos**. Todo el mundo tiene al menos
+una: quien trabaja solo tiene la suya, de un asiento.
+
+| Método | Ruta | Body | Notas |
+|---|---|---|---|
+| GET | `/me/organizations` | — | Las tuyas, con `myPermissions` ya resuelto |
+| POST | `/me/organizations` | `{ name, tier, seats }` | Nace en `FREE`; el plan lo aplica el webhook |
+| POST | `/me/organizations/invitations/accept` | `{ token }` | El token del enlace del correo |
+| GET | `/organizations/:id` | — | 403 `NOT_IN_ORG` si no perteneces |
+| PATCH | `/organizations/:id` | `{ name }` | `canManageOrganization` |
+| GET | `/organizations/:id/members` | — | Basta con tener asiento |
+| POST | `/organizations/:id/members` | `{ email, roleId? }` | `canInviteMembers`. Manda correo **y** devuelve el enlace |
+| PATCH | `/organizations/:id/members/:userId` | `{ roleId }` | `canManageMembers` |
+| DELETE | `/organizations/:id/members/:idOrEmail` | — | `canManageMembers`. Libera el asiento |
+| GET | `/organizations/:id/roles` | — | `canManageMembers` — es el mapa del poder interno |
+| POST | `/organizations/:id/roles` | `{ name, permissions }` | `canManageMembers` |
+| PATCH | `/organizations/:id/roles/:roleId` | `{ name, permissions }` | `canManageMembers` |
+| DELETE | `/organizations/:id/roles/:roleId` | — | **409** si todavía lo lleva alguien |
+| GET | `/organizations/:id/role-templates` | — | Basta con tener asiento |
+| POST | `/organizations/:id/role-templates` | `{ name, permissions }` | `canManageRoleTemplates` |
+| PATCH | `/organizations/:id/role-templates/:templateId` | `{ name, permissions }` | `canManageRoleTemplates` |
+| DELETE | `/organizations/:id/role-templates/:templateId` | — | No toca ningún proyecto ya creado |
+| PATCH | `/organizations/:id/seats` | `{ seats }` | `canManageBilling`. Stripe prorratea |
+| POST | `/organizations/:id/transfer` | `{ userId }` | **Solo el dueño**. El destino tiene que estar dentro |
+| GET | `/organizations/:id/history` | — | `canViewAuditLog` |
+
+**Reglas que ya han mordido:**
+
+1. 🔴 **`permissions` es un diccionario de booleanos, nunca un array.** Igual que
+   los roles de proyecto, pero **con validador desde el primer día** — allí se
+   aprendió tarde y todavía hay filas guardadas como lista que se normalizan al
+   leer.
+2. 🔴 **No se puede conceder un permiso que no se tiene.** El servidor rechaza un
+   papel cuyos permisos no quepan en los de quien lo guarda, y lo comprueba
+   también **al invitar** — que es la puerta trasera que se olvida. Sin esa
+   regla, quien gestiona miembros se fabrica un papel con `canManageBilling` y se
+   lo pone.
+3. ⚠️ **Ser dueño no es un papel**, así que no se concede por
+   `PATCH .../members/:userId`. Traspasar tiene su propia ruta y solo la usa el
+   dueño: si fuera un valor más del desplegable, quien administra podría
+   regalarse la organización con un `PATCH`.
+4. ⚠️ **Una invitación ocupa asiento desde que se manda.** Si no lo ocupara, se
+   podrían mandar mil sobre tres y el tope reventaría al aceptarlas.
+5. ⚠️ **Borrar un papel que lleva gente da 409**, con el número dentro: sin saber
+   a cuánta gente hay que mover, no se puede arreglar. El de por defecto tampoco
+   se borra — sin él, la siguiente invitación no se puede escribir.
+6. ⚠️ **La lista de papeles exige `canManageMembers`; la de miembros no.** Saber
+   con quién compartes organización es lo mínimo para trabajar; saber quién puede
+   tocar la facturación es un mapa del poder interno.
+7. ⚠️ **`GET /projects` acepta `organizationId`**, y es un **filtro sobre lo que
+   ya puedes ver**, no una llave: se suma al «dueño o miembro» de siempre. Poner
+   ahí una organización ajena devuelve cero proyectos.
+8. ⚠️ **`POST /projects` acepta `organizationId` opcional.** Sin él cae en tu
+   organización personal. El gateway comprueba pertenencia **y**
+   `canCreateProject` antes de contar la cuota: primero dónde va, después si cabe.
 
 ---
 

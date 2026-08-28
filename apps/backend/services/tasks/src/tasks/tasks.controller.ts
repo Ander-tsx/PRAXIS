@@ -97,6 +97,12 @@ export class TasksController {
   }
 
   /** Limpieza al borrar un proyecto, un espacio o un tablero. */
+  /** Suelta a alguien de las tareas de unos proyectos. Ver `releaseAssignments`. */
+  @MessagePattern({ cmd: 'task_release_assignments' })
+  releaseAssignments(@Payload() dto: { userId: string; projectIds: string[] }) {
+    return this.tasksService.releaseAssignments(dto);
+  }
+
   @MessagePattern({ cmd: 'task_purge' })
   purge(@Payload() dto: PurgeTasksDto) {
     return this.tasksService.purgeTasks(dto);

@@ -131,7 +131,7 @@ function TaskRows({
              */}
             <a
               href={hrefDeTarea(task, projectsById)}
-              className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm px-3 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ background: alpha(colors.border, 30) }}
             >
               <span

@@ -4,11 +4,11 @@ import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 import {
   Badge,
+  PERSONA_ELIMINADA,
   type ProjectInvitation,
   type UserProfile,
   alpha,
   colors,
-  PERSONA_ELIMINADA,
   personLabel,
   useAccion,
 } from '@praxis/commons';

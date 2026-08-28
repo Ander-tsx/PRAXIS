@@ -109,13 +109,13 @@ export function NotificationList({
        * único fijo de la pantalla —la lista de abajo cambia con cada filtro— y
        * conviene que se lea como el mando de la bandeja, no como una fila más.
        */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="flex flex-col gap-3 rounded-sm border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex items-center gap-3">
           <span
             aria-hidden="true"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm"
             style={{
-              background: unread > 0 ? alpha(colors.primary, 12) : alpha(colors.textSecondary, 10),
+              background: 'transparent', border: `1px solid ${colors.border}`,
               color: unread > 0 ? colors.primary : colors.textDisabled,
             }}
           >
@@ -146,7 +146,7 @@ export function NotificationList({
               <button
                 type="submit"
                 disabled={markingAll}
-                className="cursor-pointer rounded-lg border border-border px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer rounded-sm border border-border px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {markingAll ? 'Marcando…' : 'Marcar todo como leído'}
               </button>
@@ -197,10 +197,10 @@ export function NotificationList({
 
 function Vacia({ soloSinLeer }: { soloSinLeer: boolean }) {
   return (
-    <section className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border p-10 text-center">
+    <section className="flex flex-col items-center gap-3 rounded-sm border border-dashed border-border p-10 text-center">
       <span
         aria-hidden="true"
-        className="flex h-12 w-12 items-center justify-center rounded-2xl"
+        className="flex h-12 w-12 items-center justify-center rounded-sm"
         style={{ background: alpha(colors.textSecondary, 8), color: colors.textDisabled }}
       >
         <IconoCampana activa={false} />
@@ -243,10 +243,10 @@ function NotificationRow({
     <li
       /* `group` para que el botón de marcar aparezca al pasar por encima, y
          `relative` para el enlace estirado que cubre la fila entera. */
-      className="group relative flex items-start gap-3 rounded-xl border p-3.5 transition-colors"
+      className="group relative flex items-start gap-3 rounded-sm border p-3.5 transition-colors"
       style={{
-        borderColor: unread ? alpha(colors.primary, 28) : alpha(colors.border, 60),
-        background: unread ? alpha(colors.primary, 5) : 'transparent',
+        borderColor: unread ? colors.borderStrong : colors.borderSubtle,
+        background: 'transparent',
       }}
     >
       {/**
@@ -265,7 +265,7 @@ function NotificationRow({
         <a
           href={href}
           onClick={(evento) => marcarYSeguir(evento, notification.id, unread, markReadAction)}
-          className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="absolute inset-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           {/* El nombre accesible va **dentro**, no en un `aria-label` sobre un
               enlace vacío: un enlace sin contenido es un enlace que algunos
@@ -298,7 +298,7 @@ function NotificationRow({
           <span
             aria-hidden="true"
             className="flex h-10 w-10 items-center justify-center rounded-full"
-            style={{ background: alpha(tone, 15), color: tone }}
+            style={{ background: 'transparent', border: `1px solid ${tone}`, color: tone }}
           >
             <TypeIcon type={notification.type} />
           </span>
@@ -382,7 +382,7 @@ function NotificationRow({
               /* Visible siempre en táctil, y al pasar por encima en escritorio:
                  `group-hover` no existe sin puntero, y un botón que solo
                  aparece con el ratón es un botón que en el móvil no está. */
-              className="cursor-pointer rounded-lg p-1.5 text-text-disabled opacity-100 transition-all hover:bg-surface-elevated hover:text-text-primary focus-visible:opacity-100 disabled:cursor-not-allowed sm:opacity-0 sm:group-hover:opacity-100"
+              className="cursor-pointer rounded-sm p-1.5 text-text-disabled opacity-100 transition-all hover:bg-surface-elevated hover:text-text-primary focus-visible:opacity-100 disabled:cursor-not-allowed sm:opacity-0 sm:group-hover:opacity-100"
             >
               {marking ? (
                 <span className="font-sans text-[11px]">…</span>

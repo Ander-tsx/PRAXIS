@@ -11,6 +11,8 @@ import type {
 } from '../../api/domain';
 import { PERMISSION_LABELS, PROJECT_PERMISSIONS } from '../../api/domain';
 import { Button, Input, Textarea } from '../../atoms';
+import type { QuotaExceededDetails } from '../../billing/planes';
+import { QuotaNotice } from '../../molecules';
 import { alpha, colors } from '../../tokens';
 import { Aviso, TemplatePlanReview, TemplateResultSummary, podar } from '../TemplatePlanReview';
 import type { AplicarPlantillaAction, TemplateDraftAction } from './project-form';
@@ -65,6 +67,15 @@ export function AssistedTemplate({
   const [resultado, setResultado] = useState<TemplateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sinCuota, setSinCuota] = useState(false);
+  /**
+   * El detalle del 402, cuando lo hay.
+   *
+   * ⚠️ **No se llama `cuota`**: ese nombre ya lo tiene aquí arriba el contador
+   * de mensajes que quedan, que es lo contrario —lo que hay, no lo que faltó—.
+   * Dos estados con el mismo nombre en el mismo componente es la forma más
+   * barata de pintar uno donde va el otro.
+   */
+  const [topeAgotado, setTopeAgotado] = useState<QuotaExceededDetails | null>(null);
   const [trabajando, setTrabajando] = useState(false);
 
   /** Lo que se ha quitado del plan, por clave. Ver el aviso de arriba. */
@@ -91,6 +102,7 @@ export function AssistedTemplate({
     setTrabajando(true);
     setError(null);
     setSinCuota(false);
+    setTopeAgotado(null);
 
     const respuesta =
       ajuste && plantilla
@@ -102,6 +114,7 @@ export function AssistedTemplate({
     if (!respuesta.resultado) {
       setError(respuesta.error);
       setSinCuota(respuesta.sinCuota);
+      setTopeAgotado(respuesta.cuota);
       return;
     }
 
@@ -196,7 +209,13 @@ export function AssistedTemplate({
         no quieras antes de que se cree nada.
       </p>
 
-      {error && <Aviso texto={error} accion={sinCuota ? null : 'Vuelve a intentarlo.'} />}
+      {/* Quedarse sin mensajes del mes tiene salida —esperar al día 1 o
+          ampliar— y hasta ahora era un aviso sin ninguna. Ver `QuotaNotice`. */}
+      {topeAgotado ? (
+        <QuotaNotice detalle={topeAgotado} mensaje={error ?? ''} />
+      ) : (
+        error && <Aviso texto={error} accion={sinCuota ? null : 'Vuelve a intentarlo.'} />
+      )}
 
       <div className="mt-2 flex justify-end gap-3">
         <Button type="button" variant="ghost" onClick={onCancelar}>
@@ -246,7 +265,7 @@ function Ajuste({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+    <div className="flex flex-col gap-2 rounded-sm border border-border p-3">
       <label className="font-sans text-xs font-semibold uppercase tracking-wide text-text-secondary">
         ¿Le cambiarías algo?
       </label>

@@ -6,10 +6,10 @@ import { ESTADOS, ROLES, fechaYHora, nombreDe } from '@/lib/admin';
 import {
   type AdminUser,
   Avatar,
-  avatarHref,
   Badge,
   type DataColumn,
   DataTable,
+  avatarHref,
   globalRoleLevelOf,
 } from '@praxis/commons';
 import { useMemo, useState } from 'react';

@@ -1,5 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { type APIRequestContext, expect, test } from '@playwright/test';
+import { correoUnico } from '../../fixtures/api';
 import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
+import { confirmarCorreo } from '../../fixtures/verificacion';
 
 /**
  * La pestaña Equipo de un proyecto.
@@ -62,5 +64,101 @@ test.describe('Equipo del proyecto', () => {
     await expect(equipo.getByText('DUEÑO')).toBeVisible();
 
     expect(errores, 'La pestaña no debería lanzar nada al pintarse').toEqual([]);
+  });
+});
+
+/**
+ * Registra una cuenta **sin entrar con ella**: solo hace falta que exista en el
+ * directorio para poder buscarla desde el diálogo de invitar.
+ *
+ * Va por el proxy de la zona, igual que `crearProyectoParaLaPrueba`, y no gasta
+ * ni un login — que es el recurso escaso de esta suite.
+ */
+async function registrarSuelta(request: APIRequestContext): Promise<string> {
+  const email = correoUnico('sin-asiento');
+  const alta = await request.post('/projects/api/gateway/auth/register', {
+    data: { email, password: 'Prueba@12345!' },
+  });
+  const cuerpo = alta.ok() ? await alta.json().catch(() => null) : null;
+
+  if (!cuerpo?.data?.userId) {
+    throw new Error(`No se pudo registrar ${email}: ${alta.status()} ${await alta.text()}`);
+  }
+
+  await confirmarCorreo(email);
+  return cuerpo.data.userId as string;
+}
+
+test.describe('Equipo del proyecto — el asiento', () => {
+  test('🔴 sin asientos, el error dice que falta un asiento y NO «no tienes permiso»', async ({
+    page,
+  }) => {
+    /* 🔴 **Esto fija un fallo de pantalla, no de servidor.** El gateway responde
+       403 con `code: NOT_IN_ORG` y un mensaje que explica la salida —libera un
+       asiento o amplía el plan—, y el `describe()` de la zona lo tiraba para
+       poner «No tienes permiso para hacer esto en este proyecto». Se lo decía
+       **al dueño del proyecto**, que tiene todos los permisos: una mentira sobre
+       sí mismo, y encima escondiendo lo único que se podía hacer.
+
+       Es exactamente lo mismo que ya pasó con `PROJECT_SUSPENDED`, y por eso la
+       lista de códigos que se explican solos vive en un sitio y no en cuatro. */
+    await crearCuentaYEntrar(page);
+
+    const nombre = `Sin asientos ${Date.now().toString(36)}`;
+    await crearProyectoParaLaPrueba(page, nombre);
+
+    /* El plan gratuito da tres asientos y quien crea el proyecto ocupa uno. Se
+       llenan los otros dos por la API —dar de alta a alguien ocupa su asiento
+       solo, que es justo el gesto que arregló `cdef9f2`— y la tercera persona ya
+       no cabe. */
+    await page.getByRole('link').filter({ hasText: nombre }).first().click();
+    await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
+    const slug = new URL(page.url()).pathname.split('/').pop() as string;
+
+    const detalle = await (await page.request.get(`/projects/api/gateway/projects/${slug}`)).json();
+    const projectId = detalle.data.id as string;
+    const projectRoleId = detalle.data.roles[0].id as string;
+
+    for (let hueco = 0; hueco < 2; hueco++) {
+      const userId = await registrarSuelta(page.request);
+      const alta = await page.request.post(`/projects/api/gateway/projects/${projectId}/members`, {
+        data: { userId, projectRoleId },
+      });
+      expect(alta.status(), `El asiento ${hueco + 2} de 3 debería entrar solo`).toBe(201);
+    }
+
+    /* Y ahora, la tercera, por la interfaz — que es lo que se está probando. */
+    const sobrante = correoUnico('sin-asiento');
+    const alta = await page.request.post('/projects/api/gateway/auth/register', {
+      data: { email: sobrante, password: 'Prueba@12345!' },
+    });
+    expect(alta.status()).toBe(201);
+    await confirmarCorreo(sobrante);
+
+    await page.reload();
+    await page
+      .getByRole('navigation', { name: 'Secciones del proyecto' })
+      .getByRole('link', { name: 'Equipo' })
+      .click();
+
+    await page.getByRole('button', { name: 'Invitar persona' }).click();
+    await page.getByRole('searchbox', { name: 'Buscar persona' }).fill(sobrante);
+    await page.getByRole('button', { name: 'Buscar' }).click();
+
+    await page.getByText(sobrante).first().click();
+    await page.getByRole('button', { name: 'Enviar invitación' }).click();
+
+    /* ⚠️ Acotado al formulario: Next monta su propio `role="alert"` vacío para
+       anunciar las navegaciones (`__next-route-announcer__`), y un
+       `getByRole('alert')` a secas casa con los dos y muere por modo estricto. */
+    const formulario = page
+      .locator('form')
+      .filter({ has: page.getByRole('button', { name: 'Enviar invitación' }) });
+    const aviso = formulario.getByRole('alert');
+    await expect(aviso).toBeVisible({ timeout: 15_000 });
+
+    /* Lo que importa es **qué** dice, no que diga algo. */
+    await expect(aviso).toContainText(/asiento/i);
+    await expect(aviso).not.toContainText(/no tienes permiso/i);
   });
 });

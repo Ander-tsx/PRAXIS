@@ -639,8 +639,7 @@ body.arrastrando-en-tablero {
 }
 
 :root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-toast] {
-  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.25))
-    drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.25)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
 }
 
 :root[data-theme="light"] [data-sileo-viewport][data-position] [data-sileo-title],

@@ -9,6 +9,8 @@
  * https://nextjs.org/docs/messages/invalid-use-server-value
  */
 
+import type { QuotaExceededDetails } from '@praxis/commons/billing/planes';
+
 /**
  * `CreateProjectState` y su estado inicial viven en commons, junto al organismo
  * que los consume: `commons/organisms/CreateProjectDialog/project-form.ts`.
@@ -30,6 +32,15 @@ export interface MemberState {
   error: string | null;
   /** Se rellena cuando el servidor confirma la operación. */
   done: string | null;
+  /**
+   * El detalle del 402 cuando el proyecto se quedó sin sitio en el plan.
+   *
+   * **Opcional a propósito.** Este estado lo comparten seis acciones —invitar,
+   * retirar la invitación, cambiar de rol, sacar a alguien, salirse— y solo una
+   * puede toparse con una cuota: la que hace crecer el equipo. Hacerlo
+   * obligatorio llenaría las otras cinco de `cuota: null` sin decir nada.
+   */
+  cuota?: QuotaExceededDetails | null;
 }
 
 export const MEMBER_INITIAL_STATE: MemberState = { error: null, done: null };
