@@ -30,10 +30,16 @@ que quien lo usa solo con dos amigos pierda nada.
 
 ## Dónde estamos
 
-> **Cierre de la etapa, 2026-08-27.** 59 de 73 casillas. Lo que falta está en los
-> apuntes de O7 y O8 con su motivo, y en O9 —que nunca fue de esta etapa—. Lo
-> que **sí** hay que hacer antes de fusionar a `main`: correr
-> `pnpm e2e:regresion` entera, que en esta sesión no llegó a terminar.
+> **Cierre de la etapa, 2026-08-27.** 60 de 73 casillas. Lo que falta está en los
+> apuntes de O7 y O8 con su motivo, y en O9 —que nunca fue de esta etapa—.
+>
+> ✅ **La regresión entera ya está corrida y verde**: 179 pruebas de API, 63 de
+> interfaz y 14 de seguridad. No lo estuvo a la primera — 12 fallaron, y once de
+> ellas apuntaban al mismo fallo de producto, el del asiento que se explica en los
+> apuntes de O8. Es lo que este paso existía para encontrar.
+>
+> Lo que queda antes de fusionar a `main` **no es código**: mirar el rediseño de
+> Kyloo con los ojos, que es lo único que no se puede comprobar corriendo nada.
 >
 > **Añadido esa misma noche (`190c85d`): la capa visual de Kyloo.** Estaba sin
 > commitear en el árbol —28 ficheros— y llevaba dentro un fallo que no da error:
@@ -53,7 +59,7 @@ que quien lo usa solo con dos amigos pierda nada.
 | O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
 | O6 | Frontend: roles, plantillas y el 402 con dos caras | ✅ **hecho** (2026-08-27) |
 | O7 | Gobierno del equipo | 🟡 **casi** — falta O7.3, y está bloqueada; ver apuntes |
-| O8 | Cierre: e2e, documentación y contrato | 🟡 **casi** — falta `e2e:regresion` completa |
+| O8 | Cierre: e2e, documentación y contrato | ✅ **hecho** (2026-08-27) — la regresión entera, verde |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
 
 **Cada stack termina con una prueba manual desde el frontend antes de pasar al
@@ -64,6 +70,7 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
+| 2026-08-27 | O8.8 | *sin commitear* | La regresión entera, y el fallo que destapó: el asiento se guardaba sin correo y la **segunda persona de cualquier organización no entraba nunca** |
 | 2026-08-27 | Kyloo | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
 | 2026-08-27 | O4.1+O7+O8 | `0bda922` | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
 | 2026-08-27 | O5+O6 | `06d688a` | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
@@ -885,7 +892,10 @@ empresa: es la forma de cobrarla.
 - [x] **O8.6** `CLAUDE.md`: los tres códigos de error, el puerto 3009 y la regla de
       que quien está en un proyecto está en la organización.
 - [x] **O8.7** `STRUCTURE.md`: el noveno servicio en la tabla.
-- [ ] **O8.8** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
+- [x] **O8.8** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
+      ✅ 2026-08-27: **179 de API + 63 de interfaz + 14 de seguridad, todas verdes.**
+      La primera corrida no lo estuvo — ver los apuntes, que es donde salió el fallo
+      del asiento.
 - [x] **O8.9** ⚠️ **El webhook en local necesita `stripe listen --forward-to
       localhost:3000/api/webhooks/stripe`.** Sin él se paga y el plan no se aplica —
       que es el comportamiento correcto, pero ya mordió: tres suscripciones cobradas
@@ -916,6 +926,39 @@ empresa: es la forma de cobrarla.
 - ⚠️ **`pnpm e2e:regresion` completa queda sin correr en esta sesión.** La suite
   de API entera pasa de los diez minutos y hubo que dejarla en segundo plano; las
   18 de organizaciones sí se corrieron y pasan las diez.
+- 🔴 **Correrla entera el 2026-08-27 destapó el fallo más caro de la etapa, y no
+  daba ningún error.** 166 pasaron y 12 fallaron: nueve del chat, dos de avisos y
+  una de organizaciones. Las nueve del chat y la de organizaciones eran **la
+  misma causa**, y era de producto, no de prueba:
+
+  `darAsiento` —lo que hace que «invitar a Ana a mi proyecto» sea un solo
+  gesto— escribía la fila del asiento con `email: ''`. Esa columna está en un
+  índice **único por organización** (`organizationId, email`), así que la cadena
+  vacía solo cabía **una vez**: a la segunda persona, Postgres respondía P2002,
+  la excepción salía suelta del servicio, el gateway la recogía en su `.catch()`
+  y contestaba **403 `NOT_IN_ORG`** —«no se le pudo dar asiento»— con dos
+  asientos libres. Es decir: **en cualquier organización de PRAXIS, la segunda
+  persona no entraba nunca**, el plan gratuito prometía «tú y dos personas más» y
+  daba una, y no había una línea de error en ninguna consola.
+
+  Se arregla poniendo el correo de verdad, que es lo único que hace distinta esa
+  fila. Lo resuelve el **gateway**, que es quien tiene el directorio —
+  billing-service no habla con nadie—, y si credentials no contesta se falla
+  diciéndolo (`SIN_CORREO`, 503) en vez de volver a escribir la cadena vacía. De
+  paso, `darAsiento` **adopta** una invitación pendiente a esa misma dirección en
+  vez de chocar con ella, y olvida también la caché de quien invita, que era
+  quien veía el `seatsUsed` sin actualizar.
+
+  ⚠️ **La prueba que lo fija da de alta a dos personas, no a una.** Con una sola
+  pasaba igual de verde con el fallo puesto.
+- ⚠️ **Y las nueve del chat eran un caso de prueba, no de producto**: ese archivo
+  monta diecisiete conversaciones sobre **el mismo** proyecto, y cada
+  interlocutor ocupa asiento. Tres asientos no dan para diecisiete. Ahora se
+  sueltan al terminar cada prueba, que además es lo que documenta que el asiento
+  es un recurso y no un trámite.
+- ⚠️ **Las dos de avisos eran el reloj, no el código.** Sueltas pasan las diez;
+  en la corrida entera se toparon con el límite de 10 logins por minuto —el que
+  ya está avisado en `O8.3`— y agotaron los 120 s esperando su turno.
 
 ---
 
@@ -966,4 +1009,8 @@ nadie por debajo de ese tamaño.
 6. ⚠️ Si el cliente de Prisma falla con `Cannot find module '../generated/prisma-client'`
    **con `dev:backend` ya corriendo**, `prisma:generate` no basta: hay que parar el
    backend, borrar `dist/` del servicio, regenerar y arrancar en frío.
-7. Lo siguiente que hay que hacer es **O1.1**.
+7. Lo siguiente que hay que hacer es **O8.8**: `pnpm e2e:regresion` entera, que
+   es lo único que queda entre esta rama y `main`. Lo demás pendiente no
+   bloquea la fusión y tiene su motivo escrito: **O3.5** (huérfanos) espera a
+   que exista una ruta que borre una organización, **O7.3** (dominio propio)
+   está bloqueada por la verificación DNS, y **O9** nunca fue de esta etapa.
