@@ -43,7 +43,10 @@ export interface Fallo {
     | 'YA_ESTA'
     | 'NO_VALE'
     | 'EN_USO'
-    | 'INVITACION_INVALIDA';
+    | 'INVITACION_INVALIDA'
+    /* El directorio no contestó y la fila necesita una dirección propia. No es
+       culpa de quien pide: se reintenta. Ver `darAsiento`. */
+    | 'SIN_CORREO';
 }
 
 export function esFallo(valor: unknown): valor is Fallo {
@@ -1271,8 +1274,29 @@ export class OrganizationsService {
    *
    * ⚠️ **Y ocupa asiento**, con el mismo tope que una invitación. Si no quedan,
    * falla y quien invita lee por qué.
+   *
+   * 🔴 **El correo lo pone el gateway, y sin él no se da el asiento.** La fila
+   * lleva `email` en un índice único por organización —`(organizationId,
+   * email)`—, así que la cadena vacía que se escribía aquí solo cabía **una
+   * vez**: la segunda persona a la que se le daba asiento en la misma
+   * organización chocaba con un P2002 que salía del servicio como una excepción
+   * suelta, el gateway lo recogía en su `catch` y contestaba **403 `NOT_IN_ORG`**
+   * — «no se le pudo dar asiento», con dos asientos libres y ningún error en
+   * ninguna consola. O sea: en cualquier organización, la segunda persona no
+   * entraba nunca. Lo destaparon nueve pruebas del chat que llevaban meses en
+   * verde.
+   *
+   * Por eso el correo es obligatorio: es lo único que hace de esa fila una fila
+   * distinta. Si el directorio no contesta se falla diciéndolo, en vez de
+   * inventar una dirección o volver a escribir la cadena vacía.
    */
-  async darAsiento(datos: { organizationId: string; porUserId: string; userId: string }) {
+  async darAsiento(datos: {
+    organizationId: string;
+    porUserId: string;
+    userId: string;
+    /** La dirección de quien entra, resuelta por el gateway. Ver arriba. */
+    email?: string;
+  }) {
     const permiso = await this.exigirPermiso(
       datos.organizationId,
       datos.porUserId,
@@ -1280,7 +1304,15 @@ export class OrganizationsService {
     );
     if (esFallo(permiso)) return permiso;
 
-    const [organizacion, yaEsta, ocupados, papel] = await Promise.all([
+    const email = datos.email?.trim().toLowerCase();
+    if (!email) {
+      return {
+        error: 'No se pudo comprobar el correo de esa persona. Inténtalo dentro de un momento.',
+        codigo: 'SIN_CORREO',
+      } as Fallo;
+    }
+
+    const [organizacion, yaEsta, conEseCorreo, ocupados, papel] = await Promise.all([
       this.prisma.organization.findUnique({
         where: { id: datos.organizationId },
         include: { subscription: true },
@@ -1289,6 +1321,12 @@ export class OrganizationsService {
         where: {
           organizationId_userId: { organizationId: datos.organizationId, userId: datos.userId },
         },
+      }),
+      /* La misma dirección ya puede tener fila aquí: una invitación por correo
+         que nadie ha aceptado todavía. No es un choque, es la misma persona
+         entrando por la otra puerta — se adopta más abajo. */
+      this.prisma.organizationMember.findUnique({
+        where: { organizationId_email: { organizationId: datos.organizationId, email } },
       }),
       this.prisma.organizationMember.count({ where: { organizationId: datos.organizationId } }),
       this.prisma.organizationRole.findFirst({
@@ -1304,6 +1342,42 @@ export class OrganizationsService {
       return { error: 'La organización no tiene papel por defecto.', codigo: 'NO_VALE' } as Fallo;
     }
 
+    /* Una invitación pendiente a esa dirección **ya ocupa su asiento** (es lo que
+       impide mandar mil sobre tres), así que entrar por el proyecto la completa
+       en vez de pedir otro.
+       ⚠️ Y solo si esa fila no es ya de otra cuenta. No debería poder serlo —el
+       correo es único en credentials— pero adoptarla a ciegas sería reasignar la
+       membresía de otra persona a base de una dirección repetida, y eso no puede
+       depender de que una invariante de otro servicio se mantenga. */
+    if (conEseCorreo?.userId && conEseCorreo.userId !== datos.userId) {
+      return {
+        error: 'Ese correo ya es de otra persona dentro de la organización.',
+        codigo: 'YA_ESTA',
+      } as Fallo;
+    }
+
+    if (conEseCorreo) {
+      await this.prisma.organizationMember.update({
+        where: { id: conEseCorreo.id },
+        data: {
+          userId: datos.userId,
+          status: MembershipStatus.ACTIVE,
+          joinedAt: conEseCorreo.joinedAt ?? new Date(),
+          /* El enlace que se mandó deja de valer: ya está dentro. */
+          inviteTokenHash: null,
+          inviteExpiresAt: null,
+        },
+      });
+
+      await this.olvidar(datos.organizationId, datos.userId);
+      await this.olvidar(datos.organizationId, datos.porUserId);
+      await this.registrar(datos.organizationId, 'asiento_dado', {
+        userId: datos.userId,
+        deInvitacionPendiente: true,
+      });
+      return { ok: true };
+    }
+
     const asientos = organizacion.subscription?.seats ?? 1;
     if (ocupados >= asientos) {
       return {
@@ -1316,9 +1390,10 @@ export class OrganizationsService {
       data: {
         organizationId: datos.organizationId,
         userId: datos.userId,
-        /* Sin correo: entra por el proyecto, no por un mensaje. La cadena vacía
-           miente menos que inventar una dirección. */
-        email: '',
+        /* 🔴 **Con su correo de verdad, nunca con la cadena vacía.** La columna
+           es única por organización: la cadena vacía solo cabía una vez y la
+           segunda persona chocaba en silencio. Ver la cabecera. */
+        email,
         roleId: papel.id,
         status: MembershipStatus.ACTIVE,
         joinedAt: new Date(),
@@ -1326,6 +1401,9 @@ export class OrganizationsService {
     });
 
     await this.olvidar(datos.organizationId, datos.userId);
+    /* Y a quien invita: en su lista cacheada está el `seatsUsed` que acaba de
+       cambiar, y era suya la pantalla que lo enseña. */
+    await this.olvidar(datos.organizationId, datos.porUserId);
     await this.registrar(datos.organizationId, 'asiento_dado', { userId: datos.userId });
     return { ok: true };
   }

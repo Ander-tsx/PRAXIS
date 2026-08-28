@@ -283,31 +283,95 @@ test.describe('Papeles de la organización', () => {
 });
 
 test.describe('El asiento es la puerta de un proyecto', () => {
-  test('🔴 meter a alguien sin asiento da 403 NOT_IN_ORG, no un 402', async ({ request }) => {
-    /* Es lo que sostiene el modelo de precios: si se pudiera meter a gente de
-       fuera, nadie compraría un asiento nunca. Y no es una cuota agotada — no se
-       ha agotado nada: esa persona no está dentro. */
-    const dueña = await registrar(request);
-    const extraña = await registrar(request);
-
-    const organizacion = await crearOrganizacion(request, dueña.accessToken);
+  /**
+   * Monta una organización de equipo con un proyecto dentro y devuelve lo justo
+   * para dar de alta a gente: el proyecto y un papel que ponerles.
+   */
+  async function equipoConProyecto(
+    request: Parameters<typeof crearProyecto>[0],
+    token: string,
+  ): Promise<{ organizationId: string; projectId: string; projectRoleId: string }> {
+    const organizacion = await crearOrganizacion(request, token);
     const proyecto = await data<{ id: string }>(
       await request.post('/api/projects', {
-        headers: comoBearer(dueña.accessToken),
+        headers: comoBearer(token),
         data: { name: nombreUnico('Del equipo'), organizationId: organizacion.id },
       }),
     );
+    const detalle = await data<{ roles: { id: string }[] }>(
+      await request.get(`/api/projects/${proyecto.id}`, { headers: comoBearer(token) }),
+    );
 
-    const detalle = await data<{ roles: { id: string; name: string }[] }>(
-      await request.get(`/api/projects/${proyecto.id}`, {
+    return {
+      organizationId: organizacion.id,
+      projectId: proyecto.id,
+      projectRoleId: detalle.roles[0].id,
+    };
+  }
+
+  test('🔴 meter a dos personas en un proyecto les da asiento a las dos', async ({ request }) => {
+    /* 🔴 **Esta prueba existe por un fallo de los que no dan ningún error.** La
+       fila del asiento lleva el correo en un índice único por organización, y se
+       escribía con la cadena vacía: solo cabía **una**. La segunda persona de
+       cualquier organización chocaba en la base, el gateway recogía la excepción
+       y contestaba `403 NOT_IN_ORG` —«no se le pudo dar asiento»— con dos
+       asientos libres y nada en ninguna consola. O sea: en todo PRAXIS, la
+       segunda persona de un equipo no entraba nunca.
+
+       Se comprueba con **dos** altas a propósito: con una sola, la prueba pasa
+       igual de verde con el fallo puesto. */
+    const dueña = await registrar(request);
+    const primera = await registrar(request);
+    const segunda = await registrar(request);
+
+    const equipo = await equipoConProyecto(request, dueña.accessToken);
+
+    for (const [orden, quien] of [primera, segunda].entries()) {
+      const alta = await request.post(`/api/projects/${equipo.projectId}/members`, {
+        headers: comoBearer(dueña.accessToken),
+        data: { userId: quien.userId, projectRoleId: equipo.projectRoleId },
+      });
+      expect(alta.status(), `El alta número ${orden + 1} debería entrar sola`).toBe(201);
+    }
+
+    /* Y el asiento se ve donde se administra: con su correo, no en blanco. */
+    const miembros = await data<{ userId: string | null; email: string }[]>(
+      await request.get(`/api/organizations/${equipo.organizationId}/members`, {
         headers: comoBearer(dueña.accessToken),
       }),
     );
-    const unRol = detalle.roles[0];
+    expect(miembros.length, 'La dueña y las dos que entraron por el proyecto').toBe(3);
+    for (const quien of [primera, segunda]) {
+      const suya = miembros.find((miembro) => miembro.userId === quien.userId);
+      expect(suya, 'Quien entra en el proyecto sale en la lista del equipo').toBeTruthy();
+      expect(suya?.email, 'Con su dirección: es lo que hace única su fila').toBe(quien.email);
+    }
+  });
 
-    const intento = await request.post(`/api/projects/${proyecto.id}/members`, {
+  test('🔴 sin asientos que dar, meter a alguien da 403 NOT_IN_ORG y no un 402', async ({
+    request,
+  }) => {
+    /* Es lo que sostiene el modelo de precios: si se pudiera meter a gente de
+       fuera, nadie compraría un asiento nunca. Y no es una cuota agotada del
+       plan — lo que se ha agotado son los asientos, y la salida es liberar uno o
+       ampliarlos, no «pasa a Pro». Por eso tiene código propio. */
+    const dueña = await registrar(request);
+    const equipo = await equipoConProyecto(request, dueña.accessToken);
+
+    /* La dueña ya ocupa uno, así que caben `asientos - 1` antes de toparse. */
+    for (let hueco = 1; hueco < FREE.asientos; hueco++) {
+      const cabe = await registrar(request);
+      const alta = await request.post(`/api/projects/${equipo.projectId}/members`, {
+        headers: comoBearer(dueña.accessToken),
+        data: { userId: cabe.userId, projectRoleId: equipo.projectRoleId },
+      });
+      expect(alta.status(), `Todavía queda asiento en el hueco ${hueco}`).toBe(201);
+    }
+
+    const extraña = await registrar(request);
+    const intento = await request.post(`/api/projects/${equipo.projectId}/members`, {
       headers: comoBearer(dueña.accessToken),
-      data: { userId: extraña.userId, projectRoleId: unRol.id },
+      data: { userId: extraña.userId, projectRoleId: equipo.projectRoleId },
     });
 
     expect(intento.status()).toBe(403);

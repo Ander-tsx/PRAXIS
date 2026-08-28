@@ -73,6 +73,10 @@ export class QuotaService {
   constructor(
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    /* Solo para el correo de quien entra en una organización: billing-service no
+       tiene directorio y la fila del asiento necesita una dirección propia. Ver
+       `exigirAsientoEnProyecto`. */
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
   ) {}
 
   /** El plan que vale para alguien. FREE si billing-service no contesta. */
@@ -329,13 +333,25 @@ export class QuotaService {
        «invitar a Ana a mi proyecto» siga siendo un solo gesto. Falla sola si no
        quedan asientos o si quien invita no puede repartirlos. */
     if (porUserId) {
-      const ocupado = await firstValueFrom(
-        this.billingClient.send<{ error?: string } | { ok: true }>(
-          { cmd: 'billing_org_seat_grant' },
-          { organizationId: proyecto.organizationId, porUserId, userId },
-        ),
-      ).catch(() => null);
+      /* 🔴 **Con su correo, que lo tiene el directorio y no billing-service.** La
+         fila del asiento va en un índice único `(organizationId, email)`: sin
+         dirección propia, la segunda persona de la organización chocaba con la
+         primera y el choque salía por aquí como un 403 `NOT_IN_ORG` con asientos
+         libres. */
+      const email = await this.correo(userId);
 
+      const ocupado = email
+        ? await firstValueFrom(
+            this.billingClient.send<{ error?: string } | { ok: true }>(
+              { cmd: 'billing_org_seat_grant' },
+              { organizationId: proyecto.organizationId, porUserId, userId, email },
+            ),
+          ).catch(() => null)
+        : null;
+
+      if (!email) {
+        this.log.error(`credentials-service no dio el correo de ${userId}: no se da asiento.`);
+      }
       if (ocupado && !('error' in ocupado)) return;
     }
 
@@ -345,6 +361,26 @@ export class QuotaService {
         'Esa persona no tiene asiento en la organización de este proyecto, y no se le pudo dar uno. ' +
         'Pídele a quien la administra que la añada, o libera un asiento.',
     });
+  }
+
+  /**
+   * El correo de alguien, o `undefined` si el directorio no contesta.
+   *
+   * ⚠️ **Y aquí no se falla hacia el lado permisivo.** El resto de este archivo
+   * deja pasar cuando no puede comprobar, porque negar por no haber podido
+   * preguntar es un falso positivo que quien lo sufre no puede resolver. Esto es
+   * distinto: es una **escritura**, y sin correo la fila que se guardaría sería
+   * la que ya rompió esto una vez. Se prefiere el 403, que se reintenta.
+   */
+  private correo(userId: string): Promise<string | undefined> {
+    return firstValueFrom(
+      this.credentialsClient.send<{ credential?: { email?: string } }>(
+        { cmd: 'user_find_one' },
+        { id: userId },
+      ),
+    )
+      .then((perfil) => perfil?.credential?.email)
+      .catch(() => undefined);
   }
 
   /* ─── El asistente ─────────────────────────────────────────────────────── */

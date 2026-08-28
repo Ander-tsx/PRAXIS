@@ -261,7 +261,10 @@ export class OrganizationsController {
 
   /** Da asiento directamente. Ver `darAsiento`: no es una invitación. */
   @MessagePattern({ cmd: 'billing_org_seat_grant' })
-  darAsiento(@Payload() dto: { organizationId: string; porUserId: string; userId: string }) {
+  darAsiento(
+    @Payload()
+    dto: { organizationId: string; porUserId: string; userId: string; email?: string },
+  ) {
     return this.organizaciones.darAsiento(dto);
   }
 

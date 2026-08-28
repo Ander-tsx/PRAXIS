@@ -33,7 +33,8 @@ export interface FalloDeBilling {
     | 'YA_ESTA'
     | 'NO_VALE'
     | 'EN_USO'
-    | 'INVITACION_INVALIDA';
+    | 'INVITACION_INVALIDA'
+    | 'SIN_CORREO';
 }
 
 const ESTADOS: Record<FalloDeBilling['codigo'], HttpStatus> = {
@@ -48,6 +49,10 @@ const ESTADOS: Record<FalloDeBilling['codigo'], HttpStatus> = {
   EN_USO: HttpStatus.CONFLICT,
   NO_VALE: HttpStatus.BAD_REQUEST,
   INVITACION_INVALIDA: HttpStatus.GONE,
+  /* 503 y no 400: no falló lo que se pidió, falló credentials-service al
+     resolver el correo de quien entra. Se reintenta, y decirlo con un 400
+     mandaría a corregir un cuerpo que estaba bien. */
+  SIN_CORREO: HttpStatus.SERVICE_UNAVAILABLE,
 };
 
 /** ¿Lo que contestó billing-service es un fallo y no el dato pedido? */
