@@ -121,6 +121,7 @@ export interface OrgDelSelector {
   /** `PERSONAL` se dibuja distinto: es tu espacio, no un equipo. */
   kind: 'PERSONAL' | 'ENTERPRISE';
   tier: string;
+  soyDueno: boolean;
 }
 
 /**

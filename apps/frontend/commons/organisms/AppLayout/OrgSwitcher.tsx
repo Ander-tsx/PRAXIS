@@ -15,13 +15,16 @@ export function OrgSwitcher({
   zonePath: string;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'settings' | 'upgrade' | null>(null);
+  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | null>(null);
   
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
   const primerNombre = name.trim().split(' ')[0];
   const etiqueta = activa?.name ?? `Organización de ${primerNombre || 'Praxis'}`;
   const inicial = (activa?.name ?? primerNombre ?? 'P').charAt(0).toUpperCase();
+  const MAX_ORGANIZACIONES_PROPIAS = 3;
+  const propias = lista.filter(o => o.soyDueno).length;
+  const caben = propias < MAX_ORGANIZACIONES_PROPIAS;
   
   useEffect(() => {
     if (!activaId) return;
@@ -93,15 +96,7 @@ export function OrgSwitcher({
                 </svg>
                 Mejorar plan
               </button>
-              {activaId && (
-                <button onClick={() => setActiveModal('settings')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
-                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Configuración
-                </button>
-              )}
+              
               <button onClick={() => setActiveModal('invite')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
                 <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -128,40 +123,34 @@ export function OrgSwitcher({
               ))}
             </div>
 
-            <div className="mt-1 pt-1 border-t border-white/5">
-              <button onClick={() => setActiveModal('newSpace')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
-                <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-                </svg>
-                Nuevo espacio de trabajo
-              </button>
+            <div className="mt-1 pt-1 border-t border-white/5 px-2 py-2">
+              {caben ? (
+                <button onClick={() => setActiveModal('newSpace')} className="flex items-center gap-2.5 px-1 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
+                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Nuevo espacio de trabajo
+                </button>
+              ) : (
+                <p className="font-sans text-[11px] text-white/40 leading-snug px-1">
+                  Has creado {propias} de {MAX_ORGANIZACIONES_PROPIAS} espacios, que es el límite por persona.
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       {activeModal === 'invite' && activaId && (
-        <InviteMemberModal 
-          organizationId={activaId} 
-          organizationName={etiqueta}
-          onClose={() => setActiveModal(null)} 
-        />
+        <InviteMemberModal organizationId={activaId} organizationName={etiqueta} onClose={() => setActiveModal(null)} zonePath={zonePath} />
       )}
       
       {activeModal === 'newSpace' && (
-        <NewSpaceModal onClose={() => setActiveModal(null)} />
-      )}
-      
-      {activeModal === 'settings' && activaId && (
-        <SettingsModal 
-          organizationId={activaId}
-          currentName={etiqueta}
-          onClose={() => setActiveModal(null)} 
-        />
+        <NewSpaceModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
       )}
       
       {activeModal === 'upgrade' && activaId && (
-        <UpgradeModal onClose={() => setActiveModal(null)} />
+        <UpgradeModal onClose={() => setActiveModal(null)} zonePath={zonePath} />
       )}
     </div>
   );
@@ -196,7 +185,7 @@ function OpcionDeOrg({
 
 // ================= MODALS ================= //
 
-function InviteMemberModal({ organizationId, organizationName, onClose }: { organizationId: string; organizationName: string; onClose: () => void }) {
+function InviteMemberModal({ organizationId, organizationName, onClose, zonePath }: { organizationId: string; organizationName: string; onClose: () => void; zonePath: string }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [roles, setRoles] = useState<any[]>([]);
@@ -205,7 +194,7 @@ function InviteMemberModal({ organizationId, organizationName, onClose }: { orga
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/gateway/organizations/${organizationId}/roles`)
+    fetch(`${zonePath}/api/gateway/organizations/${organizationId}/roles`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -222,7 +211,7 @@ function InviteMemberModal({ organizationId, organizationName, onClose }: { orga
     setLoading(true); setError(null); setSuccess(false);
     
     try {
-      const res = await fetch(`/api/gateway/organizations/${organizationId}/members`, {
+      const res = await fetch(`${zonePath}/api/gateway/organizations/${organizationId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, roleId: role })
@@ -272,7 +261,7 @@ function InviteMemberModal({ organizationId, organizationName, onClose }: { orga
   );
 }
 
-function NewSpaceModal({ onClose }: { onClose: () => void }) {
+function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: string }) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -282,7 +271,7 @@ function NewSpaceModal({ onClose }: { onClose: () => void }) {
     if (!name) return;
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/gateway/me/organizations`, {
+      const res = await fetch(`${zonePath}/api/gateway/me/organizations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name })
@@ -316,51 +305,7 @@ function NewSpaceModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function SettingsModal({ organizationId, currentName, onClose }: { organizationId: string; currentName: string; onClose: () => void }) {
-  const [name, setName] = useState(currentName);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleUpdate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name || name === currentName) return;
-    setLoading(true); setError(null);
-    try {
-      const res = await fetch(`/api/gateway/organizations/${organizationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name })
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || 'Error al guardar');
-      }
-      window.location.reload();
-    } catch (err: any) {
-      setError(err.message);
-      setLoading(false);
-    }
-  }
-
-  return (
-    <ModalWrapper title="Configuración" subtitle="Renombra tu organización" onClose={onClose}>
-      <form onSubmit={handleUpdate} className="p-6 flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-white/80">Nombre</label>
-          <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#161616] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all" required />
-        </div>
-        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">{error}</div>}
-        <div className="mt-2 flex justify-end">
-          <button type="submit" disabled={loading || name === currentName} className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50">
-            {loading ? 'Guardando...' : 'Guardar cambios'}
-          </button>
-        </div>
-      </form>
-    </ModalWrapper>
-  );
-}
-
-function UpgradeModal({ onClose }: { onClose: () => void }) {
+function UpgradeModal({ onClose, zonePath }: { onClose: () => void; zonePath: string }) {
   return (
     <ModalWrapper title="Mejorar plan" subtitle="Desbloquea todo el potencial de Praxis" onClose={onClose}>
       <div className="p-8 flex flex-col items-center text-center gap-6">
@@ -373,7 +318,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
           <h3 className="text-xl font-bold text-white">Lleva tu equipo al siguiente nivel</h3>
           <p className="text-sm text-white/70 max-w-sm">Compara los distintos planes y escoge el que mejor se adapte a tus necesidades y tamaño de equipo.</p>
         </div>
-        <a href="/billing" className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+        <a href={`${zonePath}/billing`} className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
           Ver planes y precios
         </a>
       </div>
