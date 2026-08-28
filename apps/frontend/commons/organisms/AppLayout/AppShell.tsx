@@ -722,6 +722,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
 function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
   const [directs, setDirects] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -729,79 +730,136 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
       fetch(`${zonePath}/api/gateway/me/chats`).then(res => res.json()).catch(() => ({ data: [] })),
       fetch(`${zonePath}/api/gateway/me/chats/projects`).then(res => res.json()).catch(() => ({ data: [] }))
     ]).then(([d, p]) => {
-      setDirects(Array.isArray(d?.data) ? d.data : []);
-      setProjects(Array.isArray(p?.data) ? p.data : []);
-      setLoading(false);
+      const listD = Array.isArray(d?.data) ? d.data : [];
+      const listP = Array.isArray(p?.data) ? p.data : [];
+      setDirects(listD);
+      setProjects(listP);
+
+      const ids = new Set<string>();
+      listD.forEach((c: any) => c.peerId && ids.add(c.peerId));
+      listP.forEach((c: any) => c.ultimo?.authorId && ids.add(c.ultimo.authorId));
+
+      if (ids.size > 0) {
+        fetch(`${zonePath}/api/gateway/users?ids=${Array.from(ids).join(',')}`)
+          .then(r => r.json())
+          .then(ubody => {
+            const uMap: Record<string, any> = {};
+            (ubody?.data?.items || ubody?.data || []).forEach((u: any) => uMap[u.id] = u);
+            setUsersMap(uMap);
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
     });
   }, [zonePath]);
 
   if (loading) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
       </div>
     );
   }
 
+  function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
+    if (mensaje.deletedAt) return 'Mensaje eliminado';
+    return mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) + (mensaje.body.length > 50 ? '...' : '');
+  }
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none">
       {projects.length > 0 && (
         <div className="flex flex-col gap-1">
           {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Proyectos</span>}
-          {projects.map((c: any) => (
-            <a
-              key={c.project?.id || c.channelId}
-              href={`${zonePath}/chat/${c.channelId}`}
-              className={`flex items-center gap-3 rounded-full px-4 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
-            >
-              <div className="w-5 h-5 rounded flex items-center justify-center bg-white/10 text-white text-[10px] font-bold shrink-0">
-                {(c.project?.name || '?').charAt(0).toUpperCase()}
-              </div>
-              {!plegada && (
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate font-sans text-[13px] font-medium text-white/80">{c.project?.name}</span>
+          {projects.map((c: any) => {
+            const autor = c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null;
+            return (
+              <a
+                key={c.project?.id || c.channelId}
+                href={`/chat/proyecto/${c.project.id}`}
+                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
+              >
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 text-white text-xs font-bold shrink-0">
+                  {(c.project?.name || '?').charAt(0).toUpperCase()}
                 </div>
-              )}
-              {!plegada && c.unread > 0 && (
-                <span className="shrink-0 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold text-primary-foreground">
-                  {c.unread > 99 ? '99+' : c.unread}
-                </span>
-              )}
-            </a>
-          ))}
+                {!plegada && (
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="truncate font-sans text-[13px] font-medium text-white/90">
+                      {c.project?.name}
+                    </span>
+                    <span className="truncate font-sans text-[11px] text-white/50">
+                      {c.ultimo ? `${(autor?.firstName || autor?.credential?.email?.split("@")[0]) || 'Alguien'}: ${resumenDe(c.ultimo)}` : 'Sin mensajes todavía'}
+                    </span>
+                  </div>
+                )}
+                {!plegada && (
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {c.ultimo && <span className="font-sans text-[10px] text-white/30">{new Date(c.ultimo.createdAt).toLocaleDateString()}</span>}
+                    {c.unread > 0 && (
+                      <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground">
+                        {c.unread > 99 ? '99+' : c.unread}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </a>
+            );
+          })}
         </div>
       )}
 
       {directs.length > 0 && (
         <div className="flex flex-col gap-1">
           {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Privados</span>}
-          {directs.map((c: any) => (
-            <a
-              key={c.user?.id || c.channelId}
-              href={`${zonePath}/chat/${c.channelId}`}
-              className={`flex items-center gap-3 rounded-full px-4 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
-            >
-              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                {c.user?.avatarSrc ? (
-                  <img src={c.user.avatarSrc} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-[10px] font-bold">{(c.user?.name || '?').charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              {!plegada && (
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="truncate font-sans text-[13px] font-medium text-white/80">{c.user?.name}</span>
+          {directs.map((c: any) => {
+            const peer = usersMap[c.peerId];
+            return (
+              <a
+                key={c.peerId || c.channelId}
+                href={`/chat/${c.peerId}`}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
+              >
+                <div className="relative shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                    {peer?.avatarUrl ? (
+                      <img src={`${zonePath}/api/gateway${peer.avatarUrl}`} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white text-xs font-bold">{(peer ? (peer.firstName || peer.credential?.email || "?") : "?").charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  {peer?.presence && (
+                    <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#080807] ${
+                      peer.presence === 'ONLINE' ? 'bg-green-500' :
+                      peer.presence === 'AWAY' ? 'bg-yellow-500' :
+                      peer.presence === 'BUSY' ? 'bg-red-500' : 'bg-gray-500'
+                    }`} />
+                  )}
                 </div>
-              )}
-              {!plegada && c.unread > 0 && (
-                <span className="shrink-0 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold text-primary-foreground">
-                  {c.unread > 99 ? '99+' : c.unread}
-                </span>
-              )}
-            </a>
-          ))}
+                {!plegada && (
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="truncate font-sans text-[13px] font-medium text-white/90">
+                      {peer ? (peer.firstName ? peer.firstName + (peer.lastName ? " " + peer.lastName : "") : peer.credential?.email?.split("@")[0]) : "Usuario desconocido"}
+                    </span>
+                    <span className="truncate font-sans text-[11px] text-white/50">
+                      {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
+                    </span>
+                  </div>
+                )}
+                {!plegada && (
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {c.ultimo && <span className="font-sans text-[10px] text-white/30">{new Date(c.ultimo.createdAt).toLocaleDateString()}</span>}
+                    {c.unread > 0 && (
+                      <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground">
+                        {c.unread > 99 ? '99+' : c.unread}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </a>
+            );
+          })}
         </div>
       )}
     </div>
@@ -810,16 +868,29 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
 
 function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
   const [items, setItems] = useState<any[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${zonePath}/api/gateway/me/notifications?limit=20`)
       .then(res => res.json())
       .then(body => {
-        if (body?.data?.items) {
-          setItems(body.data.items);
+        const list = body?.data?.items || [];
+        setItems(list);
+        
+        const ids = [...new Set(list.map((i: any) => i.actorId).filter((id: any) => !!id))];
+        if (ids.length > 0) {
+          fetch(`${zonePath}/api/gateway/users?ids=${ids.join(',')}`)
+            .then(r => r.json())
+            .then(ubody => {
+              const uMap: Record<string, any> = {};
+              (ubody?.data?.items || ubody?.data || []).forEach((u: any) => uMap[u.id] = u);
+              setUsersMap(uMap);
+            })
+            .finally(() => setLoading(false));
+        } else {
+          setLoading(false);
         }
-        setLoading(false);
       })
       .catch(() => setLoading(false));
   }, [zonePath]);
@@ -827,61 +898,91 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
   if (loading) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
-        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="px-4 py-8 text-center text-white/40 text-sm font-sans">
-        No tienes notificaciones
+      <div className="px-4 py-8 text-center text-white/40 text-[13px] font-sans">
+        Nada nuevo por aquí.
       </div>
     );
   }
 
-  function renderTitle(n: any) {
-    if (n.type === 'TASK_ASSIGNED') return 'Te han asignado una tarea';
-    if (n.type === 'TASK_COMPLETED') return 'Tarea completada';
-    if (n.type === 'PROJECT_INVITE') return 'Invitación a proyecto';
-    if (n.type === 'MENTION') return 'Te han mencionado';
-    return 'Nueva notificación';
+  function getTitle(n: any) {
+    const who = n.actorId ? (usersMap[n.actorId]?.name?.split(' ')[0] || 'Alguien') : 'El sistema';
+    const project = n.projectName ?? 'un proyecto';
+    const task = n.taskTitle ?? 'una tarea';
+
+    switch (n.type) {
+      case 'INVITATION_RECEIVED': return `${who} te invitó a ${project}`;
+      case 'INVITATION_ACCEPTED': return `${who} aceptó tu invitación a ${project}`;
+      case 'INVITATION_REJECTED': return `${who} rechazó tu invitación a ${project}`;
+      case 'MEMBER_LEFT': return `${who} salió de ${project}`;
+      case 'MEMBER_REMOVED': return `${who} te sacó de ${project}`;
+      case 'TASK_ASSIGNED': return `${who} te asignó ${task} en ${project}`;
+      case 'TASK_UNASSIGNED': return `${who} te quitó de ${task} en ${project}`;
+      case 'AUTOMATION_TASK_DUE_SOON': return `${task} vencerá pronto en ${project}`;
+      case 'AUTOMATION_TASK_STALE': return `${task} lleva días sin movimiento en ${project}`;
+      case 'AUTOMATION_TASK_OVERDUE': return `${task} ha vencido en ${project}`;
+      case 'AUTOMATION_TASK_UNASSIGNED': return `${task} sigue sin encargado en ${project}`;
+      case 'AUTOMATION_TASK_CREATED': return `Se creó ${task} en ${project}`;
+      case 'AUTOMATION_TASK_MOVED': return `${task} cambió de columna en ${project}`;
+      case 'AUTOMATION_TASK_COMPLETED': return `${task} se terminó en ${project}`;
+      case 'AUTOMATION_TASK_REOPENED': return `${task} se reabrió en ${project}`;
+      case 'AUTOMATION_TASK_ASSIGNEES_CHANGED': return `Cambiaron los encargados de ${task}`;
+      case 'AUTOMATION_TASK_DUE_DATE_CHANGED': return `Cambió el vencimiento de ${task}`;
+      default: return 'Nueva notificación';
+    }
   }
 
   function getHref(n: any) {
-    if (n.projectId && n.taskId) return `${zonePath}/projects/${n.projectId}/board?task=${n.taskId}`;
-    if (n.projectId) return `${zonePath}/projects/${n.projectId}`;
-    return `${zonePath}`;
+    if (!n.projectId || n.type === 'MEMBER_REMOVED') return '/dashboard';
+    if (n.taskId) return `/projects/${n.projectId}?task=${n.taskId}`;
+    return `/projects/${n.projectId}`;
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      {items.map((n: any) => (
-        <a
-          key={n.id}
-          href={getHref(n)}
-          className={`relative flex flex-col gap-1 rounded-2xl px-4 py-3 transition-colors hover:bg-white/5 ${!n.readAt ? 'bg-white/[0.02]' : ''}`}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <span className={`font-sans text-[13px] font-semibold ${!n.readAt ? 'text-white' : 'text-white/70'}`}>
-              {renderTitle(n)}
-            </span>
-            {!n.readAt && <span className="w-2 h-2 rounded-full bg-primary mt-1 shrink-0" />}
-          </div>
-          {n.taskTitle && (
-            <span className="font-sans text-[12px] text-white/50 truncate">
-              {n.taskTitle}
-            </span>
-          )}
-          {n.projectName && (
-            <span className="font-sans text-[10px] text-white/30 truncate mt-1">
-              En {n.projectName}
-            </span>
-          )}
-        </a>
-      ))}
+    <div className="flex flex-col gap-1 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none px-1">
+      {items.map((n: any) => {
+        const actor = n.actorId ? usersMap[n.actorId] : null;
+        return (
+          <a
+            key={n.id}
+            href={getHref(n)}
+            className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
+              !n.readAt ? 'bg-white/[0.03]' : ''
+            }`}
+          >
+            {!plegada && (
+              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                {actor?.avatarUrl ? (
+                  <img src={`${zonePath}/api/gateway${actor.avatarUrl}`} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-[11px] font-bold">
+                    {(actor?.name || 'S').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
+              <p className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white/60'}`}>
+                {getTitle(n)}
+              </p>
+              <span className="font-sans text-[10px] text-white/30 mt-1">
+                {new Date(n.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            {!n.readAt && (
+              <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
+            )}
+          </a>
+        );
+      })}
     </div>
   );
 }

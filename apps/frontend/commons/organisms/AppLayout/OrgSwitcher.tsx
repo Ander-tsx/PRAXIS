@@ -330,7 +330,7 @@ function UpgradeModal({ onClose, zonePath }: { onClose: () => void; zonePath: st
           <h3 className="text-xl font-bold text-white">Lleva tu equipo al siguiente nivel</h3>
           <p className="text-sm text-white/70 max-w-sm">Compara los distintos planes y escoge el que mejor se adapte a tus necesidades y tamaño de equipo.</p>
         </div>
-        <a href={`${zonePath}/billing`} className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+        <a href="/dashboard/billing" className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
           Ver planes y precios
         </a>
       </div>
