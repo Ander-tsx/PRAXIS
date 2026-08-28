@@ -254,7 +254,7 @@ function ArmazonInterno({
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'chat'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>('home');
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -367,11 +367,11 @@ function ArmazonInterno({
             </div>
             
             {!plegada && (
-              <div className="mb-4 flex items-center gap-2 px-1">
+              <div className="mb-4 flex items-center gap-1.5 px-1 overflow-x-auto whitespace-nowrap scrollbar-none">
                 <button
                   type="button"
                   onClick={() => setActiveTab('home')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
                     activeTab === 'home' 
                       ? 'bg-white/10 text-white' 
                       : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -385,7 +385,7 @@ function ArmazonInterno({
                 <button
                   type="button"
                   onClick={() => setActiveTab('chat')}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
                     activeTab === 'chat' 
                       ? 'bg-white/10 text-white' 
                       : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -396,16 +396,34 @@ function ArmazonInterno({
                   </svg>
                   Chat
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('inbox')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+                    activeTab === 'inbox' 
+                      ? 'bg-white/10 text-white' 
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  Bandeja de entrada
+                </button>
               </div>
             )}
-            {activeTab === 'home' ? (
+            {activeTab === 'home' && (
               <NavList
                 navItems={navItemsVivos}
                 activePath={activePathDeSecciones}
                 plegada={plegada}
               />
-            ) : (
+            )}
+            {activeTab === 'chat' && (
               <SidebarChatList zonePath={zonePath} plegada={plegada} />
+            )}
+            {activeTab === 'inbox' && (
+              <SidebarInboxList zonePath={zonePath} plegada={plegada} />
             )}
           </div>
 
@@ -786,6 +804,84 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${zonePath}/api/gateway/me/notifications?limit=20`)
+      .then(res => res.json())
+      .then(body => {
+        if (body?.data?.items) {
+          setItems(body.data.items);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [zonePath]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-2 px-1">
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="px-4 py-8 text-center text-white/40 text-sm font-sans">
+        No tienes notificaciones
+      </div>
+    );
+  }
+
+  function renderTitle(n: any) {
+    if (n.type === 'TASK_ASSIGNED') return 'Te han asignado una tarea';
+    if (n.type === 'TASK_COMPLETED') return 'Tarea completada';
+    if (n.type === 'PROJECT_INVITE') return 'Invitación a proyecto';
+    if (n.type === 'MENTION') return 'Te han mencionado';
+    return 'Nueva notificación';
+  }
+
+  function getHref(n: any) {
+    if (n.projectId && n.taskId) return `${zonePath}/projects/${n.projectId}/board?task=${n.taskId}`;
+    if (n.projectId) return `${zonePath}/projects/${n.projectId}`;
+    return `${zonePath}`;
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {items.map((n: any) => (
+        <a
+          key={n.id}
+          href={getHref(n)}
+          className={`relative flex flex-col gap-1 rounded-2xl px-4 py-3 transition-colors hover:bg-white/5 ${!n.readAt ? 'bg-white/[0.02]' : ''}`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className={`font-sans text-[13px] font-semibold ${!n.readAt ? 'text-white' : 'text-white/70'}`}>
+              {renderTitle(n)}
+            </span>
+            {!n.readAt && <span className="w-2 h-2 rounded-full bg-primary mt-1 shrink-0" />}
+          </div>
+          {n.taskTitle && (
+            <span className="font-sans text-[12px] text-white/50 truncate">
+              {n.taskTitle}
+            </span>
+          )}
+          {n.projectName && (
+            <span className="font-sans text-[10px] text-white/30 truncate mt-1">
+              En {n.projectName}
+            </span>
+          )}
+        </a>
+      ))}
     </div>
   );
 }

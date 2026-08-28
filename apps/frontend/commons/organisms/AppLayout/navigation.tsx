@@ -63,28 +63,7 @@ const iconProps = {
  * sustituirla si lo necesita.
  */
 export const APP_NAV_ITEMS: AppNavItem[] = [
-  {
-    label: 'Panel',
-    href: '/dashboard',
-    section: SECTION_PRINCIPAL,
-    /**
-     * ⚠️ **Era una cuadrícula de cuatro celdas, y ya la usaba otra cosa.** Es
-     * el mismo dibujo que marca «Espacios» dentro de un proyecto, así que en la
-     * misma pantalla había dos sitios distintos con el mismo icono — que es
-     * exactamente lo que un icono viene a evitar.
-     *
-     * Una casa: el Panel es a dónde se vuelve, no una rejilla de contenido.
-     */
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 10.5 12 3l9 7.5M5.5 9.5V19a1 1 0 001 1h3.5v-5h4v5H17a1 1 0 001-1V9.5"
-        />
-      </svg>
-    ),
-  },
+  
   {
     label: 'Proyectos',
     href: '/projects',
@@ -99,30 +78,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
       </svg>
     ),
   },
-  {
-    /**
-     * Las conversaciones privadas.
-     *
-     * Va **justo debajo de Proyectos**, y no al final del bloque de trabajo
-     * como estaba. Se pide desde el uso real: hablar con alguien del equipo
-     * ocurre a la vez que se mira un proyecto, muchas veces sobre él, y tenerlo
-     * a dos entradas de distancia obligaba a saltarse Análisis y Asistente cada
-     * vez. Arriba están los sitios a los que se vuelve a diario; Análisis y
-     * Asistente son de sentarse un rato.
-     */
-    label: 'Mensajes',
-    href: '/chat',
-    section: SECTION_PRINCIPAL,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-        />
-      </svg>
-    ),
-  },
+  
   {
     label: 'Análisis',
     href: '/reports',
