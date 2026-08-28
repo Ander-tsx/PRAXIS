@@ -27,7 +27,22 @@ export const metadata: Metadata = {
  * (`kyloo-design/SKILL.md` §4), sobre los tokens `--color-*` porque esta
  * pantalla sí responde al tema (§13).
  */
-export default async function OrganizationsPage() {
+export default async function OrganizationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ elegir?: string }>;
+}) {
+  /**
+   * De dónde viene quien llega aquí sin haberlo pedido.
+   *
+   * ⚠️ **`/dashboard/roles` redirige a esta lista cuando no puede saber de qué
+   * organización hablas** —tienes varias y no hay ninguna elegida en el
+   * selector—. Sin decirlo, ese salto se lee como un enlace roto: pulsas «Roles
+   * y permisos» y apareces en otro sitio. Lo dice aquí, una línea, y desaparece
+   * en cuanto eliges.
+   */
+  const { elegir } = await searchParams;
+
   const organizaciones = await createServerApiClient()
     .get<OrganizationView[]>('/me/organizations')
     .catch(() => null);
@@ -53,6 +68,13 @@ export default async function OrganizationsPage() {
             Crear una organización
           </Link>
         </div>
+
+        {elegir === 'roles' && (
+          <p className="mb-8 border-l-2 border-primary py-1 pl-4 font-sans text-sm text-text-secondary">
+            Los papeles son de <strong className="text-text-primary">una</strong> organización, y
+            estás mirando todas. Elige cuál para ver quién puede qué dentro.
+          </p>
+        )}
 
         {organizaciones === null && (
           <p className="border-l-2 border-warning py-1 pl-4 font-sans text-sm text-text-secondary">

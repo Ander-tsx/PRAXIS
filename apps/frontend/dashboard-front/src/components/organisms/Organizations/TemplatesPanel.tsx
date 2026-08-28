@@ -7,7 +7,7 @@ import {
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
 import { Button, Input, Select, useAccion } from '@praxis/commons';
 import type { ProjectRoleTemplateView } from '@praxis/commons/billing/planes';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 /**
  * Los permisos de proyecto, con la frase que lee una persona.
@@ -207,6 +207,17 @@ function Formulario({
     Object.fromEntries(claves.map((clave) => [clave, plantilla?.permissions[clave] ?? false])),
   );
   const nombreId = useId();
+
+  /**
+   * Al guardar, se cierra. Misma razón que en `RolesPanel`: un formulario que se
+   * queda abierto y relleno no se lee como «guardado», se lee como que no pasó
+   * nada — y volver a pulsar duplica.
+   */
+  const cerrarRef = useRef(onCerrar);
+  cerrarRef.current = onCerrar;
+  useEffect(() => {
+    if (state.done) cerrarRef.current();
+  }, [state.done]);
 
   function enviar(evento: React.FormEvent) {
     evento.preventDefault();

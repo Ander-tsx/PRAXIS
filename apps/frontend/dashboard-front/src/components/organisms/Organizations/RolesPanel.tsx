@@ -9,7 +9,7 @@ import type {
   OrganizationRoleView,
 } from '@praxis/commons/billing/planes';
 import { TEXTO_DE_PERMISO } from '@praxis/commons/billing/planes';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 /** El orden en que se leen, de lo que más abre a lo que menos. */
 const ORDEN: OrganizationPermission[] = [
@@ -220,6 +220,23 @@ function Formulario({
     Object.fromEntries(ORDEN.map((clave) => [clave, papel?.permissions[clave] ?? false])),
   );
   const nombreId = useId();
+
+  /**
+   * Al guardar, se cierra.
+   *
+   * ⚠️ **Sin esto el formulario se quedaba abierto y relleno**, y eso no se lee
+   * como «guardado»: se lee como que no pasó nada. Volver a pulsar creaba un
+   * segundo papel con el mismo nombre, o reenviaba la edición. La lista de
+   * arriba ya enseña el resultado — cerrar es la confirmación.
+   *
+   * `done` lo pone la acción con el id de lo guardado; el `ref` evita que el
+   * efecto dependa de la identidad de `onCerrar`, que cambia en cada render.
+   */
+  const cerrarRef = useRef(onCerrar);
+  cerrarRef.current = onCerrar;
+  useEffect(() => {
+    if (state.done) cerrarRef.current();
+  }, [state.done]);
 
   function enviar(evento: React.FormEvent) {
     evento.preventDefault();

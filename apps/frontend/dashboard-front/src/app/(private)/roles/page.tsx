@@ -32,5 +32,10 @@ export default async function RolesEntryPage() {
     .catch(() => [] as OrganizationView[]);
 
   if (organizaciones.length === 1) redirect(`/organizations/${organizaciones[0].id}/roles`);
-  redirect('/organizations');
+
+  /* ⚠️ **Con el motivo puesto en la URL.** Sin él, pulsar «Roles y permisos» en
+     la barra lateral te deja en una lista de organizaciones sin decir por qué:
+     se lee como que el enlace está roto, que es exactamente lo que se dijo la
+     primera vez que alguien lo pulsó. La lista lo lee y lo explica. */
+  redirect('/organizations?elegir=roles');
 }

@@ -129,7 +129,9 @@ export default async function OrganizationPage({
           }
           accion={
             permisos.canCreateProject ? (
-              <EnlaceDeTexto href="/projects">Crear un proyecto</EnlaceDeTexto>
+              <EnlaceDeTexto href="/projects" cruzaDeZona>
+                Crear un proyecto
+              </EnlaceDeTexto>
             ) : null
           }
         >
@@ -143,7 +145,11 @@ export default async function OrganizationPage({
             <ol className="flex flex-col">
               {lista.map((proyecto, i) => (
                 <li key={proyecto.id}>
-                  <Link
+                  {/* 🔴 `<a>` y no `next/link`: `projectHref` es una ruta **del
+                      shell**, y esta zona monta en `/dashboard`, así que el
+                      router la prefijaría y saldría `/dashboard/projects/<slug>`,
+                      que es un 404. Ver §16 y el comentario de `EnlaceDeTexto`. */}
+                  <a
                     href={projectHref(proyecto)}
                     className="group flex items-baseline gap-5 border-b border-dotted border-border py-5 transition-colors last:border-b-0 hover:border-border-strong"
                   >
@@ -164,7 +170,7 @@ export default async function OrganizationPage({
                       {proyecto._count?.members ?? 1}{' '}
                       {(proyecto._count?.members ?? 1) === 1 ? 'persona' : 'personas'}
                     </span>
-                  </Link>
+                  </a>
                 </li>
               ))}
             </ol>
@@ -226,7 +232,10 @@ export default async function OrganizationPage({
                       {`Pasar a ${plan.nombre}`}
                     </CheckoutButton>
                   ))}
-                  <EnlaceDeTexto href="/dashboard/billing">Comparar los planes</EnlaceDeTexto>
+                  {/* Sin `/dashboard` delante: es una ruta **de esta zona** y
+                      `next/link` ya le pone el basePath. Con él salía
+                      `/dashboard/dashboard/billing`. */}
+                  <EnlaceDeTexto href="/billing">Comparar los planes</EnlaceDeTexto>
                 </div>
               )}
             </div>
@@ -309,12 +318,44 @@ function Bloque({
  * tabla de §4: un botón dentro de una tarjeta se sustituye por texto con
  * subrayado condicional. Aquí no hay tarjetas, así que tampoco hay píldoras.
  */
-function EnlaceDeTexto({ href, children }: { href: string; children: ReactNode }) {
+/**
+ * Un enlace de texto del portal.
+ *
+ * 🔴 **`cruzaDeZona` no es un adorno: sin él, el enlace da un 404.** Esta
+ * pantalla vive en `dashboard-front`, cuyo `basePath` es `/dashboard`, y
+ * `next/link` **prefija** la ruta con él. Un `href="/projects"` sale como
+ * `/dashboard/projects`, que no existe en ninguna zona — y no falla al
+ * compilar, ni al pintar: falla cuando alguien lo pulsa. Pasó justo con «Crear
+ * un proyecto», que es el enlace más importante de esta pantalla y el que se
+ * pulsa el primer día.
+ *
+ * Lo que cruza de zona va en `<a>` duro, como en el resto del repositorio
+ * (`DashboardProjects`, `QuickAccess`, la barra lateral entera). Ver
+ * ESTADO-ACTUAL §16.
+ */
+function EnlaceDeTexto({
+  href,
+  children,
+  cruzaDeZona = false,
+}: {
+  href: string;
+  children: ReactNode;
+  /** El destino lo sirve **otra** zona del multi-zone. Ver arriba. */
+  cruzaDeZona?: boolean;
+}) {
+  const clase =
+    'font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary';
+
+  if (cruzaDeZona) {
+    return (
+      <a href={href} className={clase}>
+        {children}
+      </a>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className="font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
-    >
+    <Link href={href} className={clase}>
       {children}
     </Link>
   );
