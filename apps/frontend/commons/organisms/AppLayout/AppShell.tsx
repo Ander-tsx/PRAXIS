@@ -317,7 +317,7 @@ function ArmazonInterno({
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
-          className={`hidden shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200 md:flex ${
+          className={`hidden shrink-0 flex-col border-r border-border bg-[#080807] transition-[width] duration-200 md:flex ${
             plegada ? 'w-[4.5rem]' : 'w-64'
           }`}
         >
@@ -338,11 +338,11 @@ function ArmazonInterno({
            */}
           <div
             className={`flex items-center border-b border-border ${
-              plegada ? 'h-16 justify-center px-0' : 'justify-between px-6 py-4'
+              plegada ? 'h-16 justify-center px-0' : 'h-16 justify-between px-6'
             }`}
           >
             {!plegada && (
-              <div className="flex flex-col items-start gap-1.5">
+              <div className="flex items-center gap-2">
                 <Wordmark />
                 <ByKyloo />
               </div>
@@ -350,19 +350,18 @@ function ArmazonInterno({
             <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
-          <div className={plegada ? 'px-2 pt-4' : 'px-4 pt-4'}>
-            <OrgSwitcher
-              name={user.name}
-              plegada={plegada}
-              organizaciones={organizaciones}
-              activaId={organizacionActivaId ?? null}
-              zonePath={zonePath}
-            />
-          </div>
-
           <div
             className={`scrollbar-none flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}
           >
+            <div className="mb-6">
+              <OrgSwitcher
+                name={user.name}
+                plegada={plegada}
+                organizaciones={organizaciones}
+                activaId={organizacionActivaId ?? null}
+                zonePath={zonePath}
+              />
+            </div>
             <NavList
               navItems={navItemsVivos}
               activePath={activePathDeSecciones}
@@ -378,8 +377,8 @@ function ArmazonInterno({
               /* Plegada, el enlace y el selector siguen siendo hermanos por lo
                  mismo que desplegada: un botón dentro de un `<a>` no vale. */
               <div
-                className={`mb-2 flex justify-center rounded-lg p-1 transition-colors ${
-                  enCuenta ? 'bg-surface-elevated' : ''
+                className={`mb-2 flex justify-center rounded-full p-1 transition-colors hover:bg-white/5 ${
+                  enCuenta ? 'bg-white/5' : ''
                 }`}
               >
                 <span className="relative">
@@ -448,32 +447,32 @@ function ArmazonInterno({
               style={{ background: alpha(colors.overlay, 80) }}
             />
 
-            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-surface p-4">
-              <div className="flex flex-col gap-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-col items-start gap-1.5">
-                    <Wordmark />
-                    <ByKyloo />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Cerrar menú"
-                    className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-[#080807] p-4">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-2 mt-1">
+                  <Wordmark />
+                  <ByKyloo />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Cerrar menú"
+                  className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
+              <div className="flex flex-col gap-6 flex-1 overflow-y-auto scrollbar-none mb-6">
                 <OrgSwitcher
                   name={user.name}
                   plegada={false}
@@ -520,8 +519,8 @@ function UserCard({
       /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
          vive en la lista de secciones, así que si no se marcara aquí, estando
          en tu cuenta no habría nada marcado en ninguna parte. */
-      className={`mb-3 flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-surface-elevated ${
-        activa ? 'bg-surface-elevated' : ''
+      className={`mb-3 flex items-center gap-3 rounded-full p-1 transition-colors hover:bg-white/5 ${
+        activa ? 'bg-white/5' : ''
       }`}
     >
       {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
@@ -583,7 +582,7 @@ function Wordmark() {
  */
 function ByKyloo() {
   return (
-    <span className="flex items-center gap-1.5 text-text-disabled">
+    <span className="flex items-center gap-1.5 text-white">
       <span className="font-mono text-[0.55rem] uppercase tracking-[0.18em]">By</span>
       <KylooWordmark className="h-2.5 w-auto" />
     </span>
@@ -651,8 +650,7 @@ function OrgSwitcher({
 
   const cuadro = (
     <span
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm"
-      style={{ background: colors.primary, color: colors.primaryForeground }}
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 font-sans text-[13px] font-semibold text-white"
       aria-hidden="true"
     >
       {inicial}
@@ -675,7 +673,7 @@ function OrgSwitcher({
         aria-expanded={abierto}
         aria-haspopup={puedeAbrir ? 'menu' : undefined}
         disabled={!puedeAbrir}
-        className="flex w-full items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:border-border-strong disabled:cursor-default"
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5 disabled:cursor-default"
       >
         {cuadro}
         <span className="flex min-w-0 flex-1 flex-col">
@@ -688,29 +686,21 @@ function OrgSwitcher({
         </span>
         {puedeAbrir && (
           <svg
-            className="h-4 w-4 shrink-0 text-text-disabled"
+            className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${abierto ? '-rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
-            strokeWidth={1.75}
+            strokeWidth={2}
             aria-hidden="true"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         )}
       </button>
 
-      {abierto && (
-        <>
-          {/* Un fondo transparente para cerrar al pulsar fuera. No es un scrim:
-              no oscurece nada, solo captura el clic. */}
-          <button
-            type="button"
-            aria-label="Cerrar el selector"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setAbierto(false)}
-          />
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 flex flex-col overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-lg">
+      <div className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden">
+          <div className="flex flex-col gap-0.5 rounded-xl border border-white/10 bg-[#0F0F0F] p-1.5 shadow-xl">
             <OpcionDeOrg
               activa={activaId === null}
               etiqueta="Todas tus organizaciones"
@@ -727,8 +717,8 @@ function OrgSwitcher({
               />
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -756,8 +746,8 @@ function OpcionDeOrg({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-baseline justify-between gap-3 px-3 py-2 text-left transition-colors ${
-        activa ? 'bg-primary-muted text-primary' : 'text-text-primary hover:bg-surface-elevated'
+      className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+        activa ? 'bg-white/10 text-white font-medium' : 'text-white/70 hover:bg-white/5 hover:text-white'
       }`}
     >
       <span className="truncate font-sans text-[13px]">{etiqueta}</span>
@@ -784,7 +774,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       aria-expanded={!plegada}
       aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
       title={plegada ? 'Desplegar' : 'Plegar'}
-      className="shrink-0 cursor-pointer rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
+      className="shrink-0 cursor-pointer rounded-md p-1.5 text-text-disabled transition-colors hover:bg-white/5 hover:text-text-primary"
     >
       <svg
         className="h-4 w-4"

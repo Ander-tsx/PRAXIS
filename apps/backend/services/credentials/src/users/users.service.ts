@@ -91,6 +91,9 @@ export class UsersService {
         ...(dto.lastName !== undefined && { lastName: dto.lastName }),
         ...(dto.lastName === undefined &&
           dto.last_name !== undefined && { lastName: dto.last_name }),
+        ...(dto.biography !== undefined && { biography: dto.biography }),
+        ...(dto.location !== undefined && { location: dto.location }),
+        ...(dto.professionalInfo !== undefined && { professionalInfo: dto.professionalInfo }),
         /* La presencia la elige su dueño. `status` **no** entra por aquí: es el
            estado administrativo de la cuenta y lo pone la plataforma. */
         ...(dto.presence !== undefined && { presence: dto.presence }),
@@ -114,6 +117,54 @@ export class UsersService {
    * Los bytes van a `UserAvatar`, no a `User`: son cientos de kilobytes que no
    * hacen falta en las decenas de consultas de perfil que pinta una pantalla.
    */
+  
+  async getCover(userId: string) {
+    return this.prisma.userCover.findUnique({ where: { userId } });
+  }
+
+  async setCover(userId: string, mimeType: string, bytes: Uint8Array<ArrayBuffer>) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new RpcException({ statusCode: 404, message: 'Usuario no encontrado' });
+    }
+
+    const version = Date.now();
+    const [, actualizado] = await this.prisma.$transaction([
+      this.prisma.userCover.upsert({
+        where: { userId },
+        create: { userId, mimeType, size: bytes.length, bytes },
+        update: { mimeType, size: bytes.length, bytes },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { coverUrl: `/users/${userId}/cover?v=${version}` },
+        include: { credential: { select: { email: true } } },
+      }),
+    ]);
+
+    await this.redis.del(`user:${userId}`);
+    return actualizado;
+  }
+
+  async deleteCover(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new RpcException({ statusCode: 404, message: 'Usuario no encontrado' });
+    }
+
+    const actualizado = await this.prisma.$transaction(async (tx) => {
+      await tx.userCover.delete({ where: { userId } }).catch(() => null);
+      return tx.user.update({
+        where: { id: userId },
+        data: { coverUrl: null },
+        include: { credential: { select: { email: true } } },
+      });
+    });
+
+    await this.redis.del(`user:${userId}`);
+    return actualizado;
+  }
+
   async setAvatar(userId: string, mimeType: string, bytes: Uint8Array<ArrayBuffer>) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {

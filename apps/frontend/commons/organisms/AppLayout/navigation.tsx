@@ -342,7 +342,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * tropezando con un límite; una tabla de precios a la que se llega chocando
      * no vende nada.
      */
-    label: 'Facturación y suscripción',
+    label: 'Suscripción',
     href: '/dashboard/billing',
     section: SECTION_GESTION,
     icon: (
@@ -374,7 +374,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.
      */
-    label: 'Configuración del sistema',
+    label: 'Sistema',
     href: '/dashboard/settings',
     section: SECTION_CONFIGURACION,
     icon: (
@@ -393,7 +393,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    label: 'Centro de ayuda',
+    label: 'Ayuda',
     href: '/dashboard/ayuda',
     section: SECTION_CONFIGURACION,
     disabled: true,
@@ -408,7 +408,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    label: 'Soporte al cliente',
+    label: 'Soporte',
     href: '/dashboard/soporte',
     section: SECTION_CONFIGURACION,
     disabled: true,

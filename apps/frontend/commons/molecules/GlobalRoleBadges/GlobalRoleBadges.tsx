@@ -1,4 +1,3 @@
-import { Badge, type BadgeVariant } from '../../atoms/Badge';
 
 export interface GlobalRoleBadgesProps {
   /** Nombres de los roles globales, tal como los da `loadCurrentUser()`. */
@@ -22,24 +21,28 @@ export interface GlobalRoleBadgesProps {
  * Una cuenta sin roles no pinta nada, que es el caso normal: `POST /auth/register`
  * no asigna ninguno.
  */
+import { colors, alpha } from '../../tokens';
+
 export function GlobalRoleBadges({ roles }: GlobalRoleBadgesProps) {
   return (
     <>
-      {roles.map((role) => (
-        <Badge key={role} variant={badgeVariant(role)}>
-          {role.toUpperCase()}
-        </Badge>
-      ))}
+      {roles.map((role) => {
+        const color = role === 'User' ? colors.primary : colors.accent;
+        return (
+          <span 
+            key={role} 
+            className="inline-flex items-center justify-center font-sans font-bold uppercase tracking-widest text-[10px] rounded-full px-3 py-1"
+            style={{
+              backgroundColor: alpha(color, 20),
+              color: color,
+              border: `1px solid ${alpha(color, 30)}`
+            }}
+          >
+            {role}
+          </span>
+        );
+      })}
     </>
   );
 }
 
-/**
- * Cualquier nivel de administración destaca; `User` y lo que no reconozcamos, no.
- *
- * En negativo a propósito —«todo lo que no sea User»— para que un rol nuevo por
- * encima salga destacado por defecto en vez de camuflado.
- */
-function badgeVariant(role: string): BadgeVariant {
-  return role === 'User' ? 'primary' : 'accent';
-}

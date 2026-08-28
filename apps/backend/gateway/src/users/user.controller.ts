@@ -269,7 +269,7 @@ export class UserController {
   })
   @ApiOperation({ summary: 'Sube la foto de perfil' })
   @ApiResponse({ status: 200, description: 'Perfil con la avatarUrl nueva' })
-  setAvatar(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File) {
+  async setAvatar(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No llegó ningún archivo en el campo «file»');
     if (!(AVATAR_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
       throw new BadRequestException('La foto tiene que ser PNG, JPEG o WebP.');
@@ -281,7 +281,7 @@ export class UserController {
       throw new BadRequestException('Ese archivo no es la imagen que dice ser.');
     }
 
-    return firstValueFrom(
+    return await firstValueFrom(
       this.credentialsClient.send(
         { cmd: 'user_set_avatar' },
         { userId: id, mimeType: file.mimetype, base64: file.buffer.toString('base64') },
@@ -293,8 +293,8 @@ export class UserController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AccountOwnerGuard)
   @ApiOperation({ summary: 'Quita la foto de perfil' })
-  deleteAvatar(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(
+  async deleteAvatar(@Param('id', ParseUUIDPipe) id: string) {
+    return await firstValueFrom(
       this.credentialsClient.send({ cmd: 'user_delete_avatar' }, { userId: id }),
     );
   }
@@ -306,6 +306,67 @@ export class UserController {
    * dentro —sale en cada burbuja del chat y en cada lista de equipo—, así que
    * basta con tener sesión. Lo que no se expone por aquí es nada más del perfil.
    */
+  
+  @Get(':id/cover')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bytes de la foto de portada' })
+  async getCover(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response) {
+    const cover = await firstValueFrom(
+      this.credentialsClient.send<{ mimeType: string; size: number; base64: string } | null>(
+        { cmd: 'user_get_cover' },
+        { userId: id },
+      ),
+    );
+    if (!cover) throw new NotFoundException('Esa cuenta no tiene portada');
+
+    const bytes = Buffer.from(cover.base64, 'base64');
+    res.setHeader('Content-Type', cover.mimeType);
+    res.setHeader('Content-Length', bytes.length);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    res.send(bytes);
+  }
+
+  @Post(':id/cover')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccountOwnerGuard)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024, files: 1 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } },
+  })
+  @ApiOperation({ summary: 'Sube la foto de portada' })
+  @ApiResponse({ status: 200, description: 'Perfil con la coverUrl nueva' })
+  async setCover(@Param('id', ParseUUIDPipe) id: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No llegó ningún archivo en el campo «file»');
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype)) {
+      throw new BadRequestException('La foto tiene que ser PNG, JPEG o WebP.');
+    }
+    if (file.size === 0) throw new BadRequestException('El archivo está vacío');
+
+    return this.unoConPresenciaReal(
+      await firstValueFrom(
+        this.credentialsClient.send<any>(
+          { cmd: 'user_set_cover' },
+          { userId: id, mimeType: file.mimetype, base64: file.buffer.toString('base64') },
+        ),
+      ),
+    );
+  }
+
+  @Delete(':id/cover')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AccountOwnerGuard)
+  @ApiOperation({ summary: 'Borra la foto de portada' })
+  @ApiResponse({ status: 200, description: 'Perfil sin coverUrl' })
+  async deleteCover(@Param('id', ParseUUIDPipe) id: string) {
+    return this.unoConPresenciaReal(
+      await firstValueFrom(
+        this.credentialsClient.send<any>({ cmd: 'user_delete_cover' }, { userId: id }),
+      ),
+    );
+  }
+
   @Get(':id/avatar')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Bytes de la foto de perfil' })
@@ -335,8 +396,8 @@ export class UserController {
   @ApiOperation({ summary: 'Eliminar un usuario' })
   @ApiResponse({ status: 200, description: 'Usuario eliminado exitosamente' })
   @ApiResponse({ status: 403, description: 'Solo puedes eliminar tu propia cuenta' })
-  delete(@Param('id', ParseUUIDPipe) id: string) {
-    return firstValueFrom(
+  async delete(@Param('id', ParseUUIDPipe) id: string) {
+    return await firstValueFrom(
       this.credentialsClient.send({ cmd: 'user_delete' }, { id } satisfies DeleteUserDto),
     );
   }

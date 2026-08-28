@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useAppShell, useSidebarPlegada } from './AppShell';
 
 export interface AppHeaderProps {
+  anchoCompleto?: boolean;
   /** Título de la pantalla. */
   title: string;
   /**
@@ -37,7 +38,7 @@ export interface AppHeaderProps {
  * lo que abre es el cajón de `AppShell`: por eso pide la función por contexto en
  * vez de recibirla por props a través de media aplicación.
  */
-export function AppHeader({ title, headerSlot, lleno = false, children }: AppHeaderProps) {
+export function AppHeader({ title, headerSlot, lleno = false, anchoCompleto = false, children }: AppHeaderProps) {
   const { openMenu, cuentaSlot } = useAppShell();
   /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
      libera ~184px que esta columna nunca reclama —se queda en el margen
@@ -47,7 +48,7 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-4 sm:px-6">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-[#080807] px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
@@ -110,7 +111,7 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
         }`}
       >
         <div
-          className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'} ${
+          className={`mx-auto w-full ${anchoCompleto ? 'p-0 max-w-full' : `p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`} ${
             lleno ? 'flex h-full min-h-0 flex-col' : ''
           }`}
         >

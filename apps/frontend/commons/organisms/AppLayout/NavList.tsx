@@ -128,7 +128,7 @@ export function NavList({
                 type="button"
                 onClick={() => alternar(grupo.clave)}
                 aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-md px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
+                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors hover:text-text-primary"
               >
                 {grupo.section}
                 <svg
@@ -160,21 +160,21 @@ export function NavList({
                 className="flex min-h-0 flex-col gap-1 overflow-hidden transition-opacity duration-200"
                 style={{ opacity: compactado ? 0 : 1 }}
               >
-                {grupo.items.map((item) => {
+                {grupo.items.map((item, idx) => {
                   const active = !item.disabled && item.href === activeHref;
                   const claveItem = `${grupo.clave}::${item.href}`;
 
                   if (item.disabled) {
                     return (
                       <span
-                        key={claveItem}
+                        key={`${grupo.clave}-${idx}`}
                         aria-disabled="true"
                         title={
                           plegada
                             ? `${item.label} — disponible próximamente`
                             : 'Disponible próximamente'
                         }
-                        className={`flex cursor-not-allowed items-center rounded-lg font-sans text-[13px] font-medium text-text-disabled ${
+                        className={`flex cursor-not-allowed items-center rounded-full font-sans text-[13px] font-medium text-text-disabled ${
                           plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'
                         }`}
                       >
@@ -196,17 +196,17 @@ export function NavList({
                      * zona actual. Ver ESTADO-ACTUAL §16.
                      */
                     <a
-                      key={claveItem}
+                      key={`${grupo.clave}-${idx}`}
                       href={item.href}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
                       title={plegada ? item.label : undefined}
                       className={[
-                        'relative flex items-center rounded-lg font-sans text-[13px] transition-colors duration-150',
+                        'relative flex items-center rounded-full font-sans text-[13px] transition-colors duration-150',
                         plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
                         active
-                          ? 'bg-primary-muted font-semibold text-primary'
-                          : 'font-medium text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+                          ? 'font-semibold text-primary hover:bg-white/5'
+                          : 'font-medium text-text-secondary hover:bg-white/5 hover:text-text-primary',
                       ].join(' ')}
                     >
                       {item.icon}

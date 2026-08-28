@@ -18,6 +18,10 @@ export interface UserProfile {
    * La zona le antepone su propio proxy — ver `avatarHref`.
    */
   avatarUrl: string | null;
+  coverUrl: string | null;
+  biography: string | null;
+  location: string | null;
+  professionalInfo?: any;
   /**
    * Estado **administrativo** de la cuenta (`ACTIVE`, `INACTIVE`,
    * `SUSPENDED`), puesto por la plataforma. **No es la presencia**: esa es

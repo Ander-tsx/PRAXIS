@@ -304,7 +304,7 @@ export class OrganizationsService {
     const cacheado = await this.redis.get<unknown[]>(clave);
     if (cacheado) return cacheado;
 
-    const membresias = await this.prisma.organizationMember.findMany({
+    let membresias = await this.prisma.organizationMember.findMany({
       where: { userId, status: MembershipStatus.ACTIVE },
       include: {
         role: true,
@@ -312,6 +312,18 @@ export class OrganizationsService {
       },
       orderBy: [{ organization: { kind: 'asc' } }, { invitedAt: 'asc' }],
     });
+
+    if (membresias.length === 0) {
+      await this.personalDe(userId);
+      membresias = await this.prisma.organizationMember.findMany({
+        where: { userId, status: MembershipStatus.ACTIVE },
+        include: {
+          role: true,
+          organization: { include: { subscription: true, _count: { select: { members: true } } } },
+        },
+        orderBy: [{ organization: { kind: 'asc' } }, { invitedAt: 'asc' }],
+      });
+    }
 
     const vistas = membresias.map((membresia) =>
       this.vista(membresia.organization, membresia, userId),

@@ -75,6 +75,22 @@ export class UpdateUserBodyDto {
   @IsOptional()
   @IsEnum(USER_PRESENCES)
   presence?: UserPresence;
+
+  @ApiPropertyOptional({ description: 'Biografía', example: 'I like the code & F1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160, { message: 'La biografía no puede superar 160 caracteres' })
+  biography?: string;
+
+  @ApiPropertyOptional({ description: 'Ubicación', example: 'Mexico' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30, { message: 'La ubicación no puede superar 30 caracteres' })
+  location?: string;
+
+  @ApiPropertyOptional({ description: 'Información profesional en formato JSON' })
+  @IsOptional()
+  professionalInfo?: any;
 }
 
 /** Payload que viaja al microservicio: el cuerpo más el id de la ruta. */
