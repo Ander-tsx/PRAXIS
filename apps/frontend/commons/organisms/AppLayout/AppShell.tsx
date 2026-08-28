@@ -6,6 +6,10 @@ import { type ReactNode, createContext, useContext, useEffect, useState } from '
 import { Avatar } from '../../atoms/Avatar';
 import { LivePresences, LiveSource } from '../../realtime';
 import { useMessageCount } from '../../realtime/useMessageCount';
+import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { usePresence } from '../../realtime/presence';
+import { avatarHref } from '../../api/presence';
+import { personLabel } from '../../api/domain';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { DockColumn, DockProvider } from './DockPanel';
@@ -254,7 +258,19 @@ function ArmazonInterno({
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('praxis:sidebarTab');
+      if (stored === 'chat' || stored === 'inbox') return stored;
+    }
+    return 'home';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('praxis:sidebarTab', activeTab);
+    }
+  }, [activeTab]);
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -719,7 +735,9 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
   );
 }
 
+
 function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+  const pathname = usePathname();
   const [directs, setDirects] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, any>>({});
@@ -768,98 +786,123 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
     return mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) + (mensaje.body.length > 50 ? '...' : '');
   }
 
+  function cuandoCorto(iso: string) {
+    const d = new Date(iso);
+    const ahora = new Date();
+    if (d.getDate() === ahora.getDate() && d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear()) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+  }
+
+  const PersonRow = ({ c, peer }: any) => {
+    const presencia = usePresence(c.peerId, peer?.presence);
+    const nombre = peer ? personLabel(peer) : 'Alguien';
+    const link = `/chat/${c.peerId}`;
+    const activo = pathname === link;
+
+    return (
+      <a
+        key={c.peerId || c.channelId}
+        href={link}
+        aria-current={activo ? 'page' : undefined}
+        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
+      >
+        <div className="shrink-0">
+          <Avatar
+            label={nombre}
+            size="sm"
+            src={avatarHref(peer?.avatarUrl, `${zonePath}/api/gateway`)}
+            presence={presencia}
+          />
+        </div>
+        {!plegada && (
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}>
+                {nombre}
+              </span>
+              {c.ultimo && (
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white/40">
+                  {cuandoCorto(c.ultimo.createdAt)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}>
+                {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
+              </span>
+              {c.unread > 0 && (
+                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </a>
+    );
+  };
+
+  const ProjectRow = ({ c, autor }: any) => {
+    const link = `/chat/proyecto/${c.project.id}`;
+    const activo = pathname === link;
+
+    return (
+      <a
+        key={c.project.id}
+        href={link}
+        aria-current={activo ? 'page' : undefined}
+        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
+      >
+        <div className="shrink-0 flex items-center justify-center scale-90 origin-center">
+          <ProjectMonogram id={c.project.id} name={c.project.name} />
+        </div>
+        {!plegada && (
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}>
+                {c.project.name}
+              </span>
+              {c.ultimo && (
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white/40">
+                  {cuandoCorto(c.ultimo.createdAt)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}>
+                {c.ultimo ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}` : 'Sin mensajes'}
+              </span>
+              {c.unread > 0 && (
+                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </a>
+    );
+  };
+
   return (
-    <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none">
+    <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none pb-4 px-1">
       {projects.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Proyectos</span>}
-          {projects.map((c: any) => {
-            const autor = c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null;
-            return (
-              <a
-                key={c.project?.id || c.channelId}
-                href={`/chat/proyecto/${c.project.id}`}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
-              >
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 text-white text-xs font-bold shrink-0">
-                  {(c.project?.name || '?').charAt(0).toUpperCase()}
-                </div>
-                {!plegada && (
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="truncate font-sans text-[13px] font-medium text-white/90">
-                      {c.project?.name}
-                    </span>
-                    <span className="truncate font-sans text-[11px] text-white/50">
-                      {c.ultimo ? `${(autor?.firstName || autor?.credential?.email?.split("@")[0]) || 'Alguien'}: ${resumenDe(c.ultimo)}` : 'Sin mensajes todavía'}
-                    </span>
-                  </div>
-                )}
-                {!plegada && (
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    {c.ultimo && <span className="font-sans text-[10px] text-white/30">{new Date(c.ultimo.createdAt).toLocaleDateString()}</span>}
-                    {c.unread > 0 && (
-                      <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground">
-                        {c.unread > 99 ? '99+' : c.unread}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </a>
-            );
-          })}
+        <div className="flex flex-col gap-0.5">
+          {!plegada && <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">Proyectos</span>}
+          {projects.map((c: any) => (
+            <ProjectRow key={c.project.id} c={c} autor={c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null} />
+          ))}
         </div>
       )}
 
       {directs.length > 0 && (
-        <div className="flex flex-col gap-1">
-          {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Privados</span>}
-          {directs.map((c: any) => {
-            const peer = usersMap[c.peerId];
-            return (
-              <a
-                key={c.peerId || c.channelId}
-                href={`/chat/${c.peerId}`}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
-              >
-                <div className="relative shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                    {peer?.avatarUrl ? (
-                      <img src={`${zonePath}/api/gateway${peer.avatarUrl}`} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-white text-xs font-bold">{(peer ? (peer.firstName || peer.credential?.email || "?") : "?").charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  {peer?.presence && (
-                    <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#080807] ${
-                      peer.presence === 'ONLINE' ? 'bg-green-500' :
-                      peer.presence === 'AWAY' ? 'bg-yellow-500' :
-                      peer.presence === 'BUSY' ? 'bg-red-500' : 'bg-gray-500'
-                    }`} />
-                  )}
-                </div>
-                {!plegada && (
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="truncate font-sans text-[13px] font-medium text-white/90">
-                      {peer ? (peer.firstName ? peer.firstName + (peer.lastName ? " " + peer.lastName : "") : peer.credential?.email?.split("@")[0]) : "Usuario desconocido"}
-                    </span>
-                    <span className="truncate font-sans text-[11px] text-white/50">
-                      {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
-                    </span>
-                  </div>
-                )}
-                {!plegada && (
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    {c.ultimo && <span className="font-sans text-[10px] text-white/30">{new Date(c.ultimo.createdAt).toLocaleDateString()}</span>}
-                    {c.unread > 0 && (
-                      <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground">
-                        {c.unread > 99 ? '99+' : c.unread}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </a>
-            );
-          })}
+        <div className="flex flex-col gap-0.5">
+          {!plegada && <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">Privados</span>}
+          {directs.map((c: any) => (
+            <PersonRow key={c.peerId} c={c} peer={usersMap[c.peerId]} />
+          ))}
         </div>
       )}
     </div>
