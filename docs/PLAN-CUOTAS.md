@@ -178,11 +178,34 @@ Ni un `< 25` suelto. Todo pasa por `cabe()`, que es lo que hace que `SIN_TOPE`
 
 | Stack | Qué | Estado |
 |---|---|---|
-| Q1 | **Automatizaciones** — `automation_rule_active_count`, `exigirAutomatizacion`, y el guard en las dos puertas | ⬜ |
-| Q2 | **Almacenamiento** — `attachment_bytes_of_projects`, `exigirAlmacenamiento`, y el guard al subir | ⬜ |
-| Q3 | **Historial de Análisis** — el recorte del `from`, y la pantalla diciéndolo | ⬜ |
-| Q4 | **Pasarse hacia abajo** — el resumen marca lo excedido, y la pantalla lo dibuja | ⬜ |
-| Q5 | Documentación: `CLAUDE.md`, contrato, ESTADO-ACTUAL y este plan | ⬜ |
+| Q1 | **Automatizaciones** — `automation_rule_active_count`, `exigirAutomatizacion`, y el guard en las dos puertas | ✅ |
+| Q2 | **Almacenamiento** — `attachment_bytes_of_projects`, `exigirAlmacenamiento`, y el guard al subir | ✅ |
+| Q3 | **Historial de Análisis** — el recorte de `days`/`weeks`/`from`, y la pantalla diciéndolo | ✅ |
+| Q4 | **Pasarse hacia abajo** — el resumen marca lo excedido, y la pantalla lo dibuja | ✅ |
+| Q5 | Documentación: `CLAUDE.md`, contrato y este plan | ✅ |
+| Q6 | **Regresión entera** (`pnpm e2e:regresion`) — no corrida, ver abajo | ⬜ |
+| Q7 | Repaso visual de las dos tarjetas nuevas, en claro y en oscuro | ⬜ |
+
+### Lo que sí se ha comprobado, y lo que no
+
+✅ **Compila entero**: `tsc --noEmit` limpio en gateway, tasks, automation,
+reports y billing, y en las **siete zonas**. `next build` verde en
+`dashboard-front` y en `reports-front`.
+
+✅ **Las unitarias, verdes**: las 16 tareas, con 10 pruebas nuevas —cuatro en el
+controlador de automatizaciones y seis sobre `excedidasDe`—.
+
+✅ **`biome check` sin un hallazgo nuevo** sobre la línea base de cada fichero
+tocado. Los que quedan ya estaban.
+
+⬜ **La regresión de punta a punta no se ha corrido.** No se espera rojo: ninguna
+prueba existente pide más historial del que da su plan ni sube adjuntos cerca del
+tope. La que más cerca pasa es `17-automatizaciones`, que crea reglas — si su
+proyecto es de una organización FREE y llega a **cuatro activas**, sale un 402
+que antes no salía, y sería un rojo correcto.
+
+⬜ **Nada de esto se ha visto contra el stack levantado.** Los cuatro topes se
+comprobaron por tipos y por unitarias, no pulsando.
 
 ---
 
@@ -190,3 +213,7 @@ Ni un `< 25` suelto. Todo pasa por `cabe()`, que es lo que hace que `SIN_TOPE`
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
+| 2026-08-28 | Q1+Q2 | `6562126` | El tope de automatizaciones activas, con sus dos puertas, y el almacén de adjuntos de la organización compuesto en el gateway |
+| 2026-08-28 | Q3 | `8b92953` | El historial de Análisis recortado al plan en las once rutas —menos el `days` de `blocked`— y el aviso encima del lienzo |
+| 2026-08-28 | Q4 | `a85922f` | `excedidas[]` en el resumen y la tarjeta de topes rebasados, con la trampa 4 del encargo decidida |
+| 2026-08-28 | Q5 | (este) | `CLAUDE.md` con dos trampas nuevas, el contrato con las tres cuotas y `ventana` |

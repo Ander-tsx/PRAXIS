@@ -739,6 +739,17 @@ solo se leen en la ruta de `/content`. `task.attachments` trae los metadatos.
 
 - **Máximo 10 MB** por archivo. Pasarse da **413** `"File too large"`, que lo
   corta multer antes de leerlo entero.
+- 🔴 **Y hay un segundo tope, que es del plan: `almacenamientoOrgMb`.** Lo que
+  suman los adjuntos de **toda la organización** —200 MB en Gratis, 10 GB en
+  Equipo, 100 GB en Negocio, sin tope en Empresa—. Pasarse da **402
+  `QUOTA_EXCEEDED`** con `details.kind === 'almacenamiento'`, y ahí `tope` y
+  `actual` van **en MB**, no en bytes.
+  ⚠️ **Se cuenta lo que ocupa ahora, no lo que se subió alguna vez**: borrar un
+  adjunto libera. Y los proyectos `DELETED` no cuentan, porque sus adjuntos no se
+  pueden ni abrir ni borrar.
+  ⚠️ El 402 llega **después** del 413 y del control de tipo: quien sube basura
+  lee «esto no es un PDF» y no «no te cabe», que le mandaría a borrar adjuntos
+  para arreglar algo que no es de espacio.
 - **Lista blanca de tipos**: PNG, JPEG, GIF, WebP, PDF, texto plano, CSV, ZIP,
   Word y Excel. Otro tipo da 400 con el mime rechazado.
 - **El SVG no se admite**: es XML con scripts, y servirlo desde el mismo origen
@@ -1040,6 +1051,25 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
   que sostenía la persona contra un tope que se cuenta por organización: quien
   tuviera dos proyectos en un equipo con veinte veía «2 de 25» y creía que le
   quedaban veintitrés.
+- **`uso` trae cuatro cifras desde 2026-08-28**: `proyectos`, `iaMensual`,
+  `asientos` (ocupados, invitaciones vivas incluidas) y `almacenamientoMb`.
+  ⚠️ **`almacenamientoMb` puede ser `null`, y significa «no se pudo medir»**, no
+  cero: sumarlo cuesta dos viajes TCP y no tumba la pantalla si uno falla. Quien
+  lo pinte tiene que distinguirlo — un «0 MB» inventado es un dato, y este no lo
+  hay.
+- 🔴 **`excedidas[]`: los topes que la organización ya tiene rebasados.** Vacío
+  casi siempre. Se llega ahí **bajando de plan, no creando de más**: una
+  organización con 40 proyectos que pasa de Negocio a Equipo —25— queda por
+  encima sin que nadie haya hecho nada. Pasa igual al cancelar, al fallar un
+  cobro y al acabarse el mes gratis.
+
+  **Y no ocurre nada:** no se borra, no se archiva y no se congela. Lo que ya hay
+  se abre, se edita y se borra; lo único que no se puede es añadir uno más.
+  La pantalla tiene que **decirlo**, o quien administra descubre su situación
+  pulsando un botón que no responde — y un tope rebasado sin explicación se lee
+  como una avería.
+
+  ⚠️ Estar **justo** en el tope no sale aquí: 25 de 25 está lleno, no rebasado.
 - Cuelga de `/me` y **nunca acepta un `userId`**: quien paga es quien trae el
   token. Un parámetro aquí sería abrir el portal —con sus recibos dentro— a
   nombre de otro.
@@ -1361,6 +1391,45 @@ volvería a abrir el agujero.
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
 
+### 🔴 El plan acota cuánto historial se ve, y **recorta en vez de rechazar**
+
+`historialAnalisisDias` es una cuota como las otras —90 días en Gratis, 365 en
+Equipo, sin tope en Negocio y Empresa— pero es la única que acota una **lectura**,
+así que **no lanza 402**. Un muro de pago a media consulta no tiene salida: no es
+que te hayas pasado, es que preguntaste por más atrás de lo que tu plan alcanza.
+
+Lo que hace el gateway es recortar `days`, `weeks` y el `from` de los filtros al
+tope del plan, en **las once rutas**. ⚠️ **También cuando no mandas `from`**: los
+informes que no reciben `days` —`dynamics`, `column-time`, `people`, `matrix`—
+miran todo el historial capturado si nadie les dice otra cosa.
+
+🔴 **La excepción es el `days` de `blocked`, y hay que saberla.** Ahí `days` no es
+la ventana de historial: es **cuántos días lleva una tarea sin moverse**.
+Recortarlo al tope del plan convertiría «lo que lleva 120 días quieto» en «lo que
+lleva 90», con el mismo nombre y sin ningún error. No se toca. Su `from` sí.
+
+**Y hay que decírselo a quien mira.** El paquete (`GET /projects/:id/reports`)
+devuelve una clave `ventana` junto a los informes:
+
+```ts
+ventana: {
+  dias: number | null,     // lo que alcanza el plan. `null` = sin tope
+  tier: PlanTier,
+  plan: string,            // el nombre, para la frase
+  recortado: boolean,      // si ESTA petición se recortó de verdad
+  desde: string | null,    // la fecha más antigua que alcanza, ISO
+}
+```
+
+⚠️ **`recortado` no es «tener tope».** Un plan de 90 días contestando a una
+pregunta de 60 no ha ocultado nada, y avisar ahí es un aviso que se aprende a
+ignorar antes de que llegue el que importa. Solo se pinta con `recortado: true`.
+
+⚠️ **Las siete rutas sueltas se recortan igual y no traen `ventana`**: devuelven
+el informe pelado y no tienen dónde meterla sin cambiarles la forma a todas. Si
+algún día una de ellas la pinta una persona, hay que subirla al `meta` del sobre
+— y enseñar al cliente a leer el `meta`, que hoy lo tira.
+
 ### La cartera 🔒 — `GET /me/reports/portfolio`
 
 | Método | Ruta | Permiso |
@@ -1592,6 +1661,26 @@ El MVP admite solo `TASK_DUE_SOON` con `{ leadTimeMinutes }` y `TASK_STALE` con
 se combinan por `AND`, hay un máximo de cinco acciones secuenciales y cada acción
 se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofrece
 “Revisar ahora” para que la demostración no dependa del reloj ni de una cola.
+
+### 🔴 El plan acota cuántas reglas pueden estar **activas**
+
+`automatizacionesPorProyecto`: 3 en Gratis, 25 en Equipo, sin tope en Negocio y
+Empresa. Pasarse da **402 `QUOTA_EXCEEDED`** con
+`details.kind === 'automatizaciones'`.
+
+⚠️ **Se comprueba al ACTIVAR, no al crear.** El tope es de reglas en marcha, así
+que redactar una y dejarla en `DISABLED` no gasta cupo — es lo que hace que
+«pausa una» sea una salida de verdad. Las dos puertas dan 402:
+
+- `POST` con `status: 'ENABLED'`
+- `PATCH` con `status: 'ENABLED'` sobre una que estaba pausada
+
+⚠️ **`PAUSED_SYSTEM` e `INVALID` tampoco cuentan**: no se ejecutan, así que no
+cuestan. Y la regla que se está reactivando no se cuenta a sí misma.
+
+⚠️ Este 402 **no trae `puedeAmpliar`**: quien administra las automatizaciones de
+un tablero no es necesariamente quien toca la tarjeta de la organización. La
+pantalla lee la ausencia como «no se sabe» y ofrece la salida igual.
 
 ### El catálogo real es más estrecho que el enum
 

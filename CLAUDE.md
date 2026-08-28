@@ -206,6 +206,39 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     ⚠️ Y **`/me/chats/:peerId/mentionables` devuelve `refs: []` siempre**: no se
     referencian tareas ni tableros en privado.
 
+23. 🔴 **Las seis cuotas del plan las comprueba el gateway, y las tres últimas
+    llegaron tarde.** `proyectos`, `asientos` e `iaMensualPorPersona` se aplicaban
+    desde la etapa Enterprise; `automatizacionesPorProyecto`, `almacenamientoOrgMb`
+    e `historialAnalisisDias` estaban **escritas en `plans.ts` y no las invocaba
+    nadie** hasta 2026-08-28 (`docs/PLAN-CUOTAS.md`). Cuatro cosas que muerden:
+    - **Una cuota que no se comprueba no da ningún error.** La tabla de precios
+      promete un tope que el servidor no aplica, el plan de pago vale menos de lo
+      que dice y el gratuito da más — y nadie se queja hasta el día que se
+      aplica. Si añades un número a `PlanQuotas`, **el commit que lo añade es el
+      que tiene que invocarlo**. Ya pasó dos veces: con `organizacionesPropias` y
+      con estas tres.
+    - **Las automatizaciones se cuentan al ACTIVAR, no al crear**, porque la
+      cuota es de reglas en marcha. Son **dos puertas** —crear con `ENABLED` y
+      reactivar una pausada— y la segunda es la que se olvida.
+    - **El almacén es de la organización y lo compone el gateway.**
+      tasks-service guarda los adjuntos y no sabe de organizaciones;
+      billing-service sabe de organizaciones y no ha visto un adjunto. No se abre
+      una dependencia entre los dos: se pide por separado y se suma aquí.
+    - 🔴 **`historialAnalisisDias` RECORTA, no rechaza.** Es la única que acota
+      una **lectura**, y un 402 al abrir un informe sería un muro de pago a media
+      consulta sin nada que la persona pueda hacer. Se recorta `days`, `weeks` y
+      el `from` en las once rutas —**menos el `days` de `blocked`, que ahí
+      significa «lleva N días sin moverse» y no historial**— y el paquete
+      devuelve `ventana` para que la pantalla lo diga. Un recorte mudo es peor
+      que no recortar.
+
+24. ⚠️ **Bajar de plan por debajo de lo que ya hay no borra nada, y hay que
+    decirlo.** `GET /me/billing/resumen` trae `excedidas[]`. Lo que ya existe se
+    abre, se edita y se borra; lo único que no se puede es añadir uno más. Se
+    llega ahí **sin haber hecho nada** —baja el techo, no sube el número— así que
+    sin la tarjeta que lo explica se lee como una avería. Y estar **justo** en el
+    tope no es excederlo: 25 de 25 está lleno, no rebasado.
+
 **Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
 `from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —
 las siete sueltas y el paquete—. Antes de tocarlos, ESTADO-ACTUAL §44:
