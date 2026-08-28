@@ -72,7 +72,7 @@ que quien lo usa solo con dos amigos pierda nada.
 | O4 | El gateway: resolver la organización y contar por ella | ✅ **hecho** (2026-08-27) |
 | O5 | Frontend: el selector del sidebar y el portal | ✅ **hecho** (2026-08-27) |
 | O6 | Frontend: roles, plantillas y el 402 con dos caras | ✅ **hecho** (2026-08-27) |
-| O7 | Gobierno del equipo | 🟡 **casi** — falta O7.3, y está bloqueada; ver apuntes |
+| O7 | Gobierno del equipo | 🟡 **casi** — falta O7.3, bloqueada a propósito; ver apuntes. O7.7 estaba marcada sin estar hecha y se completó el 2026-08-27 |
 | O8 | Cierre: e2e, documentación y contrato | ✅ **hecho** (2026-08-27) — la regresión entera, verde |
 | O9 | Más adelante — no antes del primer cliente de 50 asientos | ⬜ aparcado |
 
@@ -84,6 +84,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
+| 2026-08-27 | Cierre | `3fa9b87`, `8fb1f60` | **La capa visual de Kyloo, revertida** por decisión del dueño del producto: paleta, radios y fuentes vuelven a lo anterior. El rediseño estructural de landing y acceso se queda |
+| 2026-08-27 | Pasada manual | `76ce9c1`, `f44fc49`, `f12dc77` | Tres enlaces rotos del portal, dos formularios que no se cerraban, **la pantalla de administración que O7.7 daba por hecha**, y deshecho un arreglo mío que no arreglaba |
 | 2026-08-27 | Repaso visual | `f59aa07`, `a471cb6` | Lo que solo se ve mirando: un 403 con motivo que la pantalla convertía en «no tienes permiso», y el aviso de React de la barra lateral |
 | 2026-08-27 | O8.8 | `cdef9f2`, `ec7091f` | La regresión entera, y el fallo que destapó: el asiento se guardaba sin correo y la **segunda persona de cualquier organización no entraba nunca** |
 | 2026-08-27 | Kyloo — **revertido** en `3fa9b87` | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
@@ -862,6 +864,13 @@ empresa: es la forma de cobrarla.
   megas en memoria no es una exportación— ni correos ni nombres, solo `userId`.
   Y lleva `formato: 1` desde el primer día: un JSON sin versión es un contrato
   sin fecha.
+- 🔴 **O7.7 estuvo marcada como hecha sin estarlo.** El endpoint existía —`GET
+  /api/admin/organizations`, con dueño resuelto y paginación— y **no lo consumía
+  ninguna pantalla**: el panel tenía Cuentas, Proyectos y Actividad. No lo
+  destapó ninguna prueba, porque no había pantalla que probar; lo destapó
+  recorrer el panel a mano el 2026-08-27. La pantalla se construyó ese día
+  (`f44fc49`). La lección, que no es sobre esta casilla: **una casilla se marca
+  cuando la pantalla existe, no cuando existe su ruta.**
 - **O7.7 — administración ve las organizaciones**, y **solo lee**. No hay botón
   de suspender: la palanca que existe es la del proyecto, y suspender una
   organización entera dejaría a varios equipos sin escribir de un clic sin
