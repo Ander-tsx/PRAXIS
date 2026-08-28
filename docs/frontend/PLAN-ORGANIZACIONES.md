@@ -38,8 +38,22 @@ que quien lo usa solo con dos amigos pierda nada.
 > ellas apuntaban al mismo fallo de producto, el del asiento que se explica en los
 > apuntes de O8. Es lo que este paso existía para encontrar.
 >
-> Lo que queda antes de fusionar a `main` **no es código**: mirar el rediseño de
-> Kyloo con los ojos, que es lo único que no se puede comprobar corriendo nada.
+> ✅ **Y el repaso visual está hecho**, que era lo único que no comprueba ninguna
+> suite. Las pantallas de esta etapa —el portal, los papeles, las plantillas y la
+> tabla de precios— están en Kyloo y se leen bien en claro y en oscuro. Encontró
+> dos fallos que ninguna prueba veía, los dos de los que no dan error:
+>
+> 1. 🔴 **Un 403 con motivo se leía como «no tienes permiso».** Los `describe()`
+>    de las zonas colapsaban los tres 403 del producto en una frase de permisos,
+>    y con eso tiraban el texto que explicaba la salida. Se veía entero al
+>    intentar meter a alguien en un equipo lleno: quien lo recibe es el **dueño**,
+>    con todos los permisos, y la pantalla le decía que no los tiene.
+> 2. **La barra lateral avisaba por una clave que faltaba**, en las ocho zonas y
+>    en cada carga. El aviso señalaba a `NavList`, donde no estaba el fallo.
+>
+> Lo que **no** se ha tocado, y se anota por si alguien lo lee como un olvido: la
+> rejilla de `/projects` sigue siendo de tarjetas, no de filas. Es de antes de
+> esta etapa y cambiarla es una decisión de diseño, no un arreglo.
 >
 > **Añadido esa misma noche (`190c85d`): la capa visual de Kyloo.** Estaba sin
 > commitear en el árbol —28 ficheros— y llevaba dentro un fallo que no da error:
@@ -70,7 +84,8 @@ tardan demasiado para correrlas entre stacks.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-27 | O8.8 | *sin commitear* | La regresión entera, y el fallo que destapó: el asiento se guardaba sin correo y la **segunda persona de cualquier organización no entraba nunca** |
+| 2026-08-27 | Repaso visual | `f59aa07`, `a471cb6` | Lo que solo se ve mirando: un 403 con motivo que la pantalla convertía en «no tienes permiso», y el aviso de React de la barra lateral |
+| 2026-08-27 | O8.8 | `cdef9f2`, `ec7091f` | La regresión entera, y el fallo que destapó: el asiento se guardaba sin correo y la **segunda persona de cualquier organización no entraba nunca** |
 | 2026-08-27 | Kyloo | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
 | 2026-08-27 | O4.1+O7+O8 | `0bda922` | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
 | 2026-08-27 | O5+O6 | `06d688a` | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
