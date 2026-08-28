@@ -172,7 +172,22 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * iconos de trazo: más grande compite con ellos y deja de leerse como parte
      * de la misma lista.
      */
-    icon: <PraxSidebarIcon />,
+    /**
+     * ⚠️ **La `key` no sobra, y quitarla devuelve un aviso de React en las ocho
+     * zonas.** Es el único icono de esta lista que es un **componente** y no un
+     * `<svg>` suelto, y como todos, se crea **una vez** aquí y se renderiza en
+     * dos sitios a la vez: la barra lateral de escritorio y la de móvil, que son
+     * dos `NavList` vivos al mismo tiempo. Con un elemento de componente
+     * compartido así, la validación de claves de React lo cuenta como un hijo
+     * sin clave dentro de una lista y avisa:
+     *
+     *   «Each child in a list should have a unique "key" prop. Check the render
+     *   method of `NavList`.»
+     *
+     * Y el aviso **señala a `NavList`**, donde no está el fallo: sus dos listas
+     * llevan clave desde el primer día. Se fue un buen rato buscándolo ahí.
+     */
+    icon: <PraxSidebarIcon key="prax" />,
   },
 
   /**
