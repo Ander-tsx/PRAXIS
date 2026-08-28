@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
 import { MyReportsController } from './my-reports.controller';
 import { ReportLayoutController } from './report-layout.controller';
 import { ReportsController } from './reports.controller';
@@ -25,6 +26,9 @@ import { ReportsController } from './reports.controller';
 @Module({
   imports: [
     AuthModule,
+    /* Por `QuotaService`: `historialAnalisisDias` acota hasta dónde hacia atrás
+       puede mirar un informe. Ver `ReportsController.acotar`. */
+    BillingModule,
     ClientsModule.registerAsync([
       {
         name: 'REPORTS_SERVICE',

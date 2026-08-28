@@ -495,11 +495,7 @@ export class QuotaService {
    * más se pausa; una que no se pudo activar sin motivo no tiene arreglo por
    * ninguna vía que quien la sufre pueda encontrar.
    */
-  async exigirAutomatizacion(
-    userId: string,
-    projectId: string,
-    exceptoId?: string,
-  ): Promise<void> {
+  async exigirAutomatizacion(userId: string, projectId: string, exceptoId?: string): Promise<void> {
     const organizationId = await this.organizacionDelProyecto(projectId);
     const plan = await this.planDe(userId, organizationId);
     const tope = plan.quotas.automatizacionesPorProyecto;
@@ -588,10 +584,7 @@ export class QuotaService {
     const vivos = proyectos.filter((proyecto) => proyecto.status !== 'DELETED').map((p) => p.id);
 
     const ocupados = await firstValueFrom(
-      this.tasksClient.send<number>(
-        { cmd: 'attachment_bytes_of_projects' },
-        { projectIds: vivos },
-      ),
+      this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
     ).catch(() => null);
 
     if (ocupados === null) {
@@ -773,6 +766,40 @@ export class QuotaService {
     )
       .then((perfil) => perfil?.credential?.email)
       .catch(() => undefined);
+  }
+
+  /* ─── El análisis ──────────────────────────────────────────────────────── */
+
+  /**
+   * Hasta dónde hacia atrás puede mirar un informe de este proyecto.
+   *
+   * ## 🔴 Esto NO lanza 402, y es la decisión D4 de `docs/PLAN-CUOTAS.md`
+   *
+   * Las otras cuotas acotan una **escritura**: te pasas, no entra, y hay algo
+   * que puedes hacer —borrar, pausar, ampliar—. Esta acota una **lectura**, y
+   * ahí un 402 sería otra cosa: convertiría una pantalla de consulta en un muro
+   * de pago a media sesión, sobre una pregunta que ni siquiera es
+   * desproporcionada. No es que alguien se haya pasado; es que preguntó por más
+   * atrás de lo que su plan alcanza.
+   *
+   * Así que se recorta y **se devuelve el recorte**, para que la pantalla lo
+   * escriba. ⚠️ Un recorte mudo es peor que no recortar: un gráfico que empieza
+   * noventa días atrás sin explicar por qué se lee como un dato incompleto, no
+   * como un plan, y quien lo lea sacará conclusiones de una serie que cree
+   * entera. Es la misma regla que `tareasOmitidas` en el briefing del asistente.
+   *
+   * ⚠️ **Ante un fallo devuelve `SIN_TOPE`, no el tope de FREE.** Es la regla I1
+   * —el conteo falla hacia el lado permisivo— y aquí además es lo barato: el
+   * riesgo de dejar leer noventa días de más es un escaneo algo mayor, y el de
+   * recortar sin motivo es un gráfico equivocado que nadie sabe que lo está.
+   */
+  async ventanaDeAnalisis(
+    userId: string,
+    projectId: string,
+  ): Promise<{ dias: Tope; tier: PlanTier }> {
+    const organizationId = await this.organizacionDelProyecto(projectId);
+    const plan = await this.planDe(userId, organizationId);
+    return { dias: plan.quotas.historialAnalisisDias, tier: plan.tier };
   }
 
   /* ─── El asistente ─────────────────────────────────────────────────────── */

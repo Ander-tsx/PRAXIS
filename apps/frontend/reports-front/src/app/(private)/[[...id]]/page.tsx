@@ -1,4 +1,5 @@
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
+import { type VentanaDelPlan, VentanaDelPlanAviso } from '@/components/molecules/VentanaDelPlan';
 import { AnalysisFilters } from '@/components/organisms/AnalysisFilters';
 import { GeneratedChart } from '@/components/organisms/Charts';
 import {
@@ -370,6 +371,20 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
   const columnTime = (informes['column-time'] ?? null) as ReportColumnTime | null;
 
   /**
+   * Hasta dónde llega el plan hacia atrás, y si esta petición se recortó.
+   *
+   * ⚠️ **Viaja dentro del paquete y no en el `meta` del sobre**, porque el
+   * cliente devuelve el `data` desenvuelto y tira el `meta`: un aviso ahí
+   * llegaría al navegador y no lo leería nadie. Está explicado en
+   * `ReportsController.bundle`.
+   *
+   * Si el paquete entero falló, esto es `null` y no se dibuja nada — con todas
+   * las tarjetas en «no disponible», un aviso sobre el tramo sería ruido sobre
+   * una pantalla que ya no enseña ningún tramo.
+   */
+  const ventana = (informes.ventana ?? null) as VentanaDelPlan | null;
+
+  /**
    * Los perfiles de quienes salen en esta pantalla, en **una** petición.
    *
    * ⚠️ Esto pedía `/users?limit=100` y cruzaba en memoria — la primera página del
@@ -560,6 +575,10 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             nombre: etiqueta.name,
           }))}
         />
+
+        {/* Solo aparece si el servidor recortó de verdad el tramo pedido. Ver
+            `VentanaDelPlanAviso`, donde está por qué no sale siempre. */}
+        <VentanaDelPlanAviso ventana={ventana} />
 
         {/* `projectId` y no el parámetro de la ruta: las acciones del asistente
             llaman a `/projects/:projectId/assistant/...`, que espera el UUID.

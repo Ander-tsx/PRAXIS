@@ -138,7 +138,8 @@ export class AttachmentsController {
      * escrito significaría dejar entrar siempre el que se pasa y negar el
      * siguiente, que es un tope que siempre se rebasa por un archivo.
      */
-    await this.quota.exigirAlmacenamiento(req.user!.userId, req.projectId as string, file.size);
+    const requesterId = req.user!.userId;
+    await this.quota.exigirAlmacenamiento(requesterId, req.projectId as string, file.size);
 
     return firstValueFrom(
       this.tasksClient.send(
@@ -146,7 +147,7 @@ export class AttachmentsController {
         {
           taskId,
           projectId: req.projectId,
-          requesterId: req.user!.userId,
+          requesterId,
           filename: sanitizeFilename(file.originalname),
           mimeType: file.mimetype,
           // El tamaño real de lo recibido, no lo que declare nadie.
