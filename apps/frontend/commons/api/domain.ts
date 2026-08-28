@@ -215,6 +215,40 @@ export type ProjectStatusName = (typeof PROJECT_STATUSES)[number];
  */
 export const PROJECT_SUSPENDED_CODE = 'PROJECT_SUSPENDED';
 
+/**
+ * El `code` de «esa persona no tiene asiento en la organización de este
+ * proyecto».
+ *
+ * 🔴 **Tercer 403 que no es de permisos**, y el más fácil de confundir: quien lo
+ * recibe suele ser el dueño del proyecto, con todos los permisos, intentando
+ * meter a alguien en un equipo que ya está lleno. Enseñarle «no tienes permiso»
+ * es decirle una mentira sobre sí mismo y esconderle la única salida que hay
+ * —liberar un asiento o ampliar el plan—. Ya pasó: el mensaje del servidor lo
+ * explicaba bien y la pantalla lo tiraba.
+ */
+export const NOT_IN_ORG_CODE = 'NOT_IN_ORG';
+
+/**
+ * Los 403 que **se explican solos** y cuyo mensaje no se puede sustituir.
+ *
+ * ⚠️ **La lista es corta a propósito.** Un 403 normal sí se traduce a una frase
+ * de la pantalla: el mensaje del servidor habla de guards y de permisos, y quien
+ * lo lee necesita saber a quién pedírselo, no cómo se llama la comprobación. Los
+ * de aquí son los que el servidor sabe explicar mejor que nosotros porque
+ * conocen el motivo — un plan lleno, una plataforma que suspendió algo.
+ */
+const CODIGOS_403_QUE_SE_EXPLICAN: readonly string[] = [PROJECT_SUSPENDED_CODE, NOT_IN_ORG_CODE];
+
+/**
+ * ¿Este 403 trae su propia explicación?
+ *
+ * Se usa en los `describe()` de las zonas, que hasta ahora colapsaban **todos**
+ * los 403 en una frase de permisos.
+ */
+export function el403SeExplicaSolo(code: string): boolean {
+  return CODIGOS_403_QUE_SE_EXPLICAN.includes(code);
+}
+
 /** Un elemento de `GET /api/projects` → `{ items, total }` */
 export interface Project {
   id: string;

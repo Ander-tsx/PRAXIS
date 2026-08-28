@@ -51,6 +51,7 @@ import {
   type TaskAttachment,
   type TaskComment,
   type Workspace,
+  el403SeExplicaSolo,
 } from '@praxis/commons';
 import { type LinkPreview, obtenerPreviewDeEnlace } from '@praxis/commons/api/link-preview';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
@@ -1911,6 +1912,12 @@ export async function previewDeEnlaceAction(url: string): Promise<LinkPreview | 
 function describe(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.status === 403) {
+      /* ⚠️ **No todos los 403 son de permisos.** Un proyecto suspendido y un
+         equipo sin asientos también responden 403, traen su propio `code` y su
+         mensaje explica la salida — que no es «pídeselo a quien administra».
+         Sustituirlo por la frase de abajo le dice al dueño de un proyecto que no
+         tiene permiso sobre lo suyo. */
+      if (el403SeExplicaSolo(error.code)) return error.message;
       return 'No tienes permiso para hacer esto en este proyecto.';
     }
     if (error.status >= 500) return fallback;
