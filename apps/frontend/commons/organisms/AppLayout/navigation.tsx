@@ -173,21 +173,29 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * de la misma lista.
      */
     /**
-     * ⚠️ **La `key` no sobra, y quitarla devuelve un aviso de React en las ocho
-     * zonas.** Es el único icono de esta lista que es un **componente** y no un
-     * `<svg>` suelto, y como todos, se crea **una vez** aquí y se renderiza en
-     * dos sitios a la vez: la barra lateral de escritorio y la de móvil, que son
-     * dos `NavList` vivos al mismo tiempo. Con un elemento de componente
-     * compartido así, la validación de claves de React lo cuenta como un hijo
-     * sin clave dentro de una lista y avisa:
+     * ⚠️ **Este icono provoca un aviso de React en desarrollo, y no está
+     * resuelto.** En cada carga del área privada, dashboard-front y
+     * projects-front escriben:
      *
      *   «Each child in a list should have a unique "key" prop. Check the render
      *   method of `NavList`.»
      *
-     * Y el aviso **señala a `NavList`**, donde no está el fallo: sus dos listas
-     * llevan clave desde el primer día. Se fue un buen rato buscándolo ahí.
+     * Y `NavList` **no** es el culpable: sus dos listas llevan clave desde el
+     * primer día. Es este icono — el único de la lista que es un componente y no
+     * un `<svg>` suelto. Se comprobó a base de anularlo: con `{item.icon}` a
+     * `null` solo en esta entrada, el aviso desaparece; y con el `<svg>` de
+     * `PraxSidebarIcon` reducido a **un** hijo, también.
+     *
+     * Lo que **no** lo arregla, probado y descartado: una `key` en el elemento
+     * (`<PraxSidebarIcon key="prax" />`), y `key` en cada uno de los tres hijos
+     * del `<svg>`. Tampoco eran los comentarios JSX entre ellos.
+     *
+     * Es de desarrollo y no afecta a producción —React no valida claves en la
+     * build—, así que se deja escrito en vez de tapado con algo que no funciona.
+     * Quien lo retome: el siguiente paso es capturar el `owner stack` del aviso
+     * antes de la hidratación, que es lo único que dirá qué array es.
      */
-    icon: <PraxSidebarIcon key="prax" />,
+    icon: <PraxSidebarIcon />,
   },
 
   /**
