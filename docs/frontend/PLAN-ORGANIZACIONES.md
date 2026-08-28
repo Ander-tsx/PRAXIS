@@ -908,9 +908,10 @@ empresa: es la forma de cobrarla.
       que quien está en un proyecto está en la organización.
 - [x] **O8.7** `STRUCTURE.md`: el noveno servicio en la tabla.
 - [x] **O8.8** `pnpm e2e:regresion` y `pnpm e2e:seguridad`. **Solo aquí.**
-      ✅ 2026-08-27: **179 de API + 63 de interfaz + 14 de seguridad, todas verdes.**
-      La primera corrida no lo estuvo — ver los apuntes, que es donde salió el fallo
-      del asiento.
+      ✅ 2026-08-27: **243 de regresión (180 de API + 63 de interfaz) + 14 de
+      seguridad, todas verdes**, con los arreglos de la sesión dentro. La primera
+      corrida no lo estuvo — ver los apuntes, que es donde salió el fallo del
+      asiento.
 - [x] **O8.9** ⚠️ **El webhook en local necesita `stripe listen --forward-to
       localhost:3000/api/webhooks/stripe`.** Sin él se paga y el plan no se aplica —
       que es el comportamiento correcto, pero ya mordió: tres suscripciones cobradas
