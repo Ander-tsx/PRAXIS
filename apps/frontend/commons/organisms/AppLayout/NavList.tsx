@@ -128,7 +128,7 @@ export function NavList({
                 type="button"
                 onClick={() => alternar(grupo.clave)}
                 aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors hover:text-text-primary"
+                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60 transition-colors hover:text-white"
               >
                 {grupo.section}
                 <svg
@@ -205,8 +205,8 @@ export function NavList({
                         'relative flex items-center rounded-full font-sans text-[13px] transition-colors duration-150',
                         plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
                         active
-                          ? 'font-semibold text-primary hover:bg-white/5'
-                          : 'font-medium text-text-secondary hover:bg-white/5 hover:text-text-primary',
+                          ? 'font-semibold text-white bg-white/10 hover:bg-white/15'
+                          : 'font-medium text-white/80 hover:bg-white/5 hover:text-white',
                       ].join(' ')}
                     >
                       {item.icon}

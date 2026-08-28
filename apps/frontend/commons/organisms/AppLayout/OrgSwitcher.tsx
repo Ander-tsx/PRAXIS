@@ -25,6 +25,17 @@ export function OrgSwitcher({
   const MAX_ORGANIZACIONES_PROPIAS = 3;
   const propias = lista.filter(o => o.soyDueno).length;
   const caben = propias < MAX_ORGANIZACIONES_PROPIAS;
+  const popoverRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setAbierto(false);
+      }
+    }
+    if (abierto) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [abierto]);
   
   useEffect(() => {
     if (!activaId) return;
@@ -55,7 +66,7 @@ export function OrgSwitcher({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={popoverRef}>
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
@@ -196,7 +207,8 @@ function InviteMemberModal({ organizationId, organizationName, onClose, zonePath
   useEffect(() => {
     fetch(`${zonePath}/api/gateway/organizations/${organizationId}/roles`)
       .then(res => res.json())
-      .then(data => {
+      .then(body => {
+        const data = body.data;
         if (Array.isArray(data)) {
           setRoles(data);
           if (data.length > 0) setRole(data[0].id);
@@ -217,8 +229,8 @@ function InviteMemberModal({ organizationId, organizationName, onClose, zonePath
         body: JSON.stringify({ email, roleId: role })
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || 'Error al invitar');
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message || 'Error al invitar');
       }
       setSuccess(true); setEmail('');
     } catch (err: any) {
@@ -277,8 +289,8 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
         body: JSON.stringify({ name })
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.message || 'Error al crear');
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error?.message || 'Error al crear');
       }
       window.location.reload();
     } catch (err: any) {

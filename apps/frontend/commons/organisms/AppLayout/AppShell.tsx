@@ -254,6 +254,7 @@ function ArmazonInterno({
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'chat'>('home');
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -355,7 +356,7 @@ function ArmazonInterno({
           <div
             className={`scrollbar-none flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}
           >
-            <div className="mb-6">
+            <div className="mb-4">
               <OrgSwitcher
                 name={user.name}
                 plegada={plegada}
@@ -364,11 +365,48 @@ function ArmazonInterno({
                 zonePath={zonePath}
               />
             </div>
-            <NavList
-              navItems={navItemsVivos}
-              activePath={activePathDeSecciones}
-              plegada={plegada}
-            />
+            
+            {!plegada && (
+              <div className="mb-4 flex items-center gap-2 px-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('home')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                    activeTab === 'home' 
+                      ? 'bg-white/10 text-white' 
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Inicio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition-colors ${
+                    activeTab === 'chat' 
+                      ? 'bg-white/10 text-white' 
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Chat
+                </button>
+              </div>
+            )}
+            {activeTab === 'home' ? (
+              <NavList
+                navItems={navItemsVivos}
+                activePath={activePathDeSecciones}
+                plegada={plegada}
+              />
+            ) : (
+              <SidebarChatList zonePath={zonePath} plegada={plegada} />
+            )}
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -660,5 +698,94 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
         <path strokeLinecap="round" d={plegada ? 'M9 4v16' : 'M15 4v16'} />
       </svg>
     </button>
+  );
+}
+
+function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+  const [directs, setDirects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch(`${zonePath}/api/gateway/me/chats`).then(res => res.json()).catch(() => ({ data: [] })),
+      fetch(`${zonePath}/api/gateway/me/chats/projects`).then(res => res.json()).catch(() => ({ data: [] }))
+    ]).then(([d, p]) => {
+      setDirects(Array.isArray(d?.data) ? d.data : []);
+      setProjects(Array.isArray(p?.data) ? p.data : []);
+      setLoading(false);
+    });
+  }, [zonePath]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-2 px-1">
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+        <div className="h-8 rounded bg-white/5 animate-pulse" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {projects.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Proyectos</span>}
+          {projects.map((c: any) => (
+            <a
+              key={c.project?.id || c.channelId}
+              href={`${zonePath}/chat/${c.channelId}`}
+              className={`flex items-center gap-3 rounded-full px-4 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
+            >
+              <div className="w-5 h-5 rounded flex items-center justify-center bg-white/10 text-white text-[10px] font-bold shrink-0">
+                {(c.project?.name || '?').charAt(0).toUpperCase()}
+              </div>
+              {!plegada && (
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="truncate font-sans text-[13px] font-medium text-white/80">{c.project?.name}</span>
+                </div>
+              )}
+              {!plegada && c.unread > 0 && (
+                <span className="shrink-0 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold text-primary-foreground">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {directs.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {!plegada && <span className="mx-1 px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60">Privados</span>}
+          {directs.map((c: any) => (
+            <a
+              key={c.user?.id || c.channelId}
+              href={`${zonePath}/chat/${c.channelId}`}
+              className={`flex items-center gap-3 rounded-full px-4 py-2.5 transition-colors hover:bg-white/5 ${plegada ? 'justify-center px-0' : ''}`}
+            >
+              <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                {c.user?.avatarSrc ? (
+                  <img src={c.user.avatarSrc} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-[10px] font-bold">{(c.user?.name || '?').charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              {!plegada && (
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="truncate font-sans text-[13px] font-medium text-white/80">{c.user?.name}</span>
+                </div>
+              )}
+              {!plegada && c.unread > 0 && (
+                <span className="shrink-0 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[10px] font-semibold text-primary-foreground">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
