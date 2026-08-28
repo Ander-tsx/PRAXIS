@@ -1,6 +1,4 @@
-import { createServerApiClient } from '@praxis/commons/auth';
-import type { OrganizationView } from '@praxis/commons/billing/planes';
-import { getOrganizacionActiva } from '@praxis/commons/theme';
+import { loadPrivateChrome } from '@praxis/commons/auth';
 import { redirect } from 'next/navigation';
 
 /**
@@ -10,32 +8,31 @@ import { redirect } from 'next/navigation';
  *
  * Porque los papeles pertenecen a **una** organización, y la barra lateral no
  * puede saber a cuál sin preguntarlo. Lo que sí sabe es cuál estás mirando: la
- * misma cookie que usa el selector. Con ella se entra directo; sin ella, a la
- * lista de organizaciones, que es donde se elige.
+ * organización activa, que desde 2026-08-28 siempre existe.
  *
- * ⚠️ **La entrada del sidebar existía apagada con «Pronto»** desde el rediseño
- * de Kyloo, apuntando aquí. Encenderla sin esta ruta habría dado un 404, que es
- * exactamente lo que aquel «Pronto» evitaba.
+ * ## 🔴 Esto preguntaba, y era justo el roce de esta etapa
+ *
+ * Antes, sin cookie, mandaba a `/organizations?elegir=roles` para que la persona
+ * eligiera organización — y con dos o tres equipos, eso pasaba **cada vez** que
+ * se pulsaba «Roles y permisos». Ahora no hay nada que preguntar: se entra en la
+ * activa, y para ver los papeles de otra se cambia en el selector de la barra
+ * lateral, que es donde se cambia todo lo demás.
+ *
+ * ⚠️ **`loadPrivateChrome` y no la cookie a pelo.** Es lo que aplica el
+ * repliegue: una cookie que apunte a una organización de la que ya te fueron
+ * daría aquí un 404 con cara de enlace roto. Es la misma llamada que ya hace el
+ * layout, así que no cuesta un salto de red nuevo.
  *
  * ⚠️ Sin el basePath: `redirect` habla de rutas del App Router de esta app, y
  * ahí la zona es la raíz.
  */
 export default async function RolesEntryPage() {
-  const activa = await getOrganizacionActiva();
-  if (activa) redirect(`/organizations/${activa}/roles`);
+  const { organizacionActivaId } = await loadPrivateChrome();
 
-  /* Sin ninguna elegida: si solo hay una, no hay nada que preguntar y se entra.
-     Con varias, se elige en la lista — inventar una aquí sería enseñar los
-     papeles de una organización que la persona no estaba mirando. */
-  const organizaciones = await createServerApiClient()
-    .get<OrganizationView[]>('/me/organizations')
-    .catch(() => [] as OrganizationView[]);
+  /* `null` solo si la lista de organizaciones vino vacía, que es una carga que
+     falló: la lista de organizaciones lo explica mejor que una pantalla de
+     papeles sin papeles. */
+  if (!organizacionActivaId) redirect('/organizations');
 
-  if (organizaciones.length === 1) redirect(`/organizations/${organizaciones[0].id}/roles`);
-
-  /* ⚠️ **Con el motivo puesto en la URL.** Sin él, pulsar «Roles y permisos» en
-     la barra lateral te deja en una lista de organizaciones sin decir por qué:
-     se lee como que el enlace está roto, que es exactamente lo que se dijo la
-     primera vez que alguien lo pulsó. La lista lo lee y lo explica. */
-  redirect('/organizations?elegir=roles');
+  redirect(`/organizations/${organizacionActivaId}/roles`);
 }

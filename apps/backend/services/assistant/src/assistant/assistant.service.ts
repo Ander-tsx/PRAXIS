@@ -65,6 +65,15 @@ interface ChatPayload {
    */
   limiteMensual?: number | null;
   /**
+   * En qué organización se está gastando, para la clave del contador.
+   *
+   * ⚠️ **Llega resuelta por el gateway y viaja junto al tope, no aparte.** Es la
+   * misma resolución que produjo `limiteMensual`: contar en una organización y
+   * negar contra el tope de otra deja a alguien bloqueado sin explicación
+   * posible. Ver `QuotaService.iaDe` en el gateway.
+   */
+  organizationId?: string | null;
+  /**
    * Qué plan puso ese tope. Solo se usa para **explicarlo** al agotarse.
    *
    * ⚠️ Llega del gateway junto al tope y en la misma resolución, no en dos: si
@@ -251,8 +260,8 @@ export class AssistantService {
   }
 
   /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */
-  estadoCuota(userId: string, limiteMensual?: number | null) {
-    return this.quota.estado(userId, limiteMensual);
+  estadoCuota(userId: string, limiteMensual?: number | null, organizationId?: string | null) {
+    return this.quota.estado(userId, limiteMensual, organizationId);
   }
 
   /**
@@ -309,7 +318,11 @@ export class AssistantService {
    * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
    */
   async chat(payload: ChatPayload): Promise<AssistantChatResult> {
-    const cuotaPrevia = await this.quota.estado(payload.userId, payload.limiteMensual);
+    const cuotaPrevia = await this.quota.estado(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
       throw cuotaAgotada(cuotaPrevia, payload.planTier);
@@ -398,7 +411,11 @@ export class AssistantService {
         ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
       });
 
-      cuota = await this.quota.consumir(payload.userId, payload.limiteMensual);
+      cuota = await this.quota.consumir(
+        payload.userId,
+        payload.limiteMensual,
+        payload.organizationId,
+      );
     } catch (error) {
       if (error instanceof RpcException) {
         const details = (error.getError() as any).details || {};
@@ -578,10 +595,16 @@ export class AssistantService {
     previa?: string;
     /** El tope mensual de su plan. Ver `ChatPayload.limiteMensual`. */
     limiteMensual?: number | null;
+    /** Dónde se gasta. Ver `ChatPayload.organizationId`. */
+    organizationId?: string | null;
     /** Qué plan lo puso. Ver `ChatPayload.planTier`. */
     planTier?: string | null;
   }) {
-    const cuotaPrevia = await this.quota.estado(payload.userId, payload.limiteMensual);
+    const cuotaPrevia = await this.quota.estado(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
       throw cuotaAgotada(cuotaPrevia, payload.planTier);
@@ -615,7 +638,11 @@ export class AssistantService {
     });
 
     /* Si Gemini falló, `chat` ya lanzó: la cuota no se toca. Ver `GeminiError`. */
-    const cuota = await this.quota.consumir(payload.userId, payload.limiteMensual);
+    const cuota = await this.quota.consumir(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     /**
      * La primera llamada válida, y solo esa.

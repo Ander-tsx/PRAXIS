@@ -888,6 +888,23 @@ event: latido         data: { t }        cada 25 s
 
 ### Chat privado — cuelga de `/me`, sin proyecto en la ruta
 
+🔴 **La puerta es la organización, no el proyecto, desde 2026-08-28.** Se puede
+escribir a quien comparta **alguna organización** contigo; antes hacía falta
+compartir un proyecto, lo que dejaba fuera a alguien de tu propio equipo al que
+todavía no habías metido en ningún tablero — y no protegía de nada más, porque
+quien está en un proyecto está por fuerza en su organización.
+
+Dos consecuencias en el contrato:
+
+- **`GET /me/chats/contacts` devuelve a todo tu equipo**, no solo a quien
+  comparte tablero contigo. Los proyectos en común siguen viniendo como detalle,
+  y **la lista puede venir vacía**: podéis hablar porque estáis en el mismo
+  equipo, no porque trabajéis en lo mismo.
+- ⚠️ **`GET /me/chats/:peerId/mentionables` devuelve `refs: []` siempre.** No se
+  referencian tareas ni tableros en privado: `/Sprint 1` no dice de qué proyecto
+  sale ni si quien lo recibe puede verlo. El menú `/` queda solo en los chats de
+  proyecto. `people` ya venía vacío —sois dos—.
+
 | Método | Ruta | Body |
 |---|---|---|
 | GET | `/me/chats` | — · tus conversaciones |
@@ -1007,15 +1024,30 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
 | GET | `/me/billing/planes` | — | El catálogo y cuáles se pueden contratar aquí |
-| GET | `/me/billing/resumen` | — | Plan, topes, consumo y organizaciones, en una llamada |
+| GET | `/me/billing/resumen?organizationId` | — | Plan, topes y consumo **de esa organización**, en una llamada |
 | GET | `/me/billing/estado` | — | `{ disponible, gestionable }` |
 | POST | `/me/billing/checkout` | `{ tier, seats, organizationId }` | → `{ url }` de Stripe Checkout |
 | POST | `/me/billing/portal` | — | → `{ url }` del portal. 400 si no eres cliente |
 | POST | `/webhooks/stripe` | crudo | **público, sin JWT**. Su auth es la firma |
 
+- 🔴 **`resumen` habla de UNA organización desde 2026-08-28, no de la persona.**
+  El plan vale solo dentro de la organización que lo paga, así que el `tier`, los
+  `quotas` y el `uso` que devuelve son los de la que se pida. Sin
+  `organizationId` cae en la **personal**, nunca en «la mejor que tengas».
+  ⚠️ El identificador se **valida**: mandar una organización ajena da 403
+  `NOT_IN_ORG`, no su plan.
+- ⚠️ **`uso.proyectos` cuenta los de la organización, no los tuyos.** Contaba los
+  que sostenía la persona contra un tope que se cuenta por organización: quien
+  tuviera dos proyectos en un equipo con veinte veía «2 de 25» y creía que le
+  quedaban veintitrés.
 - Cuelga de `/me` y **nunca acepta un `userId`**: quien paga es quien trae el
   token. Un parámetro aquí sería abrir el portal —con sus recibos dentro— a
   nombre de otro.
+- 🔴 **`portal` NO acepta organización, y el cliente de Stripe es de la
+  persona.** Quien tenga dos suscripciones las verá las dos en un solo portal.
+  No es un riesgo —todo lo de dentro es suyo— pero la interfaz **no puede
+  prometer «la suscripción de este equipo»**: dice «Gestionar mis
+  suscripciones». Está en PENDIENTES-BACKEND.
 - **Devuelve la URL en vez de redirigir**: un 303 lo seguiría el propio `fetch`
   en lugar de mover la pestaña.
 - `disponible` depende de que **el backend** tenga claves de Stripe, cosa que el
@@ -1051,7 +1083,7 @@ una: quien trabaja solo tiene la suya, de un asiento.
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
 | GET | `/me/organizations` | — | Las tuyas, con `myPermissions` ya resuelto |
-| POST | `/me/organizations` | `{ name, tier, seats }` | Nace en `FREE`; el plan lo aplica el webhook |
+| POST | `/me/organizations` | `{ name, tier, seats }` | Nace en `FREE`; el plan lo aplica el webhook. **402 si ya tienes 3** |
 | POST | `/me/organizations/invitations/accept` | `{ token }` | El token del enlace del correo |
 | GET | `/organizations/:id` | — | 403 `NOT_IN_ORG` si no perteneces |
 | PATCH | `/organizations/:id` | `{ name }` | `canManageOrganization` |
@@ -1616,7 +1648,7 @@ Cinco trampas que ya mordieron construyendo la interfaz:
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
-| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds? }` | ninguno propio, solo `JwtGuard` |
+| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds?, organizationId? }` | ninguno propio, solo `JwtGuard` |
 | POST | `/me/assistant/project-draft` | `{ brief }` | ninguno propio, solo `JwtGuard` |
 | POST | `/projects/:projectId/assistant/proposals/:id/resolve` | `{ status }` | `canViewReports` |
 | POST | `/me/assistant/proposals/:id/resolve` | `{ status }` | ninguno propio, solo `JwtGuard` |

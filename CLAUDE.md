@@ -17,7 +17,8 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | Etapa de automatización — motor reactivo, el asistente que siempre responde y administración con más poder. Cerrada salvo S6/S7 |
 | [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal, y sigue siendo válido |
 | [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
-| [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | **Etapa en curso** — la organización pasa a contener los proyectos, se cobra por asiento y hay papeles de organización. Once decisiones cerradas, invariantes, reglas de interfaz y el orden. Se lee al retomar y se marca al terminar cada tarea |
+| [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | Etapa cerrada — la organización pasó a contener los proyectos, a cobrarse por asiento y a tener papeles. Se conserva por sus once decisiones y su registro; la continúa el plan de abajo |
+| [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa en curso** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
@@ -162,6 +163,48 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     variables del proceso. Si hace falta configurar algo que se usa en un
     decorador —`@Throttle`, por ejemplo—, no vale leerlo así: parece que
     funciona y silenciosamente coge el valor por defecto.
+
+20. 🔴 **El plan vale SOLO dentro de la organización que lo paga, y siempre hay
+    una activa.** Desde 2026-08-28 (`docs/PLAN-ORGANIZACION-ACTIVA.md`).
+    `planEfectivoDe(userId, organizationId)` mira **esa** organización y ninguna
+    más — antes recorría todas y aplicaba la mejor. Cuatro cosas que muerden:
+    - **`planDe` sin organización devuelve FREE**, no «el mejor que tengas». Si
+      una ruta nueva no sabe qué organización pasar, hay que averiguarlo, no
+      omitirlo: omitirlo da el peldaño más bajo en silencio.
+    - 🔴 **De dónde sale ese identificador importa más que el identificador.**
+      Nunca de la cookie `praxis_org`, que la escribe el navegador. O se deriva
+      del recurso (`QuotaService.organizacionDelProyecto`) o llega en el cuerpo y
+      se valida la pertenencia antes de usarlo
+      (`QuotaService.organizacionElegida`, que da 403 `NOT_IN_ORG`).
+    - **La cuota de IA se cuenta por `(persona, organización, mes)`**, no por
+      persona. `AssistantUsage` lleva `organizationId` —cadena vacía, nunca
+      `NULL`, porque dos `NULL` no chocan en un índice único—. Contar en un cubo
+      y negar contra el tope de otro deja a alguien bloqueado nada más entrar en
+      su espacio personal.
+    - **`organizacionesPropias` ya no existe como cuota de plan.** Es
+      `MAX_ORGANIZACIONES_PROPIAS = 3`, plano, la personal incluida: si el plan
+      vive dentro de su organización, uno que además dejara crear más se estaría
+      escapando de ella. Lo aplica `exigirOrganizacion` en `POST
+      /me/organizations`; **antes estaba escrito y no lo comprobaba nadie.**
+
+21. ⚠️ **No hay «Todas las organizaciones», y `getOrganizacionActiva()` es la
+    cookie en crudo.** Lo que quiere una pantalla es `organizacionActivaId` de
+    `loadPrivateChrome()`, que aplica `resolverOrganizacionActiva` — repliega a la
+    personal si la cookie apunta a una de la que ya te fueron. Sin ese repliegue
+    la pantalla sale vacía en todas partes y las rutas de organización dan 403,
+    sin que nada diga por qué. El `OrgSwitcher` además **reescribe la cookie** al
+    montar: un Server Component no puede, y sin eso una cookie caduca no se
+    arregla nunca.
+
+22. ⚠️ **Al chat privado se entra por la organización, no por el proyecto.** Lo
+    decide el **gateway** (`DirectChatController.puedeHablarCon` →
+    `QuotaService.compartenOrganizacion`), porque projects-service no sabe de
+    asientos y los dos servicios no se hablan a propósito. La comprobación de
+    proyecto en común sigue en `ChannelsService.directo` como **suelo** —es un
+    subconjunto— y protege la ruta TCP directa. La presencia usa la misma lista:
+    si divergen, se anuncia el estado a gente a la que no puedes escribir.
+    ⚠️ Y **`/me/chats/:peerId/mentionables` devuelve `refs: []` siempre**: no se
+    referencian tareas ni tableros en privado.
 
 **Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
 `from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —

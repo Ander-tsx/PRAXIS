@@ -33,16 +33,67 @@ export const ORG_COOKIE = 'praxis_org';
 export const ORG_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 /**
- * La organización activa, si hay alguna elegida.
+ * Lo que hay escrito en la cookie, **en crudo y sin comprobar**.
  *
  * Solo desde Server Components, layouts o Server Actions.
  *
- * ⚠️ Devuelve `null` cuando no hay cookie, y **eso significa «todas»**, no «la
- * personal». Es lo que hace que quien nunca ha tocado el selector siga viendo
- * todos sus proyectos, que es lo que veía antes de que esto existiera.
+ * ⚠️ **Casi nunca es lo que quieres.** Devuelve lo que puso el navegador, que
+ * puede ser una organización de la que ya te fueron, una que nunca fue tuya o
+ * nada en absoluto. Quien pinta una pantalla quiere `resolverOrganizacionActiva`,
+ * que además repliega. Esto se exporta para el propio `resolver` y para las
+ * pruebas.
  */
 export async function getOrganizacionActiva(): Promise<string | null> {
   const store = await cookies();
   const valor = store.get(ORG_COOKIE)?.value?.trim();
   return valor ? valor : null;
+}
+
+/** Lo mínimo que hace falta de una organización para poder elegirla. */
+interface OrganizacionElegible {
+  id: string;
+  kind?: 'PERSONAL' | 'ENTERPRISE';
+}
+
+/**
+ * Qué organización se está mirando **de verdad**.
+ *
+ * ## 🔴 Ya no existe «todas»
+ *
+ * Hasta 2026-08-28, `null` significaba «todas tus organizaciones» y era lo que
+ * veía quien no había tocado el selector. Se retiró a propósito: mientras
+ * existía, cada pantalla que necesitaba una organización concreta —Suscripción,
+ * Roles y permisos— tenía que volver a preguntarla, y elegirla dos veces para la
+ * misma sesión es exactamente el roce que esta etapa viene a quitar.
+ *
+ * Ahora siempre hay una. Sin cookie, la **personal**, que todo el mundo tiene.
+ *
+ * ## Y por eso hace falta replegar
+ *
+ * ⚠️ **Una cookie puede apuntar a una organización que ya no es tuya**: te
+ * fueron del equipo, o se borró. Con el «todas» eso se absorbía solo —se veía
+ * todo—; sin él, la pantalla se quedaría vacía en todas partes y las de
+ * organización responderían `403 NOT_IN_ORG`, sin que nada dijera por qué.
+ *
+ * Así que se comprueba contra la lista que la barra lateral ya trae en cada
+ * carga (`loadPrivateChrome`), y si no está, se cae en la personal. No cuesta
+ * ninguna petición: la lista ya estaba pedida.
+ *
+ * ⚠️ **Esto no autoriza nada, y no puede.** Sigue siendo un filtro sobre lo que
+ * ya puedes ver: la lista viene del servidor, sí, pero quien decide lo que hay
+ * es cada endpoint con su guard. Ver la nota de arriba sobre la cookie.
+ */
+export function resolverOrganizacionActiva(
+  organizaciones: OrganizacionElegible[],
+  cookieId: string | null,
+): string | null {
+  if (cookieId && organizaciones.some((organizacion) => organizacion.id === cookieId)) {
+    return cookieId;
+  }
+
+  const personal = organizaciones.find((organizacion) => organizacion.kind === 'PERSONAL');
+  /* La personal primero, y la primera de la lista como último recurso: si por lo
+     que sea no hubiera personal, dejar esto en `null` devolvería el «todas» que
+     acabamos de quitar. `null` solo si no hay ninguna. */
+  return personal?.id ?? organizaciones[0]?.id ?? null;
 }

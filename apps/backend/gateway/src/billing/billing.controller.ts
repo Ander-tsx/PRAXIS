@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -90,14 +91,23 @@ export class BillingController {
    */
   @Get('resumen')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Plan, topes, consumo y organizaciones de quien pregunta' })
-  async resumen(@Request() req: Express.Request): Promise<BillingSummary> {
+  @ApiOperation({ summary: 'Plan, topes y consumo de una organización de quien pregunta' })
+  async resumen(
+    @Request() req: Express.Request,
+    @Query('organizationId') organizationIdPedida?: string,
+  ): Promise<BillingSummary> {
     const userId = req.user!.userId;
-    const plan = await this.quota.planDe(userId);
+
+    /* 🔴 **La organización se valida, no se cree.** Llega de la pantalla, que la
+       saca de una cookie que escribe el navegador: sin esta comprobación, poner
+       ahí el identificador de otra empresa enseñaría su plan y su consumo. Sin
+       parámetro cae en la personal. */
+    const organizationId = await this.quota.organizacionElegida(userId, organizationIdPedida);
+    const plan = await this.quota.planDe(userId, organizationId);
 
     const [proyectos, ia, organizaciones, cliente] = await Promise.all([
-      this.proyectosPropios(userId),
-      this.cuotaDeIa(userId, plan.quotas.iaMensualPorPersona),
+      this.proyectosDeLaOrganizacion(organizationId),
+      this.cuotaDeIa(userId, plan.quotas.iaMensualPorPersona, organizationId),
       this.organizaciones(userId),
       this.cliente(userId),
     ]);
@@ -278,20 +288,28 @@ export class BillingController {
   }
 
   /**
-   * Cuántos proyectos sostiene.
+   * Cuántos proyectos tiene la organización.
    *
-   * ⚠️ **Los `DELETED` no cuentan**, igual que en `QuotaService`: si el resumen
-   * los contara, la barra diría «3 de 2» sobre un tope que el servidor sí deja
-   * pasar, y eso se lee como una avería.
+   * 🔴 **Contaba los de la persona, y el tope se cuenta por organización.** Eran
+   * dos cifras distintas puestas en la misma barra: quien tuviera dos proyectos
+   * propios en un equipo con veinte veía «2 de 25» y creía que le quedaban
+   * veintitrés. Ahora las dos mitades de la barra —lo gastado y el tope— miden
+   * lo mismo, que es lo mínimo que se le puede pedir a una barra.
+   *
+   * ⚠️ **Los `DELETED` no cuentan**, igual que en `QuotaService.exigirProyecto`:
+   * si el resumen los contara, la barra diría «3 de 2» sobre un tope que el
+   * servidor sí deja pasar, y eso se lee como una avería.
    */
-  private proyectosPropios(userId: string): Promise<number> {
+  private proyectosDeLaOrganizacion(organizationId: string | null): Promise<number> {
+    if (!organizationId) return Promise.resolve(0);
+
     return firstValueFrom(
       this.projectsClient.send<{ status: string }[]>(
-        { cmd: 'project_find_owned' },
-        { ownerId: userId },
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
       ),
     )
-      .then((propios) => propios.filter((proyecto) => proyecto.status !== 'DELETED').length)
+      .then((suyos) => suyos.filter((proyecto) => proyecto.status !== 'DELETED').length)
       .catch(() => 0);
   }
 
@@ -302,9 +320,16 @@ export class BillingController {
    * empresa, y sin el número usaría su propia tabla por defecto — que para
    * alguien cuyo plan viene de su organización diría otra cosa que el servidor.
    */
-  private cuotaDeIa(userId: string, limiteMensual: number | null): Promise<CuotaDeIa> {
+  private cuotaDeIa(
+    userId: string,
+    limiteMensual: number | null,
+    organizationId: string | null,
+  ): Promise<CuotaDeIa> {
     return firstValueFrom(
-      this.assistantClient.send<CuotaDeIa>({ cmd: 'assistant_quota' }, { userId, limiteMensual }),
+      this.assistantClient.send<CuotaDeIa>(
+        { cmd: 'assistant_quota' },
+        { userId, limiteMensual, organizationId },
+      ),
     ).catch(() => ({
       usados: 0,
       limite: limiteMensual ?? 0,

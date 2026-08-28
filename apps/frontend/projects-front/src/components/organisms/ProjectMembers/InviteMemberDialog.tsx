@@ -6,18 +6,15 @@ import {
   Button,
   Dialog,
   Input,
-  type Paginated,
   type ProjectRole,
   QuotaNotice,
   Select,
-  type UserProfile,
   alpha,
   colors,
-  personLabel,
   useAccion,
 } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons/api';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 export interface InviteMemberDialogProps {
   projectId: string;
@@ -33,7 +30,30 @@ export interface InviteMemberDialogProps {
    * su plan no toca este proyecto.
    */
   soyDueño?: boolean;
+  /**
+   * La organización dueña del proyecto: **de ahí sale la lista**.
+   *
+   * Sin ella se cae al directorio de la plataforma, que es lo que había antes y
+   * lo que producía el 403. Es opcional porque el tipo `Project` la trae
+   * opcional —los listados viejos no la incluyen—, no porque se pueda invitar
+   * sin organización.
+   */
+  organizationId?: string;
   onClose?: () => void;
+}
+
+/**
+ * Una fila de `GET /organizations/:id/members`.
+ *
+ * ⚠️ **`userId` puede ser nulo**: una invitación a la organización sin aceptar
+ * ocupa asiento pero todavía no tiene cuenta detrás. Esas se filtran al cargar —
+ * no hay a quién meter en un proyecto.
+ */
+interface MiembroDeLaOrg {
+  userId: string | null;
+  email: string;
+  name: string | null;
+  roleName: string | null;
 }
 
 /** Toda petición del navegador pasa por el proxy de la zona, que pone el Bearer. */
@@ -50,29 +70,45 @@ const MAX_RESULTS = 6;
  * acostumbra a elegir de una lista que dejará de caber en cuanto haya cuentas
  * de verdad; buscar primero es el gesto que escala.
  *
- * La búsqueda va **contra el servidor**, con `GET /users?search=`.
+ * ## 🔴 Se busca en la organización, no en la plataforma
  *
- * ⚠️ Se resolvía en el cliente sobre `/users?limit=100` que traía la página, y
- * ese comentario decía que no había alternativa. La había: el backend acepta
- * `search` como query param desde hace tiempo y nadie volvió a mirarlo. Mientras
- * tanto, buscar solo encontraba a quien cupiera en las primeras cien cuentas de
- * **toda la plataforma** — o sea, a casi nadie en cuanto hubo cuentas de verdad.
+ * Hasta 2026-08-28 esto buscaba en `GET /users?search=`: el directorio entero de
+ * PRAXIS. Y **quien entra en un proyecto necesita asiento en su organización**,
+ * así que la mitad de lo que ofrecía terminaba en un `403 NOT_IN_ORG` al
+ * invitar — un error después de haber elegido a la persona, que es el peor
+ * momento para enterarse.
+ *
+ * Ahora la lista es `GET /organizations/:id/members` y se filtra en el cliente:
+ * son los de un equipo, caben en una respuesta, y no hay nada que buscar contra
+ * el servidor.
+ *
+ * ⚠️ **Y quien no esté sale con una salida, no con un «no encontrado».** Si
+ * nadie coincide, se ofrece invitar a la organización — que es el paso que de
+ * verdad falta, y el único que arregla el caso.
  */
 export function InviteMemberDialog({
   projectId,
   roles,
   excluirIds,
   soyDueño = false,
+  organizationId,
   onClose,
 }: InviteMemberDialogProps) {
   const [state, formAction, pending] = useAccion(inviteMemberAction, MEMBER_INITIAL_STATE);
 
   const [query, setQuery] = useState('');
-  /** `null` mientras no se ha buscado: distingue "sin buscar" de "sin resultados". */
-  const [results, setResults] = useState<UserProfile[] | null>(null);
-  const [buscando, setBuscando] = useState(false);
+  /**
+   * El equipo entero, una sola vez.
+   *
+   * `null` mientras carga o si falló. No se pagina ni se busca contra el
+   * servidor: son los miembros de **una** organización —el plan más grande da
+   * asientos de sobra para una respuesta— y filtrar en el cliente hace que
+   * escribir vaya afinando sin un viaje de red por tecla.
+   */
+  const [equipo, setEquipo] = useState<MiembroDeLaOrg[] | null>(null);
+  const [cargando, setCargando] = useState(true);
   const [errorBusqueda, setErrorBusqueda] = useState('');
-  const [selected, setSelected] = useState<UserProfile | null>(null);
+  const [selected, setSelected] = useState<MiembroDeLaOrg | null>(null);
   const [roleId, setRoleId] = useState(roles[0]?.id ?? '');
 
   const searchId = useId();
@@ -98,41 +134,72 @@ export function InviteMemberDialog({
   useEffect(() => {
     if (state.done) {
       setQuery('');
-      setResults(null);
       setSelected(null);
       onClose?.();
     }
   }, [state, onClose]);
 
-  async function search() {
-    const needle = query.trim();
-    if (!needle) {
-      setResults(null);
-      setErrorBusqueda('');
+  /**
+   * El equipo de la organización, al abrir el diálogo.
+   *
+   * ⚠️ **Solo quienes ya tienen cuenta.** Una invitación a la organización sin
+   * aceptar ocupa asiento pero viene con `userId` nulo: no hay a quién meter en
+   * un proyecto todavía, y ofrecerla dejaría elegir una fila que al enviar no
+   * manda ningún identificador.
+   */
+  useEffect(() => {
+    if (!organizationId) {
+      setCargando(false);
       return;
     }
 
-    setBuscando(true);
-    setErrorBusqueda('');
+    let vigente = true;
 
-    try {
-      const pagina = await api.get<Paginated<UserProfile>>(
-        `/users?search=${encodeURIComponent(needle)}&limit=${MAX_RESULTS}`,
-      );
+    api
+      .get<MiembroDeLaOrg[]>(`/organizations/${organizationId}/members`)
+      .then((miembros) => {
+        if (!vigente) return;
+        setEquipo(miembros.filter((miembro) => miembro.userId));
+      })
+      .catch(() => {
+        if (!vigente) return;
+        setErrorBusqueda('No se pudo cargar el equipo de la organización.');
+      })
+      .finally(() => {
+        if (vigente) setCargando(false);
+      });
 
-      const filtrados = pagina.items.filter((user) => !excluirIds.includes(user.id));
-      setResults(filtrados);
-    } catch {
-      setErrorBusqueda('La búsqueda falló por un problema de red.');
-      setResults(null);
-    } finally {
-      setBuscando(false);
-    }
-  }
+    /* Si el diálogo se cierra mientras la respuesta viaja, escribir estado sobre
+       un componente desmontado avisa en consola y no sirve de nada. */
+    return () => {
+      vigente = false;
+    };
+  }, [organizationId]);
+
+  /**
+   * Quiénes encajan con lo escrito, ya sin los que están dentro.
+   *
+   * `excluirIds` trae miembros, invitados sin responder y el dueño: ofrecerlos
+   * sería ofrecer una acción que el servidor rechaza.
+   */
+  const candidatos = useMemo(() => {
+    const disponibles = (equipo ?? []).filter(
+      (miembro) => miembro.userId && !excluirIds.includes(miembro.userId),
+    );
+    const needle = query.trim().toLowerCase();
+    if (!needle) return disponibles.slice(0, MAX_RESULTS);
+
+    return disponibles
+      .filter(
+        (miembro) =>
+          miembro.email.toLowerCase().includes(needle) ||
+          (miembro.name ?? '').toLowerCase().includes(needle),
+      )
+      .slice(0, MAX_RESULTS);
+  }, [equipo, excluirIds, query]);
 
   function reset() {
     setQuery('');
-    setResults(null);
     setSelected(null);
     onClose?.();
   }
@@ -148,44 +215,29 @@ export function InviteMemberDialog({
 
       <form action={formAction} className="flex flex-col gap-4">
         <input type="hidden" name="projectId" value={projectId} />
-        <input type="hidden" name="userId" value={selected?.id ?? ''} />
+        <input type="hidden" name="userId" value={selected?.userId ?? ''} />
 
         <div className="flex flex-col md:flex-row gap-4 items-start w-full">
           {/* Columna Izquierda: Búsqueda y Resultados */}
           <div className="flex-1 w-full flex flex-col gap-4">
-            <div className="flex items-end gap-2">
-              <Input
-                id={searchId}
-                type="search"
-                label="Buscar persona"
-                placeholder="Correo o nombre"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setSelected(null);
-                  setResults(null);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault();
-                    search();
-                  }
-                }}
-                message="Solo aparecen personas que ya tienen cuenta."
-                autoComplete="off"
-                fullWidth
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={search}
-                isLoading={buscando}
-                disabled={buscando}
-                className="mb-[22px]"
-              >
-                Buscar
-              </Button>
-            </div>
+            <Input
+              id={searchId}
+              type="search"
+              label="Buscar en el equipo"
+              placeholder="Correo o nombre"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSelected(null);
+              }}
+              message={
+                cargando
+                  ? 'Cargando el equipo…'
+                  : 'Solo sale quien ya tiene asiento en la organización.'
+              }
+              autoComplete="off"
+              fullWidth
+            />
 
             {selected ? (
               <div
@@ -194,10 +246,11 @@ export function InviteMemberDialog({
               >
                 <span className="flex min-w-0 flex-col">
                   <span className="truncate font-sans text-sm text-text-primary">
-                    {personLabel(selected)}
+                    {selected.name || selected.email}
                   </span>
                   <span className="truncate font-sans text-xs text-text-secondary">
-                    {selected.credential.email}
+                    {selected.email}
+                    {selected.roleName ? ` · ${selected.roleName}` : ''}
                   </span>
                 </span>
                 <button
@@ -209,38 +262,55 @@ export function InviteMemberDialog({
                 </button>
               </div>
             ) : (
-              results !== null && (
-                <div className="flex flex-col gap-1.5">
-                  {errorBusqueda ? (
-                    <p
-                      role="alert"
-                      className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
-                    >
-                      {errorBusqueda}
+              <div className="flex flex-col gap-1.5">
+                {errorBusqueda ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
+                  >
+                    {errorBusqueda}
+                  </p>
+                ) : cargando ? null : candidatos.length === 0 ? (
+                  /* 🔴 **Una salida, no un «no encontrado».** Quien busques puede
+                     no estar en la organización todavía, y entonces lo que falta
+                     no es otra búsqueda: es un asiento. Antes esto decía «nadie
+                     coincide» y dejaba a quien invita sin saber qué hacer —o
+                     peor, eligiendo a alguien de fuera para recibir un 403 al
+                     enviar. */
+                  <div className="flex flex-col gap-2 rounded-lg bg-surface-elevated px-3 py-3">
+                    <p className="font-sans text-sm text-text-disabled">
+                      {query.trim()
+                        ? `Nadie del equipo coincide con «${query.trim()}».`
+                        : 'Todo el equipo está ya en este proyecto.'}
                     </p>
-                  ) : results.length === 0 ? (
-                    <p className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-text-disabled">
-                      Nadie coincide con «{query.trim()}».
-                    </p>
-                  ) : (
-                    results.map((user) => (
-                      <button
-                        key={user.id}
-                        type="button"
-                        onClick={() => setSelected(user)}
-                        className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
+                    {organizationId && (
+                      <a
+                        href={`/dashboard/organizations/${organizationId}`}
+                        className="font-sans text-sm text-primary underline-offset-2 hover:underline"
                       >
-                        <span className="font-sans text-sm text-text-primary">
-                          {personLabel(user)}
-                        </span>
-                        <span className="font-sans text-xs text-text-secondary">
-                          {user.credential.email}
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )
+                        Invitar a alguien a la organización →
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  candidatos.map((miembro) => (
+                    <button
+                      key={miembro.userId as string}
+                      type="button"
+                      onClick={() => setSelected(miembro)}
+                      className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
+                    >
+                      <span className="font-sans text-sm text-text-primary">
+                        {miembro.name || miembro.email}
+                      </span>
+                      <span className="font-sans text-xs text-text-secondary">
+                        {miembro.email}
+                        {miembro.roleName ? ` · ${miembro.roleName}` : ''}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
             )}
           </div>
 

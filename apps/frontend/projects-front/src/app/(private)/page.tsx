@@ -16,8 +16,7 @@ import {
   type Project,
   type UserProfile,
 } from '@praxis/commons';
-import { createServerApiClient, loadCurrentUser } from '@praxis/commons/auth';
-import { getOrganizacionActiva } from '@praxis/commons/theme';
+import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -50,12 +49,16 @@ const POR_PAGINA = 12;
  */
 export default async function ProjectsPage({ searchParams }: PageProps) {
   const { q, page: pageParam } = await searchParams;
-  const { userId } = await loadCurrentUser();
   /* ⚠️ **Se lee en el servidor y no tras hidratar.** Si la organización activa
      saliera de `localStorage`, esta lista se serviría entera y se recortaría
      después: un parpadeo en cada carga, y en Multi-Zones cada cambio de zona es
-     una carga completa. Mismo motivo que el tema y el pliegue de la barra. */
-  const organizacionActiva = await getOrganizacionActiva();
+     una carga completa. Mismo motivo que el tema y el pliegue de la barra.
+
+     🔴 **Y resuelta, no la cookie en crudo.** Desde 2026-08-28 siempre hay una
+     organización activa: sin cookie ya no significa «todas», significa la
+     personal. `loadPrivateChrome` es la que aplica el repliegue —y la que ya
+     pide el layout—, así que sale de ahí en vez de leerse suelta. */
+  const { userId, organizacionActivaId: organizacionActiva } = await loadPrivateChrome();
   const api = createServerApiClient();
 
   const search = q?.trim() ?? '';

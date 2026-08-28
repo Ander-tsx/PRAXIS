@@ -88,13 +88,25 @@ export type MembershipStatus = 'INVITED' | 'ACTIVE';
  */
 export type Tope = number | null;
 
+/**
+ * Cuántas organizaciones puede tener alguien **a su nombre**. La personal
+ * incluida; estar invitado en las de otros no ocupa ninguna.
+ *
+ * ⚠️ **Es una constante y no una cuota de plan**, y el espejo de
+ * `MAX_ORGANIZACIONES_PROPIAS` en `@praxis/contracts`. Lo fue —`organizacionesPropias`,
+ * con una escalera por plan que nunca llegó a comprobarse— y se retiró el
+ * 2026-08-28: desde que el plan vale solo dentro de la organización que lo paga,
+ * uno que además dejara crear más organizaciones sería un beneficio escapándose
+ * de la suya. Lo que acota es el farmeo de cuotas **gratuitas**.
+ */
+export const MAX_ORGANIZACIONES_PROPIAS = 3;
+
 export interface PlanQuotas {
   /** Cuánta gente cabe en la organización. Una invitación sin aceptar ocupa. */
   asientos: Tope;
   /** Proyectos **de la organización**, no de la persona. Los borrados no cuentan. */
   proyectos: Tope;
-  /** Organizaciones de las que se es dueño. Estar invitado en otras no cuenta. */
-  organizacionesPropias: Tope;
+  /** Mensajes al asistente por persona, **por organización** y por mes natural. */
   iaMensualPorPersona: Tope;
   automatizacionesPorProyecto: Tope;
   /** Lo que suman los adjuntos de la organización, en megabytes. */

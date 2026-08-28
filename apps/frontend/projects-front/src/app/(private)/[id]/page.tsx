@@ -638,6 +638,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             invitations={invitations}
             projectName={project.name}
             currentUserId={userId}
+            /* A quién se puede invitar sale de aquí: quien entra en un proyecto
+               necesita asiento en su organización. Ver `InviteMemberDialog`. */
+            organizationId={project.organizationId}
           />
         )}
 

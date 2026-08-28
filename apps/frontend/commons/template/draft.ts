@@ -2,6 +2,7 @@ import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '.
 import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
 import { createServerApiClient } from '../auth/server-client';
+import { getOrganizacionActiva } from '../theme/organizacion';
 import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
 
 /**
@@ -50,6 +51,8 @@ export async function pedirBorrador(
     };
   }
 
+  const organizationId = await getOrganizacionActiva();
+
   try {
     const resultado = await createServerApiClient().post<TemplateDraftResult>(
       '/me/assistant/project-draft',
@@ -61,6 +64,10 @@ export async function pedirBorrador(
         ...(ajuste?.texto.trim()
           ? { ajuste: ajuste.texto.trim(), previa: JSON.stringify(ajuste.previa) }
           : {}),
+        /* Esta ruta **gasta cuota de IA y no crea nada**, así que hay que decir
+           a qué organización se le cobra: el proyecto todavía no existe. El
+           gateway valida la pertenencia antes de usarla. */
+        ...(organizationId ? { organizationId } : {}),
       },
     );
 

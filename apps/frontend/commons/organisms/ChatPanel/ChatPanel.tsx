@@ -1920,6 +1920,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 enviando={enviando}
                 placeholder={editando ? 'Edita tu mensaje…' : 'Escribe un mensaje…'}
                 permiteMenciones={permiteMenciones}
+                /* 🔴 **El menú `/`, solo en los chats de proyecto.** Es la misma
+                   condición que ya usa la vista previa de adjuntos unas líneas
+                   más abajo (`isProjectChat`), y por el mismo motivo: una
+                   referencia necesita un proyecto que la explique. El servidor
+                   ya devuelve la lista vacía en privado; esto evita además que
+                   se abra un desplegable sin nada al escribir «y/o». */
+                permiteReferencias={rutaCanal.includes('/projects')}
                 sugerencias={sugerencias}
                 onPedirSugerencias={pedirSugerencias}
                 /* Editando no hay adjuntos que enseñar: lo que se cambia es el

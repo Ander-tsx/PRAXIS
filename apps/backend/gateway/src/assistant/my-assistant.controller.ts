@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Request,
   Res,
   UploadedFile,
@@ -137,13 +138,20 @@ export class MyAssistantController {
   async chat(@Request() req: Express.Request, @Body() body: AssistantChatBodyDto) {
     const userId = req.user!.userId;
 
+    /* 🔴 **Antes de nada, y no en paralelo con lo demás.** Aquí no hay proyecto
+       del que sacar la organización, así que la elige quien llama — y si la
+       elegida no es suya, esto lanza `403 NOT_IN_ORG` antes de haber pedido
+       nada más. Comprobar después sería resolver el plan de una organización
+       ajena aunque luego no se usara. */
+    const organizationId = await this.cuotas.organizacionElegida(userId, body.organizationId);
+
     const [proyectos, quien, ia] = await Promise.all([
       this.proyectosQuePuedeAbrir(userId),
       this.nombreDe(userId),
       /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
          acabar en un 402 que tiene que decir qué plan puso ese tope. Los dos
          datos salen de la misma resolución a propósito. */
-      this.cuotas.iaDe(userId),
+      this.cuotas.iaDe(userId, organizationId),
     ]);
 
     return firstValueFrom(
@@ -168,6 +176,7 @@ export class MyAssistantController {
              es assistant-service, quien sabe cuánto da el plan es billing. El
              `planTier` va solo para poder nombrarlo si se agota. */
           limiteMensual: ia.limite,
+          organizationId: ia.organizationId,
           planTier: ia.tier,
         },
       ),
@@ -452,12 +461,21 @@ export class MyAssistantController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cuota mensual del asistente para quien llama, sin proyecto' })
   @ApiResponse({ status: 200, description: 'plan, usados, limite, periodo y fecha de reinicio' })
-  async quota(@Request() req: Express.Request) {
+  async quota(
+    @Request() req: Express.Request,
+    @Query('organizationId') organizationIdPedida?: string,
+  ) {
     const userId = req.user!.userId;
-    const limiteMensual = await this.cuotas.limiteDeIa(userId);
+    /* La misma resolución que el chat: sin ella, la pantalla pintaría el
+       contador de una organización y el turno se cobraría en otra. */
+    const organizationId = await this.cuotas.organizacionElegida(userId, organizationIdPedida);
+    const limiteMensual = await this.cuotas.limiteDeIa(userId, organizationId);
 
     return firstValueFrom(
-      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId, limiteMensual }),
+      this.assistantClient.send(
+        { cmd: 'assistant_quota' },
+        { userId, limiteMensual, organizationId },
+      ),
     );
   }
 
@@ -487,8 +505,11 @@ export class MyAssistantController {
   @ApiResponse({ status: 502, description: 'El asistente no devolvió una plantilla utilizable' })
   async borradorDeProyecto(@Request() req: Express.Request, @Body() body: ProjectDraftBodyDto) {
     const userId = req.user!.userId;
-    /* Gasta cuota, así que necesita también el plan: ver la nota de `chat`. */
-    const ia = await this.cuotas.iaDe(userId);
+    /* Gasta cuota, así que necesita también el plan: ver la nota de `chat`. Y la
+       organización, que es contra quien se cobra: el proyecto todavía no existe,
+       así que no hay recurso del que derivarla. */
+    const organizationId = await this.cuotas.organizacionElegida(userId, body.organizationId);
+    const ia = await this.cuotas.iaDe(userId, organizationId);
 
     return firstValueFrom(
       this.assistantClient.send(
@@ -499,6 +520,7 @@ export class MyAssistantController {
           ajuste: body.ajuste,
           previa: body.previa,
           limiteMensual: ia.limite,
+          organizationId: ia.organizationId,
           planTier: ia.tier,
         },
       ),

@@ -38,6 +38,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
 import { oFalla } from './fallos';
+import { QuotaService } from './quota.service';
 import { StripeService } from './stripe.service';
 
 /**
@@ -57,6 +58,7 @@ export class MyOrganizationsController {
   constructor(
     @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    private readonly cuotas: QuotaService,
   ) {}
 
   /**
@@ -92,8 +94,19 @@ export class MyOrganizationsController {
   @ApiOperation({ summary: 'Crea una organización de empresa' })
   @ApiResponse({ status: 201, description: 'Creada, sin plan hasta que se pague' })
   @ApiResponse({ status: 400, description: 'Ese plan no crea organización, o faltan asientos' })
+  @ApiResponse({
+    status: 402,
+    description: 'Ya tienes el máximo de organizaciones (QUOTA_EXCEEDED)',
+  })
   async crear(@Request() req: Express.Request, @Body() body: CreateOrganizationBodyDto) {
     const userId = req.user!.userId;
+
+    /* 🔴 **El tope, antes de tocar nada.** Existía escrito desde la etapa
+       anterior y no lo comprobaba ningún sitio: hasta 2026-08-28 se podían crear
+       sin límite, y con el plan valiendo solo dentro de su organización eso es
+       multiplicar las cuotas gratuitas por cuantas quieras crear. */
+    await this.cuotas.exigirOrganizacion(userId);
+
     const ownerEmail = (await this.correo(userId)) ?? '';
 
     return oFalla(

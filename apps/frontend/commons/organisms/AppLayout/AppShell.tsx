@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, createContext, useContext, useState } from 'react';
+import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import { Avatar } from '../../atoms/Avatar';
 import { LivePresences, LiveSource } from '../../realtime';
 import { useMessageCount } from '../../realtime/useMessageCount';
@@ -607,6 +607,15 @@ function ByKyloo() {
  * organización de otro devuelve cero proyectos, no los suyos. Ver
  * `commons/theme/organizacion.ts`.
  *
+ * ## 🔴 Y ya no hay forma de no elegir ninguna
+ *
+ * Hasta 2026-08-28 la primera fila del desplegable era «Todas tus
+ * organizaciones» y era el estado por defecto. Se retiró: mientras existía,
+ * Suscripción y Roles y permisos tenían que volver a preguntar en cuál
+ * trabajar, y elegirla dos veces para la misma sesión era el roce que esta
+ * etapa vino a quitar. Ahora siempre hay una activa, resuelta en el servidor
+ * antes de pintar.
+ *
  * ⚠️ **Recarga dura y no `router.refresh()`.** La cookie la leen los siete
  * `layout.tsx` en el servidor, y un refresco del App Router no vuelve a
  * ejecutar el layout de una zona que ya está montada: el sidebar se quedaría
@@ -629,22 +638,47 @@ function OrgSwitcher({
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
 
-  /* Sin ninguna elegida se enseña «Todas», que es lo que de verdad está
-     pasando: se ven los proyectos de todas a las que perteneces. Inventar aquí
-     la personal sería mentir sobre lo que hay debajo. */
+  /* 🔴 **Ya no hay «Todas», y por eso aquí siempre hay un nombre.** El servidor
+     resuelve la activa antes de pintar (`resolverOrganizacionActiva`), así que
+     `activa` solo es nula mientras la lista esté vacía —una carga que falló—, y
+     ahí se enseña el nombre de la persona en vez de una etiqueta que prometa un
+     modo que ya no existe. */
   const primerNombre = name.trim().split(' ')[0];
-  const etiqueta = activa
-    ? (activa.name ?? 'Sin nombre')
-    : lista.length > 0
-      ? 'Todas tus organizaciones'
-      : `Organización de ${primerNombre || 'Praxis'}`;
+  const etiqueta = activa?.name ?? `Organización de ${primerNombre || 'Praxis'}`;
   const inicial = (activa?.name ?? primerNombre ?? 'P').charAt(0).toUpperCase();
-  const puedeAbrir = lista.length > 0;
+  /* Con una sola no hay nada que elegir: el desplegable se abriría con una fila
+     que ya está marcada. Antes bastaba con tener una porque estaba «Todas». */
+  const puedeAbrir = lista.length > 1;
 
-  function elegir(id: string | null) {
+  /**
+   * Deja la cookie igual a lo que el servidor resolvió.
+   *
+   * 🔴 **Sin esto, una cookie caduca no se arregla nunca.** El servidor
+   * repliega al pintar (`resolverOrganizacionActiva`), pero un Server Component
+   * no puede escribir cookies: quien fue sacado de un equipo seguiría con el
+   * identificador viejo guardado, y toda ruta que lo mande al gateway —el chat
+   * de PRAX, el resumen de facturación— recibiría `403 NOT_IN_ORG` en cada
+   * intento, mientras la pantalla enseña la organización correcta. Un fallo
+   * imposible de entender desde fuera.
+   *
+   * Aquí sí se puede, y converge en la primera carga de cualquier pantalla
+   * privada. No recarga: lo que se ve ya está bien: lo que estaba mal era lo
+   * guardado.
+   */
+  useEffect(() => {
+    if (!activaId) return;
+    if (document.cookie.includes(`praxis_org=${activaId}`)) return;
+    document.cookie = `praxis_org=${activaId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+  }, [activaId]);
+
+  function elegir(id: string) {
     /* `max-age` y `path=/` a mano: es la misma cookie que leen las siete zonas
-       bajo el único origen del shell. Ver `ORG_COOKIE`. */
-    document.cookie = `praxis_org=${id ?? ''}; path=/; max-age=${id ? 60 * 60 * 24 * 365 : 0}; samesite=lax`;
+       bajo el único origen del shell. Ver `ORG_COOKIE`.
+
+       ⚠️ Ya no se puede borrar la cookie desde aquí: sin valor, el servidor
+       repliega a la personal, y ofrecer un botón que «quita» la organización
+       sería ofrecer el modo «todas» que se retiró. */
+    document.cookie = `praxis_org=${id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
     window.location.href = zonePath;
   }
 
@@ -678,7 +712,7 @@ function OrgSwitcher({
         {cuadro}
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="font-sans text-[10px] text-text-secondary">
-            {activa ? (activa.tier === 'FREE' ? 'Plan gratuito' : `Plan ${activa.tier}`) : 'Viendo'}
+            {activa?.tier === 'FREE' || !activa ? 'Plan gratuito' : `Plan ${activa.tier}`}
           </span>
           <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
             {etiqueta}
@@ -698,15 +732,11 @@ function OrgSwitcher({
         )}
       </button>
 
-      <div className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}>
+      <div
+        className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}
+      >
         <div className="overflow-hidden">
           <div className="flex flex-col gap-0.5 rounded-xl border border-white/10 bg-[#0F0F0F] p-1.5 shadow-xl">
-            <OpcionDeOrg
-              activa={activaId === null}
-              etiqueta="Todas tus organizaciones"
-              detalle={`${lista.length} en total`}
-              onClick={() => elegir(null)}
-            />
             {lista.map((org) => (
               <OpcionDeOrg
                 key={org.id}
@@ -747,7 +777,9 @@ function OpcionDeOrg({
       type="button"
       onClick={onClick}
       className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-        activa ? 'bg-white/10 text-white font-medium' : 'text-white/70 hover:bg-white/5 hover:text-white'
+        activa
+          ? 'bg-white/10 text-white font-medium'
+          : 'text-white/70 hover:bg-white/5 hover:text-white'
       }`}
     >
       <span className="truncate font-sans text-[13px]">{etiqueta}</span>

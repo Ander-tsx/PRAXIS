@@ -64,6 +64,7 @@ import { MentionablesService } from './mentionables.service';
  * El `requesterId` sale **siempre del token**. La ruta solo lleva con quién
  * hablas, nunca quién eres.
  */
+import { QuotaService } from '../billing/quota.service';
 import { GlobalRolesService } from '../common/global-roles/global-roles.service';
 
 @ApiTags('Direct Chat')
@@ -75,11 +76,37 @@ export class DirectChatController {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
     private readonly mentionables: MentionablesService,
     private readonly rolesService: GlobalRolesService,
+    private readonly cuotas: QuotaService,
   ) {}
 
-  private async getIsAdmin(userId: string): Promise<boolean> {
+  /**
+   * ¿Puede esta persona abrir una conversación con esa otra?
+   *
+   * ## 🔴 La regla cambió: era «compartís proyecto», ahora es «compartís organización»
+   *
+   * Hasta 2026-08-28 solo se podía escribir a quien compartiera **algún
+   * proyecto** contigo. Con la organización como unidad, esa regla dejaba fuera
+   * el caso más normal de todos: alguien de tu propio equipo al que todavía no
+   * has metido en ningún tablero. Y no protegía de nada nuevo —quien está en un
+   * proyecto está por fuerza en su organización— así que solo estorbaba.
+   *
+   * ## Por qué se decide aquí y no en projects-service
+   *
+   * ⚠️ **Porque projects-service no sabe de asientos.** La membresía de
+   * organización vive en billing-service, y los dos servicios no se hablan a
+   * propósito. El gateway es el único que tiene a los dos delante — el mismo
+   * motivo por el que `MentionablesService` compone aquí las tareas y los
+   * tableros.
+   *
+   * projects-service conserva su comprobación de proyecto en común como suelo:
+   * es un subconjunto de esta, así que no puede autorizar nada que esta niegue,
+   * y deja la ruta TCP directa protegida igual que antes.
+   */
+  private async puedeHablarCon(userId: string, peerId: string): Promise<boolean> {
     const roles = await this.rolesService.rolesOf(userId);
-    return roles.includes('Admin') || roles.includes('SuperAdmin');
+    if (roles.includes('Admin') || roles.includes('SuperAdmin')) return true;
+
+    return this.cuotas.compartenOrganizacion(userId, peerId);
   }
 
   /** Mis conversaciones, con el último mensaje y lo que llevo sin leer. */
@@ -106,12 +133,31 @@ export class DirectChatController {
    */
   @Get('contacts')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Quién comparte proyecto conmigo, con sus roles' })
-  @ApiResponse({ status: 200, description: 'Contactos con sus proyectos en común' })
-  contactos(@Request() req: Express.Request) {
-    return firstValueFrom(
-      this.projectsClient.send({ cmd: 'chat_contacts' }, { userId: req.user!.userId }),
-    );
+  @ApiOperation({ summary: 'Quién comparte organización conmigo, con los proyectos en común' })
+  @ApiResponse({ status: 200, description: 'Contactos con sus proyectos en común, si los hay' })
+  async contactos(@Request() req: Express.Request) {
+    const userId = req.user!.userId;
+
+    /* 🔴 **Las dos mitades, y ninguna sobra.** projects-service sabe con quién
+       compartes tablero y con qué rol —el detalle que convierte «Juan» en «Juan,
+       Administrador en Rediseño»— pero no sabe de asientos. billing-service sabe
+       quién tiene asiento contigo, que desde 2026-08-28 es la regla de con quién
+       puedes hablar, pero no sabe de proyectos.
+
+       Así que la lista la manda billing y el detalle lo pone projects. Alguien
+       de tu equipo con quien todavía no compartes ningún tablero sale con la
+       lista de proyectos vacía, que es la verdad: podéis hablar porque estáis en
+       el mismo equipo, no porque trabajéis en lo mismo. */
+    const [companeros, conProyectos] = await Promise.all([
+      this.cuotas.companerosDeOrganizacion(userId),
+      firstValueFrom(
+        this.projectsClient.send<ContactoConProyectos[]>({ cmd: 'chat_contacts' }, { userId }),
+      ).catch(() => [] as ContactoConProyectos[]),
+    ]);
+
+    const detalle = new Map((conProyectos ?? []).map((contacto) => [contacto.userId, contacto]));
+
+    return companeros.map((peerId) => detalle.get(peerId) ?? { userId: peerId, proyectos: [] });
   }
 
   /**
@@ -149,11 +195,11 @@ export class DirectChatController {
     @Request() req: Express.Request,
     @Query() query: FindChatMessagesQueryDto,
   ) {
-    const isAdmin = await this.getIsAdmin(req.user!.userId);
+    const yaAutorizado = await this.puedeHablarCon(req.user!.userId, peerId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_find_all' },
-        { ...query, peerId, requesterId: req.user!.userId, isAdmin },
+        { ...query, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado },
       ),
     );
   }
@@ -167,11 +213,11 @@ export class DirectChatController {
     @Request() req: Express.Request,
     @Body() body: SendChatMessageBodyDto,
   ) {
-    const isAdmin = await this.getIsAdmin(req.user!.userId);
+    const yaAutorizado = await this.puedeHablarCon(req.user!.userId, peerId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_send' },
-        { ...body, peerId, requesterId: req.user!.userId, isAdmin },
+        { ...body, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado },
       ),
     );
   }
@@ -192,11 +238,11 @@ export class DirectChatController {
     @Param('id') id: string,
     @Request() req: Express.Request,
   ) {
-    const isAdmin = await this.getIsAdmin(req.user!.userId);
+    const yaAutorizado = await this.puedeHablarCon(req.user!.userId, peerId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_thread' },
-        { messageId: id, peerId, requesterId: req.user!.userId, isAdmin },
+        { messageId: id, peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado },
       ),
     );
   }
@@ -463,11 +509,11 @@ export class DirectChatController {
     @Param('peerId', ParseUUIDPipe) peerId: string,
     @Request() req: Express.Request,
   ) {
-    const isAdmin = await this.getIsAdmin(req.user!.userId);
+    const yaAutorizado = await this.puedeHablarCon(req.user!.userId, peerId);
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'chat_direct_hide_conversation' },
-        { peerId, requesterId: req.user!.userId, isAdmin },
+        { peerId, requesterId: req.user!.userId, isAdmin: yaAutorizado },
       ),
     );
   }
@@ -487,4 +533,10 @@ function sanitizeFilename(name: string): string {
     .trim();
 
   return clean.slice(0, 255) || 'archivo';
+}
+
+/** Lo que devuelve projects-service por cada persona con la que compartes tablero. */
+interface ContactoConProyectos {
+  userId: string;
+  proyectos: { id: string; name: string; slug: string; rol: string }[];
 }

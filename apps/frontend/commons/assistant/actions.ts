@@ -25,6 +25,7 @@ import type {
   Workspace,
 } from '../api/domain';
 import { getSession } from '../auth/session';
+import { getOrganizacionActiva } from '../theme/organizacion';
 import type { QuotaExceededDetails } from '../billing/planes';
 import { detallesDeCuota } from '../billing/planes';
 import { aplicarPlantilla } from '../template/apply';
@@ -190,9 +191,24 @@ export async function preguntarAction(
   try {
     const ruta = projectId ? `/projects/${projectId}/assistant/chat` : '/me/assistant/chat';
 
+    /* 🔴 **Sin proyecto hay que decir desde qué organización se pregunta.** El
+       tope de IA lo pone su plan y el gasto se cuenta con esa clave, así que
+       omitirlo cobraría el mensaje en la personal —gratuita— aunque se esté
+       trabajando en el equipo que paga.
+
+       ⚠️ **Y no es una llave.** Sale de la cookie, que escribe el navegador; el
+       gateway comprueba la pertenencia antes de usarla
+       (`QuotaService.organizacionElegida`) y responde `403 NOT_IN_ORG` si no es
+       tuya. Es un filtro, como siempre.
+
+       En la ruta de proyecto no se manda: allí la organización sale del propio
+       proyecto, que es lo que no se puede falsificar. */
+    const organizationId = projectId ? null : await getOrganizacionActiva();
+
     const resultado = await api.post<AssistantChatResult>(ruta, {
       message: texto,
       ...(conversationId ? { conversationId } : {}),
+      ...(organizationId ? { organizationId } : {}),
       /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
          cuyo cuerpo está topado en 1 MB: con el archivo dentro, cualquier foto
          de teléfono moría con un «Body exceeded 1 MB limit» de Next, sin

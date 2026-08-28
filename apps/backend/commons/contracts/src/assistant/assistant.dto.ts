@@ -324,6 +324,27 @@ export class AssistantChatBodyDto {
   @ArrayMaxSize(ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE)
   @IsUUID('4', { each: true })
   attachmentIds?: string[];
+
+  /**
+   * Desde qué organización se pregunta. **Solo lo usa PRAX sin proyecto.**
+   *
+   * ⚠️ Desde 2026-08-28 la cuota del asistente es de una organización: el tope lo
+   * pone su plan y el gasto se cuenta con esa clave. En la ruta de proyecto la
+   * organización sale del proyecto y **este campo se ignora**; en
+   * `/me/assistant/chat` no hay proyecto del que sacarla, así que la elige quien
+   * llama.
+   *
+   * 🔴 **Y por eso se valida.** El gateway comprueba la pertenencia antes de
+   * usarla (`QuotaService.organizacionElegida`): sin este paso, escribir aquí el
+   * identificador de una empresa ajena daría su plan. Sin el campo se cae en la
+   * organización personal.
+   */
+  @ApiPropertyOptional({
+    description: 'Organización desde la que se pregunta. Solo en la ruta sin proyecto',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
 }
 
 /** Renombrar una conversación. */

@@ -107,11 +107,19 @@ export class AssistantController {
     /* ⚠️ El tope se resuelve aquí y viaja en el payload: assistant-service
        cuenta los mensajes, pero **no sabe de planes de empresa** —esa tabla es
        de billing-service— y sin el número usaría su tabla por defecto, que para
-       quien tiene el plan de su organización diría otra cosa que el servidor. */
-    const limiteMensual = await this.cuotas.limiteDeIa(userId);
+       quien tiene el plan de su organización diría otra cosa que el servidor.
+
+       ⚠️ Y la organización sale **del proyecto**, no de lo que mande nadie:
+       desde 2026-08-28 el tope es el de la organización en la que se trabaja, y
+       el contador se lleva con esa misma clave. */
+    const organizationId = await this.cuotas.organizacionDelProyecto(_projectId);
+    const limiteMensual = await this.cuotas.limiteDeIa(userId, organizationId);
 
     return firstValueFrom(
-      this.assistantClient.send({ cmd: 'assistant_quota' }, { userId, limiteMensual }),
+      this.assistantClient.send(
+        { cmd: 'assistant_quota' },
+        { userId, limiteMensual, organizationId },
+      ),
     );
   }
 
@@ -146,8 +154,14 @@ export class AssistantController {
       this.miembrosConNombre(projectId),
       this.chatReciente(projectId, userId),
       /* `iaDe` y no `limiteDeIa`: esta ruta **gasta** cuota, así que puede
-         acabar en un 402 que tiene que decir qué plan puso ese tope. */
-      this.cuotas.iaDe(userId),
+         acabar en un 402 que tiene que decir qué plan puso ese tope.
+
+         La organización sale del proyecto: es el recurso el que dice dónde se
+         está trabajando, y por tanto qué plan aplica y contra qué cubo se
+         cuenta. */
+      this.cuotas
+        .organizacionDelProyecto(projectId)
+        .then((organizationId) => this.cuotas.iaDe(userId, organizationId)),
     ]);
 
     return firstValueFrom(
@@ -169,6 +183,7 @@ export class AssistantController {
           miembros,
           chat,
           limiteMensual: ia.limite,
+          organizationId: ia.organizationId,
           planTier: ia.tier,
         },
       ),

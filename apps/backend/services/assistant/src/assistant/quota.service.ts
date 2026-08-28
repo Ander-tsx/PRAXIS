@@ -14,7 +14,13 @@ import { PrismaService } from '../prisma/prisma.service';
  * contador desechable, acaba siendo una tabla de todas formas. Es el motivo
  * entero por el que existe este microservicio.
  *
- * ## Una fila por mes, no un contador que se reinicia
+ * ## Una fila por organización y mes, no un contador que se reinicia
+ *
+ * ⚠️ **La organización entró en la clave el 2026-08-28.** El tope lo da el plan
+ * de la organización en la que se está trabajando, así que el gasto tiene que
+ * contarse en el mismo sitio: contar en un cubo y negar contra otro deja a
+ * alguien bloqueado nada más entrar en su espacio personal, sin nada que lo
+ * explique.
  *
  * Reiniciar un contador borra la única prueba de cuánto se usó esto. El
  * histórico de consumo es lo primero que hará falta el día que haya planes de
@@ -70,11 +76,18 @@ export class QuotaService {
    * consumo: un mes en el que no se escribió ningún mensaje no tiene por qué
    * dejar rastro.
    */
-  async estado(userId: string, limiteMensual?: number | null): Promise<AssistantQuota> {
+  async estado(
+    userId: string,
+    limiteMensual?: number | null,
+    organizationId?: string | null,
+  ): Promise<AssistantQuota> {
     const period = this.periodo();
+    const org = organizationId ?? '';
     const [plan, uso] = await Promise.all([
       this.plan(userId),
-      this.prisma.assistantUsage.findUnique({ where: { userId_period: { userId, period } } }),
+      this.prisma.assistantUsage.findUnique({
+        where: { userId_organizationId_period: { userId, organizationId: org, period } },
+      }),
     ]);
 
     return {
@@ -212,12 +225,18 @@ export class QuotaService {
    * El `upsert` con `increment` deja la suma **en la base**, no en JavaScript:
    * dos pestañas escribiendo a la vez no se pisan el contador.
    */
-  async consumir(userId: string, limiteMensual?: number | null): Promise<AssistantQuota> {
+  async consumir(
+    userId: string,
+    limiteMensual?: number | null,
+    organizationId?: string | null,
+  ): Promise<AssistantQuota> {
     const period = this.periodo();
+    /* Cadena vacía y no `null`: es la clave del índice único. Ver el modelo. */
+    const org = organizationId ?? '';
 
     const uso = await this.prisma.assistantUsage.upsert({
-      where: { userId_period: { userId, period } },
-      create: { userId, period, used: 1 },
+      where: { userId_organizationId_period: { userId, organizationId: org, period } },
+      create: { userId, organizationId: org, period, used: 1 },
       update: { used: { increment: 1 } },
     });
 

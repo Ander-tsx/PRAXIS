@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
+  MAX_ORGANIZACIONES_PROPIAS,
   NOT_IN_ORG_CODE,
   OrganizationPermission,
   PLANS,
@@ -79,11 +80,33 @@ export class QuotaService {
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
   ) {}
 
-  /** El plan que vale para alguien. FREE si billing-service no contesta. */
-  async planDe(userId: string): Promise<PlanEfectivo> {
+  /**
+   * El plan que vale para alguien **dentro de una organización**.
+   *
+   * 🔴 **La organización es obligatoria de facto, aunque el tipo la deje pasar
+   * nula.** Desde 2026-08-28 el plan vale solo dentro de la organización que lo
+   * paga, así que llamar a esto sin decir dónde devuelve FREE — el peldaño más
+   * bajo— y nunca «el mejor que tengas». Si una ruta nueva no sabe qué
+   * organización pasar, la respuesta correcta es averiguarlo, no omitirlo.
+   *
+   * ⚠️ **Y de dónde sale ese identificador importa más que el identificador.**
+   * Nunca de la cookie `praxis_org`, que la escribe el navegador: o se deriva del
+   * recurso (un proyecto sabe en qué organización está) o viene en el cuerpo y se
+   * **valida la pertenencia antes de usarlo**, como hace
+   * `resolverOrganizacionParaProyecto`. billing-service comprueba la membresía
+   * por su cuenta y devuelve FREE ante una organización ajena, así que esto es
+   * cinturón y tirantes — pero el cinturón se pone aquí.
+   *
+   * ⚠️ FREE también si billing-service no contesta. Ver la nota de la clase: un
+   * fallo aquí no puede regalar el plan más caro.
+   */
+  async planDe(userId: string, organizationId?: string | null): Promise<PlanEfectivo> {
     try {
       const plan = await firstValueFrom(
-        this.billingClient.send<PlanEfectivo>({ cmd: 'billing_plan_of' }, { userId }),
+        this.billingClient.send<PlanEfectivo>(
+          { cmd: 'billing_plan_of' },
+          { userId, organizationId: organizationId ?? null },
+        ),
       );
       if (plan?.tier) return { ...plan, quotas: quotasDe(plan.tier) };
     } catch (error) {
@@ -97,11 +120,228 @@ export class QuotaService {
       tier: PlanTier.FREE,
       quotas: PLANS[PlanTier.FREE].quotas,
       status: 'ACTIVE' as SubscriptionStatus,
-      organizationId: null,
+      organizationId: organizationId ?? null,
       trialEndsAt: null,
       currentPeriodEnd: null,
       cancelAt: null,
     };
+  }
+
+  /**
+   * ¿Cabe otra organización a nombre de esta persona?
+   *
+   * 🔴 **El tope existía escrito y no se comprobaba en ningún sitio.**
+   * `organizacionesPropias` tenía valor en los cuatro planes y `QuotaKind.
+   * ORGANIZACIONES` tenía hasta su mensaje de error, pero ninguna ruta lo
+   * invocaba: hasta 2026-08-28 se podían crear sin límite.
+   *
+   * ⚠️ **Y ya no depende del plan**, que es lo que lo hacía incoherente: si el
+   * plan vale solo dentro de su organización, uno que te deje crear más
+   * organizaciones se está escapando de ella. Es una constante,
+   * `MAX_ORGANIZACIONES_PROPIAS`.
+   *
+   * ⚠️ **Si no se puede contar, se deja crear.** La misma asimetría que en
+   * proyectos: negar por no haber podido contar es un falso positivo que quien lo
+   * sufre no puede resolver de ninguna manera, y una organización de más se
+   * borra.
+   */
+  async exigirOrganizacion(userId: string): Promise<void> {
+    const propias = await firstValueFrom(
+      this.billingClient.send<number>({ cmd: 'billing_orgs_owned_count' }, { userId }),
+    ).catch(() => null);
+
+    if (propias === null) {
+      this.log.error(`No se pudieron contar las organizaciones de ${userId}: se deja crear.`);
+      return;
+    }
+
+    if (cabe(propias, MAX_ORGANIZACIONES_PROPIAS)) return;
+
+    /* Sin `puedeAmpliar`: este tope no se amplía pagando —no es de ningún
+       plan— así que ofrecer el botón de mejorar sería mandar a alguien a una
+       pantalla que no arregla lo que le acaba de pasar. */
+    throw new HttpException(
+      {
+        code: QUOTA_EXCEEDED_CODE,
+        message:
+          `Ya tienes ${MAX_ORGANIZACIONES_PROPIAS} organizaciones a tu nombre, que es el máximo. ` +
+          'Borra una que no uses, o pide que te inviten a la que necesitas.',
+        details: {
+          kind: QuotaKind.ORGANIZACIONES,
+          tier: PlanTier.FREE,
+          tope: MAX_ORGANIZACIONES_PROPIAS,
+          actual: propias,
+          puedeAmpliar: false,
+        } satisfies QuotaExceededDetails,
+      },
+      HttpStatus.PAYMENT_REQUIRED,
+    );
+  }
+
+  /**
+   * De qué organización es un proyecto.
+   *
+   * ⚠️ **Es la forma correcta de resolver la organización en una ruta que tiene
+   * proyecto**, y la única que no se puede falsificar: sale del recurso, no de
+   * lo que mande el cliente. Toda ruta anidada bajo `/projects/:id` que necesite
+   * saber en qué organización está trabajando alguien pasa por aquí.
+   *
+   * `null` si no se puede averiguar. Quien llame decide qué hacer con eso —lo
+   * habitual es seguir con FREE, que es el peldaño más bajo—, nunca inventarse
+   * una organización.
+   */
+  async organizacionDelProyecto(projectId: string): Promise<string | null> {
+    const proyecto = await firstValueFrom(
+      this.projectsClient.send<{ organizationId?: string } | null>(
+        { cmd: 'project_find_one' },
+        { id: projectId },
+      ),
+    ).catch(() => null);
+
+    return proyecto?.organizationId ?? null;
+  }
+
+  /**
+   * En qué organización trabaja alguien cuando **no hay proyecto** que lo diga.
+   *
+   * ## Por qué hace falta y por qué no vale la cookie
+   *
+   * Las rutas de PRAX sin proyecto (`/me/assistant/*`) gastan cuota, y desde
+   * 2026-08-28 la cuota es de una organización. No tienen recurso del que
+   * derivarla, así que la elige quien llama — y por eso **se valida antes de
+   * usarla**. La cookie `praxis_org` no sirve: la escribe el navegador, y un
+   * identificador ajeno ahí daría el plan de otra empresa.
+   *
+   * ## Qué hace cada rama
+   *
+   * - **Con organización**: se comprueba la pertenencia. Sin ella, `403
+   *   NOT_IN_ORG` — no es un problema de permisos, es que no estás dentro, y la
+   *   salida es un asiento.
+   * - **Sin organización**: cae en la **personal**, que todo el mundo tiene.
+   *   ⚠️ Se busca en la lista cacheada, no con `billing_personal_org`, que la
+   *   **crea** si no existe: esto se llama al abrir un chat, y una lectura no
+   *   puede acabar escribiendo una fila. Si no hay ninguna, `null` → FREE, que
+   *   es exactamente lo que diría la fila.
+   */
+  async organizacionElegida(
+    userId: string,
+    organizationId?: string | null,
+  ): Promise<string | null> {
+    if (organizationId) {
+      const dentro = await firstValueFrom(
+        this.billingClient.send<boolean>(
+          { cmd: 'billing_org_is_member' },
+          { organizationId, userId },
+        ),
+      ).catch(() => null);
+
+      if (dentro !== true) {
+        throw new ForbiddenException({
+          code: NOT_IN_ORG_CODE,
+          message: 'No perteneces a esa organización.',
+        });
+      }
+      return organizationId;
+    }
+
+    const suyas = await firstValueFrom(
+      this.billingClient.send<{ id: string; kind: string }[]>(
+        { cmd: 'billing_orgs_of' },
+        { userId },
+      ),
+    ).catch(() => [] as { id: string; kind: string }[]);
+
+    return suyas.find((organizacion) => organizacion.kind === 'PERSONAL')?.id ?? null;
+  }
+
+  /**
+   * ¿Comparten estas dos personas alguna organización?
+   *
+   * Es la puerta del chat privado desde 2026-08-28. Antes lo era «compartís
+   * algún proyecto», que dejaba fuera a alguien de tu propio equipo al que
+   * todavía no habías metido en ningún tablero — y no protegía nada más, porque
+   * quien está en un proyecto está por fuerza en su organización.
+   *
+   * ⚠️ **Se apoya en `billing_orgs_of`, que está cacheado en Redis.** Es la
+   * misma lista que pide la barra lateral en cada carga de cada zona, así que
+   * preguntarla aquí no añade consultas — solo dos lecturas de caché.
+   *
+   * ⚠️ **Ante un fallo, `false`.** Es lo contrario de lo que hacen las cuotas,
+   * donde no poder contar deja pasar. Aquí no cabe la misma asimetría: esto no
+   * es un tope que se resuelve borrando algo, es quién puede escribirle a quién,
+   * y dejar pasar por no haber podido comprobarlo abre el chat a toda la
+   * plataforma.
+   */
+  async compartenOrganizacion(unUsuario: string, otroUsuario: string): Promise<boolean> {
+    const suyas = (ids: { id: string }[]) => new Set(ids.map((organizacion) => organizacion.id));
+
+    const [unas, otras] = await Promise.all([
+      firstValueFrom(
+        this.billingClient.send<{ id: string }[]>(
+          { cmd: 'billing_orgs_of' },
+          { userId: unUsuario },
+        ),
+      ).catch(() => null),
+      firstValueFrom(
+        this.billingClient.send<{ id: string }[]>(
+          { cmd: 'billing_orgs_of' },
+          { userId: otroUsuario },
+        ),
+      ).catch(() => null),
+    ]);
+
+    if (!unas || !otras) {
+      this.log.error(
+        `No se pudo comprobar si ${unUsuario} y ${otroUsuario} comparten organización: se niega.`,
+      );
+      return false;
+    }
+
+    const deUno = suyas(unas);
+    return otras.some((organizacion) => deUno.has(organizacion.id));
+  }
+
+  /**
+   * Todo el mundo con quien compartes organización, por id.
+   *
+   * Es la lista que define **con quién puedes hablar** y **a quién se le anuncia
+   * tu presencia**, y las dos tienen que salir del mismo sitio: si la presencia
+   * se calculara con otra regla, se le anunciaría el estado a gente a la que no
+   * puedes escribir, o al revés — un punto de color que aparece y desaparece sin
+   * motivo aparente.
+   *
+   * ⚠️ **No incluye a quien tiene una invitación sin aceptar.** Ocupa asiento,
+   * pero todavía no tiene cuenta con la que hablar: sus filas vienen con
+   * `userId` nulo.
+   *
+   * ⚠️ **Ni a uno mismo.** Quien llama suele añadirse aparte y con otro
+   * significado —la presencia propia va marcada como `mio`—, así que devolverlo
+   * aquí obligaría a filtrarlo en cada sitio.
+   */
+  async companerosDeOrganizacion(userId: string): Promise<string[]> {
+    const suyas = await firstValueFrom(
+      this.billingClient.send<{ id: string }[]>({ cmd: 'billing_orgs_of' }, { userId }),
+    ).catch(() => [] as { id: string }[]);
+
+    const listas = await Promise.all(
+      suyas.map((organizacion) =>
+        firstValueFrom(
+          this.billingClient.send<{ userId: string | null }[]>(
+            { cmd: 'billing_org_members' },
+            { organizationId: organizacion.id, userId },
+          ),
+        ).catch(() => [] as { userId: string | null }[]),
+      ),
+    );
+
+    const companeros = new Set<string>();
+    for (const lista of listas) {
+      for (const miembro of lista ?? []) {
+        if (miembro.userId && miembro.userId !== userId) companeros.add(miembro.userId);
+      }
+    }
+
+    return [...companeros];
   }
 
   /* ─── Proyectos ────────────────────────────────────────────────────────── */
@@ -179,7 +419,7 @@ export class QuotaService {
    * proyecto de más se borra.
    */
   async exigirProyecto(userId: string, organizationId: string): Promise<void> {
-    const plan = await this.planDe(userId);
+    const plan = await this.planDe(userId, organizationId);
     const tope = plan.quotas.proyectos;
     if (tope === null) return;
 
@@ -397,8 +637,8 @@ export class QuotaService {
    * viaja tal cual: convertirlo aquí en un número grande sería inventarse un
    * límite que la pantalla acabaría enseñando.
    */
-  async limiteDeIa(userId: string): Promise<number | null> {
-    const plan = await this.planDe(userId);
+  async limiteDeIa(userId: string, organizationId?: string | null): Promise<number | null> {
+    const plan = await this.planDe(userId, organizationId);
     return plan.quotas.iaMensualPorPersona;
   }
 
@@ -414,9 +654,20 @@ export class QuotaService {
    * arranque). Las que solo la **leen** siguen con `limiteDeIa`: ahí el plan no
    * hace falta y traerlo sería ancho de banda por nada.
    */
-  async iaDe(userId: string): Promise<{ tier: PlanTier; limite: Tope }> {
-    const plan = await this.planDe(userId);
-    return { tier: plan.tier, limite: plan.quotas.iaMensualPorPersona };
+  async iaDe(
+    userId: string,
+    organizationId?: string | null,
+  ): Promise<{ tier: PlanTier; limite: Tope; organizationId: string | null }> {
+    const plan = await this.planDe(userId, organizationId);
+    /* La organización se devuelve resuelta y no se da por sabida: el contador de
+       assistant-service la usa como parte de su clave, y si la de la respuesta
+       no fuera la misma que la del tope, el mes se contaría contra un cubo y se
+       negaría contra otro. */
+    return {
+      tier: plan.tier,
+      limite: plan.quotas.iaMensualPorPersona,
+      organizationId: plan.organizationId,
+    };
   }
 
   /* ─── El motor ─────────────────────────────────────────────────────────── */
@@ -488,8 +739,14 @@ const MENSAJES: Record<QuotaKind, (tope: number) => string> = {
     `Has gastado los ${tope} mensajes de este mes. Vuelven el día 1, o amplía el plan.`,
   [QuotaKind.ASIENTOS]: (tope) =>
     `Tu organización ya tiene ${tope} asientos ocupados. Libera uno o amplía el plan.`,
+  /* ⚠️ **No dice «en tu plan», y es el único de la lista que no lo dice.** Este
+     tope no es de ningún plan desde 2026-08-28: es una constante por persona, y
+     no se amplía pagando. Prometer lo contrario manda a alguien a la tabla de
+     precios a resolver algo que la tabla de precios no resuelve. El camino real
+     lo construye `exigirOrganizacion`, que lanza su propio mensaje con la
+     salida buena; esta entrada existe para que el `Record` esté completo. */
   [QuotaKind.ORGANIZACIONES]: (tope) =>
-    `Ya tienes ${tope} organizaciones, que es todo lo que caben en tu plan.`,
+    `Ya tienes ${tope} organizaciones a tu nombre, que es el máximo por persona.`,
   [QuotaKind.AUTOMATIZACIONES]: (tope) =>
     `Este proyecto ya tiene ${tope} automatizaciones activas. Pausa una o amplía el plan.`,
   [QuotaKind.ALMACENAMIENTO]: (tope) =>

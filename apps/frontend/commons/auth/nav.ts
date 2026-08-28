@@ -6,7 +6,7 @@ import {
   type AppNavItem,
   SECTION_ADMINISTRACION,
 } from '../organisms/AppLayout/navigation';
-import { getOrganizacionActiva } from '../theme/organizacion';
+import { getOrganizacionActiva, resolverOrganizacionActiva } from '../theme/organizacion';
 import { type CurrentUser, loadCurrentUser } from './current-user';
 import { createServerApiClient } from './server-client';
 
@@ -185,6 +185,12 @@ export async function loadPrivateChrome(): Promise<PrivateChrome> {
     ...user,
     navItems: buildNavItems({ roles: user.roles, unread, mensajes }),
     organizaciones,
-    organizacionActivaId,
+    /* 🔴 **Resuelta, no la cookie en crudo.** Siempre hay una activa desde
+       2026-08-28, y la cookie puede apuntar a una de la que ya te fueron: sin
+       este repliegue, la pantalla se quedaría vacía en todas partes y las de
+       organización darían `403 NOT_IN_ORG` sin explicar nada. Aquí es gratis —la
+       lista ya está pedida arriba— y es el único sitio del repositorio por el
+       que pasan las ocho zonas. */
+    organizacionActivaId: resolverOrganizacionActiva(organizaciones, organizacionActivaId),
   };
 }

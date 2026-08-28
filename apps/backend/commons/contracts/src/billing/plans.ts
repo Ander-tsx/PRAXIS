@@ -135,22 +135,25 @@ export interface PlanQuotas {
    */
   proyectos: Tope;
   /**
-   * Organizaciones **de las que se es dueño**.
+   * Mensajes al asistente **por persona, por organización y por mes natural**.
    *
-   * ⚠️ La diferencia importa: estar invitado en las de otros no cuenta y no tiene
-   * límite. Si contara, alguien que colabora con tres clientes se quedaría sin
-   * poder tener la suya, que es justo al revés de lo que se quiere.
-   */
-  organizacionesPropias: Tope;
-  /**
-   * Mensajes al asistente **por persona y por mes natural**.
+   * ⚠️ **Por persona y no agregado al equipo.** Se consideró un tope de equipo y
+   * se descartó: un límite así se agota por lo que hizo otro, a media tarde, sin
+   * aviso y sin nada que la persona pueda hacer. La organización **ve** el
+   * agregado en su portal, que es para lo que sirve saberlo; lo que se niega se
+   * niega por lo que gastaste tú. El techo total sigue acotado: es este número
+   * por los asientos.
    *
-   * ⚠️ **Por persona, y no también por organización.** Se consideró un segundo
-   * tope agregado y se descartó: un límite de equipo se agota por lo que hizo
-   * otro, a media tarde, sin aviso y sin nada que la persona pueda hacer. La
-   * organización **ve** el agregado en su portal, que es para lo que sirve
-   * saberlo; lo que se niega se niega por lo que gastaste tú. El techo total sigue
-   * acotado: es este número por los asientos.
+   * ⚠️ **Y también por organización, desde 2026-08-28.** Antes el contador era
+   * `(persona, mes)` a secas. Con el plan valiendo solo dentro de la
+   * organización que lo paga, un contador único no se puede aplicar: alguien que
+   * gastara 50 en la BUSINESS del trabajo entraría en su espacio personal —tope
+   * 13— ya por encima del límite, bloqueado desde el primer mensaje y sin nada
+   * que explicara por qué. La clave es `(persona, organización, mes)`.
+   *
+   * ⚠️ **Sí, eso multiplica la cuota gratuita por el número de organizaciones**,
+   * y es lo mismo que hacen los productos que cobran por espacio de trabajo. Lo
+   * que acota la multiplicación es `MAX_ORGANIZACIONES_PROPIAS`, no este número.
    */
   iaMensualPorPersona: Tope;
   /** Reglas de automatización activas en un proyecto. Las pausadas no cuentan. */
@@ -235,7 +238,6 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 3,
       proyectos: 3,
-      organizacionesPropias: 1,
       iaMensualPorPersona: 13,
       automatizacionesPorProyecto: 3,
       almacenamientoOrgMb: 200,
@@ -254,7 +256,6 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 15,
       proyectos: 25,
-      organizacionesPropias: 3,
       iaMensualPorPersona: 100,
       automatizacionesPorProyecto: 25,
       almacenamientoOrgMb: 10_240,
@@ -273,7 +274,6 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: 100,
       proyectos: 150,
-      organizacionesPropias: SIN_TOPE,
       iaMensualPorPersona: 300,
       automatizacionesPorProyecto: SIN_TOPE,
       almacenamientoOrgMb: 102_400,
@@ -292,7 +292,6 @@ export const PLANS: Record<PlanTier, PlanSpec> = {
     quotas: {
       asientos: SIN_TOPE,
       proyectos: SIN_TOPE,
-      organizacionesPropias: SIN_TOPE,
       iaMensualPorPersona: 1000,
       automatizacionesPorProyecto: SIN_TOPE,
       almacenamientoOrgMb: SIN_TOPE,
@@ -340,6 +339,35 @@ export const PLANES_AUTOSERVICIO = PLAN_LIST.filter(
  * poner nada. Lo que queda es la defensa, no la política.
  */
 export const PLAN_POR_DEFECTO = PlanTier.FREE;
+
+/**
+ * Cuántas organizaciones puede tener alguien **a su nombre**.
+ *
+ * ## Por qué es una constante y no una cuota de plan
+ *
+ * 🔴 **Lo fue, y era una contradicción.** `organizacionesPropias` vivía en
+ * `PlanQuotas` con una escalera (1 / 3 / sin tope) que nunca llegó a
+ * comprobarse — el tope estaba escrito, el mensaje de error también, y ningún
+ * código lo invocaba.
+ *
+ * Desde que el plan vale **solo dentro de la organización que lo paga**, esa
+ * escalera se contradice a sí misma: un plan que te deja crear más
+ * organizaciones es un beneficio escapándose de la organización justo después
+ * de haber decidido que no puede. Cuántas organizaciones caben a nombre de
+ * alguien es una propiedad **de la persona**, no de ninguna suscripción.
+ *
+ * ## Y es lo que cierra el farmeo
+ *
+ * ⚠️ Crear organizaciones ya no multiplica ningún beneficio de pago, pero sí
+ * multiplicaría las gratuitas: tres proyectos y su cuota de IA **por cada una**.
+ * Este número es el techo de esa multiplicación, y es el único que hay.
+ *
+ * ⚠️ **Cuenta la personal**, que se crea sola y no se puede borrar. O sea: la
+ * propia más dos equipos. Lo que **no** cuenta es estar invitado en las de
+ * otros, que no tiene límite — si contara, quien colabora con tres clientes se
+ * quedaría sin poder tener la suya, que es justo al revés de lo que se quiere.
+ */
+export const MAX_ORGANIZACIONES_PROPIAS = 3;
 
 /** Las cuotas de un plan, con FREE como red por si llega uno que no existe. */
 export function quotasDe(tier: PlanTier | string | null | undefined): PlanQuotas {

@@ -28,7 +28,7 @@ describe('PresenceService.efectiva', () => {
      necesitara algo, este `as never` fallaría al compilar y sería la señal de
      que la regla dejó de ser pura. */
   const clienteInerte = { send: () => undefined } as never;
-  const presencia = new PresenceService(clienteInerte, clienteInerte);
+  const presencia = new PresenceService(clienteInerte, clienteInerte, clienteInerte);
 
   const ELEGIBLES = ['BUSY', 'IN_MEETING', 'EATING', 'DO_NOT_DISTURB'] as const;
 

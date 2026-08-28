@@ -271,6 +271,19 @@ export interface Project {
   slug: string;
   description: string | null;
   ownerId: string;
+  /**
+   * La organización a la que pertenece. `NOT NULL` en la base desde la etapa de
+   * organizaciones.
+   *
+   * ⚠️ **No es solo informativo: decide a quién se puede invitar.** Quien entra
+   * en un proyecto necesita asiento en esta organización (403 `NOT_IN_ORG` si
+   * no), así que el buscador de «Invitar al proyecto» ofrece a su gente y no al
+   * directorio de la plataforma.
+   *
+   * Opcional en el tipo porque los listados viejos y algún doble de prueba no lo
+   * traen; quien dependa de él tiene que contemplar que falte.
+   */
+  organizationId?: string;
   createdAt: string;
   updatedAt: string;
   /**

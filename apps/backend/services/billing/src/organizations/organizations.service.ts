@@ -14,7 +14,6 @@ import {
   SubscriptionStatus,
   cabenEn,
   estaVigente,
-  mejorPlan,
   normalizarPermisosOrg,
   permisosDeAdministracion,
   permisosDeDueno,
@@ -241,48 +240,107 @@ export class OrganizationsService {
   /* ─── El plan efectivo ─────────────────────────────────────────────────── */
 
   /**
-   * Qué plan vale para alguien, mirando **todas** sus organizaciones.
+   * Qué plan vale para alguien **dentro de una organización concreta**.
    *
-   * Alguien puede estar en la suya personal y a la vez en la de su empresa. Si
-   * el plan dependiera de cuál está mirando, la misma acción se permitiría o se
-   * negaría según la pantalla, que no hay forma de explicar. Vale el mejor.
+   * ## 🔴 Esto miraba todas, y valía la mejor
    *
-   * ⚠️ **Una suscripción que no está vigente no cuenta**, pero tampoco estorba:
-   * una BUSINESS cancelada deja de dar BUSINESS y se cae al siguiente mejor, que
-   * es lo que hace que darse de baja funcione sin tocar nada más.
+   * Hasta 2026-08-28 esta función recorría todas las organizaciones de una
+   * persona y aplicaba `mejorPlan` sobre las suscripciones vigentes. Su
+   * argumento era bueno mientras lo fue: *«si el plan dependiera de cuál está
+   * mirando, la misma acción se permitiría o se negaría según la pantalla, que
+   * no hay forma de explicar»*.
+   *
+   * Dejó de serlo cuando la organización pasó a **ser** la pantalla. Ahora sí
+   * hay forma de explicarlo —«esto es lo que da Estudio Nordeste, y estás
+   * dentro de Estudio Nordeste»— y es la única manera de que un plan de pago
+   * signifique algo: con el criterio viejo, pagar BUSINESS en el trabajo
+   * regalaba BUSINESS en el espacio personal de cada empleado, y de paso hacía
+   * mentir a cualquier pantalla acotada a una organización.
+   *
+   * ## Qué pasa sin organización
+   *
+   * ⚠️ **`organizationId` nulo cae en FREE, no en «la mejor».** Es el camino de
+   * las rutas que todavía no saben desde dónde se las llama, y tiene que ser el
+   * peldaño más bajo: heredar el mejor plan por no haber dicho dónde estás sería
+   * exactamente el agujero que esta función viene a cerrar.
+   *
+   * ## Lo que no ha cambiado
+   *
+   * ⚠️ **Una suscripción que no está vigente no cuenta.** Una BUSINESS cancelada
+   * deja de dar BUSINESS y cae a FREE, que es lo que hace que darse de baja
+   * funcione sin tocar nada más.
    *
    * ⚠️ **No crea la organización personal.** Esto se llama en cada comprobación
    * de cuota —o sea, casi en cada escritura del producto— y crear una fila ahí
    * convertiría una lectura en una escritura para todo el mundo. Sin fila, FREE,
    * que es exactamente lo mismo que diría la fila.
+   *
+   * ⚠️ **Y se comprueba la pertenencia igual.** Mandar aquí una organización
+   * ajena no da su plan: sin membresía activa no hay suscripción que mirar y
+   * sale FREE. El identificador lo elige quien llama, así que esto no puede
+   * fiarse de él.
    */
-  async planEfectivoDe(userId: string) {
-    const membresias = await this.prisma.organizationMember.findMany({
-      where: { userId, status: MembershipStatus.ACTIVE },
+  async planEfectivoDe(userId: string, organizationId?: string | null) {
+    if (!organizationId) return this.planVacio(userId);
+
+    const membresia = await this.prisma.organizationMember.findFirst({
+      where: { userId, organizationId, status: MembershipStatus.ACTIVE },
       include: { organization: { include: { subscription: true } } },
     });
 
-    const vigentes = membresias
-      .flatMap((membresia) => membresia.organization.subscription ?? [])
-      .filter((suscripcion) => estaVigente(suscripcion.status as SubscriptionStatus));
+    if (!membresia) return this.planVacio(userId);
 
-    const tier = mejorPlan(vigentes.map((suscripcion) => suscripcion.tier));
+    /* `subscription` es una relación **a uno** (`Subscription?`), no una lista:
+       una organización tiene una suscripción o ninguna. */
+    const suscripcion = membresia.organization.subscription;
+    const vigente =
+      suscripcion && estaVigente(suscripcion.status as SubscriptionStatus) ? suscripcion : null;
 
-    /* Se devuelve también de qué organización sale el plan bueno: la pantalla
-       lo necesita para decir «este tope te lo da Estudio Nordeste» en vez de un
-       número sin dueño, que es lo que hace que un límite se lea como avería. */
-    const fuente = vigentes.find((suscripcion) => suscripcion.tier === tier) ?? null;
+    if (!vigente) return this.planVacio(userId, organizationId);
 
     return {
       userId,
-      tier,
-      quotas: quotasDe(tier),
-      status: (fuente?.status ?? SubscriptionStatus.ACTIVE) as SubscriptionStatus,
-      organizationId: fuente?.organizationId ?? null,
-      trialEndsAt: fuente?.trialEndsAt ?? null,
-      currentPeriodEnd: fuente?.currentPeriodEnd ?? null,
-      cancelAt: fuente?.cancelAt ?? null,
+      tier: vigente.tier as PlanTier,
+      quotas: quotasDe(vigente.tier),
+      status: vigente.status as SubscriptionStatus,
+      organizationId: vigente.organizationId,
+      trialEndsAt: vigente.trialEndsAt ?? null,
+      currentPeriodEnd: vigente.currentPeriodEnd ?? null,
+      cancelAt: vigente.cancelAt ?? null,
     };
+  }
+
+  /**
+   * FREE, con la organización dentro si se sabe cuál era.
+   *
+   * ⚠️ **`organizationId` se conserva aunque no haya suscripción**, y no es
+   * decorativo: es lo que deja a la pantalla decir «esta organización es
+   * gratuita» en vez de «no hay organización», que son cosas distintas y solo
+   * una de las dos tiene un botón que ofrecer.
+   */
+  private planVacio(userId: string, organizationId: string | null = null) {
+    return {
+      userId,
+      tier: PlanTier.FREE,
+      quotas: quotasDe(PlanTier.FREE),
+      status: SubscriptionStatus.ACTIVE,
+      organizationId,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAt: null,
+    };
+  }
+
+  /**
+   * Cuántas organizaciones existen ya a nombre de alguien.
+   *
+   * ⚠️ **Por `ownerUserId`, e incluye la personal.** El tope
+   * (`MAX_ORGANIZACIONES_PROPIAS`) cuenta la propia porque existe igualmente y
+   * consume sus cuotas gratuitas como cualquier otra; lo que no cuenta es estar
+   * invitado en las de otros, que no tiene límite.
+   */
+  contarPropias(userId: string): Promise<number> {
+    return this.prisma.organization.count({ where: { ownerUserId: userId } });
   }
 
   /* ─── Las organizaciones de una persona ────────────────────────────────── */
@@ -857,9 +915,7 @@ export class OrganizationsService {
     const limit = Math.min(100, Math.max(1, datos.limit ?? 20));
     const busqueda = datos.search?.trim();
 
-    const where = busqueda
-      ? { name: { contains: busqueda, mode: 'insensitive' as const } }
-      : {};
+    const where = busqueda ? { name: { contains: busqueda, mode: 'insensitive' as const } } : {};
 
     const [filas, total] = await Promise.all([
       this.prisma.organization.findMany({

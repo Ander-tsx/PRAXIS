@@ -100,6 +100,20 @@ export interface ComposerProps {
   ocultarAdjuntos?: boolean;
   /** Enfoca el campo nada más montarlo. */
   autoFoco?: boolean;
+  /**
+   * Si el menú `/` de tareas y tableros está disponible.
+   *
+   * 🔴 **Solo en los chats de proyecto.** En uno privado, `/Sprint 1` no dice de
+   * qué proyecto sale ni si quien lo recibe puede verlo — y desde que se puede
+   * escribir a cualquiera de tu organización, esas dos personas pueden compartir
+   * equipo sin compartir un solo tablero. El servidor ya devuelve la lista vacía
+   * (`MentionablesService`); esto es para que ni siquiera se abra el
+   * desplegable.
+   *
+   * ⚠️ **No afecta a `@`.** Mencionar a alguien sigue valiendo donde hay a quién
+   * mencionar: en privado sois dos, así que la lista viene vacía por su cuenta.
+   */
+  permiteReferencias?: boolean;
 }
 
 /** Qué se está escribiendo tras un `@` o un `/`, y desde dónde. */
@@ -121,10 +135,20 @@ interface Disparador {
  * los títulos de tarea los tienen casi siempre («Rediseñar el panel»), y cortar
  * en el primero hacía imposible afinar más allá de una palabra.
  */
-function disparadorEn(texto: string, cursor: number): Disparador | null {
+function disparadorEn(
+  texto: string,
+  cursor: number,
+  permiteReferencias: boolean,
+): Disparador | null {
   for (let i = cursor - 1; i >= 0; i--) {
     const caracter = texto[i] as string;
     if (caracter === '\n') return null;
+
+    /* 🔴 **En privado, la barra es una barra.** Desde 2026-08-28 no se
+       referencian tareas ni tableros en una conversación entre dos personas, y
+       si el disparador siguiera vivo, escribir «12 / 24» o «y/o» abriría un
+       desplegable vacío. Peor que no ofrecerlo es ofrecerlo y que no haya nada. */
+    if (caracter === '/' && !permiteReferencias) return null;
 
     if (caracter === '@' || caracter === '/') {
       const anterior = i === 0 ? '' : (texto[i - 1] as string);
@@ -178,6 +202,9 @@ export function Composer({
   sugerencias,
   onPedirSugerencias,
   permiteMenciones,
+  /* Por defecto sí: quien no lo pasa es un chat de proyecto, que es donde
+     siempre ha estado. Es el `ChatPanel` quien lo apaga en las privadas. */
+  permiteReferencias = true,
   respuestaSlot,
   citaId,
   adjuntosPendientes,
@@ -204,7 +231,10 @@ export function Composer({
   const archivoRef = useRef<HTMLInputElement>(null);
   const pedidas = useRef(false);
 
-  const disparador = useMemo(() => disparadorEn(texto, cursor), [texto, cursor]);
+  const disparador = useMemo(
+    () => disparadorEn(texto, cursor, permiteReferencias),
+    [texto, cursor, permiteReferencias],
+  );
 
   /* El catálogo se pide **la primera vez que hace falta**, no al montar: la
      mayoría de los mensajes no llevan etiqueta, y traerlo siempre sería pagar

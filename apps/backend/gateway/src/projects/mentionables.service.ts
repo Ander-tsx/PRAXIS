@@ -67,6 +67,18 @@ export class MentionablesService {
     projectId?: string;
     peerId?: string;
   }): Promise<Mencionables> {
+    /* 🔴 **En privado no se referencia nada, desde 2026-08-28.** El menú `/` de
+       tareas y tableros queda solo en los chats de proyecto, que es donde una
+       referencia tiene un proyecto que la explica: en una conversación entre dos
+       personas, `/Sprint 1` no dice de qué proyecto sale ni si quien lo recibe
+       puede verlo siquiera — y con la organización como contexto, esos dos
+       pueden compartir equipo sin compartir un solo tablero.
+
+       Se corta aquí y no en el cliente: la lista la sirve esta ruta, y dejarla
+       viva mientras la pantalla la esconde es dejar puesta una forma de
+       enumerar tareas ajenas por una ruta que ya no se mira. */
+    if (!dto.projectId) return { people: [], refs: [] };
+
     const base = await firstValueFrom(
       this.projectsClient.send<{ people: string[]; tableros: Tablero[] }>(
         { cmd: 'chat_mentionables' },

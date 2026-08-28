@@ -31,6 +31,14 @@ export interface ProjectMembersProps {
   projectName: string;
   /** Para ofrecer «salir»: solo a quien es miembro y no es el dueño. */
   currentUserId: string;
+  /**
+   * La organización dueña del proyecto.
+   *
+   * ⚠️ **Es de dónde sale la lista de a quién se puede invitar.** Sin ella, el
+   * buscador cae al directorio de la plataforma, que es lo que hacía antes — y
+   * lo que producía un 403 `NOT_IN_ORG` al invitar a alguien de fuera.
+   */
+  organizationId?: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('es-MX', {
@@ -56,6 +64,7 @@ export function ProjectMembers({
   invitations,
   projectName,
   currentUserId,
+  organizationId,
 }: ProjectMembersProps) {
   const [isInviting, setIsInviting] = useState(false);
   const memberIds = new Set(members.map((member) => member.userId));
@@ -117,6 +126,7 @@ export function ProjectMembers({
               /* El tope de miembros lo pone el plan del dueño: quien no lo es no
                  arregla nada ampliando el suyo. */
               soyDueño={ownerId === currentUserId}
+              organizationId={organizationId}
               onClose={() => setIsInviting(false)}
             />
           </div>

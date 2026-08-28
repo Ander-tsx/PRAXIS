@@ -25,8 +25,20 @@ export class OrganizationsController {
    * lo pide el gateway antes de cada escritura con cuota.
    */
   @MessagePattern({ cmd: 'billing_plan_of' })
-  planDe(@Payload() dto: { userId: string }) {
-    return this.organizaciones.planEfectivoDe(dto.userId);
+  planDe(@Payload() dto: { userId: string; organizationId?: string | null }) {
+    return this.organizaciones.planEfectivoDe(dto.userId, dto.organizationId);
+  }
+
+  /**
+   * Cuántas organizaciones hay ya a nombre de alguien.
+   *
+   * ⚠️ **Cuenta por `ownerUserId`, no por membresía.** Estar invitado en la de
+   * otro no ocupa ninguna de las tuyas: si contara, quien colabora con tres
+   * clientes se quedaría sin poder tener la suya.
+   */
+  @MessagePattern({ cmd: 'billing_orgs_owned_count' })
+  organizacionesPropias(@Payload() dto: { userId: string }) {
+    return this.organizaciones.contarPropias(dto.userId);
   }
 
   /**
