@@ -21,7 +21,7 @@ import { createServerApiClient } from './server-client';
  * `navigation.tsx`: el emparejamiento es por igualdad de cadena, así que un
  * desajuste no da error, simplemente deja la insignia a cero para siempre.
  */
-const AVISOS_HREF = '/dashboard';
+const AVISOS_HREF = '/projects';
 
 /** Href de los mensajes directos, que llevan su propia insignia. */
 const CHAT_HREF = '/chat';

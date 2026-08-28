@@ -257,6 +257,9 @@ function ArmazonInterno({
   organizacionActivaId,
   children,
 }: AppShellProps) {
+  const pathname = usePathname();
+  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
     const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
@@ -284,8 +287,6 @@ function ArmazonInterno({
    * con el ancho correcto y no hay nada que corregir.
    */
   const [plegada, setPlegada] = useState(plegadaInicial);
-  const pathname = usePathname();
-  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   function alternarPliegue() {
     const siguiente = !plegada;
@@ -989,7 +990,7 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
   }
 
   function getHref(n: any) {
-    if (!n.projectId || n.type === 'MEMBER_REMOVED') return '/dashboard';
+    if (!n.projectId || n.type === 'MEMBER_REMOVED') return '/projects';
     if (n.taskId) return `/projects/${n.projectId}?task=${n.taskId}`;
     return `/projects/${n.projectId}`;
   }
