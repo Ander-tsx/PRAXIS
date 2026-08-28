@@ -259,6 +259,9 @@ function ArmazonInterno({
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
+    const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
+    if (isChat) return 'chat';
+    
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('praxis:sidebarTab');
       if (stored === 'chat' || stored === 'inbox') return stored;
@@ -282,6 +285,7 @@ function ArmazonInterno({
    */
   const [plegada, setPlegada] = useState(plegadaInicial);
   const pathname = usePathname();
+  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   function alternarPliegue() {
     const siguiente = !plegada;
@@ -738,6 +742,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
 
 function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
   const pathname = usePathname();
+  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
   const [directs, setDirects] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, any>>({});
@@ -799,7 +804,7 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
     const presencia = usePresence(c.peerId, peer?.presence);
     const nombre = peer ? personLabel(peer) : 'Alguien';
     const link = `/chat/${c.peerId}`;
-    const activo = pathname === link;
+    const activo = browserPath === link;
 
     return (
       <a
@@ -846,7 +851,7 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
 
   const ProjectRow = ({ c, autor }: any) => {
     const link = `/chat/proyecto/${c.project.id}`;
-    const activo = pathname === link;
+    const activo = browserPath === link;
 
     return (
       <a
