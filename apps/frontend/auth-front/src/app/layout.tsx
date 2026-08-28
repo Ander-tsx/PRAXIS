@@ -62,27 +62,6 @@ const khteka = localFont({
   fallback: ['Arial', 'sans-serif'],
 });
 
-/** Animo y Suisse Mono, las dos de Kyloo. Van en las ocho zonas porque
- *  `theme.css` las nombra en `--font-sans` y `--font-mono`, y una zona que no
- *  las cargue invalida esas dos declaraciones enteras. */
-const animo = localFont({
-  src: './fonts/animo-normal-regular.woff2',
-  weight: '400',
-  style: 'normal',
-  display: 'swap',
-  variable: '--font-animo',
-  fallback: ['Arial', 'sans-serif'],
-});
-
-const suisseMono = localFont({
-  src: './fonts/suisseintlmono-regular-webxl.woff2',
-  weight: '400',
-  style: 'normal',
-  display: 'swap',
-  variable: '--font-suisse-mono',
-  fallback: ['monospace'],
-});
-
 export const metadata: Metadata = {
   title: 'PRAXIS — Acceso',
   description: 'Inicia sesión o crea tu cuenta en PRAXIS.',
@@ -99,7 +78,7 @@ export default async function RootLayout({
     <html
       lang="es"
       data-theme={theme}
-      className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable} ${animo.variable} ${suisseMono.variable}`}
+      className={`${inter.variable} ${lora.variable} ${fraunces.variable} ${grotesk.variable} ${khteka.variable}`}
       suppressHydrationWarning
     >
       <body>{children}</body>
