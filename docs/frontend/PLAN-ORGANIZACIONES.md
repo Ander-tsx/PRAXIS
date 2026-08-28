@@ -86,7 +86,7 @@ tardan demasiado para correrlas entre stacks.
 |---|---|---|---|
 | 2026-08-27 | Repaso visual | `f59aa07`, `a471cb6` | Lo que solo se ve mirando: un 403 con motivo que la pantalla convertía en «no tienes permiso», y el aviso de React de la barra lateral |
 | 2026-08-27 | O8.8 | `cdef9f2`, `ec7091f` | La regresión entera, y el fallo que destapó: el asiento se guardaba sin correo y la **segunda persona de cualquier organización no entraba nunca** |
-| 2026-08-27 | Kyloo | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
+| 2026-08-27 | Kyloo — **revertido** en `3fa9b87` | `190c85d` | La paleta monocroma y los radios en `theme.css`, los 27 componentes con ella, y **las tres fuentes nuevas cargadas en las ocho zonas** — estaban solo en dashboard-front |
 | 2026-08-27 | O4.1+O7+O8 | `0bda922` | La caché de billing, la invitación por correo, la documentación al día y diez pruebas de punta a punta |
 | 2026-08-27 | O5+O6 | `06d688a` | Las pantallas en Kyloo con el trabajo dentro, el selector del sidebar conectado, y papeles y plantillas |
 | 2026-08-26 | O3+O4 | `7d8e970` | El proyecto pertenece a una organización, la quinta semilla, el conteo por organización y la comprobación de asiento |

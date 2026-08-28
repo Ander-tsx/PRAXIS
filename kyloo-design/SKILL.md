@@ -25,6 +25,21 @@ todo aquí aplica igual, pero el criterio sí.
 > idioma, Tailwind v4, Multi-Zones, Atomic Design y las trampas del backend
 > siguen mandando. Esto es la capa visual encima.
 
+> [!CAUTION]
+> 🚫 **La paleta, los radios y las fuentes de este documento NO están aplicados
+> dentro de la aplicación, y no se vuelven a aplicar sin pedirlo.** Se llevaron a
+> `theme.css` el 2026-08-27 (`190c85d`) y el dueño del producto los revirtió el
+> mismo día (`3fa9b87`): la aplicación va con la paleta azulada oscura y su
+> claro, los radios de 4/8/12/16/24 px y Redaction 50 + Lora + Inter.
+>
+> Lo que **sí** sigue vigente de aquí: el rediseño **estructural** de la landing
+> y del acceso —que se queda—, y el criterio de composición: filas con una raya
+> fina en vez de tarjetas, la tipografía como jerarquía, activo por tono y no por
+> caja, y motion solo cuando cambia lo que se entiende.
+>
+> O sea: **§2 (color) y los radios de §3 describen lo revertido**; el resto del
+> documento describe cómo se componen las pantallas y sigue mandando.
+
 ---
 
 ## Tabla de contenidos
