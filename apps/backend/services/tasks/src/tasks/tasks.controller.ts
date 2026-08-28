@@ -165,6 +165,17 @@ export class TasksController {
     return this.attachmentsService.findAttachments(dto);
   }
 
+  /**
+   * Lo que ocupan los adjuntos de unos proyectos, para la cuota del plan.
+   *
+   * La lista de proyectos llega ya resuelta: este servicio no sabe de
+   * organizaciones. Ver `AttachmentsService.bytesOfProjects`.
+   */
+  @MessagePattern({ cmd: 'attachment_bytes_of_projects' })
+  attachmentBytes(@Payload() dto: { projectIds: string[] }) {
+    return this.attachmentsService.bytesOfProjects(dto.projectIds ?? []);
+  }
+
   @MessagePattern({ cmd: 'attachment_create' })
   createAttachment(@Payload() dto: CreateAttachmentDto) {
     return this.attachmentsService.createAttachment(dto);

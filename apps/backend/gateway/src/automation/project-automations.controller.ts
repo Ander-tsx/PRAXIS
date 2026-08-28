@@ -17,12 +17,14 @@ import {
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
+  AutomationRuleStatus,
   CreateAutomationRuleBodyDto,
   ProjectPermission,
   UpdateAutomationRuleBodyDto,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -31,7 +33,10 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/automations')
 export class ProjectAutomationsController {
-  constructor(@Inject('AUTOMATION_SERVICE') private readonly automationClient: ClientProxy) {}
+  constructor(
+    @Inject('AUTOMATION_SERVICE') private readonly automationClient: ClientProxy,
+    private readonly quota: QuotaService,
+  ) {}
 
   @Get()
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
@@ -50,9 +55,18 @@ export class ProjectAutomationsController {
     status: 201,
     description: 'Regla creada y deshabilitada o habilitada según su estado',
   })
-  create(@Request() req: Express.Request, @Body() body: CreateAutomationRuleBodyDto) {
+  @ApiResponse({ status: 402, description: 'El plan no da para otra automatización activa' })
+  async create(@Request() req: Express.Request, @Body() body: CreateAutomationRuleBodyDto) {
     const createdBy = req.user?.userId;
     if (!createdBy) throw new UnauthorizedException();
+
+    /* ⚠️ **Solo si nace activa.** El tope es de reglas en marcha, así que
+       redactar una y dejarla pausada no gasta cupo — es lo que hace que «pausa
+       una» sea una salida de verdad. Ver `QuotaService.exigirAutomatizacion`. */
+    if (body.status === AutomationRuleStatus.ENABLED) {
+      await this.quota.exigirAutomatizacion(createdBy, req.projectId as string);
+    }
+
     return firstValueFrom(
       this.automationClient.send(
         { cmd: 'automation_rule_create' },
@@ -108,11 +122,26 @@ export class ProjectAutomationsController {
   @Patch(':id')
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_AUTOMATIONS)
   @ApiOperation({ summary: 'Actualiza una regla e incrementa su versión' })
-  update(
+  @ApiResponse({ status: 402, description: 'El plan no da para otra automatización activa' })
+  async update(
     @Request() req: Express.Request,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: UpdateAutomationRuleBodyDto,
   ) {
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException();
+
+    /* 🔴 **La segunda puerta, que es la que se olvida.** Una regla pausada que
+       se reactiva pasa a ocupar cupo igual que una recién creada; comprobar
+       solo al crear dejaría el tope abierto con dos clics.
+
+       `id` va como excepción del conteo: si ya estaba activa, esta llamada no
+       la activa —no cambia nada— y contarla dentro del total la haría negarse a
+       sí misma en cuanto el cupo estuviera justo. */
+    if (body.status === AutomationRuleStatus.ENABLED) {
+      await this.quota.exigirAutomatizacion(userId, req.projectId as string, id);
+    }
+
     return firstValueFrom(
       this.automationClient.send(
         { cmd: 'automation_rule_update' },

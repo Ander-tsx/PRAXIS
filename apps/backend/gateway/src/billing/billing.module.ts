@@ -16,14 +16,21 @@ import { StripeService } from './stripe.service';
  * Tenerlo aparte hace evidente cuál es —y que su autenticación es la firma de
  * Stripe— en vez de esconderlo entre rutas que sí llevan sesión.
  *
- * ## Los cuatro clientes, y por qué son cuatro
+ * ## Los seis clientes, y por qué son seis
  *
  * - `BILLING_SERVICE` es el dueño de la respuesta: qué plan tienes.
- * - `PROJECTS_SERVICE` y `ASSISTANT_SERVICE` son **los que cuentan**: cuántos
- *   proyectos sostienes y cuántos mensajes llevas. billing-service no los tiene
- *   y no debe tenerlos — ver la cabecera de `QuotaService`.
+ * - `PROJECTS_SERVICE`, `ASSISTANT_SERVICE`, `AUTOMATION_SERVICE` y
+ *   `TASKS_SERVICE` son **los que cuentan**: proyectos, mensajes de este mes,
+ *   reglas activas y bytes de adjuntos. billing-service no tiene ninguno de esos
+ *   números y no debe tenerlos — ver la cabecera de `QuotaService`.
  * - `CREDENTIALS_SERVICE` es para el correo: rellenarlo en la página de Stripe
  *   y ponerle nombre a los miembros de una organización.
+ *
+ * ⚠️ **Que sean seis es la consecuencia de dónde se comprueban las cuotas**, no
+ * un acoplamiento que se haya colado. El gateway es el único punto que tiene
+ * delante al que sabe el tope y al que sabe el consumo; la alternativa era
+ * darle a billing-service un cliente hacia cada servicio medible, que es el
+ * mismo número de flechas apuntando al sitio equivocado.
  *
  * ⚠️ **`QuotaService` se exporta**, y por eso este módulo lo importan
  * `ProjectsModule` y `AssistantModule`: la cuota se comprueba donde ocurre la
@@ -71,8 +78,9 @@ import { StripeService } from './stripe.service';
           },
         }),
       },
-      /* Para soltar las tareas de quien sale de una organización. Ver
-         `OrganizationsController.quitar`. */
+      /* Para soltar las tareas de quien sale de una organización
+         (`OrganizationsController.quitar`) y para sumar los bytes de los
+         adjuntos de una organización (`QuotaService.exigirAlmacenamiento`). */
       {
         name: 'TASKS_SERVICE',
         imports: [ConfigModule],
@@ -82,6 +90,20 @@ import { StripeService } from './stripe.service';
           options: {
             host: config.get<string>('TASKS_SERVICE_HOST'),
             port: config.get<number>('TASKS_SERVICE_PORT'),
+          },
+        }),
+      },
+      /* Para contar las reglas activas de un proyecto contra el tope del plan.
+         Ver `QuotaService.exigirAutomatizacion`. */
+      {
+        name: 'AUTOMATION_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('AUTOMATION_SERVICE_HOST'),
+            port: config.get<number>('AUTOMATION_SERVICE_PORT'),
           },
         }),
       },

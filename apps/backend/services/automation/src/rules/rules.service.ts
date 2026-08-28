@@ -24,6 +24,34 @@ export class RulesService {
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
   ) {}
 
+  /**
+   * Cuántas reglas hay **activas** en un proyecto.
+   *
+   * Existe para la cuota `automatizacionesPorProyecto`, que el gateway
+   * comprueba antes de dejar activar una más. Aquí no se decide nada: este
+   * servicio no sabe de planes ni de organizaciones y no debe saberlo — solo
+   * cuenta lo suyo y devuelve el número.
+   *
+   * ⚠️ **Solo `ENABLED`, y es la mitad de la decisión.** Una regla pausada por
+   * su dueño no consume cupo, y tampoco una que el motor paró por permisos
+   * (`PAUSED_SYSTEM`) o que quedó inválida: ninguna de las tres se ejecuta, así
+   * que ninguna cuesta. Es lo que hace que «pausa una» sea una salida de verdad
+   * y no un consejo que no libera nada.
+   *
+   * ⚠️ **Se puede excluir una**, y hace falta al actualizar: si la regla que se
+   * está activando ya estuviera contada, activarla con el cupo justo se negaría
+   * a sí misma. Es el error de contarse dentro del propio límite.
+   */
+  async countActive(projectId: string, exceptoId?: string): Promise<number> {
+    return this.prisma.automationRule.count({
+      where: {
+        projectId,
+        status: 'ENABLED',
+        ...(exceptoId ? { id: { not: exceptoId } } : {}),
+      },
+    });
+  }
+
   async list(projectId: string) {
     return this.prisma.automationRule.findMany({
       where: { projectId },

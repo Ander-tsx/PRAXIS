@@ -78,6 +78,12 @@ export class QuotaService {
        tiene directorio y la fila del asiento necesita una dirección propia. Ver
        `exigirAsientoEnProyecto`. */
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    /* Los dos que **cuentan** las cuotas que faltaban. Ninguno decide nada: uno
+       sabe cuántas reglas activas tiene un proyecto y el otro cuántos bytes
+       ocupan sus adjuntos, y el tope contra el que se comparan solo lo tiene
+       este servicio. Ver la cabecera de la clase. */
+    @Inject('AUTOMATION_SERVICE') private readonly automationClient: ClientProxy,
+    @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
   ) {}
 
   /**
@@ -464,6 +470,152 @@ export class QuotaService {
       extras: permisos
         ? { puedeAmpliar: permisos.permisos[OrganizationPermission.CAN_MANAGE_BILLING] === true }
         : {},
+    });
+  }
+
+  /**
+   * ¿Cabe una automatización activa más en este proyecto?
+   *
+   * 🔴 **Se comprueba al ACTIVAR, no al crear**, y es la decisión D2 de
+   * `docs/PLAN-CUOTAS.md`. La cuota dice «reglas activas; las pausadas no
+   * cuentan», así que el guard tiene que estar donde una regla pasa a estar
+   * activa. Si estuviera al crear, alguien con el cupo lleno no podría ni
+   * redactar una para dejarla lista, y —peor— la salida que ofrece el mensaje,
+   * «pausa una», no liberaría nada: la pausada seguiría ocupando.
+   *
+   * ⚠️ **Hay dos puertas y hace falta cerrar las dos**: crear con `ENABLED` y
+   * actualizar una que estaba pausada. La segunda es la que se olvida, y es la
+   * misma clase de puerta trasera que la invitación en `cabenEn`.
+   *
+   * ⚠️ `exceptoId` no es un adorno. Al actualizar, la regla que se está
+   * activando **ya existe**: contarla dentro del total la haría negarse a sí
+   * misma en cuanto el cupo estuviera justo.
+   *
+   * ⚠️ Y si no se puede contar, se deja pasar y se registra (I1). Una regla de
+   * más se pausa; una que no se pudo activar sin motivo no tiene arreglo por
+   * ninguna vía que quien la sufre pueda encontrar.
+   */
+  async exigirAutomatizacion(
+    userId: string,
+    projectId: string,
+    exceptoId?: string,
+  ): Promise<void> {
+    const organizationId = await this.organizacionDelProyecto(projectId);
+    const plan = await this.planDe(userId, organizationId);
+    const tope = plan.quotas.automatizacionesPorProyecto;
+    if (tope === null) return;
+
+    const activas = await firstValueFrom(
+      this.automationClient.send<number>(
+        { cmd: 'automation_rule_active_count' },
+        { projectId, ...(exceptoId ? { exceptoId } : {}) },
+      ),
+    ).catch(() => null);
+
+    if (activas === null) {
+      this.log.error(
+        `No se pudieron contar las automatizaciones de ${projectId}: se deja activar.`,
+      );
+      return;
+    }
+
+    this.exigir(cabe(activas, tope), {
+      kind: QuotaKind.AUTOMATIZACIONES,
+      tier: plan.tier,
+      tope,
+      actual: activas,
+      /* ⚠️ **Sin `puedeAmpliar`, y no es un olvido.** Quien administra las
+         automatizaciones de un tablero es quien tiene `canManageAutomations`
+         en ese proyecto, que no dice nada de si puede tocar la tarjeta de la
+         organización. Averiguarlo cuesta otro viaje TCP y la pantalla ya sabe
+         leer la ausencia como «no se sabe»: ofrece la salida, que es lo caro de
+         esconder. La salida barata —pausar una— la nombra el mensaje y no
+         depende de ningún permiso de facturación. */
+      extras: {},
+    });
+  }
+
+  /**
+   * ¿Caben estos bytes más en el almacén de la organización?
+   *
+   * ## Por qué la suma se compone aquí
+   *
+   * Porque no la tiene nadie entero: tasks-service guarda los adjuntos y **no
+   * sabe de organizaciones**; billing-service sabe de organizaciones y no ha
+   * visto un adjunto en su vida. El gateway es el único que habla con los dos,
+   * así que pide los proyectos de la organización por un lado y la suma de sus
+   * bytes por el otro. Es la misma composición que hace `exigirProyecto`, y la
+   * misma regla de arquitectura que fijó B7 de la etapa anterior: **no se abre
+   * una dependencia entre microservicios que hoy no existe.**
+   *
+   * ⚠️ **Se mide lo que ocupa ahora, no lo que se subió alguna vez.** Borrar un
+   * adjunto libera, igual que borrar un proyecto libera un hueco. Un contador
+   * que solo sube cobra por lo que ya no está, y eso se lee como una avería.
+   *
+   * ⚠️ **`nuevosBytes` es `file.size`, medido en el servidor.** Nunca un tamaño
+   * declarado por el cliente: sería un tope que se salta escribiendo un número.
+   *
+   * ⚠️ El tope del catálogo va en **megabytes** y esto compara **bytes**. La
+   * conversión se hace en un solo sitio, aquí, porque los dos son números y
+   * confundirlos no da ningún error — solo un tope un millón de veces más
+   * grande o más pequeño de lo que dice la tabla de precios.
+   */
+  async exigirAlmacenamiento(
+    userId: string,
+    projectId: string,
+    nuevosBytes: number,
+  ): Promise<void> {
+    const organizationId = await this.organizacionDelProyecto(projectId);
+    const plan = await this.planDe(userId, organizationId);
+    const topeMb = plan.quotas.almacenamientoOrgMb;
+    if (topeMb === null || !organizationId) return;
+
+    const proyectos = await firstValueFrom(
+      this.projectsClient.send<{ id: string; status: string }[]>(
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
+      ),
+    ).catch(() => null);
+
+    if (proyectos === null) {
+      this.log.error(`No se pudieron listar los proyectos de ${organizationId}: se deja subir.`);
+      return;
+    }
+
+    /* Los `DELETED` no se listan al contar proyectos y tampoco se cuentan aquí,
+       por lo mismo: sus adjuntos no se pueden ni abrir ni borrar, así que cobrar
+       por ellos sería cobrar por algo que nadie puede liberar. */
+    const vivos = proyectos.filter((proyecto) => proyecto.status !== 'DELETED').map((p) => p.id);
+
+    const ocupados = await firstValueFrom(
+      this.tasksClient.send<number>(
+        { cmd: 'attachment_bytes_of_projects' },
+        { projectIds: vivos },
+      ),
+    ).catch(() => null);
+
+    if (ocupados === null) {
+      this.log.error(`No se pudieron sumar los adjuntos de ${organizationId}: se deja subir.`);
+      return;
+    }
+
+    const topeBytes = topeMb * 1024 * 1024;
+
+    /* No es `cabe()`, y es el único sitio del repositorio donde no lo es: `cabe`
+       contesta «¿cabe uno más?» sobre unidades, y aquí lo que entra tiene
+       tamaño. Un archivo de 30 MB con 190 de 200 ocupados **no cabe** aunque
+       quepa «uno más». El `null` ya se descartó arriba, así que la comparación
+       suelta que `cabe()` existe para evitar no puede darse. */
+    if (ocupados + nuevosBytes <= topeBytes) return;
+
+    this.exigir(false, {
+      kind: QuotaKind.ALMACENAMIENTO,
+      tier: plan.tier,
+      tope: topeMb,
+      /* En MB, como el tope: el mensaje los pone en la misma frase y mezclar
+         unidades ahí produce un «ocupas 199229440 de 200 MB». Se redondea hacia
+         arriba para que 0,4 MB no salga como 0 ocupados con el aviso puesto. */
+      actual: Math.ceil(ocupados / (1024 * 1024)),
     });
   }
 
