@@ -15,20 +15,8 @@ export function OrgSwitcher({
   zonePath: string;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [inviteModalAbierto, setInviteModalAbierto] = useState(false);
+  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'settings' | 'upgrade' | null>(null);
   
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setAbierto(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
   const primerNombre = name.trim().split(' ')[0];
@@ -48,7 +36,7 @@ export function OrgSwitcher({
 
   const cuadro = (
     <span
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-white/10 bg-white/5 font-sans text-[11px] font-bold text-white shadow-sm"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 font-sans text-[13px] font-semibold text-white"
       aria-hidden="true"
     >
       {inicial}
@@ -64,116 +52,116 @@ export function OrgSwitcher({
   }
 
   return (
-    <div className="relative w-full" ref={popoverRef}>
+    <div className="relative">
       <button
         type="button"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
-        className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/5 disabled:cursor-default group"
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5"
       >
-        <div className="flex items-center gap-2 min-w-0">
-          {cuadro}
-          <span className="truncate font-sans text-[13px] font-medium text-white/90 group-hover:text-white transition-colors">
+        {cuadro}
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="font-sans text-[10px] text-text-secondary">
+            {activa?.tier === 'FREE' || !activa ? 'Plan gratuito' : `Plan ${activa.tier}`}
+          </span>
+          <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
             {etiqueta}
           </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <svg className="h-4 w-4 text-white/40 group-hover:text-white/70 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-          </svg>
-        </div>
+        </span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-white/40 transition-transform duration-200 ${abierto ? '-rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
       </button>
 
-      {abierto && (
-        <div className="absolute left-0 top-full mt-1.5 w-[280px] z-[100] rounded-xl border border-white/10 bg-[#161616] shadow-2xl py-2 flex flex-col font-sans">
-          
-          <div className="px-3 py-2 flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 font-sans text-[18px] font-bold text-white shadow-sm">
-              {inicial}
-            </span>
-            <div className="flex flex-col min-w-0">
-              <span className="truncate font-sans text-[13px] font-medium text-white">
-                {etiqueta}
-              </span>
-              <span className="font-sans text-[11px] text-white/50">
-                {activa?.tier === 'FREE' || !activa ? 'Plan gratuito' : `Plan ${activa.tier}`}
+      <div
+        className={`grid transition-all duration-200 ease-in-out ${abierto ? 'grid-rows-[1fr] opacity-100 mt-1.5' : 'grid-rows-[0fr] opacity-0'}`}
+      >
+        <div className="overflow-hidden">
+          <div className="flex flex-col gap-0.5 rounded-xl border border-white/10 bg-[#0F0F0F] p-1.5 shadow-inner">
+            
+            <div className="flex flex-col mb-1 pb-1 border-b border-white/5">
+              <button onClick={() => setActiveModal('upgrade')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
+                <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+                Mejorar plan
+              </button>
+              {activaId && (
+                <button onClick={() => setActiveModal('settings')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
+                  <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Configuración
+                </button>
+              )}
+              <button onClick={() => setActiveModal('invite')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
+                <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                Invitar a miembros
+              </button>
+            </div>
+
+            <div className="px-3 py-1">
+              <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
+                {name}
               </span>
             </div>
-          </div>
+            
+            <div className="flex flex-col max-h-[160px] overflow-y-auto scrollbar-none">
+              {lista.map((org) => (
+                <OpcionDeOrg
+                  key={org.id}
+                  activa={org.id === activaId}
+                  etiqueta={org.name ?? 'Sin nombre'}
+                  detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
+                  onClick={() => elegir(org.id)}
+                />
+              ))}
+            </div>
 
-          <div className="h-px bg-white/5 my-1" />
-
-          <div className="flex flex-col px-1.5">
-            <a href="/billing" className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors">
-              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-              Mejorar plan
-            </a>
-            {activaId && (
-              <a href={`/organizations/${activaId}`} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors">
+            <div className="mt-1 pt-1 border-t border-white/5">
+              <button onClick={() => setActiveModal('newSpace')} className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full">
                 <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                 </svg>
-                Configuración
-              </a>
-            )}
-            <button onClick={() => { setAbierto(false); setInviteModalAbierto(true); }} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors w-full text-left">
-              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              Invitar a miembros
-            </button>
-            <a href="/organizations/new" className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors">
-              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-              Agregar cuenta
-            </a>
-          </div>
-
-          <div className="h-px bg-white/5 my-1" />
-
-          <div className="px-3 py-1">
-            <span className="text-[10px] font-medium text-white/40 uppercase tracking-wider">
-              {name}
-            </span>
-          </div>
-          <div className="flex flex-col px-1.5 max-h-[200px] overflow-y-auto scrollbar-none">
-            {lista.map((org) => (
-              <OpcionDeOrg
-                key={org.id}
-                activa={org.id === activaId}
-                etiqueta={org.name ?? 'Sin nombre'}
-                detalle={org.kind === 'PERSONAL' ? 'Tu espacio' : 'Equipo'}
-                onClick={() => elegir(org.id)}
-              />
-            ))}
-            <a href="/organizations/new" className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors mt-1">
-              <svg className="w-4 h-4 text-white/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-              Nuevo espacio de trabajo
-            </a>
-          </div>
-
-          <div className="h-px bg-white/5 my-1" />
-          
-          <div className="flex flex-col px-1.5">
-            <a href="/api/logout" className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors">
-              Cerrar sesión
-            </a>
+                Nuevo espacio de trabajo
+              </button>
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {inviteModalAbierto && activaId && (
+      {activeModal === 'invite' && activaId && (
         <InviteMemberModal 
           organizationId={activaId} 
           organizationName={etiqueta}
-          onClose={() => setInviteModalAbierto(false)} 
+          onClose={() => setActiveModal(null)} 
         />
+      )}
+      
+      {activeModal === 'newSpace' && (
+        <NewSpaceModal onClose={() => setActiveModal(null)} />
+      )}
+      
+      {activeModal === 'settings' && activaId && (
+        <SettingsModal 
+          organizationId={activaId}
+          currentName={etiqueta}
+          onClose={() => setActiveModal(null)} 
+        />
+      )}
+      
+      {activeModal === 'upgrade' && activaId && (
+        <UpgradeModal onClose={() => setActiveModal(null)} />
       )}
     </div>
   );
@@ -194,32 +182,21 @@ function OpcionDeOrg({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center justify-between gap-3 px-2 py-1.5 rounded-md text-left transition-colors hover:bg-white/5 ${activa ? 'text-white' : 'text-white/70'}`}
+      className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+        activa
+          ? 'bg-white/10 text-white font-medium'
+          : 'text-white/70 hover:bg-white/5 hover:text-white'
+      }`}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-white/10 bg-white/5 font-sans text-[9px] font-bold text-white shadow-sm">
-          {etiqueta.charAt(0).toUpperCase()}
-        </span>
-        <span className="truncate font-sans text-[13px] font-medium">{etiqueta}</span>
-      </div>
-      {activa && (
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      )}
+      <span className="truncate font-sans text-[13px]">{etiqueta}</span>
+      <span className="shrink-0 font-sans text-[10px] text-text-disabled">{detalle}</span>
     </button>
   );
 }
 
-function InviteMemberModal({
-  organizationId,
-  organizationName,
-  onClose
-}: {
-  organizationId: string;
-  organizationName: string;
-  onClose: () => void;
-}) {
+// ================= MODALS ================= //
+
+function InviteMemberModal({ organizationId, organizationName, onClose }: { organizationId: string; organizationName: string; onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('');
   const [roles, setRoles] = useState<any[]>([]);
@@ -228,41 +205,33 @@ function InviteMemberModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/gateway/me/organizations/${organizationId}/roles`)
+    fetch(`/api/gateway/organizations/${organizationId}/roles`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
           setRoles(data);
-          if (data.length > 0) {
-            setRole(data[0].id);
-          }
+          if (data.length > 0) setRole(data[0].id);
         }
       })
-      .catch(err => console.error(err));
+      .catch(console.error);
   }, [organizationId]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
     if (!email || !role) return;
-    
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
+    setLoading(true); setError(null); setSuccess(false);
     
     try {
-      const res = await fetch(`/api/gateway/me/organizations/${organizationId}/members`, {
+      const res = await fetch(`/api/gateway/organizations/${organizationId}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, roleId: role })
       });
-      
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         throw new Error(data?.message || 'Error al invitar');
       }
-      
-      setSuccess(true);
-      setEmail('');
+      setSuccess(true); setEmail('');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -271,19 +240,156 @@ function InviteMemberModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
+    <ModalWrapper title="Agregar miembros" subtitle={`a ${organizationName}`} onClose={onClose}>
+      <form onSubmit={handleInvite} className="p-6 flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-white/80">Escribe o pega los correos electrónicos a continuación</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="alguien@ejemplo.com" className="w-full bg-[#161616] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all" required />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-white/80">Seleccionar rol</label>
+          <div className="flex flex-col gap-2 border border-white/10 rounded-xl overflow-hidden bg-[#161616]">
+            {roles.length === 0 ? <div className="px-4 py-4 text-sm text-white/50 text-center">Cargando roles...</div> : roles.map(r => (
+              <button key={r.id} type="button" onClick={() => setRole(r.id)} className={`flex items-start justify-between p-4 text-left transition-colors border-b border-white/5 last:border-b-0 ${role === r.id ? 'bg-white/5' : 'hover:bg-white/[0.02]'}`}>
+                <div className="flex flex-col gap-1 pr-6">
+                  <span className="text-sm font-medium text-white">{r.name}</span>
+                  {r.description && <span className="text-xs text-white/50">{r.description}</span>}
+                </div>
+                {role === r.id && <svg className="w-5 h-5 text-white shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+              </button>
+            ))}
+          </div>
+        </div>
+        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">{error}</div>}
+        {success && <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">Invitación enviada con éxito.</div>}
+        <div className="mt-2 flex justify-end">
+          <button type="submit" disabled={loading || !email || !role} className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50">
+            {loading ? 'Enviando...' : 'Invitar miembro'}
+          </button>
+        </div>
+      </form>
+    </ModalWrapper>
+  );
+}
+
+function NewSpaceModal({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name) return;
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`/api/gateway/me/organizations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || 'Error al crear');
+      }
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <ModalWrapper title="Nuevo espacio de trabajo" subtitle="Crea un lugar para tu equipo" onClose={onClose}>
+      <form onSubmit={handleCreate} className="p-6 flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-white/80">Nombre del espacio</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Acme Corp" className="w-full bg-[#161616] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all" required />
+        </div>
+        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">{error}</div>}
+        <div className="mt-2 flex justify-end">
+          <button type="submit" disabled={loading || !name} className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50">
+            {loading ? 'Creando...' : 'Crear espacio'}
+          </button>
+        </div>
+      </form>
+    </ModalWrapper>
+  );
+}
+
+function SettingsModal({ organizationId, currentName, onClose }: { organizationId: string; currentName: string; onClose: () => void }) {
+  const [name, setName] = useState(currentName);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || name === currentName) return;
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`/api/gateway/organizations/${organizationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.message || 'Error al guardar');
+      }
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <ModalWrapper title="Configuración" subtitle="Renombra tu organización" onClose={onClose}>
+      <form onSubmit={handleUpdate} className="p-6 flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-white/80">Nombre</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-[#161616] border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all" required />
+        </div>
+        {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">{error}</div>}
+        <div className="mt-2 flex justify-end">
+          <button type="submit" disabled={loading || name === currentName} className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50">
+            {loading ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </form>
+    </ModalWrapper>
+  );
+}
+
+function UpgradeModal({ onClose }: { onClose: () => void }) {
+  return (
+    <ModalWrapper title="Mejorar plan" subtitle="Desbloquea todo el potencial de Praxis" onClose={onClose}>
+      <div className="p-8 flex flex-col items-center text-center gap-6">
+        <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center">
+          <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xl font-bold text-white">Lleva tu equipo al siguiente nivel</h3>
+          <p className="text-sm text-white/70 max-w-sm">Compara los distintos planes y escoge el que mejor se adapte a tus necesidades y tamaño de equipo.</p>
+        </div>
+        <a href="/billing" className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+          Ver planes y precios
+        </a>
+      </div>
+    </ModalWrapper>
+  );
+}
+
+function ModalWrapper({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      
       <div className="relative z-10 w-full max-w-lg bg-[#080807] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex flex-col">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <svg className="w-5 h-5 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-              </svg>
-              Agregar miembros
-            </h2>
-            <span className="text-xs text-white/50">a {organizationName}</span>
+            <h2 className="text-xl font-bold text-white font-sans">{title}</h2>
+            {subtitle && <span className="text-xs text-white/50">{subtitle}</span>}
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -291,65 +397,7 @@ function InviteMemberModal({
             </svg>
           </button>
         </div>
-
-        <form onSubmit={handleInvite} className="p-6 flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-white/80">
-              Escribe o pega los correos electrónicos a continuación
-            </label>
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="alguien@ejemplo.com"
-              className="w-full bg-[#161616] border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 focus:ring-1 focus:ring-white/30 transition-all"
-              required
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-white/80">
-              Seleccionar rol
-            </label>
-            <div className="flex flex-col gap-2 border border-white/10 rounded-xl overflow-hidden bg-[#161616]">
-              {roles.length === 0 ? (
-                <div className="px-4 py-4 text-sm text-white/50 text-center">Cargando roles...</div>
-              ) : (
-                roles.map(r => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setRole(r.id)}
-                    className={`flex items-start justify-between p-4 text-left transition-colors border-b border-white/5 last:border-b-0 ${role === r.id ? 'bg-white/5' : 'hover:bg-white/[0.02]'}`}
-                  >
-                    <div className="flex flex-col gap-1 pr-6">
-                      <span className="text-sm font-medium text-white">{r.name}</span>
-                      {r.description && <span className="text-xs text-white/50">{r.description}</span>}
-                    </div>
-                    {role === r.id && (
-                      <svg className="w-5 h-5 text-white shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-          
-          {error && <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">{error}</div>}
-          {success && <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-sm text-green-400">Invitación enviada con éxito.</div>}
-
-          <div className="mt-2 flex justify-end">
-            <button 
-              type="submit" 
-              disabled={loading || !email || !role}
-              className="px-6 py-2.5 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Enviando...' : 'Invitar miembro'}
-            </button>
-          </div>
-        </form>
+        {children}
       </div>
     </div>
   );
