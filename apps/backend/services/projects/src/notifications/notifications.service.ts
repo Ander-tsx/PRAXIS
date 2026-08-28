@@ -52,6 +52,8 @@ export class NotificationsService {
         actorId: notification.actorId ?? null,
         projectId: notification.projectId ?? null,
         projectName: notification.projectName ?? null,
+        organizationId: notification.organizationId ?? null,
+        organizationName: notification.organizationName ?? null,
         taskId: notification.taskId ?? null,
         taskTitle: notification.taskTitle ?? null,
       })),
@@ -81,6 +83,8 @@ export class NotificationsService {
         actorId: notification.actorId ?? null,
         projectId: notification.projectId ?? null,
         projectName: notification.projectName ?? null,
+        organizationId: notification.organizationId ?? null,
+        organizationName: notification.organizationName ?? null,
         /* El slug no lo trae el DTO de la notificación —la tabla guarda el
            nombre del proyecto como copia del momento, no su slug— así que va
            nulo y el cliente cae al `projectId`, que el guard también resuelve. */

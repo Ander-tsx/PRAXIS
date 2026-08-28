@@ -337,6 +337,8 @@ model Notification {
   actorId     String?
   projectId   String?
   projectName String?
+  organizationId String?
+  organizationName String?
   taskId      String?
   taskTitle   String?
   /// `null` mientras no se haya leído. Guarda el cuándo, no solo el si.

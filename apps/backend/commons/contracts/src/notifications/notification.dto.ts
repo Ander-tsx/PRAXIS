@@ -77,6 +77,15 @@ export class CreateNotificationDto {
   projectId?: string;
 
   @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  organizationName?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   projectName?: string;

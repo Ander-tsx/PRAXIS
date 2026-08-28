@@ -1218,6 +1218,8 @@ export class ChatService {
       projectName: contexto.projectName,
       projectSlug: contexto.projectSlug,
       peerId: contexto.peerId,
+      organizationId: contexto.organizationId,
+      organizationName: contexto.organizationName,
     }));
   }
   /**
