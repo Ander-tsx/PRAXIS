@@ -5429,3 +5429,189 @@ nombre, explica las tres cosas que cambian, y nace en gratuito.
 - **Dominio de correo propio y exportación de un proyecto**, que son las dos
   piezas de gobierno que más venden y no están.
 - **El mensaje directo sigue sin ámbito**: hoy se puede escribir a cualquiera.
+
+---
+
+## 48. Las seis cuotas del plan, y las tres que no comprobaba nadie
+
+> Etapa de cuotas, 2026-08-28, rama `feature/enterprise-cuotas`. El plan, con las
+> cinco decisiones y sus invariantes, en [PLAN-CUOTAS.md](../PLAN-CUOTAS.md).
+>
+> Continúa el [encargo Enterprise](ENCARGO-ENTERPRISE.md), que quedó casi entero
+> repartido entre tres etapas anteriores y al que le faltaba justo esto.
+
+### 48.1 El hueco, en una frase
+
+**El catálogo prometía seis topes y el servidor aplicaba tres.**
+
+`PlanQuotas` declara `asientos`, `proyectos`, `iaMensualPorPersona`,
+`automatizacionesPorProyecto`, `almacenamientoOrgMb` e `historialAnalisisDias`.
+Los tres primeros se comprobaban desde la etapa Enterprise. Los tres últimos
+tenían su número en los cuatro planes, su mensaje escrito en `MENSAJES`, su
+`QuotaKind` declarado en el enum — y **no aparecían fuera de `plans.ts`**.
+
+🔴 **Es la tercera vez que pasa lo mismo.** Antes fue `miembrosPorProyecto`, que
+se retiró, y después `organizacionesPropias`, que se descubrió en la etapa de la
+organización activa. La regla que sale de ahí y está en `CLAUDE.md`: **el commit
+que añade un número a `PlanQuotas` es el que tiene que invocarlo.**
+
+Lo caro no es el fallo, es que no se ve. La tabla de precios promete un tope que
+el servidor no aplica: el plan de pago vale menos de lo que dice y el gratuito da
+más de lo que dice, y nadie se queja de una cuota que no se aplica — se queja el
+día que se aplica.
+
+### 48.2 Las automatizaciones: al activar, no al crear
+
+`automatizacionesPorProyecto` es 3 en Gratis, 25 en Equipo y sin tope arriba.
+
+La cuota dice «reglas **activas**; las pausadas no cuentan», y eso decide dónde
+va el guard. Si estuviera al crear, dos cosas se romperían a la vez: alguien con
+el cupo lleno no podría ni redactar una regla para dejarla lista, y la salida que
+ofrece el mensaje —«pausa una»— no liberaría nada, porque la pausada seguiría
+ocupando.
+
+⚠️ **Son dos puertas.** Crear con `status: ENABLED` y **actualizar una que estaba
+pausada**. La segunda es la que se olvida: sin ella el tope se salta pausando y
+reactivando, y no lo cuenta ningún error. Es el mismo patrón que la invitación en
+`cabenEn` — la puerta trasera está siempre en el `update`.
+
+⚠️ **Y la regla que se reactiva se excluye del conteo.** Si estuviera dentro del
+total, activarla con el cupo justo se negaría a sí misma.
+
+`automation-service` cuenta (`automation_rule_active_count`, solo `ENABLED`:
+`PAUSED_SYSTEM` e `INVALID` no se ejecutan, así que no cuestan) y el gateway
+decide (`QuotaService.exigirAutomatizacion`).
+
+### 48.3 El almacén: lo compone el gateway porque no lo tiene nadie
+
+`almacenamientoOrgMb`: 200 MB en Gratis, 10 GB en Equipo, 100 GB en Negocio.
+
+⚠️ **Ni tasks-service ni billing-service pueden contestar esto solos.** El
+primero guarda los adjuntos y no sabe de organizaciones; el segundo sabe de
+organizaciones y no ha visto un adjunto en su vida. El gateway pide los proyectos
+de la organización por un lado y la suma de sus bytes por el otro. Es la misma
+composición que `exigirProyecto` y la misma regla de arquitectura que fijó la
+etapa anterior con el chat privado: **no se abre una dependencia entre
+microservicios que hoy no existe.**
+
+Tres detalles que costarían encontrarse:
+
+1. **Se mide lo que ocupa ahora, no lo que se subió alguna vez.** Borrar libera.
+   Un contador que solo sube cobra por lo que ya no está, y eso se lee como una
+   avería. Los proyectos `DELETED` tampoco cuentan: sus adjuntos no se pueden ni
+   abrir ni borrar, así que cobrar por ellos sería cobrar por algo que nadie
+   puede liberar.
+2. **`attachment_bytes_of_projects` suma la columna `size` y no toca
+   `AttachmentBlob`.** Un `SUM(length(data))` traería el TOAST entero de la
+   organización a memoria para contestar un número que ya está guardado — que es
+   justo el motivo por el que los bytes viven en otra tabla.
+3. ⚠️ **Es el único punto del repositorio que no usa `cabe()`.** `cabe` contesta
+   «¿cabe uno más?» sobre unidades, y aquí lo que entra tiene tamaño: un archivo
+   de 30 MB con 190 de 200 ocupados **no cabe** aunque quepa «uno más».
+
+El guard va **el último de los cinco controles de la subida**: los otros cuatro
+se contestan con el archivo que ya está en memoria y este cuesta dos viajes TCP.
+Más importante que el coste: quien sube basura tiene que leer «esto no es un
+PDF», no «no te cabe» — el segundo mensaje le manda a borrar adjuntos para
+arreglar un problema que no es de espacio.
+
+### 48.4 El historial de Análisis: recorta, y lo dice
+
+`historialAnalisisDias`: 90 días en Gratis, 365 en Equipo, sin tope arriba.
+
+🔴 **Es la única de las seis que acota una lectura, y por eso no lanza 402.** Un
+muro de pago a media consulta no tiene salida: no es que alguien se haya pasado,
+es que preguntó por más atrás de lo que su plan alcanza, y no hay nada que pueda
+hacer distinto. Las otras cinco acotan escrituras y todas ofrecen algo —borrar,
+pausar, liberar, esperar al día 1—.
+
+Así que el gateway **recorta** `days`, `weeks` y el `from` de los filtros en las
+once rutas de informes.
+
+⚠️ **También cuando no llega ningún `from`.** Los informes que no reciben `days`
+—`dynamics`, `column-time`, `people`, `matrix`— miran todo el historial capturado
+si nadie les dice otra cosa. Recortar solo cuando el cliente manda un `from`
+dejaba el tope abierto justo para el caso normal.
+
+🔴 **El `days` de `blocked` NO se recorta, y es el único de los once así.** Ahí
+`days` no es la ventana de historial: es **cuántos días lleva una tarea sin
+moverse**. Recortarlo al tope del plan convertiría «lo que lleva 120 días quieto»
+en «lo que lleva 90», con el mismo nombre en la pantalla y sin que nada fallara —
+el informe seguiría saliendo, contestando a otra pregunta. Es la misma trampa por
+la que el paquete tampoco le pasa su `days` (§44).
+
+**Y hay que decirlo, o el recorte es mudo.** El paquete devuelve una clave
+`ventana` con `dias`, `plan`, `recortado` y `desde`, y `VentanaDelPlanAviso` la
+escribe encima del lienzo. Es la misma regla que `tareasOmitidas` en el briefing
+del asistente (§43) y que la nota de días naturales de §44: un gráfico que
+empieza noventa días atrás sin explicar por qué se lee como un dato incompleto,
+no como un plan, y quien lo lea sacará conclusiones de una serie que cree entera.
+
+⚠️ **`recortado` no es «tener tope».** Un plan de 90 días contestando a una
+pregunta de 60 no ha ocultado nada, y un aviso permanente ahí se aprende a
+ignorar antes de que llegue el que importa.
+
+⚠️ **`ventana` va dentro del `data` del paquete y no en el `meta` del sobre**, y
+la razón es del cliente: `createApiClient` devuelve el `data` ya desenvuelto y
+**tira el `meta`**. Un aviso ahí llegaría hasta el navegador y no lo leería nadie
+— el mismo final que tuvieron los avisos en vivo cuando el sobre se comía su
+`type` (trampa 12 de `CLAUDE.md`).
+
+### 48.5 Bajar de plan: la trampa 4 del encargo, decidida
+
+*«Bajar de plan con más proyectos de los que el plan permite es el caso que nadie
+diseña y todos sufren.»* Estaba escrita en el encargo y seguía sin decidirse.
+
+**Decidido: no se borra, no se archiva y no se congela.** Una organización con 40
+proyectos que pasa de Negocio a Equipo —25— queda por encima **sin haber hecho
+nada**: el número no subió, bajó el techo. Pasa igual al cancelar, al fallar un
+cobro y al acabarse el mes gratis.
+
+Lo que ocurre entonces es lo que ya ocurría: `cabe(40, 25)` es `false`, así que no
+se puede crear el 41. Los 40 se abren, se editan y se borran.
+
+- **Por qué no se congela lo que hay:** la organización pagó por tenerlo, y quien
+  baja de plan suele ser quien menos culpa tiene del volumen. Congelar cuarenta
+  proyectos por una tarjeta caducada es la forma más rápida de que un cliente se
+  vaya con sus datos dentro.
+- **Por qué no se archiva solo:** archivar es elegir a quién se le apaga el
+  trabajo, y eso no lo puede decidir un webhook. Es la misma regla que ya fijó
+  D7 de PLAN-ENTERPRISE para los asientos.
+
+Lo que faltaba era **decirlo**. `GET /me/billing/resumen` devuelve `excedidas[]`
+y la pantalla de Facturación lo dibuja con la salida de cada tope, empezando por
+lo que sigue funcionando. Sin eso, quien administra se entera pulsando un botón
+que no responde — y un tope rebasado sin explicación se lee como una avería, que
+no se paga: se abandona.
+
+Tres cosas que la prueba fija porque ninguna falla con un error:
+
+1. 🔴 **`SIN_TOPE` es `null`**, y un `actual > tope` suelto compara contra cero:
+   el plan sin límite saldría como el único rebasado de los cuatro.
+2. **Estar justo en el tope es estar lleno, no rebasado.** 25 de 25 no es un
+   exceso, y decirle «te has pasado» a quien está donde compró es una acusación
+   falsa.
+3. **`almacenamientoMb: null` es «no se pudo medir», no «cero».** Marcar un
+   exceso sobre una cifra que no se tiene sería inventarse el aviso más caro de
+   la pantalla.
+
+Y la menos evidente entra también: quien gastó 200 mensajes de IA con Negocio y
+baja a Gratis —13— pasa el resto del mes por encima sin haber escrito nada más.
+
+### 48.6 Lo que no está hecho
+
+- **Sin pruebas end-to-end de las tres cuotas nuevas.** Se comprobaron por tipos
+  y por unitarias —diez nuevas—, no pulsando. La regresión completa no se ha
+  corrido; se revisó a mano que `17-automatizaciones` no la roza, porque sus
+  reglas de rechazo nacen `DISABLED`.
+- **Nada de esto se ha visto contra el stack levantado.**
+- **`historialAnalisisDias` no se recorta en las siete rutas sueltas con un
+  aviso**: se recorta igual, pero devuelven el informe pelado y no tienen dónde
+  decirlo sin cambiarles la forma. Si algún día una de ellas la pinta una
+  persona, hay que subir `ventana` al `meta` del sobre y enseñar al cliente a
+  leerlo.
+- **`ENTERPRISE` se contrata por un `mailto:`.** Es lo que había y sigue siendo
+  lo que hay: no tiene precio en Stripe porque se negocia. Un formulario con su
+  tabla sería la forma final.
+- **El portal de Stripe sigue siendo de la persona y no de la organización.**
+  Viene de la etapa anterior y está en PENDIENTES-BACKEND.

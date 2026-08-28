@@ -198,11 +198,17 @@ controlador de automatizaciones y seis sobre `excedidasDe`—.
 ✅ **`biome check` sin un hallazgo nuevo** sobre la línea base de cada fichero
 tocado. Los que quedan ya estaban.
 
-⬜ **La regresión de punta a punta no se ha corrido.** No se espera rojo: ninguna
-prueba existente pide más historial del que da su plan ni sube adjuntos cerca del
-tope. La que más cerca pasa es `17-automatizaciones`, que crea reglas — si su
-proyecto es de una organización FREE y llega a **cuatro activas**, sale un 402
-que antes no salía, y sería un rojo correcto.
+⬜ **La regresión de punta a punta no se ha corrido, y no se espera rojo.** Se
+revisó a mano dónde podría salir uno:
+
+- `17-automatizaciones` es la única suite que roza el tope de 3 activas de FREE.
+  No lo toca: su bloque largo de rechazos crea las reglas **sin `status`**, y las
+  reglas nacen `DISABLED`, así que no gastan cupo. Los dos tests que sí piden
+  `ENABLED` se hacen su propio `crearMundo`, con una regla activa cada uno.
+- Ninguna prueba pide más historial del que da su plan, ni sube adjuntos cerca de
+  los 200 MB de FREE.
+
+Aun así hay que correrla: lo de arriba es lectura del código, no ejecución.
 
 ⬜ **Nada de esto se ha visto contra el stack levantado.** Los cuatro topes se
 comprobaron por tipos y por unitarias, no pulsando.
