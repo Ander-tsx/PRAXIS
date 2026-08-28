@@ -191,7 +191,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
 
   /**
-   * Administración de la plataforma, en tres pantallas — no una.
+   * Administración de la plataforma, en cuatro pantallas — no una.
    *
    * ⚠️ **Las tres rutas ya existían** (`/admin`, `/admin/projects`,
    * `/admin/actividad`) pero solo la primera tenía entrada en la barra: las
@@ -227,6 +227,28 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
           strokeLinecap="round"
           strokeLinejoin="round"
           d="M4 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v1H4V6zM4 9h16v9a2 2 0 01-2 2H6a2 2 0 01-2-2V9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    /**
+     * Las organizaciones de **toda la instalación**, no las tuyas.
+     *
+     * ⚠️ No se confunde con la entrada de Gestión: aquella abre las tuyas —donde
+     * trabajas— y esta la lista completa de quién ha contratado qué. Son la
+     * misma separación que «Proyectos» de Principal y «Proyectos» de
+     * Administración, que ya conviven con el mismo nombre en dos grupos.
+     */
+    label: 'Organizaciones',
+    href: '/admin/organizations',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 20V7.5L11 4v16M11 20h9V10.5L11 7.5M7 9.5h1M7 13h1M7 16.5h1M14.5 13h1M14.5 16.5h1"
         />
       </svg>
     ),

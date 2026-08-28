@@ -89,8 +89,9 @@ async function loadChatUnreadCount(): Promise<number> {
  * sabe quién está delante:
  *
  * - el grupo de administración entero se cae si la cuenta no administra —las
- *   tres pantallas (`Cuentas`, `Proyectos`, `Actividad`) comparten sección, así
- *   que se filtra por `section` y no comparando tres `href` sueltos;
+ *   cuatro pantallas (`Cuentas`, `Proyectos`, `Organizaciones`, `Actividad`)
+ *   comparten sección, así que se filtra por `section` y no comparando `href`
+ *   sueltos, que es lo que habría habido que tocar al añadir la cuarta;
  * - la insignia de avisos solo aparece con algo sin leer, porque una insignia que
  *   enseña un cero es una insignia que enseña nada.
  */
