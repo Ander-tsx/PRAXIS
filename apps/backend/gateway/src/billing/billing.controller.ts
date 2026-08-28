@@ -19,8 +19,12 @@ import {
   type OrganizationView,
   PLANS,
   PLAN_LIST,
+  type PlanQuotas,
   PlanTier,
+  type QuotaExcedida,
+  QuotaKind,
   type SubscriptionStatus,
+  type Tope,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
@@ -105,19 +109,31 @@ export class BillingController {
     const organizationId = await this.quota.organizacionElegida(userId, organizationIdPedida);
     const plan = await this.quota.planDe(userId, organizationId);
 
-    const [proyectos, ia, organizaciones, cliente] = await Promise.all([
+    const [proyectos, ia, organizaciones, cliente, bytes] = await Promise.all([
       this.proyectosDeLaOrganizacion(organizationId),
       this.cuotaDeIa(userId, plan.quotas.iaMensualPorPersona, organizationId),
       this.organizaciones(userId),
       this.cliente(userId),
+      /* La única cifra que puede faltar. Cuesta dos viajes TCP y no vale la pena
+         tumbar la pantalla entera si uno de los dos no contesta. */
+      organizationId ? this.quota.almacenamientoDe(organizationId) : Promise.resolve(null),
     ]);
+
+    const asientos = organizaciones.find((una) => una.id === organizationId)?.seatsUsed ?? 0;
+    const almacenamientoMb = bytes === null ? null : Math.ceil(bytes / (1024 * 1024));
 
     return {
       organizationId: plan.organizationId,
       tier: plan.tier,
       status: plan.status,
       quotas: plan.quotas,
-      uso: { proyectos, iaMensual: ia.usados },
+      uso: { proyectos, iaMensual: ia.usados, asientos, almacenamientoMb },
+      excedidas: excedidasDe(plan.quotas, {
+        proyectos,
+        iaMensual: ia.usados,
+        asientos,
+        almacenamientoMb,
+      }),
       iaReiniciaEn: ia.reinicia,
       pruebaTerminaEn: plan.trialEndsAt,
       cancelaEn: plan.cancelAt,
@@ -353,6 +369,70 @@ export class BillingController {
       .then((perfil) => perfil?.credential?.email)
       .catch(() => undefined);
   }
+}
+
+/**
+ * Qué topes tiene ya rebasados esta organización.
+ *
+ * ## 🔴 La trampa 4 del encargo, dicha en vez de sufrida
+ *
+ * *«Bajar de plan con más proyectos de los que el plan permite es el caso que
+ * nadie diseña y todos sufren.»* Se llega aquí sin haber hecho nada: no sube el
+ * número, baja el techo — al bajar de plan, al cancelar, al fallar un cobro y al
+ * acabarse el mes gratis.
+ *
+ * **Y lo que pasa entonces es nada** (D5 de `docs/PLAN-CUOTAS.md`): no se borra,
+ * no se archiva y no se congela. Lo que ya hay se abre, se edita y se borra; lo
+ * único que no se puede es añadir uno más, exactamente igual que si se hubiera
+ * llegado al tope por arriba. Congelar cuarenta proyectos por una tarjeta
+ * caducada es la forma más rápida de que un cliente se vaya con sus datos
+ * dentro, y archivar es elegir a quién se le apaga el trabajo — eso no lo puede
+ * decidir un webhook.
+ *
+ * ⚠️ **Esto no niega nada.** Quien niega es `QuotaService`, en el servidor y con
+ * las mismas cifras de `plans.ts`. Esto existe para que quien administra lo vea
+ * **antes** de descubrirlo pulsando un botón que no responde: un tope rebasado
+ * sin explicación se lee como una avería, y una avería no se paga, se abandona.
+ *
+ * ⚠️ **`cabe()` y no un `<`.** Con `SIN_TOPE` —que es `null`— un `actual > tope`
+ * suelto compara contra cero y marcaría como excedido al plan que no tiene
+ * límite, que es justo al revés.
+ */
+export function excedidasDe(
+  quotas: PlanQuotas,
+  uso: {
+    proyectos: number;
+    iaMensual: number;
+    asientos: number;
+    almacenamientoMb: number | null;
+  },
+): QuotaExcedida[] {
+  const excedidas: QuotaExcedida[] = [];
+
+  const mirar = (kind: QuotaKind, tope: Tope, actual: number | null) => {
+    /* `actual === null` es «no se pudo medir», no «cero». Marcar un exceso sobre
+       una cifra que no se tiene sería inventarse el aviso más caro de la
+       pantalla. */
+    if (tope === null || actual === null) return;
+    /* `cabe` contesta «¿cabe uno más?», así que estar al tope justo no es
+       excederlo: 25 de 25 está lleno, no rebasado, y decirle «te has pasado» a
+       quien está exactamente donde compró es una acusación falsa. */
+    if (actual <= tope) return;
+    excedidas.push({ kind, tope, actual });
+  };
+
+  mirar(QuotaKind.PROYECTOS, quotas.proyectos, uso.proyectos);
+  mirar(QuotaKind.ASIENTOS, quotas.asientos, uso.asientos);
+  mirar(QuotaKind.ALMACENAMIENTO, quotas.almacenamientoOrgMb, uso.almacenamientoMb);
+  /**
+   * ⚠️ **La IA también, y es la menos evidente.** Alguien que gastó 200 mensajes
+   * con BUSINESS y baja a FREE —13— pasa el resto del mes por encima. No se le
+   * quita nada de lo que ya escribió, pero no puede mandar otro hasta el día 1,
+   * y sin esto el 402 le llegaría sin ninguna pantalla que lo hubiera avisado.
+   */
+  mirar(QuotaKind.IA_MENSUAL, quotas.iaMensualPorPersona, uso.iaMensual);
+
+  return excedidas;
 }
 
 /**

@@ -135,13 +135,40 @@ export interface CatalogoDePlanes {
   disponibles: PlanTier[];
 }
 
+/**
+ * Un tope que la organización ya tiene rebasado. Espejo de `QuotaExcedida`.
+ *
+ * 🔴 **Se llega aquí bajando de plan, no creando de más.** Una organización con
+ * 40 proyectos en Negocio que pasa a Equipo —25— queda por encima sin haber
+ * hecho nada: el número no subió, bajó el techo. Pasa igual al cancelar, al
+ * fallar un cobro y al acabarse el mes gratis.
+ *
+ * **Y no se le quita nada:** lo que ya hay se abre, se edita y se borra. Lo
+ * único que no se puede es añadir uno más. Esta lista existe para poder decirlo
+ * antes de que se descubra pulsando un botón que no responde.
+ */
+export interface QuotaExcedida {
+  kind: QuotaKind;
+  tope: number;
+  actual: number;
+}
+
 /** Lo que devuelve `GET /me/billing/resumen`. */
 export interface BillingSummary {
   organizationId: string | null;
   tier: PlanTier;
   status: SubscriptionStatus;
   quotas: PlanQuotas;
-  uso: { proyectos: number; iaMensual: number };
+  uso: {
+    proyectos: number;
+    iaMensual: number;
+    /** Asientos ocupados: miembros activos **más invitaciones vivas**. */
+    asientos: number;
+    /** Lo que ocupan los adjuntos, en MB. `null` si no se pudo medir. */
+    almacenamientoMb: number | null;
+  };
+  /** Los topes ya rebasados. Vacío casi siempre. Ver `QuotaExcedida`. */
+  excedidas: QuotaExcedida[];
   iaReiniciaEn: string;
   pruebaTerminaEn: string | null;
   cancelaEn: string | null;

@@ -532,6 +532,37 @@ export class QuotaService {
   }
 
   /**
+   * Cuántos bytes ocupan los adjuntos de una organización, o `null` si no se pudo.
+   *
+   * Lo comparten el guard de la subida y el resumen de facturación, y por eso
+   * está fuera de los dos: si cada uno hiciera su propia cuenta, el aviso de la
+   * pantalla y la negativa del servidor podrían discrepar — y discreparían justo
+   * en el caso interesante, que es el de quien está al borde.
+   *
+   * ⚠️ **Los `DELETED` no cuentan.** Sus adjuntos no se pueden ni abrir ni
+   * borrar, así que cobrar por ellos sería cobrar por algo que nadie puede
+   * liberar. Es la misma regla que en el conteo de proyectos.
+   */
+  async almacenamientoDe(organizationId: string): Promise<number | null> {
+    const proyectos = await firstValueFrom(
+      this.projectsClient.send<{ id: string; status: string }[]>(
+        { cmd: 'project_find_by_organization' },
+        { organizationId },
+      ),
+    ).catch(() => null);
+
+    if (proyectos === null) return null;
+
+    const vivos = proyectos
+      .filter((proyecto) => proyecto.status !== 'DELETED')
+      .map((proyecto) => proyecto.id);
+
+    return firstValueFrom(
+      this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
+    ).catch(() => null);
+  }
+
+  /**
    * ¿Caben estos bytes más en el almacén de la organización?
    *
    * ## Por qué la suma se compone aquí
@@ -566,29 +597,9 @@ export class QuotaService {
     const topeMb = plan.quotas.almacenamientoOrgMb;
     if (topeMb === null || !organizationId) return;
 
-    const proyectos = await firstValueFrom(
-      this.projectsClient.send<{ id: string; status: string }[]>(
-        { cmd: 'project_find_by_organization' },
-        { organizationId },
-      ),
-    ).catch(() => null);
-
-    if (proyectos === null) {
-      this.log.error(`No se pudieron listar los proyectos de ${organizationId}: se deja subir.`);
-      return;
-    }
-
-    /* Los `DELETED` no se listan al contar proyectos y tampoco se cuentan aquí,
-       por lo mismo: sus adjuntos no se pueden ni abrir ni borrar, así que cobrar
-       por ellos sería cobrar por algo que nadie puede liberar. */
-    const vivos = proyectos.filter((proyecto) => proyecto.status !== 'DELETED').map((p) => p.id);
-
-    const ocupados = await firstValueFrom(
-      this.tasksClient.send<number>({ cmd: 'attachment_bytes_of_projects' }, { projectIds: vivos }),
-    ).catch(() => null);
-
+    const ocupados = await this.almacenamientoDe(organizationId);
     if (ocupados === null) {
-      this.log.error(`No se pudieron sumar los adjuntos de ${organizationId}: se deja subir.`);
+      this.log.error(`No se pudo medir el almacén de ${organizationId}: se deja subir.`);
       return;
     }
 

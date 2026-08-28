@@ -54,6 +54,35 @@ export function estaVigente(status: SubscriptionStatus | string | null | undefin
  * «has llegado al límite» sin decir cuál es el límite obliga a ir a buscarlo, y
  * enseñar el límite sin lo gastado no deja saber si queda.
  */
+/**
+ * Un tope que la organización ya tiene rebasado.
+ *
+ * ## Se puede estar por encima sin haber hecho nada mal
+ *
+ * 🔴 **Es la trampa 4 del encargo, y el caso es bajar de plan.** Una
+ * organización con 40 proyectos en BUSINESS que pasa a TEAM —25— queda por
+ * encima sin haber creado nada: el número no subió, bajó el techo. Pasa igual al
+ * cancelar, al fallar un cobro y al acabarse el mes gratis.
+ *
+ * **Lo que ocurre entonces es nada**, y está decidido así en D5 de
+ * `docs/PLAN-CUOTAS.md`: no se borra, no se archiva y no se congela lo que ya
+ * hay. Los 40 proyectos se abren, se editan y se borran; lo único que no se
+ * puede es crear el 41, exactamente igual que si se hubiera llegado al tope por
+ * arriba.
+ *
+ * ⚠️ **Lo que sí hace falta es decirlo.** Sin esto, quien administra descubre su
+ * situación pulsando un botón que no responde, y un tope rebasado se lee como
+ * una avería en vez de como la consecuencia de un cambio de plan que hizo él.
+ * Nada de esto decide nada: quien niega sigue siendo `QuotaService`.
+ */
+export interface QuotaExcedida {
+  kind: QuotaKind;
+  /** El tope del plan actual. Nunca `null` — sin tope no se puede exceder. */
+  tope: number;
+  /** Lo que hay, en las mismas unidades que `tope`. */
+  actual: number;
+}
+
 export interface BillingSummary {
   /**
    * De qué organización sale el plan que vale.
@@ -72,7 +101,23 @@ export interface BillingSummary {
   uso: {
     proyectos: number;
     iaMensual: number;
+    /** Asientos ocupados: miembros activos **más invitaciones vivas**. */
+    asientos: number;
+    /**
+     * Lo que ocupan los adjuntos, en MB.
+     *
+     * `null` si no se pudo medir. Es la única cifra del resumen que puede
+     * faltar: sumarla cuesta dos viajes TCP y no vale la pena tumbar la pantalla
+     * de facturación entera porque uno de los dos no conteste.
+     */
+    almacenamientoMb: number | null;
   };
+  /**
+   * Los topes que esta organización ya tiene rebasados. Vacío casi siempre.
+   *
+   * Ver `QuotaExcedida`: se llega aquí bajando de plan, no creando de más.
+   */
+  excedidas: QuotaExcedida[];
   /** Cuándo vuelve a cero el contador de IA, en ISO. */
   iaReiniciaEn: string;
   /**
