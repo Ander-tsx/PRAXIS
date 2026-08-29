@@ -49,7 +49,7 @@ const nextConfig: NextConfig = {
       { source: '/profile', destination: `${dashboardFrontUrl}/profile` },
       { source: '/profile/:path*', destination: `${dashboardFrontUrl}/profile/:path*` },
       { source: '/settings', destination: `${dashboardFrontUrl}/settings` },
-      { source: '/settings/:path*', destination: `${dashboardFrontUrl}/settings/:path*` },,
+      { source: '/settings/:path*', destination: `${dashboardFrontUrl}/settings/:path*` },
       { source: '/projects', destination: `${projectsFrontUrl}/projects` },
       {
         source: '/projects/:path*',
