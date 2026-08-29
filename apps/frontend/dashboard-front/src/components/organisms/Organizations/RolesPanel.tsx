@@ -97,7 +97,7 @@ export function RolesPanel({
             onClick={() => setCreando(true)}
             className="self-start font-sans text-sm text-white/90 underline decoration-white/[0.12] underline-offset-4 transition-colors hover:decoration-emerald-400"
           >
-            Crear un papel
+            Crear un rol
           </button>
         ))}
     </div>
@@ -257,7 +257,7 @@ function Formulario({
     <form onSubmit={enviar} className="flex flex-col gap-5">
       <FloatingLabelInput
         id={nombreId}
-        label="Nombre del papel"
+        label="Nombre del rol"
         value={name}
         onChange={(evento) => setName(evento.target.value)}
         maxLength={60}
@@ -316,7 +316,7 @@ function Formulario({
           disabled={pending}
           className="rounded-full border border-white/[0.14] bg-white/[0.04] px-4 py-2 font-sans text-xs font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {pending ? '...' : (papel ? 'Guardar' : 'Crear el papel')}
+          {pending ? '...' : (papel ? 'Guardar' : 'Crear rol')}
         </button>
         <button
           type="button"

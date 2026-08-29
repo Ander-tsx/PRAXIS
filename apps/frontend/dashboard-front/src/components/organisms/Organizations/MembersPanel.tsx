@@ -113,7 +113,7 @@ function Invitar({
           <FloatingLabelSelect
             id={correoId + '-role'}
             name="role"
-            label="Papel"
+            label="Rol"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             options={[
@@ -204,7 +204,7 @@ function Fila({
             : 'border-white/[0.12] bg-white/[0.04] text-white/70'
         }`}
       >
-        {esDueño ? 'Dueño' : (miembro.roleName ?? 'Sin papel')}
+        {esDueño ? 'Dueño' : (miembro.roleName ?? 'Sin rol')}
       </span>
       {miembro.status === 'INVITED' && (
         <span className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-sans text-xs font-medium text-amber-400">
@@ -212,13 +212,13 @@ function Fila({
         </span>
       )}
 
-      {/* Cambiar de papel es **elegir de una lista**, y por eso este control no
+      {/* Cambiar de rol es **elegir de una lista**, y por eso este control no
           existía mientras los papeles eran un enum de tres valores: un botón que
           alterna entre dos no sirve cuando puede haber diez.
 
           ⚠️ Se envía al elegir, sin botón de confirmar: es un campo y no un
           formulario, y pedir dos gestos para un desplegable de dos opciones es
-          justo el trámite que sobra. El servidor rechaza un papel con permisos
+          justo el trámite que sobra. El servidor rechaza un rol con permisos
           que quien lo reparte no tiene, y ese error se enseña abajo. */}
       {seLePuedeTocar && miembro.userId && papeles.length > 0 && (
         <div className="w-44 shrink-0 relative">

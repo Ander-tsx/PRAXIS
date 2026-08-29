@@ -19,8 +19,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = { title: 'Equipo' };
 
-export default async function TeamPage({ searchParams }: { searchParams: Promise<{ config?: string }> }) {
-  const { config } = await searchParams;
+export default async function TeamPage() {
   const { organizacionActivaId } = await loadPrivateChrome();
   if (!organizacionActivaId) {
     redirect('/organizations/new');
@@ -83,8 +82,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           </Seccion>
 
           <Seccion
-            titulo="Roles de la organización"
-            entradilla="Quién crea proyectos, quién invita, quién toca el plan."
+            titulo="Roles y permisos"
+            entradilla="Define qué rol ejerce cada usuario en el sistema. Puedes crear roles personalizados con permisos específicos."
           >
             {papeles ? (
               <RolesPanel
@@ -115,33 +114,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         </div>
       </div>
       
-      {config === 'true' && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <Link href="/team" className="fixed inset-0 bg-black/60 backdrop-blur-sm" scroll={false} />
-          <div className="relative z-10 w-full max-w-lg bg-[#080807] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <div className="flex flex-col">
-                <h2 className="text-xl font-bold text-white font-sans">Configuración</h2>
-                <span className="text-xs text-white/50">El nombre, icono y color del equipo</span>
-              </div>
-              <Link href="/team" scroll={false} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </Link>
-            </div>
-            <div className="p-6">
-              <OrgIdentityForm
-                organizationId={organizationId}
-                initialName={org.name ?? ''}
-                initialIconKey={org.iconKey ?? null}
-                initialColor={org.color ?? null}
-                puedeEditar={permisos.canManageOrganization}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      
     </AppHeader>
   );
 }

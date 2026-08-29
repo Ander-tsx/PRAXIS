@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
+import { OrgIdentityModal } from "./OrgIdentityModal";
 import type { OrgDelSelector } from './AppShell';
 
 /**
@@ -35,7 +36,7 @@ export function OrgSwitcher({
   zonePath: string;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | null>(null);
+  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | 'config' | null>(null);
 
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
@@ -190,8 +191,8 @@ export function OrgSwitcher({
                   sigue exigiendo `canManageOrganization`; la pantalla enseña la
                   identidad a todo el mundo y el formulario solo a quien puede. */}
               {activaId && (
-                <a
-                  href="/team?config=true"
+                <button
+                  onClick={() => { setAbierto(false); setActiveModal('config'); }}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full"
                 >
                   <svg
@@ -214,7 +215,7 @@ export function OrgSwitcher({
                     />
                   </svg>
                   Configuración
-                </a>
+                </button>
               )}
             </div>
 
@@ -275,6 +276,10 @@ export function OrgSwitcher({
           onClose={() => setActiveModal(null)}
           zonePath={zonePath}
         />
+      )}
+
+      {activeModal === 'config' && activa && (
+        <OrgIdentityModal org={activa} zonePath={zonePath} onClose={() => setActiveModal(null)} />
       )}
 
       {activeModal === 'newSpace' && (
