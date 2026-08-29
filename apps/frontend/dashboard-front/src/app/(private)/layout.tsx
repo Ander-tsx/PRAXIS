@@ -28,7 +28,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
   return (
     <AppShell
       navItems={navItems}
-      zonePath="/dashboard"
+      zonePath=""
       plegadaInicial={plegada}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
@@ -37,7 +37,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       user={{
         name: displayName(profile),
         email: profile.credential.email,
-        avatarSrc: avatarHref(profile.avatarUrl, '/dashboard/api/gateway'),
+        avatarSrc: avatarHref(profile.avatarUrl, '/api/gateway'),
         presence: profile.presence ?? null,
       }}
       /* El selector de estado se dibuja sobre la esquina del avatar: la

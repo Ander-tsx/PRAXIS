@@ -39,11 +39,13 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   if (!organizacion) {
     return (
       <AppHeader title="Equipo">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 pb-16">
-          <header className="flex flex-col gap-2">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
+          <header className="flex items-end justify-between border-b border-white/[0.08] pb-6">
+          <div className="flex flex-col gap-2">
             <h1 className="font-sans text-2xl font-semibold text-white">Equipo</h1>
             <p className="font-sans text-sm text-white/45">No se pudo cargar la organización.</p>
-          </header>
+          </div>
+        </header>
         </div>
       </AppHeader>
     );
@@ -54,12 +56,12 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   return (
     <AppHeader title="Equipo">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 pb-16">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 pb-16">
         <header className="flex flex-col gap-2">
-          <h1 className="font-sans text-2xl font-semibold text-white">Equipo</h1>
-          <p className="max-w-2xl font-sans text-sm text-white/45">
-            Gestiona los miembros y las invitaciones de <span className="text-white/80">{org.name}</span>.
-          </p>
+          <h1 className="font-sans text-3xl font-medium tracking-tight text-white">Equipo</h1>
+            <p className="max-w-2xl font-sans text-sm text-white/50">
+              Gestiona los miembros y los niveles de acceso para <span className="text-white/90 font-medium">{org.name}</span>.
+            </p>
         </header>
 
         <div className="flex flex-col gap-8">
@@ -146,10 +148,10 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
 function Seccion({ titulo, entradilla, children }: { titulo: string; entradilla?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-7">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-sans text-base font-semibold text-white/90">{titulo}</h2>
-        {entradilla && <p className="max-w-xl font-sans text-xs text-white/40">{entradilla}</p>}
+    <section className="flex flex-col gap-8 pb-14 border-b border-white/[0.08] last:border-0 last:pb-0">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="font-sans text-xl font-medium tracking-tight text-white/95">{titulo}</h2>
+        {entradilla && <p className="max-w-2xl font-sans text-sm text-white/50">{entradilla}</p>}
       </div>
       {children}
     </section>

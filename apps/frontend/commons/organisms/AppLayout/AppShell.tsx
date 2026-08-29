@@ -192,7 +192,7 @@ const UN_ANO = 60 * 60 * 24 * 365;
  * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
  * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
  */
-const CUENTA_HREF = '/dashboard/profile';
+const CUENTA_HREF = '/profile';
 
 /**
  * Dónde vive el centro de mensajes.
