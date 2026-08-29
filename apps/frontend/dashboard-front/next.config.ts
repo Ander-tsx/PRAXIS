@@ -1,6 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  assetPrefix: '/dashboard-assets',
+
   /**
    * Multi-Zones: esta zona vive bajo `/dashboard` y el web-shell la expone con
    * un rewrite. El prefijo lo aplica Next automáticamente a `next/link`,

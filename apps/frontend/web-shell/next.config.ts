@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
     const assistantFrontUrl = process.env.ASSISTANT_FRONT_URL ?? 'http://localhost:4107';
 
     return [
+      { source: '/dashboard-assets/_next/:path*', destination: `${dashboardFrontUrl}/_next/:path*` },
+
       {
         source: '/auth/:path*',
         destination: `${authFrontUrl}/auth/:path*`,
