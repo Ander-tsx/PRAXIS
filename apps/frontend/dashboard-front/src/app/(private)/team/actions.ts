@@ -59,7 +59,7 @@ export async function crearOrganizacionAction(
     });
     if (!creada?.id) return { error: 'El servidor no devolvió la organización.', creada: null };
 
-    revalidatePath('/organizations');
+    revalidatePath('/team');
     return { error: null, creada: creada.id };
   } catch (error) {
     /* El mensaje del backend cuando lo hay: «El plan Equipo empieza en 3
@@ -112,7 +112,7 @@ export async function invitarMiembroAction(
       return { error: 'El servidor no devolvió el enlace.', enlace: null, email: null };
     }
 
-    revalidatePath(`/organizations/${organizationId}`);
+    revalidatePath('/team');
     return {
       error: null,
       enlace: invitacion.enlace,
@@ -144,7 +144,7 @@ export async function quitarMiembroAction(
     await createServerApiClient().delete(
       `/organizations/${organizationId}/members/${encodeURIComponent(idOrEmail)}`,
     );
-    revalidatePath(`/organizations/${organizationId}`);
+    revalidatePath('/team');
     return { error: null, done: idOrEmail };
   } catch (error) {
     return {
@@ -176,7 +176,7 @@ export async function cambiarRolAction(
     await createServerApiClient().patch(`/organizations/${organizationId}/members/${userId}`, {
       roleId,
     });
-    revalidatePath(`/organizations/${organizationId}`);
+    revalidatePath('/team');
     return { error: null, done: userId };
   } catch (error) {
     return {
@@ -201,7 +201,7 @@ export async function cambiarAsientosAction(
 
   try {
     await createServerApiClient().patch(`/organizations/${organizationId}/seats`, { seats });
-    revalidatePath(`/organizations/${organizationId}`);
+    revalidatePath('/team');
     return { error: null, done: String(seats) };
   } catch (error) {
     /* El 409 llega con el número de ocupados dentro: «Hay 5 asientos ocupados…».
@@ -248,7 +248,7 @@ export async function guardarIdentidadOrgAction(
       iconKey,
       color: iconKey ? color : null,
     });
-    revalidatePath(`/organizations/${organizationId}`);
+    revalidatePath('/team');
     return { error: null, done: name };
   } catch (error) {
     return {
@@ -274,7 +274,7 @@ export async function aceptarInvitacionAction(
     );
     if (!organizacion?.id) return { error: 'El servidor no confirmó la entrada.', done: null };
 
-    revalidatePath('/organizations');
+    revalidatePath('/team');
     return { error: null, done: organizacion.id };
   } catch (error) {
     /* 410: caducada, ya usada, o dirigida a otra dirección. Los tres se dicen
@@ -324,7 +324,7 @@ export async function guardarPapelAction(
 
     if (!guardado?.id) return { error: 'El servidor no devolvió el papel.', done: null };
 
-    revalidatePath(`/organizations/${organizationId}/roles`);
+    revalidatePath('/team');
     return { error: null, done: guardado.id };
   } catch (error) {
     return {
@@ -345,7 +345,7 @@ export async function borrarPapelAction(
 
   try {
     await createServerApiClient().delete(`/organizations/${organizationId}/roles/${roleId}`);
-    revalidatePath(`/organizations/${organizationId}/roles`);
+    revalidatePath('/team');
     return { error: null, done: roleId };
   } catch (error) {
     /* El mensaje del servidor dice **cuánta gente** hay que mover antes de poder
@@ -389,7 +389,7 @@ export async function guardarPlantillaAction(
 
     if (!guardada?.id) return { error: 'El servidor no devolvió la plantilla.', done: null };
 
-    revalidatePath(`/organizations/${organizationId}/roles`);
+    revalidatePath('/team');
     return { error: null, done: guardada.id };
   } catch (error) {
     return {
@@ -412,7 +412,7 @@ export async function borrarPlantillaAction(
     await createServerApiClient().delete(
       `/organizations/${organizationId}/role-templates/${templateId}`,
     );
-    revalidatePath(`/organizations/${organizationId}/roles`);
+    revalidatePath('/team');
     return { error: null, done: templateId };
   } catch (error) {
     return {

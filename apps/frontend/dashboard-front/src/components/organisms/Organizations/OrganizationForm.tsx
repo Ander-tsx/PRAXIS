@@ -1,6 +1,6 @@
 'use client';
 
-import { crearOrganizacionAction } from '@/app/(private)/organizations/actions';
+import { crearOrganizacionAction } from '@/app/(private)/team/actions';
 import { CREAR_ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
 import { Button, Input, useAccion } from '@praxis/commons';
 import { useRouter } from 'next/navigation';

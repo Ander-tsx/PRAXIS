@@ -40,14 +40,16 @@ const nextConfig: NextConfig = {
        * sin segmento extra) y todo lo que cuelga de ella. Sin la primera,
        * `/dashboard` a secas no casa con `/:path*` y cae en un 404 del shell.
        */
-      {
-        source: '/dashboard',
-        destination: `${dashboardFrontUrl}/dashboard`,
-      },
-      {
-        source: '/dashboard/:path*',
-        destination: `${dashboardFrontUrl}/dashboard/:path*`,
-      },
+      { source: '/billing', destination: `${dashboardFrontUrl}/billing` },
+      { source: '/billing/:path*', destination: `${dashboardFrontUrl}/billing/:path*` },
+      { source: '/team', destination: `${dashboardFrontUrl}/team` },
+      { source: '/team/:path*', destination: `${dashboardFrontUrl}/team/:path*` },
+      { source: '/organizations', destination: `${dashboardFrontUrl}/organizations` },
+      { source: '/organizations/:path*', destination: `${dashboardFrontUrl}/organizations/:path*` },
+      { source: '/profile', destination: `${dashboardFrontUrl}/profile` },
+      { source: '/profile/:path*', destination: `${dashboardFrontUrl}/profile/:path*` },
+      { source: '/settings', destination: `${dashboardFrontUrl}/settings` },
+      { source: '/settings/:path*', destination: `${dashboardFrontUrl}/settings/:path*` },,
       { source: '/projects', destination: `${projectsFrontUrl}/projects` },
       {
         source: '/projects/:path*',

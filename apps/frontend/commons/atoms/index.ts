@@ -12,3 +12,4 @@ export * from './StatItem';
 export * from './Textarea';
 export * from './FloatingLabelInput';
 export * from './FloatingLabelTextarea';
+export * from './FloatingLabelSelect';

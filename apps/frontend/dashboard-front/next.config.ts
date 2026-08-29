@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
    *
    * Para salir de la zona hace falta navegación dura. Ver ESTADO-ACTUAL §16.
    */
-  basePath: '/dashboard',
+  // basePath: '/dashboard',
 
   /**
    * @praxis/commons se publica como TypeScript sin compilar y pnpm lo enlaza

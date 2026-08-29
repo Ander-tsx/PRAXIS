@@ -4,9 +4,10 @@ import {
   cambiarRolAction,
   invitarMiembroAction,
   quitarMiembroAction,
-} from '@/app/(private)/organizations/actions';
+} from '@/app/(private)/team/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Input, Select, useAccion } from '@praxis/commons';
+import { FloatingLabelInput, useAccion } from '@praxis/commons';
+import { FloatingLabelSelect } from '@praxis/commons/atoms/FloatingLabelSelect';
 import type {
   OrganizationMemberView,
   OrganizationPermissions,
@@ -97,29 +98,28 @@ function Invitar({
         <input type="hidden" name="organizationId" value={organizationId} />
 
         <div className="min-w-[16rem] flex-1">
-          <Input
+          <FloatingLabelInput
             id={correoId}
             name="email"
             type="email"
             label="Invitar por correo"
             placeholder="alguien@ejemplo.com"
             maxLength={160}
-            fullWidth
             required
           />
         </div>
 
         <div className="w-44">
-          <Select
+          <FloatingLabelSelect
+            id={correoId + '-role'}
             name="role"
             label="Papel"
             value={role}
-            onValueChange={setRole}
+            onChange={(e) => setRole(e.target.value)}
             options={[
               { value: 'MEMBER', label: 'Miembro' },
               { value: 'ADMIN', label: 'Administra' },
             ]}
-            fullWidth
           />
         </div>
 
@@ -221,11 +221,12 @@ function Fila({
           justo el trámite que sobra. El servidor rechaza un papel con permisos
           que quien lo reparte no tiene, y ese error se enseña abajo. */}
       {seLePuedeTocar && miembro.userId && papeles.length > 0 && (
-        <div className="w-44 shrink-0">
-          <Select
+        <div className="w-44 shrink-0 relative">
+          <select
             value={miembro.roleId ?? ''}
             disabled={cambiando}
-            onValueChange={(roleId) => {
+            onChange={(e) => {
+              const roleId = e.target.value;
               if (!roleId || roleId === miembro.roleId) return;
               const datos = new FormData();
               datos.set('organizationId', organizationId);
@@ -233,9 +234,19 @@ function Fila({
               datos.set('roleId', roleId);
               rolAction(datos);
             }}
-            options={papeles.map((papel) => ({ value: papel.id, label: papel.name }))}
-            fullWidth
-          />
+            className="w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-1.5 text-sm text-white/90 outline-none transition-colors hover:border-white/25 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50 appearance-none"
+          >
+            {papeles.map((papel) => (
+              <option key={papel.id} value={papel.id} className="bg-[#1a1a1a] text-white">
+                {papel.name}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/50">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
       )}
 

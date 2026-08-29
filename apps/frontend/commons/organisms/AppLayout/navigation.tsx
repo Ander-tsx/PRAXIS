@@ -84,111 +84,31 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   /* «Análisis» (`/reports`) se retiró del sidebar: la pantalla de análisis no
      daba valor y está pendiente decidir qué hacer con esa zona. El código de
      `reports-front` sigue ahí, solo que ya no se enlaza desde la navegación. */
-  {
-    /**
-     * PRAX, el asistente.
-     *
-     * ## Por qué tiene entrada propia
-     *
-     * Vivía dentro de Análisis, en un panel al lado de los gráficos, y eso lo
-     * definía: se le preguntaba por el informe que se estaba viendo. Pero sabe
-     * hacer bastante más —proponer tareas, repartir trabajo, escribir al chat
-     * del equipo— y nada de eso tiene que ver con estar mirando un percentil.
-     * Metido en una esquina, la mitad de lo que sabe no se descubría nunca.
-     *
-     * Va **justo después de Análisis**, y el sitio no es arbitrario: son las
-     * dos entradas donde se para uno a entender el trabajo en vez de a
-     * despacharlo — primero el gráfico, luego a quién preguntarle por él. Lo de
-     * arriba (Panel, Proyectos, Mensajes) es el día a día.
-     *
-     * ⚠️ Sigue estando dentro de Análisis, con el proyecto ya puesto, para quien
-     * mira un gráfico y tiene una duda ahí mismo. Las dos pantallas montan el
-     * mismo organismo (`commons/organisms/AssistantChat`).
-     */
-    label: 'Asistente',
-    href: '/assistant',
-    section: SECTION_PRINCIPAL,
-    /**
-     * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
-     * miniatura. Un bocadillo con una chispa —que es lo que había— decía
-     * «conversación con una IA», o sea lo mismo que dicen ya otras cincuenta
-     * aplicaciones. La cara dice **quién**, que es lo que hace que se reconozca
-     * de un vistazo entre siete entradas que por lo demás son líneas grises.
-     *
-     * En `xs`, que es la única medida pensada para ir en una fila junto a
-     * iconos de trazo: más grande compite con ellos y deja de leerse como parte
-     * de la misma lista.
-     */
-    icon: <PraxSidebarIcon />,
-  },
-
-  /**
-   * Lo que antes era «Gestión» va aquí, en Principal: es *tu* espacio —tu
-   * organización, tus papeles, tu plan—, no administración de la plataforma, y
-   * un separador propio para cuatro entradas solo añadía ruido.
-   */
-  {
-    /**
-     * La organización **activa**: sus proyectos, su gente, su plan y su
-     * configuración.
-     *
-     * ⚠️ **Singular a propósito.** No existe «Todas las organizaciones» (D1 de
-     * `docs/PLAN-ORGANIZACION-ACTIVA.md`): siempre hay una activa —la del
-     * selector— y todo cuelga de ella. `/dashboard/organizations` ya no es una
-     * galería, **redirige** al portal de la activa, como `/dashboard/roles`.
-     *
-     * ⚠️ **Sale para todo el mundo.** No es administración de la plataforma
-     * —eso es la sección de abajo, filtrada por rol— sino *tu* espacio: hasta
-     * quien trabaja solo tiene una, y es donde viven sus proyectos.
-     */
-    label: 'Organización',
-    href: '/dashboard/organizations',
-    section: SECTION_PRINCIPAL,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3.75 21h16.5M4.5 3h9a.75.75 0 01.75.75V21H3.75V3.75A.75.75 0 014.5 3zm9.75 6h5.25a.75.75 0 01.75.75V21h-6V9zM7 7.5h3M7 11h3M7 14.5h3"
-        />
-      </svg>
-    ),
-  },
-  {
-    /**
-     * Los roles de la organización y las plantillas de rol de sus proyectos.
-     *
-     * ⚠️ **`/dashboard/roles` no es una pantalla: redirige.** Los roles
-     * pertenecen a una organización, y la barra no sabe a cuál — lo resuelve
-     * con la misma cookie que el selector, al portal de la organización activa.
-     */
-    label: 'Roles',
-    href: '/dashboard/roles',
-    section: SECTION_PRINCIPAL,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM10 12l1.5 1.5L14.5 10"
-        />
-      </svg>
-    ),
-  },
+  
   /*
-   * 🕳️ Aquí estaba «Suscripción» → `/dashboard/billing`.
+   * 🕳️ Aquí estaba «Suscripción» → `/billing`.
    *
    * Se quitó de la barra lateral: el plan es de la organización activa, así que
    * su sitio es el portal de la organización («Plan y asientos», con su botón de
    * contratar que ahora abre Stripe directo). La tabla comparativa
-   * (`/dashboard/billing`) **sigue existiendo** —la ruta no se toca— y se llega
+   * (`/billing`) **sigue existiendo** —la ruta no se toca— y se llega
    * por «Comparar los planes» desde ese portal y desde el aviso de cuota del
    * asistente. Una entrada de barra lateral para una tabla de precios era la
    * tercera de tres que hablaban de lo mismo.
    */
   {
+    label: 'Facturación',
+    href: '/billing',
+    section: SECTION_PRINCIPAL,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Integraciones',
-    href: '/dashboard/integraciones',
+    href: '/integraciones',
     section: SECTION_PRINCIPAL,
     disabled: true,
     icon: (
@@ -283,11 +203,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   {
     /**
      * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
-     * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
+     * registro no pide— y por eso **absorbió `/profile`** en vez de
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.
      */
     label: 'Sistema',
-    href: '/dashboard/settings',
+    href: '/settings',
     section: SECTION_CONFIGURACION,
     icon: (
       <svg {...iconProps} aria-hidden="true">
@@ -308,7 +228,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Ayuda',
-    href: '/dashboard/ayuda',
+    href: '/ayuda',
     section: SECTION_CONFIGURACION,
     disabled: true,
     icon: (
@@ -323,7 +243,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Soporte',
-    href: '/dashboard/soporte',
+    href: '/soporte',
     section: SECTION_CONFIGURACION,
     disabled: true,
     icon: (

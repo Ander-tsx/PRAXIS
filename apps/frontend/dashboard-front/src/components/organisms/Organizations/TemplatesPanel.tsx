@@ -3,9 +3,10 @@
 import {
   borrarPlantillaAction,
   guardarPlantillaAction,
-} from '@/app/(private)/organizations/actions';
+} from '@/app/(private)/team/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Input, Select, useAccion } from '@praxis/commons';
+import { FloatingLabelInput, useAccion } from '@praxis/commons';
+import { FloatingLabelSelect } from '@praxis/commons/atoms/FloatingLabelSelect';
 import type { ProjectRoleTemplateView } from '@praxis/commons/billing/planes';
 import { useEffect, useId, useRef, useState } from 'react';
 
@@ -70,7 +71,7 @@ export function TemplatesPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-xl border-l-2 border-warning py-1 pl-4 font-sans text-sm text-text-secondary">
+      <p className="max-w-xl border-l-2 border-amber-500/40 py-1 pl-4 font-sans text-sm text-white/70">
         Un cambio aquí solo se nota en los proyectos que se creen a partir de ahora. Los que ya
         existen conservan sus roles.
       </p>
@@ -79,7 +80,7 @@ export function TemplatesPanel({
         {plantillas.map((plantilla) => (
           <li
             key={plantilla.id}
-            className="border-b border-dotted border-border py-5 last:border-b-0"
+            className="border-b border-dotted border-white/[0.12] py-5 last:border-b-0"
           >
             {editando === plantilla.id ? (
               <Formulario
@@ -102,7 +103,7 @@ export function TemplatesPanel({
 
       {puedeEditar &&
         (creando ? (
-          <div className="border-t border-border pt-6">
+          <div className="border-t border-white/[0.12] pt-6">
             <Formulario
               organizationId={organizationId}
               plantilla={null}
@@ -114,7 +115,7 @@ export function TemplatesPanel({
           <button
             type="button"
             onClick={() => setCreando(true)}
-            className="self-start font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+            className="self-start font-sans text-sm text-white/90 underline decoration-white/[0.12] underline-offset-4 transition-colors hover:decoration-emerald-400"
           >
             Crear una plantilla
           </button>
@@ -145,8 +146,8 @@ function Fila({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="font-display text-lg text-text-primary">{plantilla.name}</span>
-          <span className="font-sans text-xs text-text-disabled">
+          <span className="font-sans text-[15px] font-medium text-white/90">{plantilla.name}</span>
+          <span className="font-sans text-xs text-white/45">
             {cuantos === total
               ? 'Todos los permisos del proyecto'
               : `${cuantos} de ${total} permisos`}
@@ -158,23 +159,27 @@ function Fila({
             <button
               type="button"
               onClick={onEditar}
-              className="font-sans text-sm text-text-primary underline decoration-border underline-offset-4 transition-colors hover:decoration-primary"
+              className="font-sans text-sm text-white/90 underline decoration-white/[0.12] underline-offset-4 transition-colors hover:decoration-emerald-400"
             >
               Editar
             </button>
             <form action={borrarAction}>
               <input type="hidden" name="organizationId" value={organizationId} />
               <input type="hidden" name="templateId" value={plantilla.id} />
-              <Button type="submit" variant="ghost" size="sm" isLoading={borrando}>
-                Borrar
-              </Button>
+              <button
+                type="submit"
+                disabled={borrando}
+                className="rounded-md px-2.5 py-1.5 font-sans text-xs font-medium text-red-400/70 transition-colors hover:bg-white/[0.06] hover:text-red-400 disabled:opacity-40"
+              >
+                {borrando ? '…' : 'Borrar'}
+              </button>
             </form>
           </div>
         )}
       </div>
 
       {borrar.error && (
-        <p role="alert" className="font-sans text-sm text-error">
+        <p role="alert" className="font-sans text-sm text-red-400">
           {borrar.error}
         </p>
       )}
@@ -231,14 +236,13 @@ function Formulario({
 
   return (
     <form onSubmit={enviar} className="flex flex-col gap-5">
-      <Input
+      <FloatingLabelInput
         id={nombreId}
         label="Nombre del rol"
         value={name}
         onChange={(evento) => setName(evento.target.value)}
         maxLength={60}
         placeholder="QA"
-        fullWidth
         required
       />
 
@@ -246,42 +250,48 @@ function Formulario({
         {claves.map((clave) => (
           <li
             key={clave}
-            className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-dotted border-border py-3 last:border-b-0"
+            className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-dotted border-white/[0.12] py-3 last:border-b-0"
           >
-            <span className="min-w-0 flex-1 font-sans text-sm text-text-secondary">
+            <span className="min-w-0 flex-1 font-sans text-sm text-white/70">
               {TEXTO[clave] ?? clave}
             </span>
-            <div className="w-28 shrink-0">
-              <Select
+            <div className="w-28 shrink-0 relative">
+              <select
                 value={permisos[clave] ? 'si' : 'no'}
-                onValueChange={(valor) =>
-                  setPermisos((antes) => ({ ...antes, [clave]: valor === 'si' }))
-                }
-                options={[
-                  { value: 'no', label: 'No' },
-                  { value: 'si', label: 'Sí' },
-                ]}
-                fullWidth
-              />
+                onChange={(e) => setPermisos((antes) => ({ ...antes, [clave]: e.target.value === 'si' }))}
+                className="w-full rounded-md border border-white/[0.12] bg-white/[0.04] px-3 py-1.5 text-sm text-white/90 outline-none transition-colors hover:border-white/25 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 disabled:opacity-50 appearance-none"
+              >
+                <option value="no" className="bg-[#1a1a1a] text-white">No</option>
+                <option value="si" className="bg-[#1a1a1a] text-white">Sí</option>
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/50">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
             </div>
           </li>
         ))}
       </ul>
 
       {state.error && (
-        <p role="alert" className="font-sans text-sm text-error">
+        <p role="alert" className="font-sans text-sm text-red-400">
           {state.error}
         </p>
       )}
 
       <div className="flex flex-wrap items-center gap-4">
-        <Button type="submit" isLoading={pending}>
-          {plantilla ? 'Guardar' : 'Crear la plantilla'}
-        </Button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-full border border-white/[0.14] bg-white/[0.04] px-4 py-2 font-sans text-xs font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? '...' : (plantilla ? 'Guardar' : 'Crear la plantilla')}
+        </button>
         <button
           type="button"
           onClick={onCerrar}
-          className="font-sans text-sm text-text-secondary underline decoration-transparent underline-offset-4 transition-colors hover:decoration-border"
+          className="font-sans text-sm text-white/70 underline decoration-transparent underline-offset-4 transition-colors hover:decoration-white/[0.12]"
         >
           Cancelar
         </button>

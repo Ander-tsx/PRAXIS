@@ -98,11 +98,7 @@ export function OrgSwitcher({
   );
 
   if (plegada) {
-    return (
-      <div className="flex justify-center" title={etiqueta}>
-        {cuadro}
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -195,7 +191,7 @@ export function OrgSwitcher({
                   identidad a todo el mundo y el formulario solo a quien puede. */}
               {activaId && (
                 <a
-                  href={`/dashboard/organizations/${activaId}#configuracion`}
+                  href="/team?config=true"
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white/80 hover:text-white transition-colors text-left w-full"
                 >
                   <svg
@@ -468,9 +464,12 @@ function NewSpaceModal({ onClose, zonePath }: { onClose: () => void; zonePath: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
       });
+      const body = await res.json().catch(() => null);
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
         throw new Error(body?.error?.message || 'Error al crear');
+      }
+      if (body?.id) {
+        document.cookie = `praxis_org=${body.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
       }
       window.location.reload();
     } catch (err: any) {
@@ -542,7 +541,7 @@ function UpgradeModal({ onClose, zonePath }: { onClose: () => void; zonePath: st
           </p>
         </div>
         <a
-          href="/dashboard/billing"
+          href="/billing"
           className="mt-4 px-8 py-3 bg-white text-black font-bold rounded-full hover:bg-white/90 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.3)]"
         >
           Ver planes y precios
