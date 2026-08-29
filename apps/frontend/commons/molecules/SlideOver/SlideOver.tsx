@@ -14,6 +14,16 @@ export interface SlideOverProps {
    * `md` = max-w-md, `lg` = max-w-lg, `xl` = max-w-xl
    */
   size?: 'md' | 'lg' | 'xl';
+  /**
+   * Paleta del panel.
+   *
+   * `default` es la de siempre —`surface` azulado, `text-primary`—. `dark` es la
+   * del refrandeo: negro casi puro (`#0c0c0b`), bordes y textos en blanco
+   * translúcido. Se añadió para el diálogo de tarea, que abre sobre el tablero
+   * ya refrandeado y desentonaba en azul. Los demás consumidores no pasan `tone`
+   * y siguen exactamente igual.
+   */
+  tone?: 'default' | 'dark';
 }
 
 const sizeClasses = {
@@ -42,8 +52,10 @@ export function SlideOver({
   description,
   children,
   size = 'md',
+  tone = 'default',
 }: SlideOverProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const dark = tone === 'dark';
 
   useEffect(() => {
     const isDesktop = window.matchMedia('(min-width: 640px)').matches;
@@ -89,8 +101,17 @@ export function SlideOver({
     <>
       <div
         ref={panelRef}
+        /* `data-tone="dark"` redefine los tokens de color para todo el subárbol
+           (ver `theme.css`): los átomos de dentro —Select, SelectorDeFecha,
+           Input…— salen en la paleta near-black sin tocarlos uno a uno. El
+           panel además fija su propio fondo/borde a pelo porque quiere el
+           `#0c0c0b` del rebrand, un peldaño por debajo del `surface` de dentro. */
+        data-tone={dark ? 'dark' : undefined}
         className={[
-          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto bg-surface p-6 text-left text-text-primary transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l sm:border-border cursor-default',
+          'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto p-6 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
+          dark
+            ? 'bg-[#0c0c0b] text-white sm:border-white/[0.08]'
+            : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}

@@ -71,8 +71,23 @@ export class OrganizationsController {
   }
 
   @MessagePattern({ cmd: 'billing_org_rename' })
-  renombrar(@Payload() dto: { organizationId: string; userId: string; name: string }) {
-    return this.organizaciones.renombrar(dto.organizationId, dto.userId, dto.name);
+  renombrar(
+    @Payload()
+    dto: {
+      organizationId: string;
+      userId: string;
+      name: string;
+      iconKey?: string | null;
+      color?: string | null;
+    },
+  ) {
+    return this.organizaciones.renombrar(
+      dto.organizationId,
+      dto.userId,
+      dto.name,
+      dto.iconKey,
+      dto.color,
+    );
   }
 
   @MessagePattern({ cmd: 'billing_org_members' })

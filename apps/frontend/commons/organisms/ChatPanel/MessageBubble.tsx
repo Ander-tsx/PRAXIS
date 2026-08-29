@@ -612,8 +612,8 @@ export function MessageBubble({
    * sólido del que la esquina puede tirar.
    */
   const fondo = mine
-    ? `color-mix(in srgb, ${colors.primary} 16%, ${colors.background})`
-    : colors.surfaceElevated;
+    ? `color-mix(in srgb, ${colors.primary} 16%, #080807)`
+    : '#131312';
 
   /**
    * Si la flecha del desplegable tiene algo que desplegar.
@@ -696,12 +696,15 @@ export function MessageBubble({
       >
         {/* El hueco del avatar, para que la lápida quede en la misma columna que
             el resto de burbujas y no se desalinee el bloque. */}
-        <span className="w-6 shrink-0" aria-hidden="true" />
+        <span className="w-8 shrink-0" aria-hidden="true" />
 
         <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
           {!continued && (
-            <span className="flex items-center gap-2 px-1 font-sans text-xs">
-              <span className="font-semibold text-text-disabled">{mine ? 'Tú' : nombre}</span>
+            <span className="flex items-center gap-2 px-1 mb-1">
+              <span className="font-display font-medium text-sm text-text-primary">{mine ? 'Tú' : nombre}</span>
+              <span className="font-sans text-[10px] text-text-disabled/50">
+                {soloHora(message.createdAt)}
+              </span>
             </span>
           )}
 
@@ -740,18 +743,18 @@ export function MessageBubble({
        * Hueco del ancho del avatar cuando no se pinta, para que las burbujas
        * seguidas queden alineadas entre sí.
        *
-       * ⚠️ **`w-6` porque `Avatar size="sm"` es `h-6 w-6`.** Estaba en `w-8` y el
+       * ⚠️ **`w-8` porque `Avatar size="base"` es `h-8 w-8`.** Estaba en `w-8` y el
        * resultado eran 8 px de desfase: la primera burbuja de cada bloque nacía
        * pegada al borde y las siguientes se separaban. Si algún día cambia el
        * tamaño del átomo, esto tiene que cambiar con él.
        */}
       {continued ? (
-        <span className="w-6 shrink-0" aria-hidden="true" />
+        <span className="w-8 shrink-0" aria-hidden="true" />
       ) : (
         <Avatar
           label={nombre}
           mine={mine}
-          size="sm"
+          size="base"
           src={avatarHref(author?.avatarUrl, gatewayPath)}
           /* El punto de estado también en el chat: saber que alguien está en
              una reunión explica por qué no contesta, y ese es justo el momento
@@ -788,12 +791,12 @@ export function MessageBubble({
               <a
                 href={hrefDePersona}
                 title={`Escribir a ${nombre} en privado`}
-                className="font-semibold text-text-primary underline-offset-2 hover:underline"
+                className="font-display font-medium text-[15px] text-text-primary underline-offset-2 hover:underline"
               >
                 {nombre}
               </a>
             ) : (
-              <span className="font-semibold text-text-primary">{mine ? 'Tú' : nombre}</span>
+              <span className="font-display font-medium text-[15px] text-text-primary">{mine ? 'Tú' : nombre}</span>
             )}
             {fijado && (
               <span
@@ -860,13 +863,17 @@ export function MessageBubble({
              lo que revela las dos asas. Con nombre porque dentro hay otro grupo
              —el del reproductor de vídeo— y `group-hover` a secas se los
              confundiría. */
-          className={`group/burbuja relative min-w-0 max-w-full rounded-sm ${
+          className={`group/burbuja relative min-w-0 max-w-full rounded-2xl ${
+            !mine && !continued ? 'rounded-tl-sm' : ''
+          } ${
+            mine && !continued ? 'rounded-tr-sm' : ''
+          } ${
             /* ⚠️ **Solo un medio: relleno igual por los cuatro lados.** El de
-               un mensaje de texto (`px-3.5 py-2`) es más ancho que alto a
+               un mensaje de texto (`px-4 py-2.5`) es más ancho que alto a
                propósito —así se lee mejor una línea— pero alrededor de una foto
                ese desajuste se ve: dos milímetros arriba y cuatro a los lados,
                como un marco mal cortado. */
-            soloMedia ? 'p-2' : 'px-3.5 py-2'
+            soloMedia ? 'p-2' : 'px-4 py-2.5'
           }`}
           /* Los tres gestos táctiles: `onGestoFin` cubre tanto soltar el dedo
              como que el sistema cancele el gesto a medias (una llamada
@@ -884,11 +891,6 @@ export function MessageBubble({
             touchAction: 'pan-y',
             transform: arrastreX !== 0 ? `translateX(${arrastreX}px)` : undefined,
             transition: gestoRef.current.esDeslizamiento ? 'none' : 'transform 150ms ease-out',
-            /* La esquina que apunta al avatar se queda cuadrada solo en el
-               primero del bloque: es lo que agrupa los mensajes seguidos
-               visualmente sin necesidad de separadores. */
-            borderTopLeftRadius: !mine && !continued ? '0.35rem' : undefined,
-            borderTopRightRadius: mine && !continued ? '0.35rem' : undefined,
             /* El realce de un mensaje fijado se pinta con un div absoluto
                adentro para que quede por encima del botón de acciones y no
                se vea mordido por su fondo radial. */
@@ -1098,7 +1100,7 @@ export function MessageBubble({
                     : 'pointer-events-none opacity-0'
                 }`}
                 style={{
-                  background: colors.surfaceElevated,
+                  background: '#131312',
                   borderColor: colors.borderStrong,
                   color: selectorAbierto ? colors.primary : colors.textSecondary,
                   boxShadow: `0 4px 12px ${alpha(colors.overlay, 35)}`,
@@ -1122,7 +1124,7 @@ export function MessageBubble({
                     selectorAbajo ? 'top-full mt-2' : 'bottom-full mb-2'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
-                    background: colors.surfaceElevated,
+                    background: '#131312',
                     borderColor: colors.borderStrong,
                     boxShadow: `0 10px 30px ${alpha(colors.overlay, 50)}`,
                   }}
@@ -1208,13 +1210,13 @@ export function MessageBubble({
               {menuAbierto && (
                 <div
                   role="menu"
-                  className={`absolute z-50 flex w-52 flex-col overflow-hidden rounded-sm border py-1 ${
-                    menuArriba ? 'bottom-full mb-1' : 'top-full mt-1'
+                  className={`absolute z-50 flex w-52 flex-col rounded-2xl border p-1.5 ${
+                    menuArriba ? 'bottom-full mb-2' : 'top-full mt-2'
                   } ${mine ? 'right-0' : 'left-0'}`}
                   style={{
-                    background: colors.surfaceElevated,
-                    borderColor: colors.borderStrong,
-                    boxShadow: `0 14px 40px ${alpha(colors.overlay, 55)}`,
+                    background: '#131312',
+                    borderColor: 'rgba(255,255,255,0.05)',
+                    boxShadow: `0 10px 40px -10px rgba(0,0,0,0.5)`,
                   }}
                 >
                   {listaDeVistos ? (
@@ -1459,7 +1461,7 @@ export function MessageBubble({
             onPointerCancel={onHojaGestoFin}
             className="fixed inset-x-0 bottom-0 z-10 flex flex-col gap-1 rounded-t-2xl border-t p-3 ease-out"
             style={{
-              background: colors.surfaceElevated,
+              background: '#131312',
               borderColor: colors.border,
               paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
               touchAction: 'none',

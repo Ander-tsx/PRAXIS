@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useAppShell, useSidebarPlegada } from './AppShell';
+import { PraxLauncher } from './PraxLauncher';
 
 export interface AppHeaderProps {
   anchoCompleto?: boolean;
@@ -38,8 +39,14 @@ export interface AppHeaderProps {
  * lo que abre es el cajón de `AppShell`: por eso pide la función por contexto en
  * vez de recibirla por props a través de media aplicación.
  */
-export function AppHeader({ title, headerSlot, lleno = false, anchoCompleto = false, children }: AppHeaderProps) {
-  const { openMenu, cuentaSlot } = useAppShell();
+export function AppHeader({
+  title,
+  headerSlot,
+  lleno = false,
+  anchoCompleto = false,
+  children,
+}: AppHeaderProps) {
+  const { openMenu } = useAppShell();
   /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
      libera ~184px que esta columna nunca reclama —se queda en el margen
      lateral en vez de dárselos al contenido— y en una pantalla ancha, plegar
@@ -72,21 +79,18 @@ export function AppHeader({ title, headerSlot, lleno = false, anchoCompleto = fa
         </div>
 
         {/**
-         * La derecha lleva dos cosas, y en este orden.
+         * La derecha: la acción de la pantalla y, pegado al borde, **PRAX**.
          *
-         * Primero la acción de la pantalla —lo que se viene a hacer aquí— y
-         * después quién eres, pegado al borde: el rol y el plan se consultan de
-         * reojo y su sitio es la esquina, no delante del botón principal.
-         *
-         * `cuentaSlot` lo pone el armazón, así que sale en **todas** las
-         * pantallas de la zona sin que cada página tenga que acordarse.
+         * Ese hueco tenía antes las insignias de rol global y plan (`cuentaSlot`
+         * → `CuentaEnCabecera`). Se retiraron: dos datos que se iban a mirar a
+         * Configuración una vez, no de reojo. En su sitio va el asistente, que sí
+         * se usa desde cualquier pantalla. `PraxLauncher` sale en **todas** sin
+         * que cada página se acuerde, porque `AppHeader` va en todas.
          */}
-        {(headerSlot || cuentaSlot) && (
-          <div className="flex shrink-0 items-center gap-3">
-            {headerSlot}
-            {cuentaSlot}
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-3">
+          {headerSlot}
+          <PraxLauncher />
+        </div>
       </header>
 
       {/**

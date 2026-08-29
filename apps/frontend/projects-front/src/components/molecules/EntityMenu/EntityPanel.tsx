@@ -167,7 +167,7 @@ export function EntityPanel({
 
           <label
             htmlFor={idNombre}
-            className="font-sans text-[11px] uppercase tracking-wide text-text-disabled"
+            className="font-sans text-[11px] uppercase tracking-wide text-white/35"
           >
             Nombre del {entidad}
           </label>
@@ -186,7 +186,7 @@ export function EntityPanel({
                 evento.currentTarget.form?.requestSubmit();
               }
             }}
-            className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-sm text-text-primary outline-none focus:border-primary"
+            className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
           />
 
           {(errorDeNombre ?? renombrar.error) && (
@@ -218,7 +218,7 @@ export function EntityPanel({
         <form action={eliminar.ejecutar} className="flex flex-col gap-2 p-1.5" noValidate>
           {camposOcultos}
 
-          <p className="font-sans text-xs text-text-primary">¿Eliminar «{nombre}»?</p>
+          <p className="font-sans text-xs text-white">¿Eliminar «{nombre}»?</p>
           <p className="font-sans text-[11px] leading-snug" style={{ color: colors.warning }}>
             {avisoDeBorrado}
           </p>
@@ -227,9 +227,9 @@ export function EntityPanel({
             <>
               <label
                 htmlFor={idConfirmacion}
-                className="font-sans text-[11px] leading-snug text-text-secondary"
+                className="font-sans text-[11px] leading-snug text-white/55"
               >
-                Escribe <strong className="text-text-primary">{nombre}</strong> para confirmar
+                Escribe <strong className="text-white">{nombre}</strong> para confirmar
               </label>
               <input
                 id={idConfirmacion}
@@ -237,7 +237,7 @@ export function EntityPanel({
                 onChange={(evento) => setConfirmacion(evento.target.value)}
                 autoComplete="off"
                 aria-invalid={!puedeBorrar}
-                className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-sm text-text-primary outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
             </>
           )}
@@ -283,8 +283,8 @@ function ItemDeMenu({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
-      style={tono ? { color: tono } : undefined}
+      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left font-sans text-xs transition-colors hover:bg-white/5"
+      style={{ color: tono ?? colors.textPrimary }}
     >
       {children}
     </button>
@@ -296,7 +296,7 @@ function BotonVolver({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+      className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
     >
       Cancelar
     </button>

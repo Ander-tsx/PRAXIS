@@ -83,8 +83,8 @@ export function CreateBoardButton({
           title="Nuevo tablero"
           className={
             compacto
-              ? 'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-              : 'flex items-center gap-2 rounded-lg bg-surface px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary'
+              ? 'flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+              : 'flex items-center gap-2 rounded-lg border border-white/10 bg-[#131312] px-4 py-2 font-sans text-sm text-white/70 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white'
           }
         >
           <svg
@@ -108,7 +108,7 @@ export function CreateBoardButton({
             setTouched(true);
             if (clientError || name.trim().length < 2) event.preventDefault();
           }}
-          className="flex items-center gap-1 rounded-md bg-surface pl-2 pr-1 h-7 border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+          className="flex h-9 items-center gap-1 rounded-xl border border-white/10 bg-[#131312] pl-3 pr-1.5 transition-colors focus-within:border-primary"
         >
           <input type="hidden" name="workspaceId" value={workspaceId} />
           <input type="hidden" name="projectId" value={projectId} />
@@ -116,23 +116,25 @@ export function CreateBoardButton({
           <input
             id={nameId}
             name="name"
-            placeholder="Nuevo tablero..."
+            placeholder="Nombre del tablero…"
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={BOARD_NAME_MAX}
             autoComplete="off"
             autoFocus
-            className={`w-32 bg-transparent text-xs font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
-              touched && clientError ? 'text-error' : 'text-text-primary'
+            className={`w-40 bg-transparent text-sm font-medium outline-none placeholder:font-normal placeholder:text-white/30 ${
+              touched && clientError ? 'text-error' : 'text-white'
             }`}
           />
           <button
             type="submit"
             disabled={pending || name.trim().length < 2 || Boolean(clientError)}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
+            aria-label="Crear tablero"
+            title="Crear"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             <svg
-              className="h-3 w-3"
+              className="h-3.5 w-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -148,7 +150,9 @@ export function CreateBoardButton({
               setName('');
               setTouched(false);
             }}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
+            aria-label="Cancelar"
+            title="Cancelar"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white"
           >
             <svg
               className="h-3.5 w-3.5"

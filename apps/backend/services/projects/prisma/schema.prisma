@@ -32,6 +32,15 @@ model Project {
 
   description String?
 
+  /// Identidad visual del proyecto, elegida en su modal de configuración.
+  ///
+  /// `iconKey` es el nombre kebab-case de un icono de `lucide-react` de la lista
+  /// curada del frontend; `color` es un `#rrggbb`. Anulables: sin ellos el
+  /// frontend cae al monograma —dos letras sobre un color derivado del `id`—.
+  /// El backend solo los guarda y los devuelve.
+  iconKey     String?
+  color       String?
+
   /// Quién es **responsable** del proyecto.
   ///
   /// ⚠️ **Ya no es «el dueño», aunque la columna siga llamándose así.** Desde

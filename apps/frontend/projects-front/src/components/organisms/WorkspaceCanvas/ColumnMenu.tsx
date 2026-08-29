@@ -164,7 +164,7 @@ export function ColumnMenu({
         aria-expanded={open}
         aria-label={`Opciones de la columna ${columnName}`}
         title="Opciones"
-        className="cursor-pointer rounded p-1 text-text-disabled transition-colors hover:text-text-primary"
+        className="cursor-pointer rounded p-1 text-white/35 transition-colors hover:text-white"
         style={{ color: open ? colors.textPrimary : undefined }}
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -182,7 +182,7 @@ export function ColumnMenu({
           aria-label={`Opciones de la columna ${columnName}`}
           className="absolute right-0 top-full z-30 mt-1 w-56 rounded-xl p-1.5"
           style={{
-            background: colors.surfaceElevated,
+            background: '#1c1c1b',
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
           }}
         >
@@ -208,9 +208,7 @@ export function ColumnMenu({
                     />
                     Cambiar color
                     {columnColor === DONE_COLUMN_COLOR && (
-                      <span className="ml-auto font-sans text-[10px] text-text-disabled">
-                        cierre
-                      </span>
+                      <span className="ml-auto font-sans text-[10px] text-white/35">cierre</span>
                     )}
                   </MenuItem>
                   <MenuItem onClick={() => show('rename')}>
@@ -246,7 +244,7 @@ export function ColumnMenu({
               <input type="hidden" name="columnId" value={columnId} />
               <input type="hidden" name="projectId" value={projectId} />
 
-              <span className="font-sans text-[11px] uppercase tracking-wide text-text-disabled">
+              <span className="font-sans text-[11px] uppercase tracking-wide text-white/35">
                 Color del punto
               </span>
 
@@ -314,7 +312,7 @@ export function ColumnMenu({
 
               <label
                 htmlFor={`rename-${columnId}`}
-                className="font-sans text-[11px] uppercase tracking-wide text-text-disabled"
+                className="font-sans text-[11px] uppercase tracking-wide text-white/35"
               >
                 Nombre
               </label>
@@ -340,14 +338,14 @@ export function ColumnMenu({
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-sm text-text-primary outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
 
               {/* El estado de las tareas guarda el **nombre** de la columna, así
                   que renombrar las arrastra. Se avisa: quien renombra no tiene
                   por qué saber que el modelo está denormalizado. */}
               {taskCount > 0 && (
-                <span className="font-sans text-[11px] text-text-disabled">
+                <span className="font-sans text-[11px] text-white/35">
                   {taskCount === 1
                     ? 'Su tarea pasará a este estado.'
                     : `Sus ${taskCount} tareas pasarán a este estado.`}
@@ -366,7 +364,7 @@ export function ColumnMenu({
                 <button
                   type="button"
                   onClick={() => show('menu')}
-                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
                 >
                   Cancelar
                 </button>
@@ -376,7 +374,7 @@ export function ColumnMenu({
 
           {view === 'delete' && (
             <div className="flex flex-col gap-2 p-1.5">
-              <p className="font-sans text-xs text-text-primary">¿Eliminar «{columnName}»?</p>
+              <p className="font-sans text-xs text-white">¿Eliminar «{columnName}»?</p>
               <p className="font-sans text-[11px]" style={{ color: colors.warning }}>
                 {taskCount === 1
                   ? 'Se irá con ella su única tarea.'
@@ -395,7 +393,7 @@ export function ColumnMenu({
                 <button
                   type="button"
                   onClick={() => show('menu')}
-                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
                 >
                   No
                 </button>
@@ -445,7 +443,7 @@ function MenuItem({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left font-sans text-xs transition-colors hover:bg-surface"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left font-sans text-xs transition-colors hover:bg-white/5"
       style={{ color: tone ?? colors.textPrimary }}
     >
       {children}
@@ -458,7 +456,7 @@ function MenuBack({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="self-start cursor-pointer rounded px-1 font-sans text-[11px] text-text-secondary transition-colors hover:text-text-primary"
+      className="self-start cursor-pointer rounded px-1 font-sans text-[11px] text-white/55 transition-colors hover:text-white"
     >
       ← Volver
     </button>

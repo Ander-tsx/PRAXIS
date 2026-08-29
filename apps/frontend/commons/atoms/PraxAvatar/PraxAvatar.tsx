@@ -551,24 +551,6 @@ export function PraxAvatar({
           </g>
         )}
       </svg>
-
-      <style>{`
-        @keyframes prax-float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-3px); }
-        }
-        @keyframes prax-eye-wobble {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(2px); }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          [aria-label^="PRAX"],
-          [aria-label^="PRAX"] * {
-            animation: none !important;
-            transition: none !important;
-          }
-        }
-      `}</style>
     </span>
   );
 }

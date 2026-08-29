@@ -272,6 +272,16 @@ export interface Project {
   description: string | null;
   ownerId: string;
   /**
+   * Identidad visual, elegida en el modal de configuración del proyecto.
+   *
+   * `iconKey` es un nombre de icono de `lucide-react` de la lista curada
+   * (`commons/atoms/GlyphPicker`); `color`, un `#rrggbb`. `null`/ausente = sin
+   * elegir, y `ProjectMonogram` cae a las dos letras sobre el color derivado del
+   * `id`. Vienen en `GET /projects` y en `GET /projects/:id`.
+   */
+  iconKey?: string | null;
+  color?: string | null;
+  /**
    * La organización a la que pertenece. `NOT NULL` en la base desde la etapa de
    * organizaciones.
    *
@@ -622,7 +632,6 @@ export const CHAT_ATTACHMENT_ALLOWED_MIME = [
      navegador y lo rechazaba otro. */
   'text/markdown',
   'text/x-markdown',
-  'application/zip',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel',

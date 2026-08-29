@@ -113,9 +113,13 @@ export function DeleteProjectButton({
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="font-sans text-sm font-medium text-white/50 transition-colors hover:text-red-400"
+        onClick={() => setOpen(true)}
+      >
         Eliminar proyecto
-      </Button>
+      </button>
 
       <Dialog
         open={open}
@@ -127,28 +131,24 @@ export function DeleteProjectButton({
           <input type="hidden" name="projectId" value={projectId} />
 
           <div
-            className="flex flex-col gap-2 rounded-lg border px-4 py-3"
-            style={{
-              background: alpha(colors.error, 8),
-              borderColor: alpha(colors.error, 30),
-            }}
+            className="flex flex-col gap-2 rounded-lg border px-4 py-3 border-red-500/30 bg-red-500/10"
           >
-            <p className="font-sans text-sm font-semibold text-text-primary">Se eliminarán:</p>
+            <p className="font-sans text-sm font-semibold text-white/90">Se eliminarán:</p>
 
             {counting && !inventory ? (
-              <p className="font-sans text-sm text-text-secondary">Contando lo que hay dentro…</p>
+              <p className="font-sans text-sm text-white/50">Contando lo que hay dentro…</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {visible.map((line) => (
-                  <li key={line.plural} className="font-sans text-sm text-text-secondary">
+                  <li key={line.plural} className="font-sans text-sm text-white/50">
                     {line.count === null ? (
                       <>
-                        Sus <strong className="text-text-primary">{line.plural}</strong> — no se
+                        Sus <strong className="text-white/90">{line.plural}</strong> — no se
                         pudieron contar
                       </>
                     ) : (
                       <>
-                        <strong className="tabular-nums text-text-primary">{line.count}</strong>{' '}
+                        <strong className="tabular-nums text-white/90">{line.count}</strong>{' '}
                         {line.count === 1 ? line.singular : line.plural}
                       </>
                     )}

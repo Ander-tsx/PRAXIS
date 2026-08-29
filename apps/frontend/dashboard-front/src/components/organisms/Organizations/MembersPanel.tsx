@@ -6,7 +6,7 @@ import {
   quitarMiembroAction,
 } from '@/app/(private)/organizations/actions';
 import { INVITAR_MIEMBRO_INITIAL_STATE, ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Badge, Button, Input, Select, useAccion } from '@praxis/commons';
+import { Input, Select, useAccion } from '@praxis/commons';
 import type {
   OrganizationMemberView,
   OrganizationPermissions,
@@ -123,19 +123,23 @@ function Invitar({
           />
         </div>
 
-        <Button type="submit" isLoading={pending} disabled={sinAsientos}>
-          Invitar
-        </Button>
+        <button
+          type="submit"
+          disabled={pending || sinAsientos}
+          className="rounded-full border border-white/[0.14] bg-white/[0.04] px-4 py-2 font-sans text-xs font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {pending ? 'Invitando…' : 'Invitar'}
+        </button>
       </form>
 
       {sinAsientos && (
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white/45">
           No quedan asientos. Amplía el plan o saca a alguien antes de invitar.
         </p>
       )}
 
       {state.error && (
-        <p role="alert" className="font-sans text-sm text-error">
+        <p role="alert" className="font-sans text-sm text-red-400">
           {state.error}
         </p>
       )}
@@ -144,8 +148,8 @@ function Invitar({
         /* Una raya de color a la izquierda en vez de una caja verde entera: es
            un aviso, no un panel. El enlace sí se separa, porque hay que poder
            seleccionarlo entero sin arrastrar media frase con él. */
-        <div className="flex flex-col gap-2 border-l-2 border-success py-1 pl-4">
-          <p className="font-sans text-sm text-text-primary">
+        <div className="flex flex-col gap-2 border-l-2 border-emerald-500/40 py-1 pl-4">
+          <p className="font-sans text-sm text-white/80">
             {state.correoEnviado
               ? `Le hemos mandado un correo a ${state.email}.`
               : `Invitación creada para ${state.email}, pero el correo no salió.`}{' '}
@@ -154,9 +158,7 @@ function Invitar({
                 en no deseados el día que hay que enseñarlo. */}
             Este enlace también sirve, y no se puede volver a ver:
           </p>
-          <code className="block break-all font-mono text-xs text-text-secondary">
-            {state.enlace}
-          </code>
+          <code className="block break-all font-mono text-xs text-white/45">{state.enlace}</code>
         </div>
       )}
     </div>
@@ -185,20 +187,30 @@ function Fila({
   const seLePuedeTocar = puedeGestionar && !esDueño;
 
   return (
-    <li className="flex flex-wrap items-center gap-3 border-b border-dotted border-border py-4 last:border-b-0">
+    <li className="flex flex-wrap items-center gap-3 border-b border-white/[0.06] py-4 last:border-b-0">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-display text-base text-text-primary">
+        <p className="truncate font-sans text-[15px] font-medium text-white/90">
           {miembro.name ?? miembro.email}
         </p>
         {miembro.name && (
-          <p className="truncate font-sans text-xs text-text-secondary">{miembro.email}</p>
+          <p className="truncate font-sans text-xs text-white/45">{miembro.email}</p>
         )}
       </div>
 
-      <Badge variant={esDueño ? 'primary' : 'default'}>
+      <span
+        className={`shrink-0 rounded-md border px-2 py-0.5 font-sans text-xs font-medium ${
+          esDueño
+            ? 'border-primary/40 bg-primary/15 text-primary'
+            : 'border-white/[0.12] bg-white/[0.04] text-white/70'
+        }`}
+      >
         {esDueño ? 'Dueño' : (miembro.roleName ?? 'Sin papel')}
-      </Badge>
-      {miembro.status === 'INVITED' && <Badge variant="warning">Invitación pendiente</Badge>}
+      </span>
+      {miembro.status === 'INVITED' && (
+        <span className="shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-sans text-xs font-medium text-amber-400">
+          Invitación pendiente
+        </span>
+      )}
 
       {/* Cambiar de papel es **elegir de una lista**, y por eso este control no
           existía mientras los papeles eran un enum de tres valores: un botón que
@@ -233,14 +245,18 @@ function Fila({
           {/* El identificador de quien ya entró, o el correo de quien todavía
               no: una invitación sin aceptar no tiene `userId`. */}
           <input type="hidden" name="idOrEmail" value={miembro.userId ?? miembro.email} />
-          <Button type="submit" variant="ghost" size="sm" isLoading={quitando}>
-            {miembro.status === 'INVITED' ? 'Cancelar' : 'Sacar'}
-          </Button>
+          <button
+            type="submit"
+            disabled={quitando}
+            className="rounded-md px-2.5 py-1.5 font-sans text-xs font-medium text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+          >
+            {quitando ? '…' : miembro.status === 'INVITED' ? 'Cancelar' : 'Sacar'}
+          </button>
         </form>
       )}
 
       {(quitar.error || rol.error) && (
-        <p role="alert" className="w-full font-sans text-xs text-error">
+        <p role="alert" className="w-full font-sans text-xs text-red-400">
           {quitar.error ?? rol.error}
         </p>
       )}

@@ -973,7 +973,20 @@ export class ChatService {
   async misChatsDeProyecto(userId: string) {
     const membresias = await this.prisma.projectMember.findMany({
       where: { userId, project: { status: { not: 'DELETED' } } },
-      select: { project: { select: { id: true, name: true, slug: true } } },
+      select: {
+        project: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            iconKey: true,
+            color: true,
+            /* Para que el directorio filtre los chats de proyecto por la
+               organización activa, como el resto de la interfaz. */
+            organizationId: true,
+          },
+        },
+      },
       orderBy: { joinedAt: 'desc' },
     });
     if (membresias.length === 0) return [];

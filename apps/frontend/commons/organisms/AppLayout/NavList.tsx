@@ -1,8 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
+
+/**
+ * ⚠️ **Aviso de React en desarrollo, sin resolver: «Each child in a list should
+ * have a unique "key" prop … render method of `NavList`».**
+ *
+ * Salta en cada hidratación (2× por `StrictMode`) y **no vuelve a saltar** en
+ * los re-renders — el elemento que lo dispara se valida una vez y se marca. Es
+ * de desarrollo: la build de producción no comprueba claves.
+ *
+ * Descartado, comprobado en el navegador: las listas de `NavList` llevan clave
+ * (`grupo.clave`, `claveItem`); los iconos tampoco son —clonarlos con `key` no
+ * lo calla—; los `<svg>` de varios trazos van envueltos en `<g>` para tener un
+ * solo hijo y aun así salta. Queda por capturar el `owner stack` real antes de
+ * la hidratación, que es lo único que dirá qué array es.
+ */
 
 /**
  * El enlace activo es el que **más** coincide con la ruta, no cualquiera que sea
@@ -90,11 +105,17 @@ export function NavList({
   const grupos = agruparPorSeccion(navItems);
 
   /**
-   * Qué grupos están compactados, por `clave`. Vacío al montar — todos
-   * abiertos — y el estado no se guarda entre visitas: es una comodidad de
-   * la sesión, no una preferencia que necesite sobrevivir a un `F5`.
+   * Qué grupos están compactados, por `clave`.
    */
-  const [compactados, setCompactados] = useState<Set<string>>(() => new Set());
+  const [compactados, setCompactados] = useState<Set<string>>(new Set());
+
+  // Cargar estado inicial
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem('praxis_nav_compactados');
+      if (guardado) setCompactados(new Set(JSON.parse(guardado)));
+    } catch (e) {}
+  }, []);
 
   function alternar(clave: string) {
     setCompactados((actual) => {
@@ -104,6 +125,9 @@ export function NavList({
       } else {
         siguiente.add(clave);
       }
+      try {
+        localStorage.setItem('praxis_nav_compactados', JSON.stringify([...siguiente]));
+      } catch (e) {}
       return siguiente;
     });
   }
@@ -128,7 +152,7 @@ export function NavList({
                 type="button"
                 onClick={() => alternar(grupo.clave)}
                 aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/60 transition-colors hover:text-white"
+                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50 transition-colors hover:text-white"
               >
                 {grupo.section}
                 <svg
@@ -162,12 +186,12 @@ export function NavList({
               >
                 {grupo.items.map((item, idx) => {
                   const active = !item.disabled && item.href === activeHref;
-                  const claveItem = `${grupo.clave}::${item.href}`;
+                  const claveItem = `${grupo.clave}::${item.href}::${idx}`;
 
                   if (item.disabled) {
                     return (
                       <span
-                        key={`${grupo.clave}-${idx}`}
+                        key={claveItem}
                         aria-disabled="true"
                         title={
                           plegada
@@ -196,7 +220,7 @@ export function NavList({
                      * zona actual. Ver ESTADO-ACTUAL §16.
                      */
                     <a
-                      key={`${grupo.clave}-${idx}`}
+                      key={claveItem}
                       href={item.href}
                       onClick={onNavigate}
                       aria-current={active ? 'page' : undefined}
@@ -206,7 +230,7 @@ export function NavList({
                         plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
                         active
                           ? 'font-semibold text-white bg-white/10 hover:bg-white/15'
-                          : 'font-medium text-white/80 hover:bg-white/5 hover:text-white',
+                          : 'font-medium text-white/70 hover:bg-white/5 hover:text-white',
                       ].join(' ')}
                     >
                       {item.icon}

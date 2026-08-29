@@ -44,8 +44,8 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex w-72 shrink-0 items-center gap-2 rounded-2xl px-4 py-4 text-left font-sans text-sm text-text-secondary transition-all duration-200 ease-out hover:bg-surface hover:text-text-primary"
-        style={{ background: alpha(colors.surface, 55) }}
+        className="flex w-72 shrink-0 items-center gap-2 rounded-2xl px-4 py-4 text-left font-sans text-sm text-white/55 transition-all duration-200 ease-out hover:bg-white/5 hover:text-white"
+        style={{ background: 'rgba(255,255,255,0.03)' }}
       >
         <span
           className="flex h-6 w-6 items-center justify-center rounded-lg font-sans text-base leading-none"
@@ -62,7 +62,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
   return (
     <form
       action={formAction}
-      className="flex w-72 shrink-0 flex-col gap-2 rounded-2xl bg-surface p-4"
+      className="flex w-72 shrink-0 flex-col gap-2 rounded-2xl bg-[#131312] p-4"
     >
       <input type="hidden" name="boardId" value={boardId} />
       <input type="hidden" name="projectId" value={projectId} />
@@ -79,7 +79,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
         placeholder="Por hacer"
         autoComplete="off"
         aria-label="Nombre de la columna"
-        className="h-9 rounded-lg border border-border bg-surface-elevated px-3 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
+        className="h-9 rounded-lg border border-white/10 bg-[#1c1c1b] px-3 font-sans text-sm text-white outline-none placeholder:text-white/35 focus:border-primary"
       />
 
       <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function AddColumnCard({ boardId, projectId, nextOrder }: AddColumnCardPr
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+          className="font-sans text-xs text-white/55 transition-colors hover:text-white"
         >
           Cancelar
         </button>

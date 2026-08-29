@@ -39,6 +39,10 @@ export async function createProjectAction(
 
   const name = String(formData.get('name') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
+  /* La organización activa, que llega del servidor por props del trigger. Sin
+     ella el gateway usa la personal, y el proyecto acaba donde no lo miras. El
+     gateway valida pertenencia y `canCreateProject` antes de contar la cuota. */
+  const organizationId = String(formData.get('organizationId') ?? '').trim();
 
   const invalid = validateProject({ name, description });
   if (invalid) return { error: invalid, createdName: null, cuota: null };
@@ -50,6 +54,7 @@ export async function createProjectAction(
     created = await api.post<Project>('/projects', {
       name,
       ...(description ? { description } : {}),
+      ...(organizationId ? { organizationId } : {}),
     });
   } catch (error) {
     /* El 402 sale por su propia puerta: el diálogo necesita el detalle para

@@ -43,11 +43,18 @@ const INTENTOS = 10;
 export function PaymentReturn({
   planActual,
   nombreDelPlan,
+  organizationId,
 }: {
   /** El plan que el servidor decía al pintar la página. */
   planActual: PlanTier;
   /** Cómo se llama el plan ya confirmado, para escribirlo en la enhorabuena. */
   nombreDelPlan?: string | null;
+  /**
+   * La organización que acaba de comprar. **Obligatorio de facto**: el sondeo
+   * pregunta por el plan de *esta* organización, y sin id `/me/billing/resumen`
+   * devuelve FREE y la confirmación no llega nunca (trampa #20 de CLAUDE.md).
+   */
+  organizationId?: string | null;
 }) {
   const router = useRouter();
   const [plan, setPlan] = useState<PlanTier>(planActual);
@@ -61,7 +68,7 @@ export function PaymentReturn({
     if (!esperando) return;
 
     const temporizador = window.setTimeout(async () => {
-      const resumen = await resumenDeFacturacionAction();
+      const resumen = await resumenDeFacturacionAction(organizationId);
       setIntentos((cuantos) => cuantos + 1);
       if (resumen && resumen.tier !== planActual) {
         setPlan(resumen.tier);
@@ -73,7 +80,7 @@ export function PaymentReturn({
     }, ESPERA_MS);
 
     return () => window.clearTimeout(temporizador);
-  }, [esperando, intentos, planActual, router]);
+  }, [esperando, intentos, planActual, organizationId, router]);
 
   if (confirmado) {
     return (

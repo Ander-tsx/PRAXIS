@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { updateProfileAction, uploadAvatarAction, uploadCoverAction } from '@/app/(private)/profile/actions';
-import { Avatar, alpha, colors } from '@praxis/commons';
+import { Avatar, alpha, colors, FloatingLabelInput, FloatingLabelTextarea } from '@praxis/commons';
 
 export function EditProfileModal({
   isOpen,
@@ -52,6 +52,15 @@ export function EditProfileModal({
       setError(null);
     }
   }, [isOpen, initialData]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -156,25 +165,30 @@ export function EditProfileModal({
           <div className="px-4 pt-16 pb-8 flex flex-col gap-6">
             {error && <div className="text-red-400 text-sm p-3 bg-red-400/10 rounded-lg">{error}</div>}
 
-            <div className="group relative border border-white/20 rounded-md px-3 pt-6 pb-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-              <label className="absolute top-2 left-3 text-xs text-white/50 group-focus-within:text-primary transition-colors">Nombre</label>
-              <input value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} className="w-full bg-transparent text-white outline-none text-base" />
-            </div>
+            <FloatingLabelInput
+              label="Nombre"
+              value={formData.firstName}
+              onChange={e => setFormData({...formData, firstName: e.target.value})}
+            />
 
-            <div className="group relative border border-white/20 rounded-md px-3 pt-6 pb-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-              <label className="absolute top-2 left-3 text-xs text-white/50 group-focus-within:text-primary transition-colors">Apellido</label>
-              <input value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} className="w-full bg-transparent text-white outline-none text-base" />
-            </div>
+            <FloatingLabelInput
+              label="Apellido"
+              value={formData.lastName}
+              onChange={e => setFormData({...formData, lastName: e.target.value})}
+            />
 
-            <div className="group relative border border-white/20 rounded-md px-3 pt-6 pb-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-              <label className="absolute top-2 left-3 text-xs text-white/50 group-focus-within:text-primary transition-colors">Biografía</label>
-              <textarea value={formData.biography} onChange={e => setFormData({...formData, biography: e.target.value})} className="w-full bg-transparent text-white outline-none text-base resize-none" rows={3} />
-            </div>
+            <FloatingLabelTextarea
+              label="Biografía"
+              value={formData.biography}
+              onChange={e => setFormData({...formData, biography: e.target.value})}
+              rows={3}
+            />
 
-            <div className="group relative border border-white/20 rounded-md px-3 pt-6 pb-2 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
-              <label className="absolute top-2 left-3 text-xs text-white/50 group-focus-within:text-primary transition-colors">Ubicación</label>
-              <input value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} className="w-full bg-transparent text-white outline-none text-base" />
-            </div>
+            <FloatingLabelInput
+              label="Ubicación"
+              value={formData.location}
+              onChange={e => setFormData({...formData, location: e.target.value})}
+            />
           </div>
         </div>
       </div>

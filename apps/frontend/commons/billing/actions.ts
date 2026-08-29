@@ -139,11 +139,22 @@ export async function catalogoDePlanesAction(): Promise<CatalogoDePlanes | null>
  * ⚠️ **Esto no decide nada.** Sirve para apagar un botón y para avisar antes de
  * gastar el viaje; quien niega una escritura es el gateway, con las mismas
  * cifras y un 402. Ver `QuotaService`.
+ *
+ * ⚠️ **Con `organizationId` o sin él NO da lo mismo.** El plan vale dentro de la
+ * organización que lo paga (trampa #20 de CLAUDE.md): `/me/billing/resumen` sin
+ * organización devuelve **FREE**, no «el mejor que tengas». La pantalla de
+ * vuelta del pago sondea con el id de la organización que acaba de comprar; sin
+ * él, nunca detectaría que el plan cambió.
  */
-export async function resumenDeFacturacionAction(): Promise<BillingSummary | null> {
+export async function resumenDeFacturacionAction(
+  organizationId?: string | null,
+): Promise<BillingSummary | null> {
   const api = await requireApi();
   if (!api) return null;
-  return api.get<BillingSummary>('/me/billing/resumen').catch(() => null);
+  const ruta = organizationId
+    ? `/me/billing/resumen?organizationId=${encodeURIComponent(organizationId)}`
+    : '/me/billing/resumen';
+  return api.get<BillingSummary>(ruta).catch(() => null);
 }
 
 /**

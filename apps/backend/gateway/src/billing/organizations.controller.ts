@@ -219,7 +219,7 @@ export class OrganizationsController {
 
   @Patch()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Renombra la organización' })
+  @ApiOperation({ summary: 'Cambia el nombre, el icono o el color de la organización' })
   async renombrar(
     @Request() req: Express.Request,
     @Param('organizationId', ParseUUIDPipe) organizationId: string,
@@ -229,7 +229,13 @@ export class OrganizationsController {
       await firstValueFrom(
         this.billingClient.send<OrganizationView>(
           { cmd: 'billing_org_rename' },
-          { organizationId, userId: req.user!.userId, name: body.name },
+          {
+            organizationId,
+            userId: req.user!.userId,
+            name: body.name,
+            iconKey: body.iconKey,
+            color: body.color,
+          },
         ),
       ),
     );

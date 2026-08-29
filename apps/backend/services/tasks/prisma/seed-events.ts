@@ -77,6 +77,17 @@ const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
 const SLUG_PROYECTO = 'sprint-historico-datos-de-demostracion';
 
 /**
+ * La organización dueña del proyecto fabricado.
+ *
+ * `Project.organizationId` pasó a `NOT NULL` en la etapa de organizaciones y
+ * este INSERT crudo no se actualizó —justo lo que avisa el comentario de
+ * `SLUG_PROYECTO`—: la siembra reventaba con `null value in column
+ * "organizationId"`. Es el **mismo UUID a fuego** que usa `projects/seed.ts`
+ * (`ORG_DEMO_ID`); no hay clave foránea, solo el acuerdo de escribirlo igual.
+ */
+const ORG_DEMO_ID = '99999999-0000-4000-8000-000000000010';
+
+/**
  * Cuánto historial se fabrica.
  *
  * **16 semanas y no 8.** `weekly` acepta hasta 52 y dibuja una serie: con ocho
@@ -279,10 +290,11 @@ async function main() {
     await prisma.task.deleteMany({ where: { projectId } });
   } else {
     const creado = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO projects.projects (id, name, slug, description, "ownerId", "createdAt", "updatedAt")
+      INSERT INTO projects.projects
+        (id, name, slug, description, "ownerId", "organizationId", "createdAt", "updatedAt")
       VALUES (gen_random_uuid(), ${NOMBRE_PROYECTO}, ${SLUG_PROYECTO},
               ${'Historial fabricado para poder enseñar los reportes. No mide trabajo real.'},
-              ${dueno}, ${arranque}, now())
+              ${dueno}, ${ORG_DEMO_ID}, ${arranque}, now())
       RETURNING id
     `;
     projectId = creado[0].id;

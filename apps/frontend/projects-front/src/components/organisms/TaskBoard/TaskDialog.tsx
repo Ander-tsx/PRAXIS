@@ -3,8 +3,8 @@
 import { deleteTaskAction, updateTaskAction } from '@/app/(private)/[id]/actions';
 import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
-  Button,
-  Input,
+  FloatingLabelInput,
+  FloatingLabelTextarea,
   type Label as LabelType,
   PRIORITIES,
   PRIORITY_COLORS,
@@ -13,7 +13,6 @@ import {
   SelectorDeFecha,
   SlideOver,
   type Task,
-  Textarea,
   type UserProfile,
   alpha,
   colors,
@@ -124,7 +123,8 @@ export function TaskDialog({
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const [state, formAction, pending] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
+  /* Sin el tercer elemento (`enMarcha`) a propósito: ver `handleClose`. */
+  const [state, formAction] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
   const [deleteState, deleteAction, deleting] = useAccion(deleteTaskAction, TASK_INITIAL_STATE);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -216,10 +216,28 @@ export function TaskDialog({
   };
 
   const handleClose = () => {
-    if (canEdit && formRef.current && !pending) {
+    /**
+     * ⚠️ **Sin la guarda `!pending`, y no es un descuido.**
+     *
+     * Estaba para no reenviar mientras un guardado anterior seguía en vuelo. El
+     * problema es de dónde sale ese `pending`: es el `enMarcha` de `useAccion`,
+     * que mide una transición del router de Next —global a toda la app—. Cuando
+     * esa transición se queda colgada por una carrera en la cola (un
+     * `router.refresh()` de los avisos en vivo, o el `revalidate` de gestionar
+     * una etiqueta, justo encima de este `PATCH`), `pending` se queda `true` y
+     * **no vuelve a bajar mientras se siga interactuando** —el techo de 25 s se
+     * rearma en cada acción nueva—. Con la guarda puesta, a partir de ahí este
+     * `requestSubmit()` no se dispara nunca y **deja de guardarse todo**: título,
+     * prioridad, etiquetas. Justo el síntoma que se veía al marcar etiquetas.
+     *
+     * Reenviar de más es inofensivo: `saveIfChanged` compara la firma del
+     * formulario y no hace nada si no ha cambiado, y si cambió es que hay algo
+     * más nuevo que mandar.
+     */
+    if (canEdit && formRef.current) {
       formRef.current.requestSubmit();
     }
-    // Optimistic close: allow animation to start instantly without waiting for server response
+    // Cierre optimista: la animación arranca ya, sin esperar al servidor.
     onClose();
   };
 
@@ -228,16 +246,11 @@ export function TaskDialog({
       open={open}
       onClose={handleClose}
       size="xl"
+      tone="dark"
       title={task.title}
       description={
         <span className="flex items-center gap-2">
-          <span
-            className="rounded-full px-2 py-0.5 font-sans text-[11px]"
-            style={{
-              background: alpha(colors.primary, 15),
-              color: colors.primary,
-            }}
-          >
+          <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white/70">
             {columnName}
           </span>
           <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
@@ -258,21 +271,21 @@ export function TaskDialog({
         <input type="hidden" name="status" value={columnName} />
         <input type="hidden" name="taskId" value={task.id} />
 
-        <Input
+        <FloatingLabelInput
+          id="task-title"
           name="title"
           label="Título"
           defaultValue={task.title}
-          placeholder="Qué hay que hacer"
           maxLength={255}
           disabled={readOnly}
           required
         />
 
-        <Textarea
+        <FloatingLabelTextarea
+          id="task-description"
           name="description"
           label="Descripción"
           defaultValue={task.description ?? ''}
-          placeholder="Contexto, criterios de aceptación, enlaces…"
           rows={4}
           disabled={readOnly}
         />
@@ -301,6 +314,10 @@ export function TaskDialog({
             label="Fecha límite (opcional)"
             defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
+            /* Va en la columna derecha de un panel estrecho: el panel de 18rem
+               se salía por la derecha. Se pega al borde derecho y crece hacia
+               dentro. */
+            align="right"
           />
         </div>
 
@@ -316,9 +333,9 @@ export function TaskDialog({
          */}
         <div className="flex flex-col gap-2">
           <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-            <legend className="font-sans text-sm font-medium text-text-primary">Etiquetas</legend>
+            <legend className="font-sans text-sm font-medium text-white">Etiquetas</legend>
             {labels.length === 0 ? (
-              <p className="font-sans text-xs text-text-secondary">
+              <p className="font-sans text-xs text-white/55">
                 Este proyecto no tiene etiquetas todavía.
                 {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
               </p>
@@ -339,9 +356,9 @@ export function TaskDialog({
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-          <legend className="font-sans text-sm font-medium text-text-primary">Encargados</legend>
+          <legend className="font-sans text-sm font-medium text-white">Encargados</legend>
           {members.length === 0 ? (
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white/55">
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
@@ -355,13 +372,16 @@ export function TaskDialog({
               ))}
             </div>
           )}
-          <p className="font-sans text-xs text-text-disabled">
+          <p className="font-sans text-xs text-white/35">
             Solo se puede asignar a quien esté en el proyecto.
           </p>
         </fieldset>
 
         {(state.error || deleteState.error) && (
-          <p role="alert" className="font-sans text-sm" style={{ color: colors.error }}>
+          <p
+            role="alert"
+            className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 font-sans text-xs text-red-400"
+          >
             {state.error ?? deleteState.error}
           </p>
         )}
@@ -385,7 +405,7 @@ export function TaskDialog({
         canModerate={canDelete}
       />
 
-      <div className="mt-8 mb-12 flex w-full shrink-0 items-center justify-between gap-2 border-t border-border pt-4 pb-4">
+      <div className="mt-8 mb-12 flex w-full shrink-0 items-center justify-between gap-2 border-t border-white/10 pt-4 pb-4">
         <div>
           {canDelete && (
             <form action={deleteAction}>
@@ -393,28 +413,30 @@ export function TaskDialog({
               <input type="hidden" name="taskId" value={task.id} />
               {confirmingDelete ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-sans text-xs text-text-secondary">¿Seguro?</span>
-                  <Button type="submit" variant="danger" size="sm" disabled={deleting}>
+                  <span className="font-sans text-xs text-white/55">¿Seguro?</span>
+                  <button
+                    type="submit"
+                    disabled={deleting}
+                    className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-sans text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                  >
                     {deleting ? 'Eliminando…' : 'Sí, eliminar'}
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={() => setConfirmingDelete(false)}
+                    className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white"
                   >
                     No
-                  </Button>
+                  </button>
                 </span>
               ) : (
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => setConfirmingDelete(true)}
+                  className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white"
                 >
                   Eliminar
-                </Button>
+                </button>
               )}
             </form>
           )}
@@ -510,7 +532,7 @@ function AssigneeToggle({
   defaultChecked: boolean;
 }) {
   return (
-    <label className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated has-[:disabled]:cursor-not-allowed">
+    <label className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5 has-[:disabled]:cursor-not-allowed">
       <input
         type="checkbox"
         name="assigneeIds"
@@ -521,7 +543,7 @@ function AssigneeToggle({
 
       {/* La marca se enciende con `[&>svg]`: los variantes `peer-*` solo miran
           hermanos, y el icono es hijo de este span, no hermano del input. */}
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-border transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-white/20 transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
         <svg
           className="h-3.5 w-3.5 text-primary opacity-0 transition-opacity"
           viewBox="0 0 24 24"
@@ -534,7 +556,7 @@ function AssigneeToggle({
         </svg>
       </span>
 
-      <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary peer-disabled:text-text-secondary">
+      <span className="min-w-0 flex-1 truncate font-sans text-sm text-white peer-disabled:text-white/55">
         {personLabel(member)}
       </span>
     </label>

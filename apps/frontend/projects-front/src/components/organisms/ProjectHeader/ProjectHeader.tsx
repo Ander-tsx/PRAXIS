@@ -1,7 +1,6 @@
-import { Badge, type ProjectDetail } from '@praxis/commons';
+import { type ProjectDetail, ProjectMonogram } from '@praxis/commons';
 import Link from 'next/link';
-import { DeleteProjectButton } from './DeleteProjectButton';
-import { EditableProjectFields } from './EditableProjectFields';
+import { ProjectSettingsButton } from './ProjectSettingsButton';
 
 export interface ProjectHeaderProps {
   project: ProjectDetail;
@@ -17,19 +16,18 @@ export interface ProjectHeaderProps {
    */
   canDelete: boolean;
   /**
-   * `canEditProject`. Sin él la cabecera es texto plano, con su `<h2>` y su
-   * párrafo: quien solo mira no debe encontrarse campos, ni siquiera
-   * desactivados.
+   * `canEditProject`. Sin él ni con `canDelete`, no aparece el botón de
+   * configuración: quien solo mira no tiene nada que tocar.
    */
   canEdit: boolean;
   /**
    * La cabecera en una sola línea.
    *
    * Lo pide la pestaña del tablero, que ya no desplaza la página: allí el alto
-   * es un recurso escaso y la cabecera completa —volver, título a `text-4xl`,
+   * es un recurso escaso y la cabecera completa —volver, título grande,
    * descripción en serif y el pie de metadatos— gastaba cuatro filas para decir
    * cosas que solo se leen al llegar. En compacto queda lo que sigue haciendo
-   * falta mientras se trabaja: volver, el nombre, de quién es y el borrado.
+   * falta mientras se trabaja: volver, el nombre, de quién es y la configuración.
    *
    * ⚠️ **La fecha de creación y los recuentos no salen en compacto**, y es a
    * propósito: son contexto de aterrizaje, no de trabajo, y los mismos números
@@ -44,6 +42,15 @@ const dateFormatter = new Intl.DateTimeFormat('es-MX', {
   year: 'numeric',
 });
 
+/**
+ * ⚠️ **El nombre y la descripción ya no se editan aquí en línea.**
+ *
+ * Lo hacían (`EditableProjectFields`, con autosave). Al sumar icono y color a la
+ * identidad del proyecto, y con el borrado viviendo ya en la cabecera, todo eso
+ * se juntó en el **modal de configuración** (`ProjectSettingsButton`): «la
+ * configuración del proyecto» es una cosa, no cuatro controles sueltos repartidos
+ * por la cabecera. Aquí el título vuelve a ser texto.
+ */
 export function ProjectHeader({
   project,
   isOwner,
@@ -55,6 +62,31 @@ export function ProjectHeader({
   canEdit,
   compacto = false,
 }: ProjectHeaderProps) {
+  /* La píldora «DUEÑO / MIEMBRO» se retiró: no aportaba —quien entra ya sabe si
+     el proyecto es suyo, y para lo que importa (qué puede hacer) está el mapa de
+     permisos—. `isOwner` sigue llegando por si otra parte de la cabecera lo
+     necesita. */
+  void isOwner;
+
+  const settings = (
+    <ProjectSettingsButton
+      projectId={project.id}
+      projectName={project.name}
+      projectDescription={project.description ?? ''}
+      projectIconKey={project.iconKey ?? null}
+      projectColor={project.color ?? null}
+      canEdit={canEdit}
+      canDelete={canDelete}
+      workspaceCount={project.workspaces.length}
+      boardCount={boardCount}
+      columnCount={columnCount}
+      labelCount={labelCount}
+      memberCount={memberCount}
+      roleCount={project.roles.length}
+      compacto={compacto}
+    />
+  );
+
   if (compacto) {
     return (
       <header className="flex min-w-0 shrink-0 items-center gap-3">
@@ -76,114 +108,67 @@ export function ProjectHeader({
           </svg>
         </Link>
 
-        {canEdit ? (
-          <EditableProjectFields
-            compacto
-            key={project.id}
-            projectId={project.id}
-            initialName={project.name}
-            initialDescription={project.description ?? ''}
-            badgeSlot={
-              <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
-            }
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <ProjectMonogram
+            id={project.id}
+            name={project.name}
+            iconKey={project.iconKey ?? null}
+            color={project.color ?? null}
           />
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <h2 className="truncate font-display text-xl text-text-primary">{project.name}</h2>
-            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
-            {project.description && (
-              <p
-                title={project.description}
-                className="min-w-0 flex-1 truncate font-serif text-sm italic text-text-secondary"
-              >
-                {project.description}
-              </p>
-            )}
-          </div>
-        )}
+          <h2 className="truncate font-sans text-xl font-semibold text-white">{project.name}</h2>
+          {project.description && (
+            <p
+              title={project.description}
+              className="min-w-0 flex-1 truncate font-serif text-sm italic text-white/50"
+            >
+              {project.description}
+            </p>
+          )}
+        </div>
 
-        {canDelete && (
-          <DeleteProjectButton
-            projectId={project.id}
-            projectName={project.name}
-            workspaceCount={project.workspaces.length}
-            boardCount={boardCount}
-            columnCount={columnCount}
-            labelCount={labelCount}
-            memberCount={memberCount}
-            roleCount={project.roles.length}
-          />
-        )}
+        {settings}
       </header>
     );
   }
 
   return (
     <header className="flex flex-col gap-4">
-      {/* Volver y eliminar comparten fila: son las dos acciones sobre el
+      {/* Volver y configuración comparten fila: son lo que actúa sobre el
           proyecto entero, y ninguna pertenece al título. */}
       <div className="flex items-center justify-between gap-4">
         {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
         <Link
           href="/"
-          className="w-fit font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="w-fit font-sans text-sm text-white/60 transition-colors hover:text-white"
         >
           ← Todos los proyectos
         </Link>
 
-        {canDelete && (
-          <DeleteProjectButton
-            projectId={project.id}
-            projectName={project.name}
-            workspaceCount={project.workspaces.length}
-            boardCount={boardCount}
-            columnCount={columnCount}
-            labelCount={labelCount}
-            memberCount={memberCount}
-            roleCount={project.roles.length}
+        {settings}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-2">
+          <ProjectMonogram
+            id={project.id}
+            name={project.name}
+            iconKey={project.iconKey ?? null}
+            color={project.color ?? null}
+            size="md"
           />
+          <h2 className="font-sans text-3xl font-semibold text-white sm:text-4xl">{project.name}</h2>
+        </div>
+
+        {project.description ? (
+          <p className="max-w-2xl font-serif text-lg italic text-white/55">{project.description}</p>
+        ) : (
+          <p className="font-serif text-lg italic text-white/30">Sin descripción</p>
         )}
       </div>
 
-      {canEdit ? (
-        /**
-         * Con permiso, el nombre y la descripción **son** los campos: parecen
-         * texto y se guardan solos. La insignia se queda dentro para que siga
-         * en la misma línea que el título.
-         *
-         * Se le pasa `key={project.id}`: sin ella, navegar de un proyecto a
-         * otro reutilizaría el componente y su estado inicial —el texto de
-         * antes— porque el valor de las props no vuelve a leerse a propósito.
-         */
-        <EditableProjectFields
-          key={project.id}
-          projectId={project.id}
-          initialName={project.name}
-          initialDescription={project.description ?? ''}
-          badgeSlot={
-            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
-          }
-        />
-      ) : (
-        <>
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-x-4 gap-y-2">
-            <h2 className="font-display text-3xl text-text-primary sm:text-4xl">{project.name}</h2>
-            <Badge variant={isOwner ? 'accent' : 'info'}>{isOwner ? 'DUEÑO' : 'MIEMBRO'}</Badge>
-          </div>
-
-          {project.description ? (
-            <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
-              {project.description}
-            </p>
-          ) : (
-            <p className="font-serif text-lg italic text-text-disabled">Sin descripción</p>
-          )}
-        </>
-      )}
-
       {/* Los contadores de espacios, equipo y roles los llevan las pestañas;
           aquí solo va lo que no aparece allí. */}
-      <p className="font-sans text-sm text-text-disabled">
+      <p className="font-sans text-sm text-white/45">
         Creado el {dateFormatter.format(new Date(project.createdAt))} · {boardCount}{' '}
         {boardCount === 1 ? 'tablero' : 'tableros'} · {memberCount}{' '}
         {memberCount === 1 ? 'persona' : 'personas'}

@@ -2,20 +2,21 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, createContext, useContext, useEffect, useState } from 'react';
-import { Avatar } from '../../atoms/Avatar';
-import { LivePresences, LiveSource } from '../../realtime';
-import { useMessageCount } from '../../realtime/useMessageCount';
-import { ProjectMonogram } from '../../atoms/ProjectMonogram';
-import { usePresence } from '../../realtime/presence';
-import { avatarHref } from '../../api/presence';
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { personLabel } from '../../api/domain';
+import { avatarHref } from '../../api/presence';
+import { Avatar } from '../../atoms/Avatar';
+import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
+import { usePresence } from '../../realtime/presence';
+import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
-import type { AppNavItem } from './navigation';
 import { OrgSwitcher } from './OrgSwitcher';
+import { PraxProvider } from './PraxWindow';
+import type { AppNavItem } from './navigation';
 
 /**
  * Las tarjetas emergentes, **fuera de la carga inicial** (E6.5).
@@ -92,17 +93,6 @@ export interface AppShellProps {
    */
   plegadaInicial?: boolean;
   /**
-   * Quién eres, para la esquina derecha de **todas** las cabeceras de la zona.
-   *
-   * Va por el armazón y no por cada página porque el rol y el plan no cambian
-   * al navegar: puesto aquí, Next conserva el layout entre pantallas y esto se
-   * resuelve una vez por visita a la zona en lugar de una por pantalla.
-   *
-   * Viaja hasta `AppHeader` por contexto —igual que la apertura del cajón
-   * móvil— porque la cabecera es otro componente y otra parte del árbol.
-   */
-  cuentaSlot?: ReactNode;
-  /**
    * Las organizaciones a las que perteneces, y cuál estás mirando.
    *
    * ⚠️ **Lo resuelve el `layout.tsx` de la zona**, igual que `plegadaInicial`:
@@ -126,6 +116,13 @@ export interface OrgDelSelector {
   kind: 'PERSONAL' | 'ENTERPRISE';
   tier: string;
   soyDueno: boolean;
+  /**
+   * Identidad visual, del modal de configuración. `null` = monograma de letras.
+   * `iconKey` es un icono de `lucide-react` de la lista curada; `color`, un
+   * `#rrggbb`.
+   */
+  iconKey?: string | null;
+  color?: string | null;
 }
 
 /**
@@ -149,7 +146,6 @@ export interface OrgDelSelector {
 const AppShellContext = createContext<{
   openMenu: () => void;
   plegada: boolean;
-  cuentaSlot?: ReactNode;
 } | null>(null);
 
 /** Lo usa `AppHeader` para su botón de menú en móvil. */
@@ -239,7 +235,15 @@ export function AppShell(props: AppShellProps) {
             el contenido lo proyecta la página, así que el proveedor tiene que
             envolver a los dos. Ver `DockPanel`. */}
         <DockProvider>
-          <ArmazonInterno {...props} />
+          {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
+              acoplado). Dentro de `DockProvider` porque el modo acoplado usa su
+              columna. Ver `PraxWindow`. */}
+          <PraxProvider
+            zonePath={props.zonePath}
+            organizacionActivaId={props.organizacionActivaId ?? null}
+          >
+            <ArmazonInterno {...props} />
+          </PraxProvider>
         </DockProvider>
       </LivePresences>
     </LiveSource>
@@ -251,7 +255,6 @@ function ArmazonInterno({
   zonePath,
   user,
   estadoSlot,
-  cuentaSlot,
   plegadaInicial = false,
   organizaciones,
   organizacionActivaId,
@@ -264,7 +267,7 @@ function ArmazonInterno({
   const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
     const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
     if (isChat) return 'chat';
-    
+
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('praxis:sidebarTab');
       if (stored === 'chat' || stored === 'inbox') return stored;
@@ -335,14 +338,12 @@ function ArmazonInterno({
   );
 
   return (
-    <AppShellContext.Provider
-      value={{ openMenu: () => setMobileMenuOpen(true), plegada, cuentaSlot }}
-    >
+    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
       <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
           className={`hidden shrink-0 flex-col border-r border-border bg-[#080807] transition-[width] duration-200 md:flex ${
-            plegada ? 'w-[4.5rem]' : 'w-64'
+            plegada ? 'w-[4.5rem]' : 'w-80'
           }`}
         >
           {/* El pliegue vive **en la cabecera, al lado de la marca**: es donde
@@ -386,20 +387,30 @@ function ArmazonInterno({
                 zonePath={zonePath}
               />
             </div>
-            
+
             {!plegada && (
               <div className="mb-4 flex items-center gap-1.5 px-1 overflow-x-auto whitespace-nowrap scrollbar-none">
                 <button
                   type="button"
                   onClick={() => setActiveTab('home')}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'home' 
-                      ? 'bg-white/10 text-white' 
+                    activeTab === 'home'
+                      ? 'bg-white/10 text-white'
                       : 'text-white/60 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
                   </svg>
                   Inicio
                 </button>
@@ -407,13 +418,23 @@ function ArmazonInterno({
                   type="button"
                   onClick={() => setActiveTab('chat')}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'chat' 
-                      ? 'bg-white/10 text-white' 
+                    activeTab === 'chat'
+                      ? 'bg-white/10 text-white'
                       : 'text-white/60 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
                   </svg>
                   Chat
                 </button>
@@ -421,31 +442,51 @@ function ArmazonInterno({
                   type="button"
                   onClick={() => setActiveTab('inbox')}
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'inbox' 
-                      ? 'bg-white/10 text-white' 
+                    activeTab === 'inbox'
+                      ? 'bg-white/10 text-white'
                       : 'text-white/60 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                    />
                   </svg>
                   Bandeja de entrada
                 </button>
               </div>
             )}
             {activeTab === 'home' && (
-              <NavList
-                navItems={navItemsVivos}
-                activePath={activePathDeSecciones}
-                plegada={plegada}
-              />
+              <div className="flex flex-col gap-4">
+                <SidebarProjectsTree
+                  zonePath={zonePath}
+                  plegada={plegada}
+                  activePath={activePathDeSecciones}
+                  organizacionActivaId={organizacionActivaId ?? null}
+                />
+                <NavList
+                  navItems={navItemsVivos.filter((i) => i.href !== '/projects')}
+                  activePath={activePathDeSecciones}
+                  plegada={plegada}
+                />
+              </div>
             )}
             {activeTab === 'chat' && (
-              <SidebarChatList zonePath={zonePath} plegada={plegada} />
+              <SidebarChatList
+                zonePath={zonePath}
+                plegada={plegada}
+                organizacionActivaId={organizacionActivaId ?? null}
+              />
             )}
-            {activeTab === 'inbox' && (
-              <SidebarInboxList zonePath={zonePath} plegada={plegada} />
-            )}
+            {activeTab === 'inbox' && <SidebarInboxList zonePath={zonePath} plegada={plegada} />}
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -626,9 +667,9 @@ function UserCard({
       {/* El texto sí es el enlace a tu cuenta. */}
       <a href={CUENTA_HREF} className="min-w-0 flex-1">
         {user.name.trim() && (
-          <p className="truncate font-sans text-sm font-semibold text-text-primary">{user.name}</p>
+          <p className="truncate font-sans text-sm font-semibold text-white">{user.name}</p>
         )}
-        <p className="truncate font-sans text-xs text-text-secondary">{user.email}</p>
+        <p className="truncate font-sans text-xs text-white/60">{user.email}</p>
       </a>
     </div>
   );
@@ -701,7 +742,6 @@ function ByKyloo() {
  * marcando la organización vieja mientras la lista de abajo enseña la nueva.
  */
 
-
 /**
  * El botón de plegar: **un icono, sin texto**.
  *
@@ -740,24 +780,395 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
   );
 }
 
+// ─── Árbol jerárquico de proyectos ──────────────────────────────────────────
 
-function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+function ChevronIcon({ open, className = 'h-3 w-3' }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={`${className} shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function WorkspaceLeafIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="14" width="7" height="6" rx="1.5" />
+      <rect x="13.5" y="14" width="7" height="6" rx="1.5" />
+    </svg>
+  );
+}
+
+interface SidebarProject {
+  id: string;
+  name: string;
+  slug: string;
+  iconKey: string | null;
+  color: string | null;
+  workspaces: Array<{ id: string; name: string }>;
+}
+
+async function fetchProjectsTree(
+  zonePath: string,
+  organizacionActivaId: string | null,
+): Promise<SidebarProject[]> {
+  const params = new URLSearchParams({ limit: '50' });
+  if (organizacionActivaId) {
+    params.set('organizationId', organizacionActivaId);
+  }
+
+  const listBody = await fetch(`${zonePath}/api/gateway/projects?${params.toString()}`, {
+    cache: 'no-store',
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+
+  // El backend devuelve { data: { items: [...] } } o { data: [...] }
+  const items: any[] =
+    listBody?.data?.items ?? (Array.isArray(listBody?.data) ? listBody.data : []);
+  if (items.length === 0) return [];
+
+  const resolved = await Promise.all(
+    items.map(async (p: any) => {
+      const detail = await fetch(`${zonePath}/api/gateway/projects/${p.id}`, { cache: 'no-store' })
+        .then((r) => r.json())
+        .catch(() => null);
+      const workspaces: Array<{ id: string; name: string }> = (detail?.data?.workspaces ?? []).map(
+        (w: any) => ({ id: w.id, name: w.name }),
+      );
+      return {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        /* `GET /projects` ya trae la identidad visual; el detalle también, y es
+           lo que gana si difieren. */
+        iconKey: detail?.data?.iconKey ?? p.iconKey ?? null,
+        color: detail?.data?.color ?? p.color ?? null,
+        workspaces,
+      };
+    }),
+  );
+  return resolved;
+}
+
+function SidebarProjectsTree({
+  zonePath,
+  plegada,
+  activePath,
+  organizacionActivaId,
+}: {
+  zonePath: string;
+  plegada: boolean;
+  activePath: string;
+  organizacionActivaId: string | null;
+}) {
+  const [projects, setProjects] = useState<SidebarProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem('praxis_sidebar_projects_expanded');
+      if (guardado) {
+        setExpanded(new Set(JSON.parse(guardado)));
+      }
+    } catch (e) {}
+  }, []);
+
+  const load = (esInicial = false) => {
+    fetchProjectsTree(zonePath, organizacionActivaId)
+      .then((resolved) => {
+        setProjects((prev) => {
+          const prevStr = JSON.stringify(prev);
+          const nextStr = JSON.stringify(resolved);
+          if (prevStr === nextStr) return prev;
+
+          setExpanded((e) => {
+            const next = new Set(e);
+            resolved.forEach((p) => {
+              if (esInicial) {
+                // Solo si no habia nada guardado, expandimos por defecto
+                if (!localStorage.getItem('praxis_sidebar_projects_expanded')) {
+                  next.add(p.id);
+                }
+              } else if (!prev.find((pp) => pp.id === p.id)) {
+                // Es un proyecto nuevo recien creado, lo expandimos
+                next.add(p.id);
+              }
+            });
+            try {
+              localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
+            } catch (err) {}
+            return next;
+          });
+          return resolved;
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load(true);
+
+    // Polling ligero: refresca cada 30 s para capturar proyectos nuevos
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [zonePath]);
+
+  // Refresca al volver el foco a la ventana (usuario crea proyecto en otra pestaña)
+  useEffect(() => {
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [zonePath]);
+
+  function toggleProject(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
+      } catch (err) {}
+      return next;
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-1 px-1">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-7 rounded-lg bg-white/5 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (projects.length === 0 && !plegada) {
+    return (
+      <div className="px-3 py-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40 select-none block mb-1">
+          Proyectos
+        </span>
+        <a
+          href="/projects"
+          className="flex items-center gap-2 text-white/40 hover:text-white text-[12px] py-1 transition-colors"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Crear primer proyecto
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      {!plegada && (
+        <div className="flex items-center justify-between px-3 mb-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40 select-none">
+            Proyectos
+          </span>
+          <a
+            href="/projects"
+            title="Ver todos los proyectos"
+            className="rounded p-0.5 text-white/30 hover:text-white transition-colors"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+              />
+            </svg>
+          </a>
+        </div>
+      )}
+
+      <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+        {projects.map((project) => {
+          const isOpen = expanded.has(project.id);
+          // Las URLs de proyecto usan el SLUG, no el id
+          const projectHref = `/projects/${project.slug}`;
+          const isActiveProject =
+            activePath === projectHref ||
+            activePath.startsWith(`${projectHref}?`) ||
+            activePath.startsWith(`${projectHref}/`);
+
+          if (plegada) {
+            return (
+              <a
+                key={project.id}
+                href={projectHref}
+                title={project.name}
+                aria-current={isActiveProject ? 'page' : undefined}
+                className={`flex justify-center py-2 rounded-lg transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+              >
+                <ProjectMonogram
+                  id={project.id}
+                  name={project.name}
+                  iconKey={project.iconKey}
+                  color={project.color}
+                />
+              </a>
+            );
+          }
+
+          return (
+            <div key={project.id} className="flex flex-col">
+              <div
+                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleProject(project.id)}
+                  aria-expanded={isOpen}
+                  aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
+                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-white/25 hover:text-white/60 transition-colors"
+                >
+                  <ChevronIcon open={isOpen} />
+                </button>
+
+                <span className="shrink-0 scale-[0.72] origin-center -mx-0.5">
+                  <ProjectMonogram
+                    id={project.id}
+                    name={project.name}
+                    iconKey={project.iconKey}
+                    color={project.color}
+                  />
+                </span>
+
+                <a
+                  href={projectHref}
+                  className={`flex-1 min-w-0 truncate text-[13px] transition-colors ${
+                    isActiveProject
+                      ? 'text-white font-semibold'
+                      : 'text-white font-medium opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  {project.name}
+                </a>
+              </div>
+
+              <div
+                className="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)]"
+                style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+              >
+                <div
+                  className="min-h-0 overflow-hidden"
+                  style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 200ms' }}
+                >
+                  <div className="flex flex-col gap-0.5 pl-6 pb-1 pt-0.5">
+                    {project.workspaces.length === 0 ? (
+                      <span className="px-2 py-1 text-[12px] text-white/25 italic select-none">
+                        Sin espacios
+                      </span>
+                    ) : (
+                      project.workspaces.map((ws) => {
+                        // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
+                        const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
+                        const isActiveWs = activePath.includes(`ws=${ws.id}`);
+                        return (
+                          <a
+                            key={ws.id}
+                            href={wsHref}
+                            aria-current={isActiveWs ? 'page' : undefined}
+                            className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
+                              isActiveWs
+                                ? 'bg-white/10 text-white font-medium'
+                                : 'text-white/45 hover:text-white hover:bg-white/[0.06]'
+                            }`}
+                          >
+                            <WorkspaceLeafIcon />
+                            <span className="truncate">{ws.name}</span>
+                          </a>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function SidebarChatList({
+  zonePath,
+  plegada,
+  organizacionActivaId,
+}: {
+  zonePath: string;
+  plegada: boolean;
+  organizacionActivaId: string | null;
+}) {
   const pathname = usePathname();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
   const [directs, setDirects] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projectsCrudos, setProjectsCrudos] = useState<any[]>([]);
+  /**
+   * Los chats de proyecto **de la organización activa**. Un chat de proyecto es
+   * 1:1 con un proyecto, y un proyecto pertenece a una sola organización, así que
+   * el directorio se recorta igual que el árbol del sidebar y la lista de
+   * proyectos. Los privados **no** se filtran: un DM no es de ninguna
+   * organización (ver la conversación de diseño).
+   */
+  const projects = organizacionActivaId
+    ? projectsCrudos.filter((c: any) => c?.project?.organizationId === organizacionActivaId)
+    : projectsCrudos;
   const [usersMap, setUsersMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const [search, setSearch] = useState('');
+
+  const fetchChats = useCallback(() => {
     Promise.all([
-      fetch(`${zonePath}/api/gateway/me/chats`).then(res => res.json()).catch(() => ({ data: [] })),
-      fetch(`${zonePath}/api/gateway/me/chats/projects`).then(res => res.json()).catch(() => ({ data: [] }))
+      fetch(`${zonePath}/api/gateway/me/chats`)
+        .then((res) => res.json())
+        .catch(() => ({ data: [] })),
+      fetch(`${zonePath}/api/gateway/me/chats/projects`)
+        .then((res) => res.json())
+        .catch(() => ({ data: [] })),
     ]).then(([d, p]) => {
       const listD = Array.isArray(d?.data) ? d.data : [];
       const listP = Array.isArray(p?.data) ? p.data : [];
       setDirects(listD);
-      setProjects(listP);
+      setProjectsCrudos(listP);
 
       const ids = new Set<string>();
       listD.forEach((c: any) => c.peerId && ids.add(c.peerId));
@@ -765,10 +1176,10 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
 
       if (ids.size > 0) {
         fetch(`${zonePath}/api/gateway/users?ids=${Array.from(ids).join(',')}`)
-          .then(r => r.json())
-          .then(ubody => {
+          .then((r) => r.json())
+          .then((ubody) => {
             const uMap: Record<string, any> = {};
-            (ubody?.data?.items || ubody?.data || []).forEach((u: any) => uMap[u.id] = u);
+            (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
             setUsersMap(uMap);
           })
           .finally(() => setLoading(false));
@@ -777,6 +1188,14 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
       }
     });
   }, [zonePath]);
+
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
+
+  useLiveEvent('chat.mensaje', () => fetchChats());
+  useLiveEvent('chat.leido', () => fetchChats());
+  useReconnection(fetchChats);
 
   if (loading) {
     return (
@@ -789,13 +1208,20 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
 
   function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
     if (mensaje.deletedAt) return 'Mensaje eliminado';
-    return mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) + (mensaje.body.length > 50 ? '...' : '');
+    return (
+      mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) +
+      (mensaje.body.length > 50 ? '...' : '')
+    );
   }
 
   function cuandoCorto(iso: string) {
     const d = new Date(iso);
     const ahora = new Date();
-    if (d.getDate() === ahora.getDate() && d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear()) {
+    if (
+      d.getDate() === ahora.getDate() &&
+      d.getMonth() === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear()
+    ) {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
@@ -806,6 +1232,9 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
     const nombre = peer ? personLabel(peer) : 'Alguien';
     const link = `/chat/${c.peerId}`;
     const activo = browserPath === link;
+
+    // filter by search
+    if (search && !nombre.toLowerCase().includes(search.toLowerCase())) return null;
 
     return (
       <a
@@ -825,7 +1254,9 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
         {!plegada && (
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}>
+              <span
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}
+              >
                 {nombre}
               </span>
               {c.ultimo && (
@@ -835,7 +1266,9 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
               )}
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}>
+              <span
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}
+              >
                 {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
               </span>
               {c.unread > 0 && (
@@ -854,6 +1287,9 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
     const link = `/chat/proyecto/${c.project.id}`;
     const activo = browserPath === link;
 
+    // filter by search
+    if (search && !c.project.name.toLowerCase().includes(search.toLowerCase())) return null;
+
     return (
       <a
         key={c.project.id}
@@ -862,12 +1298,19 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
         className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
       >
         <div className="shrink-0 flex items-center justify-center scale-90 origin-center">
-          <ProjectMonogram id={c.project.id} name={c.project.name} />
+          <ProjectMonogram
+            id={c.project.id}
+            name={c.project.name}
+            iconKey={c.project.iconKey}
+            color={c.project.color}
+          />
         </div>
         {!plegada && (
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}>
+              <span
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}
+              >
                 {c.project.name}
               </span>
               {c.ultimo && (
@@ -877,8 +1320,12 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
               )}
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}>
-                {c.ultimo ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}` : 'Sin mensajes'}
+              <span
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}
+              >
+                {c.ultimo
+                  ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}`
+                  : 'Sin mensajes'}
               </span>
               {c.unread > 0 && (
                 <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
@@ -894,18 +1341,40 @@ function SidebarChatList({ zonePath, plegada }: { zonePath: string; plegada: boo
 
   return (
     <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none pb-4 px-1">
+      {/* Search input */}
+      <div className="px-2">
+        <input
+          type="text"
+          placeholder="Buscar chats..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md bg-white/5 px-2 py-1 text-sm text-white placeholder-white/60 focus:outline-none"
+        />
+      </div>
       {projects.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          {!plegada && <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">Proyectos</span>}
+          {!plegada && (
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">
+              Proyectos
+            </span>
+          )}
           {projects.map((c: any) => (
-            <ProjectRow key={c.project.id} c={c} autor={c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null} />
+            <ProjectRow
+              key={c.project.id}
+              c={c}
+              autor={c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null}
+            />
           ))}
         </div>
       )}
 
       {directs.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          {!plegada && <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">Privados</span>}
+          {!plegada && (
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">
+              Privados
+            </span>
+          )}
           {directs.map((c: any) => (
             <PersonRow key={c.peerId} c={c} peer={usersMap[c.peerId]} />
           ))}
@@ -919,21 +1388,24 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
   const [items, setItems] = useState<any[]>([]);
   const [usersMap, setUsersMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
+  const [mostrarTodos, setMostrarTodos] = useState(false);
 
   useEffect(() => {
-    fetch(`${zonePath}/api/gateway/me/notifications?limit=20`)
-      .then(res => res.json())
-      .then(body => {
+    setLoading(true);
+    const unreadParam = mostrarTodos ? '' : '&unread=true';
+    fetch(`${zonePath}/api/gateway/me/notifications?limit=30${unreadParam}`)
+      .then((res) => res.json())
+      .then((body) => {
         const list = body?.data?.items || [];
         setItems(list);
-        
+
         const ids = [...new Set(list.map((i: any) => i.actorId).filter((id: any) => !!id))];
         if (ids.length > 0) {
           fetch(`${zonePath}/api/gateway/users?ids=${ids.join(',')}`)
-            .then(r => r.json())
-            .then(ubody => {
+            .then((r) => r.json())
+            .then((ubody) => {
               const uMap: Record<string, any> = {};
-              (ubody?.data?.items || ubody?.data || []).forEach((u: any) => uMap[u.id] = u);
+              (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
               setUsersMap(uMap);
             })
             .finally(() => setLoading(false));
@@ -942,50 +1414,58 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
         }
       })
       .catch(() => setLoading(false));
-  }, [zonePath]);
+  }, [zonePath, mostrarTodos]);
 
-  if (loading) {
-    return (
-      <div className="flex flex-col gap-2 px-1">
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="px-4 py-8 text-center text-white/40 text-[13px] font-sans">
-        Nada nuevo por aquí.
-      </div>
-    );
-  }
+  const loader = (
+    <div className="flex flex-col gap-2 px-1 py-2">
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+    </div>
+  );
 
   function getTitle(n: any) {
-    const who = n.actorId ? (usersMap[n.actorId]?.name?.split(' ')[0] || 'Alguien') : 'El sistema';
+    const who = n.actorId ? usersMap[n.actorId]?.name?.split(' ')[0] || 'Alguien' : 'El sistema';
     const project = n.projectName ?? 'un proyecto';
     const task = n.taskTitle ?? 'una tarea';
 
     switch (n.type) {
-      case 'INVITATION_RECEIVED': return `${who} te invitó a ${project}`;
-      case 'INVITATION_ACCEPTED': return `${who} aceptó tu invitación a ${project}`;
-      case 'INVITATION_REJECTED': return `${who} rechazó tu invitación a ${project}`;
-      case 'MEMBER_LEFT': return `${who} salió de ${project}`;
-      case 'MEMBER_REMOVED': return `${who} te sacó de ${project}`;
-      case 'TASK_ASSIGNED': return `${who} te asignó ${task} en ${project}`;
-      case 'TASK_UNASSIGNED': return `${who} te quitó de ${task} en ${project}`;
-      case 'AUTOMATION_TASK_DUE_SOON': return `${task} vencerá pronto en ${project}`;
-      case 'AUTOMATION_TASK_STALE': return `${task} lleva días sin movimiento en ${project}`;
-      case 'AUTOMATION_TASK_OVERDUE': return `${task} ha vencido en ${project}`;
-      case 'AUTOMATION_TASK_UNASSIGNED': return `${task} sigue sin encargado en ${project}`;
-      case 'AUTOMATION_TASK_CREATED': return `Se creó ${task} en ${project}`;
-      case 'AUTOMATION_TASK_MOVED': return `${task} cambió de columna en ${project}`;
-      case 'AUTOMATION_TASK_COMPLETED': return `${task} se terminó en ${project}`;
-      case 'AUTOMATION_TASK_REOPENED': return `${task} se reabrió en ${project}`;
-      case 'AUTOMATION_TASK_ASSIGNEES_CHANGED': return `Cambiaron los encargados de ${task}`;
-      case 'AUTOMATION_TASK_DUE_DATE_CHANGED': return `Cambió el vencimiento de ${task}`;
-      default: return 'Nueva notificación';
+      case 'INVITATION_RECEIVED':
+        return `${who} te invitó a ${project}`;
+      case 'INVITATION_ACCEPTED':
+        return `${who} aceptó tu invitación a ${project}`;
+      case 'INVITATION_REJECTED':
+        return `${who} rechazó tu invitación a ${project}`;
+      case 'MEMBER_LEFT':
+        return `${who} salió de ${project}`;
+      case 'MEMBER_REMOVED':
+        return `${who} te sacó de ${project}`;
+      case 'TASK_ASSIGNED':
+        return `${who} te asignó ${task} en ${project}`;
+      case 'TASK_UNASSIGNED':
+        return `${who} te quitó de ${task} en ${project}`;
+      case 'AUTOMATION_TASK_DUE_SOON':
+        return `${task} vencerá pronto en ${project}`;
+      case 'AUTOMATION_TASK_STALE':
+        return `${task} lleva días sin movimiento en ${project}`;
+      case 'AUTOMATION_TASK_OVERDUE':
+        return `${task} ha vencido en ${project}`;
+      case 'AUTOMATION_TASK_UNASSIGNED':
+        return `${task} sigue sin encargado en ${project}`;
+      case 'AUTOMATION_TASK_CREATED':
+        return `Se creó ${task} en ${project}`;
+      case 'AUTOMATION_TASK_MOVED':
+        return `${task} cambió de columna en ${project}`;
+      case 'AUTOMATION_TASK_COMPLETED':
+        return `${task} se terminó en ${project}`;
+      case 'AUTOMATION_TASK_REOPENED':
+        return `${task} se reabrió en ${project}`;
+      case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
+        return `Cambiaron los encargados de ${task}`;
+      case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
+        return `Cambió el vencimiento de ${task}`;
+      default:
+        return 'Nueva notificación';
     }
   }
 
@@ -996,42 +1476,75 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
   }
 
   return (
-    <div className="flex flex-col gap-1 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none px-1">
-      {items.map((n: any) => {
-        const actor = n.actorId ? usersMap[n.actorId] : null;
-        return (
-          <a
-            key={n.id}
-            href={getHref(n)}
-            className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
-              !n.readAt ? 'bg-white/[0.03]' : ''
-            }`}
+    <div className="flex flex-col max-h-[calc(100vh-200px)]">
+      {!plegada && (
+        <div className="flex bg-white/5 rounded-lg p-0.5 mx-3 mb-3 shrink-0">
+          <button
+            onClick={() => setMostrarTodos(false)}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${!mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
           >
-            {!plegada && (
-              <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                {actor?.avatarUrl ? (
-                  <img src={`${zonePath}/api/gateway${actor.avatarUrl}`} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-white text-[11px] font-bold">
-                    {(actor?.name || 'S').charAt(0).toUpperCase()}
-                  </span>
+            Sin leer
+          </button>
+          <button
+            onClick={() => setMostrarTodos(true)}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+          >
+            Todos
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1 overflow-y-auto scrollbar-none px-1 pb-4 flex-1 min-h-0">
+        {loading ? (
+          loader
+        ) : items.length === 0 ? (
+          <div className="px-4 py-8 text-center text-white/40 text-[13px] font-sans">
+            Nada nuevo por aquí.
+          </div>
+        ) : (
+          items.map((n: any) => {
+            const actor = n.actorId ? usersMap[n.actorId] : null;
+            return (
+              <a
+                key={n.id}
+                href={getHref(n)}
+                className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
+                  !n.readAt ? 'bg-white/[0.04]' : ''
+                }`}
+              >
+                {!plegada && (
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                    {actor?.avatarUrl ? (
+                      <img
+                        src={`${zonePath}/api/gateway${actor.avatarUrl}`}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-[11px] font-bold">
+                        {(actor?.name || 'S').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
-              <p className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white/60'}`}>
-                {getTitle(n)}
-              </p>
-              <span className="font-sans text-[10px] text-white/30 mt-1">
-                {new Date(n.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-            {!n.readAt && (
-              <span className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-            )}
-          </a>
-        );
-      })}
+                <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
+                  <p
+                    className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white/60'}`}
+                  >
+                    {getTitle(n)}
+                  </p>
+                  <span className="font-sans text-[10px] text-white/30 mt-1">
+                    {new Date(n.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                {!n.readAt && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white mt-1.5 shrink-0" />
+                )}
+              </a>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }

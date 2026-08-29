@@ -93,6 +93,16 @@ model Organization {
   /// organización crean dos y la segunda se queda con las cuotas.
   ownerUserId String
 
+  /// Identidad visual de la organización, elegida en su modal de configuración.
+  ///
+  /// `iconKey` es el nombre kebab-case de un icono de `lucide-react` de la lista
+  /// curada del frontend (`commons/atoms/GlyphPicker`); `color` es un `#rrggbb`.
+  /// Los dos son anulables: sin ellos el frontend cae al monograma de siempre
+  /// —dos letras sobre un color derivado del `id`—. El backend solo los guarda
+  /// y los devuelve; qué iconos valen y cómo se pintan es cosa del cliente.
+  iconKey String?
+  color   String?
+
   members       OrganizationMember[]
   roles         OrganizationRole[]
   roleTemplates ProjectRoleTemplate[]

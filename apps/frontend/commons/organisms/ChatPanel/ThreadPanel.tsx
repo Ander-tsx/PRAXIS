@@ -160,7 +160,7 @@ export function ThreadPanel({
         anchoLibre === null ? (plegada ? 'md:w-96' : 'md:w-80') : ''
       }`}
       style={{
-        background: colors.background,
+        background: '#080807',
         ...(anchoLibre !== null ? { width: `${anchoLibre}px` } : {}),
       }}
     >
@@ -221,10 +221,8 @@ export function ThreadPanel({
         {bubbles.map((mensaje, indice) => {
           const anterior = bubbles[indice - 1];
           const continued =
-            anterior !== undefined &&
-            anterior.authorId === mensaje.authorId &&
-            new Date(mensaje.createdAt).getTime() - new Date(anterior.createdAt).getTime() <
-              5 * 60_000;
+            anterior &&
+            anterior.authorId === mensaje.authorId;
           return (
             <div key={mensaje.id}>
               <MessageBubble

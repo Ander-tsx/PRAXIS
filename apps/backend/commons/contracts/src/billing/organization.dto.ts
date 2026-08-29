@@ -7,10 +7,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 import { PlanTier } from './plans';
 
@@ -324,6 +326,13 @@ export interface OrganizationView {
   seats: number;
   /** Asientos gastados: miembros activos **más invitaciones vivas**. */
   seatsUsed: number;
+  /**
+   * Identidad visual, elegida en el modal de configuración. `null` = sin
+   * elegir, y el frontend cae al monograma de letras derivado del `id`.
+   * `iconKey` es un nombre de icono de `lucide-react`; `color`, un `#rrggbb`.
+   */
+  iconKey: string | null;
+  color: string | null;
   createdAt: string;
 }
 
@@ -361,12 +370,41 @@ export class CreateOrganizationBodyDto {
      su portal el día que el equipo o los proyectos no quepan. */
 }
 
+/**
+ * Cuerpo de `PATCH /organizations/:id`: la identidad de la organización.
+ *
+ * Nació renombrando y solo eso —de ahí el nombre—; desde el modal de
+ * configuración también lleva el icono y el color. `name` sigue siendo
+ * obligatorio (el modal siempre lo manda); `iconKey` y `color` son opcionales y
+ * admiten `null` para volver al monograma.
+ */
 export class RenameOrganizationBodyDto {
   @ApiProperty()
   @IsString()
   @MinLength(2)
   @MaxLength(80)
   name: string;
+
+  /**
+   * Nombre kebab-case de un icono de `lucide-react` de la lista curada del
+   * frontend. `null` lo borra y vuelve al monograma. Se valida la forma, no que
+   * el icono exista: la lista canónica vive en el cliente.
+   */
+  @ApiPropertyOptional({ nullable: true, example: 'rocket' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(40)
+  @Matches(/^[a-z][a-z0-9-]*$/, { message: 'iconKey no tiene forma de nombre de icono' })
+  iconKey?: string | null;
+
+  /** Color de acento en `#rrggbb`. `null` lo borra. */
+  @ApiPropertyOptional({ nullable: true, example: '#7c5cff' })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'color debe ser un hexadecimal #rrggbb' })
+  color?: string | null;
 }
 
 export class InviteOrganizationMemberBodyDto {

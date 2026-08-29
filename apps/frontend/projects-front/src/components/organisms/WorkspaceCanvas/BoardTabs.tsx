@@ -54,14 +54,14 @@ export function BoardTabs({ boards, activeId, onCambiar, tareasPorTablero }: Boa
               'flex max-w-[13rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1',
               'font-sans text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
               activo
-                ? 'font-semibold text-text-primary'
-                : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+                ? 'font-semibold text-white'
+                : 'text-white/55 hover:bg-[#1c1c1b] hover:text-white',
             ].join(' ')}
             style={activo ? { background: alpha(colors.primary, 12) } : undefined}
           >
             <span className="truncate">{board.name}</span>
             {tareas > 0 && (
-              <span className="shrink-0 font-sans text-[11px] tabular-nums text-text-disabled">
+              <span className="shrink-0 font-sans text-[11px] tabular-nums text-white/35">
                 {tareas}
               </span>
             )}

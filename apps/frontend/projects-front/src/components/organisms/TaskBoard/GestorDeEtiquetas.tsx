@@ -71,7 +71,7 @@ export function GestorDeEtiquetas({ projectId, labels }: GestorDeEtiquetasProps)
         type="button"
         onClick={() => setAbierto((estaba) => !estaba)}
         aria-expanded={abierto}
-        className="self-start rounded-lg px-2 py-1 font-sans text-xs font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="self-start rounded-lg px-2 py-1 font-sans text-xs font-medium text-white/55 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         {abierto ? 'Cerrar la gestión de etiquetas' : 'Gestionar etiquetas'}
       </button>
@@ -123,9 +123,9 @@ function Panel({ projectId, labels }: GestorDeEtiquetasProps) {
   const puedeEnviar = nombre.trim().length > 0 && !guardando;
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border p-3">
+    <div className="flex flex-col gap-3 rounded-xl border border-white/10 p-3">
       {labels.length > 0 && (
-        <ul className="flex flex-col divide-y divide-border">
+        <ul className="flex flex-col divide-y divide-white/10">
           {labels.map((label) => (
             <li key={label.id}>
               <Fila
@@ -192,7 +192,7 @@ function Panel({ projectId, labels }: GestorDeEtiquetasProps) {
               setNombre('');
               setColor('primary');
             }}
-            className="h-10 cursor-pointer rounded-lg px-3 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+            className="h-10 cursor-pointer rounded-lg px-3 font-sans text-sm text-white/55 transition-colors hover:text-white"
           >
             Cancelar
           </button>
@@ -251,7 +251,7 @@ function Fila({
 
       {confirmando ? (
         <span className="ml-auto flex items-center gap-2">
-          <span className="font-sans text-xs text-text-secondary">Se quitará de sus tareas.</span>
+          <span className="font-sans text-xs text-white/55">Se quitará de sus tareas.</span>
           <button
             type="button"
             onClick={confirmarBorrado}
@@ -264,7 +264,7 @@ function Fila({
           <button
             type="button"
             onClick={() => setConfirmando(false)}
-            className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+            className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-white/55 transition-colors hover:text-white"
           >
             No
           </button>
@@ -322,9 +322,9 @@ function BotonDeIcono({
       title={title}
       className={[
         'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg',
-        'text-text-secondary transition-colors hover:bg-surface-elevated',
+        'text-white/55 transition-colors hover:bg-white/5',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-        peligro ? 'hover:text-error' : 'hover:text-text-primary',
+        peligro ? 'hover:text-error' : 'hover:text-white',
       ].join(' ')}
     >
       {children}

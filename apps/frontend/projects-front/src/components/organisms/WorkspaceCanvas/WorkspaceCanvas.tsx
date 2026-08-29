@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { BoardStrip } from './BoardStrip';
 import { BoardTabs } from './BoardTabs';
 import { CreateBoardButton } from './CreateBoardButton';
+import { VistaSelector, type VistaTablero, esVista } from './VistaSelector';
 import { WorkspacePicker } from './WorkspacePicker';
 
 /**
@@ -56,6 +57,8 @@ export interface WorkspaceCanvasProps {
    * A partir de ahí manda el estado local: cambiar de tablero no navega.
    */
   boardIdInicial?: string | null;
+  /** La vista de arranque (`?vista=`): `kanban` (por defecto), `calendario` o `tabla`. */
+  vistaInicial?: string;
   canManage: boolean;
   /** Renombrar espacios y tableros: `canEditBoard`. */
   canEditBoard: boolean;
@@ -128,6 +131,7 @@ export function WorkspaceCanvas({
   workspaces,
   activeWorkspace,
   boardIdInicial,
+  vistaInicial,
   canManage,
   canEditBoard,
   canDeleteBoard,
@@ -172,6 +176,23 @@ export function WorkspaceCanvas({
   const boardActivo = boards.find((board) => board.id === boardActivoId) ?? boards[0] ?? null;
 
   /**
+   * La vista del tablero —Kanban, Calendario o Tabla—. Como `?mias=1` y la
+   * pestaña, el estado de partida llega de la URL (`?vista=`), pero a partir de
+   * ahí lo lleva `useState` y se refleja en la barra de direcciones **sin
+   * navegar**: cambiar de vista no debe revalidar el árbol del proyecto.
+   */
+  const [vista, setVista] = useState<VistaTablero>(() =>
+    esVista(vistaInicial) ? vistaInicial : 'kanban',
+  );
+  function cambiarVista(v: VistaTablero) {
+    setVista(v);
+    const url = new URL(window.location.href);
+    if (v === 'kanban') url.searchParams.delete('vista');
+    else url.searchParams.set('vista', v);
+    window.history.replaceState(null, '', url);
+  }
+
+  /**
    * La barra de direcciones sigue al tablero abierto, **sin navegar**.
    *
    * `replaceState` y no `router.replace`: lo segundo pediría la página al
@@ -208,7 +229,7 @@ export function WorkspaceCanvas({
         canDeleteBoard={canDeleteBoard}
       />
 
-      <span aria-hidden="true" className="shrink-0 font-sans text-sm text-text-disabled">
+      <span aria-hidden="true" className="shrink-0 font-sans text-sm text-white/35">
         /
       </span>
 
@@ -265,7 +286,7 @@ export function WorkspaceCanvas({
       className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         soloMias
           ? 'bg-primary text-primary-foreground'
-          : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+          : 'text-white/55 hover:bg-[#131312] hover:text-white'
       }`}
     >
       <svg
@@ -286,10 +307,19 @@ export function WorkspaceCanvas({
     </button>
   );
 
+  /* El selector de vista va pegado al filtro: los dos deciden **qué** se ve del
+     tablero, y comparten sitio encima del lienzo. */
+  const controlesDeVista = (
+    <>
+      <VistaSelector value={vista} onChange={cambiarVista} />
+      {filtroMisTareas}
+    </>
+  );
+
   if (!activeWorkspace) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border rounded-lg bg-surface px-4 py-2">
+      <div className="flex flex-col h-full bg-[#080807]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-white/10 rounded-lg bg-[#131312] px-4 py-2">
           {barraDelTablero}
         </div>
 
@@ -313,8 +343,8 @@ export function WorkspaceCanvas({
               />
             </svg>
           </span>
-          <h3 className="font-display text-2xl text-text-primary">Ningún espacio todavía</h3>
-          <p className="max-w-md font-sans text-sm text-text-secondary">
+          <h3 className="font-sans text-2xl font-semibold text-white">Ningún espacio todavía</h3>
+          <p className="max-w-md font-sans text-sm text-white/55">
             Un espacio agrupa tableros: uno por equipo, por fase o por lo que le convenga a este
             proyecto.{' '}
             {canManage
@@ -328,16 +358,14 @@ export function WorkspaceCanvas({
 
   if (!boardActivo) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border bg-surface px-4 py-2">
+      <div className="flex flex-col h-full bg-[#080807]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-white/10 bg-[#131312] px-4 py-2">
           {barraDelTablero}
         </div>
 
         <div className="flex flex-col items-center justify-center flex-1 gap-3 px-6 py-16 text-center">
-          <h3 className="font-display text-2xl text-text-primary">
-            «{activeWorkspace.name}» está vacío
-          </h3>
-          <p className="max-w-md font-sans text-sm text-text-secondary">
+          <h3 className="font-sans text-2xl font-semibold text-white">«{activeWorkspace.name}» está vacío</h3>
+          <p className="max-w-md font-sans text-sm text-white/55">
             Un tablero organiza el trabajo en columnas.{' '}
             {canManage ? 'Crea el primero desde el botón de arriba.' : ''}
           </p>
@@ -353,8 +381,9 @@ export function WorkspaceCanvas({
          orden del anterior hasta el primer efecto. */
       key={boardActivo.id}
       board={boardActivo}
+      vista={vista}
       titulo={barraDelTablero}
-      filtroMisTareas={filtroMisTareas}
+      filtroMisTareas={controlesDeVista}
       projectId={projectId}
       canEditBoard={canEditBoard}
       canDeleteBoard={canDeleteBoard}

@@ -412,6 +412,8 @@ export class OrganizationsService {
       name: string | null;
       slug: string | null;
       ownerUserId: string;
+      iconKey: string | null;
+      color: string | null;
       createdAt: Date;
       subscription: { tier: string; seats: number } | null;
       _count?: { members: number };
@@ -439,6 +441,8 @@ export class OrganizationsService {
       /* `_count.members` cuenta invitadas **y** activas, que es justo lo que
          significa un asiento gastado. Ver la nota de `OrganizationMember`. */
       seatsUsed: organizacion._count?.members ?? 0,
+      iconKey: organizacion.iconKey,
+      color: organizacion.color,
       createdAt: organizacion.createdAt.toISOString(),
     };
   }
@@ -564,10 +568,19 @@ export class OrganizationsService {
     return `${base}-${randomBytes(2).toString('hex')}`;
   }
 
-  async renombrar(organizationId: string, userId: string, name: string) {
+  async renombrar(
+    organizationId: string,
+    userId: string,
+    name: string,
+    /* Identidad visual, desde el modal de configuración. `undefined` = no se
+       toca; `null` = se borra y vuelve al monograma. */
+    iconKey?: string | null,
+    color?: string | null,
+  ) {
     /* Renombrar es identidad, no gestión de gente: se separó de
        `canManageMembers` para que quien lleva el equipo pueda arreglar una
-       errata sin poder además tocar quién está dentro. */
+       errata sin poder además tocar quién está dentro. El icono y el color van
+       por la misma puerta — son identidad igual que el nombre. */
     const permiso = await this.exigirPermiso(
       organizationId,
       userId,
@@ -577,9 +590,18 @@ export class OrganizationsService {
 
     const organizacion = await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { name: name.trim() },
+      data: {
+        name: name.trim(),
+        ...(iconKey !== undefined && { iconKey: iconKey || null }),
+        ...(color !== undefined && { color: color || null }),
+      },
       include: { subscription: true, _count: { select: { members: true } } },
     });
+    /* El selector de la barra lateral cachea la lista por usuario 30 s: sin este
+       olvido, quien acaba de renombrar o de cambiar el icono lo sigue viendo
+       viejo hasta media pantalla después. Al resto de miembros les llega al
+       caducar el TTL. */
+    await this.olvidar(organizationId, userId);
     return this.vista(
       organizacion,
       { role: { name: permiso.roleName ?? '', permissions: permiso.permisos } },

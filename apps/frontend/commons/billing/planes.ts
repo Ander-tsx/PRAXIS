@@ -199,6 +199,13 @@ export interface OrganizationView {
   seats: number;
   /** Asientos gastados: miembros activos **más invitaciones vivas**. */
   seatsUsed: number;
+  /**
+   * Identidad visual, del modal de configuración. `null` = sin elegir, y el
+   * selector cae al monograma de letras. `iconKey` es un icono de
+   * `lucide-react` de la lista curada; `color`, un `#rrggbb`.
+   */
+  iconKey: string | null;
+  color: string | null;
   createdAt: string;
 }
 

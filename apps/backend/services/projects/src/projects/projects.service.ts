@@ -427,6 +427,10 @@ export class ProjectsService {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(slug !== undefined && { slug }),
           ...(dto.description !== undefined && { description: dto.description }),
+          /* Identidad visual, desde el modal de configuración. `undefined` = no
+             se toca; `null` o '' = se borra y vuelve al monograma. */
+          ...(dto.iconKey !== undefined && { iconKey: dto.iconKey || null }),
+          ...(dto.color !== undefined && { color: dto.color || null }),
         },
       });
     } catch (error) {

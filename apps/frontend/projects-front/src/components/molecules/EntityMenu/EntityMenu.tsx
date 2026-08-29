@@ -68,7 +68,7 @@ export function EntityMenu(props: EntityMenuProps) {
         aria-expanded={abierto}
         aria-label={`Opciones del ${props.entidad} ${props.nombre}`}
         title="Opciones"
-        className="flex shrink-0 cursor-pointer items-center rounded-lg px-1.5 py-1 text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="flex shrink-0 cursor-pointer items-center rounded-lg px-1.5 py-1 text-white/35 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         style={abierto ? { color: colors.textPrimary } : undefined}
       >
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -87,7 +87,7 @@ export function EntityMenu(props: EntityMenuProps) {
           aria-label={`Opciones del ${props.entidad} ${props.nombre}`}
           className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl p-1.5"
           style={{
-            background: colors.surfaceElevated,
+            background: '#1c1c1b',
             boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
           }}
         >

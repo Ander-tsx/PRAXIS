@@ -183,6 +183,8 @@ export interface ChatPanelProps {
  */
 export interface ChatPanelHandle {
   abrirBusqueda: () => void;
+  buscarLocal: (termino: string) => void;
+  cerrarBusqueda: () => void;
 }
 
 /**
@@ -274,6 +276,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [editando, setEditando] = useState<ChatMessage | null>(null);
   const [sugerencias, setSugerencias] = useState<Sugerencia[]>([]);
   const [alFinal, setAlFinal] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   /** Los borradores que esperan al envío del mensaje. */
   /**
    * Los borradores que esperan al envío, **uno por compositor**.
@@ -512,6 +515,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * modelo lleva evitando desde que se separaron «responder» y «hilo».
    */
   const historial = useMemo(() => {
+    if (busquedaAbierta && resultados !== null) {
+      return [...resultados].filter((m) => m.visibleEnChat !== false).sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+    }
+
     const porId = new Map<string, ChatMessage>();
     for (const mensaje of [...older, ...page.items, ...nuevos]) {
       if (mensaje.visibleEnChat === false) continue;
@@ -520,7 +529,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     return [...porId.values()].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
-  }, [older, page.items, nuevos]);
+  }, [older, page.items, nuevos, busquedaAbierta, resultados]);
 
   const mensajes = historial.map((mensaje) => {
     const reacciones = conMisReacciones(mensaje);
@@ -1516,7 +1525,31 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setTerminoBuscado('');
   }
 
-  useImperativeHandle(ref, () => ({ abrirBusqueda }));
+  async function buscarLocal(t: string) {
+    if (!t.trim()) {
+      setResultados(null);
+      setTerminoBuscado('');
+      return;
+    }
+    setBuscando(true);
+    setErrorBusqueda(null);
+    try {
+      const api = createApiClient({ gatewayPath });
+      const pagina = await api.get<ChatMessagePage>(
+        `${rutaCanal}/messages?q=${encodeURIComponent(t.trim())}`,
+      );
+      setResultados(pagina.items);
+      setTerminoBuscado(t.trim());
+      setBusquedaAbierta(true); // Flag to show we are searching
+    } catch {
+      setResultados(null);
+      setErrorBusqueda('No se pudo buscar.');
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  useImperativeHandle(ref, () => ({ abrirBusqueda, buscarLocal, cerrarBusqueda }));
 
   /**
    * Saltar a un mensaje y enseñarlo en su sitio del historial.
@@ -1603,9 +1636,32 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
   }
 
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    if (canWrite) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!canWrite) return;
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      void adjuntar('chat', file);
+    }
+  }
+
   return (
     <div
-      className={`flex min-h-0 flex-1 flex-col w-full max-w-[100vw] overflow-x-hidden ${
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative flex min-h-0 flex-1 flex-col w-full max-w-[100vw] overflow-x-hidden ${
         /* `max-md:` y no un `hidden md:flex` en el padre: así el mismo
            componente sirve en las dos y no hay dos árboles que mantener.
            `bg-background` es obligatorio — al salir del flujo, lo de debajo se
@@ -1634,7 +1690,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
        * chat ocupa todo el ancho. Con hilo, el panel lateral se cuela a la
        * derecha desde `sm` y en móvil (max-sm) es fijo, a pantalla entera.
        */}
-      <div className="flex min-h-0 min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 relative">
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-primary/10 border-2 border-dashed border-primary backdrop-blur-[2px] pointer-events-none m-2">
+            <div className="flex flex-col items-center gap-2 text-primary">
+              <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="font-sans text-sm font-semibold">Suelta el archivo para adjuntarlo</span>
+            </div>
+          </div>
+        )}
         <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${hiloRaiz ? 'md:mr-4' : ''} `}>
           {/**
            * ⚠️ **El panel llena siempre el alto que le da su padre, y quien lo
@@ -1657,7 +1723,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              píxel —una etiqueta larga, una palabra sin espacios— saca una barra
              horizontal en toda la conversación. Aquí nada debe desbordar a lo
              ancho: si algo no cabe, se parte. */
-              className="flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-14 pt-3"
+              className="scrollbar-chat flex min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-y-auto overflow-x-hidden px-1 pb-14 pt-3"
             >
               {hasMore && (
                 <div className="mb-2 flex justify-center">
@@ -1705,12 +1771,12 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   return (
                     <div key={mensaje.id} data-msg-id={mensaje.id}>
                       {separador && (
-                        <div className="my-3 flex items-center gap-3">
-                          <span className="h-px flex-1" style={{ background: colors.border }} />
-                          <span className="font-sans text-[11px] uppercase tracking-wide text-text-disabled">
+                        <div className="my-3 flex items-center gap-4 text-text-disabled/40">
+                          <CurvedLine />
+                          <span className="font-sans text-[11px] uppercase tracking-wide font-medium text-text-disabled">
                             {separador}
                           </span>
-                          <span className="h-px flex-1" style={{ background: colors.border }} />
+                          <CurvedLine />
                         </div>
                       )}
 
@@ -1720,10 +1786,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         mine={mensaje.authorId === currentUserId}
                         continued={
                           !separador &&
-                          anterior?.authorId === mensaje.authorId &&
-                          new Date(mensaje.createdAt).getTime() -
-                            new Date(anterior.createdAt).getTime() <
-                            CORTE_DE_BLOQUE_MS
+                          anterior?.authorId === mensaje.authorId
                         }
                         canDelete={mensaje.authorId === currentUserId}
                         canReact={canWrite}
@@ -1774,7 +1837,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 aria-label="Ir al último mensaje"
                 className="absolute bottom-3 right-4 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border transition-transform hover:scale-105"
                 style={{
-                  background: colors.surfaceElevated,
+                  background: '#131312',
                   boxShadow: `0 8px 20px ${alpha(colors.overlay, 45)}`,
                 }}
               >
@@ -1792,104 +1855,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             )}
 
             {/**
-             * La vista de búsqueda, encima del historial.
-             *
-             * Ocupa el área del scroll en lugar de empujarlo: así quien buscó y
-             * cierra vuelve a donde estaba, sin que la conversación se mueva un
-             * píxel por haber consultado otra cosa.
+             * Estado de búsqueda si no hay resultados.
              */}
-            {busquedaAbierta && (
-              <div
-                className="absolute inset-0 z-20 flex flex-col overflow-hidden rounded-sm border border-border p-3"
-                style={{ background: colors.background }}
-              >
-                <div className="flex shrink-0 items-center gap-2">
-                  <div
-                    className="flex flex-1 items-center gap-2 rounded-lg border border-border px-3 py-2"
-                    style={{ background: colors.surface }}
-                  >
-                    <svg
-                      className="h-4 w-4 shrink-0 text-text-secondary"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-                      />
-                    </svg>
-                    <input
-                      value={termino}
-                      onChange={(e) => setTermino(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void buscar();
-                        if (e.key === 'Escape') cerrarBusqueda();
-                      }}
-                      placeholder="Busca en esta conversación…"
-                      className="min-w-0 flex-1 bg-transparent font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled"
-                      aria-label="Buscar en la conversación"
-                    />
-                    {buscando && (
-                      <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-text-disabled border-t-transparent" />
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={cerrarBusqueda}
-                    aria-label="Cerrar búsqueda"
-                    className="shrink-0 cursor-pointer rounded-lg border border-border px-3 py-2 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-
-                {errorBusqueda ? (
-                  <p className="mt-3 font-sans text-xs" style={{ color: colors.error }}>
-                    {errorBusqueda}
-                  </p>
-                ) : resultados === null ? (
-                  <p className="mt-3 font-sans text-sm text-text-secondary">
-                    {terminoBuscado ? 'Sin resultados.' : 'Escribe algo y pulsa Enter para buscar.'}
-                  </p>
-                ) : resultados.length === 0 ? (
-                  <p className="mt-3 font-sans text-sm text-text-secondary">
-                    Nada que coincida con «{terminoBuscado}».
-                  </p>
-                ) : (
-                  <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-                    {resultados.map((mensaje) => (
-                      <li key={mensaje.id}>
-                        <button
-                          type="button"
-                          onClick={() => void saltarAlMensaje(mensaje.id)}
-                          className="w-full cursor-pointer rounded-lg px-2 py-2 text-left transition-colors hover:bg-overlay/5"
-                        >
-                          <span className="flex items-center gap-2 font-sans text-xs">
-                            <span className="font-semibold text-text-primary">
-                              {nombreDeAutor(mensaje.authorId)}
-                            </span>
-                            <span className="text-text-disabled">
-                              {new Date(mensaje.createdAt).toLocaleString('es', {
-                                day: 'numeric',
-                                month: 'short',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
-                            {mensaje.pinnedAt && <span className="text-text-disabled">📌</span>}
-                          </span>
-                          <span className="mt-0.5 line-clamp-2 block font-sans text-sm text-text-secondary">
-                            <AttachmentPreview mensaje={mensaje} />
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+            {busquedaAbierta && (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#080807]/90 backdrop-blur-sm">
+                <p className="font-sans text-sm text-text-secondary">
+                  {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
+                </p>
+                <button
+                  type="button"
+                  onClick={cerrarBusqueda}
+                  className="mt-4 rounded-lg border border-border px-4 py-2 font-sans text-xs text-text-primary hover:bg-white/5"
+                >
+                  Cerrar búsqueda
+                </button>
               </div>
             )}
           </div>
@@ -1903,9 +1882,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * — o vuelven a desalinearse.
            */}
           {canWrite ? (
-            <div className="relative shrink-0 p-3 pt-4 bg-surface rounded-b-2xl">
+            <div className="relative shrink-0 p-3 pt-4 bg-[#131312] rounded-b-2xl">
               {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
-              <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-surface to-transparent pointer-events-none z-10" />
+              <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-[#131312] to-transparent pointer-events-none z-10" />
               <Composer
                 /**
                  * ⚠️ **La `key` es lo que rellena el campo al editar.**
@@ -2102,5 +2081,20 @@ function mismoDia(a: Date, b: Date): boolean {
     a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
+  );
+}
+
+function CurvedLine() {
+  return (
+    <div className="flex-1">
+      <svg width="100%" height="8" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="wave" x="0" y="0" width="24" height="8" patternUnits="userSpaceOnUse">
+            <path d="M0,4 Q6,0 12,4 T24,4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="8" fill="url(#wave)" />
+      </svg>
+    </div>
   );
 }

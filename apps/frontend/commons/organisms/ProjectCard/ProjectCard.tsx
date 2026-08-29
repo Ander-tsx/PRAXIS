@@ -117,7 +117,14 @@ export function ProjectCard({
   const cuerpo = (
     <>
       <div className="flex items-start gap-3">
-        <ProjectMonogram id={project.id} name={project.name} size="md" apagado={suspendido} />
+        <ProjectMonogram
+          id={project.id}
+          name={project.name}
+          iconKey={project.iconKey ?? null}
+          color={project.color ?? null}
+          size="md"
+          apagado={suspendido}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className="truncate font-sans text-base font-semibold text-text-primary">
@@ -134,7 +141,9 @@ export function ProjectCard({
               tarjeta en una fila de etiquetas — y «de quién es» ya lo dice la
               línea de debajo del nombre, que no gasta insignia. */}
         {suspendido && (
-          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-text-secondary">SUSPENDIDO</span>
+          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-text-secondary">
+            SUSPENDIDO
+          </span>
         )}
       </div>
 
@@ -155,7 +164,11 @@ export function ProjectCard({
       {suspendido && project.suspendedReason && (
         <p
           className="line-clamp-2 rounded-sm px-2.5 py-1.5 font-sans text-xs"
-          style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textSecondary }}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${colors.border}`,
+            color: colors.textSecondary,
+          }}
         >
           {project.suspendedReason}
         </p>

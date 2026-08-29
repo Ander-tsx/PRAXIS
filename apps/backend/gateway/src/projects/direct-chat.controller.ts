@@ -277,7 +277,7 @@ export class DirectChatController {
       throw new BadRequestException('No llegó ningún archivo en el campo «file»');
     }
     if (!(CHAT_ATTACHMENT_ALLOWED_MIME as readonly string[]).includes(file.mimetype)) {
-      throw new BadRequestException('Solo se admiten imágenes, vídeo, PDF, texto, ZIP y Office.');
+      throw new BadRequestException('Solo se admiten imágenes, vídeo, PDF, texto y Office.');
     }
     if (file.size === 0) {
       throw new BadRequestException('El archivo está vacío');

@@ -2,7 +2,7 @@
 
 import { cambiarAsientosAction } from '@/app/(private)/organizations/actions';
 import { ORGANIZACION_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Input, useAccion } from '@praxis/commons';
+import { FloatingLabelInput, useAccion } from '@praxis/commons';
 import { useId, useState } from 'react';
 
 /**
@@ -33,9 +33,6 @@ export function SeatsPanel({
   const campoId = useId();
 
   return (
-    /* Sin caja: la sección que lo envuelve ya tiene su raya y su título. Un
-       borde aquí dentro sería una tarjeta dentro de una fila, que es justo lo
-       que §4 quita. */
     <section className="flex flex-col gap-3">
       {/* ⚠️ `onSubmit` y no `action={…}`: esto **edita** un valor que ya existe,
           y un `<form action>` se resetea solo en React 19 — el campo volvería a
@@ -51,7 +48,7 @@ export function SeatsPanel({
         className="flex flex-wrap items-end gap-3"
       >
         <div className="w-40">
-          <Input
+          <FloatingLabelInput
             id={campoId}
             type="number"
             label="Contratados"
@@ -59,31 +56,29 @@ export function SeatsPanel({
             max={500}
             value={String(seats)}
             onChange={(evento) => setSeats(Number(evento.target.value))}
-            fullWidth
           />
         </div>
-        <Button
+        <button
           type="submit"
-          variant="secondary"
-          isLoading={pending}
-          disabled={seats === contratados}
+          disabled={pending || seats === contratados}
+          className="rounded-full border border-white/[0.14] bg-white/[0.04] px-4 py-2 font-sans text-xs font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Cambiar
-        </Button>
+          {pending ? 'Cambiando…' : 'Cambiar'}
+        </button>
       </form>
 
-      <p className="font-sans text-xs text-text-secondary">
+      <p className="font-sans text-xs text-white/45">
         Ahora mismo hay {ocupados} ocupados, contando invitaciones pendientes. Al subir, Stripe
         cobra la parte proporcional de lo que queda de mes.
       </p>
 
       {state.error && (
-        <p role="alert" className="font-sans text-sm text-error">
+        <p role="alert" className="font-sans text-sm text-red-400">
           {state.error}
         </p>
       )}
       {state.done && (
-        <p role="status" className="font-sans text-sm text-success">
+        <p role="status" className="font-sans text-sm text-emerald-400">
           Ahora tienes {state.done} asientos.
         </p>
       )}

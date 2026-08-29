@@ -29,6 +29,16 @@ export interface SelectorDeFechaProps {
    * enterarse por el `<input type="hidden">`: los ocultos no emiten `change`.
    */
   onValueChange?: (valor: string) => void;
+  /**
+   * A qué borde del campo se pega el panel.
+   *
+   * `left` (por defecto) lo alinea con el borde izquierdo y crece hacia la
+   * derecha —lo de siempre—. `right` lo alinea con el borde derecho y crece
+   * hacia la izquierda: para cuando el campo está en la mitad derecha de un
+   * contenedor estrecho (la fecha límite en el diálogo de tarea) y el panel de
+   * 18rem se salía de la pantalla.
+   */
+  align?: 'left' | 'right';
 }
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -117,6 +127,7 @@ export function SelectorDeFecha({
   disabled = false,
   placeholder = 'Sin fecha límite',
   onValueChange,
+  align = 'left',
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
@@ -249,7 +260,9 @@ export function SelectorDeFecha({
           <div
             role="dialog"
             aria-label="Elegir fecha"
-            className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl p-3"
+            className={`absolute top-full z-50 mt-2 w-72 rounded-xl p-3 ${
+              align === 'right' ? 'right-0' : 'left-0'
+            }`}
             style={{
               background: colors.surfaceElevated,
               boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,

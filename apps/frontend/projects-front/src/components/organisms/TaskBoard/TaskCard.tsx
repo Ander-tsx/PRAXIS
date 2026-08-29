@@ -171,7 +171,7 @@ export function TaskCard({
       }}
       onClick={fantasma ? undefined : alPulsar}
       className={[
-        'relative flex flex-col gap-2 rounded-xl bg-background p-3 text-left',
+        'relative flex flex-col gap-2 rounded-xl bg-[#0b0b0a] p-3 text-left',
         'transition-[box-shadow,outline-color] duration-150 ease-out',
         fantasma ? 'pointer-events-none w-full' : '',
         /**
@@ -219,7 +219,7 @@ export function TaskCard({
        * Sin fondo, sin borde y sin cursor propio: tiene que seguir leyéndose
        * como el título de la tarjeta, no como un control dentro de ella.
        */}
-      <h6 className="min-w-0 font-sans text-sm leading-snug text-text-primary">
+      <h6 className="min-w-0 font-sans text-sm leading-snug text-white">
         <button
           type="button"
           aria-label={
@@ -302,7 +302,7 @@ export function TaskCard({
             })}
           {task.assignees.length > 7 && (
             <span
-              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated font-sans text-[11px] font-medium text-text-secondary ring-2 ring-background"
+              className="relative z-10 flex h-8 w-8 items-center justify-center rounded-full bg-[#1c1c1b] font-sans text-[11px] font-medium text-white/55 ring-2 ring-[#131312]"
               title={`${task.assignees.length - 7} más`}
             >
               +{task.assignees.length - 7}

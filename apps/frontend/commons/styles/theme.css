@@ -212,6 +212,42 @@
   --color-info-muted: rgba(37, 99, 235, 0.1);
 }
 
+/* ============================================================
+   REBRAND — subárbol en negro casi puro (`data-tone="dark"`)
+
+   El refrandeo de `projects-front` pinta algunas superficies —el diálogo de
+   tarea, para empezar— en paleta near-black, y **con independencia del tema**:
+   el rebrand no tiene variante clara (igual que el modal de «Nuevo proyecto»,
+   que lleva su `#0c0c0b` a pelo).
+
+   En vez de pasar un `tone` por cada componente de commons que cae dentro
+   (`Select`, `SelectorDeFecha`, `Input`, `Textarea`…), se redefinen los tokens
+   en el contenedor y **todo** lo que los consume hereda la paleta: las clases de
+   utilidad (`bg-surface` → `background: var(--color-surface)`) y también los
+   `style={{ background: colors.surfaceElevated }}` inline, que no son más que
+   `var(--color-surface-elevated)` (ver `commons/tokens/colors.ts`). `alpha()` es
+   `color-mix(... var(--color-x) ...)`, así que también resuelve contra el valor
+   nuevo.
+
+   Especificidad (0,1,0): empata con el `:root` que emite `@theme` y gana por
+   orden de fuente —va después—. Un `<html data-theme="light">` no le afecta:
+   `:root[data-theme="light"]` fija los tokens en el `<html>`, y este selector
+   los vuelve a fijar en el contenedor, que es donde de verdad se leen.
+   ============================================================ */
+[data-tone="dark"] {
+  --color-background: #0c0c0b;
+  --color-surface: #131312;
+  --color-surface-elevated: #1c1c1b;
+  --color-overlay: #000000;
+  --color-canvas-shadow: #000000;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: rgba(255, 255, 255, 0.55);
+  --color-text-disabled: rgba(255, 255, 255, 0.38);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
+}
+
 /* ── BASE STYLES ──────────────────────────────────────────── */
 *,
 *::before,
@@ -386,6 +422,29 @@ button:disabled,
   animation: puntos-suspensivos 1.2s steps(4) infinite;
 }
 
+/* La cara de PRAX: flotar y el vaivén de los ojos al pensar.
+   ⚠️ Vivían en un `<style>` dentro del propio `PraxAvatar`, y eso reventaba la
+   hidratación —un `<style>` no es hijo válido de un `<span>`—. El bloque global
+   de `prefers-reduced-motion` de aquí abajo ya las apaga. */
+@keyframes prax-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes prax-eye-wobble {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -480,6 +539,27 @@ body.arrastrando-en-tablero {
 }
 .scrollbar-slim:hover::-webkit-scrollbar-thumb {
   background: var(--color-text-disabled);
+}
+
+/* La barra del historial del chat, en el mismo tono `#131312` que el fondo del
+   compositor: se funde con la conversación y solo se insinúa al pasar por
+   encima. El track transparente evita la línea vertical permanente en el borde. */
+.scrollbar-chat {
+  scrollbar-width: thin;
+  scrollbar-color: #131312 transparent;
+}
+.scrollbar-chat::-webkit-scrollbar {
+  width: 8px;
+}
+.scrollbar-chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-chat::-webkit-scrollbar-thumb {
+  background: #131312;
+  border-radius: var(--radius-full);
+}
+.scrollbar-chat:hover::-webkit-scrollbar-thumb {
+  background: #1f1e1c;
 }
 
 /* La barra de progreso del reproductor de vídeo del chat.

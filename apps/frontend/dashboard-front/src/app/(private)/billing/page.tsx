@@ -112,10 +112,9 @@ export default async function BillingPage({
              confirmación — no en la misma fila que los botones de comprar. */
           if (plan.tier === 'FREE') return null;
 
-          /* ⚠️ **El checkout sigue necesitando saber qué organización paga** —su
-             id va en el `client_reference_id` de Stripe, que es lo único que ata
-             el pago a algo de PRAXIS—, pero ya no hay que preguntarlo: es la
-             activa. Lo que sí queda por decir es cuándo **no** se puede. */
+          /* ⚠️ **El checkout necesita saber qué organización paga** —su id va en
+             el `client_reference_id` de Stripe, lo único que ata el pago a algo
+             de PRAXIS—, pero ya no hay que preguntarlo: es la activa. */
           if (plan.contratacion === 'AUTOSERVICIO') {
             const btnClass =
               plan.tier === 'TEAM'
@@ -144,10 +143,21 @@ export default async function BillingPage({
               );
             }
 
+            /* 🔴 **Abre el checkout de Stripe directo**, no un enlace al portal
+               de la organización. Antes esto era un `<Link>` a
+               `/organizations/:id` y había que buscar allí otra vez el botón de
+               pagar — dos saltos para una compra. El `organizationId` es el de
+               la activa; los asientos, al menos el mínimo del plan y al menos lo
+               que ya está ocupado. */
             return (
-              <Link href={`/organizations/${activa.id}`} className={btnClass}>
+              <CheckoutButton
+                destino="checkout"
+                tier={plan.tier}
+                organizationId={activa.id}
+                seats={Math.max(plan.asientosMinimos, resumen?.uso.asientos ?? 0)}
+              >
                 Contratar para {activa.name}
-              </Link>
+              </CheckoutButton>
             );
           }
 
@@ -179,7 +189,10 @@ export default async function BillingPage({
         }
         vueltaDelPago={
           pago === 'ok' ? (
-            <PaymentReturn planActual={resumen?.tier ?? 'FREE'} />
+            <PaymentReturn
+              planActual={resumen?.tier ?? 'FREE'}
+              organizationId={organizacionActivaId}
+            />
           ) : pago === 'cancelado' ? (
             /* Sin drama y sin culpar a nadie: los botones siguen ahí abajo. */
             <p className="rounded-2xl border border-border bg-surface-elevated px-5 py-4 font-sans text-sm text-text-secondary">

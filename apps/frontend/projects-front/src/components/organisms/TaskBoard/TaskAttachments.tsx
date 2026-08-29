@@ -58,18 +58,18 @@ export function TaskAttachments({
   const total = attachments.reduce((sum, file) => sum + file.size, 0);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
-      <h4 className="font-sans text-sm font-medium text-text-primary">
+    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
+      <h4 className="font-sans text-sm font-medium text-white">
         Archivos{' '}
         {attachments.length > 0 && (
-          <span className="font-normal text-text-secondary">
+          <span className="font-normal text-white/55">
             {attachments.length} · {formatBytes(total)}
           </span>
         )}
       </h4>
 
       {attachments.length === 0 && (
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white/55">
           {canUpload
             ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
             : 'Esta tarea no tiene archivos.'}
@@ -102,12 +102,12 @@ export function TaskAttachments({
                `accept` se puede saltar eligiendo «todos los archivos». */
             accept={ATTACHMENT_ALLOWED_MIME.join(',')}
             aria-label="Archivo que adjuntar"
-            className="flex-1 cursor-pointer font-sans text-xs text-text-secondary file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-surface-elevated file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-text-primary"
+            className="flex-1 cursor-pointer font-sans text-xs text-white/55 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
           />
           <button
             type="submit"
             disabled={uploading}
-            className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            className="shrink-0 cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             style={{ background: alpha(colors.primary, 20) }}
           >
             {uploading ? 'Subiendo…' : 'Adjuntar'}
@@ -160,22 +160,22 @@ function AttachmentRow({
             src={href}
             alt=""
             className="h-10 w-10 shrink-0 rounded-lg object-cover"
-            style={{ background: alpha(colors.border, 40) }}
+            style={{ background: 'rgba(255,255,255,0.08)' }}
           />
         ) : (
           <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-sans text-[10px] font-semibold uppercase text-text-secondary"
-            style={{ background: alpha(colors.border, 40) }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-sans text-[10px] font-semibold uppercase text-white/55"
+            style={{ background: 'rgba(255,255,255,0.08)' }}
           >
             {extension(file.filename)}
           </span>
         )}
 
         <span className="flex min-w-0 flex-col">
-          <span className="truncate font-sans text-xs text-text-primary" title={file.filename}>
+          <span className="truncate font-sans text-xs text-white" title={file.filename}>
             {file.filename}
           </span>
-          <span className="font-sans text-[11px] text-text-disabled">
+          <span className="font-sans text-[11px] text-white/35">
             {formatBytes(file.size)}
             {uploader && ` · ${personLabel(uploader)}`}
           </span>
@@ -194,7 +194,7 @@ function AttachmentRow({
             disabled={deleting}
             aria-label={`Eliminar ${file.filename}`}
             title="Eliminar"
-            className="cursor-pointer rounded p-1 text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed"
+            className="cursor-pointer rounded p-1 text-white/35 transition-colors hover:text-error disabled:cursor-not-allowed"
           >
             <svg
               className="h-3.5 w-3.5"

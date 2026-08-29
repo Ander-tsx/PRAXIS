@@ -213,6 +213,51 @@ export async function cambiarAsientosAction(
   }
 }
 
+/**
+ * Nombre, icono y color de la organización, en un solo `PATCH /organizations/:id`.
+ *
+ * Antes vivía en un modal del selector de la barra lateral (`OrgSettingsModal`
+ * en `commons/OrgSwitcher`), que hacía el `fetch` a mano. Se movió al portal de
+ * la organización: el botón «Configuración» del desplegable ahora **navega**
+ * aquí en vez de abrir el modal, así toda la configuración de la organización
+ * está en un sitio.
+ *
+ * ⚠️ **`iconKey` vacío es `null`**: así se vuelve al monograma de letras. Y el
+ * `color` solo viaja si hay icono — guardar un acento que nada pinta es ruido.
+ * El backend exige `canManageOrganization`; quien no lo tenga recibe el 403 con
+ * su texto.
+ */
+export async function guardarIdentidadOrgAction(
+  _prev: OrganizacionState,
+  formData: FormData,
+): Promise<OrganizacionState> {
+  if (!(await sesionViva())) return { error: SESION_CADUCADA, done: null };
+
+  const organizationId = String(formData.get('organizationId') ?? '');
+  const name = String(formData.get('name') ?? '').trim();
+  const iconKey = String(formData.get('iconKey') ?? '') || null;
+  const color = String(formData.get('color') ?? '') || null;
+
+  if (name.length < 2) {
+    return { error: 'El nombre necesita al menos 2 caracteres.', done: null };
+  }
+
+  try {
+    await createServerApiClient().patch(`/organizations/${organizationId}`, {
+      name,
+      iconKey,
+      color: iconKey ? color : null,
+    });
+    revalidatePath(`/organizations/${organizationId}`);
+    return { error: null, done: name };
+  } catch (error) {
+    return {
+      error: error instanceof ApiError ? error.message : 'No se pudo guardar la configuración.',
+      done: null,
+    };
+  }
+}
+
 export async function aceptarInvitacionAction(
   _prev: OrganizacionState,
   formData: FormData,
