@@ -53,6 +53,8 @@ COPY apps/backend/services/projects/package.json        apps/backend/services/pr
 COPY apps/backend/services/reports/package.json         apps/backend/services/reports/
 COPY apps/backend/services/tasks/package.json           apps/backend/services/tasks/
 COPY apps/frontend/admin-front/package.json             apps/frontend/admin-front/
+COPY apps/frontend/assistant-front/package.json         apps/frontend/assistant-front/
+COPY apps/frontend/chat-front/package.json              apps/frontend/chat-front/
 COPY apps/frontend/auth-front/package.json              apps/frontend/auth-front/
 COPY apps/frontend/commons/package.json                 apps/frontend/commons/
 COPY apps/frontend/dashboard-front/package.json         apps/frontend/dashboard-front/
