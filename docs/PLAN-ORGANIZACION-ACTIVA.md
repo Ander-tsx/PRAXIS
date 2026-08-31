@@ -294,8 +294,8 @@ siguiente. La regresión completa (`pnpm e2e:regresion`) no se corre hasta C7.
 | C6 | **B7+B8+B9+F5** — los chats: organización común como puerta, y sin referencias en privado | ✅ |
 | C7 | **D8** — invitar a un proyecto ofrece la organización, no la plataforma | ✅ |
 | C8 | Documentación: contrato, pendientes, `CLAUDE.md` y este plan | ✅ |
-| C9 | **Regresión entera** (`pnpm e2e:regresion`) — no corrida todavía, ver abajo | ⬜ |
-| C10 | Repaso visual del túnel en claro y en oscuro | ⬜ |
+| C9 | **Regresión entera** (`pnpm e2e:regresion`) — en curso, ver Registro | ⬜ |
+| C10 | Repaso visual del túnel — **solo oscuro**: el modo claro se retiró en `2aae679` (`getTheme()` fijo a `'dark'`, cookie y `ThemeToggle` dormidos), fuera de esta etapa. El repaso en claro ya no aplica | ⬜ |
 
 ### Lo que sí se ha comprobado, y lo que no
 
@@ -322,7 +322,9 @@ de ella comprobaban la regla vieja. Se reescriben, no se silencian.
 
 | Fecha | Stack | Commit | Qué entró |
 |---|---|---|---|
-| 2026-08-28 | C1–C8 | (sin commitear) | La etapa entera menos la regresión: el plan por organización, la cuota de IA con su migración, el tope de tres, el túnel del sidebar, la facturación acotada, los chats por organización y la invitación a proyecto |
+| 2026-08-28 | C1–C8 | `533a30a`…y sucesivos en `feature/enterprise-cuotas` | La etapa entera menos la regresión: el plan por organización, la cuota de IA con su migración, el tope de tres, el túnel del sidebar, la facturación acotada, los chats por organización y la invitación a proyecto. Ya commiteado — la nota «sin commitear» de la primera versión de este registro quedó obsoleta |
+| 2026-08-31 | (fuera de esta etapa, en la misma rama) | `782e0af`…`913bd3d` | Q1–Q5 de `PLAN-CUOTAS.md`, un rediseño visual grande (Facturación, Administración, insignias, retirada del modo claro) y la actualización de las pruebas de UI al rediseño. `main` sigue en `6a549ac`; los 32 commits de encima viven solo en `feature/enterprise-cuotas`, sin fusionar |
+| 2026-08-31 | — | — | Recuperados `credentials-service` y `tasks-service`, caídos desde antes de esta sesión (puertos 3001/3004 sin escuchar, procesos `nest --watch` vivos pero en bucle — el `MODULE_NOT_FOUND` que documenta CLAUDE.md). Parados, `dist/` limpiado, Prisma regenerado y arrancados en frío; el resto del stack no se tocó. `pnpm e2e:regresion` (C9) lanzada a continuación |
 
 ---
 
