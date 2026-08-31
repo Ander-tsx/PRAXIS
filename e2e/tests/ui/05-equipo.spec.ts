@@ -1,4 +1,4 @@
-import { type APIRequestContext, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { correoUnico } from '../../fixtures/api';
 import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
 import { confirmarCorreo } from '../../fixtures/verificacion';
@@ -67,98 +67,60 @@ test.describe('Equipo del proyecto', () => {
   });
 });
 
-/**
- * Registra una cuenta **sin entrar con ella**: solo hace falta que exista en el
- * directorio para poder buscarla desde el diálogo de invitar.
- *
- * Va por el proxy de la zona, igual que `crearProyectoParaLaPrueba`, y no gasta
- * ni un login — que es el recurso escaso de esta suite.
- */
-async function registrarSuelta(request: APIRequestContext): Promise<string> {
-  const email = correoUnico('sin-asiento');
-  const alta = await request.post('/projects/api/gateway/auth/register', {
-    data: { email, password: 'Prueba@12345!' },
-  });
-  const cuerpo = alta.ok() ? await alta.json().catch(() => null) : null;
-
-  if (!cuerpo?.data?.userId) {
-    throw new Error(`No se pudo registrar ${email}: ${alta.status()} ${await alta.text()}`);
-  }
-
-  await confirmarCorreo(email);
-  return cuerpo.data.userId as string;
-}
-
 test.describe('Equipo del proyecto — el asiento', () => {
-  test('🔴 sin asientos, el error dice que falta un asiento y NO «no tienes permiso»', async ({
+  test('🔴 buscar a quien no está en la organización ofrece la salida, no un muro', async ({
     page,
   }) => {
-    /* 🔴 **Esto fija un fallo de pantalla, no de servidor.** El gateway responde
-       403 con `code: NOT_IN_ORG` y un mensaje que explica la salida —libera un
-       asiento o amplía el plan—, y el `describe()` de la zona lo tiraba para
-       poner «No tienes permiso para hacer esto en este proyecto». Se lo decía
-       **al dueño del proyecto**, que tiene todos los permisos: una mentira sobre
-       sí mismo, y encima escondiendo lo único que se podía hacer.
+    /* 🔴 **Fija un fallo de pantalla, no de servidor.** El diálogo de invitar al
+       proyecto solo lista a quien ya tiene asiento en la organización — a quien
+       no lo tiene ni siquiera se le puede seleccionar. Antes, elegir a alguien
+       de fuera y enviar daba un 403 `NOT_IN_ORG` que la zona traducía a «No
+       tienes permiso para hacer esto en este proyecto», dicho **al dueño**, que
+       lo puede todo: una mentira sobre sí mismo que encima escondía la salida.
 
-       Es exactamente lo mismo que ya pasó con `PROJECT_SUSPENDED`, y por eso la
-       lista de códigos que se explican solos vive en un sitio y no en cuatro. */
+       Ahora el diálogo lo dice antes de enviar nada: «nadie del equipo coincide»
+       y un enlace para llevar a esa persona a la organización. Es la misma
+       lección que `PROJECT_SUSPENDED`: la pantalla explica la salida en vez de
+       rebotar con un permiso que no es el problema. */
     await crearCuentaYEntrar(page);
 
-    const nombre = `Sin asientos ${Date.now().toString(36)}`;
+    const nombre = `Sin asiento ${Date.now().toString(36)}`;
     await crearProyectoParaLaPrueba(page, nombre);
 
-    /* El plan gratuito da tres asientos y quien crea el proyecto ocupa uno. Se
-       llenan los otros dos por la API —dar de alta a alguien ocupa su asiento
-       solo, que es justo el gesto que arregló `cdef9f2`— y la tercera persona ya
-       no cabe. */
     await page.getByRole('link').filter({ hasText: nombre }).first().click();
     await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
-    const slug = new URL(page.url()).pathname.split('/').pop() as string;
 
-    const detalle = await (await page.request.get(`/projects/api/gateway/projects/${slug}`)).json();
-    const projectId = detalle.data.id as string;
-    const projectRoleId = detalle.data.roles[0].id as string;
-
-    for (let hueco = 0; hueco < 2; hueco++) {
-      const userId = await registrarSuelta(page.request);
-      const alta = await page.request.post(`/projects/api/gateway/projects/${projectId}/members`, {
-        data: { userId, projectRoleId },
-      });
-      expect(alta.status(), `El asiento ${hueco + 2} de 3 debería entrar solo`).toBe(201);
-    }
-
-    /* Y ahora, la tercera, por la interfaz — que es lo que se está probando. */
-    const sobrante = correoUnico('sin-asiento');
+    /* Una cuenta que existe pero no pertenece a la organización de quien invita:
+       registrada por el proxy de la zona, sin gastar un login. */
+    const fuera = correoUnico('fuera-de-org');
     const alta = await page.request.post('/projects/api/gateway/auth/register', {
-      data: { email: sobrante, password: 'Prueba@12345!' },
+      data: { email: fuera, password: 'Prueba@12345!' },
     });
     expect(alta.status()).toBe(201);
-    await confirmarCorreo(sobrante);
+    await confirmarCorreo(fuera);
 
-    await page.reload();
     await page
       .getByRole('navigation', { name: 'Secciones del proyecto' })
       .getByRole('link', { name: 'Equipo' })
       .click();
 
     await page.getByRole('button', { name: 'Invitar persona' }).click();
-    await page.getByRole('searchbox', { name: 'Buscar persona' }).fill(sobrante);
-    await page.getByRole('button', { name: 'Buscar' }).click();
+    /* Buscador en vivo, sin botón «Buscar»; su etiqueta es «Buscar en el equipo». */
+    await page.getByRole('searchbox', { name: 'Buscar en el equipo' }).fill(fuera);
 
-    await page.getByText(sobrante).first().click();
-    await page.getByRole('button', { name: 'Enviar invitación' }).click();
-
-    /* ⚠️ Acotado al formulario: Next monta su propio `role="alert"` vacío para
-       anunciar las navegaciones (`__next-route-announcer__`), y un
-       `getByRole('alert')` a secas casa con los dos y muere por modo estricto. */
-    const formulario = page
+    const panel = page
       .locator('form')
       .filter({ has: page.getByRole('button', { name: 'Enviar invitación' }) });
-    const aviso = formulario.getByRole('alert');
-    await expect(aviso).toBeVisible({ timeout: 15_000 });
 
-    /* Lo que importa es **qué** dice, no que diga algo. */
-    await expect(aviso).toContainText(/asiento/i);
-    await expect(aviso).not.toContainText(/no tienes permiso/i);
+    /* Dice que no está en el equipo y ofrece llevarlo a la organización — ni un
+       «no tienes permiso», ni un callejón sin salida. */
+    await expect(panel.getByText(/nadie del equipo coincide/i)).toBeVisible({ timeout: 15_000 });
+    await expect(
+      panel.getByRole('link', { name: /invitar a alguien a la organización/i }),
+    ).toBeVisible();
+    await expect(panel).not.toContainText(/no tienes permiso/i);
+
+    /* Y sin nadie seleccionado, «Enviar invitación» no envía. */
+    await expect(page.getByRole('button', { name: 'Enviar invitación' })).toBeDisabled();
   });
 });

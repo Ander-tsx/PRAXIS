@@ -109,8 +109,7 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
 
   if (!(await intentar(15_000))) {
     throw new Error(
-      `No se pudo entrar con ${email} ni tras esperar el límite de login. ` +
-        'Si el error de la pantalla no habla de intentos, el fallo es otro.',
+      `No se pudo entrar con ${email} ni tras esperar el límite de login. Si el error de la pantalla no habla de intentos, el fallo es otro.`,
     );
   }
 }

@@ -285,7 +285,7 @@ export function InviteMemberDialog({
                     </p>
                     {organizationId && (
                       <a
-                        href={`/dashboard/organizations/${organizationId}`}
+                        href="/main/team"
                         className="font-sans text-sm text-primary underline-offset-2 hover:underline"
                       >
                         Invitar a alguien a la organización →
