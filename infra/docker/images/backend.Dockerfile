@@ -29,7 +29,7 @@ WORKDIR /app
 # Solo los manifiestos primero: mientras no cambie ninguno, Docker reutiliza la
 # capa del install aunque haya cambiado todo el código.
 #
-# Están los 20 paquetes del workspace, incluidos los del frontend que esta
+# Están los 24 paquetes del workspace, incluidos los del frontend que esta
 # imagen no usa. No es un descuido: `--frozen-lockfile` compara el lockfile
 # contra *todos* los miembros declarados en pnpm-workspace.yaml, y si falta un
 # package.json aborta. El install sí se filtra a `apps/backend`.
@@ -46,6 +46,7 @@ COPY apps/backend/commons/observability/package.json    apps/backend/commons/obs
 COPY apps/backend/commons/domain-events/package.json    apps/backend/commons/domain-events/
 COPY apps/backend/services/alexa/package.json           apps/backend/services/alexa/
 COPY apps/backend/services/automation/package.json      apps/backend/services/automation/
+COPY apps/backend/services/billing/package.json         apps/backend/services/billing/
 COPY apps/backend/services/assistant/package.json       apps/backend/services/assistant/
 COPY apps/backend/services/credentials/package.json     apps/backend/services/credentials/
 COPY apps/backend/services/permissions/package.json     apps/backend/services/permissions/
