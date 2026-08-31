@@ -8,9 +8,9 @@
 >
 > Última revisión: 2026-07-29 · gateway en `localhost:3000`
 >
-> **Estado: 17 de 17 resueltos.** El equipo de frontend recibió autorización para
-> tocar `apps/backend/` y los ha ido cerrando; cada punto resuelto lleva el
-> commit y cómo se verificó.
+> **Estado: 17 de 17 resueltos**, más el §26, abierto el 2026-08-28. El equipo de
+> frontend recibió autorización para tocar `apps/backend/` y los ha ido cerrando;
+> cada punto resuelto lleva el commit y cómo se verificó.
 >
 > Lo que queda no es de esta lista. Hoy es un solo hueco de producto: **no se
 > pueden reordenar tareas dentro de una columna**.
@@ -1126,3 +1126,36 @@ la ocasión.
 Mientras tanto el frontend **no hace nada**: comprobarlo en el cliente exigiría
 que cada zona conociera las rutas de las demás, y el arreglo de verdad está en
 quien genera el slug.
+
+---
+
+## 🟠 26. El portal de Stripe es de la persona, y la interfaz habla de equipos
+
+**Leído en el código** · `gateway/src/billing/billing.controller.ts:205`
+
+`POST /me/billing/portal` resuelve el cliente con `cliente(req.user.userId)` →
+`billing_customer_of { userId }`. Hay **un cliente de Stripe por persona**, y la
+sesión del portal se abre contra él.
+
+Desde la etapa de la organización activa (2026-08-28) toda la pantalla de
+Suscripción habla de **una** organización: su plan, su consumo, su botón de
+contratar. El portal es lo único que no puede. Quien sea dueño de dos
+organizaciones con dos suscripciones abre un portal que las lista las dos.
+
+**No es un fallo de seguridad**: todo lo que hay ahí dentro es suyo. Lo que es,
+es una promesa que no se puede cumplir — y la baja equivocada se da **dentro de
+Stripe**, donde ya no podemos avisar de nada.
+
+**Qué hace el frontend mientras tanto.** El botón dice «Gestionar mis
+suscripciones», en plural y sin nombrar el equipo. Es lo único honesto que se
+puede escribir sobre lo que abre.
+
+**Qué haría falta.** Que `portal` acepte un `organizationId`, compruebe que quien
+llama es su dueño —igual que hace ya `checkout` con `organizacionPropia`— y abra
+la sesión contra el cliente de esa suscripción. Eso implica que el
+`stripeCustomerId` deje de colgar de la persona y pase a colgar de la
+suscripción, que ya lo tiene (`billing_subscription_of` lo devuelve).
+
+**Severidad 🟠 y no roja** porque no expone nada y hoy casi nadie tiene dos
+suscripciones. Sube a naranja el día que alguien pague dos equipos.
+

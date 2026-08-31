@@ -1,4 +1,5 @@
 import { NoReportsAccess } from '@/components/molecules/NoReportsAccess';
+import { type VentanaDelPlan, VentanaDelPlanAviso } from '@/components/molecules/VentanaDelPlan';
 import { AnalysisFilters } from '@/components/organisms/AnalysisFilters';
 import { GeneratedChart } from '@/components/organisms/Charts';
 import {
@@ -370,6 +371,20 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
   const columnTime = (informes['column-time'] ?? null) as ReportColumnTime | null;
 
   /**
+   * Hasta dónde llega el plan hacia atrás, y si esta petición se recortó.
+   *
+   * ⚠️ **Viaja dentro del paquete y no en el `meta` del sobre**, porque el
+   * cliente devuelve el `data` desenvuelto y tira el `meta`: un aviso ahí
+   * llegaría al navegador y no lo leería nadie. Está explicado en
+   * `ReportsController.bundle`.
+   *
+   * Si el paquete entero falló, esto es `null` y no se dibuja nada — con todas
+   * las tarjetas en «no disponible», un aviso sobre el tramo sería ruido sobre
+   * una pantalla que ya no enseña ningún tramo.
+   */
+  const ventana = (informes.ventana ?? null) as VentanaDelPlan | null;
+
+  /**
    * Los perfiles de quienes salen en esta pantalla, en **una** petición.
    *
    * ⚠️ Esto pedía `/users?limit=100` y cruzaba en memoria — la primera página del
@@ -507,7 +522,7 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
               Análisis del Proyecto
             </h2>
-            <p className="max-w-2xl font-sans text-sm text-text-secondary">
+            <p className="max-w-2xl font-sans text-sm text-white">
               Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
           </div>
@@ -561,6 +576,10 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
           }))}
         />
 
+        {/* Solo aparece si el servidor recortó de verdad el tramo pedido. Ver
+            `VentanaDelPlanAviso`, donde está por qué no sale siempre. */}
+        <VentanaDelPlanAviso ventana={ventana} />
+
         {/* `projectId` y no el parámetro de la ruta: las acciones del asistente
             llaman a `/projects/:projectId/assistant/...`, que espera el UUID.
             Con el slug de la URL respondían 403. */}
@@ -598,7 +617,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
           <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
             Cómo va el trabajo
           </h2>
-          <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+          <p className="max-w-2xl font-serif text-lg italic text-white">
             Cuánto hay, cómo se mueve, cuánto tarda y qué cabe esperar.
           </p>
         </div>
@@ -610,7 +629,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
             <p className="font-display text-lg text-text-primary">
               Todavía no estás en ningún proyecto
             </p>
-            <p className="mt-1 font-sans text-sm text-text-secondary">
+            <p className="mt-1 font-sans text-sm text-white">
               Los reportes se calculan sobre el trabajo de un proyecto, así que necesitas estar en
               al menos uno.
             </p>
@@ -625,7 +644,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
 function NoDisponible() {
   return (
     <div className="flex h-full min-h-24 items-center justify-center px-4 text-center">
-      <p className="font-sans text-sm text-text-disabled">
+      <p className="font-sans text-sm text-white">
         No se pudo cargar este informe. Vuelve a intentarlo en un momento.
       </p>
     </div>

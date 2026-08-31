@@ -79,7 +79,7 @@ export function DashboardProjects({
             /* Otra zona → la ruta completa del shell y `<a>` duro, que es lo
                que hace `sameZone` por defecto. */
             href={projectHref(project)}
-            gatewayPath="/dashboard/api/gateway"
+            gatewayPath="/main/api/gateway"
           />
         ))}
       </ul>

@@ -210,6 +210,48 @@ variable "stripe_price_pro" {
   default     = ""
 }
 
+# Los tres precios de la etapa Enterprise.
+#
+# Mismo trato que `stripe_price_pro`: vacío = ese plan no se puede contratar y
+# la pantalla de precios no lo ofrece, en vez de ofrecer un botón que responde
+# 503. Los tres son ids de **precio** (`price_…`), no de producto.
+variable "stripe_price_plus" {
+  description = <<-EOT
+    El id del precio del plan PLUS (`price_…`), el individual intermedio.
+
+    🔴 **Este es el que lleva el mes gratis**, y el periodo de prueba lo aplica
+    el gateway al abrir el checkout (`trial_period_days`), no la configuración
+    del precio en Stripe. Si además se configura una prueba en el propio precio,
+    se suman: quedarían dos meses gratis y nadie lo notaría hasta el recibo que
+    no llega.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_team" {
+  description = <<-EOT
+    El id del precio del plan Equipo (`price_…`).
+
+    ⚠️ Tiene que ser un precio **por unidad**: se cobra por asiento y el
+    checkout manda `quantity` con los asientos contratados. Con un precio a
+    tanto alzado, Stripe cobra lo mismo por tres asientos que por cincuenta.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_price_business" {
+  description = <<-EOT
+    El id del precio del plan Empresa (`price_…`). Por asiento, igual que Equipo.
+  EOT
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "stripe_webhook_secret" {
   description = <<-EOT
     El secreto de firma del webhook de Stripe (`whsec_…`).

@@ -37,6 +37,39 @@ export class AttachmentsService {
     private readonly redis: RedisService,
   ) {}
 
+  /**
+   * Cuántos bytes ocupan los adjuntos de estos proyectos.
+   *
+   * Existe para la cuota `almacenamientoOrgMb`, que el gateway comprueba antes
+   * de dejar subir. Aquí no se decide nada y no se sabe de organizaciones: se
+   * recibe una lista de proyectos ya resuelta y se devuelve la suma. Quien la
+   * compone es el gateway, que es el único que habla con projects-service y con
+   * este a la vez.
+   *
+   * ⚠️ **Suma `size`, que es la columna de metadatos, y no toca los bytes.**
+   * `AttachmentBlob` vive en su propia tabla justo para que nada que no sea la
+   * descarga la lea; un `SUM(length(data))` traería el TOAST entero de la
+   * organización a memoria para contestar un número que ya está guardado.
+   *
+   * ⚠️ **Con la lista vacía devuelve 0 sin ir a la base.** Un `in: []` de Prisma
+   * también da cero, pero pasando por Postgres — y esta ruta se llama en cada
+   * subida.
+   */
+  async bytesOfProjects(projectIds: string[]): Promise<number> {
+    if (projectIds.length === 0) return 0;
+
+    const total = await this.prisma.taskAttachment.aggregate({
+      _sum: { size: true },
+      where: { task: { projectId: { in: projectIds } } },
+    });
+
+    /* `_sum` es `null` cuando no hay ni una fila, no 0. Devolverlo tal cual
+       haría que el gateway sumara `null + bytes` y comparara `NaN <= tope`, que
+       es `false`: el primer adjunto de una organización vacía se rechazaría por
+       pasarse de un almacén que está vacío. */
+    return total._sum.size ?? 0;
+  }
+
   async findAttachments(dto: FindAttachmentsDto) {
     await this.assertTaskInProject(dto.taskId, dto.projectId);
 

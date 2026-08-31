@@ -60,12 +60,12 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
   }, [addState]);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
+    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
       <header className="flex items-center justify-between gap-3">
-        <h4 className="font-sans text-sm font-medium text-text-primary">
+        <h4 className="font-sans text-sm font-medium text-white">
           Checklist{' '}
           {total > 0 && (
-            <span className="font-normal tabular-nums text-text-secondary">
+            <span className="font-normal tabular-nums text-white">
               {done}/{total}
             </span>
           )}
@@ -83,7 +83,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
       </header>
 
       {total === 0 && (
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white">
           {canEdit
             ? 'Divide la tarea en pasos concretos para ver el avance de un vistazo.'
             : 'Esta tarea no tiene checklist.'}
@@ -112,21 +112,27 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
           <input type="hidden" name="projectId" value={projectId} />
           <input type="hidden" name="taskId" value={task.id} />
           <input type="hidden" name="order" value={total} />
-          
+
           <input
             name="text"
             placeholder="Añadir un paso…"
             maxLength={500}
             aria-label="Nuevo ítem del checklist"
-            className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 pr-12 font-sans text-sm text-text-primary outline-none transition-colors placeholder:text-text-disabled focus:border-primary focus:ring-1 focus:ring-primary"
+            className="w-full rounded-xl border border-white/10 bg-[#191919] px-4 py-2.5 pr-12 font-sans text-sm text-white outline-none transition-colors placeholder:text-white focus:border-primary focus:ring-1 focus:ring-primary"
           />
           <button
             type="submit"
             disabled={adding}
             className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-text-inverse transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
             </svg>
           </button>
         </form>
@@ -169,7 +175,7 @@ function ChecklistRow({
   const error = toggleState.error ?? deleteState.error;
 
   return (
-    <li className="group flex items-center gap-2 rounded-lg px-1 py-0.5 transition-colors hover:bg-surface-elevated">
+    <li className="group flex items-center gap-2 rounded-lg px-1 py-0.5 transition-colors hover:bg-white/5">
       <form action={toggleAction} className="flex min-w-0 flex-1 items-center gap-2">
         <input type="hidden" name="projectId" value={projectId} />
         <input type="hidden" name="taskId" value={taskId} />
@@ -186,7 +192,7 @@ function ChecklistRow({
           aria-label={completed ? `Desmarcar «${text}»` : `Marcar «${text}»`}
           className="flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors disabled:cursor-not-allowed"
           style={{
-            borderColor: completed ? colors.success : colors.border,
+            borderColor: completed ? colors.success : 'rgba(255,255,255,0.2)',
             background: completed ? alpha(colors.success, 25) : 'transparent',
             cursor: canToggle && !toggling ? 'pointer' : undefined,
           }}
@@ -208,7 +214,7 @@ function ChecklistRow({
         <span
           className={[
             'min-w-0 flex-1 truncate font-sans text-xs',
-            completed ? 'text-text-disabled line-through' : 'text-text-primary',
+            completed ? 'text-white line-through' : 'text-white',
           ].join(' ')}
           title={text}
         >
@@ -228,7 +234,7 @@ function ChecklistRow({
             title="Eliminar"
             /* Aparece al pasar por encima, pero con foco también: si no, con
                teclado sería invisible e inalcanzable. */
-            className="cursor-pointer rounded p-1 text-text-disabled opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+            className="cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
           >
             <svg
               className="h-3 w-3"

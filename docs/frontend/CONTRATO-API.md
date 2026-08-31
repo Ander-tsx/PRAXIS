@@ -739,6 +739,17 @@ solo se leen en la ruta de `/content`. `task.attachments` trae los metadatos.
 
 - **Máximo 10 MB** por archivo. Pasarse da **413** `"File too large"`, que lo
   corta multer antes de leerlo entero.
+- 🔴 **Y hay un segundo tope, que es del plan: `almacenamientoOrgMb`.** Lo que
+  suman los adjuntos de **toda la organización** —200 MB en Gratis, 10 GB en
+  Equipo, 100 GB en Negocio, sin tope en Empresa—. Pasarse da **402
+  `QUOTA_EXCEEDED`** con `details.kind === 'almacenamiento'`, y ahí `tope` y
+  `actual` van **en MB**, no en bytes.
+  ⚠️ **Se cuenta lo que ocupa ahora, no lo que se subió alguna vez**: borrar un
+  adjunto libera. Y los proyectos `DELETED` no cuentan, porque sus adjuntos no se
+  pueden ni abrir ni borrar.
+  ⚠️ El 402 llega **después** del 413 y del control de tipo: quien sube basura
+  lee «esto no es un PDF» y no «no te cabe», que le mandaría a borrar adjuntos
+  para arreglar algo que no es de espacio.
 - **Lista blanca de tipos**: PNG, JPEG, GIF, WebP, PDF, texto plano, CSV, ZIP,
   Word y Excel. Otro tipo da 400 con el mime rechazado.
 - **El SVG no se admite**: es XML con scripts, y servirlo desde el mismo origen
@@ -888,6 +899,23 @@ event: latido         data: { t }        cada 25 s
 
 ### Chat privado — cuelga de `/me`, sin proyecto en la ruta
 
+🔴 **La puerta es la organización, no el proyecto, desde 2026-08-28.** Se puede
+escribir a quien comparta **alguna organización** contigo; antes hacía falta
+compartir un proyecto, lo que dejaba fuera a alguien de tu propio equipo al que
+todavía no habías metido en ningún tablero — y no protegía de nada más, porque
+quien está en un proyecto está por fuerza en su organización.
+
+Dos consecuencias en el contrato:
+
+- **`GET /me/chats/contacts` devuelve a todo tu equipo**, no solo a quien
+  comparte tablero contigo. Los proyectos en común siguen viniendo como detalle,
+  y **la lista puede venir vacía**: podéis hablar porque estáis en el mismo
+  equipo, no porque trabajéis en lo mismo.
+- ⚠️ **`GET /me/chats/:peerId/mentionables` devuelve `refs: []` siempre.** No se
+  referencian tareas ni tableros en privado: `/Sprint 1` no dice de qué proyecto
+  sale ni si quien lo recibe puede verlo. El menú `/` queda solo en los chats de
+  proyecto. `people` ya venía vacío —sois dos—.
+
 | Método | Ruta | Body |
 |---|---|---|
 | GET | `/me/chats` | — · tus conversaciones |
@@ -1006,14 +1034,50 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
+| GET | `/me/billing/planes` | — | El catálogo y cuáles se pueden contratar aquí |
+| GET | `/me/billing/resumen?organizationId` | — | Plan, topes y consumo **de esa organización**, en una llamada |
 | GET | `/me/billing/estado` | — | `{ disponible, gestionable }` |
-| POST | `/me/billing/checkout` | — | → `{ url }` de Stripe Checkout |
+| POST | `/me/billing/checkout` | `{ tier, seats, organizationId }` | → `{ url }` de Stripe Checkout |
 | POST | `/me/billing/portal` | — | → `{ url }` del portal. 400 si no eres cliente |
 | POST | `/webhooks/stripe` | crudo | **público, sin JWT**. Su auth es la firma |
 
+- 🔴 **`resumen` habla de UNA organización desde 2026-08-28, no de la persona.**
+  El plan vale solo dentro de la organización que lo paga, así que el `tier`, los
+  `quotas` y el `uso` que devuelve son los de la que se pida. Sin
+  `organizationId` cae en la **personal**, nunca en «la mejor que tengas».
+  ⚠️ El identificador se **valida**: mandar una organización ajena da 403
+  `NOT_IN_ORG`, no su plan.
+- ⚠️ **`uso.proyectos` cuenta los de la organización, no los tuyos.** Contaba los
+  que sostenía la persona contra un tope que se cuenta por organización: quien
+  tuviera dos proyectos en un equipo con veinte veía «2 de 25» y creía que le
+  quedaban veintitrés.
+- **`uso` trae cuatro cifras desde 2026-08-28**: `proyectos`, `iaMensual`,
+  `asientos` (ocupados, invitaciones vivas incluidas) y `almacenamientoMb`.
+  ⚠️ **`almacenamientoMb` puede ser `null`, y significa «no se pudo medir»**, no
+  cero: sumarlo cuesta dos viajes TCP y no tumba la pantalla si uno falla. Quien
+  lo pinte tiene que distinguirlo — un «0 MB» inventado es un dato, y este no lo
+  hay.
+- 🔴 **`excedidas[]`: los topes que la organización ya tiene rebasados.** Vacío
+  casi siempre. Se llega ahí **bajando de plan, no creando de más**: una
+  organización con 40 proyectos que pasa de Negocio a Equipo —25— queda por
+  encima sin que nadie haya hecho nada. Pasa igual al cancelar, al fallar un
+  cobro y al acabarse el mes gratis.
+
+  **Y no ocurre nada:** no se borra, no se archiva y no se congela. Lo que ya hay
+  se abre, se edita y se borra; lo único que no se puede es añadir uno más.
+  La pantalla tiene que **decirlo**, o quien administra descubre su situación
+  pulsando un botón que no responde — y un tope rebasado sin explicación se lee
+  como una avería.
+
+  ⚠️ Estar **justo** en el tope no sale aquí: 25 de 25 está lleno, no rebasado.
 - Cuelga de `/me` y **nunca acepta un `userId`**: quien paga es quien trae el
   token. Un parámetro aquí sería abrir el portal —con sus recibos dentro— a
   nombre de otro.
+- 🔴 **`portal` NO acepta organización, y el cliente de Stripe es de la
+  persona.** Quien tenga dos suscripciones las verá las dos en un solo portal.
+  No es un riesgo —todo lo de dentro es suyo— pero la interfaz **no puede
+  prometer «la suscripción de este equipo»**: dice «Gestionar mis
+  suscripciones». Está en PENDIENTES-BACKEND.
 - **Devuelve la URL en vez de redirigir**: un 303 lo seguiría el propio `fetch`
   en lugar de mover la pestaña.
 - `disponible` depende de que **el backend** tenga claves de Stripe, cosa que el
@@ -1028,6 +1092,76 @@ Tipos: `user`, `project`, `workspace`, `board`, `task`.
   eventos que se solapan. Todo lo que hace es un `upsert` de estado final.
 - Sin firma válida → **400**. Sin `STRIPE_WEBHOOK_SECRET` configurado rechaza
   **todo**: es su única autenticación.
+- 🔴 **`checkout` exige `organizationId` SIEMPRE**, desde 2026-08-26. Todos los
+  planes de pago van por asiento y los contrata una organización — incluida la
+  personal de quien trabaja solo, que es una organización de un asiento. Antes
+  los «individuales» iban sin él y era la única excepción; ya no hay ninguna.
+- ⚠️ **`ENTERPRISE` no se puede pedir aquí**, y no por falta de dinero: no tiene
+  precio en Stripe porque se negocia. Aceptarlo abriría un checkout contra un
+  precio que no existe. La lista buena es `PLANES_AUTOSERVICIO`.
+- ⚠️ Cada precio que falte en el entorno **apaga solo su plan**, no el cobro
+  entero. `planes.disponibles` dice cuáles se pueden pedir; ofrecer uno que no
+  está da **503** al pulsar.
+
+---
+
+## Organizaciones 🔒
+
+La unidad que paga **y que contiene los proyectos**. Todo el mundo tiene al menos
+una: quien trabaja solo tiene la suya, de un asiento.
+
+| Método | Ruta | Body | Notas |
+|---|---|---|---|
+| GET | `/me/organizations` | — | Las tuyas, con `myPermissions` ya resuelto |
+| POST | `/me/organizations` | `{ name, tier, seats }` | Nace en `FREE`; el plan lo aplica el webhook. **402 si ya tienes 3** |
+| POST | `/me/organizations/invitations/accept` | `{ token }` | El token del enlace del correo |
+| GET | `/organizations/:id` | — | 403 `NOT_IN_ORG` si no perteneces |
+| PATCH | `/organizations/:id` | `{ name }` | `canManageOrganization` |
+| GET | `/organizations/:id/members` | — | Basta con tener asiento |
+| POST | `/organizations/:id/members` | `{ email, roleId? }` | `canInviteMembers`. Manda correo **y** devuelve el enlace |
+| PATCH | `/organizations/:id/members/:userId` | `{ roleId }` | `canManageMembers` |
+| DELETE | `/organizations/:id/members/:idOrEmail` | — | `canManageMembers`. Libera el asiento |
+| GET | `/organizations/:id/roles` | — | `canManageMembers` — es el mapa del poder interno |
+| POST | `/organizations/:id/roles` | `{ name, permissions }` | `canManageMembers` |
+| PATCH | `/organizations/:id/roles/:roleId` | `{ name, permissions }` | `canManageMembers` |
+| DELETE | `/organizations/:id/roles/:roleId` | — | **409** si todavía lo lleva alguien |
+| GET | `/organizations/:id/role-templates` | — | Basta con tener asiento |
+| POST | `/organizations/:id/role-templates` | `{ name, permissions }` | `canManageRoleTemplates` |
+| PATCH | `/organizations/:id/role-templates/:templateId` | `{ name, permissions }` | `canManageRoleTemplates` |
+| DELETE | `/organizations/:id/role-templates/:templateId` | — | No toca ningún proyecto ya creado |
+| PATCH | `/organizations/:id/seats` | `{ seats }` | `canManageBilling`. Stripe prorratea |
+| POST | `/organizations/:id/transfer` | `{ userId }` | **Solo el dueño**. El destino tiene que estar dentro |
+| GET | `/organizations/:id/history` | — | `canViewAuditLog` |
+
+**Reglas que ya han mordido:**
+
+1. 🔴 **`permissions` es un diccionario de booleanos, nunca un array.** Igual que
+   los roles de proyecto, pero **con validador desde el primer día** — allí se
+   aprendió tarde y todavía hay filas guardadas como lista que se normalizan al
+   leer.
+2. 🔴 **No se puede conceder un permiso que no se tiene.** El servidor rechaza un
+   papel cuyos permisos no quepan en los de quien lo guarda, y lo comprueba
+   también **al invitar** — que es la puerta trasera que se olvida. Sin esa
+   regla, quien gestiona miembros se fabrica un papel con `canManageBilling` y se
+   lo pone.
+3. ⚠️ **Ser dueño no es un papel**, así que no se concede por
+   `PATCH .../members/:userId`. Traspasar tiene su propia ruta y solo la usa el
+   dueño: si fuera un valor más del desplegable, quien administra podría
+   regalarse la organización con un `PATCH`.
+4. ⚠️ **Una invitación ocupa asiento desde que se manda.** Si no lo ocupara, se
+   podrían mandar mil sobre tres y el tope reventaría al aceptarlas.
+5. ⚠️ **Borrar un papel que lleva gente da 409**, con el número dentro: sin saber
+   a cuánta gente hay que mover, no se puede arreglar. El de por defecto tampoco
+   se borra — sin él, la siguiente invitación no se puede escribir.
+6. ⚠️ **La lista de papeles exige `canManageMembers`; la de miembros no.** Saber
+   con quién compartes organización es lo mínimo para trabajar; saber quién puede
+   tocar la facturación es un mapa del poder interno.
+7. ⚠️ **`GET /projects` acepta `organizationId`**, y es un **filtro sobre lo que
+   ya puedes ver**, no una llave: se suma al «dueño o miembro» de siempre. Poner
+   ahí una organización ajena devuelve cero proyectos.
+8. ⚠️ **`POST /projects` acepta `organizationId` opcional.** Sin él cae en tu
+   organización personal. El gateway comprueba pertenencia **y**
+   `canCreateProject` antes de contar la cuota: primero dónde va, después si cabe.
 
 ---
 
@@ -1256,6 +1390,45 @@ volvería a abrir el agujero.
 | GET | `/projects/:projectId/reports/people` | `canViewReports` |
 
 `days` va acotado a 1–365 en el gateway; por defecto 60. `weeks`, a 2–52.
+
+### 🔴 El plan acota cuánto historial se ve, y **recorta en vez de rechazar**
+
+`historialAnalisisDias` es una cuota como las otras —90 días en Gratis, 365 en
+Equipo, sin tope en Negocio y Empresa— pero es la única que acota una **lectura**,
+así que **no lanza 402**. Un muro de pago a media consulta no tiene salida: no es
+que te hayas pasado, es que preguntaste por más atrás de lo que tu plan alcanza.
+
+Lo que hace el gateway es recortar `days`, `weeks` y el `from` de los filtros al
+tope del plan, en **las once rutas**. ⚠️ **También cuando no mandas `from`**: los
+informes que no reciben `days` —`dynamics`, `column-time`, `people`, `matrix`—
+miran todo el historial capturado si nadie les dice otra cosa.
+
+🔴 **La excepción es el `days` de `blocked`, y hay que saberla.** Ahí `days` no es
+la ventana de historial: es **cuántos días lleva una tarea sin moverse**.
+Recortarlo al tope del plan convertiría «lo que lleva 120 días quieto» en «lo que
+lleva 90», con el mismo nombre y sin ningún error. No se toca. Su `from` sí.
+
+**Y hay que decírselo a quien mira.** El paquete (`GET /projects/:id/reports`)
+devuelve una clave `ventana` junto a los informes:
+
+```ts
+ventana: {
+  dias: number | null,     // lo que alcanza el plan. `null` = sin tope
+  tier: PlanTier,
+  plan: string,            // el nombre, para la frase
+  recortado: boolean,      // si ESTA petición se recortó de verdad
+  desde: string | null,    // la fecha más antigua que alcanza, ISO
+}
+```
+
+⚠️ **`recortado` no es «tener tope».** Un plan de 90 días contestando a una
+pregunta de 60 no ha ocultado nada, y avisar ahí es un aviso que se aprende a
+ignorar antes de que llegue el que importa. Solo se pinta con `recortado: true`.
+
+⚠️ **Las siete rutas sueltas se recortan igual y no traen `ventana`**: devuelven
+el informe pelado y no tienen dónde meterla sin cambiarles la forma a todas. Si
+algún día una de ellas la pinta una persona, hay que subirla al `meta` del sobre
+— y enseñar al cliente a leer el `meta`, que hoy lo tira.
 
 ### La cartera 🔒 — `GET /me/reports/portfolio`
 
@@ -1489,6 +1662,26 @@ se combinan por `AND`, hay un máximo de cinco acciones secuenciales y cada acci
 se reintenta una sola vez. La revisión es manual a propósito: la pantalla ofrece
 “Revisar ahora” para que la demostración no dependa del reloj ni de una cola.
 
+### 🔴 El plan acota cuántas reglas pueden estar **activas**
+
+`automatizacionesPorProyecto`: 3 en Gratis, 25 en Equipo, sin tope en Negocio y
+Empresa. Pasarse da **402 `QUOTA_EXCEEDED`** con
+`details.kind === 'automatizaciones'`.
+
+⚠️ **Se comprueba al ACTIVAR, no al crear.** El tope es de reglas en marcha, así
+que redactar una y dejarla en `DISABLED` no gasta cupo — es lo que hace que
+«pausa una» sea una salida de verdad. Las dos puertas dan 402:
+
+- `POST` con `status: 'ENABLED'`
+- `PATCH` con `status: 'ENABLED'` sobre una que estaba pausada
+
+⚠️ **`PAUSED_SYSTEM` e `INVALID` tampoco cuentan**: no se ejecutan, así que no
+cuestan. Y la regla que se está reactivando no se cuenta a sí misma.
+
+⚠️ Este 402 **no trae `puedeAmpliar`**: quien administra las automatizaciones de
+un tablero no es necesariamente quien toca la tarjeta de la organización. La
+pantalla lee la ausencia como «no se sabe» y ofrece la salida igual.
+
 ### El catálogo real es más estrecho que el enum
 
 ⚠️ **`AutomationTriggerType` y `AutomationActionType` (`@praxis/contracts`) no
@@ -1544,7 +1737,7 @@ Cinco trampas que ya mordieron construyendo la interfaz:
 | GET | `/projects/:projectId/assistant/quota` | — | `canViewReports` |
 | POST | `/projects/:projectId/assistant/chat` | `{ message, history? }` | `canViewReports` |
 | GET | `/me/assistant/quota` | — | ninguno propio, solo `JwtGuard` |
-| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds? }` | ninguno propio, solo `JwtGuard` |
+| POST | `/me/assistant/chat` | `{ message, conversationId?, attachmentIds?, organizationId? }` | ninguno propio, solo `JwtGuard` |
 | POST | `/me/assistant/project-draft` | `{ brief }` | ninguno propio, solo `JwtGuard` |
 | POST | `/projects/:projectId/assistant/proposals/:id/resolve` | `{ status }` | `canViewReports` |
 | POST | `/me/assistant/proposals/:id/resolve` | `{ status }` | ninguno propio, solo `JwtGuard` |

@@ -46,7 +46,7 @@ export function LandingCTA({ isAuthenticated = false }: LandingCTAProps) {
           innerClassName="flex flex-col items-center justify-center gap-5 sm:flex-row"
         >
           <RollCta
-            href={isAuthenticated ? '/dashboard' : '/auth/signup'}
+            href={isAuthenticated ? '/projects' : '/auth/signup'}
             label={isAuthenticated ? 'Ir al panel' : 'Crear cuenta gratis'}
             size="lg"
           />

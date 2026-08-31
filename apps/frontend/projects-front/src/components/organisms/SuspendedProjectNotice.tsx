@@ -36,7 +36,7 @@ export function SuspendedProjectNotice({ reason, isOwner }: SuspendedProjectNoti
         Este proyecto está suspendido por la administración
       </h2>
 
-      <p className="mt-1 font-sans text-sm text-text-secondary">
+      <p className="mt-1 font-sans text-sm text-white">
         Se puede consultar todo, y no se puede modificar nada: ni tareas, ni comentarios, ni
         miembros.{' '}
         {isOwner
@@ -45,7 +45,7 @@ export function SuspendedProjectNotice({ reason, isOwner }: SuspendedProjectNoti
       </p>
 
       {reason && (
-        <p className="mt-3 border-l-2 border-error/40 pl-3 font-sans text-sm italic text-text-secondary">
+        <p className="mt-3 border-l-2 border-error/40 pl-3 font-sans text-sm italic text-white">
           «{reason}»
         </p>
       )}

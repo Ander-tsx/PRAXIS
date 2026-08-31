@@ -38,6 +38,21 @@ const ADMIN_USER_ID = '11111111-1111-4111-8111-111111111111';
 const MARIA_USER_ID = '22222222-2222-4222-8222-222222222221';
 const CARLOS_USER_ID = '33333333-3333-4333-8333-333333333331';
 
+/**
+ * La organización a la que pertenece el proyecto de demostración.
+ *
+ * ⚠️ **Escrito a mano y no consultado**, igual que los identificadores de
+ * usuario: billing-service tiene su propio esquema y su propio proceso, y aquí
+ * no hay clave foránea que lo ate. Lo único que los relaciona es que estén
+ * escritos igual en las dos semillas — si cambia allí, cambia aquí.
+ *
+ * ⚠️ Y por eso **la semilla de billing tiene que correr antes**: sin esa fila,
+ * el proyecto apunta a una organización que no existe y nadie lo ve hasta que
+ * alguien abre el selector y no encuentra dónde está su tablero. El orden vive
+ * en `prisma:seed` del `package.json` raíz.
+ */
+const ORG_DEMO_ID = '99999999-0000-4000-8000-000000000010';
+
 // Proyecto
 export const PROJECT_ID = 'bbbb1111-1111-4111-8111-111111111111';
 export const WORKSPACE_ID = 'cccc1111-1111-4111-8111-111111111111';
@@ -126,6 +141,7 @@ async function main() {
         slug: 'proyecto-praxis-demo',
         description: 'Proyecto de demostración para pruebas y desarrollo.',
         ownerId: ADMIN_USER_ID,
+        organizationId: ORG_DEMO_ID,
       },
     });
     console.log(`  ✅  Proyecto: "${project.name}"  →  ${project.id}`);

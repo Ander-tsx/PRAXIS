@@ -1,8 +1,6 @@
-import { PanelCard } from '@/components/molecules/PanelCard';
 import { AccountIdentity } from '@/components/organisms/AccountIdentity';
 import { DeleteAccount } from '@/components/organisms/DeleteAccount';
 import { PresencePicker } from '@/components/organisms/PresencePicker';
-import { ProfileForm } from '@/components/organisms/ProfileForm';
 import { AppHeader, LogoutButton, avatarHref } from '@praxis/commons';
 import { loadCurrentUser } from '@praxis/commons/auth';
 import type { Metadata } from 'next';
@@ -57,101 +55,54 @@ export default async function CuentaPage() {
   const nombre = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
 
   return (
-    <AppHeader title="Tu cuenta">
-      {/* Las insignias del rol global **no** van en la cabecera aquí, al revés
-          que en el resto de la zona: en esta pantalla ya salen junto a tu
-          nombre, en la portada, que es su sitio natural. Repetirlas arriba
-          sería el mismo dato dos veces en la misma vista. */}
-      <div className="flex flex-col gap-4">
-        <AccountIdentity
-          nombre={nombre}
-          email={profile.credential.email}
-          /* La foto se sirve por el proxy de **esta** zona: `avatarUrl` viene
-             relativa al gateway justo para no atarla a ninguna. */
-          avatarSrc={avatarHref(profile.avatarUrl, '/dashboard/api/gateway')}
-          presencia={profile.presence ?? 'AVAILABLE'}
-          roles={roles}
-          estadoDeCuenta={estadoDeCuenta(profile.status)}
-          miembroDesde={mesYAno(profile.createdAt)}
-          actualizado={fechaLarga(profile.updatedAt)}
-        />
+    <AppHeader title="Tu cuenta" anchoCompleto={true}>
+      <AccountIdentity
+        nombre={nombre}
+        email={profile.credential.email}
+        avatarSrc={avatarHref(profile.avatarUrl, '/main/api/gateway')}
+        coverSrc={profile.coverUrl ? avatarHref(profile.coverUrl, '/main/api/gateway') : null}
+        biography={profile.biography ?? null}
+        location={profile.location ?? null}
+        presencia={profile.presence ?? 'AVAILABLE'}
+        roles={roles}
+        estadoDeCuenta={estadoDeCuenta(profile.status)}
+        miembroDesde={mesYAno(profile.createdAt)}
+        actualizado={fechaLarga(profile.updatedAt)}
+        initialFirstName={profile.firstName ?? ''}
+        initialLastName={profile.lastName ?? ''}
+      >
+        <div className="flex flex-col gap-6 pt-6 mt-6 border-t border-white/5">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-white">Tu estado</h3>
+            <p className="text-sm text-white mb-2">Hazle saber tu disponibilidad a los demás.</p>
+            <div className="w-full">
+              <PresencePicker inicial={profile.presence ?? 'AVAILABLE'} />
+            </div>
+          </div>
 
-        {/**
-         * 5 y 7, no 6 y 6.
-         *
-         * Las dos tarjetas de una fila miden lo mismo de alto (`items-stretch`,
-         * que es el defecto), así que el reparto lo decide la más alta: seis
-         * estados en dos columnas son tres filas, y un formulario de dos campos
-         * a mitad de ancho no llega ni de lejos —a 6/6 quedaba un palmo de
-         * tarjeta vacía bajo los campos—. Con el formulario más estrecho, sus
-         * campos se apilan y las dos columnas acaban casi a la misma altura.
-         */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <PanelCard
-            title="Tus datos"
-            description="Tu nombre y tu apellido, como los verá el resto de tu equipo."
-            icon={<IconoIdentidad />}
-            className="lg:col-span-5"
-          >
-            <ProfileForm
-              initialFirstName={profile.firstName ?? ''}
-              initialLastName={profile.lastName ?? ''}
-            />
-          </PanelCard>
-
-          <PanelCard
-            title="Tu estado"
-            description="Hazle saber tu disponibilidad a los demás."
-            icon={<IconoEstado />}
-            className="lg:col-span-7"
-          >
-            <PresencePicker inicial={profile.presence ?? 'AVAILABLE'} />
-          </PanelCard>
-        </div>
-
-        {/* Las dos formas de terminar, juntas: salir es cotidiano y borrar no se
-            deshace, pero las dos responden a «me voy» y separarlas en dos
-            franjas era parte de lo que sobraba. La línea las divide sin
-            convertirlas en dos bloques. */}
-        <PanelCard
-          title="Sesión y cuenta"
-          description="Cierra tu sesión o borra tu cuenta."
-          icon={<IconoSalida />}
-          tone="danger"
-        >
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 sm:divide-x sm:divide-border">
-            <div className="flex flex-col gap-3 sm:pr-8">
-              <div className="flex flex-col gap-1">
-                <h3 className="font-sans text-sm font-semibold text-text-primary">Cerrar sesión</h3>
-                <p className="font-sans text-xs text-text-secondary">
+          <div className="flex flex-col gap-2 mt-4">
+            <h3 className="text-sm font-semibold text-white">Sesión y cuenta</h3>
+            <div className="flex flex-wrap items-start gap-8 mt-2">
+              <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
+                <div className="w-fit">
+                  <LogoutButton compacto={false} />
+                </div>
+                <p className="text-xs text-white leading-relaxed">
                   Se cierra en este navegador. Podrás volver a entrar cuando quieras.
                 </p>
               </div>
-              {/* El mismo botón que estaba en la barra lateral, y por eso vive en
-                  `commons`: lo único que cambia es dónde se pinta. `compacto`
-                  en falso porque aquí el pliegue de la barra no pinta nada —sin
-                  él, plegarla dejaba este botón sin su palabra. */}
-              <div className="mt-auto w-full sm:max-w-[16rem]">
-                <LogoutButton compacto={false} />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1">
-                <h3 className="font-sans text-sm font-semibold text-text-primary">
-                  Eliminar la cuenta
-                </h3>
-                <p className="font-sans text-xs text-text-secondary">
+              <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
+                <div className="w-fit">
+                  <DeleteAccount email={profile.credential.email} />
+                </div>
+                <p className="text-xs text-white leading-relaxed">
                   Lo último y lo único que no se deshace.
                 </p>
               </div>
-              <div className="mt-auto">
-                <DeleteAccount email={profile.credential.email} />
-              </div>
             </div>
           </div>
-        </PanelCard>
-      </div>
+        </div>
+      </AccountIdentity>
     </AppHeader>
   );
 }
@@ -198,61 +149,4 @@ function estadoDeCuenta(status: string): { etiqueta: string; activa: boolean } {
     default:
       return { etiqueta: status, activa: false };
   }
-}
-
-/* Los iconos de las tarjetas, a 18 px y con el mismo trazo que los de la barra
-   lateral. Van aquí y no en un átomo nuevo porque los usa solo esta pantalla. */
-
-function IconoIdentidad() {
-  return (
-    <svg
-      className="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M15.5 8.5a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM5 20a7 7 0 0114 0"
-      />
-    </svg>
-  );
-}
-
-function IconoEstado() {
-  return (
-    <svg
-      className="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function IconoSalida() {
-  return (
-    <svg
-      className="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.75}
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-      />
-    </svg>
-  );
 }

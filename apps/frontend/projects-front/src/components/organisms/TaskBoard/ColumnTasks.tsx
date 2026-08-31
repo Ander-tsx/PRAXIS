@@ -222,9 +222,9 @@ export function ColumnTasks({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={{ background: alpha(colors.background, 50) }}
+              style={{ background: '#191919' }}
             >
-              <span className="font-sans text-xs text-text-disabled">
+              <span className="font-sans text-xs text-white">
                 {arrastrandoTarea ? 'Suelta aquí' : 'Sin tareas'}
               </span>
             </div>
@@ -313,7 +313,7 @@ function NewTaskInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-3 py-2 font-sans text-sm font-medium text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary"
+        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-transparent px-3 py-2 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white"
       >
         <svg
           className="h-4 w-4"
@@ -333,7 +333,7 @@ function NewTaskInline({
   return (
     <form
       action={formAction}
-      className="flex shrink-0 flex-col gap-2 rounded-xl bg-background p-2"
+      className="flex shrink-0 flex-col gap-2 rounded-xl bg-[#1c1c1b] p-2"
       style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 40)}` }}
       noValidate
     >
@@ -373,7 +373,7 @@ function NewTaskInline({
         placeholder="Qué hay que hacer"
         autoComplete="off"
         aria-label={`Título de la tarea nueva en ${columnName}`}
-        className="h-9 rounded-lg border border-border bg-surface px-2.5 font-sans text-xs text-text-primary outline-none placeholder:text-text-disabled focus:border-primary"
+        className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-xs text-white outline-none placeholder:text-white focus:border-primary"
       />
 
       <div className="flex items-center gap-1.5">
@@ -388,11 +388,11 @@ function NewTaskInline({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+          className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
         >
           Cancelar
         </button>
-        <span className="ml-auto pr-1 font-sans text-[10px] text-text-disabled">
+        <span className="ml-auto pr-1 font-sans text-[10px] text-white">
           Prioridad media
         </span>
       </div>

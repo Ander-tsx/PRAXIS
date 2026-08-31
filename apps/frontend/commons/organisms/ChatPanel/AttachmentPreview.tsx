@@ -44,7 +44,7 @@ export function AttachmentPreview({
      también, así que `messagePreview` devolvería una cadena vacía y la cita se
      quedaría en blanco — que es indistinguible de un fallo de carga. */
   if (mensaje.deletedAt) {
-    return <span className="italic text-text-disabled">Mensaje eliminado</span>;
+    return <span className="italic text-white">Mensaje eliminado</span>;
   }
 
   const { texto, tipoAdjunto } = messagePreview(mensaje);

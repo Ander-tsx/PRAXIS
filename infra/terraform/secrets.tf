@@ -55,6 +55,9 @@ locals {
        secreto, pero tampoco gana nada estando aparte. */
     "stripe-secret-key"     = var.stripe_secret_key
     "stripe-price-pro"      = var.stripe_price_pro
+    "stripe-price-plus"     = var.stripe_price_plus
+    "stripe-price-team"     = var.stripe_price_team
+    "stripe-price-business" = var.stripe_price_business
     "stripe-webhook-secret" = var.stripe_webhook_secret
   }
 }

@@ -14,7 +14,12 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/GUION-DEMO-REGLAS.md](docs/frontend/GUION-DEMO-REGLAS.md) | Para enseñar el apartado Reglas: qué sembrar, qué pulsar, qué debe verse — y qué no se puede demostrar en vivo |
 | [docs/frontend/PLAN-PULIDO.md](docs/frontend/PLAN-PULIDO.md) | Etapa de pulido. Cerrada; se conserva por el registro de qué se arregló y por qué |
 | [docs/frontend/PLAN-REDISENO.md](docs/frontend/PLAN-REDISENO.md) | Etapa de rediseño. Cerrada; se conserva por las decisiones y el registro |
-| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | **Etapa en curso** — motor reactivo, el asistente que siempre responde y administración con más poder. Estado, decisiones cerradas, invariantes y orden. Se lee al retomar y se marca al terminar cada tarea |
+| [docs/frontend/PLAN-AUTOMATIZACION.md](docs/frontend/PLAN-AUTOMATIZACION.md) | Etapa de automatización — motor reactivo, el asistente que siempre responde y administración con más poder. Cerrada salvo S6/S7 |
+| [docs/frontend/ENCARGO-ENTERPRISE.md](docs/frontend/ENCARGO-ENTERPRISE.md) | Lo que pidió el dueño del producto para la etapa Enterprise, y lo que delegó. Literal, y sigue siendo válido |
+| [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
+| [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | Etapa cerrada — la organización pasó a contener los proyectos, a cobrarse por asiento y a tener papeles. Se conserva por sus once decisiones y su registro; la continúa el plan de abajo |
+| [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa en curso** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
+| [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
 
@@ -136,12 +141,103 @@ Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.c
     crea necesita un login. Cualquier `POST /auth/login` en una prueba va por
     `intentarLogin()`, que espera y reintenta; a pelo, una prueba que espera un
     401 recibe un 429 y falla **por el reloj, no por el código**.
-17. ⚠️ **Una constante `process.env.X` en el cuerpo de un módulo NO ve el
+17. 🔴 **Un proyecto pertenece a una organización, y quien entra en él necesita
+    asiento.** `Project.organizationId` es `NOT NULL` desde la etapa de
+    organizaciones. Tres cosas que muerden:
+    - **El tope de proyectos se cuenta por organización**, no por persona. El
+      402 dice «esta organización ya tiene N», y quien lo ve **puede no ser quien
+      puede pagarlo**: `error.details.puedeAmpliar` lo distingue.
+    - **Meter a alguien sin asiento da 403 `NOT_IN_ORG`**, no un 402. No se ha
+      agotado nada: esa persona no está dentro, y la salida es un asiento.
+    - `POST /projects` acepta `organizationId` opcional —sin él, tu organización
+      personal— y el gateway comprueba pertenencia y `canCreateProject` **antes**
+      de contar. Primero dónde va, después si cabe.
+18. ⚠️ **Los papeles de organización son un diccionario de booleanos, y no se
+    puede conceder lo que no se tiene.** `cabenEn` lo comprueba en los cuatro
+    sitios donde se reparte —crear papel, editar, asignar e **invitar**, que es
+    la puerta trasera que se olvida—. Ser dueño no es un papel: se resuelve
+    contra `ownerUserId` antes de mirar ninguno.
+19. ⚠️ **Una constante `process.env.X` en el cuerpo de un módulo NO ve el
     `.env`.** `ConfigModule.forRoot()` lo carga al **inicializar** el módulo, y
     los `import` se evalúan antes. Lo que se lea arriba del archivo solo ve las
     variables del proceso. Si hace falta configurar algo que se usa en un
     decorador —`@Throttle`, por ejemplo—, no vale leerlo así: parece que
     funciona y silenciosamente coge el valor por defecto.
+
+20. 🔴 **El plan vale SOLO dentro de la organización que lo paga, y siempre hay
+    una activa.** Desde 2026-08-28 (`docs/PLAN-ORGANIZACION-ACTIVA.md`).
+    `planEfectivoDe(userId, organizationId)` mira **esa** organización y ninguna
+    más — antes recorría todas y aplicaba la mejor. Cuatro cosas que muerden:
+    - **`planDe` sin organización devuelve FREE**, no «el mejor que tengas». Si
+      una ruta nueva no sabe qué organización pasar, hay que averiguarlo, no
+      omitirlo: omitirlo da el peldaño más bajo en silencio.
+    - 🔴 **De dónde sale ese identificador importa más que el identificador.**
+      Nunca de la cookie `praxis_org`, que la escribe el navegador. O se deriva
+      del recurso (`QuotaService.organizacionDelProyecto`) o llega en el cuerpo y
+      se valida la pertenencia antes de usarlo
+      (`QuotaService.organizacionElegida`, que da 403 `NOT_IN_ORG`).
+    - **La cuota de IA se cuenta por `(persona, organización, mes)`**, no por
+      persona. `AssistantUsage` lleva `organizationId` —cadena vacía, nunca
+      `NULL`, porque dos `NULL` no chocan en un índice único—. Contar en un cubo
+      y negar contra el tope de otro deja a alguien bloqueado nada más entrar en
+      su espacio personal.
+    - **`organizacionesPropias` ya no existe como cuota de plan.** Es
+      `MAX_ORGANIZACIONES_PROPIAS = 3`, plano, la personal incluida: si el plan
+      vive dentro de su organización, uno que además dejara crear más se estaría
+      escapando de ella. Lo aplica `exigirOrganizacion` en `POST
+      /me/organizations`; **antes estaba escrito y no lo comprobaba nadie.**
+
+21. ⚠️ **No hay «Todas las organizaciones», y `getOrganizacionActiva()` es la
+    cookie en crudo.** Lo que quiere una pantalla es `organizacionActivaId` de
+    `loadPrivateChrome()`, que aplica `resolverOrganizacionActiva` — repliega a la
+    personal si la cookie apunta a una de la que ya te fueron. Sin ese repliegue
+    la pantalla sale vacía en todas partes y las rutas de organización dan 403,
+    sin que nada diga por qué. El `OrgSwitcher` además **reescribe la cookie** al
+    montar: un Server Component no puede, y sin eso una cookie caduca no se
+    arregla nunca.
+
+22. ⚠️ **Al chat privado se entra por la organización, no por el proyecto.** Lo
+    decide el **gateway** (`DirectChatController.puedeHablarCon` →
+    `QuotaService.compartenOrganizacion`), porque projects-service no sabe de
+    asientos y los dos servicios no se hablan a propósito. La comprobación de
+    proyecto en común sigue en `ChannelsService.directo` como **suelo** —es un
+    subconjunto— y protege la ruta TCP directa. La presencia usa la misma lista:
+    si divergen, se anuncia el estado a gente a la que no puedes escribir.
+    ⚠️ Y **`/me/chats/:peerId/mentionables` devuelve `refs: []` siempre**: no se
+    referencian tareas ni tableros en privado.
+
+23. 🔴 **Las seis cuotas del plan las comprueba el gateway, y las tres últimas
+    llegaron tarde.** `proyectos`, `asientos` e `iaMensualPorPersona` se aplicaban
+    desde la etapa Enterprise; `automatizacionesPorProyecto`, `almacenamientoOrgMb`
+    e `historialAnalisisDias` estaban **escritas en `plans.ts` y no las invocaba
+    nadie** hasta 2026-08-28 (`docs/PLAN-CUOTAS.md`). Cuatro cosas que muerden:
+    - **Una cuota que no se comprueba no da ningún error.** La tabla de precios
+      promete un tope que el servidor no aplica, el plan de pago vale menos de lo
+      que dice y el gratuito da más — y nadie se queja hasta el día que se
+      aplica. Si añades un número a `PlanQuotas`, **el commit que lo añade es el
+      que tiene que invocarlo**. Ya pasó dos veces: con `organizacionesPropias` y
+      con estas tres.
+    - **Las automatizaciones se cuentan al ACTIVAR, no al crear**, porque la
+      cuota es de reglas en marcha. Son **dos puertas** —crear con `ENABLED` y
+      reactivar una pausada— y la segunda es la que se olvida.
+    - **El almacén es de la organización y lo compone el gateway.**
+      tasks-service guarda los adjuntos y no sabe de organizaciones;
+      billing-service sabe de organizaciones y no ha visto un adjunto. No se abre
+      una dependencia entre los dos: se pide por separado y se suma aquí.
+    - 🔴 **`historialAnalisisDias` RECORTA, no rechaza.** Es la única que acota
+      una **lectura**, y un 402 al abrir un informe sería un muro de pago a media
+      consulta sin nada que la persona pueda hacer. Se recorta `days`, `weeks` y
+      el `from` en las once rutas —**menos el `days` de `blocked`, que ahí
+      significa «lleva N días sin moverse» y no historial**— y el paquete
+      devuelve `ventana` para que la pantalla lo diga. Un recorte mudo es peor
+      que no recortar.
+
+24. ⚠️ **Bajar de plan por debajo de lo que ya hay no borra nada, y hay que
+    decirlo.** `GET /me/billing/resumen` trae `excedidas[]`. Lo que ya existe se
+    abre, se edita y se borra; lo único que no se puede es añadir uno más. Se
+    llega ahí **sin haber hecho nada** —baja el techo, no sube el número— así que
+    sin la tarjeta que lo explica se lee como una avería. Y estar **justo** en el
+    tope no es excederlo: 25 de 25 está lleno, no rebasado.
 
 **Los siete agregados de Análisis aceptan filtros, y tienen tres trampas.**
 `from`/`to`, `boardId`, `assigneeId`, `labelId` y `priority`, en las ocho rutas —
@@ -254,11 +350,29 @@ sobre una lista que alguien le cortó por detrás.
 
 Los bloqueantes iniciales están resueltos: workspace, puertos, login y proxy autenticado. `auth-front` funciona end-to-end. Lo que falta y por qué, en ESTADO-ACTUAL §9 (tabla de deuda) y §15 (pendientes del equipo de backend).
 
-**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
+**Puertos:** gateway 3000 · microservicios TCP: credentials 3001, **permissions 3002, projects 3003**, tasks 3004, reports 3005, assistant 3006, alexa 3007, **automation 3008**, **billing 3009** · web-shell 4100 · auth-front 4101 · dashboard-front 4102 · projects-front 4103 · reports-front 4104 · admin-front 4105 · chat-front 4106 · **assistant-front 4107** · 4108+ para zonas nuevas.
 
 ⚠️ **`permissions` es 3002 y `projects` es 3003**, no al revés. Este documento los tuvo invertidos, y equivocarse no da un error claro: el servicio arranca, el gateway le habla al otro y las respuestas salen vacías o con `BAD_GATEWAY`. La lista de verdad está en `scripts/dev-cli/config/services.mjs`, que además la valida contra los `package.json` reales.
 
 ⚠️ El cliente de Prisma se genera dentro de `src/generated/` de cada servicio y **no está versionado**: en un árbol recién clonado o limpiado, el servicio arranca y muere con `Cannot find module '../generated/prisma-client'`. Se arregla con `pnpm prisma:generate`.
+
+⚠️ **El orden de las semillas no es alfabético y ahora son cinco**: permissions →
+credentials → **billing** → projects → tasks. Sin la de billing, la de projects no
+tiene organización a la que apuntar y falla con una restricción de columna en
+medio de un `create`, no con un mensaje claro.
+
+⚠️ **Compilar un servicio con `dev:backend` corriendo deja `dist/` a medias.** Es
+la misma trampa que `prisma:generate`, y vale igual para un `pnpm --filter …
+build`: sale un `MODULE_NOT_FOUND` que **no se arregla volviendo a compilar**.
+Hay que parar, borrar `dist/` del servicio, reconstruir y arrancar en frío.
+
+⚠️ **Levantar los 9 servicios y las 8 zonas a la vez agota los descriptores de
+archivo** (`ENFILE` en el vigilante de chokidar) y el último en arrancar muere.
+Para verificar contra la API, levanta solo el backend.
+
+🍎 ⚠️ **El `sed` de macOS no entiende `\b`.** Un `sed -i '' 's/\bX\b/Y/g'` se
+ejecuta, sale con código 0 y **no cambia nada**. Para renombrar en este
+repositorio, Python.
 
 ⚠️ **Y si eso pasa con `dev:backend` ya corriendo, `prisma:generate` no basta.** El
 servicio se ejecuta desde `dist/`, y `nest start --watch` copia el cliente allí
@@ -284,8 +398,8 @@ pnpm docker:up            # Postgres + Redis
 pnpm build:shared         # contracts + observability
 pnpm prisma:generate      # los 7 servicios con Prisma
 pnpm prisma:deploy        # aplica migraciones sin tocar los datos
-pnpm prisma:seed          # 4 seeds, en su orden de dependencia
-pnpm dev:backend          # gateway + los 8 microservicios
+pnpm prisma:seed          # 5 seeds, en su orden de dependencia
+pnpm dev:backend          # gateway + los 9 microservicios
 pnpm dev:frontend         # las 7 zonas
 ```
 

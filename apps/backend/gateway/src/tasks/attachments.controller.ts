@@ -34,6 +34,7 @@ import {
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -56,6 +57,7 @@ export class AttachmentsController {
   constructor(
     @Inject('TASKS_SERVICE') private readonly tasksClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly quota: QuotaService,
   ) {}
 
   @Get()
@@ -94,7 +96,8 @@ export class AttachmentsController {
   })
   @ApiOperation({ summary: 'Adjunta un archivo a una tarea' })
   @ApiResponse({ status: 201, description: 'Archivo adjuntado' })
-  upload(
+  @ApiResponse({ status: 402, description: 'El almacén de la organización no da para este archivo' })
+  async upload(
     @Param('taskId') taskId: string,
     @Request() req: Express.Request,
     @UploadedFile() file: Express.Multer.File,
@@ -121,13 +124,30 @@ export class AttachmentsController {
       throw new BadRequestException('Ese archivo no es un PDF, aunque lo parezca por el nombre.');
     }
 
+    /**
+     * El almacén de la organización, que es una cuota del plan.
+     *
+     * ⚠️ **Va el último de los cinco controles y es a propósito.** Los cuatro de
+     * arriba se contestan con el archivo que ya está en memoria; este cuesta dos
+     * viajes TCP. Un PDF falso o vacío no debería pagarlos, y —más importante—
+     * quien sube basura tiene que leer «esto no es un PDF», no «no te cabe»:
+     * el segundo mensaje le manda a borrar adjuntos para arreglar un problema
+     * que no es de espacio.
+     *
+     * ⚠️ Y va **antes** de guardar, no después. Comprobar contra el total ya
+     * escrito significaría dejar entrar siempre el que se pasa y negar el
+     * siguiente, que es un tope que siempre se rebasa por un archivo.
+     */
+    const requesterId = req.user!.userId;
+    await this.quota.exigirAlmacenamiento(requesterId, req.projectId as string, file.size);
+
     return firstValueFrom(
       this.tasksClient.send(
         { cmd: 'attachment_create' },
         {
           taskId,
           projectId: req.projectId,
-          requesterId: req.user!.userId,
+          requesterId,
           filename: sanitizeFilename(file.originalname),
           mimeType: file.mimetype,
           // El tamaño real de lo recibido, no lo que declare nadie.

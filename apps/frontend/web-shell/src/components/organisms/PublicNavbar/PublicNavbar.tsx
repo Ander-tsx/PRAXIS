@@ -112,7 +112,7 @@ export function PublicNavbar({ isAuthenticated = false }: PublicNavbarProps) {
         <div className="flex items-center gap-5">
           {isAuthenticated ? (
             <RollCta
-              href="/dashboard"
+              href="/projects"
               label="Ir al panel"
               bgColor={c.primary}
               fgColor={c.primaryFg}

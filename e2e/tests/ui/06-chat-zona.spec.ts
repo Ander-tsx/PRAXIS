@@ -91,40 +91,25 @@ test.describe('El chat en su propia zona', () => {
     await entrarConCuenta(page, duenno.email);
 
     /**
-     * ⚠️ **La insignia de Mensajes, estando todavía en `/dashboard`.**
+     * ⚠️ **El directorio del chat ya no vive en la zona: vive en la barra
+     * lateral global (`SidebarChatList` en `AppShell`), en la pestaña «Chat».**
      *
-     * Se mira aquí y no en el chat porque es donde puede fallar: el contador
-     * vivo se empareja con la entrada del menú por **igualdad de `href`**
-     * (`item.href === HREF_DE_MENSAJES` en `AppShell`), y esa ruta está escrita
-     * en **tres** constantes distintas —`navigation.tsx`,
-     * `AppShell.HREF_DE_MENSAJES` y `nav.CHAT_HREF`—. Cambiar solo dos, que es
-     * lo natural al mudar la zona, deja el `find` sin coincidencia: la insignia
-     * se queda a cero **para siempre y sin un solo error**.
-     *
-     * El mensaje ya está enviado y sin leer, así que aquí tiene que haber un 1.
+     * Se abre desde ahí, que es como entra la gente. La fila del compañero es
+     * un `<a href="/chat/<peerId>">` que construye el propio `SidebarChatList`
+     * con la ruta del shell — nunca `/dashboard/chat/...`—, y lleva la insignia
+     * de sin leer. El mensaje está enviado y sin leer, así que tiene que haber
+     * un 1.
      */
-    const mensajes = page.getByRole('link', { name: 'Mensajes' }).first();
-    await expect(mensajes).toBeVisible();
-    await expect(mensajes, 'La insignia de Mensajes debe contar el sin leer').toContainText('1');
+    await page.getByRole('button', { name: 'Chat' }).first().click();
 
-    /* Se entra **por el menú**, que es como entra la gente: así se comprueba de
-       paso que `navigation.tsx` apunta a la zona nueva. Un href viejo aquí sale
-       como un 404 al pulsar, nunca como un error de compilación. */
-    await mensajes.click();
-    await page.waitForURL(/\/chat\/?$/, { timeout: 30_000 });
+    const fila = page.locator(`a[href="/chat/${invitado.userId}"]`);
+    await expect(fila).toBeVisible({ timeout: 15_000 });
+    await expect(
+      fila.getByText('1', { exact: true }),
+      'La fila del chat debe contar el mensaje sin leer',
+    ).toBeVisible();
 
-    /* La columna de conversaciones la pinta el layout de la zona. Si faltara el
-       `AppShell` que la envuelve, esto respondería 500 con la página a medio
-       pintar — que es exactamente como falló la primera vez. */
-    await expect(page.getByRole('navigation', { name: 'Conversaciones' })).toBeVisible();
-
-    /* Abrir la conversación: el enlace lo construye `ChatDirectory` con la ruta
-       interna de la zona. Con la ruta vieja saldría `/chat/chat/<id>`. */
-    await page
-      .getByRole('link', { name: new RegExp(invitado.email.split('@')[0] ?? '', 'i') })
-      .or(page.locator(`a[href="/chat/${invitado.userId}"]`))
-      .first()
-      .click();
+    await fila.click();
     await page.waitForURL(`**/chat/${invitado.userId}`, { timeout: 30_000 });
 
     await expect(page.getByText('hola desde la zona nueva').first()).toBeVisible();
@@ -190,14 +175,13 @@ test.describe('El chat en su propia zona', () => {
     await entrarConCuenta(page, duenno.email);
 
     /* ⚠️ Se vacía **después de entrar y antes de ir al chat**. Entrar aterriza
-       en `/dashboard`, que abre su propio flujo por su propio proxy —eso está
+       en `/projects`, que abre su propio flujo por su propio proxy —eso está
        bien y es lo que debe pasar—, y sin este corte el primer elemento sería
-       el del panel: la prueba fallaría acusando a la zona equivocada. Le pasó a
-       esta misma prueba al escribirla. */
+       el de esa zona: la prueba fallaría acusando a la zona equivocada. Le pasó
+       a esta misma prueba al escribirla. */
     flujos.length = 0;
 
     await page.goto(`/chat/${invitado.userId}`);
-    await expect(page.getByRole('navigation', { name: 'Conversaciones' })).toBeVisible();
 
     /**
      * Se exige que **aparezca** el de esta zona, no que sean todos.
@@ -283,9 +267,11 @@ test.describe('El recuerdo de la última conversación', () => {
 
     await page.goto('/chat');
 
-    /* Lo que se exige no es «no hay 404»: es que se llegue al **directorio**,
-       que es la pantalla desde la que se puede seguir. */
-    await expect(page.getByRole('navigation', { name: 'Conversaciones' })).toBeVisible();
+    /* Lo que se exige no es «no hay 404»: es que se llegue al **índice de
+       Mensajes** —«Tus mensajes» y el buscador de contactos—, que es la pantalla
+       desde la que se puede seguir. El directorio de conversaciones vive ahora
+       en la barra lateral, no en la zona. */
+    await expect(page.getByRole('heading', { name: 'Tus mensajes' })).toBeVisible();
     await expect(page).toHaveURL(/\/chat\/?$/);
   });
 });

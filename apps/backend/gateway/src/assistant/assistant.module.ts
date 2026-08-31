@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
 import { AssistantController } from './assistant.controller';
 import { MyAssistantController } from './my-assistant.controller';
 
@@ -18,6 +19,9 @@ import { MyAssistantController } from './my-assistant.controller';
 @Module({
   imports: [
     AuthModule,
+    /* Por `QuotaService`: el tope mensual de IA lo pone el plan, y el plan puede
+       venir de la organización de una empresa — que assistant-service no ve. */
+    BillingModule,
     ClientsModule.registerAsync([
       {
         name: 'ASSISTANT_SERVICE',

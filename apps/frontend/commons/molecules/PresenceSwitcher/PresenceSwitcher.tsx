@@ -199,7 +199,7 @@ export function PresenceSwitcher({ valor, onCambiar, compacto = false }: Presenc
                   <span className="block font-sans text-xs font-medium text-text-primary">
                     {descripcion.etiqueta}
                   </span>
-                  <span className="block font-sans text-[11px] text-text-secondary">
+                  <span className="block font-sans text-[11px] text-white">
                     {descripcion.ayuda}
                   </span>
                 </span>

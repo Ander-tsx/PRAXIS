@@ -43,10 +43,14 @@ export async function crearCuentaYEntrar(page: Page): Promise<string> {
    * ⚠️ **Registrarse ya no deja dentro, y aquí se nota en tres pasos.**
    *
    * Antes de la confirmación por correo, el alta abría sesión y aterrizaba en
-   * `/dashboard`; esta función solo tenía que esperar esa URL. Ahora la cuenta
+   * el panel; esta función solo tenía que esperar esa URL. Ahora la cuenta
    * nace sin confirmar, la pantalla se queda en «te hemos escrito a…» y el
    * login responde 403 hasta que se confirma — así que hay que confirmar y
    * entrar a mano.
+   *
+   * ⚠️ Y el destino posterior al login es **`/projects`** (`POST_AUTH_DESTINATION`
+   * de auth-front), no `/dashboard`: la zona de panel pasó a servirse en `/main`
+   * y el aterrizaje se movió a proyectos.
    *
    * La confirmación se hace escribiendo en la base (ver `verificacion.ts`): el
    * token del enlace se guarda con hash y en claro solo existe dentro del
@@ -88,7 +92,8 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     try {
-      await page.waitForURL(/\/dashboard/, { timeout: espera });
+      /* El aterrizaje tras el login es `/projects` (`POST_AUTH_DESTINATION`). */
+      await page.waitForURL(/\/projects/, { timeout: espera });
       return true;
     } catch {
       return false;
@@ -104,8 +109,7 @@ export async function entrarConCuenta(page: Page, email: string): Promise<void> 
 
   if (!(await intentar(15_000))) {
     throw new Error(
-      `No se pudo entrar con ${email} ni tras esperar el límite de login. ` +
-        'Si el error de la pantalla no habla de intentos, el fallo es otro.',
+      `No se pudo entrar con ${email} ni tras esperar el límite de login. Si el error de la pantalla no habla de intentos, el fallo es otro.`,
     );
   }
 }

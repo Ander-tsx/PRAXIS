@@ -69,7 +69,7 @@ export function WidgetShell({
                 {titulo}
               </h3>
               <p
-                className="truncate font-sans text-xs text-text-disabled"
+                className="truncate font-sans text-xs text-white"
                 title={subtitulo(widget)}
               >
                 {subtitulo(widget)}
@@ -89,7 +89,7 @@ export function WidgetShell({
                   className={`shrink-0 rounded-lg p-1.5 transition-colors ${
                     flipped
                       ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
-                      : 'text-text-disabled hover:bg-surface-elevated hover:text-text-primary'
+                      : 'text-white hover:bg-surface-elevated hover:text-text-primary'
                   }`}
                 >
                   {/* Decoración: el botón ya se llama igual que su título. */}
@@ -114,7 +114,7 @@ export function WidgetShell({
                 onClick={onQuitar}
                 aria-label={`Quitar «${titulo}» del lienzo`}
                 title="Quitar del lienzo"
-                className="shrink-0 rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-error"
+                className="shrink-0 rounded-lg p-1.5 text-white transition-colors hover:bg-surface-elevated hover:text-error"
               >
                 <svg
                   className="h-4 w-4"
@@ -137,7 +137,7 @@ export function WidgetShell({
           </div>
 
           {!entrada && (
-            <p className="px-5 pb-4 font-sans text-xs text-text-disabled">
+            <p className="px-5 pb-4 font-sans text-xs text-white">
               Este grafo ya no existe en el catálogo. Quítalo del lienzo.
             </p>
           )}
@@ -200,7 +200,7 @@ const ETIQUETA_METRICA: Record<string, string> = {
 function Cargando() {
   return (
     <div className="flex h-full min-h-24 items-center justify-center">
-      <p className="font-sans text-sm text-text-disabled">Cargando el informe…</p>
+      <p className="font-sans text-sm text-white">Cargando el informe…</p>
     </div>
   );
 }

@@ -1,8 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { colors } from '../../tokens';
 import type { AppNavItem } from './navigation';
+
+/**
+ * ⚠️ **Aviso de React en desarrollo, sin resolver: «Each child in a list should
+ * have a unique "key" prop … render method of `NavList`».**
+ *
+ * Salta en cada hidratación (2× por `StrictMode`) y **no vuelve a saltar** en
+ * los re-renders — el elemento que lo dispara se valida una vez y se marca. Es
+ * de desarrollo: la build de producción no comprueba claves.
+ *
+ * Descartado, comprobado en el navegador: las listas de `NavList` llevan clave
+ * (`grupo.clave`, `claveItem`); los iconos tampoco son —clonarlos con `key` no
+ * lo calla—; los `<svg>` de varios trazos van envueltos en `<g>` para tener un
+ * solo hijo y aun así salta. Queda por capturar el `owner stack` real antes de
+ * la hidratación, que es lo único que dirá qué array es.
+ */
 
 /**
  * El enlace activo es el que **más** coincide con la ruta, no cualquiera que sea
@@ -90,11 +105,17 @@ export function NavList({
   const grupos = agruparPorSeccion(navItems);
 
   /**
-   * Qué grupos están compactados, por `clave`. Vacío al montar — todos
-   * abiertos — y el estado no se guarda entre visitas: es una comodidad de
-   * la sesión, no una preferencia que necesite sobrevivir a un `F5`.
+   * Qué grupos están compactados, por `clave`.
    */
-  const [compactados, setCompactados] = useState<Set<string>>(() => new Set());
+  const [compactados, setCompactados] = useState<Set<string>>(new Set());
+
+  // Cargar estado inicial
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem('praxis_nav_compactados');
+      if (guardado) setCompactados(new Set(JSON.parse(guardado)));
+    } catch (e) {}
+  }, []);
 
   function alternar(clave: string) {
     setCompactados((actual) => {
@@ -104,35 +125,39 @@ export function NavList({
       } else {
         siguiente.add(clave);
       }
+      try {
+        localStorage.setItem('praxis_nav_compactados', JSON.stringify([...siguiente]));
+      } catch (e) {}
       return siguiente;
     });
   }
 
   return (
     <nav className="flex flex-col gap-4" aria-label="Secciones">
-      {grupos.map((grupo, indice) => {
+      {grupos.map((grupo) => {
         const compactado = !plegada && compactados.has(grupo.clave);
 
         return (
           <div key={grupo.clave} className="flex flex-col gap-1">
-            {indice > 0 && (
-              <div
-                className={
-                  plegada ? 'mx-1 mb-1 border-t border-border' : 'mb-1 border-t border-border'
-                }
-                aria-hidden="true"
-              />
-            )}
+            {/* Una raya fina encima de **cada** sección, no solo a partir de la
+                segunda: el grupo de arriba también necesita despegarse de lo que
+                tiene encima (el árbol de proyectos, el selector de organización). */}
+            <div
+              className={
+                plegada ? 'mx-1 mb-1 border-t border-border' : 'mb-1 border-t border-border'
+              }
+              aria-hidden="true"
+            />
             {!plegada && (
               <button
                 type="button"
                 onClick={() => alternar(grupo.clave)}
                 aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-md px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
+                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white transition-colors hover:text-white"
               >
                 {grupo.section}
                 <svg
-                  className={`h-3.5 w-3.5 shrink-0 text-text-disabled transition-transform duration-200 ease-out group-hover/section:text-text-secondary ${
+                  className={`h-3.5 w-3.5 shrink-0 text-white transition-transform duration-200 ease-out group-hover/section:text-white ${
                     compactado ? '-rotate-90' : ''
                   }`}
                   fill="none"
@@ -160,9 +185,9 @@ export function NavList({
                 className="flex min-h-0 flex-col gap-1 overflow-hidden transition-opacity duration-200"
                 style={{ opacity: compactado ? 0 : 1 }}
               >
-                {grupo.items.map((item) => {
+                {grupo.items.map((item, idx) => {
                   const active = !item.disabled && item.href === activeHref;
-                  const claveItem = `${grupo.clave}::${item.href}`;
+                  const claveItem = `${grupo.clave}::${item.href}::${idx}`;
 
                   if (item.disabled) {
                     return (
@@ -174,14 +199,14 @@ export function NavList({
                             ? `${item.label} — disponible próximamente`
                             : 'Disponible próximamente'
                         }
-                        className={`flex cursor-not-allowed items-center rounded-lg font-sans text-[13px] font-medium text-text-disabled ${
+                        className={`flex cursor-not-allowed items-center rounded-full font-sans text-[13px] font-medium text-white ${
                           plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'
                         }`}
                       >
                         {item.icon}
                         <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
                         {!plegada && (
-                          <span className="font-sans text-[9px] uppercase tracking-wider text-text-disabled">
+                          <span className="font-sans text-[9px] uppercase tracking-wider text-white">
                             Pronto
                           </span>
                         )}
@@ -202,11 +227,11 @@ export function NavList({
                       aria-current={active ? 'page' : undefined}
                       title={plegada ? item.label : undefined}
                       className={[
-                        'relative flex items-center rounded-lg font-sans text-[13px] transition-colors duration-150',
+                        'relative flex items-center rounded-full font-sans text-[13px] transition-colors duration-150',
                         plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
                         active
-                          ? 'bg-primary-muted font-semibold text-primary'
-                          : 'font-medium text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+                          ? 'font-semibold text-white bg-white/10 hover:bg-white/15'
+                          : 'font-medium text-white hover:bg-white/5 hover:text-white',
                       ].join(' ')}
                     >
                       {item.icon}

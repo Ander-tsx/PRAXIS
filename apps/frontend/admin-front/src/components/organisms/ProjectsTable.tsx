@@ -65,14 +65,14 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
             <p className="truncate font-sans text-sm font-semibold text-text-primary">
               {proyecto.name}
             </p>
-            <p className="truncate font-sans text-xs text-text-secondary">
+            <p className="truncate font-sans text-xs text-white">
               {proyecto.owner?.name ?? proyecto.owner?.email ?? 'Dueño no disponible'}
             </p>
             {/* El motivo, aquí y no detrás de un clic: es la respuesta a «¿por
                 qué está suspendido?», que es la pregunta con la que se abre
                 esta pantalla. */}
             {proyecto.suspendedReason && (
-              <p className="mt-1 line-clamp-2 font-sans text-xs italic text-text-disabled">
+              <p className="mt-1 line-clamp-2 font-sans text-xs italic text-white">
                 «{proyecto.suspendedReason}»
               </p>
             )}
@@ -93,7 +93,7 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
         header: 'Tamaño',
         track: { fr: 1.2 },
         cell: (proyecto) => (
-          <p className="truncate font-sans text-xs text-text-secondary">
+          <p className="truncate font-sans text-xs text-white">
             {proyecto._count.members === 1 ? '1 miembro' : `${proyecto._count.members} miembros`}
             {' · '}
             {proyecto._count.workspaces === 1
@@ -107,7 +107,7 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
         header: 'Se creó',
         track: { fr: 1.1 },
         cell: (proyecto) => (
-          <p className="truncate font-sans text-xs text-text-secondary">
+          <p className="truncate font-sans text-xs text-white">
             {fechaYHora(proyecto.createdAt)}
           </p>
         ),

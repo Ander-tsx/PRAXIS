@@ -13,11 +13,25 @@ const COLUMN_PROGRESS_ID = 'eeee2222-2222-4222-8222-222222222222';
 const COLUMN_REVIEW_ID = 'eeee3333-3333-4333-8333-333333333333';
 const COLUMN_DONE_ID = 'eeee4444-4444-4444-8444-444444444444';
 
+/**
+ * ⚠️ **Sin `id` fijo, y no es un descuido.**
+ *
+ * Los tenían escritos a mano —`lbl0001-0001-0001-0001-000000000001`— y eso no es
+ * un UUID: `lbl0` lleva `l` y `b`, que no son hexadecimales. `UpdateTaskBodyDto`
+ * valida `labelIds` con `@IsUUID('4', { each: true })`, así que en cuanto se
+ * marcaba una etiqueta sembrada, el `PATCH /tasks/:id` respondía «Validation
+ * failed» y el diálogo de tarea dejaba de guardar **nada** —título, prioridad,
+ * lo que fuera— porque va todo en el mismo `PATCH`.
+ *
+ * `@default(uuid())` del modelo genera un v4 válido, igual que en producción, y
+ * `labelMap` ya lee el id de vuelta del `upsert`: nada aguas abajo necesita el
+ * literal.
+ */
 const SEED_LABELS = [
-  { id: 'lbl0001-0001-0001-0001-000000000001', name: 'Frontend', color: 'primary' },
-  { id: 'lbl0002-0002-0002-0002-000000000002', name: 'Backend', color: 'accent' },
-  { id: 'lbl0003-0003-0003-0003-000000000003', name: 'Bug', color: 'error' },
-  { id: 'lbl0004-0004-0004-0004-000000000004', name: 'Mejora', color: 'info' },
+  { name: 'Frontend', color: 'primary' },
+  { name: 'Backend', color: 'accent' },
+  { name: 'Bug', color: 'error' },
+  { name: 'Mejora', color: 'info' },
 ] as const;
 
 const COLUMN_STATUS: Record<string, string> = {
@@ -38,12 +52,33 @@ async function main() {
     console.log('Creando etiquetas…');
     const labelMap = new Map<string, string>();
 
+    /**
+     * Purga las etiquetas del seed viejo, que tenían id escrito a mano y **no
+     * era un UUID** (`lbl0001-0001-0001-0001-000000000001` lleva `l` y `b`).
+     *
+     * El `upsert` de abajo casa por `(projectId, name)`, así que sobre una base
+     * ya sembrada iría por la rama `update` y **nunca reescribiría el id**: la
+     * fila corrupta se quedaría para siempre y marcar esa etiqueta seguiría
+     * dando `Validation failed` en `PATCH /tasks/:id` (`@IsUUID('4')`). Borrarlas
+     * aquí deja que se recreen con un v4 de `@default(uuid())`; `task_labels`
+     * cascadea al borrar. Así basta `prisma:seed`, sin un `prisma:reset`.
+     */
+    const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const existentes = await prisma.label.findMany({
+      where: { projectId: PROJECT_ID },
+      select: { id: true },
+    });
+    const corruptas = existentes.filter((l) => !UUID_V4.test(l.id)).map((l) => l.id);
+    if (corruptas.length > 0) {
+      await prisma.label.deleteMany({ where: { id: { in: corruptas } } });
+      console.log(`  Purgadas ${corruptas.length} etiquetas con id no-UUID (seed viejo).`);
+    }
+
     for (const lbl of SEED_LABELS) {
       const label = await prisma.label.upsert({
         where: { projectId_name: { projectId: PROJECT_ID, name: lbl.name } },
         update: { color: lbl.color },
         create: {
-          id: lbl.id,
           projectId: PROJECT_ID,
           name: lbl.name,
           color: lbl.color,

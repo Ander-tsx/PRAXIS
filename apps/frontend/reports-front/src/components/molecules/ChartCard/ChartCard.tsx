@@ -34,7 +34,7 @@ export function ChartCard({ title, description, highlight, howToRead, children }
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           <h3 className="font-display text-xl text-text-primary">{title}</h3>
-          <p className="font-sans text-sm text-text-secondary">{description}</p>
+          <p className="font-sans text-sm text-white">{description}</p>
         </div>
         {highlight && <div className="shrink-0 text-right">{highlight}</div>}
       </header>
@@ -82,7 +82,7 @@ export function Stat({
       <span className="font-display text-3xl leading-none tabular-nums" style={{ color }}>
         {value}
       </span>
-      <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">{label}</span>
+      <span className="font-sans text-xs uppercase tracking-wider text-white">{label}</span>
     </div>
   );
 }
@@ -115,7 +115,7 @@ export function NotEnoughData({
       style={{ borderColor: colors.border }}
     >
       <p className="font-display text-lg text-text-primary">Todavía no hay suficiente historial</p>
-      <p className="max-w-md font-sans text-sm text-text-secondary">
+      <p className="max-w-md font-sans text-sm text-white">
         {piezas.length > 0 ? (
           <>
             Faltan <strong className="text-text-primary">{piezas.join(' y ')}</strong>.
@@ -124,7 +124,7 @@ export function NotEnoughData({
           'Faltan datos para calcular esto.'
         )}
       </p>
-      <p className="max-w-md font-sans text-xs text-text-disabled">
+      <p className="max-w-md font-sans text-xs text-white">
         Se prefiere no enseñar nada a enseñar un número que parecería fiable sin serlo. El historial
         empieza a contar desde que se registró la primera tarea, no antes.
       </p>

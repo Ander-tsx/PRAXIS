@@ -1,13 +1,10 @@
-"use client";
+'use client';
 
+import { deleteTaskAction, updateTaskAction } from '@/app/(private)/[id]/actions';
+import { TASK_INITIAL_STATE } from '@/lib/action-state';
 import {
-  deleteTaskAction,
-  updateTaskAction,
-} from "@/app/(private)/[id]/actions";
-import { TASK_INITIAL_STATE } from "@/lib/action-state";
-import {
-  Button,
-  Input,
+  FloatingLabelInput,
+  FloatingLabelTextarea,
   type Label as LabelType,
   PRIORITIES,
   PRIORITY_COLORS,
@@ -16,18 +13,17 @@ import {
   SelectorDeFecha,
   SlideOver,
   type Task,
-  Textarea,
   type UserProfile,
   alpha,
   colors,
   personLabel,
   useAccion,
-} from "@praxis/commons";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { GestorDeEtiquetas } from "./GestorDeEtiquetas";
-import { TaskAttachments } from "./TaskAttachments";
-import { TaskChecklist } from "./TaskChecklist";
-import { SECTION_PANEL } from "./section-panel";
+} from '@praxis/commons';
+import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { GestorDeEtiquetas } from './GestorDeEtiquetas';
+import { TaskAttachments } from './TaskAttachments';
+import { TaskChecklist } from './TaskChecklist';
+import { SECTION_PANEL } from './section-panel';
 
 export interface TaskDialogProps {
   open: boolean;
@@ -73,7 +69,7 @@ function formSignature(form: HTMLFormElement): string {
   return Array.from(new FormData(form).entries())
     .map(([name, value]) => `${name}=${String(value)}`)
     .sort()
-    .join("\n");
+    .join('\n');
 }
 
 /**
@@ -127,14 +123,9 @@ export function TaskDialog({
   canEdit,
   canDelete,
 }: TaskDialogProps) {
-  const [state, formAction, pending] = useAccion(
-    updateTaskAction,
-    TASK_INITIAL_STATE,
-  );
-  const [deleteState, deleteAction, deleting] = useAccion(
-    deleteTaskAction,
-    TASK_INITIAL_STATE,
-  );
+  /* Sin el tercer elemento (`enMarcha`) a propósito: ver `handleClose`. */
+  const [state, formAction] = useAccion(updateTaskAction, TASK_INITIAL_STATE);
+  const [deleteState, deleteAction, deleting] = useAccion(deleteTaskAction, TASK_INITIAL_STATE);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const readOnly = !canEdit;
@@ -225,10 +216,28 @@ export function TaskDialog({
   };
 
   const handleClose = () => {
-    if (canEdit && formRef.current && !pending) {
+    /**
+     * ⚠️ **Sin la guarda `!pending`, y no es un descuido.**
+     *
+     * Estaba para no reenviar mientras un guardado anterior seguía en vuelo. El
+     * problema es de dónde sale ese `pending`: es el `enMarcha` de `useAccion`,
+     * que mide una transición del router de Next —global a toda la app—. Cuando
+     * esa transición se queda colgada por una carrera en la cola (un
+     * `router.refresh()` de los avisos en vivo, o el `revalidate` de gestionar
+     * una etiqueta, justo encima de este `PATCH`), `pending` se queda `true` y
+     * **no vuelve a bajar mientras se siga interactuando** —el techo de 25 s se
+     * rearma en cada acción nueva—. Con la guarda puesta, a partir de ahí este
+     * `requestSubmit()` no se dispara nunca y **deja de guardarse todo**: título,
+     * prioridad, etiquetas. Justo el síntoma que se veía al marcar etiquetas.
+     *
+     * Reenviar de más es inofensivo: `saveIfChanged` compara la firma del
+     * formulario y no hace nada si no ha cambiado, y si cambió es que hay algo
+     * más nuevo que mandar.
+     */
+    if (canEdit && formRef.current) {
       formRef.current.requestSubmit();
     }
-    // Optimistic close: allow animation to start instantly without waiting for server response
+    // Cierre optimista: la animación arranca ya, sin esperar al servidor.
     onClose();
   };
 
@@ -237,21 +246,14 @@ export function TaskDialog({
       open={open}
       onClose={handleClose}
       size="xl"
+      tone="dark"
       title={task.title}
       description={
         <span className="flex items-center gap-2">
-          <span
-            className="rounded-full px-2 py-0.5 font-sans text-[11px]"
-            style={{
-              background: alpha(colors.primary, 15),
-              color: colors.primary,
-            }}
-          >
+          <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white">
             {columnName}
           </span>
-          <span className="font-sans text-xs">
-            Creada {formatDate(task.createdAt)}
-          </span>
+          <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
         </span>
       }
     >
@@ -269,21 +271,21 @@ export function TaskDialog({
         <input type="hidden" name="status" value={columnName} />
         <input type="hidden" name="taskId" value={task.id} />
 
-        <Input
+        <FloatingLabelInput
+          id="task-title"
           name="title"
           label="Título"
           defaultValue={task.title}
-          placeholder="Qué hay que hacer"
           maxLength={255}
           disabled={readOnly}
           required
         />
 
-        <Textarea
+        <FloatingLabelTextarea
+          id="task-description"
           name="description"
           label="Descripción"
-          defaultValue={task.description ?? ""}
-          placeholder="Contexto, criterios de aceptación, enlaces…"
+          defaultValue={task.description ?? ''}
           rows={4}
           disabled={readOnly}
         />
@@ -312,6 +314,10 @@ export function TaskDialog({
             label="Fecha límite (opcional)"
             defaultValue={toDateInput(task.dueDate)}
             disabled={readOnly}
+            /* Va en la columna derecha de un panel estrecho: el panel de 18rem
+               se salía por la derecha. Se pega al borde derecho y crece hacia
+               dentro. */
+            align="right"
           />
         </div>
 
@@ -327,62 +333,46 @@ export function TaskDialog({
          */}
         <div className="flex flex-col gap-2">
           <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-            <legend className="font-sans text-sm font-medium text-text-primary">
-              Etiquetas
-            </legend>
+            <legend className="font-sans text-sm font-medium text-white">Etiquetas</legend>
             {labels.length === 0 ? (
-              <p className="font-sans text-xs text-text-secondary">
+              <p className="font-sans text-xs text-white">
                 Este proyecto no tiene etiquetas todavía.
-                {canManageLabels ? " Crea la primera aquí abajo." : ""}
+                {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
               </p>
             ) : (
-              <div
-                className="flex flex-wrap gap-2 rounded-xl p-3"
-                style={SECTION_PANEL}
-              >
+              <div className="flex flex-wrap gap-2 rounded-xl p-3" style={SECTION_PANEL}>
                 {labels.map((label) => (
                   <LabelToggle
                     key={label.id}
                     label={label}
-                    defaultChecked={task.labels.some(
-                      (l) => l.labelId === label.id,
-                    )}
+                    defaultChecked={task.labels.some((l) => l.labelId === label.id)}
                   />
                 ))}
               </div>
             )}
           </fieldset>
 
-          {canManageLabels && (
-            <GestorDeEtiquetas projectId={projectId} labels={labels} />
-          )}
+          {canManageLabels && <GestorDeEtiquetas projectId={projectId} labels={labels} />}
         </div>
 
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
-          <legend className="font-sans text-sm font-medium text-text-primary">
-            Encargados
-          </legend>
+          <legend className="font-sans text-sm font-medium text-white">Encargados</legend>
           {members.length === 0 ? (
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white">
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
-            <div
-              className="flex flex-col gap-0.5 rounded-xl p-2"
-              style={SECTION_PANEL}
-            >
+            <div className="flex flex-col gap-0.5 rounded-xl p-2" style={SECTION_PANEL}>
               {members.map((member) => (
                 <AssigneeToggle
                   key={member.id}
                   member={member}
-                  defaultChecked={task.assignees.some(
-                    (a) => a.userId === member.id,
-                  )}
+                  defaultChecked={task.assignees.some((a) => a.userId === member.id)}
                 />
               ))}
             </div>
           )}
-          <p className="font-sans text-xs text-text-disabled">
+          <p className="font-sans text-xs text-white">
             Solo se puede asignar a quien esté en el proyecto.
           </p>
         </fieldset>
@@ -390,8 +380,7 @@ export function TaskDialog({
         {(state.error || deleteState.error) && (
           <p
             role="alert"
-            className="font-sans text-sm"
-            style={{ color: colors.error }}
+            className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 font-sans text-xs text-red-400"
           >
             {state.error ?? deleteState.error}
           </p>
@@ -416,7 +405,7 @@ export function TaskDialog({
         canModerate={canDelete}
       />
 
-      <div className="mt-8 mb-12 flex w-full shrink-0 items-center justify-between gap-2 border-t border-border pt-4 pb-4">
+      <div className="mt-8 mb-12 flex w-full shrink-0 items-center justify-between gap-2 border-t border-white/10 pt-4 pb-4">
         <div>
           {canDelete && (
             <form action={deleteAction}>
@@ -424,35 +413,30 @@ export function TaskDialog({
               <input type="hidden" name="taskId" value={task.id} />
               {confirmingDelete ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-sans text-xs text-text-secondary">
-                    ¿Seguro?
-                  </span>
-                  <Button
+                  <span className="font-sans text-xs text-white">¿Seguro?</span>
+                  <button
                     type="submit"
-                    variant="danger"
-                    size="sm"
                     disabled={deleting}
+                    className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 font-sans text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
                   >
-                    {deleting ? "Eliminando…" : "Sí, eliminar"}
-                  </Button>
-                  <Button
+                    {deleting ? 'Eliminando…' : 'Sí, eliminar'}
+                  </button>
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={() => setConfirmingDelete(false)}
+                    className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/[0.05] hover:text-white"
                   >
                     No
-                  </Button>
+                  </button>
                 </span>
               ) : (
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
                   onClick={() => setConfirmingDelete(true)}
+                  className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/[0.05] hover:text-white"
                 >
                   Eliminar
-                </Button>
+                </button>
               )}
             </form>
           )}
@@ -485,10 +469,7 @@ function SaveStatus({
 }) {
   if (saving) {
     return (
-      <span
-        className="font-sans text-xs text-text-secondary"
-        aria-live="polite"
-      >
+      <span className="font-sans text-xs text-white" aria-live="polite">
         Guardando…
       </span>
     );
@@ -496,11 +477,7 @@ function SaveStatus({
 
   if (failure) {
     return (
-      <span
-        className="font-sans text-xs"
-        style={{ color: colors.error }}
-        aria-live="polite"
-      >
+      <span className="font-sans text-xs" style={{ color: colors.error }} aria-live="polite">
         Sin save
       </span>
     );
@@ -510,7 +487,7 @@ function SaveStatus({
 
   return (
     <span
-      className="flex items-center gap-1 font-sans text-xs text-text-secondary"
+      className="flex items-center gap-1 font-sans text-xs text-white"
       aria-live="polite"
     >
       <svg
@@ -555,7 +532,7 @@ function AssigneeToggle({
   defaultChecked: boolean;
 }) {
   return (
-    <label className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-surface-elevated has-[:disabled]:cursor-not-allowed">
+    <label className="group flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/5 has-[:disabled]:cursor-not-allowed">
       <input
         type="checkbox"
         name="assigneeIds"
@@ -566,7 +543,7 @@ function AssigneeToggle({
 
       {/* La marca se enciende con `[&>svg]`: los variantes `peer-*` solo miran
           hermanos, y el icono es hijo de este span, no hermano del input. */}
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-border transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-white/20 transition-colors peer-checked:border-primary peer-checked:bg-primary/25 peer-checked:[&>svg]:opacity-100 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-disabled:opacity-50">
         <svg
           className="h-3.5 w-3.5 text-primary opacity-0 transition-opacity"
           viewBox="0 0 24 24"
@@ -575,15 +552,11 @@ function AssigneeToggle({
           strokeWidth={3}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </span>
 
-      <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-primary peer-disabled:text-text-secondary">
+      <span className="min-w-0 flex-1 truncate font-sans text-sm text-white peer-disabled:text-white">
         {personLabel(member)}
       </span>
     </label>
@@ -642,11 +615,7 @@ function LabelToggle({
           strokeWidth={3.5}
           aria-hidden="true"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M5 13l4 4L19 7"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </span>
 
@@ -657,16 +626,16 @@ function LabelToggle({
 
 /** `2026-08-01T23:59:59.000Z` → `2026-08-01`, que es lo que quiere el input. */
 function toDateInput(iso: string | null): string {
-  if (!iso) return "";
+  if (!iso) return '';
   const date = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("es", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+  return new Date(iso).toLocaleDateString('es', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   });
 }

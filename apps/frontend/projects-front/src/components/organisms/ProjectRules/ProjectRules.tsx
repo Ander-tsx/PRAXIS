@@ -63,7 +63,7 @@ export function ProjectRules({
 
   if (!canManage) {
     return (
-      <p className="rounded-xl border border-border bg-surface p-5 font-sans text-sm text-text-secondary">
+      <p className="rounded-xl border border-border bg-surface p-5 font-sans text-sm text-white">
         {isSuspended
           ? 'La automatización de este proyecto no se puede ver ni administrar mientras esté suspendido.'
           : 'No tienes permiso para administrar automatizaciones en este proyecto.'}
@@ -91,8 +91,8 @@ export function ProjectRules({
             <h3 id={ENCABEZADO_REGLAS} className="shrink-0 font-sans font-medium text-text-primary">
               Reglas
             </h3>
-            <span className="shrink-0 font-light text-text-disabled">/</span>
-            <p className="truncate font-sans text-sm text-text-secondary">
+            <span className="shrink-0 font-light text-white">/</span>
+            <p className="truncate font-sans text-sm text-white">
               Cuando pasa algo, si se cumplen las condiciones, la regla actúa sola.
             </p>
           </div>
@@ -141,7 +141,7 @@ export function ProjectRules({
             )}
 
             {rules.length === 0 ? (
-              <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-text-secondary">
+              <p className="rounded-xl border border-border bg-surface px-5 py-6 font-sans text-sm text-white">
                 Aún no hay reglas. Una regla dice qué tiene que pasar, sobre qué tareas, y qué hacer
                 cuando ocurra.
               </p>

@@ -148,7 +148,7 @@ export interface ProposalCardProps {
    * tarjeta funciona igual, solo que su decisión no queda anotada y al releer
    * volverá a ofrecer sus botones.
    */
-  proposalId?: string;
+  proposalId?: string | undefined;
   /**
    * Lo que se decidió la última vez, si esto viene de una conversación vieja.
    *
@@ -232,7 +232,7 @@ export function TaskProposalCard({
       <p className="font-sans text-base font-semibold text-text-primary">{propuesta.title}</p>
 
       {propuesta.description && (
-        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+        <p className="font-sans text-sm leading-relaxed text-white">
           {propuesta.description}
         </p>
       )}
@@ -314,7 +314,7 @@ export function AssignProposalCard({
       proposalId={proposalId}
       estadoGuardado={estadoGuardado}
     >
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         {/* Con el inventario en el contexto la propuesta ya viaja con el
             título. El id recortado se queda de reserva: identificaba la tarea
             para quien la escribió a mano, no para quien decide si acepta. */}
@@ -338,7 +338,7 @@ export function AssignProposalCard({
       </p>
       {/* La lista sustituye, no añade: hay que decirlo antes de aceptar, no
           después de que alguien desaparezca de una tarea sin enterarse. */}
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         {quedan.length > 0
           ? 'Quien no esté en esa lista deja de estar asignado.'
           : 'La tarea se quedaría sin nadie asignado.'}
@@ -377,7 +377,7 @@ function CambioSobreTarea({
   porQue?: string;
   ejecutar: () => Promise<AceptarSobreTareaState>;
   projectId: string;
-  proposalId?: string;
+  proposalId?: string | undefined;
   estadoGuardado?: EstadoPropuesta;
   children: React.ReactNode;
 }) {
@@ -418,7 +418,7 @@ function CambioSobreTarea({
       proposalId={proposalId}
       estadoGuardado={estadoGuardado}
     >
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         {taskTitle ? (
           <strong className="text-text-primary">{taskTitle}</strong>
         ) : (
@@ -483,7 +483,7 @@ export function EditProposalCard({
       </dl>
 
       {propuesta.description !== undefined && (
-        <p className="font-sans text-sm leading-relaxed text-text-secondary">
+        <p className="font-sans text-sm leading-relaxed text-white">
           {propuesta.description}
         </p>
       )}
@@ -498,12 +498,12 @@ export function EditProposalCard({
             ))}
           </div>
         ) : (
-          <p className="font-sans text-xs text-text-disabled">Se quedaría sin etiquetas.</p>
+          <p className="font-sans text-xs text-white">Se quedaría sin etiquetas.</p>
         ))}
 
       {propuesta.labelIds !== undefined && marcas.length > 0 && (
         /* Misma advertencia que en los encargados: la lista sustituye. */
-        <p className="font-sans text-xs text-text-disabled">
+        <p className="font-sans text-xs text-white">
           Esas serían todas sus etiquetas; las demás se quitan.
         </p>
       )}
@@ -528,7 +528,7 @@ export function MoveProposalCard({
       estadoGuardado={estadoGuardado}
       ejecutar={() => aceptarMovimientoAction(projectId, propuesta)}
     >
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         {propuesta.columnaActual ? (
           <>
             Pasaría de <strong className="text-text-primary">{propuesta.columnaActual}</strong> a{' '}
@@ -554,8 +554,8 @@ export function MoveProposalCard({
             <strong>{propuesta.boardName}</strong>.
           </p>
         ) : (
-          <p className="font-sans text-xs text-text-disabled">
-            En el tablero <strong className="text-text-secondary">{propuesta.boardName}</strong>.
+          <p className="font-sans text-xs text-white">
+            En el tablero <strong className="text-white">{propuesta.boardName}</strong>.
           </p>
         ))}
     </CambioSobreTarea>
@@ -584,16 +584,16 @@ export function ChecklistProposalCard({
           <li
             // biome-ignore lint/suspicious/noArrayIndexKey: son textos sin id, y la lista no se reordena
             key={`${indice}-${paso}`}
-            className="flex gap-2 font-sans text-sm text-text-secondary"
+            className="flex gap-2 font-sans text-sm text-white"
           >
-            <span className="text-text-disabled tabular-nums">{indice + 1}.</span>
+            <span className="text-white tabular-nums">{indice + 1}.</span>
             {paso}
           </li>
         ))}
       </ol>
       {/* Se suman: hay que decirlo, porque «proponer un checklist» suena a
           reemplazarlo entero. */}
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         Se añaden a los pasos que ya tenga. No se borra ninguno.
       </p>
     </CambioSobreTarea>
@@ -625,7 +625,7 @@ export function CommentProposalCard({
       >
         {propuesta.body}
       </p>
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         Se publicaría a tu nombre, no al del asistente.
       </p>
     </CambioSobreTarea>
@@ -724,7 +724,7 @@ export function DeleteProposalCard({
       <p className="font-sans text-sm text-text-primary">
         <strong>{propuesta.taskTitle ?? 'Una tarea'}</strong>
         {detalles.length > 0 && (
-          <span className="font-normal text-text-secondary"> — {detalles.join(' · ')}</span>
+          <span className="font-normal text-white"> — {detalles.join(' · ')}</span>
         )}
       </p>
 
@@ -741,7 +741,7 @@ export function DeleteProposalCard({
           <Button size="sm" variant="danger" onClick={() => setConfirmando(true)}>
             Sí, quiero borrarla
           </Button>
-          <span className="font-sans text-xs text-text-disabled">
+          <span className="font-sans text-xs text-white">
             Te lo preguntamos otra vez antes de hacerlo.
           </span>
         </div>
@@ -829,7 +829,7 @@ export function BoardProposalCard({
       </dl>
 
       <div className="flex flex-col gap-1.5">
-        <span className="font-sans text-xs text-text-disabled">
+        <span className="font-sans text-xs text-white">
           {columnas.length} {columnas.length === 1 ? 'columna' : 'columnas'}, en este orden
         </span>
 
@@ -837,7 +837,7 @@ export function BoardProposalCard({
           {columnas.map((columna, indice) => (
             <Fragment key={`${columna.nombre}-${indice}`}>
               {indice > 0 && (
-                <span aria-hidden="true" className="font-sans text-xs text-text-disabled">
+                <span aria-hidden="true" className="font-sans text-xs text-white">
                   ›
                 </span>
               )}
@@ -857,7 +857,7 @@ export function BoardProposalCard({
 
         {/* El verde tiene consecuencias fuera del tablero, así que se dice. */}
         {columnas.some((columna) => columna.color === 'success') && (
-          <span className="font-sans text-xs text-text-secondary">
+          <span className="font-sans text-xs text-white">
             La última es la <strong className="text-text-primary">columna de cierre</strong>: lo que
             llegue ahí cuenta como terminado en los informes y deja de avisar aunque esté vencido.
           </span>
@@ -1043,7 +1043,7 @@ export function QuestionProposalCard({
               {/* Solo cuando se pueden marcar varias: en las de una, decir «elige
                   una» al lado de opciones excluyentes es explicar lo evidente. */}
               {!unaSola && (
-                <span className="font-sans text-xs text-text-disabled">Puedes marcar varias.</span>
+                <span className="font-sans text-xs text-white">Puedes marcar varias.</span>
               )}
             </fieldset>
           );
@@ -1055,7 +1055,7 @@ export function QuestionProposalCard({
               Responder
             </Button>
             {!completo && (
-              <span className="font-sans text-xs text-text-disabled">
+              <span className="font-sans text-xs text-white">
                 {propuesta.preguntas.length === 1
                   ? 'Elige una respuesta.'
                   : 'Responde a todas para enviar.'}
@@ -1109,7 +1109,7 @@ export function MarkStepsProposalCard({
           </li>
         ))}
       </ul>
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         Solo se marcan. El asistente no puede desmarcar ni borrar pasos.
       </p>
     </CambioSobreTarea>
@@ -1177,7 +1177,7 @@ export function MessageProposalCard({
       >
         {propuesta.body}
       </p>
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         Lo verá todo el equipo del proyecto y les llegará un aviso. Se enviaría a tu nombre, no al
         del asistente.
       </p>
@@ -1283,7 +1283,7 @@ export function ChartProposalCard({
       </p>
 
       {!aceptarGrafico && (
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white">
           Los grafos se colocan desde{' '}
           {/* Cruza de zona → `<a>` duro, nunca `next/link`. Ver §16. */}
           <a
@@ -1311,7 +1311,7 @@ export function ChartProposalCard({
         )}
       </dl>
 
-      <p className="font-sans text-xs text-text-disabled">
+      <p className="font-sans text-xs text-white">
         Va a tu panel y solo al tuyo: no cambia nada del proyecto y no lo ve el resto del equipo.
         Puedes moverlo, cambiarle el tamaño o quitarlo cuando quieras.
       </p>
@@ -1488,11 +1488,11 @@ function Marco({
   if (estado === 'pendiente' && decididaAntes) {
     return (
       <article
-        className="flex flex-col gap-3 rounded-xl border border-dashed px-4 py-3"
+        className="flex flex-col gap-3 rounded-sm border border-dashed px-4 py-3"
         style={{ borderColor: colors.border }}
       >
         <header className="flex items-center gap-2">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+          <span className="font-sans text-[11px] uppercase tracking-wider text-white">
             {titulo}
           </span>
           <span
@@ -1509,7 +1509,7 @@ function Marco({
 
   if (estado === 'descartada') {
     return (
-      <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-disabled">
+      <p className="rounded-sm border border-dashed border-border px-4 py-3 font-sans text-sm text-white">
         {/* «No se ha creado nada» solo valía para la tarea nueva: al descartar
             un cambio de encargado no había nada que crear. */}
         Propuesta descartada. No se ha aplicado nada.
@@ -1522,7 +1522,7 @@ function Marco({
 
   return (
     <article
-      className="flex flex-col gap-3 rounded-xl border p-4"
+      className="flex flex-col gap-3 rounded-sm border p-4"
       style={{
         borderColor: alpha(acento, tono === 'destructivo' ? 45 : 30),
         background: alpha(acento, 6),
@@ -1532,7 +1532,7 @@ function Marco({
         <span className="font-sans text-[11px] uppercase tracking-wider" style={{ color: acento }}>
           {titulo}
         </span>
-        <span className="font-sans text-[11px] text-text-disabled">
+        <span className="font-sans text-[11px] text-white">
           {estado === 'hecho' ? 'aceptada' : sinAplicar}
         </span>
       </header>
@@ -1548,7 +1548,7 @@ function Marco({
           borde izquierdo se perdía a partir del primer salto de línea. */}
       {porQue && (
         <div
-          className="flex flex-col gap-2 border-l-2 pl-3 font-sans text-sm leading-relaxed text-text-secondary"
+          className="flex flex-col gap-2 border-l-2 pl-3 font-sans text-sm leading-relaxed text-white"
           style={{ borderColor: alpha(colors.primary, 35) }}
         >
           <ModelText texto={porQue} />
@@ -1601,10 +1601,10 @@ function Marco({
 function Campo({ termino, valor }: { termino: string; valor: string }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <dt className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+      <dt className="font-sans text-[11px] uppercase tracking-wider text-white">
         {termino}
       </dt>
-      <dd className="font-sans text-sm text-text-secondary">{valor}</dd>
+      <dd className="font-sans text-sm text-white">{valor}</dd>
     </div>
   );
 }
@@ -1683,7 +1683,7 @@ export function OpenProjectProposalCard({
         <Campo termino="Proyecto" valor={propuesta.nombre} />
       </dl>
 
-      <p className="font-sans text-xs text-text-secondary">
+      <p className="font-sans text-xs text-white">
         Seguimos en esta misma conversación, pero con sus tareas, sus tableros y su gente delante.{' '}
         <strong className="text-text-primary">A partir de ahí es su conversación</strong>: para
         hablar de otro proyecto se empieza una nueva.
@@ -1792,7 +1792,7 @@ export function TemplateProposalCard({
           />
 
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-            <span className="mr-auto font-sans text-xs text-text-secondary">
+            <span className="mr-auto font-sans text-xs text-white">
               Quita lo que no quieras antes de crearlo.
             </span>
             <Button

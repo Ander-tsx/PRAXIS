@@ -117,12 +117,12 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
   };
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-surface-elevated border border-border rounded-xl overflow-hidden shadow-sm relative">
+    <div className="flex flex-col flex-1 min-h-0 bg-surface-elevated border border-border rounded-sm overflow-hidden shadow-sm relative">
       <header className="flex items-center gap-3 border-b border-border p-4 bg-surface shrink-0">
         <PraxAvatar size="sm" mood={isTyping ? 'thinking' : 'idle'} />
         <div>
           <h3 className="font-sans font-semibold text-text-primary text-sm">Asistente PRAX</h3>
-          <p className="font-sans text-xs text-text-secondary">Diseñando tu proyecto</p>
+          <p className="font-sans text-xs text-white">Diseñando tu proyecto</p>
         </div>
       </header>
 
@@ -135,13 +135,13 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
             {msg.role === 'model' && <PraxAvatar size="xs" mood="idle" className="mt-1 shrink-0" />}
             <div className="flex flex-col gap-2 min-w-0">
               <div
-                className={`px-4 py-2.5 rounded-2xl font-sans text-[15px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-surface border border-border text-text-primary rounded-tl-sm'}`}
+                className={`px-4 py-2.5 rounded-sm font-sans text-[15px] leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-surface border border-border text-text-primary rounded-tl-sm'}`}
               >
                 {msg.text}
               </div>
 
               {msg.hasProposal && (
-                <div className="border border-border rounded-xl bg-surface shadow-sm mt-2 flex flex-col overflow-hidden w-[400px] max-w-full">
+                <div className="border border-border rounded-sm bg-surface shadow-sm mt-2 flex flex-col overflow-hidden w-[400px] max-w-full">
                   <div className="bg-hover/50 p-3 border-b border-border flex items-center gap-2">
                     <div className="bg-primary/10 text-primary p-1 rounded-md">
                       <svg
@@ -218,7 +218,7 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
           </div>
         ))}
         {isTyping && (
-          <div className="flex gap-3 max-w-[85%] self-start items-center text-text-secondary font-sans text-[13px]">
+          <div className="flex gap-3 max-w-[85%] self-start items-center text-white font-sans text-[13px]">
             <PraxAvatar size="xs" mood="thinking" />
             <span className="animate-pulse">Escribiendo propuesta...</span>
           </div>
@@ -246,13 +246,13 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
               area.style.height = `${Math.min(area.scrollHeight, 60)}px`;
             }}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-text-secondary py-1.5 resize-none"
+            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-white py-1.5 resize-none"
             disabled={isTyping}
           />
 
           <button
             type="button"
-            className="p-2 text-text-secondary hover:text-text-primary rounded-xl transition-colors shrink-0"
+            className="p-2 text-white hover:text-text-primary rounded-sm transition-colors shrink-0"
             aria-label="Adjuntar archivo"
           >
             <svg

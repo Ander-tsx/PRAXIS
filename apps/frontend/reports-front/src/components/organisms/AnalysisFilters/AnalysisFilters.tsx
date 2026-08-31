@@ -257,14 +257,14 @@ export function AnalysisFilters({
           <button
             type="button"
             onClick={() => router.push(basePath)}
-            className="font-sans text-xs font-semibold text-text-secondary underline-offset-2 transition-colors hover:text-text-primary hover:underline"
+            className="font-sans text-xs font-semibold text-white underline-offset-2 transition-colors hover:text-text-primary hover:underline"
           >
             Quitar todo
           </button>
         )}
 
         {!hayFiltros && (
-          <span className="font-sans text-xs text-text-disabled">Todo el proyecto, sin acotar</span>
+          <span className="font-sans text-xs text-white">Todo el proyecto, sin acotar</span>
         )}
       </div>
 

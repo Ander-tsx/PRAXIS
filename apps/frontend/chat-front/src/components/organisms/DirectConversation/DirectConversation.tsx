@@ -17,7 +17,7 @@ import {
   Avatar,
   Badge,
   type ChatMessagePage,
-  ChatPanel,
+  ChatPanel, AnimatedSearchButton,
   type ChatPanelHandle,
   type Directory,
   type UserProfile,
@@ -96,7 +96,7 @@ export function DirectConversation({
       salidaMovil={
         <a
           href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -141,7 +141,8 @@ export function DirectConversation({
           muted={page.muted}
           isAdmin={isAdmin}
           hasMessages={page.items.length > 0}
-          onBuscar={() => chatRef.current?.abrirBusqueda()}
+          onSearch={(t) => chatRef.current?.buscarLocal(t)}
+          onClear={() => chatRef.current?.cerrarBusqueda()}
         />
       }
     />
@@ -166,7 +167,8 @@ function Encabezado({
   muted,
   isAdmin,
   hasMessages,
-  onBuscar,
+  onSearch,
+  onClear,
 }: {
   perfil?: UserProfile;
   peerId: string;
@@ -175,7 +177,8 @@ function Encabezado({
   muted: boolean;
   isAdmin?: boolean;
   hasMessages?: boolean;
-  onBuscar: () => void;
+  onSearch: (t: string) => void;
+  onClear: () => void;
 }) {
   const [ampliada, setAmpliada] = useState(false);
   const inicial = (nombre.charAt(0) || peerId.charAt(0)).toUpperCase();
@@ -229,7 +232,7 @@ function Encabezado({
               <div className="text-center">
                 <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
                 {proyectos.length > 0 && (
-                  <p className="font-sans text-sm text-white/70 drop-shadow-md">
+                  <p className="font-sans text-sm text-white drop-shadow-md">
                     Coinciden en {proyectos.length}{' '}
                     {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
                   </p>
@@ -243,7 +246,7 @@ function Encabezado({
           <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
 
           {proyectos.length === 0 ? (
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white">
               {isAdmin
                 ? 'No comparten ningún proyecto, pero como administrador puedes chatear.'
                 : hasMessages
@@ -263,7 +266,7 @@ function Encabezado({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <BotonBuscar onClick={onBuscar} />
+        <AnimatedSearchButton onSearch={onSearch} onClear={onClear} />
         <MenuOpciones peerId={peerId} mutedInicial={muted} />
       </div>
     </div>
@@ -277,32 +280,6 @@ function Encabezado({
  * junto a los demás controles del canal; la llamada real va por
  * `ChatPanelHandle`, que el panel expone justo para esto.
  */
-function BotonBuscar({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Buscar en la conversación"
-      title="Buscar en la conversación"
-      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
-    >
-      <svg
-        className="h-3.5 w-3.5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-        />
-      </svg>
-    </button>
-  );
-}
 
 /**
  * Botón de 3 puntos (más opciones) en la cabecera.
@@ -355,7 +332,7 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
         onClick={() => setAbierto(!abierto)}
         aria-label="Más opciones"
         title="Opciones del chat"
-        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary hover:bg-surface"
+        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-text-primary hover:bg-surface"
       >
         <svg
           className="h-4 w-4"
@@ -382,7 +359,7 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
             type="button"
             onClick={alternarMute}
             disabled={enviandoMute}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-white transition-colors hover:bg-surface hover:text-text-primary disabled:opacity-50"
           >
             <svg
               className="h-3.5 w-3.5 shrink-0"

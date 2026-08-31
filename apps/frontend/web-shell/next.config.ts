@@ -36,18 +36,11 @@ const nextConfig: NextConfig = {
         destination: `${authFrontUrl}/auth/:path*`,
       },
       /**
-       * Las dos entradas de dashboard-front: la raíz de la zona (`/dashboard`,
-       * sin segmento extra) y todo lo que cuelga de ella. Sin la primera,
-       * `/dashboard` a secas no casa con `/:path*` y cae en un 404 del shell.
+       * dashboard-front es `/main`. El shell no se mete con el enrutado interno,
+       * todo lo que empieza por ahí se le manda a la zona.
        */
-      {
-        source: '/dashboard',
-        destination: `${dashboardFrontUrl}/dashboard`,
-      },
-      {
-        source: '/dashboard/:path*',
-        destination: `${dashboardFrontUrl}/dashboard/:path*`,
-      },
+      { source: '/main', destination: `${dashboardFrontUrl}/main` },
+      { source: '/main/:path*', destination: `${dashboardFrontUrl}/main/:path*` },
       { source: '/projects', destination: `${projectsFrontUrl}/projects` },
       {
         source: '/projects/:path*',

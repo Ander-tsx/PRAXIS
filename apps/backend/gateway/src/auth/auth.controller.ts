@@ -43,7 +43,11 @@ const LIMITE_AUTENTICACION = { default: { limit: 10, ttl: 60_000 } };
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(@Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy) {}
+  constructor(
+    @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
+    /* Solo para crear el espacio personal al registrarse. Ver `register`. */
+    @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -65,7 +69,53 @@ export class AuthController {
   async register(@Body() body: RegisterDto) {
     this.logger.log('POST /auth/register → credentials-service');
     // credentials-service crea la credencial y el perfil de usuario en un solo paso
-    return firstValueFrom(this.credentialsClient.send({ cmd: 'auth_register' }, body));
+    const alta = await firstValueFrom(
+      this.credentialsClient.send<{ userId?: string; email?: string }>(
+        { cmd: 'auth_register' },
+        body,
+      ),
+    );
+
+    /**
+     * 🔴 **Su espacio personal nace aquí, no la primera vez que hace falta.**
+     *
+     * Se creaba perezosamente —al pagar, al aceptar una invitación— porque
+     * mientras una organización solo repartía topes, una fila vacía para todo el
+     * mundo era una migración pendiente disfrazada. Desde que la organización
+     * **contiene** los proyectos eso dejó de valer: sin ella, quien acaba de
+     * registrarse abre el selector de la barra lateral y no ve **nada**, ni
+     * siquiera su propio espacio.
+     *
+     * ⚠️ **Y no se espera a que termine.** Si billing-service no contesta, el
+     * registro no puede fallar por eso: la cuenta ya existe, y `personalDe` la
+     * crea igualmente la primera vez que alguien la necesite. Lo que se pierde
+     * es que salga en el selector hasta entonces, no la cuenta.
+     */
+    if (alta?.userId) {
+      firstValueFrom(
+        this.credentialsClient.send<{ firstName?: string }[]>(
+          { cmd: 'user_find_by_ids' },
+          { ids: [alta.userId] },
+        ),
+      )
+        .then((perfiles) =>
+          firstValueFrom(
+            this.billingClient.send(
+              { cmd: 'billing_personal_org' },
+              {
+                userId: alta.userId,
+                name: perfiles[0]?.firstName ? `Espacio de ${perfiles[0].firstName}` : 'Mi espacio',
+                email: alta.email,
+              },
+            ),
+          ),
+        )
+        .catch((error: Error) => {
+          this.logger.warn(`No se pudo crear el espacio de ${alta.userId}: ${error.message}`);
+        });
+    }
+
+    return alta;
   }
 
   /**

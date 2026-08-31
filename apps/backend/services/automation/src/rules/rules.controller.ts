@@ -35,6 +35,17 @@ export class RulesController {
     return this.rules.list(dto.projectId);
   }
 
+  /**
+   * Las reglas activas que hay, para la cuota del plan.
+   *
+   * La decide el gateway, que es quien sabe el tope; esto solo cuenta. Ver
+   * `RulesService.countActive`.
+   */
+  @MessagePattern({ cmd: 'automation_rule_active_count' })
+  countActive(@Payload() dto: { projectId: string; exceptoId?: string }) {
+    return this.rules.countActive(dto.projectId, dto.exceptoId);
+  }
+
   @MessagePattern({ cmd: 'automation_rule_find_one' })
   find(@Payload() dto: FindAutomationRuleDto) {
     return this.rules.find(dto.projectId, dto.id);

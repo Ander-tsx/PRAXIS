@@ -9,6 +9,7 @@ interface CanalCrudo {
   projectId: string | null;
   projectName: string | null;
   projectSlug: string | null;
+  organizationId: string | null;
   miembros: string[];
   callados: string[];
 }
@@ -19,7 +20,7 @@ interface CanalParaRepartir {
   kind: 'PROJECT' | 'DIRECT';
   directUserA: string | null;
   directUserB: string | null;
-  project: { id: string; name: string | null; slug: string | null } | null;
+  project: { id: string; name: string | null; slug: string | null; organizationId: string | null } | null;
   /** El equipo del proyecto. Vacío en un canal privado. */
   miembros: string[];
   /** Quiénes lo tienen silenciado, ya como conjunto. */
@@ -102,6 +103,7 @@ export class EventDispatcher {
         p."id"   AS "projectId",
         p."name" AS "projectName",
         p."slug" AS "projectSlug",
+        p."organizationId" AS "organizationId",
         COALESCE(m.miembros, ARRAY[]::text[]) AS miembros,
         COALESCE(s.callados, ARRAY[]::text[]) AS callados
       FROM "projects"."chat_channels" c
@@ -127,7 +129,7 @@ export class EventDispatcher {
       directUserA: fila.directUserA,
       directUserB: fila.directUserB,
       project: fila.projectId
-        ? { id: fila.projectId, name: fila.projectName, slug: fila.projectSlug }
+        ? { id: fila.projectId, name: fila.projectName, slug: fila.projectSlug, organizationId: fila.organizationId }
         : null,
       miembros: fila.miembros,
       callados: new Set(fila.callados),
@@ -193,6 +195,8 @@ export class EventDispatcher {
           projectId: canal.project?.id ?? null,
           projectName: canal.project?.name ?? null,
           projectSlug: canal.project?.slug ?? null,
+          organizationId: canal.project?.organizationId ?? null,
+          organizationName: null,
           /* La «otra persona» vista desde este destinatario. En un canal de
              proyecto no hay interlocutor y va nulo. */
           peerId:

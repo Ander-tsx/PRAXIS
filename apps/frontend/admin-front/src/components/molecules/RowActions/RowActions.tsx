@@ -96,7 +96,7 @@ export function RowActions({ actions, label }: RowActionsProps) {
         aria-expanded={abierto}
         aria-label={`Acciones sobre ${label}`}
         title="Acciones"
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         style={abierto ? { background: colors.surface, color: colors.textPrimary } : undefined}
       >
         {/**
@@ -167,7 +167,7 @@ export function RowActions({ actions, label }: RowActionsProps) {
                 </button>
 
                 {bloqueada && (
-                  <p className="px-3 pb-1.5 font-sans text-xs text-text-disabled">
+                  <p className="px-3 pb-1.5 font-sans text-xs text-white">
                     {accion.disabledReason}
                   </p>
                 )}

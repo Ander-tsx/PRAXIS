@@ -24,7 +24,8 @@ test.describe('Sesión en el navegador', () => {
   test('crear cuenta, confirmar y entrar aterriza en el panel', async ({ page }) => {
     await crearCuentaYEntrar(page);
 
-    await expect(page).toHaveURL(/\/dashboard/);
+    /* El aterrizaje tras el login es `/projects` (`POST_AUTH_DESTINATION`). */
+    await expect(page).toHaveURL(/\/projects/);
   });
 
   /**
@@ -106,7 +107,7 @@ test.describe('Sesión en el navegador', () => {
   test('con sesión se entra a las tres zonas privadas', async ({ page }) => {
     await crearCuentaYEntrar(page);
 
-    for (const ruta of ['/dashboard', '/projects', '/reports']) {
+    for (const ruta of ['/main', '/projects', '/reports']) {
       await page.goto(ruta);
       await expect(page, `${ruta} debería servirse con sesión`).not.toHaveURL(/\/auth\/login/);
     }
@@ -115,19 +116,20 @@ test.describe('Sesión en el navegador', () => {
   test('con sesión, el login redirige al panel en vez de mostrarse', async ({ page }) => {
     await crearCuentaYEntrar(page);
 
-    /* El guard de auth-front: quien ya entró no debe ver el formulario. */
+    /* El guard de auth-front: quien ya entró no debe ver el formulario. Sale al
+       destino posterior al login, que es `/projects`. */
     await page.goto('/auth/login');
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/projects/);
   });
 
   test('el panel muestra la navegación del área privada', async ({ page }) => {
     await crearCuentaYEntrar(page);
-    await page.goto('/dashboard');
+    await page.goto('/main');
 
-    /* Los `href` de `APP_NAV_ITEMS` son rutas **del shell**, sin el basePath de
-       ninguna zona. Si alguna se escribiera con el prefijo de su zona, el
-       enlace saldría como `/dashboard/projects` y aquí se vería. */
-    for (const href of ['/dashboard', '/projects', '/reports']) {
+    /* Los `href` de `APP_NAV_ITEMS` son rutas **del shell**; las de dashboard-front
+       llevan su `basePath` `/main` a propósito (`navigation.tsx`). Si alguna se
+       escribiera mal, el enlace no aparecería o saldría con un prefijo de más. */
+    for (const href of ['/projects', '/assistant', '/main/billing']) {
       await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
     }
   });
@@ -140,17 +142,17 @@ test.describe('Sesión en el navegador', () => {
        la barra lateral pasó a ser el selector de estado (ver `AppShell`). No se
        notó porque la suite de interfaz llevaba sin ejecutarse desde entonces:
        sin navegador instalado, estas 27 pruebas no daban ni un dato. */
-    await page.goto('/dashboard/profile');
+    await page.goto('/main/profile');
 
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith('/dashboard'), { timeout: 30_000 });
+    await page.waitForURL((url) => !url.pathname.startsWith('/main'), { timeout: 30_000 });
 
     const cookies = await context.cookies();
     const sesion = cookies.find((c) => c.name === 'praxis_session');
     expect(sesion?.value ?? '', 'La cookie debe quedar vacía o desaparecer').toBe('');
 
     /* Y el área privada vuelve a estar cerrada. */
-    await page.goto('/dashboard');
+    await page.goto('/main');
     await expect(page).toHaveURL(/\/auth\/login/);
   });
 });
@@ -162,7 +164,12 @@ test.describe('Proyectos desde la interfaz', () => {
     const nombre = `Proyecto UI ${Date.now().toString(36)}`;
     await crearProyectoParaLaPrueba(page, nombre);
 
-    await expect(page.getByText(nombre)).toBeVisible({ timeout: 30_000 });
+    /* El proyecto sale en dos sitios —la rejilla y el árbol de la barra
+       lateral—, así que `getByText` a secas viola el modo estricto. Basta con
+       que aparezca en alguno: los dos son «el listado». */
+    await expect(page.getByRole('link', { name: new RegExp(nombre) }).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   /**
@@ -273,7 +280,10 @@ test.describe('Las personas de un proyecto', () => {
     for (let i = 0; i < 8; i++) await registrar(alGateway);
     await alGateway.dispose();
 
-    for (const ruta of ['/reports', '/dashboard/notifications']) {
+    /* `/main` es la bandeja de avisos hoy: la pantalla suelta de notificaciones
+       se retiró (`/notifications` redirige a `/main`) y su equivalente vive en
+       el panel y en la pestaña de bandeja del `AppShell`. */
+    for (const ruta of ['/reports', '/main']) {
       const respuesta = await page.goto(ruta);
       await page.waitForLoadState('networkidle');
 

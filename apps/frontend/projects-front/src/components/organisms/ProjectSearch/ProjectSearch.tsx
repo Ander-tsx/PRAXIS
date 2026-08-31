@@ -68,7 +68,7 @@ export function ProjectSearch({ initialValue }: ProjectSearchProps) {
        */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-text-secondary"
+        className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-white"
       >
         <svg
           className="h-4 w-4"
@@ -110,7 +110,7 @@ export function ProjectSearch({ initialValue }: ProjectSearchProps) {
           }}
           aria-label="Quitar la búsqueda"
           title="Quitar la búsqueda"
-          className="absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+          className="absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-white transition-colors hover:bg-surface hover:text-text-primary"
         >
           <svg
             className="h-3.5 w-3.5"

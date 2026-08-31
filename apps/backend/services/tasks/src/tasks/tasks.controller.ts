@@ -97,6 +97,12 @@ export class TasksController {
   }
 
   /** Limpieza al borrar un proyecto, un espacio o un tablero. */
+  /** Suelta a alguien de las tareas de unos proyectos. Ver `releaseAssignments`. */
+  @MessagePattern({ cmd: 'task_release_assignments' })
+  releaseAssignments(@Payload() dto: { userId: string; projectIds: string[] }) {
+    return this.tasksService.releaseAssignments(dto);
+  }
+
   @MessagePattern({ cmd: 'task_purge' })
   purge(@Payload() dto: PurgeTasksDto) {
     return this.tasksService.purgeTasks(dto);
@@ -157,6 +163,17 @@ export class TasksController {
   @MessagePattern({ cmd: 'attachment_find_all' })
   findAttachments(@Payload() dto: FindAttachmentsDto) {
     return this.attachmentsService.findAttachments(dto);
+  }
+
+  /**
+   * Lo que ocupan los adjuntos de unos proyectos, para la cuota del plan.
+   *
+   * La lista de proyectos llega ya resuelta: este servicio no sabe de
+   * organizaciones. Ver `AttachmentsService.bytesOfProjects`.
+   */
+  @MessagePattern({ cmd: 'attachment_bytes_of_projects' })
+  attachmentBytes(@Payload() dto: { projectIds: string[] }) {
+    return this.attachmentsService.bytesOfProjects(dto.projectIds ?? []);
   }
 
   @MessagePattern({ cmd: 'attachment_create' })

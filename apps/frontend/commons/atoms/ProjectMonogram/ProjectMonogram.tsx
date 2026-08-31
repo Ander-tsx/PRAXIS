@@ -1,11 +1,21 @@
 import { alpha, colors, serieColors } from '../../tokens';
 import { iniciales } from '../Avatar';
+import { Glyph } from '../GlyphPicker';
+import { glyphByKey } from '../GlyphPicker/glyphs';
 
 export interface ProjectMonogramProps {
-  /** El `id` del proyecto. **De aquí sale el color**, no del nombre. */
+  /** El `id` del proyecto. **De aquí sale el color** del monograma, no del nombre. */
   id: string;
   /** El nombre. De aquí salen las dos letras. */
   name: string;
+  /**
+   * Identidad visual elegida en el modal de configuración. Si `iconKey` está en
+   * la lista curada (`GlyphPicker`), se pinta ese icono sobre `color` **en vez
+   * de** las iniciales. Si no, se cae al monograma de siempre — que es también
+   * lo que pasa en cualquier sitio que todavía no pase estas props.
+   */
+  iconKey?: string | null;
+  color?: string | null;
   /**
    * `sm` (32 px) en listas y filas; `md` (44 px) en tarjetas.
    *
@@ -65,10 +75,27 @@ const MEDIDAS = {
 export function ProjectMonogram({
   id,
   name,
+  iconKey = null,
+  color = null,
   size = 'sm',
   apagado = false,
   className = '',
 }: ProjectMonogramProps) {
+  /* Con un icono elegido y válido, esa es la cara: mismo tamaño, misma caja,
+     mismo tratamiento de color que las iniciales. Ver `Glyph`. */
+  if (glyphByKey(iconKey)) {
+    return (
+      <Glyph
+        iconKey={iconKey}
+        color={color}
+        size={size}
+        shape="square"
+        apagado={apagado}
+        className={className}
+      />
+    );
+  }
+
   const tono = apagado ? colors.textSecondary : tonoDe(id);
 
   return (

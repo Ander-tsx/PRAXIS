@@ -9,6 +9,7 @@ import {
   type AssistantAttachment,
   type AssistantProposal,
   type AssistantQuota,
+  type ConversationSummary,
   assistantAttachmentHref,
   esImagenDeAsistente,
   formatoReinicio,
@@ -27,14 +28,20 @@ import {
   isTaskProposal,
   isTemplateProposal,
 } from '../../api/assistant';
-import { cargarConversacionAction, preguntarAction } from '../../assistant/actions';
+import {
+  cargarConversacionAction,
+  conversacionesAction,
+  preguntarAction,
+} from '../../assistant/actions';
 import { Badge, Button, PRAX_NAME, PraxAvatar, type PraxMood } from '../../atoms';
 import { alpha, colors } from '../../tokens';
 import { useDock } from '../AppLayout/DockPanel';
+import { usePrax } from '../AppLayout/PraxContext';
+import { AmpliarPlan } from './AmpliarPlan';
+import { AjustesMenu, ModeloSelector } from './ComposerControls';
 import { ConversationHistory } from './ConversationHistory';
 import { FlujoDePensamiento } from './FlujoDePensamiento';
 import { ModelText } from './ModelText';
-import { ProUpsell } from './ProUpsell';
 import {
   AccionDelLienzo,
   type AceptarGrafico,
@@ -190,9 +197,26 @@ export interface AssistantChatProps {
    * implementación del chat, empezarán a divergir y el próximo arreglo habrá que
    * hacerlo cuatro veces.
    */
-  variante?: 'panel' | 'pantalla' | 'cajon';
+  /**
+   * - `panel` — tarjeta con borde, para incrustar en una página.
+   * - `pantalla` — ocupa el alto, la conversación **es** la pantalla (zona
+   *   `/assistant`).
+   * - `cajon` — como `pantalla`, dentro de la columna lateral del armazón
+   *   (Análisis).
+   * - `flotante` — dentro de la ventana arrastrable de PRAX global
+   *   (`PraxWindow`). Como `pantalla` en mecánica, con cabecera propia: el
+   *   nombre a la izquierda con desplegable de conversaciones recientes, y a la
+   *   derecha nueva conversación, cambio de modo y cerrar.
+   */
+  variante?: 'panel' | 'pantalla' | 'cajon' | 'flotante';
   /** Oculta el botón de historial, usado cuando no queremos que el usuario recupere conversaciones anteriores en un contexto específico. */
   sinHistorial?: boolean;
+  /**
+   * La organización activa. Solo la usa el menú de ajustes del compositor —el
+   * submenú «Recursos» lista sus proyectos—. Ausente = se leen los recursos de
+   * «sin-org».
+   */
+  organizacionActivaId?: string | null;
 }
 
 /**
@@ -267,11 +291,13 @@ export function AssistantChat({
   variante = 'panel',
   sinHistorial = false,
   userName,
+  organizacionActivaId = null,
 }: AssistantChatProps) {
-  /* Las dos variantes «altas» comparten toda la mecánica de alto y scroll; lo
-     único propio del cajón es su cabecera con el aspa. */
-  const aPantalla = variante === 'pantalla' || variante === 'cajon';
+  /* Las variantes «altas» comparten toda la mecánica de alto y scroll; lo que
+     cambia es la carcasa y la cabecera. */
+  const aPantalla = variante === 'pantalla' || variante === 'cajon' || variante === 'flotante';
   const enCajon = variante === 'cajon';
+  const esFlotante = variante === 'flotante';
   /* `projectId` → nombre, para que el historial diga de qué iba cada
      conversación sin abrirla. Se construye aquí y no en la page porque el
      historial es de esta pantalla, no del servidor. */
@@ -302,6 +328,13 @@ export function AssistantChat({
      variantes— `dock` es `null` y el aspa ni se pinta. */
   const dock = useDock();
   const cerrarCajon = dock?.cerrar;
+  /* PRAX global: solo se usa en la variante `flotante` —cambiar de modo y
+     cerrar la ventana—. `null` en el resto de variantes. */
+  const prax = usePrax();
+  /** Las últimas conversaciones, para el desplegable del nombre (solo `flotante`). */
+  const [recientes, setRecientes] = useState<ConversationSummary[]>([]);
+  const [menuRecientes, setMenuRecientes] = useState(false);
+  const [menuModo, setMenuModo] = useState(false);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   /**
    * Los archivos del mensaje que se está escribiendo.
@@ -484,6 +517,31 @@ export function AssistantChat({
   const archivoRef = useRef<HTMLInputElement>(null);
   const campoId = useId();
 
+  /** Abre el selector de archivos, con `accept` de imagen o el general. */
+  const abrirSelector = useCallback((soloImagenes: boolean) => {
+    const el = archivoRef.current;
+    if (!el) return;
+    el.accept = soloImagenes
+      ? 'image/png,image/jpeg,image/webp,image/gif'
+      : ASSISTANT_ATTACHMENT_ACCEPT;
+    el.click();
+  }, []);
+
+  /** Mete un fragmento en el cursor del campo y devuelve el foco. */
+  const insertarEnCampo = useCallback((fragmento: string) => {
+    const el = campoRef.current;
+    if (!el) return;
+    const inicio = el.selectionStart ?? el.value.length;
+    const fin = el.selectionEnd ?? el.value.length;
+    const nuevo = `${el.value.slice(0, inicio)}${fragmento}${el.value.slice(fin)}`;
+    setTexto(nuevo);
+    requestAnimationFrame(() => {
+      el.focus();
+      const cursor = inicio + fragmento.length;
+      el.setSelectionRange(cursor, cursor);
+    });
+  }, []);
+
   /**
    * Lo que deja escrito el botón «Generar» del lienzo.
    *
@@ -499,6 +557,17 @@ export function AssistantChat({
     seccionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     campoRef.current?.focus();
   }, [sugerenciaExterna?.sello]);
+
+  useEffect(() => {
+    function onPraxSugerencia(e: CustomEvent<string>) {
+      setVista('chat');
+      setTexto(e.detail);
+      seccionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      campoRef.current?.focus();
+    }
+    window.addEventListener('prax-sugerencia', onPraxSugerencia as EventListener);
+    return () => window.removeEventListener('prax-sugerencia', onPraxSugerencia as EventListener);
+  }, []);
 
   const agotada = cuota !== null && cuota.usados >= cuota.limite;
 
@@ -522,6 +591,21 @@ export function AssistantChat({
   useEffect(() => {
     irAlFondo();
   }, [mensajes.length, pendiente, irAlFondo]);
+
+  /* Las recientes para el desplegable del nombre (variante `flotante`). Se
+     refrescan al montar y cada vez que cambia la conversación abierta, así una
+     nueva sube a la lista. */
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `conversationId` es disparador, no se usa en el cuerpo.
+  useEffect(() => {
+    if (!esFlotante) return;
+    let vivo = true;
+    conversacionesAction().then((lista) => {
+      if (vivo) setRecientes(lista);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [esFlotante, conversationId]);
 
   /**
    * Abre una conversación guardada, con sus propuestas y su estado.
@@ -695,6 +779,8 @@ export function AssistantChat({
         reply: null,
         proposals: [],
         cuota: null,
+        /* Una conexión perdida sí se reintenta: no es una cuota. */
+        topeAgotado: null,
         conversationId: null,
         error: 'Se ha perdido la conexión con el servidor. Inténtalo otra vez.',
       };
@@ -734,7 +820,17 @@ export function AssistantChat({
           degradado: true,
         },
       ]);
-      setReintento({ texto: limpio, preguntaId: mio.id, avisoId: idDegradado });
+      /**
+       * ⚠️ **Una cuota agotada no ofrece reintento, y es la única excepción.**
+       * El botón no puede funcionar hasta el día 1: quien lo ve lo pulsa tres o
+       * cuatro veces antes de entender que el problema no es de red. La salida
+       * de este caso ya está montada y es otra —`AmpliarPlan`, que aparece sola
+       * en cuanto el contador llega al tope—, así que aquí basta con no poner un
+       * botón que compite con ella y no lleva a ninguna parte.
+       */
+      if (!respuesta.topeAgotado) {
+        setReintento({ texto: limpio, preguntaId: mio.id, avisoId: idDegradado });
+      }
       return;
     }
 
@@ -786,13 +882,16 @@ export function AssistantChat({
                  contenedor — sin él, un `flex-1` con contenido largo crece y el
                  scroll se lo queda la página entera, que es justo lo que se
                  quiere evitar en un chat. */
-              `flex min-h-0 flex-1 flex-col gap-4 ${enCajon ? 'p-4' : ''}`
-            : 'flex flex-col gap-4 rounded-2xl border p-5'
+              `flex min-h-0 flex-1 flex-col gap-4 ${enCajon || esFlotante ? 'p-4' : ''}`
+            : 'flex flex-col gap-4 rounded-sm border p-5'
         }
         style={
-          aPantalla
-            ? undefined
-            : { borderColor: alpha(colors.primary, 25), background: colors.surface }
+          esFlotante
+            ? /* El minichat comparte el tono de la barra lateral. */
+              { background: '#202020' }
+            : aPantalla
+              ? undefined
+              : { borderColor: alpha(colors.primary, 25), background: colors.surface }
         }
         aria-label={`${PRAX_NAME}, el asistente`}
       >
@@ -802,29 +901,52 @@ export function AssistantChat({
         <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             {/* La cara, a la izquierda del título: es lo que convierte esto en
-              «hablar con alguien» y no en «usar un cuadro de texto». Y mientras
-              el modelo tarda es la única señal de que sigue vivo. */}
-            <PraxAvatar mood={animo} size="lg" />
+              «hablar con alguien» y no en «usar un cuadro de texto». En la
+              ventana flotante no cabe y el nombre-desplegable ya ancla la
+              esquina, así que ahí no se pinta. */}
+            {!esFlotante && <PraxAvatar mood={animo} size="lg" />}
 
             <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-display text-xl text-text-primary">
-                  {vista === 'historial' ? 'Historial' : PRAX_NAME}
-                </h3>
-                <Badge
-                  variant="accent"
-                  className="inline-flex items-center gap-1 uppercase text-sm"
-                  style={{
-                    borderRadius: 4,
-                    background: alpha(colors.accent, 15),
-                    border: `1px solid ${alpha(colors.accent, 40)}`,
-                    color: colors.accent,
-                    fontWeight: 700,
+              {esFlotante && vista === 'chat' ? (
+                /* Nombre a la izquierda, recortado, con desplegable de las 5
+                   conversaciones más recientes. */
+                <NombreConRecientes
+                  titulo={
+                    recientes.find((c) => c.id === conversationId)?.title ??
+                    (conversationId ? 'Conversación' : 'Nueva conversación')
+                  }
+                  abierto={menuRecientes}
+                  onAlternar={() => setMenuRecientes((v) => !v)}
+                  onCerrar={() => setMenuRecientes(false)}
+                  recientes={recientes.slice(0, 5)}
+                  activaId={conversationId}
+                  onElegir={(id) => {
+                    setMenuRecientes(false);
+                    if (id !== conversationId) void cargar(id);
                   }}
-                >
-                  AI
-                </Badge>
-              </div>
+                />
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-display text-xl text-text-primary">
+                    {vista === 'historial' ? 'Historial' : PRAX_NAME}
+                  </h3>
+                  {!esFlotante && (
+                    <Badge
+                      variant="accent"
+                      className="inline-flex items-center gap-1 uppercase text-sm"
+                      style={{
+                        borderRadius: 4,
+                        background: alpha(colors.accent, 15),
+                        border: `1px solid ${alpha(colors.accent, 40)}`,
+                        color: colors.accent,
+                        fontWeight: 700,
+                      }}
+                    >
+                      AI
+                    </Badge>
+                  )}
+                </div>
+              )}
               {/**
                * El proyecto, como insignia. Y **con aspa solo mientras se pueda**.
                *
@@ -895,7 +1017,7 @@ export function AssistantChat({
                 ))}
 
               {vista === 'historial' && (
-                <p className="font-sans text-sm text-text-secondary">
+                <p className="font-sans text-sm text-white">
                   Tus conversaciones. Abre una para seguir donde la dejaste.
                 </p>
               )}
@@ -930,8 +1052,12 @@ export function AssistantChat({
                 aria-label="Empezar una conversación nueva"
                 title="Conversación nueva"
                 disabled={mensajes.length === 0}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-text-secondary transition-colors enabled:hover:bg-surface-elevated enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                style={{ borderColor: colors.border }}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  esFlotante
+                    ? 'text-white enabled:hover:bg-white/5 enabled:hover:text-white'
+                    : 'h-10 w-10 rounded-sm border text-white enabled:hover:bg-surface-elevated enabled:hover:text-text-primary'
+                }`}
+                style={esFlotante ? undefined : { borderColor: colors.border }}
               >
                 <svg
                   className="h-5 w-5"
@@ -950,56 +1076,84 @@ export function AssistantChat({
                 </svg>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
-              aria-label={vista === 'historial' ? 'Volver al chat' : 'Ver el historial'}
-              aria-pressed={vista === 'historial'}
-              title={vista === 'historial' ? 'Volver al chat' : 'Historial'}
-              /* 40×40 con borde: el contador de cuota que tiene al lado son dos
+            {/* En la ventana flotante no hay botón de historial: el desplegable
+                del nombre ya lleva a las conversaciones recientes. */}
+            {!esFlotante && (
+              <button
+                type="button"
+                onClick={() => setVista(vista === 'historial' ? 'chat' : 'historial')}
+                aria-label={vista === 'historial' ? 'Volver al chat' : 'Ver el historial'}
+                aria-pressed={vista === 'historial'}
+                title={vista === 'historial' ? 'Volver al chat' : 'Historial'}
+                /* 40×40 con borde: el contador de cuota que tiene al lado son dos
                líneas (~32 px de alto) y un icono suelto de 16 px quedaba
                diminuto y descolgado. Con este tamaño los dos bloques pesan lo
                mismo y la cabecera se lee simétrica. */
-              className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                vista === 'historial'
-                  ? 'bg-surface-elevated text-text-primary'
-                  : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
-              }`}
-              style={{ borderColor: colors.border }}
-            >
-              {vista === 'historial' ? (
-                /* De vuelta: una flecha, que es lo que se espera de «salir de
+                className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  vista === 'historial'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-white hover:bg-surface-elevated hover:text-text-primary'
+                }`}
+                style={{ borderColor: colors.border }}
+              >
+                {vista === 'historial' ? (
+                  /* De vuelta: una flecha, que es lo que se espera de «salir de
                  aquí» y no se confunde con otra sección. */
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              ) : (
-                /* Un reloj con la flecha de retroceso: el icono estándar de
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                ) : (
+                  /* Un reloj con la flecha de retroceso: el icono estándar de
                  «historial», que se reconoce sin leer nada. */
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.75}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3.05 11a9 9 0 111.5 6M3 20v-5h5"
-                  />
-                </svg>
-              )}
-            </button>
+                  <svg
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l2.5 2.5" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3.05 11a9 9 0 111.5 6M3 20v-5h5"
+                    />
+                  </svg>
+                )}
+              </button>
+            )}
+
+            {/* Solo en la ventana flotante de PRAX global: cambiar de modo y
+                cerrar. El resto de variantes no tienen ventana que gobernar. */}
+            {esFlotante && prax && (
+              <ModoYCerrar
+                modo={prax.modo}
+                menuAbierto={menuModo}
+                onAlternarMenu={() => setMenuModo((v) => !v)}
+                onCerrarMenu={() => setMenuModo(false)}
+                onAcoplar={() => {
+                  setMenuModo(false);
+                  prax.ponerModo('acoplado');
+                }}
+                onFlotante={() => {
+                  setMenuModo(false);
+                  prax.ponerModo('flotante');
+                }}
+                onPantallaCompleta={() => {
+                  setMenuModo(false);
+                  prax.aPantallaCompleta();
+                }}
+                onCerrar={prax.cerrar}
+              />
+            )}
           </div>
         </header>
 
@@ -1303,7 +1457,7 @@ export function AssistantChat({
                      * aquí, que es hablar — y elegir proyecto pasa a ser una de
                      * las opciones, no el peaje.
                      */}
-                    <p className="font-serif text-base italic text-text-secondary">
+                    <p className="font-serif text-base italic text-white">
                       {projectId
                         ? 'Dime lo que necesitas de este proyecto y yo te lo facilito.'
                         : 'Pregúntame lo que quieras, o empecemos hablando de alguno de tus proyectos.'}
@@ -1333,7 +1487,7 @@ export function AssistantChat({
                             key={proyecto.id}
                             type="button"
                             onClick={() => onElegirProyecto?.(proyecto.id, conversationId)}
-                            className="rounded-full border border-border px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
+                            className="rounded-full border border-border px-4 py-2 font-sans text-sm text-white transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
                           >
                             {proyecto.name}
                           </button>
@@ -1351,7 +1505,7 @@ export function AssistantChat({
                    * sabe hacer sin ninguno.
                    */}
                   {!projectId && proyectos.length === 0 && (
-                    <p className="max-w-md font-sans text-sm text-text-disabled">
+                    <p className="max-w-md font-sans text-sm text-white">
                       No tienes ningún proyecto cuyo análisis puedas abrir. Cuéntame en qué estás
                       trabajando y te propongo cómo montarlo.
                     </p>
@@ -1389,10 +1543,10 @@ export function AssistantChat({
              * escrito, y de ahí sale la propuesta de montarlo.
              */}
             {agotada && cuota ? (
-              /* Quedarse sin mensajes deja de ser un callejón: `ProUpsell`
+              /* Quedarse sin mensajes deja de ser un callejón: `AmpliarPlan`
                  decide si ofrece PRO o si enseña el aviso de siempre — no lo
                  ofrece a quien ya lo tiene ni donde no hay pasarela. */
-              <ProUpsell cuota={cuota} />
+              <AmpliarPlan cuota={cuota} />
             ) : (
               <form
                 /* `shrink-0` y `mt-auto`: el compositor se queda pegado abajo
@@ -1423,7 +1577,7 @@ export function AssistantChat({
                             chip no cambia de tamaño al terminar. */}
                         {adjunto.id === null ? (
                           <span
-                            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-text-disabled"
+                            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-white"
                             aria-label="Subiendo"
                           />
                         ) : (
@@ -1432,14 +1586,14 @@ export function AssistantChat({
                         <span className="max-w-48 truncate font-sans text-xs text-text-primary">
                           {adjunto.name}
                         </span>
-                        <span className="shrink-0 font-sans text-[11px] text-text-disabled">
+                        <span className="shrink-0 font-sans text-[11px] text-white">
                           {enKilobytes(adjunto.bytes)}
                         </span>
                         <button
                           type="button"
                           onClick={() => quitarAdjunto(adjunto.localId)}
                           aria-label={`Quitar ${adjunto.name}`}
-                          className="shrink-0 rounded text-text-disabled transition-colors hover:text-error"
+                          className="shrink-0 rounded text-white transition-colors hover:text-error"
                         >
                           <svg
                             className="h-3.5 w-3.5"
@@ -1474,8 +1628,10 @@ export function AssistantChat({
                  * queden abajo con el cursor en vez de subir con el borde.
                  */}
                 <div
-                  className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
-                  style={{ background: colors.surfaceElevated }}
+                  /* Al enfocar el campo, el borde se pone morado igual que el
+                     resto de inputs del sistema (`focus:border-primary` + halo). */
+                  className="flex flex-col gap-1.5 rounded-2xl border border-white/10 p-2.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+                  style={{ background: '#191919' }}
                 >
                   <textarea
                     ref={campoRef}
@@ -1502,81 +1658,76 @@ export function AssistantChat({
                       area.style.height = 'auto';
                       area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
                     }}
-                    className="max-h-40 min-w-0 flex-1 resize-none bg-transparent px-2 py-1.5 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled disabled:cursor-not-allowed"
+                    className="max-h-40 w-full resize-none bg-transparent px-1.5 py-1 font-sans text-sm text-text-primary outline-none placeholder:text-white disabled:cursor-not-allowed"
                   />
 
-                  <button
-                    type="button"
-                    onClick={() => archivoRef.current?.click()}
-                    disabled={pendiente || adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE}
-                    aria-label="Adjuntar un archivo"
-                    title={
-                      adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE
-                        ? `Máximo ${ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE} archivos`
-                        : 'Adjuntar archivo'
-                    }
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      aria-hidden="true"
+                  {/* La fila de acciones, debajo del campo: a la izquierda el
+                      «+» y los ajustes; a la derecha el modelo y Enviar. */}
+                  <div className="flex items-center gap-1">
+                    <ComposerMasMenu
+                      disabled={pendiente}
+                      alTope={adjuntos.length >= ASSISTANT_ATTACHMENT_MAX_PER_MESSAGE}
+                      onAdjuntarImagen={() => abrirSelector(true)}
+                      onAdjuntarArchivo={() => abrirSelector(false)}
+                      onEtiquetarProyecto={() => insertarEnCampo('#')}
+                      onEtiquetarPersona={() => insertarEnCampo('@')}
+                    />
+
+                    <AjustesMenu
+                      gatewayPath={gatewayPath}
+                      organizacionActivaId={organizacionActivaId ?? null}
+                    />
+
+                    {/* Escondido: lo abre el menú «+». Las extensiones además de
+                        los tipos, porque algunos selectores no reconocen
+                        `text/markdown` y dejan los `.md` en gris. `accept` se
+                        ajusta al vuelo según se pida imagen o archivo. */}
+                    <input
+                      ref={archivoRef}
+                      type="file"
+                      multiple
+                      accept={ASSISTANT_ATTACHMENT_ACCEPT}
+                      onChange={alElegirArchivos}
+                      className="hidden"
+                    />
+
+                    <div className="flex-1" />
+
+                    <ModeloSelector />
+
+                    <button
+                      type="submit"
+                      /* El texto es obligatorio aunque haya archivos: ver
+                         `enviar`. Así el botón dice lo mismo que la regla. */
+                      disabled={pendiente || subiendo || texto.trim().length === 0}
+                      aria-label="Enviar"
+                      title={subiendo ? 'Esperando a que suban los archivos' : 'Enviar'}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: alpha(colors.primary, 22), color: colors.primary }}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Escondido: lo abre el clip. Las extensiones además de los
-                      tipos, porque el selector de algunos sistemas no reconoce
-                      `text/markdown` y dejaba los `.md` en gris. */}
-                  <input
-                    ref={archivoRef}
-                    type="file"
-                    multiple
-                    accept={ASSISTANT_ATTACHMENT_ACCEPT}
-                    onChange={alElegirArchivos}
-                    className="hidden"
-                  />
-
-                  <button
-                    type="submit"
-                    /* El texto es obligatorio aunque haya archivos: ver
-                       `enviar`. Así el botón dice lo mismo que la regla. */
-                    disabled={pendiente || subiendo || texto.trim().length === 0}
-                    aria-label="Enviar"
-                    title={subiendo ? 'Esperando a que suban los archivos' : 'Enviar'}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ background: alpha(colors.primary, 22), color: colors.primary }}
-                  >
-                    {pendiente || subiendo ? (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <svg
-                        className="h-4 w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 12h14M13 6l6 6-6 6"
-                        />
-                      </svg>
-                    )}
-                  </button>
+                      {pendiente || subiendo ? (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      ) : (
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.25}
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 19V5M5 12l7-7 7 7"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                <p className="font-sans text-xs text-text-disabled">
+                <p className="font-sans text-xs text-white">
                   {PRAX_NAME} puede equivocarse. Revisa cada propuesta antes de aceptarla.
                 </p>
 
@@ -1602,7 +1753,7 @@ function ContadorCuota({ cuota }: { cuota: AssistantQuota }) {
       >
         {cuota.usados} / {cuota.limite}
       </span>
-      <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+      <span className="font-sans text-[11px] uppercase tracking-wider text-white">
         mensajes este mes
       </span>
     </div>
@@ -1626,7 +1777,7 @@ function Sugerencia({
       type="button"
       disabled={agotada}
       onClick={() => onElegir(texto)}
-      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-white transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
     >
       {texto}
     </button>
@@ -1692,7 +1843,7 @@ function Burbuja({
              `ModelText` devuelve bloques —párrafos, listas, código— el salto de
              línea lo pone el propio bloque. Manteniendo los dos, cada párrafo
              quedaba separado dos veces. */
-          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-2xl px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
+          'flex max-w-[85%] min-w-0 flex-col gap-2 rounded-sm px-3.5 py-2 font-sans text-sm leading-relaxed text-text-primary',
           /* La esquina de dentro, cuadrada: es lo que da el pico hacia quien
              habla sin necesidad de dibujar ninguno. Igual que en Mensajes. */
           mio ? 'rounded-br-md' : 'rounded-bl-md',
@@ -1783,15 +1934,13 @@ function AdjuntoEnLaBurbuja({
             className="h-full w-full object-cover"
           />
         ) : (
-          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-text-secondary" />
+          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-white" />
         )}
       </span>
 
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-sans text-xs text-text-primary">{adjunto.filename}</span>
-        <span className="font-sans text-[11px] text-text-disabled">
-          {enKilobytes(adjunto.size)}
-        </span>
+        <span className="font-sans text-[11px] text-white">{enKilobytes(adjunto.size)}</span>
       </span>
     </a>
   );
@@ -1931,4 +2080,386 @@ function enKilobytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
   return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+}
+
+// ─── Cabecera de la variante `flotante` ──────────────────────────────────────
+
+/** Un instante ISO, corto: hoy la hora; otro día, el día y el mes. */
+function cuandoCorto(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hoy = new Date();
+  const mismoDia =
+    d.getDate() === hoy.getDate() &&
+    d.getMonth() === hoy.getMonth() &&
+    d.getFullYear() === hoy.getFullYear();
+  return mismoDia
+    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+}
+
+/**
+ * El nombre de la conversación, arriba a la izquierda del minichat flotante, con
+ * recorte y un desplegable de las cinco más recientes.
+ */
+function NombreConRecientes({
+  titulo,
+  abierto,
+  onAlternar,
+  onCerrar,
+  recientes,
+  activaId,
+  onElegir,
+}: {
+  titulo: string;
+  abierto: boolean;
+  onAlternar: () => void;
+  onCerrar: () => void;
+  recientes: ConversationSummary[];
+  activaId: string | null;
+  onElegir: (id: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function fuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onCerrar();
+    }
+    document.addEventListener('mousedown', fuera);
+    return () => document.removeEventListener('mousedown', fuera);
+  }, [abierto, onCerrar]);
+
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button
+        type="button"
+        onClick={onAlternar}
+        aria-expanded={abierto}
+        aria-haspopup="menu"
+        className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1 font-sans text-sm font-semibold text-white transition-colors hover:text-white"
+      >
+        <span className="truncate">{titulo}</span>
+        <svg
+          className={`h-3.5 w-3.5 shrink-0 text-white transition-transform ${abierto ? 'rotate-180' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {abierto && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
+        >
+          {recientes.length === 0 ? (
+            <p className="px-3 py-3 font-sans text-xs text-white">Todavía no hay conversaciones.</p>
+          ) : (
+            recientes.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="menuitem"
+                onClick={() => onElegir(c.id)}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                  c.id === activaId
+                    ? 'bg-white/10 text-white'
+                    : 'text-white hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate font-sans text-[13px]">
+                  {c.title || 'Sin título'}
+                </span>
+                <span className="shrink-0 font-sans text-[10px] text-white">
+                  {cuandoCorto(c.updatedAt)}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * El cambio de modo (acoplado / flotante / pantalla completa) y el aspa de
+ * cerrar, para la esquina superior derecha del minichat flotante.
+ */
+function ModoYCerrar({
+  modo,
+  menuAbierto,
+  onAlternarMenu,
+  onCerrarMenu,
+  onAcoplar,
+  onFlotante,
+  onPantallaCompleta,
+  onCerrar,
+}: {
+  modo: 'flotante' | 'acoplado';
+  menuAbierto: boolean;
+  onAlternarMenu: () => void;
+  onCerrarMenu: () => void;
+  onAcoplar: () => void;
+  onFlotante: () => void;
+  onPantallaCompleta: () => void;
+  onCerrar: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuAbierto) return;
+    function fuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onCerrarMenu();
+    }
+    document.addEventListener('mousedown', fuera);
+    return () => document.removeEventListener('mousedown', fuera);
+  }, [menuAbierto, onCerrarMenu]);
+
+  const claseBoton =
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white';
+
+  return (
+    <div ref={ref} className="relative flex items-center gap-1">
+      <button
+        type="button"
+        onClick={onAlternarMenu}
+        aria-expanded={menuAbierto}
+        aria-haspopup="menu"
+        title="Modo de la ventana"
+        aria-label="Cambiar el modo de la ventana"
+        className={claseBoton}
+      >
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          aria-hidden="true"
+        >
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path strokeLinecap="round" d="M15 4v16" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        onClick={onCerrar}
+        title="Cerrar"
+        aria-label="Cerrar PRAX"
+        className={claseBoton}
+      >
+        <svg
+          className="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {menuAbierto && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
+        >
+          <OpcionModo
+            activa={modo === 'flotante'}
+            onClick={onFlotante}
+            etiqueta="Ventana flotante"
+          />
+          <OpcionModo
+            activa={modo === 'acoplado'}
+            onClick={onAcoplar}
+            etiqueta="Acoplado al lateral"
+          />
+          <OpcionModo activa={false} onClick={onPantallaCompleta} etiqueta="Pantalla completa" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OpcionModo({
+  activa,
+  onClick,
+  etiqueta,
+}: {
+  activa: boolean;
+  onClick: () => void;
+  etiqueta: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors ${
+        activa ? 'bg-white/10 text-white' : 'text-white hover:bg-white/5 hover:text-white'
+      }`}
+    >
+      {etiqueta}
+      {activa && (
+        <svg
+          className="h-3.5 w-3.5 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+// ─── El «+» del compositor ──────────────────────────────────────────────────
+
+/**
+ * El botón «+» del compositor y su desplegable: adjuntar imagen o archivo, y
+ * etiquetar un proyecto o una persona (que de momento solo mete `#` o `@` en el
+ * campo — el picker con resolución real es más adelante).
+ *
+ * El menú se abre **hacia arriba**: el compositor vive pegado al fondo.
+ */
+function ComposerMasMenu({
+  disabled,
+  alTope,
+  onAdjuntarImagen,
+  onAdjuntarArchivo,
+  onEtiquetarProyecto,
+  onEtiquetarPersona,
+}: {
+  disabled: boolean;
+  alTope: boolean;
+  onAdjuntarImagen: () => void;
+  onAdjuntarArchivo: () => void;
+  onEtiquetarProyecto: () => void;
+  onEtiquetarPersona: () => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function fuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+    }
+    function esc(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAbierto(false);
+    }
+    document.addEventListener('mousedown', fuera);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', fuera);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [abierto]);
+
+  function elegir(accion: () => void) {
+    setAbierto(false);
+    accion();
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        aria-haspopup="menu"
+        aria-label="Añadir al mensaje"
+        title="Añadir"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <svg
+          className={`h-5 w-5 transition-transform ${abierto ? 'rotate-45' : ''}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          aria-hidden="true"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+
+      {abierto && (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 z-30 mb-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
+        >
+          <ItemMas
+            etiqueta="Adjuntar imagen"
+            disabled={alTope}
+            onClick={() => elegir(onAdjuntarImagen)}
+            d="M4 5h16v14H4zM4 16l4-4 3 3 4-5 5 6M9 9.5a1 1 0 11-2 0 1 1 0 012 0z"
+          />
+          <ItemMas
+            etiqueta="Adjuntar archivo"
+            disabled={alTope}
+            onClick={() => elegir(onAdjuntarArchivo)}
+            d="M14 3v5h5M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z"
+          />
+          <div className="my-1 border-t border-white/5" />
+          <ItemMas
+            etiqueta="Etiquetar proyecto"
+            onClick={() => elegir(onEtiquetarProyecto)}
+            d="M3 7h18M3 12h18M3 17h18"
+          />
+          <ItemMas
+            etiqueta="Etiquetar persona"
+            onClick={() => elegir(onEtiquetarPersona)}
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ItemMas({
+  etiqueta,
+  d,
+  onClick,
+  disabled = false,
+}: {
+  etiqueta: string;
+  d: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <svg
+        className="h-4 w-4 shrink-0 text-white"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        aria-hidden="true"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d={d} />
+      </svg>
+      {etiqueta}
+    </button>
+  );
 }

@@ -24,6 +24,7 @@ import {
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -32,7 +33,10 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/members')
 export class MembersController {
-  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly quota: QuotaService,
+  ) {}
 
   /**
    * Lista todos los miembros de un proyecto.
@@ -67,13 +71,28 @@ export class MembersController {
     );
   }
 
-  /** Agrega un miembro a un proyecto (requiere canManageMembers) */
+  /**
+   * Agrega un miembro a un proyecto (requiere canManageMembers).
+   *
+   * ⚠️ **El tope de miembros lo pone el plan del DUEÑO del proyecto**, no el de
+   * ⚠️ **Ya no hay un tope de miembros por proyecto**: lo sustituyó el asiento.
+   * Lo que se comprueba es que quien entra tenga uno en la organización del
+   * proyecto, y falla con **403 `NOT_IN_ORG`** — la salida es darle asiento, no
+   * ampliar el plan.
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Agrega un miembro a un proyecto' })
   @ApiResponse({ status: 201, description: 'Miembro agregado exitosamente' })
-  add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
+  @ApiResponse({ status: 403, description: 'Esa persona no tiene asiento en la organización' })
+  async add(@Request() req: Express.Request, @Body() body: AddMemberBodyDto) {
+    /* 🔴 Quien está en un proyecto tiene que estar en su organización. Sin esta
+       línea nadie compraría un asiento nunca: se metería a todo el mundo como
+       «externo» y el plan sería decorativo. Responde 403 con `NOT_IN_ORG`, que
+       **no** es un 402: no se ha agotado nada, esa persona no está dentro. */
+    await this.quota.exigirAsientoEnProyecto(req.projectId!, body.userId, req.user!.userId);
+
     return firstValueFrom(
       this.projectsClient.send({ cmd: 'member_add' }, { projectId: req.projectId, ...body }),
     );

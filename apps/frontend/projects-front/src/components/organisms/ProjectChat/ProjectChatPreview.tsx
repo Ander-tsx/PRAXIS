@@ -57,7 +57,7 @@ export function ProjectChatPreview({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
           <h3 className="font-display text-2xl text-text-primary">Chat del equipo</h3>
-          <p className="font-sans text-sm text-text-secondary">
+          <p className="font-sans text-sm text-white">
             Lo que se escriba aquí lo ve todo el equipo de {projectName}.
           </p>
         </div>
@@ -81,7 +81,7 @@ export function ProjectChatPreview({
       </div>
 
       {ultimos.length === 0 ? (
-        <p className="rounded-xl border border-border bg-surface-elevated px-4 py-6 text-center font-sans text-sm text-text-secondary">
+        <p className="rounded-xl border border-border bg-surface-elevated px-4 py-6 text-center font-sans text-sm text-white">
           Todavía no hay mensajes en este proyecto.
         </p>
       ) : (
@@ -97,7 +97,7 @@ export function ProjectChatPreview({
               {/* Una línea por mensaje: es una muestra, no la conversación.
                   `textoPlano` quita el formato de las referencias, que aquí
                   solo serían ruido. */}
-              <span className="truncate font-sans text-xs text-text-secondary">
+              <span className="truncate font-sans text-xs text-white">
                 {textoPlano(mensaje.body) ||
                   (mensaje.attachments.length > 0 ? 'Ha enviado un archivo' : '')}
               </span>

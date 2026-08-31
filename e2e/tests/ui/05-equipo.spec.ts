@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { correoUnico } from '../../fixtures/api';
 import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
+import { confirmarCorreo } from '../../fixtures/verificacion';
 
 /**
  * La pestaña Equipo de un proyecto.
@@ -62,5 +64,63 @@ test.describe('Equipo del proyecto', () => {
     await expect(equipo.getByText('DUEÑO')).toBeVisible();
 
     expect(errores, 'La pestaña no debería lanzar nada al pintarse').toEqual([]);
+  });
+});
+
+test.describe('Equipo del proyecto — el asiento', () => {
+  test('🔴 buscar a quien no está en la organización ofrece la salida, no un muro', async ({
+    page,
+  }) => {
+    /* 🔴 **Fija un fallo de pantalla, no de servidor.** El diálogo de invitar al
+       proyecto solo lista a quien ya tiene asiento en la organización — a quien
+       no lo tiene ni siquiera se le puede seleccionar. Antes, elegir a alguien
+       de fuera y enviar daba un 403 `NOT_IN_ORG` que la zona traducía a «No
+       tienes permiso para hacer esto en este proyecto», dicho **al dueño**, que
+       lo puede todo: una mentira sobre sí mismo que encima escondía la salida.
+
+       Ahora el diálogo lo dice antes de enviar nada: «nadie del equipo coincide»
+       y un enlace para llevar a esa persona a la organización. Es la misma
+       lección que `PROJECT_SUSPENDED`: la pantalla explica la salida en vez de
+       rebotar con un permiso que no es el problema. */
+    await crearCuentaYEntrar(page);
+
+    const nombre = `Sin asiento ${Date.now().toString(36)}`;
+    await crearProyectoParaLaPrueba(page, nombre);
+
+    await page.getByRole('link').filter({ hasText: nombre }).first().click();
+    await page.waitForURL(/\/projects\/[^/?]+/, { timeout: 30_000 });
+
+    /* Una cuenta que existe pero no pertenece a la organización de quien invita:
+       registrada por el proxy de la zona, sin gastar un login. */
+    const fuera = correoUnico('fuera-de-org');
+    const alta = await page.request.post('/projects/api/gateway/auth/register', {
+      data: { email: fuera, password: 'Prueba@12345!' },
+    });
+    expect(alta.status()).toBe(201);
+    await confirmarCorreo(fuera);
+
+    await page
+      .getByRole('navigation', { name: 'Secciones del proyecto' })
+      .getByRole('link', { name: 'Equipo' })
+      .click();
+
+    await page.getByRole('button', { name: 'Invitar persona' }).click();
+    /* Buscador en vivo, sin botón «Buscar»; su etiqueta es «Buscar en el equipo». */
+    await page.getByRole('searchbox', { name: 'Buscar en el equipo' }).fill(fuera);
+
+    const panel = page
+      .locator('form')
+      .filter({ has: page.getByRole('button', { name: 'Enviar invitación' }) });
+
+    /* Dice que no está en el equipo y ofrece llevarlo a la organización — ni un
+       «no tienes permiso», ni un callejón sin salida. */
+    await expect(panel.getByText(/nadie del equipo coincide/i)).toBeVisible({ timeout: 15_000 });
+    await expect(
+      panel.getByRole('link', { name: /invitar a alguien a la organización/i }),
+    ).toBeVisible();
+    await expect(panel).not.toContainText(/no tienes permiso/i);
+
+    /* Y sin nadie seleccionado, «Enviar invitación» no envía. */
+    await expect(page.getByRole('button', { name: 'Enviar invitación' })).toBeDisabled();
   });
 });

@@ -274,21 +274,21 @@ export function ChartBuilder({
        * lo único que se puede prometer sin mentir.
        */}
       <aside className="w-full shrink-0 lg:w-64">
-        <p className="mb-2 font-sans text-xs uppercase tracking-wider text-text-disabled">
+        <p className="mb-2 font-sans text-xs uppercase tracking-wider text-white">
           Así entrará en el lienzo
         </p>
         <div className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4">
           <p className="truncate font-display text-base text-text-primary" title={titulo}>
             {titulo || 'Sin título'}
           </p>
-          <p className="font-sans text-xs leading-relaxed text-text-disabled">{spec.descripcion}</p>
+          <p className="font-sans text-xs leading-relaxed text-white">{spec.descripcion}</p>
           <div
             className="flex items-center justify-center rounded-xl py-4"
             style={{ background: alpha(colors.primary, 6) }}
           >
             <MiniGrafo vista={forma} />
           </div>
-          <p className="font-sans text-xs text-text-secondary">
+          <p className="font-sans text-xs text-white">
             {FORMAS[forma]} · {spec.etiqueta}
             {spec.aceptaRango && dias ? ` · ${dias} días` : ''}
             {spec.aceptaTopN && topN ? ` · top ${topN}` : ''}

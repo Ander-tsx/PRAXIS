@@ -17,6 +17,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { InviteMemberBodyDto, ProjectPermission } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -32,7 +33,10 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/invitations')
 export class ProjectInvitationsController {
-  constructor(@Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy) {}
+  constructor(
+    @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly quota: QuotaService,
+  ) {}
 
   @Get()
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
@@ -43,17 +47,28 @@ export class ProjectInvitationsController {
     );
   }
 
+  /**
+   * ⚠️ **La invitación ocupa sitio en el tope desde que se manda**, no desde que
+   * la aceptan. Si no lo ocupara se podrían mandar veinte sobre un tope de
+   * cinco y el límite se rompería al aceptarlas, con el proyecto ya por encima
+   * del plan y la única salida siendo echar a alguien.
+   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @RequireProjectPermission(ProjectPermission.CAN_MANAGE_MEMBERS)
   @ApiOperation({ summary: 'Invitar a alguien al proyecto' })
   @ApiResponse({ status: 201, description: 'Invitación enviada, pendiente de respuesta' })
+  @ApiResponse({ status: 403, description: 'Esa persona no tiene asiento en la organización' })
   @ApiResponse({ status: 409, description: 'Ya es miembro o ya tiene una invitación pendiente' })
-  invite(
+  async invite(
     @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Body() body: InviteMemberBodyDto,
   ) {
+    /* Misma regla que al añadir directamente: sin asiento en la organización del
+       proyecto no se entra. Ver `exigirAsientoEnProyecto`. */
+    await this.quota.exigirAsientoEnProyecto(projectId, body.userId, req.user!.userId);
+
     return firstValueFrom(
       this.projectsClient.send(
         { cmd: 'invitation_create' },

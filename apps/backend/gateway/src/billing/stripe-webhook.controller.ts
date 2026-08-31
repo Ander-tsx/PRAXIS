@@ -13,6 +13,7 @@ import type { RawBodyRequest } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { PLAN_TIERS, PlanTier, SubscriptionStatus } from '@praxis/contracts';
 import type { Request } from 'express';
 import { firstValueFrom } from 'rxjs';
 import type Stripe from 'stripe';
@@ -23,11 +24,11 @@ import { StripeService } from './stripe.service';
  *
  * ## Esto decide el plan. La vuelta del navegador no
  *
- * ⚠️ **Es el único sitio donde se concede PRO por un pago.** La `success_url`
- * del checkout es una página que dice «gracias»: la puede visitar cualquiera
- * escribiéndola en la barra de direcciones, así que si diera el plan, el plan
- * sería gratis. Es el error clásico de esta integración y por eso está escrito
- * aquí y en `StripeService`.
+ * ⚠️ **Es el único sitio donde se concede un plan por un pago.** La
+ * `success_url` del checkout es una página que dice «gracias»: la puede visitar
+ * cualquiera escribiéndola en la barra de direcciones, así que si diera el
+ * plan, el plan sería gratis. Es el error clásico de esta integración y por eso
+ * está escrito aquí y en `StripeService`.
  *
  * ## Por qué no lleva JWT
  *
@@ -41,7 +42,8 @@ import { StripeService } from './stripe.service';
  * —`checkout.session.completed` y `customer.subscription.updated` describen el
  * mismo hecho—. Todo lo que se hace aquí escribe un estado final con un
  * `upsert`, nunca un incremento ni una transición, así que repetirlo no cambia
- * nada.
+ * nada. Y el `stripeEventId` viaja hasta `billing_events`, cuyo índice único
+ * hace que el registro tampoco se duplique.
  *
  * ## Siempre 200, salvo firma inválida
  *
@@ -57,7 +59,7 @@ export class StripeWebhookController {
 
   constructor(
     private readonly stripe: StripeService,
-    @Inject('ASSISTANT_SERVICE') private readonly assistantClient: ClientProxy,
+    @Inject('BILLING_SERVICE') private readonly billingClient: ClientProxy,
   ) {}
 
   @Post()
@@ -73,12 +75,27 @@ export class StripeWebhookController {
 
     switch (event.type) {
       case 'checkout.session.completed':
-        await this.onCheckoutCompleted(event.data.object);
+        await this.onCheckoutCompleted(event.data.object, event.id);
         break;
 
+      /**
+       * 🔴 **`created` también, y no estaba.**
+       *
+       * `checkout.session.completed` llega sin la suscripción expandida, así que
+       * de ahí no se puede saber si hay periodo de prueba —y ante la duda se
+       * asume que no, porque prometer gratis lo que se cobra es peor que lo
+       * contrario—. La consecuencia era que un plan con mes gratis se guardaba
+       * como `ACTIVE` **sin `trialEndsAt`**, y la pantalla no podía avisar de
+       * cuándo llega el cobro: justo la trampa 3 del encargo.
+       *
+       * `customer.subscription.created` llega un instante después con el estado
+       * real, el precio, la cantidad y `trial_end`. Sin escucharlo había que
+       * esperar a la primera renovación para corregir la fila.
+       */
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        await this.onSubscriptionChanged(event.data.object);
+        await this.onSubscriptionChanged(event.data.object, event.id);
         break;
 
       default:
@@ -93,71 +110,137 @@ export class StripeWebhookController {
   /**
    * Alguien acaba de pagar.
    *
-   * El `userId` sale de `client_reference_id`, que pusimos nosotros al abrir el
-   * pago: es lo único que ata una sesión de Stripe a una cuenta de PRAXIS.
+   * El `organizationId` sale de `client_reference_id`, que pusimos nosotros al
+   * abrir el pago: es lo único que ata una sesión de Stripe a algo de PRAXIS.
+   *
+   * ⚠️ **Se contesta 200 aunque falte.** Significa que algo abrió un checkout
+   * sin pasar por nuestro endpoint, y devolver un error solo conseguiría que
+   * Stripe lo reintentara durante días sobre una sesión que nunca vamos a saber
+   * de quién es.
    */
-  private async onCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const userId = session.client_reference_id;
-    if (!userId) {
-      /* Sin referencia no hay a quién dárselo. Se avisa porque significa que
-         algo abrió un checkout sin pasar por nuestro endpoint. */
+  private async onCheckoutCompleted(session: Stripe.Checkout.Session, eventId: string) {
+    const organizationId = session.client_reference_id;
+    if (!organizationId) {
       this.log.warn(`Checkout ${session.id} sin client_reference_id: no se aplica ningún plan.`);
       return;
     }
 
+    const tier = this.planDe(session.metadata?.tier, null);
+    if (!tier) {
+      this.log.error(`Checkout ${session.id} sin plan reconocible: no se aplica nada.`);
+      return;
+    }
+
     await this.aplicar({
-      userId,
-      plan: 'PRO',
+      organizationId,
+      tier,
+      /**
+       * ⚠️ **`TRIALING` si hay mes gratis, y no `ACTIVE`.**
+       *
+       * Los dos dan acceso, así que la diferencia no cambia lo que se puede
+       * hacer — cambia lo que se puede **decir**. Sin este estado la pantalla no
+       * podría avisar de que el cobro llega el mes que viene, que es justo la
+       * trampa 3 del encargo: «no me avisaron» es la queja más cara de este
+       * terreno.
+       */
+      status:
+        session.subscription && sesionEnPrueba(session)
+          ? SubscriptionStatus.TRIALING
+          : SubscriptionStatus.ACTIVE,
+      seats: Number(session.metadata?.seats) || undefined,
       stripeCustomerId: idDe(session.customer),
       stripeSubscriptionId: idDe(session.subscription),
+      stripeEventId: eventId,
     });
   }
 
   /**
    * La suscripción cambió de estado, o se acabó.
    *
-   * ⚠️ Aquí **no llega nuestro `userId`**: Stripe no lo conoce fuera del momento
-   * del checkout, así que se busca por el id de la suscripción, que sí guardamos.
-   *
-   * `active` y `trialing` son las dos formas de estar al día. Cualquier otra
-   * —impagada, cancelada, incompleta— vuelve a FREE: lo que decide el plan es
-   * el estado de la suscripción, no la última cosa que pasó.
+   * ⚠️ Aquí **no llega el identificador de la organización en el cuerpo del
+   * evento**, salvo por los metadatos que le pusimos al crearla. Se intenta por
+   * ahí primero y, si no está —una suscripción anterior a esta etapa, o creada a
+   * mano en el panel de Stripe—, se busca por el id de la suscripción, que sí
+   * guardamos.
    */
-  private async onSubscriptionChanged(subscription: Stripe.Subscription) {
-    const dueño = await firstValueFrom(
-      this.assistantClient.send<{ userId: string } | null>(
-        { cmd: 'assistant_billing_by_subscription' },
+  private async onSubscriptionChanged(subscription: Stripe.Subscription, eventId: string) {
+    const guardada = await firstValueFrom(
+      this.billingClient.send<{ organizationId: string; tier: PlanTier } | null>(
+        { cmd: 'billing_by_stripe_subscription' },
         { stripeSubscriptionId: subscription.id },
       ),
     ).catch(() => null);
 
-    if (!dueño?.userId) {
-      this.log.warn(`Suscripción ${subscription.id} sin cuenta asociada: se ignora.`);
+    const organizationId = subscription.metadata?.organizationId || guardada?.organizationId;
+    if (!organizationId) {
+      this.log.warn(`Suscripción ${subscription.id} sin organización asociada: se ignora.`);
       return;
     }
 
-    const alDia = subscription.status === 'active' || subscription.status === 'trialing';
+    const tier = this.planDe(
+      subscription.metadata?.tier,
+      subscription.items.data[0]?.price?.id ?? null,
+      guardada?.tier,
+    );
+    if (!tier) {
+      this.log.error(`Suscripción ${subscription.id} sin plan reconocible: se ignora.`);
+      return;
+    }
+
+    const status = traducirEstado(subscription.status);
 
     await this.aplicar({
-      userId: dueño.userId,
-      plan: alDia ? 'PRO' : 'FREE',
+      organizationId,
+      /**
+       * ⚠️ **Al caerse la suscripción, el plan vuelve a FREE de verdad.**
+       *
+       * Guardar el plan contratado con estado `CANCELED` habría dejado una fila
+       * que dice BUSINESS, y cualquier consulta que mirase `tier` sin mirar
+       * `status` —hoy no hay ninguna, mañana quién sabe— regalaría el plan más
+       * caro. Con `FREE` dentro, olvidarse de mirar el estado falla hacia el
+       * lado seguro.
+       */
+      tier: status === SubscriptionStatus.CANCELED ? PlanTier.FREE : tier,
+      status,
+      seats: subscription.items.data[0]?.quantity ?? undefined,
       stripeCustomerId: idDe(subscription.customer),
       stripeSubscriptionId: subscription.id,
+      stripePriceId: subscription.items.data[0]?.price?.id ?? null,
+      trialEndsAt: enIso(subscription.trial_end),
+      cancelAt: enIso(subscription.cancel_at),
+      stripeEventId: eventId,
     });
   }
 
-  private async aplicar(datos: {
-    userId: string;
-    plan: 'FREE' | 'PRO';
-    stripeCustomerId: string | null;
-    stripeSubscriptionId: string | null;
-  }) {
-    await firstValueFrom(this.assistantClient.send({ cmd: 'assistant_billing_link' }, datos)).catch(
+  /**
+   * Qué plan es, mirando los metadatos primero y el precio después.
+   *
+   * ⚠️ El orden importa: el id del precio solo se puede traducir si **este**
+   * gateway tiene esa variable de entorno puesta, y el que atiende el webhook no
+   * tiene por qué ser el mismo que abrió el checkout. Los metadatos viajan con
+   * la suscripción y no dependen de la configuración de nadie.
+   */
+  private planDe(
+    deMetadatos: string | undefined,
+    priceId: string | null,
+    guardado?: PlanTier,
+  ): PlanTier | null {
+    const candidato = deMetadatos as PlanTier | undefined;
+    /* `PLAN_TIERS.includes` y no `candidato in PlanTier`: lo segundo funciona
+       hoy **por accidente**, porque las claves del enum coinciden con sus
+       valores. El día que alguien escriba `PLUS = 'plus'` deja de funcionar sin
+       dar ningún error de tipos. */
+    if (candidato && PLAN_TIERS.includes(candidato)) return candidato;
+    return this.stripe.planDePrecio(priceId) ?? guardado ?? null;
+  }
+
+  private async aplicar(datos: Record<string, unknown>) {
+    await firstValueFrom(this.billingClient.send({ cmd: 'billing_apply_plan' }, datos)).catch(
       (error: Error) => {
         /**
          * ⚠️ Se traga el error **a propósito**, y es la decisión más discutible de
          * este archivo. Si esto sube, el manejador responde 500 y Stripe reintenta;
-         * con assistant-service caído, ese reintento tampoco funcionaría, y a los
+         * con billing-service caído, ese reintento tampoco funcionaría, y a los
          * pocos días Stripe desactiva el endpoint entero.
          *
          * El pago está cobrado y registrado en Stripe pase lo que pase aquí, así
@@ -165,12 +248,53 @@ export class StripeWebhookController {
          * qué plan había que darle, y se aplica a mano desde administración.
          */
         this.log.error(
-          `No se pudo aplicar el plan ${datos.plan} a ${datos.userId} ` +
+          `No se pudo aplicar ${datos.tier} a la organización ${datos.organizationId} ` +
             `(suscripción ${datos.stripeSubscriptionId}): ${error.message}`,
         );
       },
     );
   }
+}
+
+/**
+ * Los ocho estados de Stripe, en los cuatro nuestros.
+ *
+ * ⚠️ `active` y `trialing` son las dos formas de estar al día. `past_due` y
+ * `unpaid` son un cobro que falló y Stripe sigue intentando: **no cortan el
+ * acceso**, porque una tarjeta caducada es lo más común del mundo y quitarle
+ * los proyectos a alguien por eso es la peor forma de enterarse. Todo lo demás
+ * —cancelada, incompleta, caducada, pausada— es no tener plan.
+ */
+function traducirEstado(status: Stripe.Subscription.Status): SubscriptionStatus {
+  switch (status) {
+    case 'active':
+      return SubscriptionStatus.ACTIVE;
+    case 'trialing':
+      return SubscriptionStatus.TRIALING;
+    case 'past_due':
+    case 'unpaid':
+      return SubscriptionStatus.PAST_DUE;
+    default:
+      return SubscriptionStatus.CANCELED;
+  }
+}
+
+/** ¿La sesión abrió una suscripción en periodo de prueba? */
+function sesionEnPrueba(session: Stripe.Checkout.Session): boolean {
+  const suscripcion = session.subscription;
+  if (!suscripcion || typeof suscripcion === 'string') {
+    /* Sin expandir no se puede saber, y **se asume que no**: marcar `TRIALING`
+       de más diría en la pantalla que hay un mes gratis que quizá no existe, y
+       prometer gratis lo que se cobra es peor que lo contrario. El evento de
+       `customer.subscription.updated` llega justo después con el estado real. */
+    return false;
+  }
+  return suscripcion.status === 'trialing';
+}
+
+/** Los segundos de Stripe, en ISO. `null` se queda en `null`. */
+function enIso(segundos: number | null | undefined): string | null {
+  return segundos ? new Date(segundos * 1000).toISOString() : null;
 }
 
 /**

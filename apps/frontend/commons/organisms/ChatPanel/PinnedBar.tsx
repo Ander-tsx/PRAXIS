@@ -158,7 +158,7 @@ export function PinnedBar({
           >
             {fijados.length > 1 ? `Fijado ${actualIndice + 1}/${fijados.length}` : 'Fijado'}
           </span>
-          <span className="font-sans text-xs text-text-secondary" style={UNA_LINEA}>
+          <span className="font-sans text-xs text-white" style={UNA_LINEA}>
             <span className="font-medium text-text-primary">
               {nombreDeAutor(actual.authorId)}:{' '}
             </span>
@@ -172,7 +172,7 @@ export function PinnedBar({
             onClick={() => onExpandirCambiar(!expandido)}
             aria-label={expandido ? 'Ocultar todos los fijados' : 'Ver todos los fijados'}
             aria-expanded={expandido}
-            className="shrink-0 cursor-pointer rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-overlay/5 hover:text-text-primary"
+            className="shrink-0 cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-overlay/5 hover:text-text-primary"
           >
             <svg
               className={`h-3.5 w-3.5 transition-transform ${expandido ? 'rotate-180' : ''}`}
@@ -192,7 +192,7 @@ export function PinnedBar({
 
       {expandido && (
         <div
-          className="absolute left-2 right-2 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-2xl shadow-2xl border border-transparent"
+          className="absolute left-2 right-2 top-full mt-2 z-50 max-h-64 overflow-y-auto rounded-sm shadow-2xl border border-transparent"
           style={{ background: colors.surfaceElevated }}
         >
           {fijados.map((mensaje) => (
@@ -209,7 +209,7 @@ export function PinnedBar({
                 <span className="block font-sans text-xs font-medium text-text-primary">
                   {nombreDeAutor(mensaje.authorId)}
                 </span>
-                <span className="font-sans text-xs text-text-secondary" style={UNA_LINEA}>
+                <span className="font-sans text-xs text-white" style={UNA_LINEA}>
                   <AttachmentPreview mensaje={mensaje} maximo={RESUMEN_MAXIMO} />
                 </span>
               </span>

@@ -2,14 +2,20 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, createContext, useContext, useState } from 'react';
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { personLabel } from '../../api/domain';
+import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
-import { LivePresences, LiveSource } from '../../realtime';
+import { ProjectMonogram } from '../../atoms/ProjectMonogram';
+import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
+import { usePresence } from '../../realtime/presence';
 import { useMessageCount } from '../../realtime/useMessageCount';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { DockColumn, DockProvider } from './DockPanel';
 import { NavList } from './NavList';
+import { OrgSwitcher } from './OrgSwitcher';
+import { PraxProvider } from './PraxWindow';
 import type { AppNavItem } from './navigation';
 
 /**
@@ -87,17 +93,36 @@ export interface AppShellProps {
    */
   plegadaInicial?: boolean;
   /**
-   * Quién eres, para la esquina derecha de **todas** las cabeceras de la zona.
+   * Las organizaciones a las que perteneces, y cuál estás mirando.
    *
-   * Va por el armazón y no por cada página porque el rol y el plan no cambian
-   * al navegar: puesto aquí, Next conserva el layout entre pantallas y esto se
-   * resuelve una vez por visita a la zona en lugar de una por pantalla.
+   * ⚠️ **Lo resuelve el `layout.tsx` de la zona**, igual que `plegadaInicial`:
+   * la organización activa vive en una cookie y hay que conocerla **antes** de
+   * pintar, o la lista de proyectos sale entera y se recorta tras hidratar.
    *
-   * Viaja hasta `AppHeader` por contexto —igual que la apertura del cajón
-   * móvil— porque la cabecera es otro componente y otra parte del árbol.
+   * Ausente, el selector se comporta como antes: enseña el espacio de quien
+   * mira y no ofrece cambiar. Es lo que pasa en las zonas que todavía no lo
+   * pasan, y no rompe nada.
    */
-  cuentaSlot?: ReactNode;
+  organizaciones?: OrgDelSelector[];
+  organizacionActivaId?: string | null;
   children: ReactNode;
+}
+
+/** Lo poco que el selector necesita saber de una organización. */
+export interface OrgDelSelector {
+  id: string;
+  name: string | null;
+  /** `PERSONAL` se dibuja distinto: es tu espacio, no un equipo. */
+  kind: 'PERSONAL' | 'ENTERPRISE';
+  tier: string;
+  soyDueno: boolean;
+  /**
+   * Identidad visual, del modal de configuración. `null` = monograma de letras.
+   * `iconKey` es un icono de `lucide-react` de la lista curada; `color`, un
+   * `#rrggbb`.
+   */
+  iconKey?: string | null;
+  color?: string | null;
 }
 
 /**
@@ -121,7 +146,6 @@ export interface AppShellProps {
 const AppShellContext = createContext<{
   openMenu: () => void;
   plegada: boolean;
-  cuentaSlot?: ReactNode;
 } | null>(null);
 
 /** Lo usa `AppHeader` para su botón de menú en móvil. */
@@ -168,7 +192,7 @@ const UN_ANO = 60 * 60 * 24 * 365;
  * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
  * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
  */
-const CUENTA_HREF = '/dashboard/profile';
+const CUENTA_HREF = '/main/profile';
 
 /**
  * Dónde vive el centro de mensajes.
@@ -211,7 +235,15 @@ export function AppShell(props: AppShellProps) {
             el contenido lo proyecta la página, así que el proveedor tiene que
             envolver a los dos. Ver `DockPanel`. */}
         <DockProvider>
-          <ArmazonInterno {...props} />
+          {/* PRAX global: el lanzador de la cabecera y el minichat (flotante o
+              acoplado). Dentro de `DockProvider` porque el modo acoplado usa su
+              columna. Ver `PraxWindow`. */}
+          <PraxProvider
+            zonePath={props.zonePath}
+            organizacionActivaId={props.organizacionActivaId ?? null}
+          >
+            <ArmazonInterno {...props} />
+          </PraxProvider>
         </DockProvider>
       </LivePresences>
     </LiveSource>
@@ -223,11 +255,31 @@ function ArmazonInterno({
   zonePath,
   user,
   estadoSlot,
-  cuentaSlot,
   plegadaInicial = false,
+  organizaciones,
+  organizacionActivaId,
   children,
 }: AppShellProps) {
+  const pathname = usePathname();
+  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
+    const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
+    if (isChat) return 'chat';
+
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('praxis:sidebarTab');
+      if (stored === 'chat' || stored === 'inbox') return stored;
+    }
+    return 'home';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('praxis:sidebarTab', activeTab);
+    }
+  }, [activeTab]);
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -238,7 +290,6 @@ function ArmazonInterno({
    * con el ancho correcto y no hay nada que corregir.
    */
   const [plegada, setPlegada] = useState(plegadaInicial);
-  const pathname = usePathname();
 
   function alternarPliegue() {
     const siguiente = !plegada;
@@ -287,14 +338,12 @@ function ArmazonInterno({
   );
 
   return (
-    <AppShellContext.Provider
-      value={{ openMenu: () => setMobileMenuOpen(true), plegada, cuentaSlot }}
-    >
-      <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
+    <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
+      <div className="flex h-screen overflow-hidden bg-[#191919] font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
-          className={`hidden shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200 md:flex ${
-            plegada ? 'w-[4.5rem]' : 'w-64'
+          className={`hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 md:flex ${
+            plegada ? 'w-[4.5rem]' : 'w-80'
           }`}
         >
           {/* El pliegue vive **en la cabecera, al lado de la marca**: es donde
@@ -314,11 +363,11 @@ function ArmazonInterno({
            */}
           <div
             className={`flex items-center border-b border-border ${
-              plegada ? 'h-16 justify-center px-0' : 'justify-between px-6 py-4'
+              plegada ? 'h-16 justify-center px-0' : 'h-16 justify-between px-6'
             }`}
           >
             {!plegada && (
-              <div className="flex flex-col items-start gap-1.5">
+              <div className="flex items-center gap-2">
                 <Wordmark />
                 <ByKyloo />
               </div>
@@ -326,18 +375,118 @@ function ArmazonInterno({
             <BotonDePliegue plegada={plegada} onClick={alternarPliegue} />
           </div>
 
-          <div className={plegada ? 'px-2 pt-4' : 'px-4 pt-4'}>
-            <OrgSwitcher name={user.name} plegada={plegada} />
-          </div>
-
           <div
             className={`scrollbar-none flex-1 overflow-y-auto py-6 ${plegada ? 'px-2' : 'px-4'}`}
           >
-            <NavList
-              navItems={navItemsVivos}
-              activePath={activePathDeSecciones}
-              plegada={plegada}
-            />
+            <div className="mb-4">
+              <OrgSwitcher
+                name={user.name}
+                plegada={plegada}
+                organizaciones={organizaciones}
+                activaId={organizacionActivaId ?? null}
+                zonePath={zonePath}
+              />
+            </div>
+
+            {!plegada && (
+              <div className="mb-4 flex items-center gap-1.5 px-1 overflow-x-auto whitespace-nowrap scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('home')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+                    activeTab === 'home'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                  </svg>
+                  Inicio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('chat')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+                    activeTab === 'chat'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                    />
+                  </svg>
+                  Chat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('inbox')}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+                    activeTab === 'inbox'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+                    />
+                  </svg>
+                  Bandeja de entrada
+                </button>
+              </div>
+            )}
+            {activeTab === 'home' && (
+              <div className="flex flex-col gap-4">
+                <SidebarProjectsTree
+                  zonePath={zonePath}
+                  plegada={plegada}
+                  activePath={activePathDeSecciones}
+                  organizacionActivaId={organizacionActivaId ?? null}
+                />
+                <NavList
+                  navItems={navItemsVivos.filter((i) => i.href !== '/projects')}
+                  activePath={activePathDeSecciones}
+                  plegada={plegada}
+                />
+              </div>
+            )}
+            {activeTab === 'chat' && (
+              <SidebarChatList
+                zonePath={zonePath}
+                plegada={plegada}
+                organizacionActivaId={organizacionActivaId ?? null}
+              />
+            )}
+            {activeTab === 'inbox' && <SidebarInboxList zonePath={zonePath} plegada={plegada} />}
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -348,8 +497,8 @@ function ArmazonInterno({
               /* Plegada, el enlace y el selector siguen siendo hermanos por lo
                  mismo que desplegada: un botón dentro de un `<a>` no vale. */
               <div
-                className={`mb-2 flex justify-center rounded-lg p-1 transition-colors ${
-                  enCuenta ? 'bg-surface-elevated' : ''
+                className={`mb-2 flex justify-center rounded-full p-1 transition-colors hover:bg-white/5 ${
+                  enCuenta ? 'bg-white/5' : ''
                 }`}
               >
                 <span className="relative">
@@ -418,33 +567,39 @@ function ArmazonInterno({
               style={{ background: alpha(colors.overlay, 80) }}
             />
 
-            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-surface p-4">
-              <div className="flex flex-col gap-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-col items-start gap-1.5">
-                    <Wordmark />
-                    <ByKyloo />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Cerrar menú"
-                    className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary"
-                  >
-                    <svg
-                      className="h-6 w-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-[#202020] p-4">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-2 mt-1">
+                  <Wordmark />
+                  <ByKyloo />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Cerrar menú"
+                  className="rounded-md p-1 text-white transition-colors hover:text-text-primary"
+                >
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-                <OrgSwitcher name={user.name} plegada={false} />
+              <div className="flex flex-col gap-6 flex-1 overflow-y-auto scrollbar-none mb-6">
+                <OrgSwitcher
+                  name={user.name}
+                  plegada={false}
+                  organizaciones={organizaciones}
+                  activaId={organizacionActivaId ?? null}
+                  zonePath={zonePath}
+                />
 
                 <NavList
                   navItems={navItemsVivos}
@@ -484,8 +639,8 @@ function UserCard({
       /* Resaltada cuando estás dentro: es la única «entrada» de la barra que no
          vive en la lista de secciones, así que si no se marcara aquí, estando
          en tu cuenta no habría nada marcado en ninguna parte. */
-      className={`mb-3 flex items-center gap-3 rounded-lg p-1 transition-colors hover:bg-surface-elevated ${
-        activa ? 'bg-surface-elevated' : ''
+      className={`mb-3 flex items-center gap-3 rounded-full p-1 transition-colors hover:bg-white/5 ${
+        activa ? 'bg-white/5' : ''
       }`}
     >
       {/* El mismo círculo que las tarjetas del tablero, y con `mine` puesto: en
@@ -512,9 +667,9 @@ function UserCard({
       {/* El texto sí es el enlace a tu cuenta. */}
       <a href={CUENTA_HREF} className="min-w-0 flex-1">
         {user.name.trim() && (
-          <p className="truncate font-sans text-sm font-semibold text-text-primary">{user.name}</p>
+          <p className="truncate font-sans text-sm font-semibold text-white">{user.name}</p>
         )}
-        <p className="truncate font-sans text-xs text-text-secondary">{user.email}</p>
+        <p className="truncate font-sans text-xs text-white">{user.email}</p>
       </a>
     </div>
   );
@@ -547,7 +702,7 @@ function Wordmark() {
  */
 function ByKyloo() {
   return (
-    <span className="flex items-center gap-1.5 text-text-disabled">
+    <span className="flex items-center gap-1.5 text-white">
       <span className="font-mono text-[0.55rem] uppercase tracking-[0.18em]">By</span>
       <KylooWordmark className="h-2.5 w-auto" />
     </span>
@@ -555,63 +710,37 @@ function ByKyloo() {
 }
 
 /**
- * El selector de organización — **solo visual, por ahora**. Organizaciones
- * no existe todavía a nivel de backend, así que no hay nada real a lo que
- * cambiar: un desplegable que se abre y no lleva a ninguna parte sería peor
- * que no tener desplegable. Cuando exista el concepto, este componente pasa
- * a ser interactivo sin cambiar de sitio en el armazón.
+ * El selector de organización.
  *
- * Plegada, se reduce al cuadrado con la inicial — mismo criterio que la
- * ficha de usuario del pie.
+ * ## Dejó de ser un dibujo
+ *
+ * Nació **solo visual** —icono, «Plan gratuito», un nombre inventado y un
+ * chevron sin `onClick`— porque las organizaciones no existían en el backend, y
+ * un desplegable que se abre y no lleva a ninguna parte era peor que no
+ * tenerlo. Desde 2026-08-26 existen, todo el mundo tiene al menos la suya, y
+ * **es donde viven los proyectos**: ahora abre.
+ *
+ * ## Qué hace al elegir una
+ *
+ * Escribe la cookie `praxis_org` y recarga. No es una llave: el servidor la usa
+ * como **filtro sobre lo que ya puedes ver**, nunca como permiso. Poner ahí la
+ * organización de otro devuelve cero proyectos, no los suyos. Ver
+ * `commons/theme/organizacion.ts`.
+ *
+ * ## 🔴 Y ya no hay forma de no elegir ninguna
+ *
+ * Hasta 2026-08-28 la primera fila del desplegable era «Todas tus
+ * organizaciones» y era el estado por defecto. Se retiró: mientras existía,
+ * Suscripción y Roles y permisos tenían que volver a preguntar en cuál
+ * trabajar, y elegirla dos veces para la misma sesión era el roce que esta
+ * etapa vino a quitar. Ahora siempre hay una activa, resuelta en el servidor
+ * antes de pintar.
+ *
+ * ⚠️ **Recarga dura y no `router.refresh()`.** La cookie la leen los siete
+ * `layout.tsx` en el servidor, y un refresco del App Router no vuelve a
+ * ejecutar el layout de una zona que ya está montada: el sidebar se quedaría
+ * marcando la organización vieja mientras la lista de abajo enseña la nueva.
  */
-function OrgSwitcher({ name, plegada }: { name: string; plegada: boolean }) {
-  const primerNombre = name.trim().split(' ')[0];
-  const orgName = primerNombre ? `Organización de ${primerNombre}` : 'Mi organización';
-  const inicial = (primerNombre || 'P').charAt(0).toUpperCase();
-
-  const cuadro = (
-    <span
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md font-display text-sm"
-      style={{ background: colors.primary, color: colors.primaryForeground }}
-      aria-hidden="true"
-    >
-      {inicial}
-    </span>
-  );
-
-  if (plegada) {
-    return (
-      <div className="flex justify-center" title={`${orgName} — Plan gratuito`}>
-        {cuadro}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5"
-      title="Cambiar de organización — próximamente"
-    >
-      {cuadro}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="font-sans text-[10px] text-text-secondary">Plan gratuito</span>
-        <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
-          {orgName}
-        </span>
-      </div>
-      <svg
-        className="h-4 w-4 shrink-0 text-text-disabled"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        aria-hidden="true"
-      >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
-      </svg>
-    </div>
-  );
-}
 
 /**
  * El botón de plegar: **un icono, sin texto**.
@@ -631,7 +760,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       aria-expanded={!plegada}
       aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
       title={plegada ? 'Desplegar' : 'Plegar'}
-      className="shrink-0 cursor-pointer rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
+      className="shrink-0 cursor-pointer rounded-md p-1.5 text-white transition-colors hover:bg-white/5 hover:text-text-primary"
     >
       <svg
         className="h-4 w-4"
@@ -648,5 +777,793 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
         <path strokeLinecap="round" d={plegada ? 'M9 4v16' : 'M15 4v16'} />
       </svg>
     </button>
+  );
+}
+
+// ─── Árbol jerárquico de proyectos ──────────────────────────────────────────
+
+function ChevronIcon({ open, className = 'h-3 w-3' }: { open: boolean; className?: string }) {
+  return (
+    <svg
+      className={`${className} shrink-0 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function WorkspaceLeafIcon({ className = 'h-3.5 w-3.5' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      aria-hidden="true"
+    >
+      <rect x="3.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13.5" y="4" width="7" height="7" rx="1.5" />
+      <rect x="3.5" y="14" width="7" height="6" rx="1.5" />
+      <rect x="13.5" y="14" width="7" height="6" rx="1.5" />
+    </svg>
+  );
+}
+
+interface SidebarProject {
+  id: string;
+  name: string;
+  slug: string;
+  iconKey: string | null;
+  color: string | null;
+  workspaces: Array<{ id: string; name: string }>;
+}
+
+async function fetchProjectsTree(
+  zonePath: string,
+  organizacionActivaId: string | null,
+): Promise<SidebarProject[]> {
+  const params = new URLSearchParams({ limit: '50' });
+  if (organizacionActivaId) {
+    params.set('organizationId', organizacionActivaId);
+  }
+
+  const listBody = await fetch(`${zonePath}/api/gateway/projects?${params.toString()}`, {
+    cache: 'no-store',
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+
+  // El backend devuelve { data: { items: [...] } } o { data: [...] }
+  const items: any[] =
+    listBody?.data?.items ?? (Array.isArray(listBody?.data) ? listBody.data : []);
+  if (items.length === 0) return [];
+
+  const resolved = [];
+  for (const p of items) {
+    const detail = await fetch(`${zonePath}/api/gateway/projects/${p.id}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .catch(() => null);
+    const workspaces: Array<{ id: string; name: string }> = (detail?.data?.workspaces ?? []).map(
+      (w: any) => ({ id: w.id, name: w.name }),
+    );
+    resolved.push({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      /* `GET /projects` ya trae la identidad visual; el detalle también, y es
+         lo que gana si difieren. */
+      iconKey: detail?.data?.iconKey ?? p.iconKey ?? null,
+      color: detail?.data?.color ?? p.color ?? null,
+      workspaces,
+    });
+  }
+  return resolved;
+}
+
+function SidebarProjectsTree({
+  zonePath,
+  plegada,
+  activePath,
+  organizacionActivaId,
+}: {
+  zonePath: string;
+  plegada: boolean;
+  activePath: string;
+  organizacionActivaId: string | null;
+}) {
+  const [projects, setProjects] = useState<SidebarProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const guardado = localStorage.getItem('praxis_sidebar_projects_expanded');
+      if (guardado) {
+        setExpanded(new Set(JSON.parse(guardado)));
+      }
+    } catch (e) {}
+  }, []);
+
+  const load = (esInicial = false) => {
+    fetchProjectsTree(zonePath, organizacionActivaId)
+      .then((resolved) => {
+        setProjects((prev) => {
+          const prevStr = JSON.stringify(prev);
+          const nextStr = JSON.stringify(resolved);
+          if (prevStr === nextStr) return prev;
+
+          setExpanded((e) => {
+            const next = new Set(e);
+            resolved.forEach((p) => {
+              if (esInicial) {
+                // Solo si no habia nada guardado, expandimos por defecto
+                if (!localStorage.getItem('praxis_sidebar_projects_expanded')) {
+                  next.add(p.id);
+                }
+              } else if (!prev.find((pp) => pp.id === p.id)) {
+                // Es un proyecto nuevo recien creado, lo expandimos
+                next.add(p.id);
+              }
+            });
+            try {
+              localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
+            } catch (err) {}
+            return next;
+          });
+          return resolved;
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load(true);
+
+    // Polling ligero: refresca cada 30 s para capturar proyectos nuevos
+    const interval = setInterval(load, 30_000);
+    return () => clearInterval(interval);
+  }, [zonePath]);
+
+  // Refresca al volver el foco a la ventana (usuario crea proyecto en otra pestaña)
+  useEffect(() => {
+    const onFocus = () => load();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [zonePath]);
+
+  function toggleProject(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
+      } catch (err) {}
+      return next;
+    });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-1 px-1">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="h-7 rounded-lg bg-white/5 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (projects.length === 0 && !plegada) {
+    return (
+      <div className="px-3 py-1">
+        <div className="-mx-3 mb-1.5 border-t border-border" aria-hidden="true" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none block mb-1">
+          Proyectos
+        </span>
+        <a
+          href="/projects"
+          className="flex items-center gap-2 text-white hover:text-white text-[12px] py-1 transition-colors"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Crear primer proyecto
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      {/* Raya fina encima de la sección, igual que las de `NavList`. */}
+      <div
+        className={`${plegada ? 'mx-1' : ''} mb-1.5 border-t border-border`}
+        aria-hidden="true"
+      />
+      {!plegada && (
+        <div className="flex items-center justify-between px-3 mb-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
+            Proyectos
+          </span>
+          <a
+            href="/projects"
+            title="Ver todos los proyectos"
+            className="rounded p-0.5 text-white hover:text-white transition-colors"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 6h16M4 10h16M4 14h16M4 18h16"
+              />
+            </svg>
+          </a>
+        </div>
+      )}
+
+      <nav aria-label="Proyectos" className="flex flex-col gap-0.5">
+        {projects.map((project) => {
+          const isOpen = expanded.has(project.id);
+          // Las URLs de proyecto usan el SLUG, no el id
+          const projectHref = `/projects/${project.slug}`;
+          const isActiveProject =
+            activePath === projectHref ||
+            activePath.startsWith(`${projectHref}?`) ||
+            activePath.startsWith(`${projectHref}/`);
+
+          if (plegada) {
+            return (
+              <a
+                key={project.id}
+                href={projectHref}
+                title={project.name}
+                aria-current={isActiveProject ? 'page' : undefined}
+                className={`flex justify-center py-2 rounded-lg transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+              >
+                <ProjectMonogram
+                  id={project.id}
+                  name={project.name}
+                  iconKey={project.iconKey}
+                  color={project.color}
+                />
+              </a>
+            );
+          }
+
+          return (
+            <div key={project.id} className="flex flex-col">
+              <div
+                className={`group flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.06] ${isActiveProject ? 'bg-white/10' : ''}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleProject(project.id)}
+                  aria-expanded={isOpen}
+                  aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
+                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-white hover:text-white transition-colors"
+                >
+                  <ChevronIcon open={isOpen} />
+                </button>
+
+                <span className="shrink-0 scale-[0.72] origin-center -mx-0.5">
+                  <ProjectMonogram
+                    id={project.id}
+                    name={project.name}
+                    iconKey={project.iconKey}
+                    color={project.color}
+                  />
+                </span>
+
+                <a
+                  href={projectHref}
+                  className={`flex-1 min-w-0 truncate text-[13px] transition-colors ${
+                    isActiveProject
+                      ? 'text-white font-semibold'
+                      : 'text-white font-medium opacity-75 hover:opacity-100'
+                  }`}
+                >
+                  {project.name}
+                </a>
+              </div>
+
+              <div
+                className="grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.22,0.85,0.28,1)]"
+                style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+              >
+                <div
+                  className="min-h-0 overflow-hidden"
+                  style={{ opacity: isOpen ? 1 : 0, transition: 'opacity 200ms' }}
+                >
+                  <div className="flex flex-col gap-0.5 pl-6 pb-1 pt-0.5">
+                    {project.workspaces.length === 0 ? (
+                      <span className="px-2 py-1 text-[12px] text-white italic select-none">
+                        Sin espacios
+                      </span>
+                    ) : (
+                      project.workspaces.map((ws) => {
+                        // URL correcta: /projects/{slug}?tab=espacios&ws={wsId}
+                        const wsHref = `/projects/${project.slug}?tab=espacios&ws=${ws.id}`;
+                        const isActiveWs = activePath.includes(`ws=${ws.id}`);
+                        return (
+                          <a
+                            key={ws.id}
+                            href={wsHref}
+                            aria-current={isActiveWs ? 'page' : undefined}
+                            className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
+                              isActiveWs
+                                ? 'bg-white/10 text-white font-medium'
+                                : 'text-white hover:text-white hover:bg-white/[0.06]'
+                            }`}
+                          >
+                            <WorkspaceLeafIcon />
+                            <span className="truncate">{ws.name}</span>
+                          </a>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function SidebarChatList({
+  zonePath,
+  plegada,
+  organizacionActivaId,
+}: {
+  zonePath: string;
+  plegada: boolean;
+  organizacionActivaId: string | null;
+}) {
+  const pathname = usePathname();
+  const browserPath = zonePath + (pathname === '/' ? '' : pathname);
+  const [directs, setDirects] = useState<any[]>([]);
+  const [projectsCrudos, setProjectsCrudos] = useState<any[]>([]);
+  /**
+   * Los chats de proyecto **de la organización activa**. Un chat de proyecto es
+   * 1:1 con un proyecto, y un proyecto pertenece a una sola organización, así que
+   * el directorio se recorta igual que el árbol del sidebar y la lista de
+   * proyectos. Los privados **no** se filtran: un DM no es de ninguna
+   * organización (ver la conversación de diseño).
+   */
+  const projects = organizacionActivaId
+    ? projectsCrudos.filter((c: any) => c?.project?.organizationId === organizacionActivaId)
+    : projectsCrudos;
+  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState('');
+
+  const fetchChats = useCallback(() => {
+    const fetchDirects = async () => {
+      try {
+        const res = await fetch(`${zonePath}/api/gateway/me/chats`);
+        return await res.json();
+      } catch {
+        return { data: [] };
+      }
+    };
+
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch(`${zonePath}/api/gateway/me/chats/projects`);
+        return await res.json();
+      } catch {
+        return { data: [] };
+      }
+    };
+
+    const run = async () => {
+      const d = await fetchDirects();
+      const p = await fetchProjects();
+      const listD = Array.isArray(d?.data) ? d.data : [];
+      const listP = Array.isArray(p?.data) ? p.data : [];
+      setDirects(listD);
+      setProjectsCrudos(listP);
+
+      const ids = new Set<string>();
+      listD.forEach((c: any) => c.peerId && ids.add(c.peerId));
+      listP.forEach((c: any) => c.ultimo?.authorId && ids.add(c.ultimo.authorId));
+
+      if (ids.size > 0) {
+        fetch(`${zonePath}/api/gateway/users?ids=${Array.from(ids).join(',')}`)
+          .then((r) => r.json())
+          .then((ubody) => {
+            const uMap: Record<string, any> = {};
+            (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
+            setUsersMap(uMap);
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [zonePath]);
+
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
+
+  useLiveEvent('chat.mensaje', () => fetchChats());
+  useLiveEvent('chat.leido', () => fetchChats());
+  useReconnection(fetchChats);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-2 px-1">
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+      </div>
+    );
+  }
+
+  function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
+    if (mensaje.deletedAt) return 'Mensaje eliminado';
+    return (
+      mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) +
+      (mensaje.body.length > 50 ? '...' : '')
+    );
+  }
+
+  function cuandoCorto(iso: string) {
+    const d = new Date(iso);
+    const ahora = new Date();
+    if (
+      d.getDate() === ahora.getDate() &&
+      d.getMonth() === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear()
+    ) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+  }
+
+  const PersonRow = ({ c, peer }: any) => {
+    const presencia = usePresence(c.peerId, peer?.presence);
+    const nombre = peer ? personLabel(peer) : 'Alguien';
+    const link = `/chat/${c.peerId}`;
+    const activo = browserPath === link;
+
+    // filter by search
+    if (search && !nombre.toLowerCase().includes(search.toLowerCase())) return null;
+
+    return (
+      <a
+        key={c.peerId || c.channelId}
+        href={link}
+        aria-current={activo ? 'page' : undefined}
+        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
+      >
+        <div className="shrink-0">
+          <Avatar
+            label={nombre}
+            size="sm"
+            src={avatarHref(peer?.avatarUrl, `${zonePath}/api/gateway`)}
+            presence={presencia}
+          />
+        </div>
+        {!plegada && (
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
+              >
+                {nombre}
+              </span>
+              {c.ultimo && (
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
+                  {cuandoCorto(c.ultimo.createdAt)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
+              >
+                {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
+              </span>
+              {c.unread > 0 && (
+                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </a>
+    );
+  };
+
+  const ProjectRow = ({ c, autor }: any) => {
+    const link = `/chat/proyecto/${c.project.id}`;
+    const activo = browserPath === link;
+
+    // filter by search
+    if (search && !c.project.name.toLowerCase().includes(search.toLowerCase())) return null;
+
+    return (
+      <a
+        key={c.project.id}
+        href={link}
+        aria-current={activo ? 'page' : undefined}
+        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
+      >
+        <div className="shrink-0 flex items-center justify-center scale-90 origin-center">
+          <ProjectMonogram
+            id={c.project.id}
+            name={c.project.name}
+            iconKey={c.project.iconKey}
+            color={c.project.color}
+          />
+        </div>
+        {!plegada && (
+          <div className="flex flex-col min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
+              >
+                {c.project.name}
+              </span>
+              {c.ultimo && (
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
+                  {cuandoCorto(c.ultimo.createdAt)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-0.5">
+              <span
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
+              >
+                {c.ultimo
+                  ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}`
+                  : 'Sin mensajes'}
+              </span>
+              {c.unread > 0 && (
+                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
+                  {c.unread > 99 ? '99+' : c.unread}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </a>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none pb-4 px-1">
+      {/* Search input */}
+      <div className="px-2">
+        <input
+          type="text"
+          placeholder="Buscar chats..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md bg-white/5 px-2 py-1 text-sm text-white placeholder-white/60 focus:outline-none"
+        />
+      </div>
+      {projects.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {!plegada && (
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
+              Proyectos
+            </span>
+          )}
+          {projects.map((c: any) => (
+            <ProjectRow
+              key={c.project.id}
+              c={c}
+              autor={c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null}
+            />
+          ))}
+        </div>
+      )}
+
+      {directs.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {!plegada && (
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
+              Privados
+            </span>
+          )}
+          {directs.map((c: any) => (
+            <PersonRow key={c.peerId} c={c} peer={usersMap[c.peerId]} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [mostrarTodos, setMostrarTodos] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    const unreadParam = mostrarTodos ? '' : '&unread=true';
+    fetch(`${zonePath}/api/gateway/me/notifications?limit=30${unreadParam}`)
+      .then((res) => res.json())
+      .then((body) => {
+        const list = body?.data?.items || [];
+        setItems(list);
+
+        const ids = [...new Set(list.map((i: any) => i.actorId).filter((id: any) => !!id))];
+        if (ids.length > 0) {
+          fetch(`${zonePath}/api/gateway/users?ids=${ids.join(',')}`)
+            .then((r) => r.json())
+            .then((ubody) => {
+              const uMap: Record<string, any> = {};
+              (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
+              setUsersMap(uMap);
+            })
+            .finally(() => setLoading(false));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch(() => setLoading(false));
+  }, [zonePath, mostrarTodos]);
+
+  const loader = (
+    <div className="flex flex-col gap-2 px-1 py-2">
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+      <div className="h-12 rounded-xl bg-white/5 animate-pulse" />
+    </div>
+  );
+
+  function getTitle(n: any) {
+    const who = n.actorId ? usersMap[n.actorId]?.name?.split(' ')[0] || 'Alguien' : 'El sistema';
+    const project = n.projectName ?? 'un proyecto';
+    const task = n.taskTitle ?? 'una tarea';
+
+    switch (n.type) {
+      case 'INVITATION_RECEIVED':
+        return `${who} te invitó a ${project}`;
+      case 'INVITATION_ACCEPTED':
+        return `${who} aceptó tu invitación a ${project}`;
+      case 'INVITATION_REJECTED':
+        return `${who} rechazó tu invitación a ${project}`;
+      case 'MEMBER_LEFT':
+        return `${who} salió de ${project}`;
+      case 'MEMBER_REMOVED':
+        return `${who} te sacó de ${project}`;
+      case 'TASK_ASSIGNED':
+        return `${who} te asignó ${task} en ${project}`;
+      case 'TASK_UNASSIGNED':
+        return `${who} te quitó de ${task} en ${project}`;
+      case 'AUTOMATION_TASK_DUE_SOON':
+        return `${task} vencerá pronto en ${project}`;
+      case 'AUTOMATION_TASK_STALE':
+        return `${task} lleva días sin movimiento en ${project}`;
+      case 'AUTOMATION_TASK_OVERDUE':
+        return `${task} ha vencido en ${project}`;
+      case 'AUTOMATION_TASK_UNASSIGNED':
+        return `${task} sigue sin encargado en ${project}`;
+      case 'AUTOMATION_TASK_CREATED':
+        return `Se creó ${task} en ${project}`;
+      case 'AUTOMATION_TASK_MOVED':
+        return `${task} cambió de columna en ${project}`;
+      case 'AUTOMATION_TASK_COMPLETED':
+        return `${task} se terminó en ${project}`;
+      case 'AUTOMATION_TASK_REOPENED':
+        return `${task} se reabrió en ${project}`;
+      case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
+        return `Cambiaron los encargados de ${task}`;
+      case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
+        return `Cambió el vencimiento de ${task}`;
+      default:
+        return 'Nueva notificación';
+    }
+  }
+
+  function getHref(n: any) {
+    if (!n.projectId || n.type === 'MEMBER_REMOVED') return '/projects';
+    if (n.taskId) return `/projects/${n.projectId}?task=${n.taskId}`;
+    return `/projects/${n.projectId}`;
+  }
+
+  return (
+    <div className="flex flex-col max-h-[calc(100vh-200px)]">
+      {!plegada && (
+        <div className="flex bg-white/5 rounded-lg p-0.5 mx-3 mb-3 shrink-0">
+          <button
+            onClick={() => setMostrarTodos(false)}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${!mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
+          >
+            Sin leer
+          </button>
+          <button
+            onClick={() => setMostrarTodos(true)}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
+          >
+            Todos
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1 overflow-y-auto scrollbar-none px-1 pb-4 flex-1 min-h-0">
+        {loading ? (
+          loader
+        ) : items.length === 0 ? (
+          <div className="px-4 py-8 text-center text-white text-[13px] font-sans">
+            Nada nuevo por aquí.
+          </div>
+        ) : (
+          items.map((n: any) => {
+            const actor = n.actorId ? usersMap[n.actorId] : null;
+            return (
+              <a
+                key={n.id}
+                href={getHref(n)}
+                className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
+                  !n.readAt ? 'bg-white/[0.04]' : ''
+                }`}
+              >
+                {!plegada && (
+                  <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                    {actor?.avatarUrl ? (
+                      <img
+                        src={`${zonePath}/api/gateway${actor.avatarUrl}`}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-[11px] font-bold">
+                        {(actor?.name || 'S').charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
+                  <p
+                    className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white'}`}
+                  >
+                    {getTitle(n)}
+                  </p>
+                  <span className="font-sans text-[10px] text-white mt-1">
+                    {new Date(n.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+                {!n.readAt && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-white mt-1.5 shrink-0" />
+                )}
+              </a>
+            );
+          })
+        )}
+      </div>
+    </div>
   );
 }

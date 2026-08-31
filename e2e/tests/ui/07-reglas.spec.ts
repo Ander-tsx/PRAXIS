@@ -265,9 +265,7 @@ test.describe('Reglas del proyecto', () => {
    * su propio campo «Nombre», y con los dos desplegados el locator suelto
    * resuelve a dos elementos.
    */
-  test('el constructor se reinicia al reabrirlo tras crear (corrección C1)', async ({
-    page,
-  }) => {
+  test('el constructor se reinicia al reabrirlo tras crear (corrección C1)', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);
     await api.dispose();
@@ -541,7 +539,9 @@ test.describe('Reglas del proyecto', () => {
       page
         .locator('li', { hasText: nombreFecha })
         .getByText(
-          new RegExp(`Cuando una tarea esté a punto de vencer, si fecha de vencimiento es ${fechaElegida}`),
+          new RegExp(
+            `Cuando una tarea esté a punto de vencer, si fecha de vencimiento es ${fechaElegida}`,
+          ),
         ),
     ).toBeVisible(ESPERA_TRAS_GUARDAR);
 
@@ -560,7 +560,9 @@ test.describe('Reglas del proyecto', () => {
     await expect(
       page
         .locator('li', { hasText: nombreLista })
-        .getByText(/Cuando una tarea esté a punto de vencer, si prioridad es alguno de Alta, Urgente/),
+        .getByText(
+          /Cuando una tarea esté a punto de vencer, si prioridad es alguno de Alta, Urgente/,
+        ),
     ).toBeVisible(ESPERA_TRAS_GUARDAR);
   });
 
@@ -642,7 +644,9 @@ test.describe('Reglas del proyecto', () => {
     await page.getByRole('button', { name: 'Nueva regla' }).click();
     await page.getByRole('button', { name: 'Crear regla' }).click();
 
-    await expect(page.getByText('El nombre debe tener al menos 2 caracteres.')).toBeVisible(ESPERA_TRAS_GUARDAR);
+    await expect(page.getByText('El nombre debe tener al menos 2 caracteres.')).toBeVisible(
+      ESPERA_TRAS_GUARDAR,
+    );
     /* El panel sigue abierto: no se perdió lo que ya había en el formulario. */
     await expect(page.getByRole('form', { name: 'Nueva regla' })).toBeVisible();
   });
@@ -705,9 +709,7 @@ test.describe('Reglas del proyecto', () => {
     ).toHaveCount(0);
   });
 
-  test('guardar correctamente cierra el panel sin preguntar (corrección C2)', async ({
-    page,
-  }) => {
+  test('guardar correctamente cierra el panel sin preguntar (corrección C2)', async ({ page }) => {
     const api = await apiContext();
     const mundo = await crearMundo(api);
     await api.dispose();

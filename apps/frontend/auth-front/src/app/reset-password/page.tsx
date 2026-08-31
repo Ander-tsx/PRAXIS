@@ -20,7 +20,7 @@ import { type FormEvent, Suspense, useState } from 'react';
 export default function ResetPasswordPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Cargando…</p>}>
+      <Suspense fallback={<p className="font-sans text-sm text-white">Cargando…</p>}>
         <Formulario />
       </Suspense>
     </main>
@@ -74,7 +74,7 @@ function Formulario() {
   if (!token) {
     return (
       <Marco titulo="Falta el enlace">
-        <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+        <p className="mb-6 font-sans text-sm leading-relaxed text-white">
           Esta pantalla se abre desde el enlace que te mandamos por correo. Pide uno nuevo si
           llegaste aquí de otra forma.
         </p>
@@ -88,7 +88,7 @@ function Formulario() {
   if (listo) {
     return (
       <Marco titulo="Contraseña cambiada">
-        <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+        <p className="mb-6 font-sans text-sm leading-relaxed text-white">
           Ya puedes entrar con la nueva. Por seguridad hemos cerrado las sesiones que hubiera
           abiertas en otros dispositivos.
         </p>

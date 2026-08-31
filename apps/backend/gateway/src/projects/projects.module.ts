@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
+import { AutomationPurgeService } from './automation-purge.service';
 import { BoardsController, BoardsResourceController } from './boards.controller';
 import { ColumnStatusSyncService } from './column-status-sync.service';
 import { ColumnsController } from './columns.controller';
@@ -18,7 +20,6 @@ import { ProjectPermissionsController } from './project-permissions.controller';
 import { ProjectRolesController } from './project-roles.controller';
 import { ProjectsController } from './projects.controller';
 import { TaskPurgeService } from './task-purge.service';
-import { AutomationPurgeService } from './automation-purge.service';
 import { WorkspacesController, WorkspacesResourceController } from './workspaces.controller';
 
 import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
@@ -27,6 +28,10 @@ import { GlobalRolesModule } from '../common/global-roles/global-roles.module';
   imports: [
     AuthModule,
     GlobalRolesModule,
+    /* Por `QuotaService`: los topes del plan se comprueban donde ocurre la
+       escritura —crear proyecto, meter gente— y no en el módulo de facturación,
+       que no ve pasar ninguna de las dos. */
+    BillingModule,
     ClientsModule.registerAsync([
       {
         name: 'PROJECTS_SERVICE',

@@ -1,54 +1,14 @@
 import { ULTIMO_CHAT_COOKIE, conversacionRecordada } from '@/lib/ultimo-chat';
-import type { DirectConversation } from '@praxis/commons';
+import { type ChatContact, type DirectConversation, resolveProfiles } from '@praxis/commons';
 import { createServerApiClient } from '@praxis/commons/auth';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { ChatSearch } from '@/components/organisms/ChatSearch';
 
-/** Un chat de proyecto en la bandeja, con lo poco que hace falta aquí. */
 interface ChatDeProyecto {
   project: { id: string };
 }
 
-/**
- * Mensajes, sin conversación en la URL.
- *
- * ## Vuelve a donde lo dejaste
- *
- * Salir a Avisos o a Análisis y volver reiniciaba la vista: el índice de
- * Mensajes es una pantalla distinta de la conversación, así que volver a `/chat`
- * dejaba la columna derecha vacía y había que buscar otra vez con quién estabas
- * hablando. Ahora el proxy de la zona anota la última conversación abierta en
- * una cookie y aquí se redirige a ella.
- *
- * La cookie se valida al leerla (`conversacionRecordada`): su valor termina en
- * un `redirect()`, y una cookie es algo que manda el navegador, no algo en lo
- * que se pueda confiar por haberla escrito nosotros.
- *
- * ## 🔴 Y validar la **forma** no basta: hay que comprobar que siga existiendo
- *
- * Reportado por el usuario: entrar en Mensajes redirigía solo a una conversación
- * y daba **404**. La cookie era correcta —un UUID bien formado, escrito por
- * nosotros— pero apuntaba a alguien que ya no comparte proyecto, o a una cuenta
- * que ya no está.
- *
- * Lo grave no es el 404: es que ocurría **al entrar**, así que la persona no
- * podía llegar al directorio **nunca**. Cada intento de abrir Mensajes la
- * mandaba de vuelta al mismo 404, sin forma de salir salvo conociendo otra URL.
- * Un atajo de conveniencia dejaba inservible la pantalla entera.
- *
- * Por eso ahora se comprueba contra las conversaciones que la persona tiene de
- * verdad. Si la recordada ya no está, **no se redirige** y se enseña el
- * directorio, que es exactamente lo que hace falta en ese momento.
- *
- * ⚠️ La cookie obsoleta **no se borra aquí**: una page no puede escribir
- * cookies, solo puede hacerlo el proxy o una Server Action. No hace falta —
- * queda inerte y la pisa la próxima conversación que se abra.
- *
- * ⚠️ **No redirige a la primera de la lista cuando no hay recuerdo**, que era la
- * razón original de que esta pantalla existiera: abrir una conversación que
- * nadie pidió **marca sus mensajes como leídos** sin que los haya visto nadie.
- * Volver a la que tú abriste no tiene ese problema — ya la habías leído.
- */
 export default async function ChatVacioPage() {
   const { get: getCookie } = await cookies();
   const { get: getHeader } = await headers();
@@ -57,49 +17,53 @@ export default async function ChatVacioPage() {
   const userAgent = getHeader('user-agent') || '';
   const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
 
-  // En móvil, la lista de chats y la conversación ocupan la misma pantalla.
-  // Si redirigimos siempre al último chat, el usuario se queda atrapado en esa
-  // conversación y no puede volver a ver el directorio para elegir otra.
-  if (!isMobile && recordada && (await sigueAccesible(recordada))) {
-    /* Ruta **interna** de la zona: Next le antepone el basePath (`/chat`) al
-       redirigir. Con el `/chat/` de cuando esto vivía en dashboard-front saldría
-       `/chat/chat/<uuid>`, que es un 404. */
-    redirect(`/${recordada}`);
+  const api = createServerApiClient();
+
+  // En móvil, si redirigimos siempre al último chat y no tienen cómo abrir el sidebar fácil, 
+  // podría ser un problema, pero ahora el sidebar está en el AppShell.
+  // Mantenemos la redirección si hay chat recordado y sigue accesible.
+  if (!isMobile && recordada) {
+    const deProyecto = recordada.startsWith('proyecto/');
+    let accesible = false;
+
+    if (deProyecto) {
+      const projectId = recordada.slice('proyecto/'.length);
+      const chats = await api.get<ChatDeProyecto[]>('/me/chats/projects').catch(() => null);
+      accesible = chats?.some((chat) => chat.project.id === projectId) ?? false;
+    } else {
+      const conversaciones = await api.get<DirectConversation[]>('/me/chats').catch(() => null);
+      accesible = conversaciones?.some((conversacion) => conversacion.peerId === recordada) ?? false;
+    }
+
+    if (accesible) {
+      redirect(`/${recordada}`);
+    }
   }
+
+  // Si llegamos aquí (no hay redirección), mostramos el buscador de contactos
+  const contactos = await api.get<ChatContact[]>('/me/chats/contacts').catch(() => [] as ChatContact[]);
+  const directorio = await resolveProfiles(api, contactos.map(c => c.userId));
+  
+  // Obtenemos zonePath desde la cabecera x-invoke-path o asumiendo el default '/chat'
+  const zonePath = '/chat'; 
 
   return (
-    <div className="hidden sm:flex min-h-64 flex-1 items-center justify-center rounded-xl border border-dashed border-border p-8">
-      <p className="max-w-sm text-center font-sans text-sm text-text-secondary">
-        Elige a alguien de la izquierda para empezar a hablar. Aquí sale quien comparte algún
-        proyecto contigo.
-      </p>
+    <div className="flex flex-1 flex-col items-center justify-center p-4 sm:p-8">
+      <div className="flex flex-col items-center gap-6 w-full">
+        <div className="flex flex-col items-center text-center gap-2">
+          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2">
+            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white">Tus mensajes</h2>
+          <p className="text-sm text-white max-w-sm">
+            Busca un contacto para iniciar una conversación nueva, o selecciona uno existente desde la barra lateral.
+          </p>
+        </div>
+        
+        <ChatSearch contactos={contactos} directorio={directorio} zonePath={zonePath} />
+      </div>
     </div>
   );
-}
-
-/**
- * ¿La conversación recordada sigue estando entre las suyas?
- *
- * Se pregunta por las listas que ya alimentan el directorio, así que no se
- * inventa una comprobación nueva: si sale en la columna de la izquierda, se
- * puede abrir; si no sale, redirigir allí es mandar a un 404.
- *
- * ⚠️ **Ante un fallo de red se responde `false`, no `true`.** Las dos opciones
- * son malas y hay que elegir la que se pueda deshacer: no redirigir deja el
- * directorio delante —con su propio mensaje si tampoco cargó— y quien mira
- * puede pulsar. Redirigir a ciegas sobre un gateway caído reproduce justo el
- * fallo que esto arregla, y sin salida.
- */
-async function sigueAccesible(recordada: string): Promise<boolean> {
-  const api = createServerApiClient();
-  const deProyecto = recordada.startsWith('proyecto/');
-
-  if (deProyecto) {
-    const projectId = recordada.slice('proyecto/'.length);
-    const chats = await api.get<ChatDeProyecto[]>('/me/chats/projects').catch(() => null);
-    return chats?.some((chat) => chat.project.id === projectId) ?? false;
-  }
-
-  const conversaciones = await api.get<DirectConversation[]>('/me/chats').catch(() => null);
-  return conversaciones?.some((conversacion) => conversacion.peerId === recordada) ?? false;
 }

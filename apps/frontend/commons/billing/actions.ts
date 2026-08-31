@@ -1,9 +1,10 @@
 'use server';
 
 import { requireApi } from '../assistant/helpers';
+import type { BillingSummary, CatalogoDePlanes, PlanTier } from './planes';
 
 /**
- * El plan PRO, desde el lado de quien lo compra.
+ * Los planes, desde el lado de quien los compra.
  *
  * ## Por qué vive en `commons` y no en una zona
  *
@@ -78,20 +79,82 @@ export interface AperturaDePago {
  * un componente de cliente: la pestaña tiene que navegar a Stripe, y un
  * `redirect()` aquí lo seguiría la propia Server Function.
  */
-export async function abrirPagoProAction(): Promise<AperturaDePago> {
+export async function abrirPagoAction(datos: {
+  tier: PlanTier;
+  /** Solo en los de asiento. En un plan individual el backend responde 400. */
+  seats?: number;
+  /** Solo en los de empresa: quién paga. En un individual, tampoco vale. */
+  organizationId?: string;
+}): Promise<AperturaDePago> {
   const api = await requireApi();
   if (!api) return { url: null, error: 'Tu sesión ha caducado. Vuelve a iniciar sesión.' };
 
   try {
-    const { url } = await api.post<{ url: string }>('/me/billing/checkout', {});
+    /* ⚠️ **Solo los campos que el DTO declara.** `CheckoutBodyDto` rechaza uno
+       de sobra con un 400, así que los opcionales se omiten en vez de mandarse
+       en `undefined` — que el envoltorio serializa como ausente, sí, pero
+       ponerlo a `null` no. */
+    const { url } = await api.post<{ url: string }>('/me/billing/checkout', {
+      tier: datos.tier,
+      ...(datos.seats !== undefined ? { seats: datos.seats } : {}),
+      ...(datos.organizationId ? { organizationId: datos.organizationId } : {}),
+    });
     if (!url) return { url: null, error: 'No se pudo abrir la página de pago.' };
     return { url, error: null };
-  } catch {
+  } catch (error) {
+    /* El mensaje del backend cuando lo hay: «El plan Equipo empieza en 3
+       asientos» se arregla solo al leerlo, y «inténtalo de nuevo» no. */
+    const mensaje = error instanceof Error ? error.message : '';
     return {
       url: null,
-      error: 'No se pudo abrir la página de pago. Inténtalo de nuevo en un momento.',
+      error: mensaje || 'No se pudo abrir la página de pago. Inténtalo de nuevo en un momento.',
     };
   }
+}
+
+/* 🕳️ Aquí estaba `abrirPagoProAction`, el atajo que abría el pago de PRO en un
+   clic desde la tarjeta del chat y el aviso de Configuración. Se retiró el
+   2026-08-26 con el plan PRO, y **no tiene sustituto de un solo clic a
+   propósito**: desde que todo plan se contrata para una organización, el
+   checkout necesita saber cuál, y eso es una elección de quien paga. Los dos
+   sitios que lo usaban llevan ahora a la tabla de precios, que sí sabe
+   preguntarlo. */
+
+/**
+ * El catálogo y lo que este despliegue puede cobrar.
+ *
+ * Si falla se devuelve `null` y la pantalla lo dice: una tabla de precios vacía
+ * parece un producto sin planes, y una con los cinco planes sin botón parece
+ * que están agotados.
+ */
+export async function catalogoDePlanesAction(): Promise<CatalogoDePlanes | null> {
+  const api = await requireApi();
+  if (!api) return null;
+  return api.get<CatalogoDePlanes>('/me/billing/planes').catch(() => null);
+}
+
+/**
+ * El plan de quien pregunta, con lo gastado dentro.
+ *
+ * ⚠️ **Esto no decide nada.** Sirve para apagar un botón y para avisar antes de
+ * gastar el viaje; quien niega una escritura es el gateway, con las mismas
+ * cifras y un 402. Ver `QuotaService`.
+ *
+ * ⚠️ **Con `organizationId` o sin él NO da lo mismo.** El plan vale dentro de la
+ * organización que lo paga (trampa #20 de CLAUDE.md): `/me/billing/resumen` sin
+ * organización devuelve **FREE**, no «el mejor que tengas». La pantalla de
+ * vuelta del pago sondea con el id de la organización que acaba de comprar; sin
+ * él, nunca detectaría que el plan cambió.
+ */
+export async function resumenDeFacturacionAction(
+  organizationId?: string | null,
+): Promise<BillingSummary | null> {
+  const api = await requireApi();
+  if (!api) return null;
+  const ruta = organizationId
+    ? `/me/billing/resumen?organizationId=${encodeURIComponent(organizationId)}`
+    : '/me/billing/resumen';
+  return api.get<BillingSummary>(ruta).catch(() => null);
 }
 
 /**

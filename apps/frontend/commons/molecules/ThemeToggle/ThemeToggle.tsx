@@ -100,7 +100,7 @@ export function ThemeToggle({ initialTheme, onCambiar }: ThemeToggleProps) {
             onClick={() => select(option.value)}
             className={[
               'relative z-10 flex items-center justify-center rounded-full transition-colors duration-150',
-              active ? 'text-primary-foreground' : 'text-text-secondary hover:text-text-primary',
+              active ? 'text-primary-foreground' : 'text-white hover:text-text-primary',
             ].join(' ')}
             style={{ width: BUTTON_SIZE, height: BUTTON_SIZE }}
           >

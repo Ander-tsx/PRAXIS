@@ -449,12 +449,7 @@ export class ReportsService {
    * dimensión es de muchos a muchos. Viaja `tareas` al lado para que se pueda
    * decir en vez de disimularlo. Ver `StatsService.matrix`.
    */
-  async matrix(
-    projectId: string,
-    agruparPor: string,
-    partirPor: string,
-    filtros?: ReportFilters,
-  ) {
+  async matrix(projectId: string, agruparPor: string, partirPor: string, filtros?: ReportFilters) {
     return this.cached(
       `reports:${projectId}:matrix:${agruparPor}:${partirPor}${claveDeFiltros(filtros)}`,
       async () => {
@@ -747,8 +742,7 @@ export class ReportsService {
     for (const parte of incluir) {
       const cruce = leerCruce(parte);
       if (cruce) {
-        calculos[parte] = () =>
-          this.matrix(projectId, cruce.agruparPor, cruce.partirPor, filtros);
+        calculos[parte] = () => this.matrix(projectId, cruce.agruparPor, cruce.partirPor, filtros);
       }
     }
 

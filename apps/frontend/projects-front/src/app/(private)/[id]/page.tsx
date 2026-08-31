@@ -1,4 +1,3 @@
-import type { AutomationCatalog } from '@/lib/automation-catalog';
 import { TabIcon } from '@/components/atoms/TabIcon';
 import { PendingInvitationGate } from '@/components/organisms/PendingInvitationGate';
 import { ProjectChatPreview } from '@/components/organisms/ProjectChat';
@@ -8,6 +7,7 @@ import { ProjectRoles } from '@/components/organisms/ProjectRoles';
 import { ProjectRules } from '@/components/organisms/ProjectRules';
 import { SuspendedProjectNotice } from '@/components/organisms/SuspendedProjectNotice';
 import { WorkspaceCanvas } from '@/components/organisms/WorkspaceCanvas';
+import type { AutomationCatalog } from '@/lib/automation-catalog';
 import {
   AppHeader,
   type AutomationExecutionPage,
@@ -16,13 +16,13 @@ import {
   type EffectivePermissions,
   type Label,
   type MyInvitation,
+  PERSONA_ELIMINADA,
   type Paginated,
   type ProjectDetail,
   type ProjectInvitation,
   type ProjectMember,
   TabNav,
   type Task,
-  PERSONA_ELIMINADA,
   personLabel,
   projectPath,
   resolveProfiles,
@@ -41,6 +41,7 @@ interface PageProps {
     board?: string;
     task?: string;
     mias?: string;
+    vista?: string;
   }>;
 }
 
@@ -108,7 +109,7 @@ type TabId = (typeof TABS)[number]['id'];
  */
 export default async function ProjectDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { tab, ws, board, task, mias } = await searchParams;
+  const { tab, ws, board, task, mias, vista } = await searchParams;
   const { userId } = await loadCurrentUser();
   const api = createServerApiClient();
 
@@ -469,7 +470,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
 
   return (
     /* El nombre del proyecto **no** va aquí: lo pinta la propia página, en
-       grande y editable (`EditableProjectFields`). Repetirlo en la cabecera
+       grande, junto a su icono (`ProjectHeader`). Repetirlo en la cabecera
        gastaba la única línea que dice dónde estás en decir dos veces lo mismo,
        y con un nombre largo además se truncaba. La cabecera nombra la sección,
        igual que el enlace de la barra lateral por el que se llega. */
@@ -530,7 +531,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           <div className="hidden sm:flex items-center gap-2">
             <a
               href={`/chat/proyecto/${project.id}`}
-              className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
+              className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               <svg
                 className="h-4 w-4"
@@ -545,31 +546,12 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                   d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                 />
               </svg>
-              Abrir Chat{' '}
+              Chat{' '}
               {chat.unread > 0 && (
-                <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">
+                <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white font-semibold">
                   {chat.unread}
                 </span>
               )}
-            </a>
-            <a
-              href={`/reports/${project.slug}`}
-              className="flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 font-sans text-sm font-medium text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary border border-border"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              Analizar
             </a>
           </div>
         </div>
@@ -589,6 +571,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             /* Solo el punto de partida: a partir de ahí el tablero se elige en
                el cliente, sin navegar. Ver `WorkspaceCanvas`. */
             boardIdInicial={targetBoard ?? null}
+            vistaInicial={vista}
             canManage={can.canCreateBoard}
             /* Renombrar y eliminar **espacios y tableros** cuelgan de estos dos,
                no de `canCreateBoard`: el gateway pide `canEditBoard` para los
@@ -638,6 +621,9 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
             invitations={invitations}
             projectName={project.name}
             currentUserId={userId}
+            /* A quién se puede invitar sale de aquí: quien entra en un proyecto
+               necesita asiento en su organización. Ver `InviteMemberDialog`. */
+            organizationId={project.organizationId}
           />
         )}
 

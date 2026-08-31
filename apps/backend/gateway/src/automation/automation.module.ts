@@ -2,12 +2,21 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
 import { ProjectAutomationsController } from './project-automations.controller';
 
-/** Cliente TCP preparado para bloques posteriores; este bloque no expone rutas HTTP. */
+/**
+ * Las reglas de un proyecto.
+ *
+ * ⚠️ **Importa `BillingModule` por `QuotaService`**, no por facturar nada: el
+ * tope de automatizaciones activas es una cuota del plan y se comprueba donde
+ * ocurre la escritura, que es aquí. Es el mismo motivo por el que lo importan
+ * `ProjectsModule` y `AssistantModule`.
+ */
 @Module({
   imports: [
     AuthModule,
+    BillingModule,
     ClientsModule.registerAsync([
       {
         name: 'AUTOMATION_SERVICE',

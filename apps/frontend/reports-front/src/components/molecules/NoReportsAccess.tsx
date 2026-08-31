@@ -22,7 +22,7 @@ export function NoReportsAccess({ projectName }: { projectName?: string }) {
           ? `Los reportes de ${projectName} no están abiertos para ti`
           : 'Ningún proyecto tuyo tiene los reportes abiertos para ti'}
       </p>
-      <p className="mx-auto mt-2 max-w-md font-sans text-sm text-text-secondary">
+      <p className="mx-auto mt-2 max-w-md font-sans text-sm text-white">
         Ver los reportes de un proyecto —y preguntarle al asistente sobre él— es un permiso que se
         concede por rol. Si lo necesitas, pídeselo a quien administre el proyecto: lo encontrará en
         Roles, como «Ver los reportes y usar el asistente».

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 /**
  * La plantilla de proyecto que propone el asistente.
@@ -159,4 +159,17 @@ export class ProjectDraftBodyDto {
   @IsString()
   @MaxLength(TEMPLATE_PREVIEW_MAX)
   previa?: string;
+
+  /**
+   * En qué organización va a nacer el proyecto, para cobrar la cuota ahí.
+   *
+   * ⚠️ Esta ruta **gasta cuota de IA y no crea nada**, así que necesita saber
+   * de qué organización sale ese mensaje — es la misma pregunta que resuelve
+   * `AssistantChatBodyDto.organizationId`, y se valida igual. Sin él, la
+   * personal.
+   */
+  @ApiPropertyOptional({ description: 'Organización a la que se le cobra la cuota de IA' })
+  @IsOptional()
+  @IsUUID('4')
+  organizationId?: string;
 }

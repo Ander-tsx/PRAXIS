@@ -5,6 +5,7 @@ import {
   CHAT_ATTACHMENT_MAX_BYTES,
   type ChatAttachment,
   type ChatMessage,
+  el403SeExplicaSolo,
 } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
 import { revalidatePath } from 'next/cache';
@@ -49,6 +50,12 @@ function revalidarChat(projectId: string) {
 function describe(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.status === 403) {
+      /* ⚠️ **No todos los 403 son de permisos.** Un proyecto suspendido y un
+         equipo sin asientos también responden 403, traen su propio `code` y su
+         mensaje explica la salida — que no es «pídeselo a quien administra».
+         Sustituirlo por la frase de abajo le dice al dueño de un proyecto que no
+         tiene permiso sobre lo suyo. */
+      if (el403SeExplicaSolo(error.code)) return error.message;
       return 'Tu rol en este proyecto no incluye escribir en su chat.';
     }
     if (error.status >= 500) return fallback;

@@ -58,7 +58,7 @@ export function Pagination({ page, limit, total, hrefFor, nombre = 'elementos' }
       className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"
       aria-label={`Paginación de ${nombre}`}
     >
-      <p className="font-sans text-sm text-text-secondary tabular-nums">
+      <p className="font-sans text-sm text-white tabular-nums">
         {desde}–{hasta} de {total} {nombre}
       </p>
 
@@ -66,7 +66,7 @@ export function Pagination({ page, limit, total, hrefFor, nombre = 'elementos' }
         <Salto href={hrefFor(actual - 1)} disabled={actual === 1}>
           Anterior
         </Salto>
-        <span className="font-sans text-sm text-text-disabled tabular-nums">
+        <span className="font-sans text-sm text-white tabular-nums">
           {actual} / {paginas}
         </span>
         <Salto href={hrefFor(actual + 1)} disabled={actual === paginas}>
@@ -100,7 +100,7 @@ function Salto({
     return (
       <span
         aria-disabled="true"
-        className={`${clases} cursor-not-allowed border-border text-text-disabled opacity-50`}
+        className={`${clases} cursor-not-allowed border-border text-white opacity-50`}
       >
         {children}
       </span>
@@ -110,7 +110,7 @@ function Salto({
   return (
     <a
       href={href}
-      className={`${clases} border-border text-text-secondary hover:text-text-primary`}
+      className={`${clases} border-border text-white hover:text-text-primary`}
       style={{ borderColor: alpha(colors.border, 100) }}
     >
       {children}

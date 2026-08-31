@@ -14,7 +14,7 @@ import {
 } from '@/app/(private)/proyecto-actions';
 import {
   type ChatMessagePage,
-  ChatPanel,
+  ChatPanel, AnimatedSearchButton, ProjectMonogram,
   type ChatPanelHandle,
   type Directory,
   alpha,
@@ -27,6 +27,9 @@ export interface ProjectConversationProps {
   projectName: string;
   /** Para volver al proyecto desde la cabecera. */
   projectSlug: string;
+  /** Identidad visual del proyecto, para el monograma de la cabecera. */
+  projectIconKey?: string | null;
+  projectColor?: string | null;
   page: ChatMessagePage;
   /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
   directorio: Directory;
@@ -66,6 +69,8 @@ export function ProjectConversation({
   projectId,
   projectName,
   projectSlug,
+  projectIconKey = null,
+  projectColor = null,
   page,
   directorio,
   currentUserId,
@@ -105,7 +110,7 @@ export function ProjectConversation({
       salidaMovil={
         <a
           href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -142,8 +147,17 @@ export function ProjectConversation({
       encabezado={
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
           <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="truncate font-display text-2xl text-text-primary">{projectName}</h2>
-            <p className="font-sans text-xs text-text-secondary">
+            <div className="flex items-center gap-2">
+              <ProjectMonogram
+                id={projectId}
+                name={projectName}
+                iconKey={projectIconKey}
+                color={projectColor}
+                size="sm"
+              />
+              <h2 className="truncate font-display text-2xl text-text-primary">{projectName}</h2>
+            </div>
+            <p className="font-sans text-xs text-white">
               Chat del equipo · {/* Cruza de zona, así que `<a>` duro y no `<Link>`. */}
               <a
                 href={`/projects/${projectSlug}`}
@@ -155,7 +169,10 @@ export function ProjectConversation({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <BotonBuscar onClick={() => chatRef.current?.abrirBusqueda()} />
+            <AnimatedSearchButton
+              onSearch={(t) => chatRef.current?.buscarLocal(t)}
+              onClear={() => chatRef.current?.cerrarBusqueda()}
+            />
             <BotonSilenciar projectId={projectId} inicial={page.muted} />
           </div>
         </div>
@@ -165,33 +182,6 @@ export function ProjectConversation({
 }
 
 /** Abre la búsqueda de `ChatPanel`, con el mismo estilo que «Silenciar avisos». */
-function BotonBuscar({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Buscar en el chat"
-      title="Buscar en el chat"
-      className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 font-sans text-xs transition-colors"
-      style={{ borderColor: colors.border, color: colors.textSecondary }}
-    >
-      <svg
-        className="h-4 w-4"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        aria-hidden="true"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-        />
-      </svg>
-    </button>
-  );
-}
 
 /**
  * ⚠️ El texto dice **«avisos»** y no «notificaciones» a propósito: silenciar

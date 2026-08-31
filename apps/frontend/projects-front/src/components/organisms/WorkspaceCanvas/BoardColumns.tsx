@@ -17,12 +17,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnTasks } from '../TaskBoard/ColumnTasks';
-import { TaskDialog } from '../TaskBoard/TaskDialog';
 import { TaskCard } from '../TaskBoard/TaskCard';
+import { TaskDialog } from '../TaskBoard/TaskDialog';
+import { TaskMobileMoveSheet } from '../TaskBoard/TaskMobileMoveSheet';
 import { CURVA } from '../TaskBoard/arrastre';
 import { repartirPorColumna, useMovimientosOptimistas } from '../TaskBoard/movimientos';
 import { useArrastreDeTablero } from '../TaskBoard/useArrastreDeTablero';
-import { TaskMobileMoveSheet } from '../TaskBoard/TaskMobileMoveSheet';
 import { useReposicionAnimada } from '../TaskBoard/useReposicionAnimada';
 import { AddColumnCard } from './AddColumnCard';
 import { ColumnMenu } from './ColumnMenu';
@@ -217,7 +217,9 @@ export function BoardColumns({
   const [columnaExpandidaId, setColumnaExpandidaId] = useState<string | null>(null);
 
   /** Tarea de la que se abrió el menú de mover en versión móvil. */
-  const [mobileMenuTask, setMobileMenuTask] = useState<{ id: string; columnId: string } | null>(null);
+  const [mobileMenuTask, setMobileMenuTask] = useState<{ id: string; columnId: string } | null>(
+    null,
+  );
 
   const [moveState, moveAction] = useAccion(moveTaskAction, TASK_INITIAL_STATE);
   const [reorderState, reorderAction] = useAccion(reorderColumnsAction, COLUMN_INITIAL_STATE);
@@ -458,7 +460,7 @@ export function BoardColumns({
           registrarColumna(column.id, el);
           reposicion.registrar(`columna:${column.id}`, el);
         }}
-        className="flex h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-surface"
+        className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -489,9 +491,7 @@ export function BoardColumns({
               className="h-2 w-2 shrink-0 rounded-full transition-colors"
               style={{ background: tintOf(column.color, index) }}
             />
-            <h5 className="truncate font-sans text-sm font-semibold text-text-primary">
-              {column.name}
-            </h5>
+            <h5 className="truncate font-sans text-sm font-semibold text-white">{column.name}</h5>
           </span>
 
           <span className="flex shrink-0 items-center gap-1">
@@ -515,7 +515,7 @@ export function BoardColumns({
               </>
             )}
             <span
-              className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
+              className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
               style={{ background: alpha(colors.border, 60) }}
             >
               {deLaColumna.length}
@@ -719,7 +719,7 @@ export function BoardColumns({
          */
         <div
           className="fixed inset-0 z-40 flex flex-col gap-4 p-5"
-          style={{ ...BOARD_SURFACE, backgroundColor: colors.background }}
+          style={{ ...BOARD_SURFACE, backgroundColor: '#080807' }}
         >
           <header className="flex flex-wrap items-center gap-3">
             <span
@@ -729,10 +729,8 @@ export function BoardColumns({
               }}
               aria-hidden="true"
             />
-            <h4 className="font-sans text-lg font-semibold text-text-primary">
-              {columnaExpandida.name}
-            </h4>
-            <span className="font-sans text-xs text-text-secondary">
+            <h4 className="font-sans text-lg font-semibold text-white">{columnaExpandida.name}</h4>
+            <span className="font-sans text-xs text-white">
               {board.name} · {(() => {
                 const total = tasksByColumn.get(columnaExpandida.id)?.length ?? 0;
                 return `${total} ${total === 1 ? 'tarea' : 'tareas'}`;
@@ -744,7 +742,7 @@ export function BoardColumns({
               onClick={() => setColumnaExpandidaId(null)}
               aria-label={`Salir de pantalla completa de la columna ${columnaExpandida.name}`}
               title="Salir de pantalla completa (Esc)"
-              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <MinimizarIcono />
               Salir
@@ -755,7 +753,7 @@ export function BoardColumns({
               tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
               que se reconozca como la columna de siempre. */}
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-surface p-2"
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-[#191919] p-2"
             style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
           >
             <ColumnTasks
@@ -801,24 +799,26 @@ export function BoardColumns({
         />
       )}
 
-      {renderedTask && <TaskDialog
-        open={!!openTask}
-        onClose={handleCloseTask}
-        projectId={projectId}
-        boardId={board.id}
-        task={renderedTask}
-        columnId={renderedTask.columnId}
-        columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
-        members={members}
-        labels={labels}
-        usersById={usersById}
-        currentUserId={currentUserId}
-        canToggleChecklist={canMoveTask}
-        canComment={canComment}
-        canManageLabels={canManageLabels}
-        canEdit={canEditTask}
-        canDelete={canDeleteTask}
-      />}
+      {renderedTask && (
+        <TaskDialog
+          open={!!openTask}
+          onClose={handleCloseTask}
+          projectId={projectId}
+          boardId={board.id}
+          task={renderedTask}
+          columnId={renderedTask.columnId}
+          columnName={columns.find((c) => c.id === renderedTask.columnId)?.name ?? ''}
+          members={members}
+          labels={labels}
+          usersById={usersById}
+          currentUserId={currentUserId}
+          canToggleChecklist={canMoveTask}
+          canComment={canComment}
+          canManageLabels={canManageLabels}
+          canEdit={canEditTask}
+          canDelete={canDeleteTask}
+        />
+      )}
     </div>
   );
 }
@@ -859,14 +859,14 @@ function ColumnaFantasma({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-4"
+      className="flex flex-col gap-3 rounded-2xl bg-[#191919] px-4 py-4"
       style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tono }} />
-        <h5 className="truncate font-sans text-sm font-semibold text-text-primary">{nombre}</h5>
+        <h5 className="truncate font-sans text-sm font-semibold text-white">{nombre}</h5>
         <span
-          className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-text-secondary"
+          className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
           style={{ background: alpha(colors.border, 60) }}
         >
           {tareas}
@@ -908,7 +908,7 @@ function NudgeButton({
       disabled={disabled}
       aria-label={`${label} la columna ${columnName}`}
       title={label}
-      className="rounded p-0.5 text-text-disabled transition-colors hover:text-text-primary disabled:opacity-25 disabled:hover:text-text-disabled"
+      className="rounded p-0.5 text-white transition-colors hover:text-white disabled:opacity-25 disabled:hover:text-white"
     >
       <svg
         className="h-3.5 w-3.5"

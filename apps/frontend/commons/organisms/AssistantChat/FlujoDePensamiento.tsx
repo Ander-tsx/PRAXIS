@@ -103,7 +103,7 @@ export function FlujoDePensamiento({ alAvanzar }: FlujoDePensamientoProps) {
               <span
                 className={[
                   'font-sans text-sm transition-colors',
-                  enCurso ? 'text-text-secondary' : 'text-text-disabled',
+                  enCurso ? 'text-white' : 'text-white',
                 ].join(' ')}
               >
                 {paso.texto}

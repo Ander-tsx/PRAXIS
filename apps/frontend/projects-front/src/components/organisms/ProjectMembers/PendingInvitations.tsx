@@ -4,11 +4,11 @@ import { cancelInvitationAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
 import {
   Badge,
+  PERSONA_ELIMINADA,
   type ProjectInvitation,
   type UserProfile,
   alpha,
   colors,
-  PERSONA_ELIMINADA,
   personLabel,
   useAccion,
 } from '@praxis/commons';
@@ -36,7 +36,7 @@ export function PendingInvitations({
 
   return (
     <div className="flex flex-col gap-2">
-      <h4 className="font-sans text-sm font-medium text-text-secondary">
+      <h4 className="font-sans text-sm font-medium text-white">
         Invitaciones pendientes ({invitations.length})
       </h4>
 
@@ -64,7 +64,7 @@ export function PendingInvitations({
 
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-sans text-sm text-text-primary">{label}</span>
-                  <span className="truncate font-sans text-xs text-text-secondary">
+                  <span className="truncate font-sans text-xs text-white">
                     {user?.credential.email ?? 'Correo no disponible'}
                   </span>
                 </span>
@@ -94,7 +94,7 @@ function CancelButton({ projectId, invitationId }: { projectId: string; invitati
         type="submit"
         disabled={pending}
         title={state.error ?? 'Retirar la invitación'}
-        className="rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-error disabled:opacity-40"
+        className="rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:text-error disabled:opacity-40"
       >
         Retirar
       </button>

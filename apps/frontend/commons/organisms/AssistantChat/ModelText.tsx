@@ -311,7 +311,7 @@ function tablaDesdeLineas(lineas: string[], clave: string): ReactNode | null {
                 // biome-ignore lint/suspicious/noArrayIndexKey: la posición ES la identidad de una celda
                 <td
                   key={columna}
-                  className="border-b border-border px-2 py-1.5 align-top text-text-secondary"
+                  className="border-b border-border px-2 py-1.5 align-top text-white"
                 >
                   {enTrozos(fila[columna] ?? '')}
                 </td>
@@ -403,7 +403,7 @@ function Grafica({ titulo, datos }: GraficaLeida) {
         {datos.map((dato, indice) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: la posición ES la identidad de una barra
           <div key={indice} className="flex items-center gap-2">
-            <span className="w-24 shrink-0 truncate font-sans text-[11px] text-text-secondary">
+            <span className="w-24 shrink-0 truncate font-sans text-[11px] text-white">
               {dato.etiqueta}
             </span>
             {/* `min-w-0` para que la barra pueda encogerse: sin él, el `flex-1`

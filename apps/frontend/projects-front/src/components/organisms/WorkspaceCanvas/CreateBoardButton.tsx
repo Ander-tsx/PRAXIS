@@ -1,10 +1,10 @@
 'use client';
 
 import { createBoardAction } from '@/app/(private)/[id]/actions';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BOARD_INITIAL_STATE } from '@/lib/action-state';
 import { BOARD_NAME_MAX, validateBoard } from '@/lib/validation';
 import { Button, Dialog, Input, alpha, colors, useAccion } from '@praxis/commons';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useEffect, useId, useRef, useState } from 'react';
 
 export interface CreateBoardButtonProps {
@@ -83,8 +83,8 @@ export function CreateBoardButton({
           title="Nuevo tablero"
           className={
             compacto
-              ? 'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-              : 'flex items-center gap-2 rounded-lg bg-surface px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary'
+              ? 'flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+              : 'flex items-center gap-2 rounded-lg border border-white/10 bg-[#191919] px-4 py-2 font-sans text-sm text-white transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white'
           }
         >
           <svg
@@ -100,113 +100,129 @@ export function CreateBoardButton({
           {!compacto && 'Nuevo tablero'}
         </button>
       ) : isDesktop ? (
+        <form
+          ref={formRef}
+          action={formAction}
+          noValidate
+          onSubmit={(event) => {
+            setTouched(true);
+            if (clientError || name.trim().length < 2) event.preventDefault();
+          }}
+          className="flex h-9 items-center gap-1 rounded-xl border border-white/10 bg-[#191919] pl-3 pr-1.5 transition-colors focus-within:border-primary"
+        >
+          <input type="hidden" name="workspaceId" value={workspaceId} />
+          <input type="hidden" name="projectId" value={projectId} />
+
+          <input
+            id={nameId}
+            name="name"
+            placeholder="Nombre del tablero…"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={BOARD_NAME_MAX}
+            autoComplete="off"
+            autoFocus
+            className={`w-40 bg-transparent text-sm font-medium outline-none placeholder:font-normal placeholder:text-white ${
+              touched && clientError ? 'text-error' : 'text-white'
+            }`}
+          />
+          <button
+            type="submit"
+            disabled={pending || name.trim().length < 2 || Boolean(clientError)}
+            aria-label="Crear tablero"
+            title="Crear"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setName('');
+              setTouched(false);
+            }}
+            aria-label="Cancelar"
+            title="Cancelar"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </form>
+      ) : (
+        <Dialog
+          open={open}
+          onClose={() => setOpen(false)}
+          size="sm"
+          title="Nuevo tablero"
+          description="Dentro irán las columnas y las tareas."
+        >
           <form
-            ref={formRef}
             action={formAction}
             noValidate
             onSubmit={(event) => {
               setTouched(true);
-              if (clientError || name.trim().length < 2) event.preventDefault();
+              if (clientError) event.preventDefault();
             }}
-            className="flex items-center gap-1 rounded-md bg-surface pl-2 pr-1 h-7 border border-border transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+            className="flex flex-col gap-4"
           >
             <input type="hidden" name="workspaceId" value={workspaceId} />
             <input type="hidden" name="projectId" value={projectId} />
 
-            <input
+            <Input
               id={nameId}
               name="name"
-              placeholder="Nuevo tablero..."
+              label="Nombre"
+              placeholder="Sprint 1"
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={BOARD_NAME_MAX}
+              variant={touched && clientError ? 'error' : 'default'}
+              message={touched && clientError ? clientError : undefined}
               autoComplete="off"
-              autoFocus
-              className={`w-32 bg-transparent text-xs font-medium outline-none placeholder:text-text-disabled placeholder:font-normal ${
-                touched && clientError ? 'text-error' : 'text-text-primary'
-              }`}
+              fullWidth
             />
-            <button
-              type="submit"
-              disabled={pending || name.trim().length < 2 || Boolean(clientError)}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-primary text-text-inverse hover:bg-primary-hover disabled:opacity-50 transition-colors"
-            >
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                setName('');
-                setTouched(false);
-              }}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-surface-elevated hover:text-text-primary transition-colors"
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+
+            {state.error && (
+              <p
+                role="alert"
+                className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
+                style={{
+                  background: alpha(colors.error, 10),
+                  borderColor: alpha(colors.error, 30),
+                }}
+              >
+                {state.error}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>
+                Crear tablero
+              </Button>
+            </div>
           </form>
-        ) : (
-          <Dialog
-            open={open}
-            onClose={() => setOpen(false)}
-            size="sm"
-            title="Nuevo tablero"
-            description="Dentro irán las columnas y las tareas."
-          >
-            <form
-              action={formAction}
-              noValidate
-              onSubmit={(event) => {
-                setTouched(true);
-                if (clientError) event.preventDefault();
-              }}
-              className="flex flex-col gap-4"
-            >
-              <input type="hidden" name="workspaceId" value={workspaceId} />
-              <input type="hidden" name="projectId" value={projectId} />
-
-              <Input
-                id={nameId}
-                name="name"
-                label="Nombre"
-                placeholder="Sprint 1"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={BOARD_NAME_MAX}
-                variant={touched && clientError ? 'error' : 'default'}
-                message={touched && clientError ? clientError : undefined}
-                autoComplete="off"
-                fullWidth
-              />
-
-              {state.error && (
-                <p
-                  role="alert"
-                  className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-                  style={{
-                    background: alpha(colors.error, 10),
-                    borderColor: alpha(colors.error, 30),
-                  }}
-                >
-                  {state.error}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" isLoading={pending} disabled={touched && Boolean(clientError)}>
-                  Crear tablero
-                </Button>
-              </div>
-            </form>
-          </Dialog>
-        )}
+        </Dialog>
+      )}
     </>
   );
 }

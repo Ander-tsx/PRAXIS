@@ -75,6 +75,28 @@ export class UsersController {
   }
 
   /** Devuelve los bytes en base64, por el mismo motivo que los recibe así. */
+  
+  @MessagePattern({ cmd: 'user_get_cover' })
+  async getCover(@Payload() dto: { userId: string }) {
+    const cover = await this.usersService.getCover(dto.userId);
+    if (!cover) return null;
+    return {
+      mimeType: cover.mimeType,
+      size: cover.size,
+      base64: Buffer.from(cover.bytes).toString('base64'),
+    };
+  }
+
+  @MessagePattern({ cmd: 'user_set_cover' })
+  setCover(@Payload() dto: { userId: string; mimeType: string; base64: string }) {
+    return this.usersService.setCover(dto.userId, dto.mimeType, Buffer.from(dto.base64, 'base64'));
+  }
+
+  @MessagePattern({ cmd: 'user_delete_cover' })
+  deleteCover(@Payload() dto: { userId: string }) {
+    return this.usersService.deleteCover(dto.userId);
+  }
+
   @MessagePattern({ cmd: 'user_get_avatar' })
   async getAvatar(@Payload() dto: { userId: string }) {
     const avatar = await this.usersService.getAvatar(dto.userId);

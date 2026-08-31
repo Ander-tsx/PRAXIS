@@ -16,7 +16,7 @@ export function AccessDenied() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
       <svg
-        className="h-8 w-8 text-text-disabled"
+        className="h-8 w-8 text-white"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -33,7 +33,7 @@ export function AccessDenied() {
       <p className="font-display text-lg text-text-primary">
         Esta zona es solo para administración
       </p>
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         Tu cuenta no administra la plataforma, así que no hay nada que puedas hacer aquí. Si crees
         que debería, pídeselo a quien te dio acceso a Praxis.
       </p>

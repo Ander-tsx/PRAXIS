@@ -112,18 +112,25 @@ export function ProjectCard({
      `<a>` no son el mismo tipo, y unificarlas obliga a un `any` que se lleva por
      delante la comprobación de la única prop que importa. */
   const clase =
-    'group flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+    'group flex h-full flex-col gap-4 rounded-sm border border-border bg-surface p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
   const cuerpo = (
     <>
       <div className="flex items-start gap-3">
-        <ProjectMonogram id={project.id} name={project.name} size="md" apagado={suspendido} />
+        <ProjectMonogram
+          id={project.id}
+          name={project.name}
+          iconKey={project.iconKey ?? null}
+          color={project.color ?? null}
+          size="md"
+          apagado={suspendido}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h3 className="truncate font-sans text-base font-semibold text-text-primary">
             {project.name}
           </h3>
-          <span className="font-sans text-xs text-text-disabled">
+          <span className="font-sans text-xs text-white">
             {eresElDueno ? 'Tuyo' : 'Te añadieron'}
           </span>
         </div>
@@ -134,16 +141,16 @@ export function ProjectCard({
               tarjeta en una fila de etiquetas — y «de quién es» ya lo dice la
               línea de debajo del nombre, que no gasta insignia. */}
         {suspendido && (
-          <Badge variant="error" className="shrink-0">
+          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-white">
             SUSPENDIDO
-          </Badge>
+          </span>
         )}
       </div>
 
       {project.description ? (
-        <p className="line-clamp-2 font-sans text-sm text-text-secondary">{project.description}</p>
+        <p className="line-clamp-2 font-sans text-sm text-white">{project.description}</p>
       ) : (
-        <p className="font-sans text-sm italic text-text-disabled">Sin descripción</p>
+        <p className="font-sans text-sm italic text-white">Sin descripción</p>
       )}
 
       {/**
@@ -156,8 +163,12 @@ export function ProjectCard({
        */}
       {suspendido && project.suspendedReason && (
         <p
-          className="line-clamp-2 rounded-lg px-2.5 py-1.5 font-sans text-xs"
-          style={{ background: alpha(colors.error, 8), color: colors.error }}
+          className="line-clamp-2 rounded-sm px-2.5 py-1.5 font-sans text-xs"
+          style={{
+            background: 'transparent',
+            border: `1px solid ${colors.border}`,
+            color: colors.textSecondary,
+          }}
         >
           {project.suspendedReason}
         </p>
@@ -189,7 +200,7 @@ export function ProjectCard({
           icono={<IconoEspacios />}
         />
         <span
-          className="ml-auto font-sans text-xs text-text-disabled"
+          className="ml-auto font-sans text-xs text-white"
           title={`Creado el ${fechaLarga.format(new Date(project.createdAt))}`}
         >
           {dateFormatter.format(new Date(project.createdAt))}
@@ -269,7 +280,7 @@ function Equipo({
       </span>
 
       {restantes > 0 && (
-        <span className="pl-2 font-sans text-xs text-text-secondary">+{restantes}</span>
+        <span className="pl-2 font-sans text-xs text-white">+{restantes}</span>
       )}
     </span>
   );
@@ -283,8 +294,8 @@ function Dato({
   icono,
 }: { valor: number; singular: string; plural: string; icono: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5 font-sans text-xs text-text-secondary">
-      <span className="text-text-disabled">{icono}</span>
+    <span className="flex items-center gap-1.5 font-sans text-xs text-white">
+      <span className="text-white">{icono}</span>
       <span className="font-semibold text-text-primary">{valor}</span>
       {valor === 1 ? singular : plural}
     </span>

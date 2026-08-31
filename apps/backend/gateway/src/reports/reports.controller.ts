@@ -6,11 +6,15 @@ import {
   Param,
   ParseUUIDPipe,
   Query,
+  Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
+  PLANS,
+  type PlanTier,
   ProjectPermission,
   REPORT_CROSS_DIMENSIONS,
   ReportBundleQueryDto,
@@ -18,9 +22,11 @@ import {
   ReportMatrixQueryDto,
   ReportWeeklyQueryDto,
   ReportWindowQueryDto,
+  type Tope,
 } from '@praxis/contracts';
 import { firstValueFrom } from 'rxjs';
 import { JwtGuard } from '../auth/jwt.guard';
+import { QuotaService } from '../billing/quota.service';
 import { RequireProjectPermission } from '../common/decorators/require-project-permission.decorator';
 import { ProjectPermissionGuard } from '../common/guards/project-permission.guard';
 
@@ -32,6 +38,30 @@ import { ProjectPermissionGuard } from '../common/guards/project-permission.guar
  * dos respondiera a algo que la otra rechaza.
  */
 const MAX_DIAS_DE_TRAMO = 365;
+
+/**
+ * Hasta dónde alcanza hacia atrás el plan de quien mira, y si se ha notado.
+ *
+ * Viaja en el paquete de informes (`GET /projects/:id/reports`) bajo la clave
+ * `ventana`, para que la pantalla pueda escribirlo. Ver `ReportsController.acotar`.
+ */
+export interface VentanaDelPlan {
+  /** Días de historial que alcanza el plan. `null` es sin tope. */
+  dias: number | null;
+  tier: PlanTier;
+  /** El nombre del plan, para poder nombrarlo en la frase sin traducir el enum. */
+  plan: string;
+  /**
+   * Si **esta** petición se recortó de verdad.
+   *
+   * ⚠️ No es lo mismo que tener tope: un plan de 90 días que responde a una
+   * pregunta de 60 no ha recortado nada, y avisar ahí sería un aviso que se
+   * aprende a ignorar antes de que llegue el que importa.
+   */
+  recortado: boolean;
+  /** La fecha más antigua que alcanza el plan, en ISO. `null` si no hay tope. */
+  desde: string | null;
+}
 
 /**
  * Reportes de un proyecto.
@@ -58,7 +88,12 @@ const MAX_DIAS_DE_TRAMO = 365;
 @UseGuards(JwtGuard, ProjectPermissionGuard)
 @Controller('projects/:projectId/reports')
 export class ReportsController {
-  constructor(@Inject('REPORTS_SERVICE') private readonly reportsClient: ClientProxy) {}
+  constructor(
+    @Inject('REPORTS_SERVICE') private readonly reportsClient: ClientProxy,
+    /* `historialAnalisisDias`: hasta dónde hacia atrás alcanza el plan. Ver
+       `acotar` y `QuotaService.ventanaDeAnalisis`. */
+    private readonly quota: QuotaService,
+  ) {}
 
   /**
    * Cuántos días de historial mira un informe.
@@ -129,6 +164,131 @@ export class ReportsController {
   }
 
   /**
+   * Lo que el plan alcanza, y si esta petición se ha tenido que recortar.
+   *
+   * ## Se recorta, no se rechaza — y por eso hay que decirlo
+   *
+   * `historialAnalisisDias` es la única cuota del catálogo que acota una
+   * **lectura**, así que no lanza 402: un muro de pago a media consulta sobre
+   * una pregunta razonable no tiene salida —no es que te hayas pasado, es que
+   * preguntaste por más atrás de lo que tu plan llega—. La decisión entera está
+   * en D4 de `docs/PLAN-CUOTAS.md` y en `QuotaService.ventanaDeAnalisis`.
+   *
+   * ⚠️ **Y un recorte mudo es peor que no recortar.** Por eso esto devuelve
+   * `recortado` y `desde`, y el paquete los publica: un gráfico que empieza
+   * noventa días atrás sin explicar por qué se lee como un dato incompleto, y
+   * quien lo lea sacará conclusiones de una serie que cree entera.
+   *
+   * ⚠️ **`days` de `blocked` NO pasa por aquí, y es la trampa de este cambio.**
+   * En los demás informes `days` es la ventana de historial; en aquel es
+   * **cuántos días lleva una tarea sin moverse**. Recortárselo al tope del plan
+   * convertiría «lo que lleva 120 días parado» en «lo que lleva 90», con el
+   * mismo nombre y sin que nada fallara. Es el mismo motivo por el que el
+   * paquete tampoco le pasa su `days`.
+   */
+  private async acotar(
+    userId: string,
+    projectId: string,
+    query: ReportFiltersQueryDto,
+    opciones: { days?: number; weeks?: number } = {},
+  ): Promise<{
+    days?: number;
+    weeks?: number;
+    filtros?: ReportFiltersQueryDto;
+    ventana: VentanaDelPlan;
+  }> {
+    const filtros = this.filtros(query);
+    const { dias, tier } = await this.quota.ventanaDeAnalisis(userId, projectId);
+
+    if (dias === null) {
+      return {
+        ...(opciones.days !== undefined ? { days: opciones.days } : {}),
+        ...(opciones.weeks !== undefined ? { weeks: opciones.weeks } : {}),
+        ...(filtros ? { filtros } : {}),
+        ventana: { dias: null, tier, plan: PLANS[tier].nombre, recortado: false, desde: null },
+      };
+    }
+
+    const desde = new Date(Date.now() - dias * 86_400_000);
+    let recortado = false;
+
+    /* `days` por defecto es 60 al otro lado, así que un plan de 90 no recorta
+       nada mientras no se pida más. Solo se toca lo que se pidió. */
+    let days = opciones.days;
+    if (days !== undefined && days > dias) {
+      days = dias;
+      recortado = true;
+    }
+
+    /* Las semanas son la misma ventana contada en otra unidad, y se recortan
+       hacia abajo: 90 días son 12 semanas completas y no 12,8. Redondear hacia
+       arriba devolvería una semana que empieza antes de donde llega el plan. */
+    let weeks = opciones.weeks;
+    const semanasDelPlan = Math.max(Math.floor(dias / 7), 1);
+    if (weeks !== undefined && weeks > semanasDelPlan) {
+      weeks = semanasDelPlan;
+      recortado = true;
+    }
+
+    let acotados = filtros;
+    if (filtros?.from && new Date(filtros.from).getTime() < desde.getTime()) {
+      acotados = { ...filtros, from: desde.toISOString() };
+      recortado = true;
+    }
+
+    /**
+     * ⚠️ **Sin `from` también se acota, y es lo que cierra el hueco.** Los
+     * informes que no reciben `days` —`dynamics`, `column-time`, `people`,
+     * `matrix`— miran **todo el historial capturado** si nadie les dice otra
+     * cosa. Recortar solo cuando el cliente manda un `from` dejaría el tope
+     * abierto para quien no lo manda, que es justo el caso normal.
+     */
+    if (!acotados?.from) {
+      acotados = { ...(acotados ?? {}), from: desde.toISOString() };
+    }
+
+    return {
+      ...(days !== undefined ? { days } : {}),
+      ...(weeks !== undefined ? { weeks } : {}),
+      filtros: acotados,
+      ventana: {
+        dias,
+        tier,
+        plan: PLANS[tier].nombre,
+        recortado,
+        desde: desde.toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Quién pregunta.
+   *
+   * El `JwtGuard` ya garantiza que hay sesión, así que esto no puede fallar en
+   * la práctica; existe para no repetir once veces una aserción de no-nulo que
+   * el tipo de `Express.Request` no respalda. Un `?? ''` sería peor: acabaría
+   * pidiéndole el plan a un usuario vacío, que responde FREE, y el recorte
+   * saldría de la nada.
+   */
+  private actor(req: Express.Request): string {
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException();
+    return userId;
+  }
+
+  /** El atajo de los tres informes cuyo `days` **sí** es ventana de historial. */
+  private acotarConDias(
+    req: Express.Request,
+    projectId: string,
+    query: ReportWindowQueryDto,
+  ): ReturnType<ReportsController['acotar']> {
+    const dias = this.ventana(query.days);
+    return this.acotar(this.actor(req), projectId, query, {
+      ...(dias !== undefined ? { days: dias } : {}),
+    });
+  }
+
+  /**
    * Varios informes en **una** petición.
    *
    * ## Por qué existe, con el coste delante
@@ -163,22 +323,44 @@ export class ReportsController {
     status: 200,
     description: 'Solo las claves pedidas. Una a `null` es «se pidió y no se pudo»',
   })
-  bundle(
+  async bundle(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportBundleQueryDto,
   ) {
-    return firstValueFrom(
-      this.reportsClient.send(
+    const acotado = await this.acotar(this.actor(req), projectId, query, {
+      ...(this.ventana(query.days) !== undefined ? { days: this.ventana(query.days) } : {}),
+      ...(this.semanas(query.weeks) !== undefined ? { weeks: this.semanas(query.weeks) } : {}),
+    });
+
+    const informes = await firstValueFrom(
+      this.reportsClient.send<Record<string, unknown>>(
         { cmd: 'report_bundle' },
         {
           projectId,
           incluir: query.include ?? [],
-          days: this.ventana(query.days),
-          weeks: this.semanas(query.weeks),
-          filtros: this.filtros(query),
+          days: acotado.days,
+          weeks: acotado.weeks,
+          filtros: acotado.filtros,
         },
       ),
     );
+
+    /**
+     * ⚠️ **`ventana` va dentro del paquete y no en el `meta` del sobre.** El
+     * cliente de la interfaz devuelve el `data` ya desenvuelto y **tira el
+     * `meta`**, así que un aviso ahí llegaría hasta el navegador y no lo leería
+     * nadie — el mismo final que tuvieron los avisos en vivo cuando el sobre se
+     * comía su `type`.
+     *
+     * ⚠️ Y es el paquete quien lo publica porque es lo que pide la pantalla de
+     * Análisis. Las siete rutas sueltas **se recortan igual** —el tope es del
+     * plan, no de una ruta— pero devuelven el informe pelado y no tienen dónde
+     * decirlo sin cambiarles la forma a todas. Está en su Swagger y en el
+     * contrato; si algún día una de ellas la pinta una persona, esto tiene que
+     * subir al sobre y el cliente aprender a leer `meta`.
+     */
+    return { ...informes, ventana: acotado.ventana };
   }
 
   @Get('snapshot')
@@ -187,15 +369,14 @@ export class ReportsController {
     summary: 'Estado actual del proyecto. Es el único informe que no necesita historial',
   })
   @ApiResponse({ status: 200, description: 'Instantánea del proyecto' })
-  snapshot(
+  async snapshot(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportFiltersQueryDto,
   ) {
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
-      this.reportsClient.send(
-        { cmd: 'report_snapshot' },
-        { projectId, filtros: this.filtros(query) },
-      ),
+      this.reportsClient.send({ cmd: 'report_snapshot' }, { projectId, filtros: acotado.filtros }),
     );
   }
 
@@ -203,11 +384,16 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Flujo acumulado: cuántas tareas hay en cada columna cada día' })
   @ApiQuery({ name: 'days', required: false, description: 'Días de historial (1–365)' })
-  flow(@Param('projectId', ParseUUIDPipe) projectId: string, @Query() query: ReportWindowQueryDto) {
+  async flow(
+    @Request() req: Express.Request,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Query() query: ReportWindowQueryDto,
+  ) {
+    const acotado = await this.acotarConDias(req, projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_flow' },
-        { projectId, days: this.ventana(query.days), filtros: this.filtros(query) },
+        { projectId, days: acotado.days, filtros: acotado.filtros },
       ),
     );
   }
@@ -216,14 +402,16 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Tiempos de entrega y de ciclo, en percentiles 50 y 85' })
   @ApiQuery({ name: 'days', required: false })
-  cycleTime(
+  async cycleTime(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportWindowQueryDto,
   ) {
+    const acotado = await this.acotarConDias(req, projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_cycle_time' },
-        { projectId, days: this.ventana(query.days), filtros: this.filtros(query) },
+        { projectId, days: acotado.days, filtros: acotado.filtros },
       ),
     );
   }
@@ -239,14 +427,16 @@ export class ReportsController {
       'Con poco historial devuelve `prediccion: null` y cuánto falta, en vez de un número inventado',
   })
   @ApiQuery({ name: 'days', required: false })
-  forecast(
+  async forecast(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportWindowQueryDto,
   ) {
+    const acotado = await this.acotarConDias(req, projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_forecast' },
-        { projectId, days: this.ventana(query.days), filtros: this.filtros(query) },
+        { projectId, days: acotado.days, filtros: acotado.filtros },
       ),
     );
   }
@@ -266,14 +456,19 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Cierres y entradas por semana, con la anterior para comparar' })
   @ApiQuery({ name: 'weeks', required: false, description: 'Semanas de serie (2–52)' })
-  weekly(
+  async weekly(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportWeeklyQueryDto,
   ) {
+    const semanas = this.semanas(query.weeks);
+    const acotado = await this.acotar(this.actor(req), projectId, query, {
+      ...(semanas !== undefined ? { weeks: semanas } : {}),
+    });
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_weekly' },
-        { projectId, weeks: this.semanas(query.weeks), filtros: this.filtros(query) },
+        { projectId, weeks: acotado.weeks, filtros: acotado.filtros },
       ),
     );
   }
@@ -294,14 +489,28 @@ export class ReportsController {
     status: 200,
     description: 'Las anteriores a la captura del historial vienen marcadas con `sinHistorial`',
   })
-  blocked(
+  async blocked(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportWindowQueryDto,
   ) {
+    /**
+     * 🔴 **Su `days` no pasa por `acotar`, y es el único de los once así.**
+     *
+     * Aquí `days` no es la ventana de historial que se mira: es **cuántos días
+     * lleva una tarea sin moverse** para considerarla parada. Recortarlo al tope
+     * del plan convertiría «lo que lleva 120 días quieto» en «lo que lleva 90»,
+     * con el mismo nombre en la pantalla y sin que nada fallara — el informe
+     * seguiría saliendo, contestando a otra pregunta. Es la misma trampa por la
+     * que el paquete tampoco le pasa su `days`.
+     *
+     * El `from` de los filtros sí se acota: ese sí es historial.
+     */
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_blocked' },
-        { projectId, days: this.ventana(query.days), filtros: this.filtros(query) },
+        { projectId, days: this.ventana(query.days), filtros: acotado.filtros },
       ),
     );
   }
@@ -328,14 +537,16 @@ export class ReportsController {
     status: 200,
     description: 'Una fila por columna del tablero, tenga estancias o no',
   })
-  columnTime(
+  async columnTime(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportFiltersQueryDto,
   ) {
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_column_time' },
-        { projectId, filtros: this.filtros(query) },
+        { projectId, filtros: acotado.filtros },
       ),
     );
   }
@@ -365,15 +576,14 @@ export class ReportsController {
     status: 200,
     description: '`desde` es el primer evento capturado: antes de eso no hay nada que medir',
   })
-  dynamics(
+  async dynamics(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportFiltersQueryDto,
   ) {
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
-      this.reportsClient.send(
-        { cmd: 'report_dynamics' },
-        { projectId, filtros: this.filtros(query) },
-      ),
+      this.reportsClient.send({ cmd: 'report_dynamics' }, { projectId, filtros: acotado.filtros }),
     );
   }
 
@@ -405,13 +615,15 @@ export class ReportsController {
     status: 200,
     description: '`tareas` son las distintas que entran; la suma de las celdas puede ser mayor',
   })
-  matrix(
+  async matrix(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportMatrixQueryDto,
   ) {
     if (query.groupBy === query.splitBy) {
       throw new BadRequestException('Las dos dimensiones del cruce tienen que ser distintas.');
     }
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
       this.reportsClient.send(
         { cmd: 'report_matrix' },
@@ -419,7 +631,7 @@ export class ReportsController {
           projectId,
           agruparPor: query.groupBy,
           partirPor: query.splitBy,
-          filtros: this.filtros(query),
+          filtros: acotado.filtros,
         },
       ),
     );
@@ -437,15 +649,14 @@ export class ReportsController {
   @RequireProjectPermission(ProjectPermission.CAN_VIEW_REPORTS)
   @ApiOperation({ summary: 'Carga y flujo por persona (requiere canViewReports)' })
   @ApiResponse({ status: 403, description: 'Sin canViewReports' })
-  people(
+  async people(
+    @Request() req: Express.Request,
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() query: ReportFiltersQueryDto,
   ) {
+    const acotado = await this.acotar(this.actor(req), projectId, query);
     return firstValueFrom(
-      this.reportsClient.send(
-        { cmd: 'report_people' },
-        { projectId, filtros: this.filtros(query) },
-      ),
+      this.reportsClient.send({ cmd: 'report_people' }, { projectId, filtros: acotado.filtros }),
     );
   }
 }

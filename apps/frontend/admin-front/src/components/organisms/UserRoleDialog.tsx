@@ -106,7 +106,7 @@ export function UserRoleDialog({ usuario, miNivel, open, onClose }: UserRoleDial
         </footer>
       </form>
 
-      <p className="mt-3 font-sans text-xs text-text-disabled">
+      <p className="mt-3 font-sans text-xs text-white">
         Rol actual: {ROLES[usuario.globalRole].etiqueta}.
         {repartibles.length === 0 && ' No puedes asignar ningún rol a esta cuenta desde tu nivel.'}
       </p>

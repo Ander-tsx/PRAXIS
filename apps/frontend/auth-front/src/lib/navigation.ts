@@ -17,7 +17,7 @@
  * Es el panel, no la landing: quien acaba de identificarse quiere su área
  * privada. La sirve el web-shell y la protege su `proxy.ts`.
  */
-export const POST_AUTH_DESTINATION = '/dashboard';
+export const POST_AUTH_DESTINATION = '/projects';
 
 /**
  * Navega a una ruta de otra zona.

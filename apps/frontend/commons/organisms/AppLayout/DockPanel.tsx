@@ -176,7 +176,7 @@ export function DockColumn() {
       >
         <div
           className={[
-            'absolute inset-0 flex flex-col overflow-hidden bg-surface border-l border-border',
+            'absolute inset-0 flex flex-col overflow-hidden bg-[#191919] border-l border-border',
             abierto ? 'md:border-l' : 'md:border-l-0',
           ].join(' ')}
         >
@@ -190,34 +190,9 @@ export function DockColumn() {
            */}
           <div ref={registrarHueco} className="flex min-h-0 min-w-0 flex-1 flex-col" />
         </div>
-
-        {/* El botón de plegar, asomando en el borde izquierdo. Solo se muestra en desktop. */}
-        <button
-          type="button"
-          onClick={cerrar}
-          title="Plegar asistente"
-          aria-label="Plegar asistente"
-          /* Cerrado sigue montado —solo invisible— así que sin esto el tabulador
-             se para en un botón que no se ve. */
-          tabIndex={abierto ? 0 : -1}
-          className={[
-            'absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10',
-            'hidden md:flex h-8 w-8 items-center justify-center rounded-full bg-surface border border-border text-text-secondary shadow-sm transition-all hover:text-text-primary hover:bg-hover hover:scale-105',
-            abierto ? 'opacity-100 scale-100 delay-100' : 'opacity-0 scale-75 pointer-events-none',
-          ].join(' ')}
-          style={{ boxShadow: `0 4px 12px ${alpha(colors.overlay, 15)}` }}
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            aria-hidden="true"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        {/* El chevron de plegar del borde izquierdo se retiró: lo que se monta en
+            el cajón (el minichat de PRAX, el chat de Análisis) ya trae su propia
+            aspa de cerrar en la cabecera, y Escape sigue cerrando. */}
       </aside>
     </>
   );

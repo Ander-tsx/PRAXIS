@@ -14,7 +14,7 @@ export function StatItem({ value, label }: StatItemProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="font-display text-2xl text-text-primary">{value}</span>
-      <span className="font-sans text-xs text-text-disabled uppercase tracking-wide">{label}</span>
+      <span className="font-sans text-xs text-white uppercase tracking-wide">{label}</span>
     </div>
   );
 }

@@ -46,7 +46,7 @@ export function ValueField({ fieldSpec, operator, value, onChange, proyecto }: V
                 'flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-sans text-xs transition-colors',
                 marcado
                   ? 'border-primary bg-primary-muted text-primary'
-                  : 'border-border text-text-secondary hover:text-text-primary',
+                  : 'border-border text-white hover:text-text-primary',
               ].join(' ')}
             >
               <input

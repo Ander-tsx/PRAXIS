@@ -54,7 +54,7 @@ export function RuleCard({
           {trigger && (
             <span
               aria-hidden
-              className={trigger.kind === 'reactive' ? 'text-primary' : 'text-text-disabled'}
+              className={trigger.kind === 'reactive' ? 'text-primary' : 'text-white'}
               title={trigger.kind === 'reactive' ? 'Actúa sola' : 'Actúa al revisar'}
             >
               {trigger.kind === 'reactive' ? (
@@ -85,14 +85,14 @@ export function RuleCard({
         </p>
       )}
 
-      <p className="mt-1 font-sans text-sm text-text-secondary">
+      <p className="mt-1 font-sans text-sm text-white">
         {describeRule(catalog, rule, proyecto)}
       </p>
 
       {/* Las condiciones, sueltas y en lista. Ya salen dentro de la frase de
           arriba encadenadas con «y»; con dos o tres hay que leerla entera para
           saber cuándo salta, y esto es lo que se escanea. */}
-      <p className="mt-2 font-sans text-sm text-text-secondary">
+      <p className="mt-2 font-sans text-sm text-white">
         {condiciones.length === 0 ? (
           <span className="italic">
             Sin condiciones: actúa sobre toda tarea que encaje con el disparador.

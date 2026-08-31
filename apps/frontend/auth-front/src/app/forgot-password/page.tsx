@@ -102,7 +102,7 @@ function Aviso({ titulo, texto }: { titulo: string; texto: string }) {
   return (
     <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-8">
       <h1 className="mb-2 font-display text-3xl text-text-primary">{titulo}</h1>
-      <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">{texto}</p>
+      <p className="mb-6 font-sans text-sm leading-relaxed text-white">{texto}</p>
       <Link href="/login" className="font-sans text-sm text-primary hover:underline">
         Volver a entrar
       </Link>

@@ -23,7 +23,7 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
         <h4 className="font-sans text-lg font-semibold text-text-primary">
           Eliminar «{role.name}»
         </h4>
-        <p className="font-sans text-xs text-text-secondary mt-1">
+        <p className="font-sans text-xs text-white mt-1">
           {blocked
             ? 'Este rol está en uso, así que no se puede eliminar todavía.'
             : 'Esta acción no se puede deshacer.'}
@@ -32,9 +32,9 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
 
       {blocked ? (
         <div className="flex flex-col gap-4">
-          <p className="font-sans text-sm text-text-secondary">
-            Lo tienen {membersUsing} {membersUsing === 1 ? 'persona' : 'personas'}. Cámbialas de
-            rol antes de eliminarlo.
+          <p className="font-sans text-sm text-white">
+            Lo tienen {membersUsing} {membersUsing === 1 ? 'persona' : 'personas'}. Cámbialas de rol
+            antes de eliminarlo.
           </p>
           <div className="flex justify-end gap-3 mt-2">
             <Button variant="secondary" onClick={onCancel}>

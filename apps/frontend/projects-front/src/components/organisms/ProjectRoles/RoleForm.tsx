@@ -24,12 +24,7 @@ export interface RoleFormProps {
   onSuccess?: () => void;
 }
 
-export function RoleForm({
-  projectId,
-  role,
-  onCancel,
-  onSuccess,
-}: RoleFormProps) {
+export function RoleForm({ projectId, role, onCancel, onSuccess }: RoleFormProps) {
   const [state, formAction, pending] = useAccion(saveRoleAction, ROLE_INITIAL_STATE);
 
   const [name, setName] = useState(role?.name ?? '');
@@ -64,8 +59,9 @@ export function RoleForm({
         <h4 className="font-sans text-lg font-semibold text-text-primary">
           {role ? `Editar «${role.name}»` : 'Nuevo rol'}
         </h4>
-        <p className="font-sans text-xs text-text-secondary mt-1">
-          Los permisos de mayor nivel conceden los de menor: marcar «eliminar» da también «editar» y «crear».
+        <p className="font-sans text-xs text-white mt-1">
+          Los permisos de mayor nivel conceden los de menor: marcar «eliminar» da también «editar» y
+          «crear».
         </p>
       </header>
       <form
@@ -95,14 +91,12 @@ export function RoleForm({
         />
 
         <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 font-sans text-sm font-medium text-text-primary">
-            Permisos
-          </legend>
+          <legend className="mb-2 font-sans text-sm font-medium text-text-primary">Permisos</legend>
 
           <div className="flex flex-col gap-5 pr-1">
             {PERMISSION_GROUPS.map((group) => (
               <div key={group.title} className="flex flex-col gap-2">
-                <span className="font-sans text-xs uppercase tracking-wider text-text-disabled">
+                <span className="font-sans text-xs uppercase tracking-wider text-white">
                   {group.title}
                 </span>
 

@@ -1,13 +1,18 @@
 import type { Board, Label, Task, UserProfile } from '@praxis/commons';
 import type { ReactNode } from 'react';
+import { BoardCalendar } from './BoardCalendar';
 import { BoardColumns } from './BoardColumns';
+import { BoardTable } from './BoardTable';
 import { TableroExpandible } from './TableroExpandible';
 import { TableroMenu } from './TableroMenu';
+import type { VistaTablero } from './VistaSelector';
 import { BOARD_SURFACE } from './superficie-tablero';
 
 export interface BoardStripProps {
-  /** El control de «solo mis tareas», que va junto a «Ampliar». */
+  /** El selector de vista + el filtro de «solo mis tareas». */
   filtroMisTareas?: ReactNode;
+  /** Qué vista se pinta: Kanban, Calendario o Tabla. */
+  vista: VistaTablero;
   /**
    * Lo que va a la izquierda de la cabecera en vez del nombre del tablero: el
    * selector de espacio y las pestañas de tablero. Ver `TableroExpandible`.
@@ -58,6 +63,7 @@ export interface BoardStripProps {
 export function BoardStrip({
   board,
   filtroMisTareas,
+  vista,
   titulo,
   projectId,
   canEditBoard,
@@ -86,7 +92,7 @@ export function BoardStrip({
       /* `min-h-0 flex-1`: el tablero ocupa lo que quede de pantalla y **no la
          estira**. Es lo que permite que la página no tenga desplazamiento
          propio y que el único scroll vertical sea el de dentro de una columna. */
-      className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl border border-border p-4"
+      className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl p-4"
       style={BOARD_SURFACE}
     >
       {/* La cabecera se fue a `TableroExpandible` con el botón de ampliar: los
@@ -112,25 +118,61 @@ export function BoardStrip({
             : `${columnCount} ${columnCount === 1 ? 'columna' : 'columnas'}`
         }${tasks.length > 0 ? ` · ${tasks.length} ${tasks.length === 1 ? 'tarea' : 'tareas'}` : ''}`}
       >
-        <BoardColumns
-          board={board}
-          projectId={projectId}
-          canCreateColumn={canCreateColumn}
-          canEditColumn={canEditColumn}
-          canDeleteColumn={canDeleteColumn}
-          tasks={tasks}
-          members={members}
-          labels={labels}
-          usersById={usersById}
-          currentUserId={currentUserId}
-          canCreateTask={canCreateTask}
-          canMoveTask={canMoveTask}
-          openTaskId={openTaskId}
-          canComment={canComment}
-          canManageLabels={canManageLabels}
-          canEditTask={canEditTask}
-          canDeleteTask={canDeleteTask}
-        />
+        {/* Kanban es la de siempre —arrastre incluido—; Calendario y Tabla son
+            solo lectura de la misma lista y comparten el panel de tarea. */}
+        {vista === 'calendario' ? (
+          <BoardCalendar
+            board={board}
+            projectId={projectId}
+            tasks={tasks}
+            members={members}
+            labels={labels}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            openTaskId={openTaskId}
+            canMoveTask={canMoveTask}
+            canComment={canComment}
+            canManageLabels={canManageLabels}
+            canEditTask={canEditTask}
+            canDeleteTask={canDeleteTask}
+          />
+        ) : vista === 'tabla' ? (
+          <BoardTable
+            board={board}
+            projectId={projectId}
+            tasks={tasks}
+            members={members}
+            labels={labels}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            openTaskId={openTaskId}
+            canMoveTask={canMoveTask}
+            canComment={canComment}
+            canManageLabels={canManageLabels}
+            canEditTask={canEditTask}
+            canDeleteTask={canDeleteTask}
+          />
+        ) : (
+          <BoardColumns
+            board={board}
+            projectId={projectId}
+            canCreateColumn={canCreateColumn}
+            canEditColumn={canEditColumn}
+            canDeleteColumn={canDeleteColumn}
+            tasks={tasks}
+            members={members}
+            labels={labels}
+            usersById={usersById}
+            currentUserId={currentUserId}
+            canCreateTask={canCreateTask}
+            canMoveTask={canMoveTask}
+            openTaskId={openTaskId}
+            canComment={canComment}
+            canManageLabels={canManageLabels}
+            canEditTask={canEditTask}
+            canDeleteTask={canDeleteTask}
+          />
+        )}
       </TableroExpandible>
     </section>
   );

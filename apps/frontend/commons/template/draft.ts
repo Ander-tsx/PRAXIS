@@ -2,6 +2,8 @@ import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '.
 import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
 import { createServerApiClient } from '../auth/server-client';
+import { getOrganizacionActiva } from '../theme/organizacion';
+import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
 
 /**
  * Le pide al asistente una plantilla para un proyecto que aún no existe.
@@ -36,6 +38,7 @@ export async function pedirBorrador(
       resultado: null,
       error: `Cuéntale un poco más: al menos ${TEMPLATE_BRIEF_MIN} caracteres.`,
       sinCuota: false,
+      cuota: null,
     };
   }
 
@@ -44,8 +47,11 @@ export async function pedirBorrador(
       resultado: null,
       error: `Son ${texto.length} caracteres y el máximo es ${TEMPLATE_BRIEF_MAX}.`,
       sinCuota: false,
+      cuota: null,
     };
   }
+
+  const organizationId = await getOrganizacionActiva();
 
   try {
     const resultado = await createServerApiClient().post<TemplateDraftResult>(
@@ -58,6 +64,10 @@ export async function pedirBorrador(
         ...(ajuste?.texto.trim()
           ? { ajuste: ajuste.texto.trim(), previa: JSON.stringify(ajuste.previa) }
           : {}),
+        /* Esta ruta **gasta cuota de IA y no crea nada**, así que hay que decir
+           a qué organización se le cobra: el proyecto todavía no existe. El
+           gateway valida la pertenencia antes de usarla. */
+        ...(organizationId ? { organizationId } : {}),
       },
     );
 
@@ -68,17 +78,23 @@ export async function pedirBorrador(
         resultado: null,
         error: 'El asistente no ha sabido proponer una plantilla. Prueba a contarle algo más.',
         sinCuota: false,
+        cuota: null,
       };
     }
 
-    return { resultado, error: null, sinCuota: false };
+    return { resultado, error: null, sinCuota: false, cuota: null };
   } catch (error) {
     const apiError = error instanceof ApiError ? error : null;
 
     return {
       resultado: null,
       error: apiError?.message ?? 'No se pudo hablar con el asistente. Vuelve a intentarlo.',
-      sinCuota: apiError?.status === 429,
+      /* 🔴 Se miraba `status === 429`, que es también el del límite de
+         peticiones del gateway: un throttle en mitad de una tanda se leía como
+         «se te acabó el mes». La cuota tiene código propio desde que habla en
+         402. Ver `TemplateDraftState.sinCuota`. */
+      sinCuota: apiError?.code === QUOTA_EXCEEDED_CODE,
+      cuota: detallesDeCuota(apiError),
     };
   }
 }

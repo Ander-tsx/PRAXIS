@@ -26,7 +26,19 @@ export type ApiErrorCode =
    * suspensión y un 403 de permiso normal se distinguen por esto —
    * `PROJECT_SUSPENDED_CODE` en `domain.ts` — y no por el mensaje.
    */
-  | 'PROJECT_SUSPENDED';
+  | 'PROJECT_SUSPENDED'
+  /**
+   * Una cuota del plan agotada. Viaja con **402**, no con 403.
+   *
+   * ⚠️ La diferencia no es cosmética: un 403 se arregla pidiéndole permiso a
+   * una persona y un 402 no se arregla con permisos —o se paga, o se borra
+   * algo—. Con el mismo código, la pantalla ofrecería «pídeselo a quien
+   * administra el proyecto» a alguien que lo administra él.
+   *
+   * `details` trae `QuotaExceededDetails` (`commons/billing/planes`): qué tope,
+   * cuánto es y cuánto llevas. Sin eso no se puede ofrecer la salida correcta.
+   */
+  | 'QUOTA_EXCEEDED';
 
 export interface ApiEnvelopeError {
   success: false;

@@ -97,12 +97,12 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="flex flex-col gap-6">
+      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Proyectos"
           descripcion="El inventario completo, archivados incluidos. Suspender y archivar son reversibles; el borrado de verdad es del dueño y no vive aquí."
           cifras={[
-            { etiqueta: 'En total', valor: enTotal, tono: colors.primary },
+            { etiqueta: 'En total', valor: enTotal, tono: colors.textPrimary },
             { etiqueta: 'Suspendidos', valor: suspendidos, tono: colors.error },
             { etiqueta: 'Archivados', valor: archivados, tono: colors.warning },
           ]}
@@ -121,11 +121,11 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
         />
 
         {listado === null ? (
-          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
             No se pudieron cargar los proyectos. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
             {busqueda || estadoFiltro
               ? 'Ningún proyecto encaja con lo que buscas.'
               : 'Todavía no hay proyectos en la plataforma.'}

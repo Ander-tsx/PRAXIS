@@ -100,6 +100,20 @@ export interface ComposerProps {
   ocultarAdjuntos?: boolean;
   /** Enfoca el campo nada más montarlo. */
   autoFoco?: boolean;
+  /**
+   * Si el menú `/` de tareas y tableros está disponible.
+   *
+   * 🔴 **Solo en los chats de proyecto.** En uno privado, `/Sprint 1` no dice de
+   * qué proyecto sale ni si quien lo recibe puede verlo — y desde que se puede
+   * escribir a cualquiera de tu organización, esas dos personas pueden compartir
+   * equipo sin compartir un solo tablero. El servidor ya devuelve la lista vacía
+   * (`MentionablesService`); esto es para que ni siquiera se abra el
+   * desplegable.
+   *
+   * ⚠️ **No afecta a `@`.** Mencionar a alguien sigue valiendo donde hay a quién
+   * mencionar: en privado sois dos, así que la lista viene vacía por su cuenta.
+   */
+  permiteReferencias?: boolean;
 }
 
 /** Qué se está escribiendo tras un `@` o un `/`, y desde dónde. */
@@ -121,10 +135,20 @@ interface Disparador {
  * los títulos de tarea los tienen casi siempre («Rediseñar el panel»), y cortar
  * en el primero hacía imposible afinar más allá de una palabra.
  */
-function disparadorEn(texto: string, cursor: number): Disparador | null {
+function disparadorEn(
+  texto: string,
+  cursor: number,
+  permiteReferencias: boolean,
+): Disparador | null {
   for (let i = cursor - 1; i >= 0; i--) {
     const caracter = texto[i] as string;
     if (caracter === '\n') return null;
+
+    /* 🔴 **En privado, la barra es una barra.** Desde 2026-08-28 no se
+       referencian tareas ni tableros en una conversación entre dos personas, y
+       si el disparador siguiera vivo, escribir «12 / 24» o «y/o» abriría un
+       desplegable vacío. Peor que no ofrecerlo es ofrecerlo y que no haya nada. */
+    if (caracter === '/' && !permiteReferencias) return null;
 
     if (caracter === '@' || caracter === '/') {
       const anterior = i === 0 ? '' : (texto[i - 1] as string);
@@ -178,6 +202,9 @@ export function Composer({
   sugerencias,
   onPedirSugerencias,
   permiteMenciones,
+  /* Por defecto sí: quien no lo pasa es un chat de proyecto, que es donde
+     siempre ha estado. Es el `ChatPanel` quien lo apaga en las privadas. */
+  permiteReferencias = true,
   respuestaSlot,
   citaId,
   adjuntosPendientes,
@@ -204,7 +231,10 @@ export function Composer({
   const archivoRef = useRef<HTMLInputElement>(null);
   const pedidas = useRef(false);
 
-  const disparador = useMemo(() => disparadorEn(texto, cursor), [texto, cursor]);
+  const disparador = useMemo(
+    () => disparadorEn(texto, cursor, permiteReferencias),
+    [texto, cursor, permiteReferencias],
+  );
 
   /* El catálogo se pide **la primera vez que hace falta**, no al montar: la
      mayoría de los mensajes no llevan etiqueta, y traerlo siempre sería pagar
@@ -441,13 +471,13 @@ export function Composer({
           {adjuntosPendientes.map((adjunto) => (
             <span
               key={adjunto.id}
-              className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-text-secondary"
-              style={{ background: colors.surfaceElevated }}
+              className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-white"
+              style={{ background: '#131312' }}
             >
               <span className="max-w-40 truncate" title={adjunto.filename}>
                 {adjunto.filename}
               </span>
-              <span className="shrink-0 text-[10px] text-text-disabled">
+              <span className="shrink-0 text-[10px] text-white">
                 {formatBytes(adjunto.size)}
               </span>
               <button
@@ -456,7 +486,7 @@ export function Composer({
                 disabled={subiendo}
                 aria-label={`Quitar ${adjunto.filename}`}
                 title="Quitar"
-                className="shrink-0 cursor-pointer rounded p-0.5 text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0 cursor-pointer rounded p-0.5 text-white transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg
                   className="h-3 w-3"
@@ -484,9 +514,9 @@ export function Composer({
             role="listbox"
             tabIndex={-1}
             aria-label="Sugerencias"
-            className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-xl border border-border"
+            className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-md overflow-hidden rounded-sm border border-border"
             style={{
-              background: colors.surfaceElevated,
+              background: '#131312',
               boxShadow: `0 16px 40px ${alpha(colors.overlay, 55)}`,
             }}
           >
@@ -538,7 +568,7 @@ export function Composer({
                       {sugerencia.estado}
                     </span>
                   )}
-                  <span className="max-w-40 truncate font-sans text-[11px] text-text-disabled">
+                  <span className="max-w-40 truncate font-sans text-[11px] text-white">
                     {sugerencia.contexto}
                   </span>
                 </span>
@@ -548,8 +578,8 @@ export function Composer({
         )}
 
         <div
-          className="flex items-end gap-2 rounded-xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
-          style={{ background: colors.surfaceElevated }}
+          className="flex items-end gap-2 rounded-2xl border border-border-strong p-2 shadow-sm transition-colors focus-within:border-primary"
+          style={{ background: '#131312' }}
         >
           <div className="relative min-w-0 flex-1">
             {/* La capa de debajo: el mismo texto, con las etiquetas pintadas. */}
@@ -583,7 +613,7 @@ export function Composer({
               }}
               /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
                  se pinta aparte con `caret-color`, o el campo parecería muerto. */
-              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-secondary disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
+              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-white disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
               style={{ caretColor: colors.textPrimary }}
             />
           </div>
@@ -599,7 +629,7 @@ export function Composer({
               }
               aria-label="Adjuntar un archivo"
               title="Adjuntar archivo"
-              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               {subiendo ? (
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -649,9 +679,9 @@ export function Composer({
                  una fila que se alinea por abajo (`items-end`). */
               className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg ${
                 compactButtons
-                  ? 'w-9 border border-border bg-surface shadow-sm hover:bg-surfaceElevated'
-                  : 'px-3 hover:bg-surfaceElevated hover:text-text-primary'
-              } font-sans text-xs text-text-secondary transition-colors`}
+                  ? 'w-9 border border-border bg-[#191919] shadow-sm hover:bg-white/5'
+                  : 'px-3 hover:bg-white/5 hover:text-text-primary'
+              } font-sans text-xs text-white transition-colors`}
             >
               {compactButtons ? (
                 <svg
@@ -727,20 +757,20 @@ export function Composer({
          * texto completo sigue a la vista en el compositor ancho.
          */}
         <div
-          className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
+          className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-white mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
         >
           <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
               ↵
             </kbd>{' '}
             enviar
           </span>
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 ⇧
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 ↵
               </kbd>
             </span>{' '}
@@ -748,24 +778,26 @@ export function Composer({
           </span>
           {permiteMenciones && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1.5 font-sans text-[10px] font-medium shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1.5 font-sans text-[10px] font-medium shadow-sm">
                 @
               </kbd>{' '}
               mencionar
             </span>
           )}
-          <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] font-medium shadow-sm">
-              /
-            </kbd>{' '}
-            enlazar tarea
-          </span>
+          {permiteReferencias && (
+            <span className="flex items-center gap-1.5">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] font-medium shadow-sm">
+                /
+              </kbd>{' '}
+              enlazar tarea
+            </span>
+          )}
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 Ctrl
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-surface px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 V
               </kbd>
             </span>{' '}

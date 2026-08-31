@@ -51,7 +51,7 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
 
   return (
     <li
-      className="flex flex-col gap-3 rounded-xl p-3.5 sm:flex-row sm:items-center"
+      className="flex flex-col gap-3 rounded-sm p-3.5 sm:flex-row sm:items-center"
       style={{ background: alpha(colors.border, 30) }}
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -63,7 +63,7 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
         </span>
 
         {invitation.project.description && (
-          <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+          <span className="line-clamp-1 font-sans text-xs text-white">
             {invitation.project.description}
           </span>
         )}

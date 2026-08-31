@@ -24,6 +24,32 @@ export class AuthController {
     return this.authService.loginWithGoogle(dto);
   }
 
+  /**
+   * Manda el correo de una invitación a una organización.
+   *
+   * 🔴 **Es un comando acotado, no un relé de correo.** Este es el único
+   * servicio con `MailService`, y abrirle al gateway una ruta de «manda este
+   * HTML a esta dirección» sería exactamente eso: un relé, con la reputación de
+   * envío de PRAXIS detrás. Aquí llega **qué** hay que decir —a quién, de qué
+   * organización, quién invita y con qué enlace— y la plantilla vive de este
+   * lado, donde vive el resto del correo del producto.
+   *
+   * ⚠️ **No devuelve el token ni lo toca**: lo genera billing-service y solo
+   * viaja dentro del enlace ya montado. Este servicio no sabe qué es una
+   * invitación ni puede crear una.
+   *
+   * ⚠️ **Y no falla hacia fuera.** Si el correo no sale, la invitación ya está
+   * creada y el enlace se devuelve igualmente en la respuesta para poder
+   * pasarlo a mano — que es justo por lo que se sigue devolviendo.
+   */
+  @MessagePattern({ cmd: 'mail_send_invitation' })
+  sendInvitation(
+    @Payload()
+    dto: { email: string; organizacion: string; invitaPor: string | null; enlace: string },
+  ) {
+    return this.authService.enviarInvitacion(dto);
+  }
+
   @MessagePattern({ cmd: 'auth_verify_email' })
   verifyEmail(@Payload() dto: { token: string }) {
     return this.authService.verifyEmail(dto.token);

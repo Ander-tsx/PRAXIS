@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { PraxSidebarIcon } from '../../atoms/PraxAvatar';
+import { PraxAvatar } from '../../atoms/PraxAvatar/PraxAvatar';
 
 /**
  * Un enlace de la barra lateral del área privada.
@@ -38,7 +39,6 @@ const SECTION_PRINCIPAL = 'Principal';
 /** Exportada: `commons/auth/nav.ts` la usa para esconder el grupo entero a
  * quien no administra, en vez de comparar tres `href` sueltos. */
 export const SECTION_ADMINISTRACION = 'Administración';
-const SECTION_GESTION = 'Gestión';
 const SECTION_CONFIGURACION = 'Configuración';
 
 /**
@@ -46,6 +46,10 @@ const SECTION_CONFIGURACION = 'Configuración';
  * junto a una etiqueta de texto, así que ocultarlos al lector de pantalla es lo
  * correcto — pero dentro de un spread el linter de accesibilidad no lo ve y
  * reclama un `<title>` que sobra.
+ *
+ * Los iconos de varios trazos van envueltos en un `<g>` para que el `<svg>`
+ * tenga un solo hijo — buena higiene, aunque no basta para el aviso de claves
+ * de desarrollo que documenta `NavList`.
  */
 const iconProps = {
   className: 'h-5 w-5 shrink-0',
@@ -64,26 +68,10 @@ const iconProps = {
  */
 export const APP_NAV_ITEMS: AppNavItem[] = [
   {
-    label: 'Panel',
-    href: '/dashboard',
+    label: 'Asistente',
+    href: '/assistant',
     section: SECTION_PRINCIPAL,
-    /**
-     * ⚠️ **Era una cuadrícula de cuatro celdas, y ya la usaba otra cosa.** Es
-     * el mismo dibujo que marca «Espacios» dentro de un proyecto, así que en la
-     * misma pantalla había dos sitios distintos con el mismo icono — que es
-     * exactamente lo que un icono viene a evitar.
-     *
-     * Una casa: el Panel es a dónde se vuelve, no una rejilla de contenido.
-     */
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 10.5 12 3l9 7.5M5.5 9.5V19a1 1 0 001 1h3.5v-5h4v5H17a1 1 0 001-1V9.5"
-        />
-      </svg>
-    ),
+    icon: <PraxSidebarIcon />,
   },
   {
     label: 'Proyectos',
@@ -99,84 +87,68 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
       </svg>
     ),
   },
+
+  /* «Análisis» (`/reports`) se retiró del sidebar: la pantalla de análisis no
+     daba valor y está pendiente decidir qué hacer con esa zona. El código de
+     `reports-front` sigue ahí, solo que ya no se enlaza desde la navegación. */
+
+  /*
+   * 🕳️ Aquí estaba «Suscripción» → `/billing`.
+   *
+   * Se quitó de la barra lateral: el plan es de la organización activa, así que
+   * su sitio es el portal de la organización («Plan y asientos», con su botón de
+   * contratar que ahora abre Stripe directo). La tabla comparativa
+   * (`/billing`) **sigue existiendo** —la ruta no se toca— y se llega
+   * por «Comparar los planes» desde ese portal y desde el aviso de cuota del
+   * asistente. Una entrada de barra lateral para una tabla de precios era la
+   * tercera de tres que hablaban de lo mismo.
+   */
   {
-    /**
-     * Las conversaciones privadas.
-     *
-     * Va **justo debajo de Proyectos**, y no al final del bloque de trabajo
-     * como estaba. Se pide desde el uso real: hablar con alguien del equipo
-     * ocurre a la vez que se mira un proyecto, muchas veces sobre él, y tenerlo
-     * a dos entradas de distancia obligaba a saltarse Análisis y Asistente cada
-     * vez. Arriba están los sitios a los que se vuelve a diario; Análisis y
-     * Asistente son de sentarse un rato.
-     */
-    label: 'Mensajes',
-    href: '/chat',
+    label: 'Equipo',
+    href: '/main/team',
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.9 9.9 0 01-4.2-.9L3 21l1.4-4.2A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+          d="M17 20h5V16a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-4a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
         />
       </svg>
     ),
   },
   {
-    label: 'Análisis',
-    href: '/reports',
+    label: 'Facturación',
+    href: '/main/billing',
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
         />
       </svg>
     ),
   },
   {
-    /**
-     * PRAX, el asistente.
-     *
-     * ## Por qué tiene entrada propia
-     *
-     * Vivía dentro de Análisis, en un panel al lado de los gráficos, y eso lo
-     * definía: se le preguntaba por el informe que se estaba viendo. Pero sabe
-     * hacer bastante más —proponer tareas, repartir trabajo, escribir al chat
-     * del equipo— y nada de eso tiene que ver con estar mirando un percentil.
-     * Metido en una esquina, la mitad de lo que sabe no se descubría nunca.
-     *
-     * Va **justo después de Análisis**, y el sitio no es arbitrario: son las
-     * dos entradas donde se para uno a entender el trabajo en vez de a
-     * despacharlo — primero el gráfico, luego a quién preguntarle por él. Lo de
-     * arriba (Panel, Proyectos, Mensajes) es el día a día.
-     *
-     * ⚠️ Sigue estando dentro de Análisis, con el proyecto ya puesto, para quien
-     * mira un gráfico y tiene una duda ahí mismo. Las dos pantallas montan el
-     * mismo organismo (`commons/organisms/AssistantChat`).
-     */
-    label: 'Asistente',
-    href: '/assistant',
+    label: 'Integraciones',
+    href: '/main/integraciones',
     section: SECTION_PRINCIPAL,
-    /**
-     * ⚠️ **El único icono que no es un trazado**: es la cara de PRAX en
-     * miniatura. Un bocadillo con una chispa —que es lo que había— decía
-     * «conversación con una IA», o sea lo mismo que dicen ya otras cincuenta
-     * aplicaciones. La cara dice **quién**, que es lo que hace que se reconozca
-     * de un vistazo entre siete entradas que por lo demás son líneas grises.
-     *
-     * En `xs`, que es la única medida pensada para ir en una fila junto a
-     * iconos de trazo: más grande compite con ellos y deja de leerse como parte
-     * de la misma lista.
-     */
-    icon: <PraxSidebarIcon />,
+    disabled: true,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9 3v4M15 3v4M6 7h12l-1 5a5 5 0 01-10 0L6 7zM9 21v-4M15 21v-4"
+        />
+      </svg>
+    ),
   },
 
   /**
-   * Administración de la plataforma, en tres pantallas — no una.
+   * Administración de la plataforma, en cuatro pantallas — no una.
    *
    * ⚠️ **Las tres rutas ya existían** (`/admin`, `/admin/projects`,
    * `/admin/actividad`) pero solo la primera tenía entrada en la barra: las
@@ -217,6 +189,28 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
+    /**
+     * Las organizaciones de **toda la instalación**, no las tuyas.
+     *
+     * ⚠️ No se confunde con la entrada de Gestión: aquella abre las tuyas —donde
+     * trabajas— y esta la lista completa de quién ha contratado qué. Son la
+     * misma separación que «Proyectos» de Principal y «Proyectos» de
+     * Administración, que ya conviven con el mismo nombre en dos grupos.
+     */
+    label: 'Organizaciones',
+    href: '/admin/organizations',
+    section: SECTION_ADMINISTRACION,
+    icon: (
+      <svg {...iconProps} aria-hidden="true">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4 20V7.5L11 4v16M11 20h9V10.5L11 7.5M7 9.5h1M7 13h1M7 16.5h1M14.5 13h1M14.5 16.5h1"
+        />
+      </svg>
+    ),
+  },
+  {
     label: 'Actividad',
     href: '/admin/actividad',
     section: SECTION_ADMINISTRACION,
@@ -231,82 +225,17 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
 
-  /**
-   * Gestión — todavía no hay backend detrás de ninguna de las tres. Salen
-   * apagadas con «Pronto» a propósito, siguiendo el mismo criterio que ya
-   * usaba Análisis antes de tener servicio: que la estructura del producto se
-   * entienda sin prometer una pantalla que daría 404.
+  /*
+   * 🕳️ Aquí estaba «Sistema» → `/main/settings`.
+   *
+   * Se quitó de la barra: su único contenido era el selector de tema claro/
+   * oscuro, y el modo claro se ha retirado por ahora. Los datos de la cuenta
+   * viven en `/main/profile`, a la que se llega pulsando tu propia ficha. La
+   * ruta `/settings` sigue existiendo y redirige a `/profile`.
    */
   {
-    label: 'Roles y permisos',
-    href: '/dashboard/roles',
-    section: SECTION_GESTION,
-    disabled: true,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3zM10 12l1.5 1.5L14.5 10"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: 'Facturación y suscripción',
-    href: '/dashboard/facturacion',
-    section: SECTION_GESTION,
-    disabled: true,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <rect x="3" y="5.5" width="18" height="13" rx="2.5" />
-        <path strokeLinecap="round" d="M3 10h18M6.5 14.5h3" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Integraciones',
-    href: '/dashboard/integraciones',
-    section: SECTION_GESTION,
-    disabled: true,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M9 3v4M15 3v4M6 7h12l-1 5a5 5 0 01-10 0L6 7zM9 21v-4M15 21v-4"
-        />
-      </svg>
-    ),
-  },
-
-  {
-    /**
-     * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
-     * registro no pide— y por eso **absorbió `/dashboard/profile`** en vez de
-     * enlazarla: una pantalla que solo llevara a otra es un salto de más.
-     */
-    label: 'Configuración del sistema',
-    href: '/dashboard/settings',
-    section: SECTION_CONFIGURACION,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M10.3 4.3a1 1 0 011-.8h1.4a1 1 0 011 .8l.2 1.4a6.5 6.5 0 011.5.9l1.3-.5a1 1 0 011.2.4l.7 1.2a1 1 0 01-.2 1.3l-1.1.9a6.6 6.6 0 010 1.7l1.1.9a1 1 0 01.2 1.3l-.7 1.2a1 1 0 01-1.2.4l-1.3-.5a6.5 6.5 0 01-1.5.9l-.2 1.4a1 1 0 01-1 .8h-1.4a1 1 0 01-1-.8l-.2-1.4a6.5 6.5 0 01-1.5-.9l-1.3.5a1 1 0 01-1.2-.4l-.7-1.2a1 1 0 01.2-1.3l1.1-.9a6.6 6.6 0 010-1.7l-1.1-.9a1 1 0 01-.2-1.3l.7-1.2a1 1 0 011.2-.4l1.3.5a6.5 6.5 0 011.5-.9l.2-1.4z"
-        />
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M14.5 12a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: 'Centro de ayuda',
-    href: '/dashboard/ayuda',
+    label: 'Ayuda',
+    href: '/ayuda',
     section: SECTION_CONFIGURACION,
     disabled: true,
     icon: (
@@ -320,8 +249,8 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
   {
-    label: 'Soporte al cliente',
-    href: '/dashboard/soporte',
+    label: 'Soporte',
+    href: '/soporte',
     section: SECTION_CONFIGURACION,
     disabled: true,
     icon: (

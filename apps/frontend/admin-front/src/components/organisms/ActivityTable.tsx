@@ -37,7 +37,7 @@ export function ActivityTable({ entradas }: { entradas: AdminActivityEntry[] }) 
       header: 'Cuándo',
       track: { fr: 1 },
       cell: (entrada) => (
-        <p className="font-sans text-xs text-text-secondary">{fechaYHora(entrada.createdAt)}</p>
+        <p className="font-sans text-xs text-white">{fechaYHora(entrada.createdAt)}</p>
       ),
     },
     {
@@ -68,7 +68,7 @@ export function ActivityTable({ entradas }: { entradas: AdminActivityEntry[] }) 
               {entrada.targetLabel || entrada.targetId}
             </p>
             {rol && (
-              <p className="font-sans text-xs text-text-secondary">
+              <p className="font-sans text-xs text-white">
                 Rol resultante: <span className="text-text-primary">{rol}</span>
               </p>
             )}
@@ -81,8 +81,8 @@ export function ActivityTable({ entradas }: { entradas: AdminActivityEntry[] }) 
       header: 'Por qué',
       track: { fr: 2 },
       cell: (entrada) => (
-        <p className="font-serif text-sm text-text-secondary">
-          {entrada.reason || <span className="text-text-disabled">Sin motivo anotado</span>}
+        <p className="font-serif text-sm text-white">
+          {entrada.reason || <span className="text-white">Sin motivo anotado</span>}
         </p>
       ),
     },

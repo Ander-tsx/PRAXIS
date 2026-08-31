@@ -73,7 +73,7 @@ export function DistributionBars({ data, unit }: { data: BarDatum[]; unit: strin
        le dio quien la colocó, y un «Sin datos.» en la primera línea con medio
        palmo de vacío debajo se lee como un gráfico que no terminó de cargar. */
     return (
-      <p className="flex h-full min-h-32 items-center justify-center text-center font-sans text-sm text-text-disabled">
+      <p className="flex h-full min-h-32 items-center justify-center text-center font-sans text-sm text-white">
         Sin datos.
       </p>
     );
@@ -139,7 +139,7 @@ export function FlowChart({ flow }: { flow: ReportFlow }) {
         {flow.columnas.map((columna) => (
           <li
             key={columna.id}
-            className="flex items-center gap-2 font-sans text-xs text-text-secondary"
+            className="flex items-center gap-2 font-sans text-xs text-white"
           >
             <span
               aria-hidden="true"

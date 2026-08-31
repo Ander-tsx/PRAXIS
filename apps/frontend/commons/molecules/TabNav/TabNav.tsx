@@ -72,7 +72,7 @@ export function TabNav({
      * falta y en táctil se arrastra igual.
      */
     <nav
-      className="scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border"
+      className="scrollbar-none flex gap-1 overflow-x-auto overflow-y-hidden border-b border-white/[0.08]"
       aria-label={ariaLabel}
     >
       {tabs.map((tab) => {
@@ -91,8 +91,8 @@ export function TabNav({
                 className={[
                   'rounded-full px-1.5 py-0.5 font-sans text-[11px] tabular-nums',
                   isActive
-                    ? 'bg-primary-muted text-primary'
-                    : 'bg-surface-elevated text-text-disabled',
+                    ? 'bg-white/10 text-white'
+                    : 'bg-white/5 text-white',
                 ].join(' ')}
               >
                 {tab.count}
@@ -125,7 +125,7 @@ export function tabLinkClasses(isActive: boolean): string {
   return [
     'shrink-0 border-b-2 px-4 py-3 font-sans text-sm transition-colors -mb-px',
     isActive
-      ? 'border-primary font-semibold text-text-primary'
-      : 'border-transparent font-medium text-text-secondary hover:text-text-primary',
+      ? 'border-white font-semibold text-white'
+      : 'border-transparent font-medium text-white hover:text-white',
   ].join(' ');
 }

@@ -50,7 +50,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
     /* `fieldset` deshabilitado mientras guarda: bloquea las seis de una vez sin
        repetir `disabled` en cada botón. */
     <fieldset
-      className="grid min-w-0 gap-2 sm:grid-cols-2"
+      className="flex flex-wrap gap-3"
       disabled={guardando}
       aria-busy={guardando}
     >
@@ -66,13 +66,10 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
             type="button"
             onClick={() => void elegir(clave)}
             aria-pressed={puesta}
-            className="flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+            className={`flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:transform-none ${puesta ? 'shadow-lg border-transparent' : 'border-white/10 hover:border-white/20'}`}
             style={{
-              /* El color del estado tiñe la opción elegida: es lo mismo que
-                 distingue su punto, así que no hay que aprenderse un segundo
-                 código. Las demás quedan en el borde de siempre. */
-              borderColor: puesta ? descripcion.color : colors.border,
-              background: puesta ? alpha(descripcion.color, 12) : 'transparent',
+              background: puesta ? alpha(descripcion.color, 15) : 'rgba(255, 255, 255, 0.02)',
+              boxShadow: puesta ? `0 0 0 1px ${descripcion.color}` : 'none',
             }}
           >
             <span
@@ -84,7 +81,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
               <span className="font-sans text-sm font-medium text-text-primary">
                 {descripcion.etiqueta}
               </span>
-              <span className="font-sans text-xs text-text-secondary">{descripcion.ayuda}</span>
+              <span className="font-sans text-xs text-white">{descripcion.ayuda}</span>
             </span>
           </button>
         );

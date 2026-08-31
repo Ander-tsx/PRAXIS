@@ -62,11 +62,7 @@ export function ActivityToolbar({ accion, desde, hasta }: ActivityToolbarProps) 
   const hayFiltros = Boolean(valores.accion || valores.desde || valores.hasta);
 
   return (
-    <form
-      onSubmit={aplicar}
-      noValidate
-      className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 sm:flex-row sm:items-end"
-    >
+    <form onSubmit={aplicar} noValidate className="flex flex-col gap-3 sm:flex-row sm:items-end">
       <div className="w-full sm:max-w-xs">
         <Select
           label="Acción"

@@ -52,7 +52,7 @@ export function TaskMobileMoveSheet({
         <h3 className="shrink-0 px-2 text-center font-sans text-sm font-semibold text-text-primary">
           Mover a...
         </h3>
-        
+
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {columns.map((col) => {
             const isCurrent = col.id === currentColumnId;
@@ -74,7 +74,7 @@ export function TaskMobileMoveSheet({
               >
                 <span className="truncate">{col.name}</span>
                 {isCurrent && (
-                  <span className="shrink-0 text-xs text-text-secondary">(Actual)</span>
+                  <span className="shrink-0 text-xs text-white">(Actual)</span>
                 )}
               </button>
             );

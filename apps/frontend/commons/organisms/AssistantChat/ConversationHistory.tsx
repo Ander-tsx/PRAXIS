@@ -113,15 +113,15 @@ export function ConversationHistory({
           es lo que se viene a leer— una fila hacia abajo. */}
       <div className="scrollbar-slim flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
         {listaFiltrada === null && (
-          <p className="py-8 text-center font-sans text-sm text-text-disabled">Cargando…</p>
+          <p className="py-8 text-center font-sans text-sm text-white">Cargando…</p>
         )}
 
         {listaFiltrada !== null && listaFiltrada.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
+          <div className="rounded-sm border border-dashed border-border px-6 py-10 text-center">
             <p className="font-display text-base text-text-primary">
               Todavía no has hablado con el asistente
             </p>
-            <p className="mt-1 font-sans text-sm text-text-secondary">
+            <p className="mt-1 font-sans text-sm text-white">
               Las conversaciones se guardan y puedes retomarlas cuando quieras.
             </p>
           </div>
@@ -185,7 +185,7 @@ export function ConversationHistory({
                  * lista daría un salto al pedir confirmación en la de arriba.
                  */
                 <>
-                  <span className="min-w-0 flex-1 truncate font-sans text-sm text-text-secondary">
+                  <span className="min-w-0 flex-1 truncate font-sans text-sm text-white">
                     ¿Borrar «{conversacion.title}»?
                   </span>
                   <button
@@ -199,7 +199,7 @@ export function ConversationHistory({
                   <button
                     type="button"
                     onClick={() => setBorrando(null)}
-                    className="shrink-0 rounded-md px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                    className="shrink-0 rounded-md px-2 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary"
                   >
                     No
                   </button>
@@ -243,7 +243,7 @@ export function ConversationHistory({
                           : (nombresDeProyecto[conversacion.projectId] ?? 'otro proyecto')
                         : 'sin proyecto'}
                     </span>
-                    <span className="truncate font-sans text-xs text-text-disabled">
+                    <span className="truncate font-sans text-xs text-white">
                       {cuando(conversacion.updatedAt)}
                       {activa && ' · abierta'}
                     </span>
@@ -275,7 +275,7 @@ export function ConversationHistory({
                   }}
                   aria-label={`Renombrar «${conversacion.title}»`}
                   title="Renombrar"
-                  className="rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+                  className="rounded-md p-1.5 text-white transition-colors hover:bg-surface hover:text-text-primary"
                 >
                   <svg
                     className="h-3.5 w-3.5"
@@ -297,7 +297,7 @@ export function ConversationHistory({
                   onClick={() => borrar(conversacion.id)}
                   aria-label={`Borrar «${conversacion.title}»`}
                   title="Borrar"
-                  className="rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface hover:text-error"
+                  className="rounded-md p-1.5 text-white transition-colors hover:bg-surface hover:text-error"
                 >
                   <svg
                     className="h-3.5 w-3.5"
@@ -372,7 +372,7 @@ function AccionDeFila({
       onClick={onClick}
       aria-label={etiqueta}
       title={etiqueta}
-      className={`shrink-0 rounded-md p-1.5 text-text-disabled transition-colors hover:bg-surface ${
+      className={`shrink-0 rounded-md p-1.5 text-white transition-colors hover:bg-surface ${
         peligroso ? 'hover:text-error' : 'hover:text-text-primary'
       }`}
     >

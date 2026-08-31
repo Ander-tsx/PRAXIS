@@ -38,7 +38,7 @@ export function LeaveProjectButton({ projectId, projectName }: LeaveProjectButto
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="projectId" value={projectId} />
 
-          <p className="font-sans text-sm text-text-secondary">
+          <p className="font-sans text-sm text-white">
             Quien administre el proyecto tendrá que volver a invitarte si quieres regresar.
           </p>
 

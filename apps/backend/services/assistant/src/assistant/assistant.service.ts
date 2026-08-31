@@ -10,7 +10,12 @@ import {
   type AssistantChatResult,
   type AssistantPlanName,
   type AssistantProposal,
+  type AssistantQuota,
   MAX_HISTORIAL,
+  PLAN_POR_DEFECTO,
+  QUOTA_EXCEEDED_CODE,
+  type QuotaExceededDetails,
+  QuotaKind,
   type ReportChartShape,
   type ReportMetric,
   validarGrafico,
@@ -50,6 +55,35 @@ interface ChatPayload {
    */
   conversationId?: string;
   history?: { role: string; text: string }[];
+  /**
+   * Cuántos mensajes al mes da su plan. Lo resuelve el gateway contra billing.
+   *
+   * ⚠️ **Ausente significa «usa el valor por defecto», no «sin límite».** Desde
+   * la etapa Enterprise hay cinco planes y el de alguien puede venir de la
+   * organización de su empresa, que este servicio no conoce. Ver
+   * `QuotaService.limite`.
+   */
+  limiteMensual?: number | null;
+  /**
+   * En qué organización se está gastando, para la clave del contador.
+   *
+   * ⚠️ **Llega resuelta por el gateway y viaja junto al tope, no aparte.** Es la
+   * misma resolución que produjo `limiteMensual`: contar en una organización y
+   * negar contra el tope de otra deja a alguien bloqueado sin explicación
+   * posible. Ver `QuotaService.iaDe` en el gateway.
+   */
+  organizationId?: string | null;
+  /**
+   * Qué plan puso ese tope. Solo se usa para **explicarlo** al agotarse.
+   *
+   * ⚠️ Llega del gateway junto al tope y en la misma resolución, no en dos: si
+   * se pidieran por separado y alguien cambiara de plan entre medias, el 402
+   * saldría diciendo «tu plan Pro llega hasta 13».
+   *
+   * Este servicio no lo interpreta ni lo valida — es una cadena que viaja hasta
+   * el `details` del error—, así que un plan nuevo no obliga a tocarlo.
+   */
+  planTier?: string | null;
   /** Mapa efectivo, ya expandido por jerarquía. Lo resuelve el gateway. */
   permisos: Record<string, boolean>;
   miembros: { userId: string; nombre: string }[];
@@ -226,8 +260,8 @@ export class AssistantService {
   }
 
   /** Cuánto lleva gastado. Lo pide la página al cargar, para pintar el contador. */
-  estadoCuota(userId: string) {
-    return this.quota.estado(userId);
+  estadoCuota(userId: string, limiteMensual?: number | null, organizationId?: string | null) {
+    return this.quota.estado(userId, limiteMensual, organizationId);
   }
 
   /**
@@ -284,18 +318,14 @@ export class AssistantService {
    * cobró — se prefiere eso a un hilo con huecos, que es lo que se lee.
    */
   async chat(payload: ChatPayload): Promise<AssistantChatResult> {
-    const cuotaPrevia = await this.quota.estado(payload.userId);
+    const cuotaPrevia = await this.quota.estado(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
-      /* 429 y no 403: no es que no pueda, es que ya no le quedan. El mensaje
-         lleva la fecha de reinicio porque un límite sin fecha es un muro. */
-      throw new RpcException({
-        statusCode: 429,
-        message:
-          `Has gastado los ${cuotaPrevia.limite} mensajes de este mes. ` +
-          'Vuelven el dia 1 del mes que viene.',
-        details: { cuota: cuotaPrevia },
-      });
+      throw cuotaAgotada(cuotaPrevia, payload.planTier);
     }
 
     const conversationId = await this.conversaciones.resolver(
@@ -381,7 +411,11 @@ export class AssistantService {
         ...(briefing ? {} : { maxOutputTokens: MAX_TOKENS_PLANTILLA }),
       });
 
-      cuota = await this.quota.consumir(payload.userId);
+      cuota = await this.quota.consumir(
+        payload.userId,
+        payload.limiteMensual,
+        payload.organizationId,
+      );
     } catch (error) {
       if (error instanceof RpcException) {
         const details = (error.getError() as any).details || {};
@@ -559,17 +593,21 @@ export class AssistantService {
     ajuste?: string;
     /** El plan anterior en JSON, tal cual se le devolvió al cliente. */
     previa?: string;
+    /** El tope mensual de su plan. Ver `ChatPayload.limiteMensual`. */
+    limiteMensual?: number | null;
+    /** Dónde se gasta. Ver `ChatPayload.organizationId`. */
+    organizationId?: string | null;
+    /** Qué plan lo puso. Ver `ChatPayload.planTier`. */
+    planTier?: string | null;
   }) {
-    const cuotaPrevia = await this.quota.estado(payload.userId);
+    const cuotaPrevia = await this.quota.estado(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     if (cuotaPrevia.usados >= cuotaPrevia.limite) {
-      throw new RpcException({
-        statusCode: 429,
-        message:
-          `Has gastado los ${cuotaPrevia.limite} mensajes de este mes. ` +
-          'Vuelven el dia 1 del mes que viene.',
-        details: { cuota: cuotaPrevia },
-      });
+      throw cuotaAgotada(cuotaPrevia, payload.planTier);
     }
 
     /**
@@ -600,7 +638,11 @@ export class AssistantService {
     });
 
     /* Si Gemini falló, `chat` ya lanzó: la cuota no se toca. Ver `GeminiError`. */
-    const cuota = await this.quota.consumir(payload.userId);
+    const cuota = await this.quota.consumir(
+      payload.userId,
+      payload.limiteMensual,
+      payload.organizationId,
+    );
 
     /**
      * La primera llamada válida, y solo esa.
@@ -1460,4 +1502,48 @@ export class AssistantService {
       details,
     });
   }
+}
+
+/**
+ * El error de «no te quedan mensajes este mes».
+ *
+ * ## 🔴 Era un 429, y eso lo hacía indistinguible del límite de peticiones
+ *
+ * El gateway limita a 300 peticiones por minuto y por cuenta, y responde **429**.
+ * Este error era también un 429, así que la pantalla no podía separar dos cosas
+ * que no se parecen en nada: una se arregla esperando quince segundos y la otra
+ * no se arregla en doce días salvo pagando. El frontend acabó decidiéndolo por
+ * `status === 429` a secas —o sea, adivinando—, y un throttle en mitad de una
+ * conversación se leía como «se te acabó el mes».
+ *
+ * Ahora es un **402 con `QUOTA_EXCEEDED`**, que es lo que ya hablaban las otras
+ * dos cuotas del plan —proyectos y miembros— desde `QuotaService` en el gateway.
+ * Las tres dicen lo mismo de la misma forma y la pantalla ofrece la misma salida
+ * sin caso especial. Es la decisión D4 del plan Enterprise, que esta ruta se
+ * había saltado por ser anterior.
+ *
+ * ⚠️ **`details` conserva `cuota` además del detalle nuevo.** El contador del
+ * chat lo lee para pintarse al agotarse, y quitarlo dejaría la barra en el
+ * último valor que vio — o sea, sin llegar nunca al tope que acaba de alcanzar.
+ */
+function cuotaAgotada(cuota: AssistantQuota, planTier?: string | null): RpcException {
+  const detalle: QuotaExceededDetails = {
+    kind: QuotaKind.IA_MENSUAL,
+    /* El plan lo resuelve el gateway contra billing-service: aquí solo se
+       transporta. Sin él —una llamada TCP directa, sin gateway— se dice el que
+       vale por defecto en vez de inventarse uno. */
+    tier: (planTier as QuotaExceededDetails['tier']) ?? PLAN_POR_DEFECTO,
+    tope: cuota.limite,
+    actual: cuota.usados,
+    reiniciaEn: cuota.reinicia,
+  };
+
+  return new RpcException({
+    statusCode: 402,
+    code: QUOTA_EXCEEDED_CODE,
+    message:
+      `Has gastado los ${cuota.limite} mensajes de este mes. ` +
+      'Vuelven el día 1 del mes que viene.',
+    details: { ...detalle, cuota },
+  });
 }

@@ -156,7 +156,7 @@ export function LandingHero({ isAuthenticated = false }: LandingHeroProps) {
             >
               <RollCta
                 size="lg"
-                href={isAuthenticated ? '/dashboard' : '/auth/signup'}
+                href={isAuthenticated ? '/projects' : '/auth/signup'}
                 label={isAuthenticated ? 'Ir al panel' : 'Comenzar gratis'}
               />
               {!isAuthenticated && (

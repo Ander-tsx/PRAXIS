@@ -1,5 +1,5 @@
 import { request as contextoDePeticion, expect, test } from '@playwright/test';
-import { nombreUnico, registrar } from '../../fixtures/api';
+import { comoBearer, nombreUnico, registrar } from '../../fixtures/api';
 import { crearCuentaYEntrar, crearProyectoParaLaPrueba } from '../../fixtures/ui';
 
 /**
@@ -27,7 +27,6 @@ test.describe('Invitar al proyecto', () => {
     });
     const primera = await registrar(api);
     const segunda = await registrar(api);
-    await api.dispose();
 
     await crearCuentaYEntrar(page);
 
@@ -36,6 +35,37 @@ test.describe('Invitar al proyecto', () => {
 
     await page.getByRole('link', { name: proyecto }).first().click();
     await expect(page).toHaveURL(/\/projects\/[^/]+$/);
+
+    /**
+     * ⚠️ **El diálogo de invitar al proyecto solo lista a quien ya tiene asiento
+     * en la organización.** Así que las dos personas hay que meterlas antes en la
+     * organización del dueño —por invitación y aceptación con su propio token—.
+     * El plan gratuito da tres asientos: dueño + estas dos, y entran justas.
+     */
+    const orgs = await (await page.request.get('/projects/api/gateway/me/organizations')).json();
+    const orgId = (Array.isArray(orgs?.data) ? orgs.data : [])[0]?.id as string;
+    expect(orgId, 'La cuenta nueva trae su organización personal').toBeTruthy();
+
+    const roles = await (
+      await page.request.get(`/projects/api/gateway/organizations/${orgId}/roles`)
+    ).json();
+    const roleId = (Array.isArray(roles?.data) ? roles.data : [])[0]?.id as string;
+    expect(roleId, 'La organización trae al menos un papel asignable').toBeTruthy();
+
+    for (const invitado of [primera, segunda]) {
+      const inv = await page.request.post(`/projects/api/gateway/organizations/${orgId}/members`, {
+        data: { email: invitado.email, roleId },
+      });
+      expect(inv.ok(), `crear invitación de organización para ${invitado.email}`).toBeTruthy();
+      const enlace = (await inv.json())?.data?.enlace as string;
+      const token = new URL(enlace).searchParams.get('token');
+      const aceptada = await api.post('/api/me/organizations/invitations/accept', {
+        headers: comoBearer(invitado.accessToken),
+        data: { token },
+      });
+      expect(aceptada.status(), `${invitado.email} acepta su invitación`).toBe(200);
+    }
+    await api.dispose();
 
     /* Las pestañas son enlaces con `?tab=`, no `role="tab"`. */
     await page.goto(`${new URL(page.url()).pathname}?tab=equipo`);
@@ -63,8 +93,9 @@ test.describe('Invitar al proyecto', () => {
         `el panel debería abrirse en la vuelta ${vuelta + 1}`,
       ).toBeVisible();
 
-      await page.getByRole('searchbox', { name: 'Buscar persona' }).fill(invitado.email);
-      await page.getByRole('button', { name: 'Buscar' }).click();
+      /* El buscador filtra en vivo mientras se escribe: ya no hay botón «Buscar»,
+         y su etiqueta es «Buscar en el equipo». */
+      await page.getByRole('searchbox', { name: 'Buscar en el equipo' }).fill(invitado.email);
 
       await page
         .getByRole('button', { name: new RegExp(invitado.email, 'i') })

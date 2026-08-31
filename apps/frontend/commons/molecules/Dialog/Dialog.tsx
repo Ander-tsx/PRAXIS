@@ -120,14 +120,14 @@ export function Dialog({
           <h3 id={titleId} className="font-display text-2xl text-text-primary">
             {title}
           </h3>
-          {description && <p className="font-sans text-sm text-text-secondary">{description}</p>}
+          {description && <p className="font-sans text-sm text-white">{description}</p>}
         </div>
 
         <button
           type="button"
           onClick={onClose}
           aria-label="Cerrar"
-          className="shrink-0 rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="shrink-0 rounded-md p-1 text-white transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <svg
             className="h-5 w-5"

@@ -47,9 +47,22 @@ export class ChannelsService {
    * vería la mitad de lo hablado. El índice único del par es lo que lo garantiza,
    * pero solo funciona si siempre se guarda en el mismo orden.
    *
-   * ⚠️ **Solo se puede abrir con quien comparta algún proyecto contigo.** Sin
-   * esa comprobación, el chat privado sería un directorio de mensajería abierto
-   * a toda la plataforma: cualquiera con un `userId` podría escribir a cualquiera.
+   * ## 🔴 Quién autoriza esto cambió el 2026-08-28
+   *
+   * La regla del producto es **«compartís organización»**, y esa la resuelve el
+   * gateway: la membresía de organización vive en billing-service, y este
+   * servicio no le habla a propósito. Llega ya decidida en
+   * `bypassPermissionCheck`.
+   *
+   * Lo que queda aquí es el **suelo**: compartir algún proyecto. Es un
+   * subconjunto estricto de la regla nueva —quien está en un proyecto está por
+   * fuerza en su organización, desde que no hay invitados externos— así que no
+   * puede autorizar nada que el gateway niegue, y mantiene protegida la ruta TCP
+   * de quien llame a este servicio sin pasar por delante.
+   *
+   * ⚠️ Sin una de las dos, el chat privado sería un directorio de mensajería
+   * abierto a toda la plataforma: cualquiera con un `userId` podría escribir a
+   * cualquiera.
    */
   async directo(
     unUsuario: string,
@@ -74,7 +87,7 @@ export class ChannelsService {
     if (!bypassPermissionCheck && !(await this.compartenProyecto(unUsuario, otroUsuario))) {
       throw new RpcException({
         statusCode: 403,
-        message: 'Solo puedes escribir a quien comparta algún proyecto contigo.',
+        message: 'Solo puedes escribir a quien comparta alguna organización contigo.',
       });
     }
 

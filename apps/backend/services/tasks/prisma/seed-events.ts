@@ -77,6 +77,17 @@ const NOMBRE_PROYECTO = 'Sprint histórico (datos de demostración)';
 const SLUG_PROYECTO = 'sprint-historico-datos-de-demostracion';
 
 /**
+ * La organización dueña del proyecto fabricado.
+ *
+ * `Project.organizationId` pasó a `NOT NULL` en la etapa de organizaciones y
+ * este INSERT crudo no se actualizó —justo lo que avisa el comentario de
+ * `SLUG_PROYECTO`—: la siembra reventaba con `null value in column
+ * "organizationId"`. Es el **mismo UUID a fuego** que usa `projects/seed.ts`
+ * (`ORG_DEMO_ID`); no hay clave foránea, solo el acuerdo de escribirlo igual.
+ */
+const ORG_DEMO_ID = '99999999-0000-4000-8000-000000000010';
+
+/**
  * Cuánto historial se fabrica.
  *
  * **16 semanas y no 8.** `weekly` acepta hasta 52 y dibuja una serie: con ocho
@@ -279,10 +290,11 @@ async function main() {
     await prisma.task.deleteMany({ where: { projectId } });
   } else {
     const creado = await prisma.$queryRaw<{ id: string }[]>`
-      INSERT INTO projects.projects (id, name, slug, description, "ownerId", "createdAt", "updatedAt")
+      INSERT INTO projects.projects
+        (id, name, slug, description, "ownerId", "organizationId", "createdAt", "updatedAt")
       VALUES (gen_random_uuid(), ${NOMBRE_PROYECTO}, ${SLUG_PROYECTO},
               ${'Historial fabricado para poder enseñar los reportes. No mide trabajo real.'},
-              ${dueno}, ${arranque}, now())
+              ${dueno}, ${ORG_DEMO_ID}, ${arranque}, now())
       RETURNING id
     `;
     projectId = creado[0].id;
@@ -324,48 +336,61 @@ async function main() {
     }
   }
 
-  /* Espacio, tablero y columnas: se recrean solo si no están. */
-  let columnas = await prisma.$queryRaw<{ id: string; name: string; order: number }[]>`
-    SELECT c.id, c.name, c."order" FROM projects.board_columns c
-      JOIN projects.boards b ON b.id = c."boardId"
+  /* Espacio, tableros y columnas: se recrean solo si no están. */
+  const boards = await prisma.$queryRaw<{ id: string; name: string }[]>`
+    SELECT b.id, b.name FROM projects.boards b
       JOIN projects.workspaces w ON w.id = b."workspaceId"
      WHERE w."projectId" = ${projectId}::text
-     ORDER BY c."order"
   `;
 
-  let boardId: string;
+  let devBoardId: string;
+  let qaBoardId: string;
+  let devColumnas: { id: string; name: string; order: number }[] = [];
+  let qaColumnas: { id: string; name: string; order: number }[] = [];
 
-  if (columnas.length === 0) {
+  if (boards.length < 2) {
+    await prisma.$executeRaw`DELETE FROM projects.workspaces WHERE "projectId" = ${projectId}::text`;
+
     const ws = await prisma.$queryRaw<{ id: string }[]>`
       INSERT INTO projects.workspaces (id, name, "projectId", "createdAt")
-      VALUES (gen_random_uuid(), 'Sprint', ${projectId}::text, ${arranque}) RETURNING id
+      VALUES (gen_random_uuid(), 'Engineering', ${projectId}::text, ${arranque}) RETURNING id
     `;
-    const board = await prisma.$queryRaw<{ id: string }[]>`
+
+    const devBoard = await prisma.$queryRaw<{ id: string }[]>`
       INSERT INTO projects.boards (id, name, "workspaceId", "createdAt")
-      VALUES (gen_random_uuid(), 'Tablero del sprint', ${ws[0].id}::text, ${arranque}) RETURNING id
+      VALUES (gen_random_uuid(), 'Development', ${ws[0].id}::text, ${arranque}) RETURNING id
     `;
-    boardId = board[0].id;
+    devBoardId = devBoard[0].id;
+
+    const qaBoard = await prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO projects.boards (id, name, "workspaceId", "createdAt")
+      VALUES (gen_random_uuid(), 'QA', ${ws[0].id}::text, ${arranque}) RETURNING id
+    `;
+    qaBoardId = qaBoard[0].id;
+
     for (const col of COLUMNAS) {
       await prisma.$executeRaw`
         INSERT INTO projects.board_columns (id, name, "order", color, "boardId")
-        VALUES (gen_random_uuid(), ${col.name}, ${col.order}, ${col.color}, ${boardId}::text)
+        VALUES (gen_random_uuid(), ${col.name}, ${col.order}, ${col.color}, ${devBoardId}::text)
+      `;
+      await prisma.$executeRaw`
+        INSERT INTO projects.board_columns (id, name, "order", color, "boardId")
+        VALUES (gen_random_uuid(), ${col.name}, ${col.order}, ${col.color}, ${qaBoardId}::text)
       `;
     }
-    columnas = await prisma.$queryRaw`
-      SELECT id, name, "order" FROM projects.board_columns
-       WHERE "boardId" = ${boardId}::text ORDER BY "order"
-    `;
   } else {
-    const b = await prisma.$queryRaw<{ boardId: string }[]>`
-      SELECT c."boardId" FROM projects.board_columns c
-        JOIN projects.boards b ON b.id = c."boardId"
-        JOIN projects.workspaces w ON w.id = b."workspaceId"
-       WHERE w."projectId" = ${projectId}::text LIMIT 1
-    `;
-    boardId = b[0].boardId;
+    devBoardId = boards.find((b) => b.name === 'Development')?.id ?? boards[0].id;
+    qaBoardId = boards.find((b) => b.name === 'QA')?.id ?? boards[1].id;
   }
 
-  const cierre = columnas[columnas.length - 1];
+  devColumnas = await prisma.$queryRaw`
+    SELECT id, name, "order" FROM projects.board_columns
+     WHERE "boardId" = ${devBoardId}::text ORDER BY "order"
+  `;
+  qaColumnas = await prisma.$queryRaw`
+    SELECT id, name, "order" FROM projects.board_columns
+     WHERE "boardId" = ${qaBoardId}::text ORDER BY "order"
+  `;
   const inicio = new Date(Date.now() - SEMANAS * 7 * DIA);
 
   /* Las etiquetas se crean una vez y sobreviven a las re-ejecuciones: borrar las
@@ -414,18 +439,25 @@ async function main() {
      * Dos tercios llegan al final; el resto se queda por el camino, que es lo
      * que da volumen a las bandas intermedias del flujo acumulado.
      */
+    const isQA = Math.random() < 0.3;
+    const currentBoardId = isQA ? qaBoardId : devBoardId;
+    const currentColumnas = isQA ? qaColumnas : devColumnas;
+    const currentCierre = currentColumnas[currentColumnas.length - 1];
+
     const llegaAlFinal = Math.random() < 0.66;
-    const hasta = llegaAlFinal ? columnas.length : 1 + Math.floor(entre(1, columnas.length - 1));
-    const paradas = columnas.slice(1, hasta);
+    const hasta = llegaAlFinal
+      ? currentColumnas.length
+      : 1 + Math.floor(entre(1, currentColumnas.length - 1));
+    const paradas = currentColumnas.slice(1, hasta);
     const eventos: {
       type: string;
       fromColumnId?: string;
       toColumnId?: string;
       occurredAt: Date;
-    }[] = [{ type: 'CREATED', toColumnId: columnas[0].id, occurredAt: nacida }];
+    }[] = [{ type: 'CREATED', toColumnId: currentColumnas[0].id, occurredAt: nacida }];
 
     let momento = nacida;
-    let actual = columnas[0];
+    let actual = currentColumnas[0];
 
     for (const parada of paradas) {
       /* El tiempo en cada columna sale de una distribución con cola: casi
@@ -444,22 +476,23 @@ async function main() {
       actual = parada;
     }
 
-    const estaCerrada = actual.id === cierre.id;
+    const estaCerrada = actual.id === currentCierre.id;
 
     /**
-     * El encargado se elige **antes** que la etiqueta, y no al revés.
-     *
-     * La etiqueta sale del reparto de esa persona, así que la correlación entre
-     * quién lleva algo y de qué es queda en el dato. Sorteadas por separado no
-     * habría nada que aprender: todo el mundo tendría de todo.
+     * El encargado principal se elige **antes** que la etiqueta, y no al revés.
+     * Modificado para tener entre 1 y 4 encargados para la demo.
      */
-    const indiceEncargado = Math.floor(Math.random() * personas.length);
-    const encargado = personas[indiceEncargado];
-    /* El sesgo de etiquetas se conserva **también sin encargados**: quien mira
-       el reparto por etiqueta tiene que ver una mezcla creíble, y con un sorteo
-       uniforme saldrían las cuatro iguales, que es lo que delata un dato
-       inventado. Lo que se pierde sin asignar es la correlación entre persona y
-       especialidad, no la forma del reparto. */
+    const posibles = [1, 1, 1, 1, 2, 2, 3, 4];
+    let numEncargados = posibles[Math.floor(Math.random() * posibles.length)];
+    if (numEncargados > personas.length) numEncargados = personas.length;
+    if (sinAsignar) numEncargados = 0;
+
+    const seleccionados = [...personas]
+      .sort(() => 0.5 - Math.random())
+      .slice(0, Math.max(1, numEncargados));
+    const encargadoPrincipal = seleccionados[0];
+    const indiceEncargado = personas.findIndex((p) => p.userId === encargadoPrincipal.userId);
+
     const reparto = ESPECIALIDAD[indiceEncargado % ESPECIALIDAD.length];
 
     /* Casi siempre una etiqueta, a veces dos: una tarea puede ser de frontend y
@@ -471,11 +504,21 @@ async function main() {
       if (Math.random() < 0.25) etiquetas.add(azarConPesos(reparto));
     }
 
+    const asignaciones = sinAsignar
+      ? undefined
+      : {
+          create: seleccionados.map((enc) => ({
+            userId: enc.userId,
+            assignedBy: dueno,
+            assignedAt: nacida,
+          })),
+        };
+
     const tarea = await prisma.task.create({
       data: {
         title: titulo,
         status: actual.name,
-        boardId,
+        boardId: currentBoardId,
         columnId: actual.id,
         reporterId: dueno,
         projectId,
@@ -484,11 +527,7 @@ async function main() {
         createdAt: nacida,
         completedAt: estaCerrada ? momento : null,
         dueDate: new Date(nacida.getTime() + entre(3, 20) * DIA),
-        assignees: sinAsignar
-          ? undefined
-          : {
-              create: [{ userId: encargado.userId, assignedBy: dueno, assignedAt: nacida }],
-            },
+        assignees: asignaciones,
         labels: {
           create: [...etiquetas].map((nombre) => ({
             labelId: etiquetasPorNombre.get(nombre)!,
@@ -498,7 +537,7 @@ async function main() {
     });
 
     if (estaCerrada) {
-      eventos.push({ type: 'COMPLETED', toColumnId: cierre.id, occurredAt: momento });
+      eventos.push({ type: 'COMPLETED', toColumnId: currentCierre.id, occurredAt: momento });
       cerradas++;
     }
 
@@ -506,7 +545,7 @@ async function main() {
       data: eventos.map((evento) => ({
         taskId: tarea.id,
         projectId,
-        boardId,
+        boardId: currentBoardId,
         type: evento.type as never,
         fromColumnId: evento.fromColumnId ?? null,
         toColumnId: evento.toColumnId ?? null,

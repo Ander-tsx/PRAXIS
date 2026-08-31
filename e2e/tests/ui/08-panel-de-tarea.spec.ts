@@ -141,9 +141,7 @@ test.describe('Panel de detalle de una tarea', () => {
      * la anterior. Un `page.goto()` monta la página de cero y no reproduce
      * nada.
      */
-    await page
-      .getByRole('button', { name: `Ver y editar la tarea ${siguiente.title}` })
-      .click();
+    await page.getByRole('button', { name: `Ver y editar la tarea ${siguiente.title}` }).click();
 
     const casillaSiguiente = page.getByRole('checkbox', { name: etiqueta });
     await expect(casillaSiguiente).not.toBeChecked();

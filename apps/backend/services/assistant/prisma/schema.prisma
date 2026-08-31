@@ -55,7 +55,13 @@ model AssistantSubscription {
   @@map("assistant_subscriptions")
 }
 
-/// Consumo de un usuario en un mes. `period` es 'YYYY-MM'.
+/// Consumo de un usuario en una organización y un mes. `period` es 'YYYY-MM'.
+///
+/// **La organización entró en la clave el 2026-08-28**, cuando el plan pasó a
+/// valer solo dentro de la organización que lo paga. Con un contador único por
+/// persona, quien gastara 50 mensajes en la BUSINESS del trabajo entraría en su
+/// espacio personal —tope 13— ya por encima del límite y bloqueado desde el
+/// primer mensaje, sin nada que explicara por qué.
 ///
 /// **Una fila por mes en vez de un contador que se reinicia**, y no es un
 /// capricho: así queda el histórico de consumo, que es lo primero que hará
@@ -68,10 +74,18 @@ model AssistantSubscription {
 model AssistantUsage {
   id     String @id @default(uuid())
   userId String
+  /// En qué organización se gastó. Cadena vacía = ninguna.
+  ///
+  /// **No es nullable, y es a propósito.** En Postgres dos `NULL` no chocan
+  /// entre sí, así que una columna nullable dentro de un `@@unique` deja meter
+  /// filas duplicadas para el caso «sin organización» — y el contador
+  /// silenciosamente dejaría de contar. Con cadena vacía el índice funciona
+  /// igual para todos los casos.
+  organizationId String @default("")
   period String
   used   Int    @default(0)
 
-  @@unique([userId, period])
+  @@unique([userId, organizationId, period])
   @@index([period])
   @@schema("assistant")
   @@map("assistant_usage")

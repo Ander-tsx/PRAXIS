@@ -3,6 +3,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
+import { QuotaService } from '../billing/quota.service';
 
 /**
  * Los estados que puede elegir una persona. Espejo de `UserPresence` en el
@@ -35,6 +36,7 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject('CREDENTIALS_SERVICE') private readonly credentialsClient: ClientProxy,
     @Inject('PROJECTS_SERVICE') private readonly projectsClient: ClientProxy,
+    private readonly cuotas: QuotaService,
   ) {}
 
   onModuleInit() {
@@ -170,15 +172,17 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
    */
   async anunciar(userId: string, presencia: Presence): Promise<void> {
     try {
-      /* `chat_peer_ids` y no `chat_contacts`: aquel devuelve por cada persona
-         todos los proyectos en común con su nombre, su slug y su rol, y de todo
-         eso aquí se usaba **una columna**. Ver `idsDeContactos` en
-         projects-service. */
-      const contactos = await firstValueFrom(
-        this.projectsClient
-          .send<string[]>({ cmd: 'chat_peer_ids' }, { userId })
-          .pipe(timeout(2000)),
-      );
+      /* 🔴 **La misma regla que el chat, y por eso ya no es `chat_peer_ids`.**
+         Desde 2026-08-28 se puede escribir a quien comparta organización, no
+         solo proyecto. Si la presencia siguiera calculándose con la regla vieja,
+         a media plantilla se le podría escribir sin verle nunca el punto de
+         color — o sea, la presencia filtrando más que el chat, que es justo lo
+         que avisaba el comentario de `idsDeContactos`.
+
+         ⚠️ Y sigue costando poco: esto se dispara al conectarse, desconectarse o
+         cambiar de estado a mano, y la lista de organizaciones está cacheada en
+         Redis. */
+      const contactos = await this.cuotas.companerosDeOrganizacion(userId);
 
       const at = new Date().toISOString();
 

@@ -76,6 +76,8 @@ export interface ChannelContext {
   channelKind: 'PROJECT' | 'DIRECT';
   projectId: string | null;
   projectName: string | null;
+  organizationId: string | null;
+  organizationName: string | null;
   projectSlug: string | null;
   /**
    * En una conversación privada, **la otra persona vista desde quien recibe**.
@@ -163,6 +165,8 @@ export interface NoticeEvent {
   actorId: string | null;
   projectId: string | null;
   projectName: string | null;
+  organizationId: string | null;
+  organizationName: string | null;
   projectSlug: string | null;
   taskId: string | null;
   taskTitle: string | null;

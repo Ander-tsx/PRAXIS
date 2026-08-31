@@ -27,6 +27,9 @@ async function idDeLaSesion(): Promise<string | null> {
 function describir(error: unknown, porDefecto: string): string {
   if (error instanceof ApiError) {
     if (error.status >= 500) return porDefecto;
+    if (error.message.includes('File too large')) return 'El archivo es demasiado grande (máximo 5MB).';
+    if (error.message.includes('Validation failed')) return 'Error de validación en los datos.';
+    if (error.message.includes('Expected')) return 'El formato del archivo no es válido.';
     return error.message;
   }
   return porDefecto;
@@ -145,4 +148,64 @@ export async function deleteAccountAction(confirmacion: string): Promise<{ error
   }
 
   return { error: null };
+}
+
+export async function uploadCoverAction(
+  formData: FormData,
+): Promise<{ error: string | null; coverUrl: string | null }> {
+  const userId = await idDeLaSesion();
+  if (!userId) return { error: 'Tu sesión ha caducado.', coverUrl: null };
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: 'No llegó ninguna imagen.', coverUrl: null };
+  }
+
+  const envio = new FormData();
+  envio.append('file', file);
+
+  try {
+    const actualizado = await createServerApiClient().postForm<UserProfile>(
+      `/users/${userId}/cover`,
+      envio,
+    );
+    if (!actualizado?.id) return { error: 'El servidor no guardó la foto.', coverUrl: null };
+
+    revalidatePath('/', 'layout');
+    return { error: null, coverUrl: actualizado.coverUrl };
+  } catch (error) {
+    return { error: describir(error, 'No se pudo subir la foto de portada.'), coverUrl: null };
+  }
+}
+
+export async function deleteCoverAction(): Promise<{ error: string | null }> {
+  const userId = await idDeLaSesion();
+  if (!userId) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await createServerApiClient().delete(`/users/${userId}/cover`);
+    revalidatePath('/', 'layout');
+    return { error: null };
+  } catch (error) {
+    return { error: describir(error, 'No se pudo quitar la foto de portada.') };
+  }
+}
+
+export async function updateProfileAction(data: {
+  firstName?: string;
+  lastName?: string;
+  biography?: string;
+  location?: string;
+  professionalInfo?: any;
+}): Promise<{ error: string | null }> {
+  const userId = await idDeLaSesion();
+  if (!userId) return { error: 'Tu sesión ha caducado.' };
+
+  try {
+    await createServerApiClient().patch(`/users/${userId}`, data);
+    revalidatePath('/', 'layout');
+    return { error: null };
+  } catch (error) {
+    return { error: describir(error, 'No se pudo actualizar el perfil.') };
+  }
 }

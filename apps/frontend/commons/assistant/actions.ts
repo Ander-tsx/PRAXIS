@@ -25,6 +25,9 @@ import type {
   Workspace,
 } from '../api/domain';
 import { getSession } from '../auth/session';
+import { getOrganizacionActiva } from '../theme/organizacion';
+import type { QuotaExceededDetails } from '../billing/planes';
+import { detallesDeCuota } from '../billing/planes';
 import { aplicarPlantilla } from '../template/apply';
 import { conversationIdDelError, cuotaDelError, describe, requireApi } from './helpers';
 
@@ -105,6 +108,16 @@ export interface RespuestaChat {
   /** La conversación en la que cayó el turno. El cliente lo guarda para el siguiente. */
   conversationId: string | null;
   error: string | null;
+  /**
+   * El detalle del 402 cuando se acabaron los mensajes del mes.
+   *
+   * ⚠️ **Es otra cosa que `cuota`**, aunque las dos hablen de lo mismo. `cuota`
+   * es el contador —para que la barra quede en el tope y no en el número de
+   * antes de intentarlo— y esto es el **fallo**, con el plan dentro, que es lo
+   * que permite ofrecer la salida. Sin él, quedarse sin mensajes en mitad de
+   * una conversación es una frase roja y un callejón.
+   */
+  topeAgotado: QuotaExceededDetails | null;
 }
 
 /**
@@ -136,6 +149,7 @@ export async function preguntarAction(
       reply: null,
       proposals: [],
       cuota: null,
+      topeAgotado: null,
       conversationId: null,
       error: 'Tu sesión ha caducado.',
     };
@@ -155,6 +169,7 @@ export async function preguntarAction(
       reply: null,
       proposals: [],
       cuota: null,
+      topeAgotado: null,
       conversationId: null,
       error:
         (attachmentIds ?? []).length > 0
@@ -167,6 +182,7 @@ export async function preguntarAction(
       reply: null,
       proposals: [],
       cuota: null,
+      topeAgotado: null,
       conversationId: null,
       error: 'El mensaje no puede pasar de 2 000 caracteres.',
     };
@@ -175,9 +191,24 @@ export async function preguntarAction(
   try {
     const ruta = projectId ? `/projects/${projectId}/assistant/chat` : '/me/assistant/chat';
 
+    /* 🔴 **Sin proyecto hay que decir desde qué organización se pregunta.** El
+       tope de IA lo pone su plan y el gasto se cuenta con esa clave, así que
+       omitirlo cobraría el mensaje en la personal —gratuita— aunque se esté
+       trabajando en el equipo que paga.
+
+       ⚠️ **Y no es una llave.** Sale de la cookie, que escribe el navegador; el
+       gateway comprueba la pertenencia antes de usarla
+       (`QuotaService.organizacionElegida`) y responde `403 NOT_IN_ORG` si no es
+       tuya. Es un filtro, como siempre.
+
+       En la ruta de proyecto no se manda: allí la organización sale del propio
+       proyecto, que es lo que no se puede falsificar. */
+    const organizationId = projectId ? null : await getOrganizacionActiva();
+
     const resultado = await api.post<AssistantChatResult>(ruta, {
       message: texto,
       ...(conversationId ? { conversationId } : {}),
+      ...(organizationId ? { organizationId } : {}),
       /* 🔴 **Solo los ids, nunca los bytes.** Esto viaja por una Server Action,
          cuyo cuerpo está topado en 1 MB: con el archivo dentro, cualquier foto
          de teléfono moría con un «Body exceeded 1 MB limit» de Next, sin
@@ -194,6 +225,7 @@ export async function preguntarAction(
         reply: null,
         proposals: [],
         cuota: resultado?.cuota ?? null,
+        topeAgotado: null,
         conversationId: resultado?.conversationId ?? null,
         error: 'El asistente no ha respondido nada.',
       };
@@ -203,6 +235,7 @@ export async function preguntarAction(
       reply: resultado.reply,
       proposals: resultado.proposals ?? [],
       cuota: resultado.cuota ?? null,
+      topeAgotado: null,
       conversationId: resultado.conversationId ?? null,
       error: null,
     };
@@ -211,9 +244,10 @@ export async function preguntarAction(
       reply: null,
       proposals: [],
       conversationId: conversationIdDelError(error),
-      /* En el 429 la cuota viaja en el error: el contador tiene que quedar en
+      /* En el 402 la cuota viaja en el error: el contador tiene que quedar en
          el tope, no en el número de antes de intentarlo. */
       cuota: cuotaDelError(error),
+      topeAgotado: detallesDeCuota(error),
       error: describe(error, 'El asistente no ha podido responder. Inténtalo otra vez.'),
     };
   }
@@ -991,6 +1025,6 @@ export async function aceptarPlantillaAction(plantilla: ProjectTemplate): Promis
  * no a las 00:00. Sin esto, «para el viernes» vence el jueves por la noche.
  */
 function toIsoDueDate(value: string): string {
-  const [year, month, day] = value.split('-').map(Number);
+  const [year = 0, month = 1, day = 1] = value.split('-').map(Number);
   return new Date(year, month - 1, day, 23, 59, 59).toISOString();
 }

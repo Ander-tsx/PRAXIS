@@ -29,6 +29,16 @@ export interface SelectorDeFechaProps {
    * enterarse por el `<input type="hidden">`: los ocultos no emiten `change`.
    */
   onValueChange?: (valor: string) => void;
+  /**
+   * A qué borde del campo se pega el panel.
+   *
+   * `left` (por defecto) lo alinea con el borde izquierdo y crece hacia la
+   * derecha —lo de siempre—. `right` lo alinea con el borde derecho y crece
+   * hacia la izquierda: para cuando el campo está en la mitad derecha de un
+   * contenedor estrecho (la fecha límite en el diálogo de tarea) y el panel de
+   * 18rem se salía de la pantalla.
+   */
+  align?: 'left' | 'right';
 }
 
 const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -117,6 +127,7 @@ export function SelectorDeFecha({
   disabled = false,
   placeholder = 'Sin fecha límite',
   onValueChange,
+  align = 'left',
 }: SelectorDeFechaProps) {
   const [valor, setValor] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
@@ -208,7 +219,7 @@ export function SelectorDeFecha({
             .join(' ')}
         >
           <CalendarioIcono />
-          <span className={seleccionada ? 'text-text-primary' : 'text-text-disabled'}>
+          <span className={seleccionada ? 'text-text-primary' : 'text-white'}>
             {seleccionada
               ? `${seleccionada.getDate()} de ${MESES[seleccionada.getMonth()]} de ${seleccionada.getFullYear()}`
               : placeholder}
@@ -229,7 +240,7 @@ export function SelectorDeFecha({
                 evento.stopPropagation();
                 aplicar('');
               }}
-              className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+              className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition-colors hover:bg-surface hover:text-text-primary"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -249,7 +260,9 @@ export function SelectorDeFecha({
           <div
             role="dialog"
             aria-label="Elegir fecha"
-            className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl p-3"
+            className={`absolute top-full z-50 mt-2 w-72 rounded-xl p-3 ${
+              align === 'right' ? 'right-0' : 'left-0'
+            }`}
             style={{
               background: colors.surfaceElevated,
               boxShadow: `0 12px 32px ${alpha(colors.overlay, 55)}, 0 0 0 1px ${alpha(colors.border, 70)}`,
@@ -268,7 +281,7 @@ export function SelectorDeFecha({
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: los días de la semana son una lista fija y «M» se repite
                   key={`${dia}-${indice}`}
-                  className="flex h-7 items-center justify-center font-sans text-[11px] text-text-disabled"
+                  className="flex h-7 items-center justify-center font-sans text-[11px] text-white"
                 >
                   {dia}
                 </span>
@@ -291,7 +304,7 @@ export function SelectorDeFecha({
                       'flex h-8 w-full cursor-pointer items-center justify-center rounded-lg',
                       'font-sans text-xs tabular-nums transition-colors',
                       esElegido ? 'font-semibold' : 'hover:bg-surface',
-                      deOtroMes && !esElegido ? 'text-text-disabled' : 'text-text-primary',
+                      deOtroMes && !esElegido ? 'text-white' : 'text-text-primary',
                     ].join(' ')}
                     style={{
                       background: esElegido ? colors.primary : undefined,
@@ -312,7 +325,7 @@ export function SelectorDeFecha({
               <button
                 type="button"
                 onClick={() => elegir(new Date())}
-                className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+                className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:bg-surface hover:text-text-primary"
               >
                 Hoy
               </button>
@@ -345,7 +358,7 @@ function FlechaMes({ direccion, onClick }: { direccion: -1 | 1; onClick: () => v
       onClick={onClick}
       aria-label={texto}
       title={texto}
-      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary"
     >
       <svg
         className="h-4 w-4"
@@ -369,7 +382,7 @@ function FlechaMes({ direccion, onClick }: { direccion: -1 | 1; onClick: () => v
 function CalendarioIcono() {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-text-secondary"
+      className="h-4 w-4 shrink-0 text-white"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"

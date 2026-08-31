@@ -24,7 +24,7 @@ export default function ChatError({
     <div className="flex min-h-screen items-center justify-center bg-background p-6">
       <div className="flex max-w-md flex-col items-center gap-4 text-center">
         <h2 className="font-display text-3xl text-text-primary">No pudimos cargar tus mensajes</h2>
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           Puede ser un corte temporal con el servidor. Vuelve a intentarlo; si sigue fallando,
           cierra sesión y entra de nuevo.
         </p>

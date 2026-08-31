@@ -1,7 +1,7 @@
 'use client';
-import { useState } from 'react';
 import { Button } from '@praxis/commons';
 import { Badge, type ProjectMember, type ProjectRole } from '@praxis/commons';
+import { useState } from 'react';
 import { DeleteRoleForm } from './DeleteRoleForm';
 import { RoleForm } from './RoleForm';
 import { PERMISSION_LABELS, impliedFrom, selectedFrom } from './permissions';
@@ -36,8 +36,8 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-4 py-2">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <h3 className="font-sans font-medium text-text-primary shrink-0">Roles</h3>
-          <span className="text-text-disabled font-light shrink-0">/</span>
-          <p className="truncate font-sans text-sm text-text-secondary">
+          <span className="text-white font-light shrink-0">/</span>
+          <p className="truncate font-sans text-sm text-white">
             Cada persona entra con un rol, y el rol decide lo que puede hacer.
           </p>
         </div>
@@ -68,7 +68,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
       )}
 
       {roles.length === 0 ? (
-        <p className="rounded-2xl border border-border bg-surface-elevated px-6 py-8 text-center font-sans text-sm text-text-secondary shadow-sm">
+        <p className="rounded-2xl border border-border bg-surface-elevated px-6 py-8 text-center font-sans text-sm text-white shadow-sm">
           Este proyecto no tiene roles. Crea uno para poder añadir a alguien.
         </p>
       ) : (
@@ -115,7 +115,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                     <h4 className="font-sans text-lg font-semibold text-text-primary">
                       {role.name}
                     </h4>
-                    <span className="font-sans text-sm font-medium text-text-disabled">
+                    <span className="font-sans text-sm font-medium text-white">
                       {inUse === 0
                         ? 'Sin personas asignadas'
                         : `${inUse} ${inUse === 1 ? 'persona' : 'personas'}`}
@@ -148,7 +148,7 @@ export function ProjectRoles({ projectId, roles, members, canManage }: ProjectRo
                     </Badge>
                   ))}
                   {selected.size === 0 && (
-                    <span className="font-sans text-sm italic text-text-disabled py-1">
+                    <span className="font-sans text-sm italic text-white py-1">
                       Sin permisos: quien tenga este rol no podrá hacer nada.
                     </span>
                   )}

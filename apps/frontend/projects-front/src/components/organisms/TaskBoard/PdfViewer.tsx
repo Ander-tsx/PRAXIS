@@ -56,7 +56,7 @@ export function PdfViewer({ href, filename }: { href: string; filename: string }
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        className="shrink-0 cursor-pointer rounded-lg px-2 py-1 font-sans text-[11px] font-semibold text-text-secondary transition-colors hover:text-text-primary"
+        className="shrink-0 cursor-pointer rounded-lg px-2 py-1 font-sans text-[11px] font-semibold text-white transition-colors hover:text-text-primary"
       >
         Ver
       </button>
@@ -83,7 +83,7 @@ export function PdfViewer({ href, filename }: { href: string; filename: string }
           <a
             href={href}
             download={filename}
-            className="self-start font-sans text-xs text-text-secondary underline underline-offset-2 hover:text-text-primary"
+            className="self-start font-sans text-xs text-white underline underline-offset-2 hover:text-text-primary"
           >
             Descargar
           </a>

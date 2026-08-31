@@ -2,8 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { useAppShell, useSidebarPlegada } from './AppShell';
+import { PraxLauncher } from './PraxLauncher';
 
 export interface AppHeaderProps {
+  anchoCompleto?: boolean;
   /** Título de la pantalla. */
   title: string;
   /**
@@ -37,8 +39,14 @@ export interface AppHeaderProps {
  * lo que abre es el cajón de `AppShell`: por eso pide la función por contexto en
  * vez de recibirla por props a través de media aplicación.
  */
-export function AppHeader({ title, headerSlot, lleno = false, children }: AppHeaderProps) {
-  const { openMenu, cuentaSlot } = useAppShell();
+export function AppHeader({
+  title,
+  headerSlot,
+  lleno = false,
+  anchoCompleto = false,
+  children,
+}: AppHeaderProps) {
+  const { openMenu } = useAppShell();
   /* El ancho máximo compensa el pliegue: sin esto, plegar la barra lateral
      libera ~184px que esta columna nunca reclama —se queda en el margen
      lateral en vez de dárselos al contenido— y en una pantalla ancha, plegar
@@ -47,13 +55,13 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-surface px-4 sm:px-6">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6 bg-transparent">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={openMenu}
             aria-label="Abrir menú"
-            className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+            className="rounded-md p-1 text-white transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
           >
             <svg
               className="h-6 w-6"
@@ -71,21 +79,18 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
         </div>
 
         {/**
-         * La derecha lleva dos cosas, y en este orden.
+         * La derecha: la acción de la pantalla y, pegado al borde, **PRAX**.
          *
-         * Primero la acción de la pantalla —lo que se viene a hacer aquí— y
-         * después quién eres, pegado al borde: el rol y el plan se consultan de
-         * reojo y su sitio es la esquina, no delante del botón principal.
-         *
-         * `cuentaSlot` lo pone el armazón, así que sale en **todas** las
-         * pantallas de la zona sin que cada página tenga que acordarse.
+         * Ese hueco tenía antes las insignias de rol global y plan (`cuentaSlot`
+         * → `CuentaEnCabecera`). Se retiraron: dos datos que se iban a mirar a
+         * Configuración una vez, no de reojo. En su sitio va el asistente, que sí
+         * se usa desde cualquier pantalla. `PraxLauncher` sale en **todas** sin
+         * que cada página se acuerde, porque `AppHeader` va en todas.
          */}
-        {(headerSlot || cuentaSlot) && (
-          <div className="flex shrink-0 items-center gap-3">
-            {headerSlot}
-            {cuentaSlot}
-          </div>
-        )}
+        <div className="flex shrink-0 items-center gap-3">
+          {headerSlot}
+          <PraxLauncher />
+        </div>
       </header>
 
       {/**
@@ -102,7 +107,7 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
        * no un defecto.
        */}
       <main
-        className={`relative flex-1 bg-background motion-safe:scroll-smooth ${
+        className={`relative flex-1 bg-[#191919] motion-safe:scroll-smooth ${
           /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
              hijo, y dejar aquí un scroll de reserva produce dos barras
              anidadas —una que no se mueve nunca— en cuanto el hijo mide justo. */
@@ -110,7 +115,7 @@ export function AppHeader({ title, headerSlot, lleno = false, children }: AppHea
         }`}
       >
         <div
-          className={`mx-auto w-full p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'} ${
+          className={`mx-auto w-full ${anchoCompleto ? 'p-0 max-w-full' : `p-4 sm:p-6 ${plegada ? 'max-w-[1584px]' : 'max-w-[1400px]'}`} ${
             lleno ? 'flex h-full min-h-0 flex-col' : ''
           }`}
         >

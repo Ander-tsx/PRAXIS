@@ -70,7 +70,7 @@ export default async function CarteraPage() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h2 className="font-display text-3xl text-text-primary">Todos tus proyectos</h2>
-          <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+          <p className="max-w-2xl font-serif text-lg italic text-white">
             Lo que pide entrar, primero. Toca un proyecto para ver su análisis entero.
           </p>
           {/* Dentro de la zona, así que `next/link` y sin el `/reports` delante:
@@ -87,7 +87,7 @@ export default async function CarteraPage() {
           /* Dos motivos distintos y no se pueden distinguir desde aquí: no estar
              en ningún proyecto, o estar sin `canViewReports`. Se dice el segundo
              porque el primero se resuelve solo al entrar en uno. */
-          <p className="font-sans text-sm text-text-secondary">
+          <p className="font-sans text-sm text-white">
             No tienes ningún proyecto con el análisis abierto. Pídeselo a quien administre el
             proyecto.
           </p>

@@ -237,7 +237,7 @@ export function useArrastreDeTablero({
 
       const nuevo = { columnId, indice };
       destinoRef.current = nuevo;
-      
+
       if (debounceTarea.current) clearTimeout(debounceTarea.current);
       debounceTarea.current = setTimeout(() => {
         setDestinoTarea(nuevo);
@@ -248,7 +248,7 @@ export function useArrastreDeTablero({
     const indice = huecoDeColumna(x, activo.id);
     if (indice === null || indice === destinoColumnaRef.current) return;
     destinoColumnaRef.current = indice;
-    
+
     if (debounceColumna.current) clearTimeout(debounceColumna.current);
     debounceColumna.current = setTimeout(() => {
       setDestinoColumna(indice);

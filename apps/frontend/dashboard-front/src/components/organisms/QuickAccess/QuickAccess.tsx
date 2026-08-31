@@ -70,7 +70,7 @@ export function QuickAccess({ roles, proyectos, espacios, miembros }: QuickAcces
 
   return (
     <section
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-surface p-5"
+      className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-5"
       aria-labelledby="titulo-accesos"
     >
       <h2 id="titulo-accesos" className="font-display text-xl text-text-primary">
@@ -120,12 +120,12 @@ export function QuickAccess({ roles, proyectos, espacios, miembros }: QuickAcces
 
         {/* Misma zona: ruta sin el prefijo y `next/link`. Ver la nota de arriba. */}
         <Acceso
-          href="/settings"
+          href="/profile"
           sameZone
           icon={<IconSettings className="h-[18px] w-[18px]" />}
           tone={colors.textSecondary}
-          label="Configuración"
-          detalle="Tu cuenta, apariencia y plan"
+          label="Tu cuenta"
+          detalle="Tus datos, la sesión y el estado"
         />
       </ul>
     </section>
@@ -149,13 +149,13 @@ function Acceso({
   sameZone?: boolean;
 }) {
   const clase =
-    'group flex items-center gap-3 rounded-xl px-2.5 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+    'group flex items-center gap-3 rounded-sm px-2.5 py-2.5 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
 
   const contenido = (
     <>
       <span
         aria-hidden="true"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm"
         style={{ background: alpha(tone, 12), color: tone }}
       >
         {icon}
@@ -163,7 +163,7 @@ function Acceso({
 
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-sans text-sm font-semibold text-text-primary">{label}</span>
-        <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
+        <span className="truncate font-sans text-xs text-white">{detalle}</span>
       </span>
     </>
   );

@@ -24,7 +24,7 @@ import { SECTION_PANEL } from './section-panel';
  * formulario de «Eliminar» no ocupe caja (ver `contents` más abajo).
  */
 const ACTION_BUTTON =
-  'cursor-pointer rounded px-1 py-0.5 font-sans text-[11px] leading-none text-text-disabled transition-colors hover:text-text-primary';
+  'cursor-pointer rounded px-1 py-0.5 font-sans text-[11px] leading-none text-white transition-colors hover:text-white';
 
 export interface TaskCommentsProps {
   projectId: string;
@@ -66,16 +66,16 @@ export function TaskComments({
   }, [state]);
 
   return (
-    <section className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
-      <h4 className="font-sans text-sm font-medium text-text-primary">
+    <section className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
+      <h4 className="font-sans text-sm font-medium text-white">
         Comentarios{' '}
         {comments.length > 0 && (
-          <span className="font-normal tabular-nums text-text-secondary">{comments.length}</span>
+          <span className="font-normal tabular-nums text-white">{comments.length}</span>
         )}
       </h4>
 
       {comments.length === 0 && (
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white">
           {canComment ? 'Todavía nadie ha comentado. Empieza tú.' : 'Todavía nadie ha comentado.'}
         </p>
       )}
@@ -106,13 +106,13 @@ export function TaskComments({
             maxLength={4000}
             placeholder="Escribe un comentario…"
             aria-label="Nuevo comentario"
-            className="w-full resize-y rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-xs text-text-primary placeholder:text-text-disabled focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white placeholder:text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex justify-end">
             <button
               type="submit"
               disabled={pending}
-              className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-text-primary transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               style={{ background: alpha(colors.primary, 20) }}
             >
               {pending ? 'Enviando…' : 'Comentar'}
@@ -120,7 +120,7 @@ export function TaskComments({
           </span>
         </form>
       ) : (
-        <p className="font-sans text-xs text-text-disabled">
+        <p className="font-sans text-xs text-white">
           Puedes leer el hilo, pero no tienes permiso para comentar.
         </p>
       )}
@@ -164,8 +164,8 @@ function CommentRow({
   return (
     <li className="flex flex-col gap-1.5 rounded-xl p-3" style={SECTION_PANEL}>
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="font-sans text-xs font-semibold text-text-primary">{name}</span>
-        <span className="font-sans text-[11px] text-text-disabled">
+        <span className="font-sans text-xs font-semibold text-white">{name}</span>
+        <span className="font-sans text-[11px] text-white">
           {formatWhen(comment.createdAt)}
           {comment.editedAt && ' · editado'}
         </span>
@@ -214,13 +214,13 @@ function CommentRow({
             maxLength={4000}
             defaultValue={comment.body}
             aria-label="Editar comentario"
-            className="w-full resize-y rounded-lg border border-border bg-surface-elevated px-3 py-2 font-sans text-xs text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full resize-y rounded-lg border border-white/10 bg-[#191919] px-3 py-2 font-sans text-xs text-white focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           />
           <span className="flex gap-2">
             <button
               type="submit"
               disabled={saving}
-              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] font-semibold text-text-primary disabled:opacity-50"
+              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] font-semibold text-white disabled:opacity-50"
               style={{ background: alpha(colors.primary, 20) }}
             >
               {saving ? 'Guardando…' : 'Guardar'}
@@ -228,7 +228,7 @@ function CommentRow({
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] text-text-secondary"
+              className="cursor-pointer rounded px-2 py-1 font-sans text-[11px] text-white"
             >
               Cancelar
             </button>
@@ -237,7 +237,7 @@ function CommentRow({
       ) : (
         /* `whitespace-pre-wrap`: los saltos de línea que escribió la persona se
            respetan sin interpretar nada más. Nunca se renderiza como HTML. */
-        <p className="whitespace-pre-wrap break-words font-sans text-xs text-text-primary">
+        <p className="whitespace-pre-wrap break-words font-sans text-xs text-white">
           {comment.body}
         </p>
       )}

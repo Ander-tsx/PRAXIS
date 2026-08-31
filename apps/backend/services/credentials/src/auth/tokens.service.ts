@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from '../mail/mail.service';
-import { correoDeRecuperacion, correoDeVerificacion } from '../mail/plantillas';
+import { correoDeInvitacion, correoDeRecuperacion, correoDeVerificacion } from '../mail/plantillas';
 import { PrismaService } from '../prisma/prisma.service';
 
 type TipoDeToken = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
@@ -135,5 +135,33 @@ export class TokensService {
 
     const { asunto, html, texto } = correoDeRecuperacion(enlace, minutos);
     await this.mail.enviar(email, asunto, html, texto);
+  }
+
+  /**
+   * Manda el correo de una invitación a una organización.
+   *
+   * 🔴 **No emite ningún token, y esa es toda la diferencia.** Los otros dos
+   * métodos de este archivo crean el suyo porque son de este servicio; la
+   * invitación la crea billing-service, que guarda su hash y solo devuelve el
+   * token en claro una vez. Aquí llega el **enlace ya montado**: este servicio
+   * no sabe qué es una invitación y no puede fabricar una.
+   *
+   * Es lo que separa un comando acotado de un relé de correo. Si algún día
+   * alguien le añade un parámetro `html`, se ha convertido en lo segundo.
+   */
+  async enviarInvitacion(datos: {
+    email: string;
+    organizacion: string;
+    invitaPor: string | null;
+    enlace: string;
+    horas: number;
+  }): Promise<boolean> {
+    const { asunto, html, texto } = correoDeInvitacion({
+      enlace: datos.enlace,
+      organizacion: datos.organizacion,
+      invitaPor: datos.invitaPor,
+      horas: datos.horas,
+    });
+    return this.mail.enviar(datos.email, asunto, html, texto);
   }
 }

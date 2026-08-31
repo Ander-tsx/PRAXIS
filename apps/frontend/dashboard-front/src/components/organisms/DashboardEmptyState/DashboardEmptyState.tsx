@@ -39,12 +39,12 @@ const STEPS = [
 export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
   return (
     <section
-      className="flex flex-col items-center gap-8 rounded-2xl border border-border bg-surface px-6 py-12 text-center"
+      className="flex flex-col items-center gap-8 rounded-sm border border-border bg-surface px-6 py-12 text-center"
       aria-label="Primeros pasos"
     >
       <div className="flex flex-col items-center gap-3">
         <span
-          className="flex h-14 w-14 items-center justify-center rounded-2xl"
+          className="flex h-14 w-14 items-center justify-center rounded-sm"
           style={{ background: alpha(colors.primary, 12), color: colors.primary }}
         >
           <svg
@@ -60,7 +60,7 @@ export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
         </span>
 
         <h3 className="font-display text-3xl text-text-primary">Todavía no tienes proyectos</h3>
-        <p className="max-w-md font-serif text-lg italic text-text-secondary">
+        <p className="max-w-md font-serif text-lg italic text-white">
           Un proyecto es el contenedor de todo lo demás: espacios, tableros y tareas.
         </p>
       </div>
@@ -69,7 +69,7 @@ export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
         {STEPS.map((step, index) => (
           <li
             key={step.title}
-            className="flex flex-col gap-2 rounded-xl border p-4"
+            className="flex flex-col gap-2 rounded-sm border p-4"
             style={{
               borderColor: step.available ? colors.border : alpha(colors.border, 60),
               background: step.available ? alpha(colors.primary, 5) : 'transparent',
@@ -95,10 +95,10 @@ export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
             >
               {step.title}
             </h4>
-            <p className="font-sans text-xs leading-relaxed text-text-secondary">{step.body}</p>
+            <p className="font-sans text-xs leading-relaxed text-white">{step.body}</p>
 
             {!step.available && (
-              <span className="mt-auto font-sans text-[10px] uppercase tracking-wider text-text-disabled">
+              <span className="mt-auto font-sans text-[10px] uppercase tracking-wider text-white">
                 Al crear el proyecto
               </span>
             )}

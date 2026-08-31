@@ -101,7 +101,7 @@ export function UserPlanDialog({ usuario, open, onClose }: UserPlanDialogProps) 
         </footer>
       </form>
 
-      <p className="mt-3 font-sans text-xs text-text-disabled">
+      <p className="mt-3 font-sans text-xs text-white">
         Plan actual: {usuario.assistantPlan}. No hay cobro: el plan se asigna a mano.
       </p>
     </Dialog>

@@ -88,7 +88,7 @@ export function ProposalGroup({ children }: ProposalGroupProps) {
   return (
     <section
       aria-label={`${total} propuestas del asistente`}
-      className="flex flex-col gap-3 rounded-2xl border p-3"
+      className="flex flex-col gap-3 rounded-sm border p-3"
       style={{ borderColor: alpha(colors.primary, 22), background: alpha(colors.primary, 4) }}
     >
       <header className="flex flex-wrap items-center gap-2 px-1">
@@ -137,7 +137,7 @@ export function ProposalGroup({ children }: ProposalGroupProps) {
         </span>
 
         {enviando ? (
-          <span className="ml-auto font-sans text-xs text-text-secondary">Aceptando…</span>
+          <span className="ml-auto font-sans text-xs text-white">Aceptando…</span>
         ) : (
           pendientes > 1 && (
             <button
@@ -250,7 +250,7 @@ function Flecha({
       disabled={disabled}
       aria-label={texto}
       title={texto}
-      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
     >
       <svg
         className="h-4 w-4"
