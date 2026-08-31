@@ -20,7 +20,8 @@ import { expect, test } from '@playwright/test';
 
 /** Las tres zonas privadas y una ruta interior de cada una. */
 const ZONAS = [
-  { nombre: 'dashboard-front', raiz: '/dashboard', interior: '/dashboard/settings' },
+  /* dashboard-front se sirve en `/main` (su `basePath`), no en `/dashboard`. */
+  { nombre: 'dashboard-front', raiz: '/main', interior: '/main/settings' },
   { nombre: 'projects-front', raiz: '/projects', interior: '/projects/no-existe-este-slug' },
   { nombre: 'reports-front', raiz: '/reports', interior: '/reports/no-existe-este-slug' },
   { nombre: 'admin-front', raiz: '/admin', interior: '/admin/actividad' },
@@ -46,7 +47,7 @@ test.describe('Sin sesión, todo lo privado manda al login', () => {
   }
 
   test('el redirect sale al origen público, no al puerto interno de la zona', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/main');
 
     /**
      * `redirectToZone` construye la URL sobre `x-forwarded-host`, no sobre
@@ -89,7 +90,7 @@ test.describe('Sin sesión, todo lo privado manda al login', () => {
      * intentaría `JSON.parse` de un documento HTML y el error resultante no
      * diría nada sobre la sesión.
      */
-    const respuesta = await request.get('http://localhost:4102/dashboard/api/gateway/users/me');
+    const respuesta = await request.get('http://localhost:4102/main/api/gateway/users/me');
 
     expect(respuesta.status()).toBe(401);
     expect(respuesta.headers()['content-type']).toContain('application/json');
