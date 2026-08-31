@@ -5,7 +5,7 @@ import type { QuotaExceededDetails, QuotaKind } from '../../billing/planes';
 import { fechaCorta } from '../../billing/planes';
 
 /** A dónde lleva «ampliar el plan». Una sola vez, y con el basePath del panel. */
-const RUTA_DE_FACTURACION = '/dashboard/billing';
+const RUTA_DE_FACTURACION = '/main/billing';
 
 /**
  * Lo que se enseña cuando una escritura no cabe en el plan.

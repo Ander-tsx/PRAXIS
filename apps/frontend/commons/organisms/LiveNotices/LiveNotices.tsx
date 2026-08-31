@@ -13,7 +13,7 @@ import { projectHref } from '../../api/routes';
  * renombra el ancla, esto lleva al panel pero sin desplazarse — degrada bien,
  * pero conviene saberlo.
  */
-const BANDEJA_DE_AVISOS = '/dashboard#avisos';
+const BANDEJA_DE_AVISOS = '/main#avisos';
 
 /**
  * El rayo de la insignia de un aviso de automatización.

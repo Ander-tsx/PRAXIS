@@ -69,10 +69,10 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
    * chat, que se monta en cinco zonas y no sabe en qué organización estás.
    *
    * Navegación dura porque cruza de zona: cada una tiene su `basePath` y un
-   * `Link` de aquí a `/dashboard` no lo resuelve.
+   * `Link` de aquí a `/main` no lo resuelve.
    */
   function verPlanes() {
-    window.location.href = '/dashboard/billing';
+    window.location.href = '/main/billing';
   }
 
   return (

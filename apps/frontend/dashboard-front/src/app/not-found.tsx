@@ -11,7 +11,7 @@ import { NotFound } from '@praxis/commons';
 export default function NoEncontrado() {
   return (
     <NotFound
-      href={'/dashboard'}
+      href={'/main'}
       hrefLabel={'Ir al panel'}
       descripcion="Esta dirección no lleva a ninguna parte dentro del panel."
     />
