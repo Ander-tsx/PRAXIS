@@ -164,7 +164,12 @@ test.describe('Proyectos desde la interfaz', () => {
     const nombre = `Proyecto UI ${Date.now().toString(36)}`;
     await crearProyectoParaLaPrueba(page, nombre);
 
-    await expect(page.getByText(nombre)).toBeVisible({ timeout: 30_000 });
+    /* El proyecto sale en dos sitios —la rejilla y el árbol de la barra
+       lateral—, así que `getByText` a secas viola el modo estricto. Basta con
+       que aparezca en alguno: los dos son «el listado». */
+    await expect(page.getByRole('link', { name: new RegExp(nombre) }).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   /**
