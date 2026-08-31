@@ -74,7 +74,7 @@ export default async function OrganizationsPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="flex flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Organizaciones"
           descripcion="Quién ha contratado qué, y cuántos asientos hay ocupados de los que paga. Solo se mira: la palanca de suspender es la del proyecto."
@@ -99,11 +99,11 @@ export default async function OrganizationsPage({ searchParams }: PageProps) {
         />
 
         {listado === null ? (
-          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
             No se pudieron cargar las organizaciones. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
             {busqueda
               ? 'Ninguna organización encaja con lo que buscas.'
               : 'Todavía no hay ninguna organización en la plataforma.'}

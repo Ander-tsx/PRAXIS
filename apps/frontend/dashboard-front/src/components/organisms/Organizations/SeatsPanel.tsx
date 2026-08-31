@@ -68,7 +68,8 @@ export function SeatsPanel({
             </button>
           </div>
           <p className="font-sans text-xs text-white/50">
-            Tienes {ocupados} {ocupados === 1 ? 'asiento ocupado' : 'asientos ocupados'} (incluyendo invitaciones). 
+            Tienes {ocupados} {ocupados === 1 ? 'asiento ocupado' : 'asientos ocupados'} (incluyendo
+            invitaciones).
           </p>
         </div>
       ) : (
@@ -80,25 +81,29 @@ export function SeatsPanel({
             datos.set('seats', String(seats));
             formAction(datos);
           }}
-          className="flex flex-col gap-4 p-4 rounded-xl border border-primary/20 bg-primary/5"
+          className="flex flex-col gap-4 rounded-r-lg border-l-2 border-primary bg-primary/5 py-4 pl-4 pr-4"
         >
           <div className="flex flex-col gap-2">
             <h4 className="font-sans font-medium text-white">Confirma el cambio de asientos</h4>
             <p className="font-sans text-sm text-white/80">
-              Vas a pasar de <strong className="text-white">{contratados}</strong> a <strong className="text-white">{seats}</strong> asientos.
+              Vas a pasar de <strong className="text-white">{contratados}</strong> a{' '}
+              <strong className="text-white">{seats}</strong> asientos.
             </p>
             {isUpgrading && (
               <p className="font-sans text-xs text-primary bg-primary/10 p-2 rounded-lg mt-1 border border-primary/20">
-                <strong>Autorización de cobro:</strong> Stripe cargará a tu método de pago principal la parte proporcional de lo que queda de mes por los {seats - contratados} asientos adicionales. Al confirmar, aceptas este cargo inmediato.
+                <strong>Autorización de cobro:</strong> Stripe cargará a tu método de pago principal
+                la parte proporcional de lo que queda de mes por los {seats - contratados} asientos
+                adicionales. Al confirmar, aceptas este cargo inmediato.
               </p>
             )}
             {isDowngrading && (
               <p className="font-sans text-xs text-white/70 bg-white/5 p-2 rounded-lg mt-1">
-                Stripe calculará el tiempo no utilizado de {contratados - seats} asientos y lo añadirá como saldo a favor para tu próxima factura.
+                Stripe calculará el tiempo no utilizado de {contratados - seats} asientos y lo
+                añadirá como saldo a favor para tu próxima factura.
               </p>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3 pt-2">
             <button
               type="submit"

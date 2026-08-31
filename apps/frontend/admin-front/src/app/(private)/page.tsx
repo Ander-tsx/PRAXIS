@@ -112,7 +112,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="flex flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Cuentas"
           descripcion="Quién puede entrar, con qué rol y con qué plan. Suspender es reversible; borrar no existe aquí."
@@ -138,11 +138,11 @@ export default async function UsersPage({ searchParams }: PageProps) {
         />
 
         {listado === null ? (
-          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
             No se pudieron cargar las cuentas. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
             {busqueda || estadoFiltro
               ? 'Ninguna cuenta encaja con lo que buscas.'
               : 'Todavía no hay cuentas en la plataforma.'}

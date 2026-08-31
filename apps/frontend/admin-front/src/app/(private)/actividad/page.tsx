@@ -82,7 +82,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="flex flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         {/* Sin cifras: aquí el número que importa es el de la búsqueda en
             curso, y ese ya lo lleva el paginador. Un «12.480 acciones en total»
             no cambiaría ninguna decisión. */}
@@ -94,11 +94,11 @@ export default async function ActivityPage({ searchParams }: PageProps) {
         <ActivityToolbar accion={accionFiltro} desde={desde} hasta={hasta} />
 
         {!registro ? (
-          <p className="rounded-2xl border border-dashed border-error/40 px-6 py-12 text-center font-sans text-sm text-error">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-error">
             No se pudo leer el registro. Vuelve a intentarlo.
           </p>
         ) : registro.items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
+          <p className="rounded-xl border border-white/10 bg-[#191919] px-6 py-16 text-center font-sans text-sm text-white/50">
             {hayFiltros
               ? 'Ninguna acción encaja con estos filtros.'
               : 'Todavía no se ha registrado ninguna acción de administración.'}
