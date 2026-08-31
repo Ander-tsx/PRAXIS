@@ -5,14 +5,7 @@ import { validateProfile } from '@/lib/validation';
 import { ApiError } from '@praxis/commons';
 import type { UserProfile } from '@praxis/commons';
 import { createServerApiClient, getSession } from '@praxis/commons/auth';
-import {
-  THEME_COOKIE,
-  type ThemeName,
-  esTemaValido,
-  themeCookieOptions,
-} from '@praxis/commons/theme';
 import { revalidatePath } from 'next/cache';
-import { cookies } from 'next/headers';
 
 /**
  * Guarda nombre y apellido del usuario identificado.
@@ -69,49 +62,11 @@ export async function updateProfileAction(
     };
   }
 
-  // Sin el basePath: son rutas del App Router de esta app, donde el panel es
-  // `/` y esta pantalla `/settings`. El nombre se ve en las dos, y también
-  // en la barra lateral, que vive en el layout y lo recibe del mismo perfil.
-  //
-  // ⚠️ **`/profile` también**, que es de donde se llama hoy: el formulario se
-  // quedó aquí porque la escritura es la misma, pero quien lo pinta es la
-  // pantalla de la cuenta, y sin esta línea el nombre grande del encabezado
-  // seguía siendo el viejo hasta recargar.
+  // Sin el basePath: son rutas del App Router de esta app. El nombre se ve en
+  // el panel, en `/profile` —que es quien pinta este formulario— y en la barra
+  // lateral, que vive en el layout y lo recibe del mismo perfil.
   revalidatePath('/');
-  revalidatePath('/settings');
   revalidatePath('/profile');
 
   return { error: null, savedName: firstName };
-}
-
-/**
- * Guarda el tema elegido en la cookie compartida por las cinco zonas.
- *
- * No hay nada que validar contra el backend —el tema no vive en ningún
- * microservicio, es una preferencia de la interfaz— así que no hay `data` que
- * confirmar: escribir la cookie y que el layout la relea es la confirmación.
- *
- * `revalidatePath('/', 'layout')` y no solo `'/settings'`: el `data-theme`
- * lo estampa el `RootLayout`, que envuelve toda la zona, no la page. Sin el
- * segundo argumento, `revalidatePath` solo invalida ese segmento y el `<html>`
- * se queda con el tema viejo hasta la próxima navegación completa.
- */
-export async function setThemeAction(theme: ThemeName): Promise<void> {
-  /**
-   * ⚠️ **Se valida aquí aunque `getTheme()` ya normalice al leer.**
-   *
-   * El parámetro de una Server Function llega del cliente, y `ThemeName` es un
-   * tipo: desaparece al compilar y no filtra nada. Hoy no hay agujero porque
-   * quien lee hace `=== 'light' ? 'light' : 'dark'`, así que cualquier basura
-   * acaba en oscuro — pero eso deja la seguridad de este valor en manos de un
-   * único lector. El día que alguien lo lea sin normalizar, el valor va directo
-   * a `data-theme` del `<html>`.
-   *
-   * Guardar solo lo que conocemos cuesta una línea y no depende de nadie.
-   */
-  if (!esTemaValido(theme)) return;
-
-  const cookieStore = await cookies();
-  cookieStore.set(THEME_COOKIE, theme, themeCookieOptions());
-  revalidatePath('/', 'layout');
 }

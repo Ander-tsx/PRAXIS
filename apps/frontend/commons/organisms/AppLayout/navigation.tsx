@@ -71,9 +71,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     label: 'Asistente',
     href: '/assistant',
     section: SECTION_PRINCIPAL,
-    icon: (
-      <PraxSidebarIcon />
-    ),
+    icon: <PraxSidebarIcon />,
   },
   {
     label: 'Proyectos',
@@ -93,7 +91,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   /* «Análisis» (`/reports`) se retiró del sidebar: la pantalla de análisis no
      daba valor y está pendiente decidir qué hacer con esa zona. El código de
      `reports-front` sigue ahí, solo que ya no se enlaza desde la navegación. */
-  
+
   /*
    * 🕳️ Aquí estaba «Suscripción» → `/billing`.
    *
@@ -111,7 +109,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5V16a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-4a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M17 20h5V16a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-4a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+        />
       </svg>
     ),
   },
@@ -121,7 +123,11 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+        />
       </svg>
     ),
   },
@@ -219,32 +225,14 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
     ),
   },
 
-  {
-    /**
-     * Ajustes de la cuenta. Hoy solo tus datos —nombre y apellido, que el
-     * registro no pide— y por eso **absorbió `/profile`** en vez de
-     * enlazarla: una pantalla que solo llevara a otra es un salto de más.
-     */
-    label: 'Sistema',
-    href: '/main/settings',
-    section: SECTION_CONFIGURACION,
-    icon: (
-      <svg {...iconProps} aria-hidden="true">
-        <g>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M10.3 4.3a1 1 0 011-.8h1.4a1 1 0 011 .8l.2 1.4a6.5 6.5 0 011.5.9l1.3-.5a1 1 0 011.2.4l.7 1.2a1 1 0 01-.2 1.3l-1.1.9a6.6 6.6 0 010 1.7l1.1.9a1 1 0 01.2 1.3l-.7 1.2a1 1 0 01-1.2.4l-1.3-.5a6.5 6.5 0 01-1.5.9l-.2 1.4a1 1 0 01-1 .8h-1.4a1 1 0 01-1-.8l-.2-1.4a6.5 6.5 0 01-1.5-.9l-1.3.5a1 1 0 01-1.2-.4l-.7-1.2a1 1 0 01.2-1.3l1.1-.9a6.6 6.6 0 010-1.7l-1.1-.9a1 1 0 01-.2-1.3l.7-1.2a1 1 0 011.2-.4l1.3.5a6.5 6.5 0 011.5-.9l.2-1.4z"
-          />
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M14.5 12a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-          />
-        </g>
-      </svg>
-    ),
-  },
+  /*
+   * 🕳️ Aquí estaba «Sistema» → `/main/settings`.
+   *
+   * Se quitó de la barra: su único contenido era el selector de tema claro/
+   * oscuro, y el modo claro se ha retirado por ahora. Los datos de la cuenta
+   * viven en `/main/profile`, a la que se llega pulsando tu propia ficha. La
+   * ruta `/settings` sigue existiendo y redirige a `/profile`.
+   */
   {
     label: 'Ayuda',
     href: '/ayuda',

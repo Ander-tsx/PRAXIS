@@ -115,7 +115,8 @@ export function NotificationList({
             aria-hidden="true"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm"
             style={{
-              background: 'transparent', border: `1px solid ${colors.border}`,
+              background: 'transparent',
+              border: `1px solid ${colors.border}`,
               color: unread > 0 ? colors.primary : colors.textDisabled,
             }}
           >
@@ -287,11 +288,7 @@ function NotificationRow({
        */}
       <span className="pointer-events-none relative shrink-0">
         {actor ? (
-          <Avatar
-            label={who}
-            size="md"
-            src={avatarHref(actor.avatarUrl, '/dashboard/api/gateway')}
-          />
+          <Avatar label={who} size="md" src={avatarHref(actor.avatarUrl, '/main/api/gateway')} />
         ) : (
           /* Sin actor —un aviso del sistema— la insignia se queda sola y en
              grande: es lo único que hay que enseñar. */

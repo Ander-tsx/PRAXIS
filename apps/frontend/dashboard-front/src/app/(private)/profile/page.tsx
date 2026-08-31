@@ -59,8 +59,8 @@ export default async function CuentaPage() {
       <AccountIdentity
         nombre={nombre}
         email={profile.credential.email}
-        avatarSrc={avatarHref(profile.avatarUrl, '/dashboard/api/gateway')}
-        coverSrc={profile.coverUrl ? avatarHref(profile.coverUrl, '/dashboard/api/gateway') : null}
+        avatarSrc={avatarHref(profile.avatarUrl, '/main/api/gateway')}
+        coverSrc={profile.coverUrl ? avatarHref(profile.coverUrl, '/main/api/gateway') : null}
         biography={profile.biography ?? null}
         location={profile.location ?? null}
         presencia={profile.presence ?? 'AVAILABLE'}
@@ -84,12 +84,20 @@ export default async function CuentaPage() {
             <h3 className="text-sm font-semibold text-white">Sesión y cuenta</h3>
             <div className="flex flex-wrap items-start gap-8 mt-2">
               <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
-                <div className="w-fit"><LogoutButton compacto={false} /></div>
-                <p className="text-xs text-white leading-relaxed">Se cierra en este navegador. Podrás volver a entrar cuando quieras.</p>
+                <div className="w-fit">
+                  <LogoutButton compacto={false} />
+                </div>
+                <p className="text-xs text-white leading-relaxed">
+                  Se cierra en este navegador. Podrás volver a entrar cuando quieras.
+                </p>
               </div>
               <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
-                <div className="w-fit"><DeleteAccount email={profile.credential.email} /></div>
-                <p className="text-xs text-white leading-relaxed">Lo último y lo único que no se deshace.</p>
+                <div className="w-fit">
+                  <DeleteAccount email={profile.credential.email} />
+                </div>
+                <p className="text-xs text-white leading-relaxed">
+                  Lo último y lo único que no se deshace.
+                </p>
               </div>
             </div>
           </div>

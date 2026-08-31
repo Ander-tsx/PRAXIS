@@ -37,7 +37,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
       user={{
         name: displayName(profile),
         email: profile.credential.email,
-        avatarSrc: avatarHref(profile.avatarUrl, '/api/gateway'),
+        avatarSrc: avatarHref(profile.avatarUrl, '/main/api/gateway'),
         presence: profile.presence ?? null,
       }}
       /* El selector de estado se dibuja sobre la esquina del avatar: la

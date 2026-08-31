@@ -120,12 +120,12 @@ export function QuickAccess({ roles, proyectos, espacios, miembros }: QuickAcces
 
         {/* Misma zona: ruta sin el prefijo y `next/link`. Ver la nota de arriba. */}
         <Acceso
-          href="/settings"
+          href="/profile"
           sameZone
           icon={<IconSettings className="h-[18px] w-[18px]" />}
           tone={colors.textSecondary}
-          label="Configuración"
-          detalle="Tu cuenta, apariencia y plan"
+          label="Tu cuenta"
+          detalle="Tus datos, la sesión y el estado"
         />
       </ul>
     </section>

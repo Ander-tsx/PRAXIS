@@ -18,60 +18,40 @@ export interface BadgeProps {
 }
 
 /**
- * `background`/`border` son washes al 10-12% sobre lo que haya detrás, no
- * colores sólidos: por eso se leen bien tanto sobre `--color-surface` oscuro
- * como sobre el blanco del tema claro. `default` es el único que no tenía
- * token propio — usaba blanco fijo, que en tema claro es invisible sobre
- * fondo blanco — así que sale de `textSecondary`, que ya es gris en los dos
- * temas.
+ * Cada variante es un **wash de color con forma de pastilla**: fondo tintado al
+ * ~15%, borde del mismo color al ~35% y el texto a plena saturación. Se lee
+ * bien sobre superficie oscura y sobre el blanco del tema claro, y el color
+ * dice de un vistazo de qué tipo es el estado —verde va, rojo para, ámbar
+ * atención— sin tener que leer la palabra.
+ *
+ * `default` sale de `textSecondary` (gris en los dos temas) para lo que no
+ * tiene color propio.
  */
+const wash = (color: string): CSSProperties => ({
+  background: alpha(color, 15),
+  border: `1px solid ${alpha(color, 35)}`,
+  color,
+});
+
 const variantStyles: Record<BadgeVariant, CSSProperties> = {
-  default: {
-    background: alpha(colors.textSecondary, 12),
-    border: `1px solid ${alpha(colors.textSecondary, 25)}`,
-    color: colors.textSecondary,
-  },
-  primary: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.primary,
-  },
-  accent: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.accent,
-  },
-  success: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.success,
-  },
-  warning: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.warning,
-  },
-  error: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.error,
-  },
-  info: {
-    background: 'transparent',
-    border: `1px solid ${colors.borderStrong}`,
-    color: colors.info,
-  },
+  default: wash(colors.textSecondary),
+  primary: wash(colors.primary),
+  accent: wash(colors.accent),
+  success: wash(colors.success),
+  warning: wash(colors.warning),
+  error: wash(colors.error),
+  info: wash(colors.info),
 };
 
 export function Badge({ children, variant = 'default', className = '', style }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center font-sans font-medium ${className}`}
+      className={`inline-flex items-center font-sans font-semibold ${className}`}
       style={{
         fontSize: 10,
         letterSpacing: '0.04em',
         padding: '3px 10px',
-        borderRadius: '2px',
+        borderRadius: '9999px',
         ...variantStyles[variant],
         ...style,
       }}
