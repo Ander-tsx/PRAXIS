@@ -79,8 +79,16 @@ async function bootstrap() {
     SwaggerModule.setup('api/docs', app, documentFactory);
   }
 
-  await app.listen(port);
-  app.get(Logger).log(`Gateway running on http://localhost:${port}/api`);
+  /**
+   * `'0.0.0.0'` explícito, no el `localhost` por defecto de Nest.
+   *
+   * En local da igual, pero en un contenedor el sondeo de salud de la
+   * plataforma (Railway) entra por la interfaz de red, no por el loopback: con
+   * el bind por defecto la conexión se rechaza y el despliegue falla en
+   * «Healthcheck failure» con el gateway perfectamente arrancado por dentro.
+   */
+  await app.listen(port, '0.0.0.0');
+  app.get(Logger).log(`Gateway running on http://0.0.0.0:${port}/api`);
 
   if (!esProduccion) {
     app.get(Logger).log(`Swagger docs available at http://localhost:${port}/api/docs`);
