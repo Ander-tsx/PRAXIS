@@ -138,11 +138,11 @@ export function DataTable<T>({
 
   return (
     <div
-      className="rounded-2xl border border-border"
+      className="rounded-xl border border-border"
       style={{ '--praxis-tabla-cols': plantilla } as CSSProperties}
     >
       {/* Cabecera: solo en escritorio, donde de verdad hay columnas. */}
-      <div className="hidden rounded-t-2xl border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-white md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4">
+      <div className="hidden rounded-t-xl border-b border-border bg-white/[0.02] px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-white md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4">
         {columns.map((columna) => (
           <span key={columna.key} className={columna.align === 'end' ? 'text-right' : undefined}>
             {columna.header}
@@ -154,7 +154,7 @@ export function DataTable<T>({
         {rows.map((row) => (
           <li
             key={rowKey(row)}
-            className={`flex flex-col gap-3 border-b border-border px-4 py-4 transition-colors last:rounded-b-2xl last:border-b-0 hover:bg-surface-elevated md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4 ${alineacion}`}
+            className={`flex flex-col gap-3 border-b border-border px-4 py-4 transition-colors last:rounded-b-xl last:border-b-0 hover:bg-white/[0.03] md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4 ${alineacion}`}
           >
             {columns.map((columna) => {
               const conEtiqueta = columna.mobileLabel !== false;

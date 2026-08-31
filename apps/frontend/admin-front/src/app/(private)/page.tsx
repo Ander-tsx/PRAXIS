@@ -112,14 +112,14 @@ export default async function UsersPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Cuentas"
           descripcion="Quién puede entrar, con qué rol y con qué plan. Suspender es reversible; borrar no existe aquí."
           cifras={[
             /* El total va sin color de estado: es el tamaño de la plataforma, no
                una alarma. Los otros dos sí lo llevan, porque significan algo. */
-            { etiqueta: 'En total', valor: enTotal, tono: colors.primary },
+            { etiqueta: 'En total', valor: enTotal, tono: colors.textPrimary },
             { etiqueta: 'Suspendidas', valor: suspendidas, tono: colors.error },
             { etiqueta: 'De baja', valor: bajas, tono: colors.warning },
           ]}

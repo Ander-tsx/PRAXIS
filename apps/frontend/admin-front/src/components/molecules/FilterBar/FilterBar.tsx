@@ -1,6 +1,5 @@
 'use client';
 
-import { alpha, colors } from '@praxis/commons';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 
@@ -169,10 +168,7 @@ export function FilterBar({
             existe para esto, y el rótulo va en un `<legend>` en vez de en un
             `aria-label` que solo oyen los lectores de pantalla. */}
         {hayFiltros && (
-          <fieldset
-            className="flex flex-wrap gap-0.5 rounded-xl p-1"
-            style={{ background: alpha(colors.border, 45) }}
-          >
+          <fieldset className="flex flex-wrap gap-0.5 rounded-xl bg-white/[0.04] p-1">
             <legend className="sr-only">Filtrar por estado</legend>
             {(filtros ?? []).map((filtro) => {
               const puesto = activo === filtro.id;
@@ -184,8 +180,8 @@ export function FilterBar({
                   aria-pressed={puesto}
                   className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
                     puesto
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-white hover:bg-surface hover:text-text-primary'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/50 hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   {filtro.etiqueta}

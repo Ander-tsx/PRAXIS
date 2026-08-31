@@ -97,12 +97,12 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   return (
     <AppHeader title="Administración">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
+      <div data-tone="dark" className="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-16">
         <AdminHeader
           titulo="Proyectos"
           descripcion="El inventario completo, archivados incluidos. Suspender y archivar son reversibles; el borrado de verdad es del dueño y no vive aquí."
           cifras={[
-            { etiqueta: 'En total', valor: enTotal, tono: colors.primary },
+            { etiqueta: 'En total', valor: enTotal, tono: colors.textPrimary },
             { etiqueta: 'Suspendidos', valor: suspendidos, tono: colors.error },
             { etiqueta: 'Archivados', valor: archivados, tono: colors.warning },
           ]}
