@@ -64,8 +64,7 @@ COPY apps/frontend/web-shell/package.json               apps/frontend/web-shell/
 COPY packages/shared-devtools/package.json              packages/shared-devtools/
 COPY e2e/package.json                                   e2e/
 
-RUN --mount=type=cache,target=/pnpm/store \
-    pnpm install --frozen-lockfile --filter "./apps/backend/**"
+RUN pnpm install --frozen-lockfile --filter "./apps/backend/**"
 
 # ────────────────────────── build ───────────────────────────
 FROM deps AS build
