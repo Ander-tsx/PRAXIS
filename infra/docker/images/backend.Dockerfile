@@ -112,6 +112,7 @@ COPY infra/docker/images/backend.pm2.config.cjs /app/pm2.config.cjs
 # tiene IP pública. La imagen conserva node_modules completo (incluidas las
 # devDependencies), así que el CLI de Prisma está disponible aquí.
 COPY --chmod=0755 infra/docker/images/migrar.sh /app/migrar.sh
+COPY --chmod=0755 infra/docker/images/start-backend.sh /app/start-backend.sh
 
 # El único puerto que sale de la máquina. Los otros siete (3001-3007) escuchan
 # en localhost y no se publican.
@@ -119,4 +120,4 @@ EXPOSE 3000
 
 # Sin sesión de login ni shell interactiva: si un proceso muere en bucle, pm2
 # lo dice por stdout y ahí lo recoge Cloud Logging.
-CMD ["pm2-runtime", "start", "/app/pm2.config.cjs"]
+CMD ["/app/start-backend.sh"]
