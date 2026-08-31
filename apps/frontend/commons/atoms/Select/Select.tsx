@@ -255,12 +255,12 @@ export function Select({
             .join(' ')}
         >
           {elegida?.color && <Muestra color={elegida.color} />}
-          <span className={`truncate ${elegida ? '' : 'text-white'}`}>
+          <span className={`truncate ${elegida ? '' : 'text-text-secondary'}`}>
             {elegida?.label ?? placeholder ?? 'Elige una opción'}
           </span>
 
           <svg
-            className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white transition-transform ${
+            className={`pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary transition-transform ${
               abierto ? 'rotate-180' : ''
             }`}
             fill="none"
@@ -303,7 +303,7 @@ export function Select({
                   className={[
                     'flex cursor-pointer items-center gap-2 px-3 py-2 font-sans text-sm',
                     opcion.disabled ? 'cursor-not-allowed opacity-40' : '',
-                    seleccionada ? 'text-text-primary' : 'text-white',
+                    seleccionada ? 'text-text-primary' : 'text-text-secondary',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -337,7 +337,7 @@ export function Select({
       {message && (
         <p
           className={`font-sans text-xs ${
-            variant === 'error' ? 'text-error' : 'text-white'
+            variant === 'error' ? 'text-error' : 'text-text-secondary'
           }`}
         >
           {message}

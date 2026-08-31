@@ -61,7 +61,7 @@ export function AuthForm({
       {/* Header */}
       <div className="mb-8 flex flex-col gap-1">
         <h1 className="font-display text-3xl text-text-primary">{title}</h1>
-        {subtitle && <p className="font-sans text-sm text-white">{subtitle}</p>}
+        {subtitle && <p className="font-sans text-sm text-text-secondary">{subtitle}</p>}
       </div>
 
       {/* Error global — un punto y texto, no una caja de color: la misma
@@ -86,7 +86,7 @@ export function AuthForm({
         <>
           <div className="my-6 flex items-center gap-3" aria-hidden="true">
             <span className="h-px flex-1 bg-border" />
-            <span className="font-sans text-xs text-white">o</span>
+            <span className="font-sans text-xs text-text-secondary">o</span>
             <span className="h-px flex-1 bg-border" />
           </div>
           {alternatives}
@@ -95,7 +95,7 @@ export function AuthForm({
 
       {/* Footer */}
       {footer && (
-        <div className="mt-6 text-center font-sans text-sm text-white">{footer}</div>
+        <div className="mt-6 text-center font-sans text-sm text-text-secondary">{footer}</div>
       )}
     </div>
   );

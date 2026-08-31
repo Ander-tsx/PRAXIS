@@ -19,18 +19,18 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const variantClasses: Record<InputVariant, string> = {
   default:
-    'border-border bg-surface-elevated text-text-primary placeholder:text-white ' +
+    'border-border bg-surface-elevated text-text-primary placeholder:text-text-secondary ' +
     'hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20',
   error:
-    'border-error bg-surface-elevated text-text-primary placeholder:text-white ' +
+    'border-error bg-surface-elevated text-text-primary placeholder:text-text-secondary ' +
     'focus:border-error focus:ring-2 focus:ring-error/20',
   success:
-    'border-success bg-surface-elevated text-text-primary placeholder:text-white ' +
+    'border-success bg-surface-elevated text-text-primary placeholder:text-text-secondary ' +
     'focus:border-success focus:ring-2 focus:ring-success/20',
 };
 
 const messageClasses: Record<InputVariant, string> = {
-  default: 'text-white',
+  default: 'text-text-secondary',
   error: 'text-error',
   success: 'text-success',
 };
@@ -96,7 +96,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               onClick={() => setShowPassword((prev) => !prev)}
               className={[
                 'absolute right-3 top-1/2 -translate-y-1/2',
-                'text-white hover:text-text-primary transition-colors',
+                'text-text-secondary hover:text-text-primary transition-colors',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded',
               ].join(' ')}
             >
