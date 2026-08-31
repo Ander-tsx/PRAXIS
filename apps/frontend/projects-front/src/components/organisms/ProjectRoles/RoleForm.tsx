@@ -6,12 +6,9 @@ import { ROLE_NAME_MAX, validateRole } from '@/lib/validation';
 import {
   Button,
   Checkbox,
-  Dialog,
   Input,
   type ProjectPermission,
   type ProjectRole,
-  alpha,
-  colors,
   useAccion,
 } from '@praxis/commons';
 import { useEffect, useId, useState } from 'react';
@@ -54,12 +51,12 @@ export function RoleForm({ projectId, role, onCancel, onSuccess }: RoleFormProps
   }
 
   return (
-    <div className="flex flex-col gap-5 rounded-2xl border border-border bg-surface-elevated p-6 shadow-md ring-2 ring-primary/20">
+    <div className="flex flex-col gap-5 rounded-xl border border-white/10 bg-[#191919] p-6 ring-1 ring-white/10">
       <header>
-        <h4 className="font-sans text-lg font-semibold text-text-primary">
+        <h4 className="font-sans text-base font-semibold text-white">
           {role ? `Editar «${role.name}»` : 'Nuevo rol'}
         </h4>
-        <p className="font-sans text-xs text-white mt-1">
+        <p className="font-sans text-xs text-white/50 mt-1">
           Los permisos de mayor nivel conceden los de menor: marcar «eliminar» da también «editar» y
           «crear».
         </p>
@@ -91,12 +88,12 @@ export function RoleForm({ projectId, role, onCancel, onSuccess }: RoleFormProps
         />
 
         <fieldset className="flex flex-col gap-4">
-          <legend className="mb-2 font-sans text-sm font-medium text-text-primary">Permisos</legend>
+          <legend className="mb-2 font-sans text-sm font-medium text-white">Permisos</legend>
 
           <div className="flex flex-col gap-5 pr-1">
             {PERMISSION_GROUPS.map((group) => (
               <div key={group.title} className="flex flex-col gap-2">
-                <span className="font-sans text-xs uppercase tracking-wider text-white">
+                <span className="font-sans text-xs uppercase tracking-wider text-white/40">
                   {group.title}
                 </span>
 
@@ -126,11 +123,7 @@ export function RoleForm({ projectId, role, onCancel, onSuccess }: RoleFormProps
         {state.error && (
           <p
             role="alert"
-            className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-            style={{
-              background: alpha(colors.error, 10),
-              borderColor: alpha(colors.error, 30),
-            }}
+            className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 font-sans text-sm text-error"
           >
             {state.error}
           </p>

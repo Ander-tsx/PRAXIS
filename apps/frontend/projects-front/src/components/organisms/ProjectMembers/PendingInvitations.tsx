@@ -7,8 +7,6 @@ import {
   PERSONA_ELIMINADA,
   type ProjectInvitation,
   type UserProfile,
-  alpha,
-  colors,
   personLabel,
   useAccion,
 } from '@praxis/commons';
@@ -36,7 +34,7 @@ export function PendingInvitations({
 
   return (
     <div className="flex flex-col gap-2">
-      <h4 className="font-sans text-sm font-medium text-white">
+      <h4 className="font-sans text-sm font-medium text-white/70">
         Invitaciones pendientes ({invitations.length})
       </h4>
 
@@ -51,20 +49,16 @@ export function PendingInvitations({
                nombre. Ver la nota de `ProjectMembers`. */
             <li
               key={invitation.id}
-              className="flex flex-col gap-3 rounded-xl px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center"
-              style={{ background: alpha(colors.warning, 6) }}
+              className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center"
             >
               <span className="flex min-w-0 flex-1 items-center gap-3">
-                <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-sans text-sm font-bold"
-                  style={{ background: alpha(colors.warning, 15), color: colors.warning }}
-                >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06] font-sans text-sm font-bold text-white/70">
                   {label[0]?.toUpperCase() ?? '?'}
                 </span>
 
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-sans text-sm text-text-primary">{label}</span>
-                  <span className="truncate font-sans text-xs text-white">
+                  <span className="truncate font-sans text-sm text-white">{label}</span>
+                  <span className="truncate font-sans text-xs text-white/50">
                     {user?.credential.email ?? 'Correo no disponible'}
                   </span>
                 </span>
@@ -72,7 +66,7 @@ export function PendingInvitations({
 
               <span className="flex flex-wrap items-center gap-2 sm:shrink-0">
                 <Badge variant="warning">SIN RESPONDER</Badge>
-                <Badge variant="primary">{invitation.projectRole.name}</Badge>
+                <Badge variant="default">{invitation.projectRole.name}</Badge>
                 {canManage && <CancelButton projectId={projectId} invitationId={invitation.id} />}
               </span>
             </li>
@@ -94,7 +88,7 @@ function CancelButton({ projectId, invitationId }: { projectId: string; invitati
         type="submit"
         disabled={pending}
         title={state.error ?? 'Retirar la invitación'}
-        className="rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:text-error disabled:opacity-40"
+        className="rounded-lg px-2 py-1 font-sans text-xs text-white/50 transition-colors hover:text-error disabled:opacity-40"
       >
         Retirar
       </button>

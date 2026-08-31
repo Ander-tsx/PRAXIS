@@ -2,7 +2,7 @@
 
 import { deleteRoleAction } from '@/app/(private)/[id]/actions';
 import { ROLE_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, type ProjectRole, alpha, colors, useAccion } from '@praxis/commons';
+import { Button, type ProjectRole, useAccion } from '@praxis/commons';
 import { useEffect, useState } from 'react';
 
 export interface DeleteRoleFormProps {
@@ -18,12 +18,10 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
   const blocked = membersUsing > 0;
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-error bg-surface-elevated p-6 shadow-md ring-2 ring-error/20">
+    <div className="flex flex-col gap-4 rounded-xl border border-error/40 bg-[#191919] p-6 ring-1 ring-error/20">
       <header>
-        <h4 className="font-sans text-lg font-semibold text-text-primary">
-          Eliminar «{role.name}»
-        </h4>
-        <p className="font-sans text-xs text-white mt-1">
+        <h4 className="font-sans text-base font-semibold text-white">Eliminar «{role.name}»</h4>
+        <p className="font-sans text-xs text-white/50 mt-1">
           {blocked
             ? 'Este rol está en uso, así que no se puede eliminar todavía.'
             : 'Esta acción no se puede deshacer.'}
@@ -32,7 +30,7 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
 
       {blocked ? (
         <div className="flex flex-col gap-4">
-          <p className="font-sans text-sm text-white">
+          <p className="font-sans text-sm text-white/60">
             Lo tienen {membersUsing} {membersUsing === 1 ? 'persona' : 'personas'}. Cámbialas de rol
             antes de eliminarlo.
           </p>
@@ -50,11 +48,7 @@ export function DeleteRoleForm({ projectId, role, membersUsing, onCancel }: Dele
           {state.error && (
             <p
               role="alert"
-              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-              style={{
-                background: alpha(colors.error, 10),
-                borderColor: alpha(colors.error, 30),
-              }}
+              className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 font-sans text-sm text-error"
             >
               {state.error}
             </p>

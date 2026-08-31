@@ -2,7 +2,7 @@
 
 import { removeMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
-import { Button, Dialog, alpha, colors, useAccion } from '@praxis/commons';
+import { Button, Dialog, useAccion } from '@praxis/commons';
 import { useEffect, useState } from 'react';
 
 export interface RemoveMemberButtonProps {
@@ -40,11 +40,7 @@ export function RemoveMemberButton({ projectId, userId, label }: RemoveMemberBut
           {state.error && (
             <p
               role="alert"
-              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-              style={{
-                background: alpha(colors.error, 10),
-                borderColor: alpha(colors.error, 30),
-              }}
+              className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 font-sans text-sm text-error"
             >
               {state.error}
             </p>

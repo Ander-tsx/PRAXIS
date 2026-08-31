@@ -2,17 +2,7 @@
 
 import { inviteMemberAction } from '@/app/(private)/[id]/actions';
 import { MEMBER_INITIAL_STATE } from '@/lib/action-state';
-import {
-  Button,
-  Dialog,
-  Input,
-  type ProjectRole,
-  QuotaNotice,
-  Select,
-  alpha,
-  colors,
-  useAccion,
-} from '@praxis/commons';
+import { Button, Input, type ProjectRole, QuotaNotice, Select, useAccion } from '@praxis/commons';
 import { createApiClient } from '@praxis/commons/api';
 import { useEffect, useId, useMemo, useState } from 'react';
 
@@ -205,10 +195,10 @@ export function InviteMemberDialog({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface-elevated p-6 shadow-sm">
+    <div className="rounded-xl border border-white/10 bg-[#191919] p-6">
       <header className="mb-4 flex flex-col gap-1">
-        <h3 className="font-display text-xl text-text-primary">Invitar al proyecto</h3>
-        <p className="font-sans text-sm text-white">
+        <h3 className="font-sans text-base font-semibold text-white">Invitar al proyecto</h3>
+        <p className="font-sans text-sm text-white/60">
           Recibirá una invitación y entrará al aceptarla, con el rol que elijas.
         </p>
       </header>
@@ -240,15 +230,12 @@ export function InviteMemberDialog({
             />
 
             {selected ? (
-              <div
-                className="flex items-center justify-between gap-3 rounded-lg border border-primary px-3 py-2"
-                style={{ background: alpha(colors.primary, 10) }}
-              >
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-white/20 bg-white/[0.06] px-3 py-2">
                 <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-sans text-sm text-text-primary">
+                  <span className="truncate font-sans text-sm text-white">
                     {selected.name || selected.email}
                   </span>
-                  <span className="truncate font-sans text-xs text-white">
+                  <span className="truncate font-sans text-xs text-white/50">
                     {selected.email}
                     {selected.roleName ? ` · ${selected.roleName}` : ''}
                   </span>
@@ -256,7 +243,7 @@ export function InviteMemberDialog({
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="shrink-0 font-sans text-xs text-white transition-colors hover:text-text-primary"
+                  className="shrink-0 font-sans text-xs text-white/60 transition-colors hover:text-white"
                 >
                   Cambiar
                 </button>
@@ -266,7 +253,7 @@ export function InviteMemberDialog({
                 {errorBusqueda ? (
                   <p
                     role="alert"
-                    className="rounded-lg bg-surface-elevated px-3 py-2.5 font-sans text-sm text-error"
+                    className="rounded-lg bg-white/[0.03] px-3 py-2.5 font-sans text-sm text-error"
                   >
                     {errorBusqueda}
                   </p>
@@ -277,8 +264,8 @@ export function InviteMemberDialog({
                      coincide» y dejaba a quien invita sin saber qué hacer —o
                      peor, eligiendo a alguien de fuera para recibir un 403 al
                      enviar. */
-                  <div className="flex flex-col gap-2 rounded-lg bg-surface-elevated px-3 py-3">
-                    <p className="font-sans text-sm text-white">
+                  <div className="flex flex-col gap-2 rounded-lg bg-white/[0.03] px-3 py-3">
+                    <p className="font-sans text-sm text-white/60">
                       {query.trim()
                         ? `Nadie del equipo coincide con «${query.trim()}».`
                         : 'Todo el equipo está ya en este proyecto.'}
@@ -286,7 +273,7 @@ export function InviteMemberDialog({
                     {organizationId && (
                       <a
                         href="/main/team"
-                        className="font-sans text-sm text-primary underline-offset-2 hover:underline"
+                        className="font-sans text-sm text-white underline underline-offset-2 hover:text-white/70"
                       >
                         Invitar a alguien a la organización →
                       </a>
@@ -298,12 +285,12 @@ export function InviteMemberDialog({
                       key={miembro.userId as string}
                       type="button"
                       onClick={() => setSelected(miembro)}
-                      className="flex flex-col items-start rounded-lg bg-surface-elevated px-3 py-2 text-left transition-colors hover:bg-border"
+                      className="flex flex-col items-start rounded-lg bg-white/[0.03] px-3 py-2 text-left transition-colors hover:bg-white/[0.06]"
                     >
-                      <span className="font-sans text-sm text-text-primary">
+                      <span className="font-sans text-sm text-white">
                         {miembro.name || miembro.email}
                       </span>
-                      <span className="font-sans text-xs text-white">
+                      <span className="font-sans text-xs text-white/50">
                         {miembro.email}
                         {miembro.roleName ? ` · ${miembro.roleName}` : ''}
                       </span>
@@ -337,11 +324,7 @@ export function InviteMemberDialog({
           state.error && (
             <p
               role="alert"
-              className="rounded-lg border px-3 py-2 font-sans text-sm text-error"
-              style={{
-                background: alpha(colors.error, 10),
-                borderColor: alpha(colors.error, 30),
-              }}
+              className="rounded-lg border border-error/30 bg-error/10 px-3 py-2 font-sans text-sm text-error"
             >
               {state.error}
             </p>

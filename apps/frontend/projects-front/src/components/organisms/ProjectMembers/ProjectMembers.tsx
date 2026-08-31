@@ -100,8 +100,8 @@ export function ProjectMembers({
             <button
               type="button"
               className={`rounded-lg px-3.5 py-1.5 font-sans text-xs font-medium transition-colors border ${
-                isInviting 
-                  ? 'border-white/[0.10] text-white hover:bg-white/[0.05] hover:text-white' 
+                isInviting
+                  ? 'border-white/[0.10] text-white hover:bg-white/[0.05] hover:text-white'
                   : 'border-white/[0.12] bg-white/[0.04] text-white hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
               }`}
               onClick={() => setIsInviting(!isInviting)}
