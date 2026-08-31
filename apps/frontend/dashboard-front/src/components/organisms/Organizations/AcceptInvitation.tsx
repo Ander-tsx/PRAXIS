@@ -32,7 +32,7 @@ export function AcceptInvitation({ token }: { token: string }) {
     <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="token" value={token} />
 
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         Te han invitado a una organización de PRAXIS. Al aceptar, su plan pasa a ser el tuyo
         mientras estés dentro; tus proyectos no cambian de sitio.
       </p>

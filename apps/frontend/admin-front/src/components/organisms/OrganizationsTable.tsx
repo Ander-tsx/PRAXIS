@@ -44,7 +44,7 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
             <p className="truncate font-sans text-sm font-semibold text-text-primary">
               {organizacion.name ?? 'Sin nombre'}
             </p>
-            <p className="truncate font-sans text-xs text-text-secondary">
+            <p className="truncate font-sans text-xs text-white">
               {organizacion.owner?.name ?? organizacion.owner?.email ?? 'Dueño no disponible'}
             </p>
           </div>
@@ -68,7 +68,7 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
         header: 'Plan',
         track: { fr: 0.9 },
         cell: (organizacion) => (
-          <p className="truncate font-sans text-xs uppercase tracking-wider text-text-secondary">
+          <p className="truncate font-sans text-xs uppercase tracking-wider text-white">
             {organizacion.tier === 'FREE' ? 'Gratis' : organizacion.tier}
           </p>
         ),
@@ -78,7 +78,7 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
         header: 'Asientos',
         track: { fr: 0.9 },
         cell: (organizacion) => (
-          <p className="truncate font-sans text-xs tabular-nums text-text-secondary">
+          <p className="truncate font-sans text-xs tabular-nums text-white">
             <span className="font-semibold text-text-primary">{organizacion.seatsUsed}</span> /{' '}
             {organizacion.seats}
           </p>
@@ -89,7 +89,7 @@ export function OrganizationsTable({ organizaciones }: OrganizationsTableProps) 
         header: 'Se creó',
         track: { fr: 1.1 },
         cell: (organizacion) => (
-          <p className="truncate font-sans text-xs text-text-secondary">
+          <p className="truncate font-sans text-xs text-white">
             {fechaYHora(organizacion.createdAt)}
           </p>
         ),

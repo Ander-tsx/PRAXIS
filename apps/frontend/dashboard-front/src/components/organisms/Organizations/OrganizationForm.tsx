@@ -46,7 +46,7 @@ export function OrganizationForm() {
         <label htmlFor={nombreId} className="font-display text-xl text-text-primary">
           ¿Cómo se llama?
         </label>
-        <p className="font-serif text-sm italic text-text-secondary">
+        <p className="font-serif text-sm italic text-white">
           El nombre del equipo, del estudio o de la empresa. Se puede cambiar después.
         </p>
       </div>
@@ -73,7 +73,7 @@ export function OrganizationForm() {
         {/* ⚠️ Se dice antes de pulsar, no en la letra pequeña de después: nace
             en gratuito, y alguien que espere haber comprado algo aquí se lleva
             una sorpresa al invitar a la undécima persona. */}
-        <span className="font-sans text-xs text-text-disabled">
+        <span className="font-sans text-xs text-white">
           Empieza en el plan gratuito · 3 asientos · 3 proyectos
         </span>
       </div>

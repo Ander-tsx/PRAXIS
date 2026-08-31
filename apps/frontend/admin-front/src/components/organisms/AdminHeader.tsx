@@ -46,7 +46,7 @@ export function AdminHeader({ titulo, descripcion, cifras = [] }: AdminHeaderPro
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <h2 className="font-display text-3xl text-text-primary">{titulo}</h2>
-        <p className="max-w-2xl font-serif text-base italic text-text-secondary">{descripcion}</p>
+        <p className="max-w-2xl font-serif text-base italic text-white">{descripcion}</p>
       </div>
 
       {cifras.length > 0 && (
@@ -60,7 +60,7 @@ export function AdminHeader({ titulo, descripcion, cifras = [] }: AdminHeaderPro
                 background: alpha(cifra.tono, 7),
               }}
             >
-              <dt className="font-sans text-xs uppercase tracking-wider text-text-secondary">
+              <dt className="font-sans text-xs uppercase tracking-wider text-white">
                 {cifra.etiqueta}
               </dt>
               <dd

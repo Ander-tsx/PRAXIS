@@ -47,7 +47,7 @@ export function GeneratedChart({
   if (datos.forma === 'sin-datos') {
     return (
       <div className="flex h-full min-h-32 items-center justify-center px-4 text-center">
-        <p className="font-sans text-sm text-text-disabled">{datos.motivo}</p>
+        <p className="font-sans text-sm text-white">{datos.motivo}</p>
       </div>
     );
   }
@@ -142,7 +142,7 @@ function Categorico({
           {filas.map((fila) => (
             <li
               key={fila.name}
-              className="flex items-center gap-2 font-sans text-xs text-text-secondary"
+              className="flex items-center gap-2 font-sans text-xs text-white"
             >
               <span
                 aria-hidden="true"
@@ -150,7 +150,7 @@ function Categorico({
                 style={{ background: fila.color }}
               />
               {fila.name}
-              <span className="tabular-nums text-text-disabled">{fila.value}</span>
+              <span className="tabular-nums text-white">{fila.value}</span>
             </li>
           ))}
         </ul>
@@ -225,7 +225,7 @@ function Temporal({
           {series.map((serie) => (
             <li
               key={serie.clave}
-              className="flex items-center gap-2 font-sans text-xs text-text-secondary"
+              className="flex items-center gap-2 font-sans text-xs text-white"
             >
               <span
                 aria-hidden="true"
@@ -399,7 +399,7 @@ function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }>
   if (filas.length === 0 || columnas.length === 0) {
     return (
       <div className="flex h-full min-h-32 items-center justify-center px-4 text-center">
-        <p className="font-sans text-sm text-text-disabled">No hay nada en este cruce.</p>
+        <p className="font-sans text-sm text-white">No hay nada en este cruce.</p>
       </div>
     );
   }
@@ -443,7 +443,7 @@ function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }>
                   key={columna.clave}
                   scope="col"
                   title={columna.nombre}
-                  className="sticky top-0 z-10 max-w-[120px] min-w-[80px] truncate border border-border bg-surface-elevated p-2 text-center font-medium text-text-secondary"
+                  className="sticky top-0 z-10 max-w-[120px] min-w-[80px] truncate border border-border bg-surface-elevated p-2 text-center font-medium text-white"
                 >
                   {columna.nombre}
                 </th>
@@ -456,7 +456,7 @@ function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }>
                 <th
                   scope="row"
                   title={fila.nombre}
-                  className="sticky left-0 z-10 max-w-[150px] truncate border border-border bg-surface p-2 text-left font-medium text-text-secondary"
+                  className="sticky left-0 z-10 max-w-[150px] truncate border border-border bg-surface p-2 text-left font-medium text-white"
                 >
                   {fila.nombre}
                 </th>
@@ -484,7 +484,7 @@ function Matriz({ datos }: { datos: Extract<DatosGenerados, { forma: 'matriz' }>
         </table>
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 font-sans text-xs text-text-disabled">
+      <div className="flex shrink-0 items-center gap-2 font-sans text-xs text-white">
         <span>0</span>
         <span
           aria-hidden="true"

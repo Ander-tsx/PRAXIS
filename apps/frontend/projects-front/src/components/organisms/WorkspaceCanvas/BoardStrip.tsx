@@ -92,7 +92,7 @@ export function BoardStrip({
       /* `min-h-0 flex-1`: el tablero ocupa lo que quede de pantalla y **no la
          estira**. Es lo que permite que la página no tenga desplazamiento
          propio y que el único scroll vertical sea el de dentro de una columna. */
-      className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl border border-white/10 p-4"
+      className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl p-4"
       style={BOARD_SURFACE}
     >
       {/* La cabecera se fue a `TableroExpandible` con el botón de ampliar: los

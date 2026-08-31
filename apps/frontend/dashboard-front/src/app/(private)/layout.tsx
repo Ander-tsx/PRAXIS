@@ -28,7 +28,7 @@ export default async function PrivateLayout({ children }: { children: React.Reac
   return (
     <AppShell
       navItems={navItems}
-      zonePath=""
+      zonePath="/main"
       plegadaInicial={plegada}
       /* El selector de organización de la barra: la lista y cuál se mira. Las
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */

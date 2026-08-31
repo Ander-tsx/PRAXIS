@@ -46,7 +46,7 @@ export function ActionsSection({ catalog, actions, onChange, proyecto }: Actions
   return (
     <fieldset className="flex flex-col gap-3">
       <legend className="font-sans text-sm font-semibold text-text-primary">
-        Entonces… <span className="font-normal text-text-secondary">¿qué hace?</span>
+        Entonces… <span className="font-normal text-white">¿qué hace?</span>
       </legend>
 
       <ul className="flex flex-col gap-2">
@@ -92,7 +92,7 @@ export function ActionsSection({ catalog, actions, onChange, proyecto }: Actions
                     type="button"
                     onClick={() => onChange(actions.filter((_, i) => i !== indice))}
                     aria-label={`Quitar la acción ${spec?.label ?? accion.type}`}
-                    className="rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-error-muted hover:text-error"
+                    className="rounded-lg p-1.5 text-white transition-colors hover:bg-error-muted hover:text-error"
                   >
                     <X className="size-4" />
                   </button>
@@ -104,7 +104,7 @@ export function ActionsSection({ catalog, actions, onChange, proyecto }: Actions
                 const valor = accion.config[campo.key];
                 return (
                   <label key={campo.key} className="flex flex-col gap-1">
-                    <span className="font-sans text-xs font-medium text-text-secondary">
+                    <span className="font-sans text-xs font-medium text-white">
                       {campo.label}
                     </span>
                     {opciones.length > 0 ? (
@@ -132,14 +132,14 @@ export function ActionsSection({ catalog, actions, onChange, proyecto }: Actions
                       />
                     )}
                     {campo.help && (
-                      <span className="font-sans text-xs text-text-disabled">{campo.help}</span>
+                      <span className="font-sans text-xs text-white">{campo.help}</span>
                     )}
                   </label>
                 );
               })}
 
               {spec?.requires && (
-                <p className="font-sans text-xs text-text-disabled">
+                <p className="font-sans text-xs text-white">
                   Necesita que quien cree la regla pueda hacer esto a mano.
                 </p>
               )}

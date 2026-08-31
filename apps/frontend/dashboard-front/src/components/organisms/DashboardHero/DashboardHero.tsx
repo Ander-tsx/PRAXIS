@@ -47,7 +47,7 @@ export function DashboardHero({ name, email, roles, resumen }: DashboardHeroProp
             <GlobalRoleBadges roles={roles} />
           </div>
 
-          <p className="font-serif text-lg italic text-text-secondary">{resumen}</p>
+          <p className="font-serif text-lg italic text-white">{resumen}</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export function DashboardHero({ name, email, roles, resumen }: DashboardHeroProp
             <p className="font-sans text-sm text-text-primary">
               Estás identificado como <span className="font-semibold">{email}</span>.
             </p>
-            <p className="font-sans text-sm text-text-secondary">
+            <p className="font-sans text-sm text-white">
               Al registrarte no te pedimos tu nombre. Añádelo para que tu equipo te reconozca.
             </p>
           </div>

@@ -12,7 +12,7 @@ export function CompareTable({ planes }: { planes: PlanSpec[] }) {
       <div className="flex justify-center mb-8">
         <button
           onClick={() => setShowCompare(!showCompare)}
-          className="flex items-center gap-2 text-sm font-semibold text-white/50 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-sm font-semibold text-white hover:text-white transition-colors"
         >
           {showCompare ? 'Ocultar comparación detallada' : 'Comparar características al detalle'}
           <svg
@@ -31,7 +31,7 @@ export function CompareTable({ planes }: { planes: PlanSpec[] }) {
           <table className="w-full text-left min-w-[800px]">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="py-6 px-8 text-sm font-bold text-white/40 uppercase tracking-widest w-1/3">
+                <th className="py-6 px-8 text-sm font-bold text-white uppercase tracking-widest w-1/3">
                   Características
                 </th>
                 {planes.map((p) => (
@@ -56,11 +56,11 @@ export function CompareTable({ planes }: { planes: PlanSpec[] }) {
                 },
               ].map((feature, idx) => (
                 <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-5 px-8 text-sm text-white/70 font-medium">{feature.label}</td>
+                  <td className="py-5 px-8 text-sm text-white font-medium">{feature.label}</td>
                   {planes.map((p) => (
                     <td
                       key={p.tier}
-                      className="py-5 px-8 text-sm text-white/50 text-center font-mono"
+                      className="py-5 px-8 text-sm text-white text-center font-mono"
                     >
                       {feature.format(p.quotas[feature.key as keyof typeof p.quotas])}
                     </td>

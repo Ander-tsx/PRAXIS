@@ -702,7 +702,7 @@ export function MessageBubble({
           {!continued && (
             <span className="flex items-center gap-2 px-1 mb-1">
               <span className="font-display font-medium text-sm text-text-primary">{mine ? 'Tú' : nombre}</span>
-              <span className="font-sans text-[10px] text-text-disabled/50">
+              <span className="font-sans text-[10px] text-white0">
                 {soloHora(message.createdAt)}
               </span>
             </span>
@@ -713,7 +713,7 @@ export function MessageBubble({
             style={{ background: alpha(colors.textSecondary, 10) }}
           >
             <svg
-              className="h-3.5 w-3.5 shrink-0 text-text-disabled"
+              className="h-3.5 w-3.5 shrink-0 text-white"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -723,8 +723,8 @@ export function MessageBubble({
               <circle cx="12" cy="12" r="9" />
               <path strokeLinecap="round" d="M5.6 5.6l12.8 12.8" />
             </svg>
-            <span className="font-sans text-xs italic text-text-disabled">Mensaje eliminado</span>
-            <span className="font-sans text-[11px] text-text-disabled">
+            <span className="font-sans text-xs italic text-white">Mensaje eliminado</span>
+            <span className="font-sans text-[11px] text-white">
               {soloHora(message.createdAt)}
             </span>
           </div>
@@ -921,7 +921,7 @@ export function MessageBubble({
               >
                 {nombreDeAutor(message.replyTo.authorId)}
               </span>
-              <span className="line-clamp-2 font-sans text-xs text-text-secondary">
+              <span className="line-clamp-2 font-sans text-xs text-white">
                 <AttachmentPreview mensaje={message.replyTo} />
               </span>
             </div>
@@ -1048,7 +1048,7 @@ export function MessageBubble({
            * la burbuja ya separa lo suficiente.
            */}
           <span
-            className={`-mb-0.5 mt-1 flex items-center gap-1.5 font-sans text-[10px] leading-none text-text-disabled ${
+            className={`-mb-0.5 mt-1 flex items-center gap-1.5 font-sans text-[10px] leading-none text-white ${
               mine ? 'justify-end' : 'justify-start'
             }`}
           >
@@ -1230,7 +1230,7 @@ export function MessageBubble({
                      * quitarlo. Viviendo dentro se va con el menú.
                      */
                     <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto px-3 py-1.5">
-                      <span className="font-sans text-[10px] uppercase tracking-wide text-text-disabled">
+                      <span className="font-sans text-[10px] uppercase tracking-wide text-white">
                         Visto por
                       </span>
                       {vistoPor.map((userId) => (
@@ -1251,14 +1251,14 @@ export function MessageBubble({
                      * encuentra ahí lo que esperaba y para.
                      */
                     <div className="flex flex-col gap-2 px-3 py-2">
-                      <span className="font-sans text-xs text-text-secondary">
+                      <span className="font-sans text-xs text-white">
                         ¿Eliminar este mensaje? No se puede deshacer.
                       </span>
                       <span className="flex items-center justify-end gap-2">
                         <button
                           type="button"
                           onClick={() => setConfirmandoBorrado(false)}
-                          className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                          className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary"
                         >
                           Cancelar
                         </button>
@@ -1482,7 +1482,7 @@ export function MessageBubble({
                   <button
                     type="button"
                     onClick={() => setConfirmandoBorrado(false)}
-                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm text-text-secondary"
+                    className="cursor-pointer rounded-lg px-3 py-1.5 font-sans text-sm text-white"
                   >
                     No
                   </button>
@@ -1904,7 +1904,7 @@ function AttachmentCard({
       style={{ background: alpha(colors.border, 22) }}
     >
       <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[9px] font-semibold uppercase text-text-secondary"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-sans text-[9px] font-semibold uppercase text-white"
         style={{ background: alpha(colors.border, 45) }}
       >
         {extension(adjunto.filename)}
@@ -1913,12 +1913,12 @@ function AttachmentCard({
         <span className="block truncate font-sans text-xs font-medium text-text-primary">
           {adjunto.filename}
         </span>
-        <span className="block font-sans text-[10px] text-text-disabled">
+        <span className="block font-sans text-[10px] text-white">
           {esPdf ? 'Ver en otra pestaña' : 'Descargar'} · {formatBytes(adjunto.size)}
         </span>
       </span>
       <svg
-        className="h-3.5 w-3.5 shrink-0 text-text-disabled"
+        className="h-3.5 w-3.5 shrink-0 text-white"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -2331,11 +2331,11 @@ function LinkPreviewCard({ preview, mine }: { preview: LinkPreview; mine: boolea
           {preview.title}
         </span>
         {preview.description && (
-          <span className="line-clamp-2 font-sans text-[11px] text-text-secondary">
+          <span className="line-clamp-2 font-sans text-[11px] text-white">
             {preview.description}
           </span>
         )}
-        <span className="line-clamp-1 font-sans text-[10px] text-text-disabled">
+        <span className="line-clamp-1 font-sans text-[10px] text-white">
           {dominioDe(preview.url)}
         </span>
       </span>

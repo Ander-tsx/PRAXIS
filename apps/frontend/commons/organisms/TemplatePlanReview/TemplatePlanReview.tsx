@@ -107,7 +107,7 @@ export function TemplatePlanReview({
     <div className="flex flex-col gap-6 pr-1">
       {plantilla.porQue && (
         <p
-          className="rounded-sm border px-4 py-3 font-sans text-sm leading-relaxed text-text-secondary"
+          className="rounded-sm border px-4 py-3 font-sans text-sm leading-relaxed text-white"
           style={{ background: alpha(colors.info, 8), borderColor: alpha(colors.info, 25) }}
         >
           <strong className="text-text-primary">Por qué esta estructura: </strong>
@@ -412,7 +412,7 @@ export function TemplateResultSummary({ resultado }: { resultado: TemplateResult
       <div>
         <p className="font-display text-xl text-text-primary">«{proyecto.name}» está listo</p>
         {partes.length > 0 && (
-          <p className="mt-1 font-sans text-sm text-text-secondary">
+          <p className="mt-1 font-sans text-sm text-white">
             Se han creado {lista(partes)}.
           </p>
         )}
@@ -431,7 +431,7 @@ export function TemplateResultSummary({ resultado }: { resultado: TemplateResult
           </p>
           <ul className="flex list-disc flex-col gap-0.5 pl-4">
             {fallos.map((fallo) => (
-              <li key={fallo} className="font-sans text-xs text-text-secondary">
+              <li key={fallo} className="font-sans text-xs text-white">
                 {fallo}
               </li>
             ))}
@@ -476,10 +476,10 @@ function Seccion({
   return (
     <section className="flex flex-col gap-2">
       <div className="flex flex-col gap-0.5">
-        <h4 className="font-sans text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        <h4 className="font-sans text-xs font-semibold uppercase tracking-wide text-white">
           {titulo}
         </h4>
-        {ayuda && <p className="font-sans text-xs text-text-secondary">{ayuda}</p>}
+        {ayuda && <p className="font-sans text-xs text-white">{ayuda}</p>}
       </div>
       {children}
     </section>

@@ -60,7 +60,7 @@ export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
         </span>
 
         <h3 className="font-display text-3xl text-text-primary">Todavía no tienes proyectos</h3>
-        <p className="max-w-md font-serif text-lg italic text-text-secondary">
+        <p className="max-w-md font-serif text-lg italic text-white">
           Un proyecto es el contenedor de todo lo demás: espacios, tableros y tareas.
         </p>
       </div>
@@ -95,10 +95,10 @@ export function DashboardEmptyState({ action }: DashboardEmptyStateProps) {
             >
               {step.title}
             </h4>
-            <p className="font-sans text-xs leading-relaxed text-text-secondary">{step.body}</p>
+            <p className="font-sans text-xs leading-relaxed text-white">{step.body}</p>
 
             {!step.available && (
-              <span className="mt-auto font-sans text-[10px] uppercase tracking-wider text-text-disabled">
+              <span className="mt-auto font-sans text-[10px] uppercase tracking-wider text-white">
                 Al crear el proyecto
               </span>
             )}

@@ -33,7 +33,7 @@ export function ProjectsEmptyState({ action }: ProjectsEmptyStateProps) {
 
       <div className="flex flex-col gap-2">
         <h3 className="font-display text-3xl text-text-primary">Todavía no tienes proyectos</h3>
-        <p className="max-w-md font-serif text-lg italic text-text-secondary">
+        <p className="max-w-md font-serif text-lg italic text-white">
           Aquí verás los que creas y aquellos donde te añada tu equipo.
         </p>
       </div>

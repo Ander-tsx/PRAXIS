@@ -130,7 +130,7 @@ export function ProjectCard({
           <h3 className="truncate font-sans text-base font-semibold text-text-primary">
             {project.name}
           </h3>
-          <span className="font-sans text-xs text-text-disabled">
+          <span className="font-sans text-xs text-white">
             {eresElDueno ? 'Tuyo' : 'Te añadieron'}
           </span>
         </div>
@@ -141,16 +141,16 @@ export function ProjectCard({
               tarjeta en una fila de etiquetas — y «de quién es» ya lo dice la
               línea de debajo del nombre, que no gasta insignia. */}
         {suspendido && (
-          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-text-secondary">
+          <span className="shrink-0 border border-border px-2 py-0.5 rounded-sm font-sans text-xs text-white">
             SUSPENDIDO
           </span>
         )}
       </div>
 
       {project.description ? (
-        <p className="line-clamp-2 font-sans text-sm text-text-secondary">{project.description}</p>
+        <p className="line-clamp-2 font-sans text-sm text-white">{project.description}</p>
       ) : (
-        <p className="font-sans text-sm italic text-text-disabled">Sin descripción</p>
+        <p className="font-sans text-sm italic text-white">Sin descripción</p>
       )}
 
       {/**
@@ -200,7 +200,7 @@ export function ProjectCard({
           icono={<IconoEspacios />}
         />
         <span
-          className="ml-auto font-sans text-xs text-text-disabled"
+          className="ml-auto font-sans text-xs text-white"
           title={`Creado el ${fechaLarga.format(new Date(project.createdAt))}`}
         >
           {dateFormatter.format(new Date(project.createdAt))}
@@ -280,7 +280,7 @@ function Equipo({
       </span>
 
       {restantes > 0 && (
-        <span className="pl-2 font-sans text-xs text-text-secondary">+{restantes}</span>
+        <span className="pl-2 font-sans text-xs text-white">+{restantes}</span>
       )}
     </span>
   );
@@ -294,8 +294,8 @@ function Dato({
   icono,
 }: { valor: number; singular: string; plural: string; icono: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5 font-sans text-xs text-text-secondary">
-      <span className="text-text-disabled">{icono}</span>
+    <span className="flex items-center gap-1.5 font-sans text-xs text-white">
+      <span className="text-white">{icono}</span>
       <span className="font-semibold text-text-primary">{valor}</span>
       {valor === 1 ? singular : plural}
     </span>

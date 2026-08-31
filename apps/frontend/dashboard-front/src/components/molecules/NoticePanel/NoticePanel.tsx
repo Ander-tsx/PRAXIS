@@ -56,7 +56,7 @@ export function NoticePanel({ tone, icon, title, hint, count, children }: Notice
 
         <span className="flex min-w-0 flex-1 flex-col">
           <h3 className="font-display text-xl leading-tight text-text-primary">{title}</h3>
-          <span className="font-sans text-sm text-text-secondary">{hint}</span>
+          <span className="font-sans text-sm text-white">{hint}</span>
         </span>
 
         {count !== undefined && (

@@ -57,11 +57,11 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 
         <span className="flex min-w-0 flex-col gap-0.5">
           <span
-            className={`font-sans text-sm font-medium ${implied ? 'text-text-secondary' : 'text-text-primary'}`}
+            className={`font-sans text-sm font-medium ${implied ? 'text-white' : 'text-text-primary'}`}
           >
             {label}
           </span>
-          {hint && <span className="font-sans text-xs text-text-disabled">{hint}</span>}
+          {hint && <span className="font-sans text-xs text-white">{hint}</span>}
         </span>
       </label>
     );

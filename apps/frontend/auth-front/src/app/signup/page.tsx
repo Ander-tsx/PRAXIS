@@ -148,11 +148,11 @@ export default function SignupPage() {
       <AuthPanel>
         <div className="w-full max-w-md">
           <h1 className="mb-2 font-display text-3xl text-text-primary">Mira tu correo</h1>
-          <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+          <p className="mb-6 font-sans text-sm leading-relaxed text-white">
             Hemos mandado un enlace a <strong className="text-text-primary">{email}</strong>. Ábrelo
             para confirmar la cuenta y poder entrar. Caduca en 24 horas.
           </p>
-          <p className="mb-6 font-sans text-xs text-text-disabled">
+          <p className="mb-6 font-sans text-xs text-white">
             Si no aparece en unos minutos, mira en la carpeta de spam.
           </p>
           <Link href="/login">

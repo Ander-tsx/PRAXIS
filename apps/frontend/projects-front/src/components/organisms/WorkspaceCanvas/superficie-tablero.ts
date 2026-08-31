@@ -8,9 +8,6 @@
  * no como un rectángulo dibujado encima.
  */
 export const BOARD_SURFACE = {
-  background: '#0a0a09',
-  boxShadow: [
-    'inset 0 0 24px 2px rgba(0, 0, 0, 0.55)',
-    'inset 0 0 72px 24px rgba(0, 0, 0, 0.35)',
-  ].join(', '),
+  background: '#191919',
+  boxShadow: 'none',
 } as const;

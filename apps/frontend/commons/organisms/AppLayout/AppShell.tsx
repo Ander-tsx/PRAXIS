@@ -192,7 +192,7 @@ const UN_ANO = 60 * 60 * 24 * 365;
  * hay que salir de la zona. Por eso es un `<a>` y no un `next/link`, que
  * prefijaría con el basePath de la zona actual (ESTADO-ACTUAL §16).
  */
-const CUENTA_HREF = '/profile';
+const CUENTA_HREF = '/main/profile';
 
 /**
  * Dónde vive el centro de mensajes.
@@ -339,10 +339,10 @@ function ArmazonInterno({
 
   return (
     <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
-      <div className="flex h-screen overflow-hidden bg-background font-sans text-text-primary">
+      <div className="flex h-screen overflow-hidden bg-[#191919] font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
-          className={`hidden shrink-0 flex-col border-r border-border bg-[#080807] transition-[width] duration-200 md:flex ${
+          className={`hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 md:flex ${
             plegada ? 'w-[4.5rem]' : 'w-80'
           }`}
         >
@@ -396,7 +396,7 @@ function ArmazonInterno({
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
                     activeTab === 'home'
                       ? 'bg-white/10 text-white'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <svg
@@ -420,7 +420,7 @@ function ArmazonInterno({
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
                     activeTab === 'chat'
                       ? 'bg-white/10 text-white'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <svg
@@ -444,7 +444,7 @@ function ArmazonInterno({
                   className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
                     activeTab === 'inbox'
                       ? 'bg-white/10 text-white'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      : 'text-white hover:bg-white/5 hover:text-white'
                   }`}
                 >
                   <svg
@@ -567,7 +567,7 @@ function ArmazonInterno({
               style={{ background: alpha(colors.overlay, 80) }}
             />
 
-            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-[#080807] p-4">
+            <div className="fixed inset-y-0 left-0 z-10 flex w-64 flex-col justify-between border-r border-border bg-[#202020] p-4">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center gap-2 mt-1">
                   <Wordmark />
@@ -577,7 +577,7 @@ function ArmazonInterno({
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
                   aria-label="Cerrar menú"
-                  className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary"
+                  className="rounded-md p-1 text-white transition-colors hover:text-text-primary"
                 >
                   <svg
                     className="h-6 w-6"
@@ -669,7 +669,7 @@ function UserCard({
         {user.name.trim() && (
           <p className="truncate font-sans text-sm font-semibold text-white">{user.name}</p>
         )}
-        <p className="truncate font-sans text-xs text-white/60">{user.email}</p>
+        <p className="truncate font-sans text-xs text-white">{user.email}</p>
       </a>
     </div>
   );
@@ -760,7 +760,7 @@ function BotonDePliegue({ plegada, onClick }: { plegada: boolean; onClick: () =>
       aria-expanded={!plegada}
       aria-label={plegada ? 'Desplegar la barra lateral' : 'Plegar la barra lateral'}
       title={plegada ? 'Desplegar' : 'Plegar'}
-      className="shrink-0 cursor-pointer rounded-md p-1.5 text-text-disabled transition-colors hover:bg-white/5 hover:text-text-primary"
+      className="shrink-0 cursor-pointer rounded-md p-1.5 text-white transition-colors hover:bg-white/5 hover:text-text-primary"
     >
       <svg
         className="h-4 w-4"
@@ -844,26 +844,25 @@ async function fetchProjectsTree(
     listBody?.data?.items ?? (Array.isArray(listBody?.data) ? listBody.data : []);
   if (items.length === 0) return [];
 
-  const resolved = await Promise.all(
-    items.map(async (p: any) => {
-      const detail = await fetch(`${zonePath}/api/gateway/projects/${p.id}`, { cache: 'no-store' })
-        .then((r) => r.json())
-        .catch(() => null);
-      const workspaces: Array<{ id: string; name: string }> = (detail?.data?.workspaces ?? []).map(
-        (w: any) => ({ id: w.id, name: w.name }),
-      );
-      return {
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        /* `GET /projects` ya trae la identidad visual; el detalle también, y es
-           lo que gana si difieren. */
-        iconKey: detail?.data?.iconKey ?? p.iconKey ?? null,
-        color: detail?.data?.color ?? p.color ?? null,
-        workspaces,
-      };
-    }),
-  );
+  const resolved = [];
+  for (const p of items) {
+    const detail = await fetch(`${zonePath}/api/gateway/projects/${p.id}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .catch(() => null);
+    const workspaces: Array<{ id: string; name: string }> = (detail?.data?.workspaces ?? []).map(
+      (w: any) => ({ id: w.id, name: w.name }),
+    );
+    resolved.push({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      /* `GET /projects` ya trae la identidad visual; el detalle también, y es
+         lo que gana si difieren. */
+      iconKey: detail?.data?.iconKey ?? p.iconKey ?? null,
+      color: detail?.data?.color ?? p.color ?? null,
+      workspaces,
+    });
+  }
   return resolved;
 }
 
@@ -964,12 +963,12 @@ function SidebarProjectsTree({
   if (projects.length === 0 && !plegada) {
     return (
       <div className="px-3 py-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40 select-none block mb-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none block mb-1">
           Proyectos
         </span>
         <a
           href="/projects"
-          className="flex items-center gap-2 text-white/40 hover:text-white text-[12px] py-1 transition-colors"
+          className="flex items-center gap-2 text-white hover:text-white text-[12px] py-1 transition-colors"
         >
           <svg
             className="h-3.5 w-3.5"
@@ -991,13 +990,13 @@ function SidebarProjectsTree({
     <div className="flex flex-col">
       {!plegada && (
         <div className="flex items-center justify-between px-3 mb-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40 select-none">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
             Proyectos
           </span>
           <a
             href="/projects"
             title="Ver todos los proyectos"
-            className="rounded p-0.5 text-white/30 hover:text-white transition-colors"
+            className="rounded p-0.5 text-white hover:text-white transition-colors"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -1056,7 +1055,7 @@ function SidebarProjectsTree({
                   onClick={() => toggleProject(project.id)}
                   aria-expanded={isOpen}
                   aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
-                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-white/25 hover:text-white/60 transition-colors"
+                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-white hover:text-white transition-colors"
                 >
                   <ChevronIcon open={isOpen} />
                 </button>
@@ -1092,7 +1091,7 @@ function SidebarProjectsTree({
                 >
                   <div className="flex flex-col gap-0.5 pl-6 pb-1 pt-0.5">
                     {project.workspaces.length === 0 ? (
-                      <span className="px-2 py-1 text-[12px] text-white/25 italic select-none">
+                      <span className="px-2 py-1 text-[12px] text-white italic select-none">
                         Sin espacios
                       </span>
                     ) : (
@@ -1108,7 +1107,7 @@ function SidebarProjectsTree({
                             className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
                               isActiveWs
                                 ? 'bg-white/10 text-white font-medium'
-                                : 'text-white/45 hover:text-white hover:bg-white/[0.06]'
+                                : 'text-white hover:text-white hover:bg-white/[0.06]'
                             }`}
                           >
                             <WorkspaceLeafIcon />
@@ -1157,14 +1156,27 @@ function SidebarChatList({
   const [search, setSearch] = useState('');
 
   const fetchChats = useCallback(() => {
-    Promise.all([
-      fetch(`${zonePath}/api/gateway/me/chats`)
-        .then((res) => res.json())
-        .catch(() => ({ data: [] })),
-      fetch(`${zonePath}/api/gateway/me/chats/projects`)
-        .then((res) => res.json())
-        .catch(() => ({ data: [] })),
-    ]).then(([d, p]) => {
+    const fetchDirects = async () => {
+      try {
+        const res = await fetch(`${zonePath}/api/gateway/me/chats`);
+        return await res.json();
+      } catch {
+        return { data: [] };
+      }
+    };
+
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch(`${zonePath}/api/gateway/me/chats/projects`);
+        return await res.json();
+      } catch {
+        return { data: [] };
+      }
+    };
+
+    const run = async () => {
+      const d = await fetchDirects();
+      const p = await fetchProjects();
       const listD = Array.isArray(d?.data) ? d.data : [];
       const listP = Array.isArray(p?.data) ? p.data : [];
       setDirects(listD);
@@ -1186,7 +1198,8 @@ function SidebarChatList({
       } else {
         setLoading(false);
       }
-    });
+    };
+    run();
   }, [zonePath]);
 
   useEffect(() => {
@@ -1255,19 +1268,19 @@ function SidebarChatList({
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span
-                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
               >
                 {nombre}
               </span>
               {c.ultimo && (
-                <span className="ml-auto shrink-0 font-sans text-[10px] text-white/40">
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
                   {cuandoCorto(c.ultimo.createdAt)}
                 </span>
               )}
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <span
-                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
               >
                 {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
               </span>
@@ -1309,19 +1322,19 @@ function SidebarChatList({
           <div className="flex flex-col min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span
-                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white/90'}`}
+                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
               >
                 {c.project.name}
               </span>
               {c.ultimo && (
-                <span className="ml-auto shrink-0 font-sans text-[10px] text-white/40">
+                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
                   {cuandoCorto(c.ultimo.createdAt)}
                 </span>
               )}
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
               <span
-                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white/30' : 'text-white/50'}`}
+                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
               >
                 {c.ultimo
                   ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}`
@@ -1354,7 +1367,7 @@ function SidebarChatList({
       {projects.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
               Proyectos
             </span>
           )}
@@ -1371,7 +1384,7 @@ function SidebarChatList({
       {directs.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50">
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
               Privados
             </span>
           )}
@@ -1481,13 +1494,13 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
         <div className="flex bg-white/5 rounded-lg p-0.5 mx-3 mb-3 shrink-0">
           <button
             onClick={() => setMostrarTodos(false)}
-            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${!mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${!mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
           >
             Sin leer
           </button>
           <button
             onClick={() => setMostrarTodos(true)}
-            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
           >
             Todos
           </button>
@@ -1498,7 +1511,7 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
         {loading ? (
           loader
         ) : items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-white/40 text-[13px] font-sans">
+          <div className="px-4 py-8 text-center text-white text-[13px] font-sans">
             Nada nuevo por aquí.
           </div>
         ) : (
@@ -1529,11 +1542,11 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
                 )}
                 <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
                   <p
-                    className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white/60'}`}
+                    className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white'}`}
                   >
                     {getTitle(n)}
                   </p>
-                  <span className="font-sans text-[10px] text-white/30 mt-1">
+                  <span className="font-sans text-[10px] text-white mt-1">
                     {new Date(n.createdAt).toLocaleDateString()}
                   </span>
                 </div>

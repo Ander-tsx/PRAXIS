@@ -85,7 +85,7 @@ export function ProyectosPageClient({
           }}
           className="relative flex-1 min-w-0 max-w-sm"
         >
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/70">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white">
             <svg
               className="h-4 w-4"
               fill="none"
@@ -110,7 +110,7 @@ export function ProyectosPageClient({
             className="h-9 w-full rounded-lg border border-white/10 bg-white/[0.04] pl-9 pr-14 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-white/25 focus:bg-white/[0.07]"
           />
           {query && query !== search && (
-            <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-medium uppercase text-white/75">
+            <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-medium uppercase text-white">
               Enter
             </div>
           )}
@@ -122,7 +122,7 @@ export function ProyectosPageClient({
                 buscar('');
               }}
               aria-label="Quitar búsqueda"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-white/70 hover:text-white transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-white hover:text-white transition-colors"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -145,7 +145,7 @@ export function ProyectosPageClient({
             onClick={() => cambiarVista('lista')}
             title="Vista lista"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              vistaActual === 'lista' ? 'bg-white/10 text-white' : 'text-white/75 hover:text-white'
+              vistaActual === 'lista' ? 'bg-white/10 text-white' : 'text-white hover:text-white'
             }`}
           >
             <svg
@@ -165,7 +165,7 @@ export function ProyectosPageClient({
             onClick={() => cambiarVista('grilla')}
             title="Vista grilla"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              vistaActual === 'grilla' ? 'bg-white/10 text-white' : 'text-white/75 hover:text-white'
+              vistaActual === 'grilla' ? 'bg-white/10 text-white' : 'text-white hover:text-white'
             }`}
           >
             <svg
@@ -191,10 +191,10 @@ export function ProyectosPageClient({
 
       {/* ── Contador ─────────────────────────────────────────────── */}
       {hayProyectos && (
-        <p className="text-sm text-white/70 -mt-1">
+        <p className="text-sm text-white -mt-1">
           {buscando ? (
             <>
-              <span className="font-medium text-white/80">{total}</span>{' '}
+              <span className="font-medium text-white">{total}</span>{' '}
               {total === 1 ? 'resultado' : 'resultados'} para «{search}»{'  ·  '}
               <button
                 type="button"
@@ -202,14 +202,14 @@ export function ProyectosPageClient({
                   setQuery('');
                   buscar('');
                 }}
-                className="text-white/75 hover:text-white transition-colors underline-offset-2 hover:underline"
+                className="text-white hover:text-white transition-colors underline-offset-2 hover:underline"
               >
                 Ver todos
               </button>
             </>
           ) : (
             <>
-              <span className="font-medium text-white/80">{total}</span>{' '}
+              <span className="font-medium text-white">{total}</span>{' '}
               {total === 1 ? 'proyecto' : 'proyectos'}
             </>
           )}
@@ -275,16 +275,16 @@ function ProyectosLista({
     <div className="flex flex-col overflow-hidden rounded-xl border border-white/[0.08]">
       {/* Cabecera */}
       <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 border-b border-white/[0.06] px-4 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-white">
           Proyecto
         </span>
-        <span className="hidden w-28 text-right text-[11px] font-semibold uppercase tracking-wider text-white/70 md:block">
+        <span className="hidden w-28 text-right text-[11px] font-semibold uppercase tracking-wider text-white md:block">
           Equipo
         </span>
-        <span className="hidden w-20 text-right text-[11px] font-semibold uppercase tracking-wider text-white/70 lg:block">
+        <span className="hidden w-20 text-right text-[11px] font-semibold uppercase tracking-wider text-white lg:block">
           Espacios
         </span>
-        <span className="hidden w-28 text-right text-[11px] font-semibold uppercase tracking-wider text-white/70 sm:block">
+        <span className="hidden w-28 text-right text-[11px] font-semibold uppercase tracking-wider text-white sm:block">
           Creado
         </span>
       </div>
@@ -315,12 +315,12 @@ function ProyectosLista({
               <div className="min-w-0">
                 <p
                   className={`truncate text-[13px] font-medium transition-colors ${
-                    suspendido ? 'text-white/70' : 'text-white/80 group-hover:text-white'
+                    suspendido ? 'text-white' : 'text-white group-hover:text-white'
                   }`}
                 >
                   {project.name}
                 </p>
-                <p className="truncate text-[11px] text-white/70">
+                <p className="truncate text-[11px] text-white">
                   {suspendido ? (
                     <span className="text-amber-500/60">Suspendido</span>
                   ) : eresElDueno ? (
@@ -344,7 +344,7 @@ function ProyectosLista({
                 {equiposPorProyecto[project.id]?.slice(0, 3).map((user) => (
                   <div
                     key={user.id}
-                    className="relative rounded-full ring-2 ring-[#080807] bg-[#080807]"
+                    className="relative rounded-full ring-2 ring-[#080807] bg-[#191919]"
                   >
                     <Avatar
                       label={
@@ -368,7 +368,7 @@ function ProyectosLista({
 
             {/* Espacios */}
             <div className="hidden w-20 items-center justify-end lg:flex">
-              <span className="text-xs text-white/70">
+              <span className="text-xs text-white">
                 {project._count.workspaces}{' '}
                 {project._count.workspaces === 1 ? 'espacio' : 'espacios'}
               </span>
@@ -376,7 +376,7 @@ function ProyectosLista({
 
             {/* Fecha */}
             <div className="hidden w-28 items-center justify-end sm:flex">
-              <span className="tabular-nums text-xs text-white/70">
+              <span className="tabular-nums text-xs text-white">
                 {dateFmt.format(new Date(project.createdAt))}
               </span>
             </div>
@@ -421,10 +421,10 @@ function ProyectosGrilla({
                   apagado={suspendido}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-semibold text-white/80 transition-colors group-hover:text-white">
+                  <p className="truncate text-[13px] font-semibold text-white transition-colors group-hover:text-white">
                     {project.name}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-white/70">
+                  <p className="mt-0.5 text-[11px] text-white">
                     {suspendido ? (
                       <span className="text-amber-500/60">Suspendido</span>
                     ) : eresElDueno ? (
@@ -437,12 +437,12 @@ function ProyectosGrilla({
               </div>
 
               {project.description && (
-                <p className="line-clamp-2 text-[12px] leading-relaxed text-white/70">
+                <p className="line-clamp-2 text-[12px] leading-relaxed text-white">
                   {project.description}
                 </p>
               )}
 
-              <div className="mt-auto flex items-center justify-between border-t border-white/[0.06] pt-2.5 text-xs text-white/70">
+              <div className="mt-auto flex items-center justify-between border-t border-white/[0.06] pt-2.5 text-xs text-white">
                 <div className="flex items-center gap-4">
                   <span
                     className="flex items-center gap-1"
@@ -472,7 +472,7 @@ function ProyectosGrilla({
                   {equiposPorProyecto[project.id]?.slice(0, 3).map((user) => (
                     <div
                       key={user.id}
-                      className="relative rounded-full ring-2 ring-[#131312] bg-[#131312] group-hover:ring-[#161615] group-hover:bg-[#161615] transition-colors"
+                      className="relative rounded-full ring-2 ring-[#131312] bg-[#191919] group-hover:ring-[#161615] group-hover:bg-[#161615] transition-colors"
                     >
                       <Avatar
                         label={
@@ -506,7 +506,7 @@ function ProyectosGrilla({
 function EstadoVacioNuevo({ crearTrigger }: { crearTrigger: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-6 rounded-xl border border-white/[0.08] py-20 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white/70">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white">
         <svg
           className="h-7 w-7"
           fill="none"
@@ -523,8 +523,8 @@ function EstadoVacioNuevo({ crearTrigger }: { crearTrigger: ReactNode }) {
         </svg>
       </div>
       <div className="flex flex-col gap-1.5">
-        <h2 className="text-base font-semibold text-white/70">Sin proyectos todavía</h2>
-        <p className="max-w-xs text-sm text-white/70">
+        <h2 className="text-base font-semibold text-white">Sin proyectos todavía</h2>
+        <p className="max-w-xs text-sm text-white">
           Crea tu primer proyecto o pide que te añadan a uno existente.
         </p>
       </div>
@@ -538,7 +538,7 @@ function EstadoVacioNuevo({ crearTrigger }: { crearTrigger: ReactNode }) {
 function SinResultados({ search, onLimpiar }: { search: string; onLimpiar: () => void }) {
   return (
     <div className="flex flex-col items-center gap-5 rounded-xl border border-white/[0.08] py-16 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white/70">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.04] text-white">
         <svg
           className="h-6 w-6"
           fill="none"
@@ -555,15 +555,15 @@ function SinResultados({ search, onLimpiar }: { search: string; onLimpiar: () =>
         </svg>
       </div>
       <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-white/80">Sin resultados para «{search}»</h3>
-        <p className="max-w-xs text-sm text-white/70">
+        <h3 className="text-sm font-semibold text-white">Sin resultados para «{search}»</h3>
+        <p className="max-w-xs text-sm text-white">
           No hay proyectos con ese nombre entre los que puedes ver.
         </p>
       </div>
       <button
         type="button"
         onClick={onLimpiar}
-        className="rounded-lg border border-white/[0.10] px-4 py-2 text-sm font-medium text-white/80 transition-colors hover:border-white/20 hover:text-white"
+        className="rounded-lg border border-white/[0.10] px-4 py-2 text-sm font-medium text-white transition-colors hover:border-white/20 hover:text-white"
       >
         Ver todos los proyectos
       </button>

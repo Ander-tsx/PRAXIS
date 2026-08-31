@@ -55,13 +55,13 @@ export function AppHeader({
 
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-[#080807] px-4 sm:px-6">
+      <header className="flex h-16 shrink-0 items-center justify-between gap-4 px-4 sm:px-6 bg-transparent">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={openMenu}
             aria-label="Abrir menú"
-            className="rounded-md p-1 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
+            className="rounded-md p-1 text-white transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:hidden"
           >
             <svg
               className="h-6 w-6"
@@ -107,7 +107,7 @@ export function AppHeader({
        * no un defecto.
        */}
       <main
-        className={`relative flex-1 bg-[#080807] motion-safe:scroll-smooth ${
+        className={`relative flex-1 bg-[#191919] motion-safe:scroll-smooth ${
           /* `overflow-hidden` y no `auto`: con `lleno`, el que desplaza es un
              hijo, y dejar aquí un scroll de reserva produce dos barras
              anidadas —una que no se mueve nunca— en cuanto el hijo mide justo. */

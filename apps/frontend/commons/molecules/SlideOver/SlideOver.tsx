@@ -110,7 +110,7 @@ export function SlideOver({
         className={[
           'fixed inset-y-0 right-0 z-40 m-0 h-full w-full max-h-screen overflow-y-auto p-6 text-left transition-none sm:transition-transform sm:duration-300 sm:left-auto sm:border-l cursor-default',
           dark
-            ? 'bg-[#0c0c0b] text-white sm:border-white/[0.08]'
+            ? 'bg-[#202020] text-white sm:border-white/[0.08]'
             : 'bg-surface text-text-primary sm:border-border',
           sizeClasses[size],
           open ? 'translate-x-0' : 'translate-x-full',
@@ -121,14 +121,14 @@ export function SlideOver({
             <div className="flex flex-col gap-1">
               {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}
               {description && (
-                <p className="font-sans text-sm text-text-secondary">{description}</p>
+                <p className="font-sans text-sm text-white">{description}</p>
               )}
             </div>
             <button
               type="button"
               onClick={onClose}
               aria-label="Cerrar panel"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-hover hover:text-text-primary"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-hover hover:text-text-primary"
             >
               <svg
                 className="h-5 w-5"

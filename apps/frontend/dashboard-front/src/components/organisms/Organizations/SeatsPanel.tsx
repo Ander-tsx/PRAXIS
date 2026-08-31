@@ -30,56 +30,103 @@ export function SeatsPanel({
 }) {
   const [state, formAction, pending] = useAccion(cambiarAsientosAction, ORGANIZACION_INITIAL_STATE);
   const [seats, setSeats] = useState(contratados);
+  const [confirmando, setConfirmando] = useState(false);
   const campoId = useId();
 
-  return (
-    <section className="flex flex-col gap-3">
-      {/* ⚠️ `onSubmit` y no `action={…}`: esto **edita** un valor que ya existe,
-          y un `<form action>` se resetea solo en React 19 — el campo volvería a
-          su `defaultValue`, que es el número viejo. Ver CLAUDE.md. */}
-      <form
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          const datos = new FormData();
-          datos.set('organizationId', organizationId);
-          datos.set('seats', String(seats));
-          formAction(datos);
-        }}
-        className="flex flex-wrap items-end gap-3"
-      >
-        <div className="w-40">
-          <FloatingLabelInput
-            id={campoId}
-            type="number"
-            label="Contratados"
-            min={Math.max(ocupados, 1)}
-            max={500}
-            value={String(seats)}
-            onChange={(evento) => setSeats(Number(evento.target.value))}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={pending || seats === contratados}
-          className="rounded-full border border-white/[0.14] bg-white/[0.04] px-4 py-2 font-sans text-xs font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {pending ? 'Cambiando…' : 'Cambiar'}
-        </button>
-      </form>
+  const isUpgrading = seats > contratados;
+  const isDowngrading = seats < contratados;
+  const hasChanged = seats !== contratados;
 
-      <p className="font-sans text-xs text-white/45">
-        Ahora mismo hay {ocupados} ocupados, contando invitaciones pendientes. Al subir, Stripe
-        cobra la parte proporcional de lo que queda de mes.
-      </p>
+  function reset() {
+    setSeats(contratados);
+    setConfirmando(false);
+  }
+
+  return (
+    <section className="flex flex-col gap-4 max-w-md">
+      {!confirmando ? (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="w-40">
+              <FloatingLabelInput
+                id={campoId}
+                type="number"
+                label="Asientos Contratados"
+                min={Math.max(ocupados, 1)}
+                max={500}
+                value={String(seats)}
+                onChange={(evento) => setSeats(Number(evento.target.value))}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmando(true)}
+              disabled={!hasChanged}
+              className="rounded-lg bg-white/10 px-5 py-2.5 h-[58px] font-sans text-sm font-semibold text-white transition-colors hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Cambiar
+            </button>
+          </div>
+          <p className="font-sans text-xs text-white/50">
+            Tienes {ocupados} {ocupados === 1 ? 'asiento ocupado' : 'asientos ocupados'} (incluyendo invitaciones). 
+          </p>
+        </div>
+      ) : (
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            const datos = new FormData();
+            datos.set('organizationId', organizationId);
+            datos.set('seats', String(seats));
+            formAction(datos);
+          }}
+          className="flex flex-col gap-4 p-4 rounded-xl border border-primary/20 bg-primary/5"
+        >
+          <div className="flex flex-col gap-2">
+            <h4 className="font-sans font-medium text-white">Confirma el cambio de asientos</h4>
+            <p className="font-sans text-sm text-white/80">
+              Vas a pasar de <strong className="text-white">{contratados}</strong> a <strong className="text-white">{seats}</strong> asientos.
+            </p>
+            {isUpgrading && (
+              <p className="font-sans text-xs text-primary bg-primary/10 p-2 rounded-lg mt-1 border border-primary/20">
+                <strong>Autorización de cobro:</strong> Stripe cargará a tu método de pago principal la parte proporcional de lo que queda de mes por los {seats - contratados} asientos adicionales. Al confirmar, aceptas este cargo inmediato.
+              </p>
+            )}
+            {isDowngrading && (
+              <p className="font-sans text-xs text-white/70 bg-white/5 p-2 rounded-lg mt-1">
+                Stripe calculará el tiempo no utilizado de {contratados - seats} asientos y lo añadirá como saldo a favor para tu próxima factura.
+              </p>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-lg bg-primary text-white px-5 py-2 font-sans text-sm font-semibold transition-colors hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pending ? 'Procesando...' : 'Confirmar cambio'}
+            </button>
+            <button
+              type="button"
+              onClick={reset}
+              disabled={pending}
+              className="rounded-lg px-5 py-2 font-sans text-sm font-medium text-white/70 hover:text-white transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
 
       {state.error && (
         <p role="alert" className="font-sans text-sm text-red-400">
           {state.error}
         </p>
       )}
-      {state.done && (
-        <p role="status" className="font-sans text-sm text-emerald-400">
-          Ahora tienes {state.done} asientos.
+      {state.done && !pending && (
+        <p role="status" className="font-sans text-sm text-primary">
+          El plan ha sido actualizado a {state.done} asientos exitosamente.
         </p>
       )}
     </section>

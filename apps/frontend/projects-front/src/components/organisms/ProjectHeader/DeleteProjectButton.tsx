@@ -115,7 +115,7 @@ export function DeleteProjectButton({
     <>
       <button
         type="button"
-        className="font-sans text-sm font-medium text-white/50 transition-colors hover:text-red-400"
+        className="font-sans text-sm font-medium text-white transition-colors hover:text-red-400"
         onClick={() => setOpen(true)}
       >
         Eliminar proyecto
@@ -133,22 +133,22 @@ export function DeleteProjectButton({
           <div
             className="flex flex-col gap-2 rounded-lg border px-4 py-3 border-red-500/30 bg-red-500/10"
           >
-            <p className="font-sans text-sm font-semibold text-white/90">Se eliminarán:</p>
+            <p className="font-sans text-sm font-semibold text-white">Se eliminarán:</p>
 
             {counting && !inventory ? (
-              <p className="font-sans text-sm text-white/50">Contando lo que hay dentro…</p>
+              <p className="font-sans text-sm text-white">Contando lo que hay dentro…</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {visible.map((line) => (
-                  <li key={line.plural} className="font-sans text-sm text-white/50">
+                  <li key={line.plural} className="font-sans text-sm text-white">
                     {line.count === null ? (
                       <>
-                        Sus <strong className="text-white/90">{line.plural}</strong> — no se
+                        Sus <strong className="text-white">{line.plural}</strong> — no se
                         pudieron contar
                       </>
                     ) : (
                       <>
-                        <strong className="tabular-nums text-white/90">{line.count}</strong>{' '}
+                        <strong className="tabular-nums text-white">{line.count}</strong>{' '}
                         {line.count === 1 ? line.singular : line.plural}
                       </>
                     )}

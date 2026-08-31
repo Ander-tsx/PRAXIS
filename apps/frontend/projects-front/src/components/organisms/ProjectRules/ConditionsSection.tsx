@@ -73,13 +73,13 @@ export function ConditionsSection({
     <fieldset className="flex flex-col gap-3">
       <legend className="font-sans text-sm font-semibold text-text-primary">
         Si…{' '}
-        <span className="font-normal text-text-secondary">
+        <span className="font-normal text-white">
           ¿sobre qué tareas? (opcional, y todas tienen que cumplirse)
         </span>
       </legend>
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-text-secondary">
+        <p className="rounded-xl border border-dashed border-border px-4 py-3 font-sans text-sm text-white">
           Sin condiciones, la regla actúa sobre toda tarea que encaje con el disparador.
         </p>
       ) : (
@@ -157,7 +157,7 @@ export function ConditionsSection({
                     />
                   )}
                   {campo?.help && (
-                    <p className="mt-1 font-sans text-xs text-text-disabled">{campo.help}</p>
+                    <p className="mt-1 font-sans text-xs text-white">{campo.help}</p>
                   )}
                 </div>
 
@@ -165,7 +165,7 @@ export function ConditionsSection({
                   type="button"
                   onClick={() => onChange(rows.filter((una) => una.id !== fila.id))}
                   aria-label={`Quitar la condición sobre ${campo?.label ?? fila.field}`}
-                  className="rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-error-muted hover:text-error"
+                  className="rounded-lg p-1.5 text-white transition-colors hover:bg-error-muted hover:text-error"
                 >
                   <X className="size-4" />
                 </button>

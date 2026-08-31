@@ -148,12 +148,12 @@ function TaskRows({
               <Chip tone={PRIORITY_COLORS[task.priority]}>{PRIORITY_LABELS[task.priority]}</Chip>
 
               {total > 0 && (
-                <span className="font-sans text-[11px] tabular-nums text-text-secondary">
+                <span className="font-sans text-[11px] tabular-nums text-white">
                   {done}/{total}
                 </span>
               )}
 
-              <span className="shrink-0 font-sans text-xs text-text-disabled">
+              <span className="shrink-0 font-sans text-xs text-white">
                 {project?.name ?? 'Proyecto'}
               </span>
             </a>

@@ -79,11 +79,11 @@ export function PraxCreateProjectTrigger({
       >
         <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0c0c0b] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-            <h2 className="text-sm font-semibold text-white/90">Nuevo Proyecto</h2>
+            <h2 className="text-sm font-semibold text-white">Nuevo Proyecto</h2>
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="rounded-lg p-1 text-white/70 hover:bg-white/[0.04] hover:text-white transition-colors"
+              className="rounded-lg p-1 text-white hover:bg-white/[0.04] hover:text-white transition-colors"
             >
               <svg
                 className="h-5 w-5"
@@ -154,7 +154,7 @@ export function PraxCreateProjectTrigger({
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="rounded-lg px-4 py-2 text-xs font-medium text-white/75 transition-colors hover:bg-white/[0.04] hover:text-white"
+                  className="rounded-lg px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-white/[0.04] hover:text-white"
                 >
                   Cancelar
                 </button>
@@ -182,7 +182,7 @@ export function PraxCreateProjectTrigger({
           className="group relative flex h-full min-h-[184px] w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-xl border border-dashed border-white/[0.15] bg-transparent p-5 transition-all hover:border-white/30 hover:bg-white/[0.04]"
         >
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white/70 transition-colors group-hover:bg-white/[0.08] group-hover:text-white"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.04] border border-white/[0.08] text-white transition-colors group-hover:bg-white/[0.08] group-hover:text-white"
             aria-hidden="true"
           >
             <svg
@@ -196,7 +196,7 @@ export function PraxCreateProjectTrigger({
             </svg>
           </span>
           <div className="flex flex-col items-center gap-1.5 text-center">
-            <span className="font-sans text-sm font-medium text-white/80 group-hover:text-white/90 transition-colors">
+            <span className="font-sans text-sm font-medium text-white group-hover:text-white transition-colors">
               Nuevo Proyecto
             </span>
           </div>
@@ -211,7 +211,7 @@ export function PraxCreateProjectTrigger({
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 text-sm font-medium text-white/80 transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 text-sm font-medium text-white transition-colors hover:border-white/25 hover:bg-white/[0.08] hover:text-white"
       >
         <svg
           className="h-4 w-4"

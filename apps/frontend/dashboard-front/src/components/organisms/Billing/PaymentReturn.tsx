@@ -92,7 +92,7 @@ export function PaymentReturn({
         <h2 className="font-sans text-lg font-semibold text-text-primary">
           ¡Enhorabuena! Ya tienes {nombre ? `PRAXIS ${nombre}` : 'tu nuevo plan'}
         </h2>
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           Tu plan está activo desde ya. El asistente vuelve a estar disponible con todos sus
           mensajes del mes, y tus proyectos siguen exactamente donde los dejaste.
         </p>
@@ -119,7 +119,7 @@ export function PaymentReturn({
         style={{ background: alpha(colors.primary, 8), borderColor: alpha(colors.primary, 30) }}
       >
         <h2 className="font-sans text-lg font-semibold text-text-primary">Confirmando tu pago…</h2>
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           El cobro se ha hecho. Estamos esperando la confirmación de Stripe para activar tu plan;
           suele tardar unos segundos.
         </p>
@@ -139,7 +139,7 @@ export function PaymentReturn({
       <h2 className="font-sans text-lg font-semibold text-text-primary">
         Tu pago está hecho, y el plan va en camino
       </h2>
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         La confirmación está tardando más de lo normal. No hace falta que pagues otra vez: tu plan
         se activará solo. Vuelve a cargar esta página en unos minutos.
       </p>

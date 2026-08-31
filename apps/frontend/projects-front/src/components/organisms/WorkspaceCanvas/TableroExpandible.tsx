@@ -49,7 +49,7 @@ export function TableroExpandible({
         {titulo ?? (
           <>
             <h4 className="font-sans text-base font-semibold text-white">{nombre}</h4>
-            <span className="font-sans text-xs text-white/50">{resumen}</span>
+            <span className="font-sans text-xs text-white">{resumen}</span>
           </>
         )}
 

@@ -62,14 +62,14 @@ export function TaskAttachments({
       <h4 className="font-sans text-sm font-medium text-white">
         Archivos{' '}
         {attachments.length > 0 && (
-          <span className="font-normal text-white/55">
+          <span className="font-normal text-white">
             {attachments.length} · {formatBytes(total)}
           </span>
         )}
       </h4>
 
       {attachments.length === 0 && (
-        <p className="font-sans text-xs text-white/55">
+        <p className="font-sans text-xs text-white">
           {canUpload
             ? `Solo PDF, hasta ${formatBytes(ATTACHMENT_MAX_BYTES)} cada uno.`
             : 'Esta tarea no tiene archivos.'}
@@ -102,7 +102,7 @@ export function TaskAttachments({
                `accept` se puede saltar eligiendo «todos los archivos». */
             accept={ATTACHMENT_ALLOWED_MIME.join(',')}
             aria-label="Archivo que adjuntar"
-            className="flex-1 cursor-pointer font-sans text-xs text-white/55 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
+            className="flex-1 cursor-pointer font-sans text-xs text-white file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:font-sans file:text-xs file:font-semibold file:text-white"
           />
           <button
             type="submit"
@@ -164,7 +164,7 @@ function AttachmentRow({
           />
         ) : (
           <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-sans text-[10px] font-semibold uppercase text-white/55"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-sans text-[10px] font-semibold uppercase text-white"
             style={{ background: 'rgba(255,255,255,0.08)' }}
           >
             {extension(file.filename)}
@@ -175,7 +175,7 @@ function AttachmentRow({
           <span className="truncate font-sans text-xs text-white" title={file.filename}>
             {file.filename}
           </span>
-          <span className="font-sans text-[11px] text-white/35">
+          <span className="font-sans text-[11px] text-white">
             {formatBytes(file.size)}
             {uploader && ` · ${personLabel(uploader)}`}
           </span>
@@ -194,7 +194,7 @@ function AttachmentRow({
             disabled={deleting}
             aria-label={`Eliminar ${file.filename}`}
             title="Eliminar"
-            className="cursor-pointer rounded p-1 text-white/35 transition-colors hover:text-error disabled:cursor-not-allowed"
+            className="cursor-pointer rounded p-1 text-white transition-colors hover:text-error disabled:cursor-not-allowed"
           >
             <svg
               className="h-3.5 w-3.5"

@@ -163,7 +163,7 @@ function Acceso({
 
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-sans text-sm font-semibold text-text-primary">{label}</span>
-        <span className="truncate font-sans text-xs text-text-secondary">{detalle}</span>
+        <span className="truncate font-sans text-xs text-white">{detalle}</span>
       </span>
     </>
   );

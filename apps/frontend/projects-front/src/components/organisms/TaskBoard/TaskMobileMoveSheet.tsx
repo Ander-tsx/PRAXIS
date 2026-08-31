@@ -74,7 +74,7 @@ export function TaskMobileMoveSheet({
               >
                 <span className="truncate">{col.name}</span>
                 {isCurrent && (
-                  <span className="shrink-0 text-xs text-text-secondary">(Actual)</span>
+                  <span className="shrink-0 text-xs text-white">(Actual)</span>
                 )}
               </button>
             );

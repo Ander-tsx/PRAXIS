@@ -126,7 +126,7 @@ export function ProjectPicker({
         className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong"
       >
         <span className="flex min-w-0 flex-col">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+          <span className="font-sans text-[11px] uppercase tracking-wider text-white">
             {label}
           </span>
           <span className="truncate font-sans text-base font-semibold text-text-primary">
@@ -135,7 +135,7 @@ export function ProjectPicker({
         </span>
 
         <svg
-          className={`h-4 w-4 shrink-0 text-text-secondary transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-white transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -161,13 +161,13 @@ export function ProjectPicker({
                       'flex w-full items-center justify-between gap-3 px-3 py-2 text-left transition-colors rounded-xl',
                       isActive
                         ? 'text-primary font-medium'
-                        : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+                        : 'text-white hover:bg-surface hover:text-text-primary',
                     ].join(' ')}
                     style={isActive ? { background: alpha(colors.primary, 10) } : undefined}
                   >
                     <span className="truncate font-sans text-sm">{project.name}</span>
                     <span
-                      className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-text-disabled'}`}
+                      className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-white'}`}
                     >
                       {project._count.members}{' '}
                       {project._count.members === 1 ? 'persona' : 'personas'}
@@ -179,7 +179,7 @@ export function ProjectPicker({
           </ul>
 
           {projects.length === 0 && (
-            <p className="px-4 py-3 font-sans text-sm text-text-disabled">{vacio}</p>
+            <p className="px-4 py-3 font-sans text-sm text-white">{vacio}</p>
           )}
         </div>
       )}

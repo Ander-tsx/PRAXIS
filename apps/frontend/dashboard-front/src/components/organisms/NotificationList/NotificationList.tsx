@@ -130,7 +130,7 @@ export function NotificationList({
                   ? '1 aviso sin leer'
                   : `${unread} avisos sin leer`}
             </p>
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white">
               {unread === 0
                 ? 'No te queda nada pendiente por mirar.'
                 : 'Tienes notificaciones por mirar.'}
@@ -169,11 +169,11 @@ export function NotificationList({
             {/* El tramo, en una línea con su cuenta: separa sin gastar una
                 tarjeta ni una regla de lado a lado. */}
             <div className="flex items-center gap-3 px-1">
-              <h2 className="font-sans text-xs font-semibold uppercase tracking-wide text-text-disabled">
+              <h2 className="font-sans text-xs font-semibold uppercase tracking-wide text-white">
                 {grupo.etiqueta}
               </h2>
               <span className="h-px flex-1" style={{ background: colors.border }} />
-              <span className="font-sans text-[11px] tabular-nums text-text-disabled">
+              <span className="font-sans text-[11px] tabular-nums text-white">
                 {grupo.avisos.length}
               </span>
             </div>
@@ -209,7 +209,7 @@ function Vacia({ soloSinLeer }: { soloSinLeer: boolean }) {
       <h3 className="font-display text-xl text-text-primary">
         {soloSinLeer ? 'Nada sin leer' : 'Nada por aquí'}
       </h3>
-      <p className="max-w-md font-sans text-sm text-text-secondary">
+      <p className="max-w-md font-sans text-sm text-white">
         {soloSinLeer
           ? 'Ya has mirado todo lo que había. Quita el filtro para releer los avisos anteriores.'
           : 'Aquí llegarán las invitaciones, los cambios de equipo y las tareas que te asignen.'}
@@ -333,7 +333,7 @@ function NotificationRow({
       </span>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           <Descripcion notification={notification} who={who} />
         </p>
 
@@ -343,7 +343,7 @@ function NotificationRow({
           <time
             dateTime={notification.createdAt}
             title={cuando}
-            className="font-sans text-[11px] text-text-disabled"
+            className="font-sans text-[11px] text-white"
           >
             {ahora === null ? cuando : tiempoRelativo(notification.createdAt, ahora)}
           </time>
@@ -352,7 +352,7 @@ function NotificationRow({
             /* Un aviso de expulsión habla de un sitio al que ya no se entra, y
                uno de un proyecto borrado llevaría a un 404. Decirlo es mejor
                que dejar una fila que no responde al clic sin explicar por qué. */
-            <span className="font-sans text-[11px] text-text-disabled">· sin destino</span>
+            <span className="font-sans text-[11px] text-white">· sin destino</span>
           )}
         </span>
 
@@ -382,7 +382,7 @@ function NotificationRow({
               /* Visible siempre en táctil, y al pasar por encima en escritorio:
                  `group-hover` no existe sin puntero, y un botón que solo
                  aparece con el ratón es un botón que en el móvil no está. */
-              className="cursor-pointer rounded-sm p-1.5 text-text-disabled opacity-100 transition-all hover:bg-surface-elevated hover:text-text-primary focus-visible:opacity-100 disabled:cursor-not-allowed sm:opacity-0 sm:group-hover:opacity-100"
+              className="cursor-pointer rounded-sm p-1.5 text-white opacity-100 transition-all hover:bg-surface-elevated hover:text-text-primary focus-visible:opacity-100 disabled:cursor-not-allowed sm:opacity-0 sm:group-hover:opacity-100"
             >
               {marking ? (
                 <span className="font-sans text-[11px]">…</span>

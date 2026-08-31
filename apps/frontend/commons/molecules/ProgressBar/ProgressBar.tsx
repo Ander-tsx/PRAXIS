@@ -24,7 +24,7 @@ export function ProgressBar({
     <div className="flex flex-col gap-1.5">
       {(label !== undefined || value !== undefined) && (
         <div className="flex justify-between">
-          {label && <span className="font-sans text-xs text-text-disabled">{label}</span>}
+          {label && <span className="font-sans text-xs text-white">{label}</span>}
           {value !== undefined && (
             <span className="font-sans text-xs font-medium text-text-primary">{value}</span>
           )}

@@ -123,7 +123,7 @@ export function CreateProjectSlideOver({
           >
             <IconoMas grande />
           </span>
-          <span className="font-sans text-sm font-semibold text-text-secondary transition-colors group-hover:text-text-primary">
+          <span className="font-sans text-sm font-semibold text-white transition-colors group-hover:text-text-primary">
             {triggerLabel}
           </span>
         </button>
@@ -224,7 +224,7 @@ export function CreateProjectSlideOver({
             <div className="flex flex-col gap-6 lg:flex-row">
               <div className="flex min-w-0 flex-1 flex-col gap-6">
                 <div className="flex flex-col gap-5 rounded-sm border border-border bg-surface p-6 shadow-sm">
-                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-white">
                     Información Principal
                   </h3>
 
@@ -269,7 +269,7 @@ export function CreateProjectSlideOver({
                 </div>
 
                 <div className="flex flex-col gap-4 rounded-sm border border-border bg-surface p-6 shadow-sm">
-                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                  <h3 className="font-sans text-xs font-semibold uppercase tracking-wider text-white">
                     Detalles Adicionales
                   </h3>
                   <Textarea
@@ -379,7 +379,7 @@ function ModoOpcion({
 
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="font-sans text-sm font-semibold text-text-primary">{titulo}</span>
-        <span className="font-sans text-xs text-text-secondary">{texto}</span>
+        <span className="font-sans text-xs text-white">{texto}</span>
       </span>
     </button>
   );
@@ -412,7 +412,7 @@ function VistaPrevia({
 
   return (
     <aside className="flex flex-col gap-3">
-      <p className="font-sans text-xs font-semibold uppercase tracking-wide text-text-disabled">
+      <p className="font-sans text-xs font-semibold uppercase tracking-wide text-white">
         Así se verá
       </p>
 
@@ -441,18 +441,18 @@ function VistaPrevia({
           <span className="flex min-w-0 flex-col gap-0.5">
             <span
               className={`truncate font-sans text-sm font-semibold ${
-                limpio ? 'text-text-primary' : 'text-text-disabled'
+                limpio ? 'text-text-primary' : 'text-white'
               }`}
             >
               {limpio || 'Sin nombre'}
             </span>
-            <span className="font-sans text-xs text-text-disabled">Tuyo</span>
+            <span className="font-sans text-xs text-white">Tuyo</span>
           </span>
         </div>
 
         <p
           className={`line-clamp-4 font-sans text-xs ${
-            descripcion.trim() ? 'text-text-secondary' : 'italic text-text-disabled'
+            descripcion.trim() ? 'text-white' : 'italic text-white'
           }`}
         >
           {descripcion.trim() || 'Sin descripción'}

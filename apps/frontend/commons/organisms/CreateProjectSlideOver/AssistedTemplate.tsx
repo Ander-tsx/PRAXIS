@@ -170,7 +170,7 @@ export function AssistedTemplate({
         {error && <Aviso texto={error} />}
 
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <span className="mr-auto font-sans text-xs text-text-secondary">
+          <span className="mr-auto font-sans text-xs text-white">
             Nada de esto existe todavía.
           </span>
           <Button type="button" variant="ghost" onClick={() => setPaso('contar')}>
@@ -204,7 +204,7 @@ export function AssistedTemplate({
         fullWidth
       />
 
-      <p className="font-sans text-xs text-text-secondary">
+      <p className="font-sans text-xs text-white">
         El asistente <strong>propone</strong>: verás la estructura completa y podrás quitar lo que
         no quieras antes de que se cree nada.
       </p>
@@ -266,7 +266,7 @@ function Ajuste({
 
   return (
     <div className="flex flex-col gap-2 rounded-sm border border-border p-3">
-      <label className="font-sans text-xs font-semibold uppercase tracking-wide text-text-secondary">
+      <label className="font-sans text-xs font-semibold uppercase tracking-wide text-white">
         ¿Le cambiarías algo?
       </label>
 
@@ -291,7 +291,7 @@ function Ajuste({
         </Button>
       </div>
 
-      <p className="font-sans text-xs text-text-secondary">
+      <p className="font-sans text-xs text-white">
         {restantes === 0
           ? 'Se te han acabado las consultas de este mes. Puedes crear el proyecto tal y como está.'
           : `Rehace la propuesta con tu cambio. Gasta una consulta${

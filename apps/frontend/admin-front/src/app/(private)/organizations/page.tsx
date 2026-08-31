@@ -103,7 +103,7 @@ export default async function OrganizationsPage({ searchParams }: PageProps) {
             No se pudieron cargar las organizaciones. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
+          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
             {busqueda
               ? 'Ninguna organización encaja con lo que buscas.'
               : 'Todavía no hay ninguna organización en la plataforma.'}

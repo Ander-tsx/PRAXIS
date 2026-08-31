@@ -219,7 +219,7 @@ export function SelectorDeFecha({
             .join(' ')}
         >
           <CalendarioIcono />
-          <span className={seleccionada ? 'text-text-primary' : 'text-text-disabled'}>
+          <span className={seleccionada ? 'text-text-primary' : 'text-white'}>
             {seleccionada
               ? `${seleccionada.getDate()} de ${MESES[seleccionada.getMonth()]} de ${seleccionada.getFullYear()}`
               : placeholder}
@@ -240,7 +240,7 @@ export function SelectorDeFecha({
                 evento.stopPropagation();
                 aplicar('');
               }}
-              className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-disabled transition-colors hover:bg-surface hover:text-text-primary"
+              className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white transition-colors hover:bg-surface hover:text-text-primary"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -281,7 +281,7 @@ export function SelectorDeFecha({
                 <span
                   // biome-ignore lint/suspicious/noArrayIndexKey: los días de la semana son una lista fija y «M» se repite
                   key={`${dia}-${indice}`}
-                  className="flex h-7 items-center justify-center font-sans text-[11px] text-text-disabled"
+                  className="flex h-7 items-center justify-center font-sans text-[11px] text-white"
                 >
                   {dia}
                 </span>
@@ -304,7 +304,7 @@ export function SelectorDeFecha({
                       'flex h-8 w-full cursor-pointer items-center justify-center rounded-lg',
                       'font-sans text-xs tabular-nums transition-colors',
                       esElegido ? 'font-semibold' : 'hover:bg-surface',
-                      deOtroMes && !esElegido ? 'text-text-disabled' : 'text-text-primary',
+                      deOtroMes && !esElegido ? 'text-white' : 'text-text-primary',
                     ].join(' ')}
                     style={{
                       background: esElegido ? colors.primary : undefined,
@@ -325,7 +325,7 @@ export function SelectorDeFecha({
               <button
                 type="button"
                 onClick={() => elegir(new Date())}
-                className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+                className="cursor-pointer rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:bg-surface hover:text-text-primary"
               >
                 Hoy
               </button>
@@ -358,7 +358,7 @@ function FlechaMes({ direccion, onClick }: { direccion: -1 | 1; onClick: () => v
       onClick={onClick}
       aria-label={texto}
       title={texto}
-      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary"
+      className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary"
     >
       <svg
         className="h-4 w-4"
@@ -382,7 +382,7 @@ function FlechaMes({ direccion, onClick }: { direccion: -1 | 1; onClick: () => v
 function CalendarioIcono() {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-text-secondary"
+      className="h-4 w-4 shrink-0 text-white"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"

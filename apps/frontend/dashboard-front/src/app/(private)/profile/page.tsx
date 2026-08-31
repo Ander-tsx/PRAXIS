@@ -74,7 +74,7 @@ export default async function CuentaPage() {
         <div className="flex flex-col gap-6 pt-6 mt-6 border-t border-white/5">
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-semibold text-white">Tu estado</h3>
-            <p className="text-sm text-white/50 mb-2">Hazle saber tu disponibilidad a los demás.</p>
+            <p className="text-sm text-white mb-2">Hazle saber tu disponibilidad a los demás.</p>
             <div className="w-full">
               <PresencePicker inicial={profile.presence ?? 'AVAILABLE'} />
             </div>
@@ -85,11 +85,11 @@ export default async function CuentaPage() {
             <div className="flex flex-wrap items-start gap-8 mt-2">
               <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
                 <div className="w-fit"><LogoutButton compacto={false} /></div>
-                <p className="text-xs text-white/40 leading-relaxed">Se cierra en este navegador. Podrás volver a entrar cuando quieras.</p>
+                <p className="text-xs text-white leading-relaxed">Se cierra en este navegador. Podrás volver a entrar cuando quieras.</p>
               </div>
               <div className="flex flex-col gap-2 max-w-[240px] sm:max-w-none">
                 <div className="w-fit"><DeleteAccount email={profile.credential.email} /></div>
-                <p className="text-xs text-white/40 leading-relaxed">Lo último y lo único que no se deshace.</p>
+                <p className="text-xs text-white leading-relaxed">Lo último y lo único que no se deshace.</p>
               </div>
             </div>
           </div>

@@ -86,7 +86,7 @@ export function ProjectStatusDialog({
               message={state.error ?? undefined}
             />
 
-            <p className="rounded-lg bg-surface-elevated px-3 py-2 font-sans text-xs text-text-secondary">
+            <p className="rounded-lg bg-surface-elevated px-3 py-2 font-sans text-xs text-white">
               El cambio es <strong>inmediato</strong>, y el motivo se enseña en la pantalla del
               proyecto: sin él, sus miembros ven que nada funciona y no saben por qué.
             </p>
@@ -105,7 +105,7 @@ export function ProjectStatusDialog({
         </footer>
       </form>
 
-      <p className="mt-3 font-sans text-xs text-text-disabled">
+      <p className="mt-3 font-sans text-xs text-white">
         Estado actual: {ESTADOS_PROYECTO[proyecto.status].etiqueta}.{' '}
         {ESTADOS_PROYECTO[proyecto.status].descripcion}
       </p>

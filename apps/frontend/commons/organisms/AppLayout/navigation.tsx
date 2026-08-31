@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { PraxSidebarIcon } from '../../atoms/PraxAvatar';
+import { PraxAvatar } from '../../atoms/PraxAvatar/PraxAvatar';
 
 /**
  * Un enlace de la barra lateral del área privada.
@@ -67,6 +68,14 @@ const iconProps = {
  */
 export const APP_NAV_ITEMS: AppNavItem[] = [
   {
+    label: 'Asistente',
+    href: '/assistant',
+    section: SECTION_PRINCIPAL,
+    icon: (
+      <PraxSidebarIcon />
+    ),
+  },
+  {
     label: 'Proyectos',
     href: '/projects',
     section: SECTION_PRINCIPAL,
@@ -98,7 +107,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
    */
   {
     label: 'Equipo',
-    href: '/team',
+    href: '/main/team',
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
@@ -108,7 +117,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Facturación',
-    href: '/billing',
+    href: '/main/billing',
     section: SECTION_PRINCIPAL,
     icon: (
       <svg {...iconProps} aria-hidden="true">
@@ -118,7 +127,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   },
   {
     label: 'Integraciones',
-    href: '/integraciones',
+    href: '/main/integraciones',
     section: SECTION_PRINCIPAL,
     disabled: true,
     icon: (
@@ -217,7 +226,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
      * enlazarla: una pantalla que solo llevara a otra es un salto de más.
      */
     label: 'Sistema',
-    href: '/settings',
+    href: '/main/settings',
     section: SECTION_CONFIGURACION,
     icon: (
       <svg {...iconProps} aria-hidden="true">

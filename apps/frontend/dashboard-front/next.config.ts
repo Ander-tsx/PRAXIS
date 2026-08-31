@@ -1,17 +1,12 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  assetPrefix: '/dashboard-assets',
-
   /**
-   * Multi-Zones: esta zona vive bajo `/dashboard` y el web-shell la expone con
-   * un rewrite. El prefijo lo aplica Next automáticamente a `next/link`,
-   * `useRouter()` y `redirect()`, así que dentro de la zona las rutas se
-   * escriben **sin** él (`/profile`, no `/dashboard/profile`).
-   *
-   * Para salir de la zona hace falta navegación dura. Ver ESTADO-ACTUAL §16.
+   * Multi-Zones: esta zona es `/main`. Sus rutas en el código no lo
+   * incluyen, pero Next se lo añade y el shell asume que todas sus páginas
+   * cuelgan de ahí.
    */
-  // basePath: '/dashboard',
+  basePath: '/main',
 
   /**
    * @praxis/commons se publica como TypeScript sin compilar y pnpm lo enlaza

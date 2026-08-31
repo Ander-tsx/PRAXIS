@@ -65,7 +65,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
         <h4 className="font-sans text-sm font-medium text-white">
           Checklist{' '}
           {total > 0 && (
-            <span className="font-normal tabular-nums text-white/55">
+            <span className="font-normal tabular-nums text-white">
               {done}/{total}
             </span>
           )}
@@ -83,7 +83,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
       </header>
 
       {total === 0 && (
-        <p className="font-sans text-xs text-white/55">
+        <p className="font-sans text-xs text-white">
           {canEdit
             ? 'Divide la tarea en pasos concretos para ver el avance de un vistazo.'
             : 'Esta tarea no tiene checklist.'}
@@ -118,7 +118,7 @@ export function TaskChecklist({ projectId, task, canEdit, canToggle }: TaskCheck
             placeholder="Añadir un paso…"
             maxLength={500}
             aria-label="Nuevo ítem del checklist"
-            className="w-full rounded-xl border border-white/10 bg-[#131312] px-4 py-2.5 pr-12 font-sans text-sm text-white outline-none transition-colors placeholder:text-white/35 focus:border-primary focus:ring-1 focus:ring-primary"
+            className="w-full rounded-xl border border-white/10 bg-[#191919] px-4 py-2.5 pr-12 font-sans text-sm text-white outline-none transition-colors placeholder:text-white focus:border-primary focus:ring-1 focus:ring-primary"
           />
           <button
             type="submit"
@@ -214,7 +214,7 @@ function ChecklistRow({
         <span
           className={[
             'min-w-0 flex-1 truncate font-sans text-xs',
-            completed ? 'text-white/35 line-through' : 'text-white',
+            completed ? 'text-white line-through' : 'text-white',
           ].join(' ')}
           title={text}
         >
@@ -234,7 +234,7 @@ function ChecklistRow({
             title="Eliminar"
             /* Aparece al pasar por encima, pero con foco también: si no, con
                teclado sería invisible e inalcanzable. */
-            className="cursor-pointer rounded p-1 text-white/35 opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
+            className="cursor-pointer rounded p-1 text-white opacity-0 transition-opacity hover:text-error focus-visible:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed"
           >
             <svg
               className="h-3 w-3"

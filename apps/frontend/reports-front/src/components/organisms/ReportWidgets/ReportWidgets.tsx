@@ -67,8 +67,8 @@ export function ResumenWidget({ snapshot }: { snapshot: ReportSnapshot }) {
       </div>
 
       {snapshot.unassigned > 0 && (
-        <p className="font-sans text-sm text-text-disabled">
-          <strong className="tabular-nums text-text-secondary">{snapshot.unassigned}</strong>{' '}
+        <p className="font-sans text-sm text-white">
+          <strong className="tabular-nums text-white">{snapshot.unassigned}</strong>{' '}
           {snapshot.unassigned === 1
             ? 'tarea no tiene a nadie asignado.'
             : 'tareas no tienen a nadie asignado.'}
@@ -245,7 +245,7 @@ export function CicloWidget({ cycle }: { cycle: ReportCycleTime | null }) {
         <Stat value={formatDuration(cycle.cycle.p85)} label="p85" tone="warning" />
       </div>
 
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         Sobre{' '}
         <strong className="tabular-nums text-text-primary">
           {cycle.cycle.muestrasConMovimiento}
@@ -281,7 +281,7 @@ export function PrediccionWidget({ forecast }: { forecast: ReportForecast | null
             <Stat value={`${forecast.prediccion.p50} d`} label="mitad de las veces" />
             <Stat value={`${forecast.prediccion.p85} d`} label="85 de cada 100" tone="warning" />
           </div>
-          <p className="font-sans text-sm text-text-secondary">
+          <p className="font-sans text-sm text-white">
             Quedan <strong className="tabular-nums text-text-primary">{forecast.pendientes}</strong>{' '}
             tareas abiertas y se cierran{' '}
             <strong className="tabular-nums text-text-primary">
@@ -335,7 +335,7 @@ export function PersonasWidget({
   return (
     <div className="flex flex-col gap-3">
       {people.length === 0 ? (
-        <p className="py-8 text-center font-sans text-sm text-text-disabled">
+        <p className="py-8 text-center font-sans text-sm text-white">
           Nadie tiene tareas asignadas todavía.
         </p>
       ) : (
@@ -346,7 +346,7 @@ export function PersonasWidget({
                 {['Persona', 'Abiertas', 'Cerradas', 'Vencidas', 'Mediana'].map((th) => (
                   <th
                     key={th}
-                    className="pb-2 font-sans text-xs uppercase tracking-wider text-text-disabled"
+                    className="pb-2 font-sans text-xs uppercase tracking-wider text-white"
                   >
                     {th}
                   </th>
@@ -362,12 +362,12 @@ export function PersonasWidget({
                     <td className="py-3 font-sans text-sm text-text-primary">
                       {user ? personLabel(user) : 'Alguien que ya no está'}
                       {rol && (
-                        <span className="ml-2 font-sans text-xs text-text-disabled">
+                        <span className="ml-2 font-sans text-xs text-white">
                           {rol.name}
                         </span>
                       )}
                     </td>
-                    <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
+                    <td className="py-3 font-sans text-sm tabular-nums text-white">
                       {persona.abiertas}
                     </td>
                     <td className="py-3 font-sans text-sm tabular-nums text-success">
@@ -375,12 +375,12 @@ export function PersonasWidget({
                     </td>
                     <td
                       className={`py-3 font-sans text-sm tabular-nums ${
-                        persona.vencidas > 0 ? 'text-error' : 'text-text-disabled'
+                        persona.vencidas > 0 ? 'text-error' : 'text-white'
                       }`}
                     >
                       {persona.vencidas}
                     </td>
-                    <td className="py-3 font-sans text-sm tabular-nums text-text-secondary">
+                    <td className="py-3 font-sans text-sm tabular-nums text-white">
                       {formatDuration(persona.medianaHoras)}
                     </td>
                   </tr>
@@ -487,7 +487,7 @@ export function DinamicaWidget({ dynamics }: { dynamics: ReportDynamics }) {
       </div>
 
       {dynamics.desde && (
-        <p className="font-sans text-xs text-text-disabled">
+        <p className="font-sans text-xs text-white">
           Se mide desde el {new Date(dynamics.desde).toLocaleDateString('es-ES')}, que es cuando
           empieza el historial de este proyecto. Lo anterior no está registrado y no se puede
           reconstruir.
@@ -536,7 +536,7 @@ function BloqueDinamica({
   return (
     <div className="flex flex-col gap-2">
       <Stat value={value} label={label} tone={tone} />
-      <p className="font-sans text-xs leading-relaxed text-text-secondary">{detalle}</p>
+      <p className="font-sans text-xs leading-relaxed text-white">{detalle}</p>
       {filas.length > 0 && (
         /* Tres y no diez: la tarjeta tiene que caber en su celda de la
            cuadrícula, y quien quiera la lista entera la tiene en el tablero.
@@ -545,10 +545,10 @@ function BloqueDinamica({
         <ul className="flex flex-col gap-1">
           {filas.slice(0, 3).map((fila) => (
             <li key={fila.id} className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="min-w-0 truncate font-sans text-text-secondary" title={fila.titulo}>
+              <span className="min-w-0 truncate font-sans text-white" title={fila.titulo}>
                 {fila.titulo}
               </span>
-              <span className="shrink-0 tabular-nums font-sans text-text-disabled">
+              <span className="shrink-0 tabular-nums font-sans text-white">
                 {fila.cifra}
               </span>
             </li>
@@ -586,7 +586,7 @@ function BloqueDinamica({
 export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColumnTime | null }) {
   if (!columnTime) {
     return (
-      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-white">
         No se pudo cargar el tiempo por columna.
       </p>
     );
@@ -600,7 +600,7 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
 
   if (columnas.length === 0) {
     return (
-      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-text-disabled">
+      <p className="flex h-full min-h-24 items-center justify-center px-4 text-center font-sans text-sm text-white">
         Este proyecto todavía no tiene columnas.
       </p>
     );
@@ -627,10 +627,10 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
                 <span className="min-w-0 truncate font-sans text-sm text-text-primary">
                   {etiquetaDeColumna(columna, variosTableros)}
                 </span>
-                <span className="shrink-0 tabular-nums font-sans text-sm text-text-secondary">
+                <span className="shrink-0 tabular-nums font-sans text-sm text-white">
                   {formatDuration(columna.p50Horas)}
                   {columna.p85Horas !== null && (
-                    <span className="text-text-disabled">
+                    <span className="text-white">
                       {' '}
                       · p85 {formatDuration(columna.p85Horas)}
                     </span>
@@ -645,7 +645,7 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
                 />
               </div>
 
-              <p className="font-sans text-xs text-text-disabled">
+              <p className="font-sans text-xs text-white">
                 {columna.estancias === 0
                   ? 'Todavía no ha salido de aquí ninguna tarea.'
                   : `${columna.estancias} ${columna.estancias === 1 ? 'paso medido' : 'pasos medidos'}.`}
@@ -666,7 +666,7 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
       </ul>
 
       {huerfanas.estancias > 0 && (
-        <p className="font-sans text-xs text-text-disabled">
+        <p className="font-sans text-xs text-white">
           Otros {huerfanas.estancias} pasos ocurrieron en columnas que ya no existen. No se
           descuentan del total, pero no tienen barra propia.
         </p>

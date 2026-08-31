@@ -68,7 +68,7 @@ export function NotFound({
 
       <h1 className="mt-4 font-display text-2xl text-text-primary sm:text-3xl">Aquí no hay nada</h1>
 
-      <p className="mt-3 max-w-md font-sans text-sm leading-relaxed text-text-secondary">
+      <p className="mt-3 max-w-md font-sans text-sm leading-relaxed text-white">
         {descripcion}
       </p>
 

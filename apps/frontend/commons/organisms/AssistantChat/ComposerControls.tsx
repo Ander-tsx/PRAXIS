@@ -110,11 +110,11 @@ export function ModeloSelector() {
         onClick={() => setAbierto((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 font-sans text-xs font-medium text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+        className="flex h-8 shrink-0 items-center gap-1 rounded-lg px-2 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5 hover:text-text-primary"
       >
         {nombreDeModelo(modelo)}
         <svg
-          className="h-3 w-3 text-white/40"
+          className="h-3 w-3 text-white"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -133,7 +133,7 @@ export function ModeloSelector() {
           {MODELOS.map((g) => (
             <div key={g.grupo || 'auto'}>
               {g.grupo && (
-                <div className="px-3 pt-2 pb-1 font-sans text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                <div className="px-3 pt-2 pb-1 font-sans text-[10px] font-semibold uppercase tracking-wider text-white">
                   {g.grupo}
                 </div>
               )}
@@ -149,20 +149,20 @@ export function ModeloSelector() {
                     o.disponible
                       ? modelo === o.id
                         ? 'bg-white/10 text-white'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white'
-                      : 'cursor-not-allowed text-white/25'
+                        : 'text-white hover:bg-white/5 hover:text-white'
+                      : 'cursor-not-allowed text-white'
                   }`}
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-sans text-[13px]">{o.nombre}</span>
                     {o.detalle && (
-                      <span className="block truncate font-sans text-[11px] text-white/35">
+                      <span className="block truncate font-sans text-[11px] text-white">
                         {o.detalle}
                       </span>
                     )}
                   </span>
                   {!o.disponible && (
-                    <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white/30">
+                    <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white">
                       Pronto
                     </span>
                   )}
@@ -182,7 +182,7 @@ export function ModeloSelector() {
               ))}
             </div>
           ))}
-          <p className="px-3 pt-1.5 pb-1 font-sans text-[10px] leading-snug text-white/25">
+          <p className="px-3 pt-1.5 pb-1 font-sans text-[10px] leading-snug text-white">
             El cambio real de modelo llegará más adelante.
           </p>
         </div>
@@ -273,7 +273,7 @@ export function AjustesMenu({
         aria-expanded={abierto}
         aria-label="Ajustes de PRAX"
         title="Ajustes"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-text-primary"
       >
         <svg
           className="h-4 w-4"
@@ -305,23 +305,23 @@ export function AjustesMenu({
             onClick={() => setSub((s) => (s === 'recursos' ? null : 'recursos'))}
             aria-expanded={sub === 'recursos'}
             className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors hover:bg-white/5 hover:text-white ${
-              sub === 'recursos' ? 'bg-white/5 text-white' : 'text-white/80'
+              sub === 'recursos' ? 'bg-white/5 text-white' : 'text-white'
             }`}
           >
             <IconoRecurso />
             <span className="flex-1">Recursos</span>
-            <span className="font-sans text-[11px] text-white/35">{nProyectosOn}</span>
+            <span className="font-sans text-[11px] text-white">{nProyectosOn}</span>
             <IconoFlechaDerecha />
           </button>
 
           <button
             type="button"
             disabled
-            className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white/25"
+            className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white"
           >
             <IconoMcp />
             <span className="flex-1">MCP</span>
-            <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white/30">
+            <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white">
               Pronto
             </span>
           </button>
@@ -333,12 +333,12 @@ export function AjustesMenu({
             onClick={() => setSub((s) => (s === 'modo' ? null : 'modo'))}
             aria-expanded={sub === 'modo'}
             className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors hover:bg-white/5 hover:text-white ${
-              sub === 'modo' ? 'bg-white/5 text-white' : 'text-white/80'
+              sub === 'modo' ? 'bg-white/5 text-white' : 'text-white'
             }`}
           >
             <IconoModo />
             <span className="flex-1">Modo</span>
-            <span className="font-sans text-[11px] text-white/35">Default</span>
+            <span className="font-sans text-[11px] text-white">Default</span>
             <IconoFlechaDerecha />
           </button>
 
@@ -355,7 +355,7 @@ export function AjustesMenu({
                 />
                 <div className="my-1 border-t border-white/5" />
                 {proyectos.length === 0 ? (
-                  <p className="px-3 py-2 font-sans text-[11px] text-white/30">
+                  <p className="px-3 py-2 font-sans text-[11px] text-white">
                     Sin proyectos en esta organización.
                   </p>
                 ) : (
@@ -378,7 +378,7 @@ export function AjustesMenu({
                   onToggle={() => {}}
                 />
               </div>
-              <p className="shrink-0 px-3 pt-1 font-sans text-[10px] leading-snug text-white/25">
+              <p className="shrink-0 px-3 pt-1 font-sans text-[10px] leading-snug text-white">
                 PRAX solo mira lo que marques aquí.
               </p>
             </div>
@@ -396,7 +396,7 @@ export function AjustesMenu({
               >
                 <span className="min-w-0 flex-1">
                   <span className="block font-sans text-[13px]">Default</span>
-                  <span className="block font-sans text-[11px] text-white/40">
+                  <span className="block font-sans text-[11px] text-white">
                     PRAX propone; nunca ejecuta.
                   </span>
                 </span>
@@ -414,15 +414,15 @@ export function AjustesMenu({
               <button
                 type="button"
                 disabled
-                className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-left text-white/25"
+                className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-left text-white"
               >
                 <span className="min-w-0 flex-1">
                   <span className="block font-sans text-[13px]">Auto</span>
-                  <span className="block font-sans text-[11px] text-white/25">
+                  <span className="block font-sans text-[11px] text-white">
                     Actúa por su cuenta.
                   </span>
                 </span>
-                <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white/30">
+                <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-white">
                   Pronto
                 </span>
               </button>
@@ -440,7 +440,7 @@ function SubHeader({ titulo, onVolver }: { titulo: string; onVolver: () => void 
     <button
       type="button"
       onClick={onVolver}
-      className="mb-1 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-left font-sans text-[11px] font-semibold uppercase tracking-wider text-white/40 transition-colors hover:bg-white/5 hover:text-white"
+      className="mb-1 flex w-full shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-left font-sans text-[11px] font-semibold uppercase tracking-wider text-white transition-colors hover:bg-white/5 hover:text-white"
     >
       <svg
         className="h-3.5 w-3.5"
@@ -486,12 +486,12 @@ function FilaToggle({
       <span className="min-w-0 flex-1">
         <span
           className={`block truncate font-sans text-[13px] ${
-            bloqueado ? 'text-white/25' : atenuado ? 'text-white/45' : 'text-white/80'
+            bloqueado ? 'text-white' : atenuado ? 'text-white' : 'text-white'
           }`}
         >
           {etiqueta}
         </span>
-        {detalle && <span className="block font-sans text-[10px] text-white/30">{detalle}</span>}
+        {detalle && <span className="block font-sans text-[10px] text-white">{detalle}</span>}
       </span>
       <span
         className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
@@ -511,7 +511,7 @@ function FilaToggle({
 function IconoFlechaDerecha() {
   return (
     <svg
-      className="h-3.5 w-3.5 shrink-0 text-white/30"
+      className="h-3.5 w-3.5 shrink-0 text-white"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -525,7 +525,7 @@ function IconoFlechaDerecha() {
 function IconoRecurso() {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-white/40"
+      className="h-4 w-4 shrink-0 text-white"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -543,7 +543,7 @@ function IconoRecurso() {
 function IconoMcp() {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-white/40"
+      className="h-4 w-4 shrink-0 text-white"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -561,7 +561,7 @@ function IconoMcp() {
 function IconoModo() {
   return (
     <svg
-      className="h-4 w-4 shrink-0 text-white/40"
+      className="h-4 w-4 shrink-0 text-white"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

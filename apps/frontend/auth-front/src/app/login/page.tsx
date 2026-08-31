@@ -164,7 +164,7 @@ export default function LoginPage() {
             >
               ¿Olvidaste tu contraseña?
             </Link>
-            <span className="mx-2 text-text-disabled">·</span>
+            <span className="mx-2 text-white">·</span>
             ¿No tienes cuenta?{' '}
             <Link
               href="/signup"
@@ -247,7 +247,7 @@ function AvisoDeConfirmacion({ email }: { email: string }) {
         <span className="h-1.5 w-1.5 flex-none rounded-full bg-warning" aria-hidden="true" />
         <p className="font-sans text-sm font-medium text-text-primary">Confirma tu correo</p>
       </div>
-      <p className="font-sans text-xs leading-relaxed text-text-secondary">
+      <p className="font-sans text-xs leading-relaxed text-white">
         Te mandamos un enlace a {email} cuando creaste la cuenta. Ábrelo y vuelve a entrar.
       </p>
 

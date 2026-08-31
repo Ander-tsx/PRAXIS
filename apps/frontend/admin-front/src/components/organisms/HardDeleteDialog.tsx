@@ -82,7 +82,7 @@ export function HardDeleteDialog({
           <p className="font-sans text-sm text-text-primary">
             Esto <strong>no se deshace</strong>. Se borra:
           </p>
-          <ul className="list-disc pl-5 font-sans text-sm text-text-secondary">
+          <ul className="list-disc pl-5 font-sans text-sm text-white">
             {arrastra.map((cosa) => (
               <li key={cosa}>{cosa}</li>
             ))}
@@ -91,7 +91,7 @@ export function HardDeleteDialog({
           {conserva && conserva.length > 0 && (
             <>
               <p className="mt-1 font-sans text-sm text-text-primary">Se conserva:</p>
-              <ul className="list-disc pl-5 font-sans text-sm text-text-secondary">
+              <ul className="list-disc pl-5 font-sans text-sm text-white">
                 {conserva.map((cosa) => (
                   <li key={cosa}>{cosa}</li>
                 ))}
@@ -101,7 +101,7 @@ export function HardDeleteDialog({
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-sm text-text-secondary">
+          <span className="font-sans text-sm text-white">
             Escribe <strong className="text-text-primary">{nombre}</strong> para confirmar.
           </span>
           <Input

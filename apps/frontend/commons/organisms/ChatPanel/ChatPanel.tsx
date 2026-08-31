@@ -1731,7 +1731,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     type="button"
                     onClick={cargarHistorial}
                     disabled={cargandoHistorial}
-                    className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    className="cursor-pointer rounded-full border border-border px-3 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {cargandoHistorial ? 'Cargando…' : 'Ver mensajes anteriores'}
                   </button>
@@ -1761,7 +1761,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                       />
                     </svg>
                   </span>
-                  <p className="font-sans text-sm text-text-secondary">{vacio}</p>
+                  <p className="font-sans text-sm text-white">{vacio}</p>
                 </div>
               ) : (
                 mensajes.map((mensaje, indice) => {
@@ -1771,9 +1771,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   return (
                     <div key={mensaje.id} data-msg-id={mensaje.id}>
                       {separador && (
-                        <div className="my-3 flex items-center gap-4 text-text-disabled/40">
+                        <div className="my-3 flex items-center gap-4 text-white0">
                           <CurvedLine />
-                          <span className="font-sans text-[11px] uppercase tracking-wide font-medium text-text-disabled">
+                          <span className="font-sans text-[11px] uppercase tracking-wide font-medium text-white">
                             {separador}
                           </span>
                           <CurvedLine />
@@ -1842,7 +1842,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 }}
               >
                 <svg
-                  className="h-4 w-4 text-text-secondary"
+                  className="h-4 w-4 text-white"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -1858,8 +1858,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
              * Estado de búsqueda si no hay resultados.
              */}
             {busquedaAbierta && (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#080807]/90 backdrop-blur-sm">
-                <p className="font-sans text-sm text-text-secondary">
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#191919]/90 backdrop-blur-sm">
+                <p className="font-sans text-sm text-white">
                   {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
                 </p>
                 <button
@@ -1882,7 +1882,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
            * — o vuelven a desalinearse.
            */}
           {canWrite ? (
-            <div className="relative shrink-0 p-3 pt-4 bg-[#131312] rounded-b-2xl">
+            <div className="relative shrink-0 p-3 pt-4 bg-[#191919] rounded-b-2xl">
               {/* Degradado suave flotante por encima del composer para fusionarse con el chat */}
               <div className="absolute left-0 right-0 top-0 h-16 -translate-y-full bg-gradient-to-t from-[#131312] to-transparent pointer-events-none z-10" />
               <Composer
@@ -1945,7 +1945,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             >
                               Respondiendo a {nombreDeAutor(respondiendo.authorId)}
                             </span>
-                            <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+                            <span className="line-clamp-1 font-sans text-xs text-white">
                               <AttachmentPreview mensaje={respondiendo} />
                             </span>
                           </span>
@@ -1953,7 +1953,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                             type="button"
                             onClick={() => setRespondiendo(null)}
                             aria-label="Dejar de responder"
-                            className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-text-disabled hover:text-text-primary"
+                            className="shrink-0 cursor-pointer rounded px-1 font-sans text-xs text-white hover:text-text-primary"
                           >
                             ✕
                           </button>
@@ -1964,7 +1964,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             </div>
           ) : (
             <p
-              className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-text-secondary"
+              className="rounded-lg border border-border px-3 py-2.5 font-sans text-xs text-white"
               style={{ background: alpha(colors.overlay, 12) }}
             >
               {motivoSinEscribir ?? 'Puedes leer la conversación, pero no escribir en ella.'}

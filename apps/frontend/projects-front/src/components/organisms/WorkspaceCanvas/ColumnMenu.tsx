@@ -164,7 +164,7 @@ export function ColumnMenu({
         aria-expanded={open}
         aria-label={`Opciones de la columna ${columnName}`}
         title="Opciones"
-        className="cursor-pointer rounded p-1 text-white/35 transition-colors hover:text-white"
+        className="cursor-pointer rounded p-1 text-white transition-colors hover:text-white"
         style={{ color: open ? colors.textPrimary : undefined }}
       >
         <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -208,7 +208,7 @@ export function ColumnMenu({
                     />
                     Cambiar color
                     {columnColor === DONE_COLUMN_COLOR && (
-                      <span className="ml-auto font-sans text-[10px] text-white/35">cierre</span>
+                      <span className="ml-auto font-sans text-[10px] text-white">cierre</span>
                     )}
                   </MenuItem>
                   <MenuItem onClick={() => show('rename')}>
@@ -244,7 +244,7 @@ export function ColumnMenu({
               <input type="hidden" name="columnId" value={columnId} />
               <input type="hidden" name="projectId" value={projectId} />
 
-              <span className="font-sans text-[11px] uppercase tracking-wide text-white/35">
+              <span className="font-sans text-[11px] uppercase tracking-wide text-white">
                 Color del punto
               </span>
 
@@ -312,7 +312,7 @@ export function ColumnMenu({
 
               <label
                 htmlFor={`rename-${columnId}`}
-                className="font-sans text-[11px] uppercase tracking-wide text-white/35"
+                className="font-sans text-[11px] uppercase tracking-wide text-white"
               >
                 Nombre
               </label>
@@ -338,14 +338,14 @@ export function ColumnMenu({
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
 
               {/* El estado de las tareas guarda el **nombre** de la columna, así
                   que renombrar las arrastra. Se avisa: quien renombra no tiene
                   por qué saber que el modelo está denormalizado. */}
               {taskCount > 0 && (
-                <span className="font-sans text-[11px] text-white/35">
+                <span className="font-sans text-[11px] text-white">
                   {taskCount === 1
                     ? 'Su tarea pasará a este estado.'
                     : `Sus ${taskCount} tareas pasarán a este estado.`}
@@ -364,7 +364,7 @@ export function ColumnMenu({
                 <button
                   type="button"
                   onClick={() => show('menu')}
-                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
                 >
                   Cancelar
                 </button>
@@ -393,7 +393,7 @@ export function ColumnMenu({
                 <button
                   type="button"
                   onClick={() => show('menu')}
-                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
+                  className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
                 >
                   No
                 </button>
@@ -456,7 +456,7 @@ function MenuBack({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="self-start cursor-pointer rounded px-1 font-sans text-[11px] text-white/55 transition-colors hover:text-white"
+      className="self-start cursor-pointer rounded px-1 font-sans text-[11px] text-white transition-colors hover:text-white"
     >
       ← Volver
     </button>

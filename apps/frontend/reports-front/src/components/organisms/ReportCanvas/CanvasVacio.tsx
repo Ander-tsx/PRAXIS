@@ -43,7 +43,7 @@ export function CanvasVacio({
     <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-6 py-16 text-center">
       <div className="flex flex-col items-center gap-2">
         <h3 className="font-display text-2xl text-text-primary">Tu lienzo está vacío</h3>
-        <p className="max-w-md font-serif text-lg italic text-text-secondary">
+        <p className="max-w-md font-serif text-lg italic text-white">
           Elige qué quieres ver y dónde. Lo que pongas se queda para la próxima vez.
         </p>
       </div>
@@ -61,7 +61,7 @@ export function CanvasVacio({
         </Button>
       </div>
 
-      <p className="max-w-md font-sans text-xs text-text-disabled">
+      <p className="max-w-md font-sans text-xs text-white">
         Es tu lienzo y solo tuyo: nadie del equipo ve el tuyo ni tú el suyo.
       </p>
     </div>

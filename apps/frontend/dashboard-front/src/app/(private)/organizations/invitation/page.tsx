@@ -25,7 +25,7 @@ export default async function InvitacionPage({
       {token ? (
         <AcceptInvitation token={token} />
       ) : (
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           Este enlace no trae el código de la invitación. Pide que te lo vuelvan a enviar: el
           anterior sigue valiendo mientras no caduque.
         </p>

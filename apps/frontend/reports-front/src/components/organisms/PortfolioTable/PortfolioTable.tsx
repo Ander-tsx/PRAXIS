@@ -24,7 +24,7 @@ function urgencia(fila: PortfolioRow): number {
 /** Una cifra que solo se pinta cuando hay algo que decir. Cero no es una alarma. */
 function Senal({ valor, tono }: { valor: number; tono: string }) {
   if (valor === 0) {
-    return <span className="font-sans text-sm tabular-nums text-text-disabled">—</span>;
+    return <span className="font-sans text-sm tabular-nums text-white">—</span>;
   }
   return (
     <Badge
@@ -49,9 +49,9 @@ function Senal({ valor, tono }: { valor: number; tono: string }) {
  */
 function Ritmo({ fila }: { fila: PortfolioRow }) {
   return (
-    <span className="font-sans text-sm tabular-nums text-text-secondary">
+    <span className="font-sans text-sm tabular-nums text-white">
       <span className="font-semibold text-text-primary">{fila.cerradasSemana}</span>
-      <span className="text-text-disabled"> / {fila.cerradasSemanaAnterior}</span>
+      <span className="text-white"> / {fila.cerradasSemanaAnterior}</span>
     </span>
   );
 }
@@ -99,7 +99,7 @@ export function PortfolioTable({ filas }: { filas: PortfolioRow[] }) {
       cell: (fila) => (
         <span className="font-sans text-sm tabular-nums text-text-primary">
           {fila.abiertas}
-          <span className="text-text-disabled"> / {fila.total}</span>
+          <span className="text-white"> / {fila.total}</span>
         </span>
       ),
     },

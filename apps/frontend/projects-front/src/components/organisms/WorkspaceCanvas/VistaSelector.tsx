@@ -35,7 +35,7 @@ export function VistaSelector({
     <div
       role="tablist"
       aria-label="Vista del tablero"
-      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-[#131312] p-0.5"
+      className="flex shrink-0 items-center gap-0.5 rounded-lg border border-white/10 bg-[#191919] p-0.5"
     >
       {VISTAS.map((v) => {
         const activo = v === value;
@@ -48,7 +48,7 @@ export function VistaSelector({
             onClick={() => onChange(v)}
             title={CONFIG[v].etiqueta}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-sans text-xs font-medium transition-colors ${
-              activo ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white'
+              activo ? 'bg-white/10 text-white' : 'text-white hover:text-white'
             }`}
           >
             <svg

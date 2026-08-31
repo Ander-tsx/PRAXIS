@@ -222,9 +222,9 @@ export function ColumnTasks({
               ]
                 .filter(Boolean)
                 .join(' ')}
-              style={{ background: '#0b0b0a' }}
+              style={{ background: '#191919' }}
             >
-              <span className="font-sans text-xs text-white/35">
+              <span className="font-sans text-xs text-white">
                 {arrastrandoTarea ? 'Suelta aquí' : 'Sin tareas'}
               </span>
             </div>
@@ -313,7 +313,7 @@ function NewTaskInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-transparent px-3 py-2 font-sans text-sm font-medium text-white/55 transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white"
+        className="flex shrink-0 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-transparent px-3 py-2 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/5 hover:text-white"
       >
         <svg
           className="h-4 w-4"
@@ -373,7 +373,7 @@ function NewTaskInline({
         placeholder="Qué hay que hacer"
         autoComplete="off"
         aria-label={`Título de la tarea nueva en ${columnName}`}
-        className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-xs text-white outline-none placeholder:text-white/35 focus:border-primary"
+        className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-xs text-white outline-none placeholder:text-white focus:border-primary"
       />
 
       <div className="flex items-center gap-1.5">
@@ -388,11 +388,11 @@ function NewTaskInline({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
+          className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
         >
           Cancelar
         </button>
-        <span className="ml-auto pr-1 font-sans text-[10px] text-white/35">
+        <span className="ml-auto pr-1 font-sans text-[10px] text-white">
           Prioridad media
         </span>
       </div>

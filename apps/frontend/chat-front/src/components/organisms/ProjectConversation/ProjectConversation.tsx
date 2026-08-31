@@ -110,7 +110,7 @@ export function ProjectConversation({
       salidaMovil={
         <a
           href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -157,7 +157,7 @@ export function ProjectConversation({
               />
               <h2 className="truncate font-display text-2xl text-text-primary">{projectName}</h2>
             </div>
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white">
               Chat del equipo · {/* Cruza de zona, así que `<a>` duro y no `<Link>`. */}
               <a
                 href={`/projects/${projectSlug}`}

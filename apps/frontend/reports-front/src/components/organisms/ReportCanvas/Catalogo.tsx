@@ -82,7 +82,7 @@ export function Catalogo({
                       </span>
                     )}
                   </span>
-                  <span className="font-sans text-xs leading-relaxed text-text-secondary">
+                  <span className="font-sans text-xs leading-relaxed text-white">
                     {puesto ? 'Ya está en tu lienzo.' : entrada.descripcion}
                   </span>
                 </span>
@@ -103,7 +103,7 @@ export function Catalogo({
       <button
         type="button"
         onClick={onGenerar}
-        className="flex items-center gap-2 self-start rounded-lg px-2 py-1 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+        className="flex items-center gap-2 self-start rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:text-text-primary"
       >
         <span aria-hidden="true">✦</span>
         ¿No ves el que buscas? Descríbeselo a {PRAX_NAME} en tus palabras →

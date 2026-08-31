@@ -888,7 +888,7 @@ export function AssistantChat({
         style={
           esFlotante
             ? /* El minichat va sobre negro puro. */
-              { background: '#000' }
+              { background: '#191919' }
             : aPantalla
               ? undefined
               : { borderColor: alpha(colors.primary, 25), background: colors.surface }
@@ -1017,7 +1017,7 @@ export function AssistantChat({
                 ))}
 
               {vista === 'historial' && (
-                <p className="font-sans text-sm text-text-secondary">
+                <p className="font-sans text-sm text-white">
                   Tus conversaciones. Abre una para seguir donde la dejaste.
                 </p>
               )}
@@ -1054,8 +1054,8 @@ export function AssistantChat({
                 disabled={mensajes.length === 0}
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   esFlotante
-                    ? 'text-white/50 enabled:hover:bg-white/5 enabled:hover:text-white'
-                    : 'h-10 w-10 rounded-sm border text-text-secondary enabled:hover:bg-surface-elevated enabled:hover:text-text-primary'
+                    ? 'text-white enabled:hover:bg-white/5 enabled:hover:text-white'
+                    : 'h-10 w-10 rounded-sm border text-white enabled:hover:bg-surface-elevated enabled:hover:text-text-primary'
                 }`}
                 style={esFlotante ? undefined : { borderColor: colors.border }}
               >
@@ -1092,7 +1092,7 @@ export function AssistantChat({
                 className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   vista === 'historial'
                     ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary'
+                    : 'text-white hover:bg-surface-elevated hover:text-text-primary'
                 }`}
                 style={{ borderColor: colors.border }}
               >
@@ -1457,7 +1457,7 @@ export function AssistantChat({
                      * aquí, que es hablar — y elegir proyecto pasa a ser una de
                      * las opciones, no el peaje.
                      */}
-                    <p className="font-serif text-base italic text-text-secondary">
+                    <p className="font-serif text-base italic text-white">
                       {projectId
                         ? 'Dime lo que necesitas de este proyecto y yo te lo facilito.'
                         : 'Pregúntame lo que quieras, o empecemos hablando de alguno de tus proyectos.'}
@@ -1487,7 +1487,7 @@ export function AssistantChat({
                             key={proyecto.id}
                             type="button"
                             onClick={() => onElegirProyecto?.(proyecto.id, conversationId)}
-                            className="rounded-full border border-border px-4 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
+                            className="rounded-full border border-border px-4 py-2 font-sans text-sm text-white transition-colors hover:border-primary hover:bg-surface-elevated hover:text-text-primary"
                           >
                             {proyecto.name}
                           </button>
@@ -1505,7 +1505,7 @@ export function AssistantChat({
                    * sabe hacer sin ninguno.
                    */}
                   {!projectId && proyectos.length === 0 && (
-                    <p className="max-w-md font-sans text-sm text-text-disabled">
+                    <p className="max-w-md font-sans text-sm text-white">
                       No tienes ningún proyecto cuyo análisis puedas abrir. Cuéntame en qué estás
                       trabajando y te propongo cómo montarlo.
                     </p>
@@ -1577,7 +1577,7 @@ export function AssistantChat({
                             chip no cambia de tamaño al terminar. */}
                         {adjunto.id === null ? (
                           <span
-                            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-text-disabled"
+                            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent text-white"
                             aria-label="Subiendo"
                           />
                         ) : (
@@ -1586,14 +1586,14 @@ export function AssistantChat({
                         <span className="max-w-48 truncate font-sans text-xs text-text-primary">
                           {adjunto.name}
                         </span>
-                        <span className="shrink-0 font-sans text-[11px] text-text-disabled">
+                        <span className="shrink-0 font-sans text-[11px] text-white">
                           {enKilobytes(adjunto.bytes)}
                         </span>
                         <button
                           type="button"
                           onClick={() => quitarAdjunto(adjunto.localId)}
                           aria-label={`Quitar ${adjunto.name}`}
-                          className="shrink-0 rounded text-text-disabled transition-colors hover:text-error"
+                          className="shrink-0 rounded text-white transition-colors hover:text-error"
                         >
                           <svg
                             className="h-3.5 w-3.5"
@@ -1629,7 +1629,7 @@ export function AssistantChat({
                  */}
                 <div
                   className="flex flex-col gap-1.5 rounded-2xl border p-2.5 transition-colors focus-within:border-white/25"
-                  style={{ borderColor: alpha(colors.border, 90), background: '#131312' }}
+                  style={{ borderColor: alpha(colors.border, 90), background: '#191919' }}
                 >
                   <textarea
                     ref={campoRef}
@@ -1656,7 +1656,7 @@ export function AssistantChat({
                       area.style.height = 'auto';
                       area.style.height = `${Math.min(area.scrollHeight, 160)}px`;
                     }}
-                    className="max-h-40 w-full resize-none bg-transparent px-1.5 py-1 font-sans text-sm text-text-primary outline-none placeholder:text-text-disabled disabled:cursor-not-allowed"
+                    className="max-h-40 w-full resize-none bg-transparent px-1.5 py-1 font-sans text-sm text-text-primary outline-none placeholder:text-white disabled:cursor-not-allowed"
                   />
 
                   {/* La fila de acciones, debajo del campo: a la izquierda el
@@ -1725,7 +1725,7 @@ export function AssistantChat({
                   </div>
                 </div>
 
-                <p className="font-sans text-xs text-text-disabled">
+                <p className="font-sans text-xs text-white">
                   {PRAX_NAME} puede equivocarse. Revisa cada propuesta antes de aceptarla.
                 </p>
 
@@ -1751,7 +1751,7 @@ function ContadorCuota({ cuota }: { cuota: AssistantQuota }) {
       >
         {cuota.usados} / {cuota.limite}
       </span>
-      <span className="font-sans text-[11px] uppercase tracking-wider text-text-disabled">
+      <span className="font-sans text-[11px] uppercase tracking-wider text-white">
         mensajes este mes
       </span>
     </div>
@@ -1775,7 +1775,7 @@ function Sugerencia({
       type="button"
       disabled={agotada}
       onClick={() => onElegir(texto)}
-      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-text-secondary transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-full border border-border px-3.5 py-2 font-sans text-sm text-white transition-colors hover:border-border-strong hover:bg-surface-elevated hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
     >
       {texto}
     </button>
@@ -1932,13 +1932,13 @@ function AdjuntoEnLaBurbuja({
             className="h-full w-full object-cover"
           />
         ) : (
-          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-text-secondary" />
+          <IconoDeArchivo mime={adjunto.mimeType} className="h-4 w-4 text-white" />
         )}
       </span>
 
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-sans text-xs text-text-primary">{adjunto.filename}</span>
-        <span className="font-sans text-[11px] text-text-disabled">
+        <span className="font-sans text-[11px] text-white">
           {enKilobytes(adjunto.size)}
         </span>
       </span>
@@ -2137,11 +2137,11 @@ function NombreConRecientes({
         onClick={onAlternar}
         aria-expanded={abierto}
         aria-haspopup="menu"
-        className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1 font-sans text-sm font-semibold text-white transition-colors hover:text-white/80"
+        className="flex max-w-full items-center gap-1.5 rounded-md py-0.5 pr-1 font-sans text-sm font-semibold text-white transition-colors hover:text-white"
       >
         <span className="truncate">{titulo}</span>
         <svg
-          className={`h-3.5 w-3.5 shrink-0 text-white/40 transition-transform ${abierto ? 'rotate-180' : ''}`}
+          className={`h-3.5 w-3.5 shrink-0 text-white transition-transform ${abierto ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -2158,7 +2158,7 @@ function NombreConRecientes({
           className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
         >
           {recientes.length === 0 ? (
-            <p className="px-3 py-3 font-sans text-xs text-white/40">
+            <p className="px-3 py-3 font-sans text-xs text-white">
               Todavía no hay conversaciones.
             </p>
           ) : (
@@ -2171,13 +2171,13 @@ function NombreConRecientes({
                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
                   c.id === activaId
                     ? 'bg-white/10 text-white'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    : 'text-white hover:bg-white/5 hover:text-white'
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate font-sans text-[13px]">
                   {c.title || 'Sin título'}
                 </span>
-                <span className="shrink-0 font-sans text-[10px] text-white/30">
+                <span className="shrink-0 font-sans text-[10px] text-white">
                   {cuandoCorto(c.updatedAt)}
                 </span>
               </button>
@@ -2224,7 +2224,7 @@ function ModoYCerrar({
   }, [menuAbierto, onCerrarMenu]);
 
   const claseBoton =
-    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/5 hover:text-white';
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-white/5 hover:text-white';
 
   return (
     <div ref={ref} className="relative flex items-center gap-1">
@@ -2306,7 +2306,7 @@ function OpcionModo({
       role="menuitem"
       onClick={onClick}
       className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors ${
-        activa ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
+        activa ? 'bg-white/10 text-white' : 'text-white hover:bg-white/5 hover:text-white'
       }`}
     >
       {etiqueta}
@@ -2384,7 +2384,7 @@ function ComposerMasMenu({
         aria-haspopup="menu"
         aria-label="Añadir al mensaje"
         title="Añadir"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
       >
         <svg
           className={`h-5 w-5 transition-transform ${abierto ? 'rotate-45' : ''}`}
@@ -2449,10 +2449,10 @@ function ItemMas({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white/70 transition-colors enabled:hover:bg-white/5 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] text-white transition-colors enabled:hover:bg-white/5 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
     >
       <svg
-        className="h-4 w-4 shrink-0 text-white/40"
+        className="h-4 w-4 shrink-0 text-white"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

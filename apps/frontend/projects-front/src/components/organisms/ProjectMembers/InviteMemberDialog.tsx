@@ -208,7 +208,7 @@ export function InviteMemberDialog({
     <div className="rounded-2xl border border-border bg-surface-elevated p-6 shadow-sm">
       <header className="mb-4 flex flex-col gap-1">
         <h3 className="font-display text-xl text-text-primary">Invitar al proyecto</h3>
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           Recibirá una invitación y entrará al aceptarla, con el rol que elijas.
         </p>
       </header>
@@ -248,7 +248,7 @@ export function InviteMemberDialog({
                   <span className="truncate font-sans text-sm text-text-primary">
                     {selected.name || selected.email}
                   </span>
-                  <span className="truncate font-sans text-xs text-text-secondary">
+                  <span className="truncate font-sans text-xs text-white">
                     {selected.email}
                     {selected.roleName ? ` · ${selected.roleName}` : ''}
                   </span>
@@ -256,7 +256,7 @@ export function InviteMemberDialog({
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="shrink-0 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  className="shrink-0 font-sans text-xs text-white transition-colors hover:text-text-primary"
                 >
                   Cambiar
                 </button>
@@ -278,7 +278,7 @@ export function InviteMemberDialog({
                      peor, eligiendo a alguien de fuera para recibir un 403 al
                      enviar. */
                   <div className="flex flex-col gap-2 rounded-lg bg-surface-elevated px-3 py-3">
-                    <p className="font-sans text-sm text-text-disabled">
+                    <p className="font-sans text-sm text-white">
                       {query.trim()
                         ? `Nadie del equipo coincide con «${query.trim()}».`
                         : 'Todo el equipo está ya en este proyecto.'}
@@ -303,7 +303,7 @@ export function InviteMemberDialog({
                       <span className="font-sans text-sm text-text-primary">
                         {miembro.name || miembro.email}
                       </span>
-                      <span className="font-sans text-xs text-text-secondary">
+                      <span className="font-sans text-xs text-white">
                         {miembro.email}
                         {miembro.roleName ? ` · ${miembro.roleName}` : ''}
                       </span>

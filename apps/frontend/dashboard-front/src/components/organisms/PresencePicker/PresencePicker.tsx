@@ -81,7 +81,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
               <span className="font-sans text-sm font-medium text-text-primary">
                 {descripcion.etiqueta}
               </span>
-              <span className="font-sans text-xs text-text-secondary">{descripcion.ayuda}</span>
+              <span className="font-sans text-xs text-white">{descripcion.ayuda}</span>
             </span>
           </button>
         );

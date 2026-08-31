@@ -229,7 +229,7 @@ export function WorkspaceCanvas({
         canDeleteBoard={canDeleteBoard}
       />
 
-      <span aria-hidden="true" className="shrink-0 font-sans text-sm text-white/35">
+      <span aria-hidden="true" className="shrink-0 font-sans text-sm text-white">
         /
       </span>
 
@@ -286,7 +286,7 @@ export function WorkspaceCanvas({
       className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
         soloMias
           ? 'bg-primary text-primary-foreground'
-          : 'text-white/55 hover:bg-[#131312] hover:text-white'
+          : 'text-white hover:bg-[#191919] hover:text-white'
       }`}
     >
       <svg
@@ -318,8 +318,8 @@ export function WorkspaceCanvas({
 
   if (!activeWorkspace) {
     return (
-      <div className="flex flex-col h-full bg-[#080807]">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-white/10 rounded-lg bg-[#131312] px-4 py-2">
+      <div className="flex flex-col h-full bg-[#191919]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 rounded-lg bg-[#191919] px-4 py-2">
           {barraDelTablero}
         </div>
 
@@ -344,7 +344,7 @@ export function WorkspaceCanvas({
             </svg>
           </span>
           <h3 className="font-sans text-2xl font-semibold text-white">Ningún espacio todavía</h3>
-          <p className="max-w-md font-sans text-sm text-white/55">
+          <p className="max-w-md font-sans text-sm text-white">
             Un espacio agrupa tableros: uno por equipo, por fase o por lo que le convenga a este
             proyecto.{' '}
             {canManage
@@ -358,14 +358,14 @@ export function WorkspaceCanvas({
 
   if (!boardActivo) {
     return (
-      <div className="flex flex-col h-full bg-[#080807]">
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-white/10 bg-[#131312] px-4 py-2">
+      <div className="flex flex-col h-full bg-[#191919]">
+        <div className="flex shrink-0 flex-wrap items-center gap-1 bg-[#191919] px-4 py-2">
           {barraDelTablero}
         </div>
 
         <div className="flex flex-col items-center justify-center flex-1 gap-3 px-6 py-16 text-center">
           <h3 className="font-sans text-2xl font-semibold text-white">«{activeWorkspace.name}» está vacío</h3>
-          <p className="max-w-md font-sans text-sm text-white/55">
+          <p className="max-w-md font-sans text-sm text-white">
             Un tablero organiza el trabajo en columnas.{' '}
             {canManage ? 'Crea el primero desde el botón de arriba.' : ''}
           </p>

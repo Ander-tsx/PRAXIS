@@ -250,7 +250,7 @@ export function TaskDialog({
       title={task.title}
       description={
         <span className="flex items-center gap-2">
-          <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white/70">
+          <span className="rounded-full bg-white/[0.08] px-2 py-0.5 font-sans text-[11px] text-white">
             {columnName}
           </span>
           <span className="font-sans text-xs">Creada {formatDate(task.createdAt)}</span>
@@ -335,7 +335,7 @@ export function TaskDialog({
           <fieldset className="flex flex-col gap-2" disabled={readOnly}>
             <legend className="font-sans text-sm font-medium text-white">Etiquetas</legend>
             {labels.length === 0 ? (
-              <p className="font-sans text-xs text-white/55">
+              <p className="font-sans text-xs text-white">
                 Este proyecto no tiene etiquetas todavía.
                 {canManageLabels ? ' Crea la primera aquí abajo.' : ''}
               </p>
@@ -358,7 +358,7 @@ export function TaskDialog({
         <fieldset className="flex flex-col gap-2" disabled={readOnly}>
           <legend className="font-sans text-sm font-medium text-white">Encargados</legend>
           {members.length === 0 ? (
-            <p className="font-sans text-xs text-white/55">
+            <p className="font-sans text-xs text-white">
               Este proyecto todavía no tiene a nadie a quien asignar.
             </p>
           ) : (
@@ -372,7 +372,7 @@ export function TaskDialog({
               ))}
             </div>
           )}
-          <p className="font-sans text-xs text-white/35">
+          <p className="font-sans text-xs text-white">
             Solo se puede asignar a quien esté en el proyecto.
           </p>
         </fieldset>
@@ -413,7 +413,7 @@ export function TaskDialog({
               <input type="hidden" name="taskId" value={task.id} />
               {confirmingDelete ? (
                 <span className="flex items-center gap-2">
-                  <span className="font-sans text-xs text-white/55">¿Seguro?</span>
+                  <span className="font-sans text-xs text-white">¿Seguro?</span>
                   <button
                     type="submit"
                     disabled={deleting}
@@ -424,7 +424,7 @@ export function TaskDialog({
                   <button
                     type="button"
                     onClick={() => setConfirmingDelete(false)}
-                    className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white"
+                    className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/[0.05] hover:text-white"
                   >
                     No
                   </button>
@@ -433,7 +433,7 @@ export function TaskDialog({
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
-                  className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white"
+                  className="rounded-lg px-3 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/[0.05] hover:text-white"
                 >
                   Eliminar
                 </button>
@@ -469,7 +469,7 @@ function SaveStatus({
 }) {
   if (saving) {
     return (
-      <span className="font-sans text-xs text-text-secondary" aria-live="polite">
+      <span className="font-sans text-xs text-white" aria-live="polite">
         Guardando…
       </span>
     );
@@ -487,7 +487,7 @@ function SaveStatus({
 
   return (
     <span
-      className="flex items-center gap-1 font-sans text-xs text-text-secondary"
+      className="flex items-center gap-1 font-sans text-xs text-white"
       aria-live="polite"
     >
       <svg
@@ -556,7 +556,7 @@ function AssigneeToggle({
         </svg>
       </span>
 
-      <span className="min-w-0 flex-1 truncate font-sans text-sm text-white peer-disabled:text-white/55">
+      <span className="min-w-0 flex-1 truncate font-sans text-sm text-white peer-disabled:text-white">
         {personLabel(member)}
       </span>
     </label>

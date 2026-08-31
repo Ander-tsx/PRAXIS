@@ -471,13 +471,13 @@ export function Composer({
           {adjuntosPendientes.map((adjunto) => (
             <span
               key={adjunto.id}
-              className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-text-secondary"
+              className="flex items-center gap-1.5 rounded-lg border border-border py-1 pl-2.5 pr-1 font-sans text-xs text-white"
               style={{ background: '#131312' }}
             >
               <span className="max-w-40 truncate" title={adjunto.filename}>
                 {adjunto.filename}
               </span>
-              <span className="shrink-0 text-[10px] text-text-disabled">
+              <span className="shrink-0 text-[10px] text-white">
                 {formatBytes(adjunto.size)}
               </span>
               <button
@@ -486,7 +486,7 @@ export function Composer({
                 disabled={subiendo}
                 aria-label={`Quitar ${adjunto.filename}`}
                 title="Quitar"
-                className="shrink-0 cursor-pointer rounded p-0.5 text-text-disabled transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0 cursor-pointer rounded p-0.5 text-white transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg
                   className="h-3 w-3"
@@ -568,7 +568,7 @@ export function Composer({
                       {sugerencia.estado}
                     </span>
                   )}
-                  <span className="max-w-40 truncate font-sans text-[11px] text-text-disabled">
+                  <span className="max-w-40 truncate font-sans text-[11px] text-white">
                     {sugerencia.contexto}
                   </span>
                 </span>
@@ -613,7 +613,7 @@ export function Composer({
               }}
               /* ⚠️ Tinta transparente: lo que se lee es la capa de abajo. El cursor
                  se pinta aparte con `caret-color`, o el campo parecería muerto. */
-              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-text-secondary disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
+              className={`relative max-h-40 w-full resize-none bg-transparent text-transparent outline-none placeholder:text-white disabled:cursor-not-allowed ${FIELD_TYPOGRAPHY}`}
               style={{ caretColor: colors.textPrimary }}
             />
           </div>
@@ -629,7 +629,7 @@ export function Composer({
               }
               aria-label="Adjuntar un archivo"
               title="Adjuntar archivo"
-              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-white transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               {subiendo ? (
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -679,9 +679,9 @@ export function Composer({
                  una fila que se alinea por abajo (`items-end`). */
               className={`flex h-9 shrink-0 cursor-pointer items-center justify-center rounded-lg ${
                 compactButtons
-                  ? 'w-9 border border-border bg-[#131312] shadow-sm hover:bg-white/5'
+                  ? 'w-9 border border-border bg-[#191919] shadow-sm hover:bg-white/5'
                   : 'px-3 hover:bg-white/5 hover:text-text-primary'
-              } font-sans text-xs text-text-secondary transition-colors`}
+              } font-sans text-xs text-white transition-colors`}
             >
               {compactButtons ? (
                 <svg
@@ -757,20 +757,20 @@ export function Composer({
          * texto completo sigue a la vista en el compositor ancho.
          */}
         <div
-          className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-text-secondary mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
+          className={`hidden sm:flex items-center gap-3 truncate font-sans text-[11px] text-white mt-1 ${hideShortcuts ? 'invisible select-none' : ''}`}
         >
           <span className="flex items-center gap-1.5">
-            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] shadow-sm">
+            <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
               ↵
             </kbd>{' '}
             enviar
           </span>
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 ⇧
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 ↵
               </kbd>
             </span>{' '}
@@ -778,7 +778,7 @@ export function Composer({
           </span>
           {permiteMenciones && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1.5 font-sans text-[10px] font-medium shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1.5 font-sans text-[10px] font-medium shadow-sm">
                 @
               </kbd>{' '}
               mencionar
@@ -786,7 +786,7 @@ export function Composer({
           )}
           {permiteReferencias && (
             <span className="flex items-center gap-1.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] font-medium shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] font-medium shadow-sm">
                 /
               </kbd>{' '}
               enlazar tarea
@@ -794,10 +794,10 @@ export function Composer({
           )}
           <span className="flex items-center gap-1.5">
             <span className="flex items-center gap-0.5">
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 Ctrl
               </kbd>
-              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#131312] px-1 font-sans text-[10px] shadow-sm">
+              <kbd className="flex h-4 items-center justify-center rounded border border-border/60 bg-[#191919] px-1 font-sans text-[10px] shadow-sm">
                 V
               </kbd>
             </span>{' '}

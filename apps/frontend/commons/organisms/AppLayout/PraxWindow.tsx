@@ -316,7 +316,7 @@ function PraxFloatingWindow({ visible, children }: { visible: boolean; children:
 
   return (
     <div
-      className={`fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl transition-opacity duration-150 ${
+      className={`fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#191919] shadow-2xl transition-opacity duration-150 ${
         visible ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       style={{ left: caja.x, top: caja.y, width: caja.w, height: caja.h }}

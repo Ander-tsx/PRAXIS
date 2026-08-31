@@ -76,11 +76,11 @@ export function QuotaNotice({ detalle, mensaje, ampliarSirve = true, accion }: Q
     <div role="alert" className="flex flex-col gap-3 border-l-2 border-warning py-1 pl-4">
       <div className="flex flex-col gap-1">
         <p className="font-display text-base text-text-primary">{mensaje}</p>
-        <p className="max-w-xl font-sans text-sm text-text-secondary">{salida}</p>
+        <p className="max-w-xl font-sans text-sm text-white">{salida}</p>
       </div>
 
       {/* El contador, aparte del texto: es el dato que se mira dos veces. */}
-      <p className="font-mono text-xs uppercase tracking-wider text-text-disabled">
+      <p className="font-mono text-xs uppercase tracking-wider text-white">
         {detalle.actual} de {detalle.tope} · plan {detalle.tier}
       </p>
 
@@ -95,7 +95,7 @@ export function QuotaNotice({ detalle, mensaje, ampliarSirve = true, accion }: Q
         ) : (
           /* Sin permiso para pagar no se ofrece pagar: se dice a quién pedírselo.
              Es la otra cara de O6.5. */
-          <span className="font-sans text-xs text-text-disabled">
+          <span className="font-sans text-xs text-white">
             Ampliar el plan lo decide quien administra la organización. Pídeselo.
           </span>
         )}

@@ -78,7 +78,7 @@ export function ProjectSettingsButton({
         onClick={() => setOpen(true)}
         title="Configuración del proyecto"
         aria-label="Configuración del proyecto"
-        className={`flex shrink-0 items-center gap-2 rounded-lg font-sans text-sm text-white/50 transition-colors hover:bg-surface hover:text-white ${
+        className={`flex shrink-0 items-center gap-2 rounded-lg font-sans text-sm text-white transition-colors hover:bg-surface hover:text-white ${
           compacto ? 'h-7 w-7 justify-center' : 'px-3 py-1.5'
         }`}
       >
@@ -208,8 +208,8 @@ function ProjectSettingsModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#080807] shadow-2xl max-h-[90vh]">
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#080807]/80 px-4 py-3 backdrop-blur-md">
+      <div className="relative z-10 flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#191919] shadow-2xl max-h-[90vh]">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#191919]/80 px-4 py-3 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -279,7 +279,7 @@ function ProjectSettingsModal({
               <GlyphPicker value={seleccion} onChange={setSeleccion} disabled={saving} />
             </>
           ) : (
-            <p className="font-sans text-sm text-white/50">
+            <p className="font-sans text-sm text-white">
               No tienes permiso para cambiar el nombre, la descripción ni la identidad de este
               proyecto.
             </p>
@@ -293,8 +293,8 @@ function ProjectSettingsModal({
 
           {canDelete && (
             <div className="mt-2 flex flex-col gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-              <p className="font-sans text-sm font-semibold text-white/90">Zona de peligro</p>
-              <p className="font-sans text-xs text-white/50">
+              <p className="font-sans text-sm font-semibold text-white">Zona de peligro</p>
+              <p className="font-sans text-xs text-white">
                 Eliminar el proyecto no se puede deshacer, y se lleva por delante todo lo que hay
                 dentro.
               </p>

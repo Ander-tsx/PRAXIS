@@ -80,13 +80,13 @@ function SettingsRow({
     <div className="flex flex-col gap-4 border-t border-border py-8 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 shrink-0 text-text-secondary" aria-hidden="true">
+          <span className="mt-0.5 shrink-0 text-white" aria-hidden="true">
             {icon}
           </span>
           <div className="flex min-w-0 flex-col gap-1">
             <h2 className="font-display text-xl text-text-primary">{title}</h2>
             {description && (
-              <p className="max-w-md font-serif text-sm italic text-text-secondary">
+              <p className="max-w-md font-serif text-sm italic text-white">
                 {description}
               </p>
             )}

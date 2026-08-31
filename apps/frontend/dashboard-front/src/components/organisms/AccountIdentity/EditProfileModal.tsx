@@ -109,9 +109,9 @@ export function EditProfileModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative z-10 w-full max-w-2xl bg-[#080807] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+      <div className="relative z-10 w-full max-w-2xl bg-[#191919] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur-md bg-[#080807]/80 sticky top-0 z-20">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 backdrop-blur-md bg-[#191919]/80 sticky top-0 z-20">
           <div className="flex items-center gap-6">
             <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -132,7 +132,7 @@ export function EditProfileModal({
         <div className="flex-1 overflow-y-auto overflow-x-hidden relative scrollbar-none">
           {/* Cover */}
           <div className="relative h-48 w-full bg-white/5">
-            <div className="absolute top-2 right-2 z-10 bg-black/60 px-2 py-1 rounded text-xs text-white/80">Max 5MB</div>
+            <div className="absolute top-2 right-2 z-10 bg-black/60 px-2 py-1 rounded text-xs text-white">Max 5MB</div>
             {coverPreview && <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />}
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-4">
               <button onClick={() => coverInputRef.current?.click()} className="p-3 bg-black/60 hover:bg-black/80 rounded-full text-white transition-colors">

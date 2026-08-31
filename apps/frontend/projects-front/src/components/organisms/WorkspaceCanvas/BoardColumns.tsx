@@ -460,7 +460,7 @@ export function BoardColumns({
           registrarColumna(column.id, el);
           reposicion.registrar(`columna:${column.id}`, el);
         }}
-        className="flex h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#131312]"
+        className="flex h-fit max-h-full w-72 shrink-0 flex-col overflow-hidden rounded-2xl bg-[#202020]"
         style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
       >
         {/**
@@ -515,7 +515,7 @@ export function BoardColumns({
               </>
             )}
             <span
-              className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white/55"
+              className="rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
               style={{ background: alpha(colors.border, 60) }}
             >
               {deLaColumna.length}
@@ -730,7 +730,7 @@ export function BoardColumns({
               aria-hidden="true"
             />
             <h4 className="font-sans text-lg font-semibold text-white">{columnaExpandida.name}</h4>
-            <span className="font-sans text-xs text-white/55">
+            <span className="font-sans text-xs text-white">
               {board.name} · {(() => {
                 const total = tasksByColumn.get(columnaExpandida.id)?.length ?? 0;
                 return `${total} ${total === 1 ? 'tarea' : 'tareas'}`;
@@ -742,7 +742,7 @@ export function BoardColumns({
               onClick={() => setColumnaExpandidaId(null)}
               aria-label={`Salir de pantalla completa de la columna ${columnaExpandida.name}`}
               title="Salir de pantalla completa (Esc)"
-              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-white/55 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 font-sans text-xs text-white transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <MinimizarIcono />
               Salir
@@ -753,7 +753,7 @@ export function BoardColumns({
               tira. Es lo que devuelve el contraste a las tarjetas y lo que hace
               que se reconozca como la columna de siempre. */}
           <div
-            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-[#131312] p-2"
+            className="flex min-h-0 flex-1 flex-col rounded-2xl bg-[#191919] p-2"
             style={{ boxShadow: `0 1px 0 ${alpha(colors.border, 45)}` }}
           >
             <ColumnTasks
@@ -859,14 +859,14 @@ function ColumnaFantasma({
 }) {
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl bg-[#131312] px-4 py-4"
+      className="flex flex-col gap-3 rounded-2xl bg-[#191919] px-4 py-4"
       style={{ boxShadow: `0 24px 48px -12px ${alpha(colors.overlay, 70)}` }}
     >
       <span className="flex min-w-0 items-center gap-2">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: tono }} />
         <h5 className="truncate font-sans text-sm font-semibold text-white">{nombre}</h5>
         <span
-          className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white/55"
+          className="ml-auto rounded-full px-2 py-0.5 font-sans text-[11px] tabular-nums text-white"
           style={{ background: alpha(colors.border, 60) }}
         >
           {tareas}
@@ -908,7 +908,7 @@ function NudgeButton({
       disabled={disabled}
       aria-label={`${label} la columna ${columnName}`}
       title={label}
-      className="rounded p-0.5 text-white/35 transition-colors hover:text-white disabled:opacity-25 disabled:hover:text-white/35"
+      className="rounded p-0.5 text-white transition-colors hover:text-white disabled:opacity-25 disabled:hover:text-white"
     >
       <svg
         className="h-3.5 w-3.5"

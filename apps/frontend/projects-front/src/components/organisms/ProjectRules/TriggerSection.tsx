@@ -41,7 +41,7 @@ export function TriggerSection({
   return (
     <fieldset className="flex flex-col gap-3">
       <legend className="font-sans text-sm font-semibold text-text-primary">
-        Cuando… <span className="font-normal text-text-secondary">¿qué lo dispara?</span>
+        Cuando… <span className="font-normal text-white">¿qué lo dispara?</span>
       </legend>
 
       {/* El tipo viaja aparte porque los botones no son un `<input>`: la
@@ -69,9 +69,9 @@ export function TriggerSection({
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-elevated p-4">
           {spec.config.map((campo) => (
             <label key={campo.key} className="flex flex-col gap-1">
-              <span className="font-sans text-xs font-medium text-text-secondary">
+              <span className="font-sans text-xs font-medium text-white">
                 {campo.label}
-                {!campo.required && <span className="text-text-disabled"> (opcional)</span>}
+                {!campo.required && <span className="text-white"> (opcional)</span>}
               </span>
               <Input
                 type="number"
@@ -81,7 +81,7 @@ export function TriggerSection({
                 onChange={(event) => onChangeConfig(campo.key, Number(event.target.value))}
               />
               {campo.help && (
-                <span className="font-sans text-xs text-text-disabled">{campo.help}</span>
+                <span className="font-sans text-xs text-white">{campo.help}</span>
               )}
             </label>
           ))}
@@ -110,12 +110,12 @@ function Grupo({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="flex items-center gap-1.5 font-sans text-xs font-semibold text-text-secondary">
+      <p className="flex items-center gap-1.5 font-sans text-xs font-semibold text-white">
         <span aria-hidden className="text-primary">
           {icono}
         </span>
         {titulo}
-        <span className="font-normal text-text-disabled">— {explicacion}</span>
+        <span className="font-normal text-white">— {explicacion}</span>
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {triggers.map((trigger) => {
@@ -141,7 +141,7 @@ function Grupo({
               >
                 {trigger.label}
               </span>
-              <span className="font-sans text-xs text-text-secondary">{trigger.description}</span>
+              <span className="font-sans text-xs text-white">{trigger.description}</span>
             </button>
           );
         })}

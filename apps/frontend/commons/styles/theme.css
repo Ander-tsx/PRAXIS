@@ -81,9 +81,9 @@
   --color-text-inverse: #0d0f14; /* Texto sobre fondos claros */
 
   /* ── BORDES ─────────────────────────────────────────────── */
-  --color-border: #2a3045; /* Bordes normales */
-  --color-border-subtle: #1e2535; /* Bordes muy sutiles */
-  --color-border-strong: #3d4a6b; /* Bordes con énfasis */
+  --color-border: rgba(255, 255, 255, 0.1); /* Bordes normales */
+  --color-border-subtle: rgba(255, 255, 255, 0.05); /* Bordes muy sutiles */
+  --color-border-strong: rgba(255, 255, 255, 0.2); /* Bordes con énfasis */
 
   /* ── ESTADOS / FEEDBACK ──────────────────────────────────── */
   --color-success: #4ade80;
@@ -236,7 +236,7 @@
    ============================================================ */
 [data-tone="dark"] {
   --color-background: #0c0c0b;
-  --color-surface: #131312;
+  --color-surface: #191919;
   --color-surface-elevated: #1c1c1b;
   --color-overlay: #000000;
   --color-canvas-shadow: #000000;

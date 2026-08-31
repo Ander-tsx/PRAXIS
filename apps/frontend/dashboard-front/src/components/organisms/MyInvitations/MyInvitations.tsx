@@ -63,7 +63,7 @@ function InvitationRow({ invitation }: { invitation: MyInvitation }) {
         </span>
 
         {invitation.project.description && (
-          <span className="line-clamp-1 font-sans text-xs text-text-secondary">
+          <span className="line-clamp-1 font-sans text-xs text-white">
             {invitation.project.description}
           </span>
         )}

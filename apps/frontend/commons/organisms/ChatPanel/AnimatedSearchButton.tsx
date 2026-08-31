@@ -16,13 +16,13 @@ export function AnimatedSearchButton({ onSearch, onClear }: { onSearch: (t: stri
   }, [abierta, onClear]);
 
   return (
-    <div className={`flex shrink-0 items-center overflow-hidden rounded-full border border-border bg-[#131312] transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}>
+    <div className={`flex shrink-0 items-center overflow-hidden rounded-full border border-border bg-[#191919] transition-all duration-300 ${abierta ? 'w-48' : 'w-8 hover:bg-white/5'}`}>
       <button
         type="button"
         onClick={() => setAbierta(!abierta)}
         aria-label="Buscar"
         title="Buscar"
-        className="flex h-8 w-8 shrink-0 items-center justify-center text-text-secondary transition-colors hover:text-text-primary"
+        className="flex h-8 w-8 shrink-0 items-center justify-center text-white transition-colors hover:text-text-primary"
       >
         {abierta ? (
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -44,7 +44,7 @@ export function AnimatedSearchButton({ onSearch, onClear }: { onSearch: (t: stri
           if (e.key === 'Escape') setAbierta(false);
         }}
         placeholder="Buscar..."
-        className={`flex-1 bg-transparent pr-3 font-sans text-xs text-text-primary outline-none placeholder:text-text-disabled transition-opacity duration-200 ${abierta ? 'opacity-100' : 'opacity-0'}`}
+        className={`flex-1 bg-transparent pr-3 font-sans text-xs text-text-primary outline-none placeholder:text-white transition-opacity duration-200 ${abierta ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   );

@@ -94,7 +94,7 @@ export function ProjectHeader({
           href="/"
           aria-label="Volver a todos los proyectos"
           title="Todos los proyectos"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white transition-colors hover:bg-surface hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <svg
             className="h-4 w-4"
@@ -119,7 +119,7 @@ export function ProjectHeader({
           {project.description && (
             <p
               title={project.description}
-              className="min-w-0 flex-1 truncate font-serif text-sm italic text-white/50"
+              className="min-w-0 flex-1 truncate font-serif text-sm italic text-white"
             >
               {project.description}
             </p>
@@ -139,7 +139,7 @@ export function ProjectHeader({
         {/* `/` es la lista: dentro de la zona se escribe sin el basePath. */}
         <Link
           href="/"
-          className="w-fit font-sans text-sm text-white/60 transition-colors hover:text-white"
+          className="w-fit font-sans text-sm text-white transition-colors hover:text-white"
         >
           ← Todos los proyectos
         </Link>
@@ -160,15 +160,15 @@ export function ProjectHeader({
         </div>
 
         {project.description ? (
-          <p className="max-w-2xl font-serif text-lg italic text-white/55">{project.description}</p>
+          <p className="max-w-2xl font-serif text-lg italic text-white">{project.description}</p>
         ) : (
-          <p className="font-serif text-lg italic text-white/30">Sin descripción</p>
+          <p className="font-serif text-lg italic text-white">Sin descripción</p>
         )}
       </div>
 
       {/* Los contadores de espacios, equipo y roles los llevan las pestañas;
           aquí solo va lo que no aparece allí. */}
-      <p className="font-sans text-sm text-white/45">
+      <p className="font-sans text-sm text-white">
         Creado el {dateFormatter.format(new Date(project.createdAt))} · {boardCount}{' '}
         {boardCount === 1 ? 'tablero' : 'tableros'} · {memberCount}{' '}
         {memberCount === 1 ? 'persona' : 'personas'}

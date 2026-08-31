@@ -347,7 +347,7 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-col gap-1">
               <h3 className="font-display text-lg text-text-primary">Añade lo que quieras ver</h3>
-              <p className="font-sans text-sm text-text-secondary">
+              <p className="font-sans text-sm text-white">
                 Se coloca al final del lienzo. Después se mueve arrastrando por la cabecera y se
                 redimensiona por la esquina.
               </p>
@@ -356,7 +356,7 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
               type="button"
               onClick={() => setPanel(null)}
               aria-label="Cerrar"
-              className="shrink-0 rounded-lg p-1.5 text-text-disabled transition-colors hover:bg-surface-elevated hover:text-text-primary"
+              className="shrink-0 rounded-lg p-1.5 text-white transition-colors hover:bg-surface-elevated hover:text-text-primary"
             >
               <svg
                 className="h-4 w-4"
@@ -395,7 +395,7 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
                 className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
                   panel === clave
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                    : 'text-white hover:bg-surface hover:text-text-primary'
                 }`}
               >
                 {rotulo}
@@ -503,7 +503,7 @@ export function ReportCanvas({ inicial, slots, guardar, onGenerar }: ReportCanva
           aviso de que aquí no se arrastra solo hace falta cuando ya ha visto lo
           que hay. Arriba era un cartel pidiendo perdón antes de enseñar nada. */}
       {mounted && !esAnchoGrande && widgets.length > 0 && (
-        <p className="font-sans text-xs leading-relaxed text-text-disabled">
+        <p className="font-sans text-xs leading-relaxed text-white">
           Los grafos se apilan para que quepan. Para moverlos y cambiarles el tamaño hace falta una
           pantalla más ancha; tu composición se queda como la dejaste allí.
         </p>

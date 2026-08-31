@@ -24,7 +24,7 @@ export function HowToRead({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={() => setFlipped(false)}
-          className="shrink-0 rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary"
+          className="shrink-0 rounded-lg p-1.5 text-white transition-colors hover:bg-surface-elevated hover:text-text-primary"
           title="Volver al gráfico"
           aria-label="Volver al gráfico"
         >
@@ -44,7 +44,7 @@ export function HowToRead({ children }: { children: ReactNode }) {
         <h3 className="font-display text-lg text-text-primary">Cómo se lee esto</h3>
       </div>
       <div className="flex-1 overflow-auto">
-        <div className="flex flex-col gap-3 font-sans text-sm leading-relaxed text-text-secondary [&_strong]:font-semibold [&_strong]:text-text-primary">
+        <div className="flex flex-col gap-3 font-sans text-sm leading-relaxed text-white [&_strong]:font-semibold [&_strong]:text-text-primary">
           {children}
         </div>
       </div>

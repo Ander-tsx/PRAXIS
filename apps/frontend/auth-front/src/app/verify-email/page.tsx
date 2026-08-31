@@ -22,7 +22,7 @@ type Estado = 'comprobando' | 'listo' | 'fallo' | 'sin-token';
 export default function VerifyEmailPage() {
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
-      <Suspense fallback={<p className="font-sans text-sm text-text-secondary">Comprobando…</p>}>
+      <Suspense fallback={<p className="font-sans text-sm text-white">Comprobando…</p>}>
         <Comprobacion />
       </Suspense>
     </main>
@@ -62,14 +62,14 @@ function Comprobacion() {
       {estado === 'comprobando' && (
         <>
           <h1 className="mb-2 font-display text-3xl text-text-primary">Confirmando…</h1>
-          <p className="font-sans text-sm text-text-secondary">Un momento.</p>
+          <p className="font-sans text-sm text-white">Un momento.</p>
         </>
       )}
 
       {estado === 'listo' && (
         <>
           <h1 className="mb-2 font-display text-3xl text-text-primary">Correo confirmado</h1>
-          <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+          <p className="mb-6 font-sans text-sm leading-relaxed text-white">
             Tu cuenta ya está lista. Entra con tu correo y tu contraseña.
           </p>
           <Link href="/login">
@@ -81,7 +81,7 @@ function Comprobacion() {
       {(estado === 'fallo' || estado === 'sin-token') && (
         <>
           <h1 className="mb-2 font-display text-3xl text-text-primary">Este enlace no vale</h1>
-          <p className="mb-6 font-sans text-sm leading-relaxed text-text-secondary">
+          <p className="mb-6 font-sans text-sm leading-relaxed text-white">
             {estado === 'sin-token'
               ? 'Esta pantalla se abre desde el enlace que te mandamos por correo.'
               : mensaje}{' '}

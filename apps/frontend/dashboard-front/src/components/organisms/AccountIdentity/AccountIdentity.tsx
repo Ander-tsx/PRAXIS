@@ -41,7 +41,7 @@ export function AccountIdentity({
 
   return (
     <>
-      <section className="w-full  bg-[#080807] text-white pb-12 min-h-screen">
+      <section className="w-full  bg-[#191919] text-white pb-12 min-h-screen">
         {/* Cover Photo */}
         <div className="h-48 sm:h-72 w-full bg-[#161615] relative">
           {coverSrc && (
@@ -51,7 +51,7 @@ export function AccountIdentity({
 
         <div className="px-6 sm:px-12 max-w-screen-2xl mx-auto">
           <div className="flex justify-between items-start -mt-16 sm:-mt-20 mb-4">
-            <span className="rounded-full border-[6px] border-[#080807] relative z-10 bg-[#080807]">
+            <span className="rounded-full border-[6px] border-[#080807] relative z-10 bg-[#191919]">
               {avatarSrc ? (
                 <img src={avatarSrc} alt={etiqueta} className="w-28 h-28 sm:w-36 sm:h-36 rounded-full object-cover" />
               ) : (
@@ -77,12 +77,12 @@ export function AccountIdentity({
                 </h2>
                 <GlobalRoleBadges roles={roles} />
               </div>
-              <p className="text-white/50 text-[15px] font-sans">@{email.split('@')[0]}</p>
+              <p className="text-white text-[15px] font-sans">@{email.split('@')[0]}</p>
             </div>
 
             {biography && <p className="text-[15px] font-sans whitespace-pre-wrap">{biography}</p>}
 
-            <div className="flex flex-wrap items-center gap-4 text-white/50 text-[15px] font-sans mt-1">
+            <div className="flex flex-wrap items-center gap-4 text-white text-[15px] font-sans mt-1">
               {location && (
                 <div className="flex items-center gap-1.5">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>

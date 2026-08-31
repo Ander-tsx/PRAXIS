@@ -30,7 +30,7 @@ export function RoleBadge({ index, role, tagline, color, label = 'Rol' }: RoleBa
         {index}
       </div>
       <div>
-        <div className="font-sans text-xs text-text-disabled uppercase tracking-widest">
+        <div className="font-sans text-xs text-white uppercase tracking-widest">
           {label}
         </div>
         <div className="font-serif text-lg font-semibold" style={{ color }}>

@@ -60,7 +60,7 @@ export function FiltroDeAvisos({
         Sin leer
         {unread > 0 && (
           <span
-            className={`tabular-nums ${soloSinLeer ? 'text-primary' : 'text-text-disabled'}`}
+            className={`tabular-nums ${soloSinLeer ? 'text-primary' : 'text-white'}`}
             aria-hidden="true"
           >
             {unread}
@@ -76,6 +76,6 @@ function pastilla(activa: boolean): string {
     'flex items-center gap-1.5 rounded-md px-3 py-1.5 font-sans text-xs font-semibold transition-colors',
     activa
       ? 'bg-primary-muted text-primary'
-      : 'text-text-secondary hover:bg-surface-elevated hover:text-text-primary',
+      : 'text-white hover:bg-surface-elevated hover:text-text-primary',
   ].join(' ');
 }

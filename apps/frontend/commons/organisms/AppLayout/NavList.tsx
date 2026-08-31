@@ -152,11 +152,11 @@ export function NavList({
                 type="button"
                 onClick={() => alternar(grupo.clave)}
                 aria-expanded={!compactado}
-                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/50 transition-colors hover:text-white"
+                className="group/section mx-1 flex items-center justify-between gap-2 rounded-full px-3 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white transition-colors hover:text-white"
               >
                 {grupo.section}
                 <svg
-                  className={`h-3.5 w-3.5 shrink-0 text-text-disabled transition-transform duration-200 ease-out group-hover/section:text-text-secondary ${
+                  className={`h-3.5 w-3.5 shrink-0 text-white transition-transform duration-200 ease-out group-hover/section:text-white ${
                     compactado ? '-rotate-90' : ''
                   }`}
                   fill="none"
@@ -198,14 +198,14 @@ export function NavList({
                             ? `${item.label} — disponible próximamente`
                             : 'Disponible próximamente'
                         }
-                        className={`flex cursor-not-allowed items-center rounded-full font-sans text-[13px] font-medium text-text-disabled ${
+                        className={`flex cursor-not-allowed items-center rounded-full font-sans text-[13px] font-medium text-white ${
                           plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5'
                         }`}
                       >
                         {item.icon}
                         <span className={plegada ? 'sr-only' : 'flex-1'}>{item.label}</span>
                         {!plegada && (
-                          <span className="font-sans text-[9px] uppercase tracking-wider text-text-disabled">
+                          <span className="font-sans text-[9px] uppercase tracking-wider text-white">
                             Pronto
                           </span>
                         )}
@@ -230,7 +230,7 @@ export function NavList({
                         plegada ? 'justify-center px-0 py-2.5' : 'gap-3 px-4 py-2.5',
                         active
                           ? 'font-semibold text-white bg-white/10 hover:bg-white/15'
-                          : 'font-medium text-white/70 hover:bg-white/5 hover:text-white',
+                          : 'font-medium text-white hover:bg-white/5 hover:text-white',
                       ].join(' ')}
                     >
                       {item.icon}

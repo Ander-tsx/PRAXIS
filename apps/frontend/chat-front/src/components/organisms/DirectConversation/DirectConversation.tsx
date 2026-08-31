@@ -96,7 +96,7 @@ export function DirectConversation({
       salidaMovil={
         <a
           href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -232,7 +232,7 @@ function Encabezado({
               <div className="text-center">
                 <h3 className="font-display text-2xl text-white drop-shadow-md">{nombre}</h3>
                 {proyectos.length > 0 && (
-                  <p className="font-sans text-sm text-white/70 drop-shadow-md">
+                  <p className="font-sans text-sm text-white drop-shadow-md">
                     Coinciden en {proyectos.length}{' '}
                     {proyectos.length === 1 ? 'proyecto' : 'proyectos'}
                   </p>
@@ -246,7 +246,7 @@ function Encabezado({
           <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
 
           {proyectos.length === 0 ? (
-            <p className="font-sans text-xs text-text-secondary">
+            <p className="font-sans text-xs text-white">
               {isAdmin
                 ? 'No comparten ningún proyecto, pero como administrador puedes chatear.'
                 : hasMessages
@@ -332,7 +332,7 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
         onClick={() => setAbierto(!abierto)}
         aria-label="Más opciones"
         title="Opciones del chat"
-        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-2 py-1.5 font-sans text-xs text-text-secondary transition-colors hover:text-text-primary hover:bg-surface"
+        className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-text-primary hover:bg-surface"
       >
         <svg
           className="h-4 w-4"
@@ -359,7 +359,7 @@ function MenuOpciones({ peerId, mutedInicial }: { peerId: string; mutedInicial: 
             type="button"
             onClick={alternarMute}
             disabled={enviandoMute}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-text-secondary transition-colors hover:bg-surface hover:text-text-primary disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-left font-sans text-xs text-white transition-colors hover:bg-surface hover:text-text-primary disabled:opacity-50"
           >
             <svg
               className="h-3.5 w-3.5 shrink-0"

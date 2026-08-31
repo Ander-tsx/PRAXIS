@@ -128,7 +128,7 @@ export function FilterBar({
         <div className="relative">
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-disabled"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white"
           >
             <svg
               className="h-4 w-4"
@@ -151,7 +151,7 @@ export function FilterBar({
             placeholder={placeholder}
             value={texto}
             onChange={(event) => setTexto(event.target.value)}
-            className="h-10 w-full rounded-lg border border-border bg-surface-elevated py-2 pl-9 pr-3 font-sans text-sm text-text-primary outline-none transition-all duration-150 placeholder:text-text-disabled hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-10 w-full rounded-lg border border-border bg-surface-elevated py-2 pl-9 pr-3 font-sans text-sm text-text-primary outline-none transition-all duration-150 placeholder:text-white hover:border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
         </div>
       </form>
@@ -185,7 +185,7 @@ export function FilterBar({
                   className={`rounded-lg px-3 py-1.5 font-sans text-xs font-semibold transition-colors ${
                     puesto
                       ? 'bg-primary text-primary-foreground'
-                      : 'text-text-secondary hover:bg-surface hover:text-text-primary'
+                      : 'text-white hover:bg-surface hover:text-text-primary'
                   }`}
                 >
                   {filtro.etiqueta}
@@ -195,7 +195,7 @@ export function FilterBar({
           </fieldset>
         )}
 
-        <p className="font-sans text-xs text-text-secondary">
+        <p className="font-sans text-xs text-white">
           <span className="font-semibold tabular-nums text-text-primary">{total}</span>{' '}
           {total === 1 ? nombreSingular : nombrePlural}
           {/* La salida del filtro, junto al número que el filtro ha cambiado.

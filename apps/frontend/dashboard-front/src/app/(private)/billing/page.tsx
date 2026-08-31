@@ -65,8 +65,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 pb-16 px-4">
         <header className="flex flex-col gap-2">
           <h1 className="font-sans text-3xl font-bold text-white tracking-tight">Facturación</h1>
-          <p className="max-w-2xl font-sans text-sm text-white/50">
-            Gestiona el plan y los asientos de <span className="text-white/80">{organizacion.name}</span>.
+          <p className="max-w-2xl font-sans text-sm text-white">
+            Gestiona el plan y los asientos de <span className="text-white">{organizacion.name}</span>.
           </p>
         </header>
 
@@ -74,63 +74,28 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <PaymentReturn planActual={resumen?.tier ?? 'FREE'} organizationId={organizationId} />
         )}
         {pago === 'cancelado' && (
-          <p className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 font-sans text-sm text-white/70">
+          <p className="rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 font-sans text-sm text-white">
             No se ha cobrado nada. Puedes volver a intentarlo cuando quieras.
           </p>
         )}
 
-        {esGratis ? (
-          <div className="flex flex-col gap-12">
-            <div className="flex flex-col gap-4 text-center items-center my-8">
+        <div className="flex flex-col gap-12">
+          {esGratis ? (
+            <div className="flex flex-col gap-4 text-center items-center my-4">
               <h2 className="text-2xl font-bold text-white tracking-tight">Potencia tu equipo</h2>
-              <p className="text-white/60 max-w-lg text-sm">
+              <p className="text-white max-w-lg text-sm">
                 Actualmente estás en el plan gratuito. Mejora tu plan para desbloquear características premium, mayor capacidad y soporte prioritario.
               </p>
             </div>
-            
-            <PlanCatalog
-              planes={catalogo.planes}
-              disponibles={catalogo.disponibles}
-              resumen={resumen}
-              precios={preciosDelEntorno()}
-              accionDe={(plan) => {
-                if (plan.tier === 'FREE') return null;
-                if (plan.contratacion === 'AUTOSERVICIO') {
-                  const btnClass = plan.tier === 'TEAM'
-                    ? 'w-full text-center bg-white text-black font-bold py-3 px-4 rounded-xl hover:bg-white/90 transition-all'
-                    : 'w-full text-center bg-white/10 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/20 border border-white/20 transition-all';
-                  
-                  if (!puedeContratar) {
-                    return <p className="w-full text-center text-xs text-white/40">Solo el creador puede mejorar el plan.</p>;
-                  }
-                  
-                  return (
-                    <CheckoutButton destino="checkout" tier={plan.tier} organizationId={organizationId} seats={Math.max(plan.asientosMinimos, organizacion.seatsUsed)}>
-                      Actualizar a {plan.nombre}
-                    </CheckoutButton>
-                  );
-                }
-                return (
-                  <a href="mailto:ventas@praxis.com" className="w-full text-center border border-white/20 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/5 transition-all">
-                    Contactar ventas
-                  </a>
-                );
-              }}
-              accionPortal={null}
-              vueltaDelPago={null}
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-8">
-            <section className="flex flex-col gap-6 rounded-3xl border border-white/[0.06] bg-[#0A0A0A] p-8 relative overflow-hidden">
-              {/* Decorative accent */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none"></div>
+          ) : (
+            <section className="flex flex-col gap-6 border-b border-white/[0.08] pb-12 relative">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-[80px] -mr-32 -mt-32 pointer-events-none"></div>
               
               <div className="flex justify-between items-start z-10">
                 <div className="flex flex-col gap-1">
-                  <span className="text-emerald-400 font-bold text-xs uppercase tracking-wider">Plan Actual</span>
+                  <span className="text-primary font-bold text-xs uppercase tracking-wider">Plan Actual</span>
                   <h2 className="font-sans text-3xl font-bold text-white">{spec?.nombre}</h2>
-                  <p className="font-sans text-sm text-white/50 mt-1">Suscripción activa para {organizacion.name}</p>
+                  <p className="font-sans text-sm text-white mt-1">Suscripción activa para {organizacion.name}</p>
                 </div>
                 {resumen?.gestionable && (
                    <CheckoutButton destino="portal">Gestionar en Stripe</CheckoutButton>
@@ -145,30 +110,69 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                 />
               </div>
             </section>
+          )}
 
-            {permisos.canViewAuditLog && (
-              <section className="flex flex-col gap-5 rounded-2xl border border-white/[0.06] bg-[#0A0A0A] p-6 sm:p-7">
-                <div className="flex flex-col gap-1">
-                  <h2 className="font-sans text-base font-semibold text-white/90">Registro de facturación</h2>
-                  <p className="max-w-xl font-sans text-xs text-white/40">Todo lo que ha movido el plan o los asientos.</p>
-                </div>
-                
-                {historial && historial.length > 0 ? (
-                  <ol className="flex flex-col">
-                    {historial.map((evento) => (
-                      <li key={evento.id} className="flex items-baseline justify-between gap-4 border-b border-white/[0.06] py-3.5 last:border-b-0">
-                        <span className="font-sans text-sm text-white/80">{evento.type}</span>
-                        <span className="shrink-0 font-mono text-xs tabular-nums text-white/30">{new Date(evento.occurredAt).toLocaleString()}</span>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="rounded-xl border border-white/[0.06] bg-black/20 p-5 font-sans text-sm text-white/45">Todavía no ha pasado nada que registrar.</p>
-                )}
-              </section>
-            )}
+          <div className="pt-4">
+            <PlanCatalog
+              planes={catalogo.planes}
+              disponibles={catalogo.disponibles}
+              resumen={resumen}
+              precios={preciosDelEntorno()}
+              accionDe={(plan) => {
+                const esElMismo = plan.tier === organizacion.tier;
+                if (plan.tier === 'FREE') return null;
+                if (plan.contratacion === 'AUTOSERVICIO') {
+                  if (esElMismo) {
+                    return (
+                      <span className="w-full text-center bg-white/5 text-white/50 font-bold py-3 px-4 rounded-xl cursor-not-allowed">
+                        Plan Actual
+                      </span>
+                    );
+                  }
+                  
+                  if (!puedeContratar) {
+                    return <p className="w-full text-center text-xs text-white">Solo el creador puede mejorar el plan.</p>;
+                  }
+                  
+                  return (
+                    <CheckoutButton destino="checkout" tier={plan.tier} organizationId={organizationId} seats={Math.max(plan.asientosMinimos, organizacion.seatsUsed)}>
+                      Cambiar a {plan.nombre}
+                    </CheckoutButton>
+                  );
+                }
+                return (
+                  <a href="mailto:ventas@praxis.com" className="w-full text-center border border-white/20 text-white font-bold py-3 px-4 rounded-xl hover:bg-white/5 transition-all">
+                    Contactar ventas
+                  </a>
+                );
+              }}
+              accionPortal={null}
+              vueltaDelPago={null}
+            />
           </div>
-        )}
+
+          {!esGratis && permisos.canViewAuditLog && (
+            <section className="flex flex-col gap-5 pt-8 border-t border-white/[0.08]">
+              <div className="flex flex-col gap-1">
+                <h2 className="font-sans text-base font-semibold text-white">Registro de facturación</h2>
+                <p className="max-w-xl font-sans text-xs text-white">Todo lo que ha movido el plan o los asientos.</p>
+              </div>
+              
+              {historial && historial.length > 0 ? (
+                <ol className="flex flex-col">
+                  {historial.map((evento) => (
+                    <li key={evento.id} className="flex items-baseline justify-between gap-4 border-b border-white/[0.06] py-3.5 last:border-b-0">
+                      <span className="font-sans text-sm text-white">{evento.type}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-white/60">{new Date(evento.occurredAt).toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="font-sans text-sm text-white/50 py-4">Todavía no ha pasado nada que registrar.</p>
+              )}
+            </section>
+          )}
+        </div>
       </div>
     </AppHeader>
   );

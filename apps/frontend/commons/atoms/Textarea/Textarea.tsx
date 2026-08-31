@@ -43,7 +43,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className={`flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}`}>
         {label && (
           <label htmlFor={id} className="font-sans text-sm font-medium text-text-primary">
-            {label} {optional && <span className="text-text-disabled">(opcional)</span>}
+            {label} {optional && <span className="text-white">(opcional)</span>}
           </label>
         )}
 
@@ -55,7 +55,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           maxLength={maxLength}
           className={[
             'w-full resize-y min-h-[80px] rounded-lg border bg-surface-elevated px-3 py-2',
-            'font-sans text-sm text-text-primary placeholder:text-text-disabled',
+            'font-sans text-sm text-text-primary placeholder:text-white',
             'outline-none transition-all duration-150',
             'disabled:cursor-not-allowed disabled:opacity-50',
             variantClasses[variant],
@@ -69,7 +69,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <div className="flex items-start justify-between gap-3">
           {message ? (
             <p
-              className={`font-sans text-xs ${variant === 'error' ? 'text-error' : 'text-text-secondary'}`}
+              className={`font-sans text-xs ${variant === 'error' ? 'text-error' : 'text-white'}`}
             >
               {message}
             </p>
@@ -78,7 +78,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           )}
 
           {showCount && maxLength !== undefined && (
-            <span className="shrink-0 font-sans text-xs text-text-disabled">
+            <span className="shrink-0 font-sans text-xs text-white">
               {used}/{maxLength}
             </span>
           )}

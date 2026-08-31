@@ -11,21 +11,21 @@
    assets de public/ se sirven bajo /dashboard, no en la raíz. */
 @font-face {
   font-family: "Redaction 50";
-  src: url("/dashboard/fonts/Redaction_50-Regular.woff2") format("woff2");
+  src: url("/main/fonts/Redaction_50-Regular.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Redaction 50";
-  src: url("/dashboard/fonts/Redaction_50-Italic.woff2") format("woff2");
+  src: url("/main/fonts/Redaction_50-Italic.woff2") format("woff2");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 @font-face {
   font-family: "Redaction 50";
-  src: url("/dashboard/fonts/Redaction_50-Bold.woff2") format("woff2");
+  src: url("/main/fonts/Redaction_50-Bold.woff2") format("woff2");
   font-weight: 700;
   font-style: normal;
   font-display: swap;

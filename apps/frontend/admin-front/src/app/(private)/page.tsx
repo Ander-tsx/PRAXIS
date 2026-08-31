@@ -142,7 +142,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
             No se pudieron cargar las cuentas. Vuelve a intentarlo.
           </p>
         ) : items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
+          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
             {busqueda || estadoFiltro
               ? 'Ninguna cuenta encaja con lo que buscas.'
               : 'Todavía no hay cuentas en la plataforma.'}

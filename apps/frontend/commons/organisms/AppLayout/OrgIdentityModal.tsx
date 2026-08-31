@@ -16,7 +16,7 @@ export function OrgIdentityModal({
   const router = useRouter();
   const [name, setName] = useState(org.name || '');
   const [seleccion, setSeleccion] = useState<GlyphSelection>({
-    iconKey: org.iconKey,
+    iconKey: org.iconKey ?? null,
     color: org.color || GLYPH_COLOR_DEFAULT,
   });
   
@@ -54,13 +54,13 @@ export function OrgIdentityModal({
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg bg-[#080807] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+      <div className="relative z-10 w-full max-w-lg bg-[#191919] rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex flex-col">
             <h2 className="text-xl font-bold text-white font-sans">Configuración</h2>
-            <span className="text-xs text-white/50">El nombre, icono y color del equipo</span>
+            <span className="text-xs text-white">El nombre, icono y color del equipo</span>
           </div>
-          <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white/50 hover:text-white">
+          <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors text-white hover:text-white">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>

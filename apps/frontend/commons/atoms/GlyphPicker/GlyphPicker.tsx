@@ -35,7 +35,7 @@ export function GlyphPicker({ value, onChange, disabled = false }: GlyphPickerPr
     <div className="flex flex-col gap-4">
       {/* ── Color ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-white/50">Color</span>
+        <span className="text-xs font-medium text-white">Color</span>
         <div className="flex flex-wrap gap-2">
           {GLYPH_COLORS.map((c) => {
             const activo = c.toLowerCase() === color.toLowerCase();
@@ -60,7 +60,7 @@ export function GlyphPicker({ value, onChange, disabled = false }: GlyphPickerPr
 
       {/* ── Icono ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium text-white/50">Icono</span>
+        <span className="text-xs font-medium text-white">Icono</span>
         <div className="grid grid-cols-8 gap-1.5 max-h-52 overflow-y-auto scrollbar-none rounded-lg border border-white/10 p-2 sm:grid-cols-9">
           <button
             type="button"
@@ -69,7 +69,7 @@ export function GlyphPicker({ value, onChange, disabled = false }: GlyphPickerPr
             aria-label="Sin icono"
             aria-pressed={value.iconKey === null}
             title="Sin icono — vuelve a las iniciales"
-            className={`flex aspect-square items-center justify-center rounded-md border text-white/40 transition-colors hover:text-white disabled:opacity-40 ${
+            className={`flex aspect-square items-center justify-center rounded-md border text-white transition-colors hover:text-white disabled:opacity-40 ${
               value.iconKey === null
                 ? 'border-white/40 bg-white/10 text-white'
                 : 'border-white/10 hover:bg-white/5'
@@ -101,7 +101,7 @@ export function GlyphPicker({ value, onChange, disabled = false }: GlyphPickerPr
                 className={`flex aspect-square items-center justify-center rounded-md border transition-colors disabled:opacity-40 ${
                   activo
                     ? 'border-transparent'
-                    : 'border-white/10 text-white/60 hover:bg-white/5 hover:text-white'
+                    : 'border-white/10 text-white hover:bg-white/5 hover:text-white'
                 }`}
                 style={
                   activo

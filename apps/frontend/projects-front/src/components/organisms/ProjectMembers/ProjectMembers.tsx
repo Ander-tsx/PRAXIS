@@ -87,9 +87,9 @@ export function ProjectMembers({
     <section className="flex flex-col gap-4" aria-label="Equipo del proyecto">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <h3 className="font-sans text-sm font-semibold text-white/80 shrink-0">Equipo</h3>
-          <span className="text-white/20 font-light shrink-0">/</span>
-          <p className="truncate font-sans text-sm text-white/40">
+          <h3 className="font-sans text-sm font-semibold text-white shrink-0">Equipo</h3>
+          <span className="text-white font-light shrink-0">/</span>
+          <p className="truncate font-sans text-sm text-white">
             Quien invites entra al aceptar la invitación, con el rol que le des.
           </p>
         </div>
@@ -101,8 +101,8 @@ export function ProjectMembers({
               type="button"
               className={`rounded-lg px-3.5 py-1.5 font-sans text-xs font-medium transition-colors border ${
                 isInviting 
-                  ? 'border-white/[0.10] text-white/50 hover:bg-white/[0.05] hover:text-white' 
-                  : 'border-white/[0.12] bg-white/[0.04] text-white/80 hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
+                  ? 'border-white/[0.10] text-white hover:bg-white/[0.05] hover:text-white' 
+                  : 'border-white/[0.12] bg-white/[0.04] text-white hover:border-white/20 hover:bg-white/[0.08] hover:text-white'
               }`}
               onClick={() => setIsInviting(!isInviting)}
             >
@@ -146,7 +146,7 @@ export function ProjectMembers({
       />
 
       {members.length === 0 ? (
-        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-8 text-center font-sans text-sm text-white/40">
+        <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-6 py-8 text-center font-sans text-sm text-white">
           Todavía no hay nadie en este proyecto.
         </p>
       ) : (
@@ -193,7 +193,7 @@ export function ProjectMembers({
                        * navegación tiene que ser dura (ESTADO-ACTUAL §16).
                        */}
                       {member.userId === currentUserId ? (
-                        <span className="truncate font-sans text-sm font-semibold text-white/90">
+                        <span className="truncate font-sans text-sm font-semibold text-white">
                           {label}
                         </span>
                       ) : (
@@ -201,13 +201,13 @@ export function ProjectMembers({
                           <a
                             href={`/chat/${member.userId}`}
                             title={`Escribir a ${label} en privado`}
-                            className="truncate font-sans text-sm font-semibold text-white/90 underline-offset-2 hover:underline"
+                            className="truncate font-sans text-sm font-semibold text-white underline-offset-2 hover:underline"
                           >
                             {label}
                           </a>
                         </div>
                       )}
-                      <span className="truncate font-sans text-xs text-white/40 mt-0.5">
+                      <span className="truncate font-sans text-xs text-white mt-0.5">
                         {/* Puede faltar si el directorio se cortó por paginación. */}
                         {user?.credential.email ?? 'Correo no disponible'}
                       </span>
@@ -233,11 +233,11 @@ export function ProjectMembers({
                         label={label}
                       />
                     ) : (
-                      <span className="rounded-md border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-xs font-medium text-white/70">
+                      <span className="rounded-md border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-xs font-medium text-white">
                         {member.projectRole.name}
                       </span>
                     )}
-                    <span className="hidden font-sans text-[11px] font-medium text-white/30 sm:inline">
+                    <span className="hidden font-sans text-[11px] font-medium text-white sm:inline">
                       desde {dateFormatter.format(new Date(member.joinedAt))}
                     </span>
 

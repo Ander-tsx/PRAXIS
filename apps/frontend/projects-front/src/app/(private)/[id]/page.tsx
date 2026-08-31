@@ -531,7 +531,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
           <div className="hidden sm:flex items-center gap-2">
             <a
               href={`/chat/proyecto/${project.id}`}
-              className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white/80 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              className="flex items-center gap-2 rounded-lg border border-white/[0.12] bg-white/[0.04] px-3.5 py-1.5 font-sans text-sm font-medium text-white transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
             >
               <svg
                 className="h-4 w-4"
@@ -546,7 +546,7 @@ export default async function ProjectDetailPage({ params, searchParams }: PagePr
                   d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                 />
               </svg>
-              Abrir Chat{' '}
+              Chat{' '}
               {chat.unread > 0 && (
                 <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] text-white font-semibold">
                   {chat.unread}

@@ -158,14 +158,14 @@ export function WorkspacePicker({
         className={
           compacto
             ? 'flex max-w-[14rem] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-left font-sans text-sm font-semibold text-white transition-colors hover:bg-[#1c1c1b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
-            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#131312] px-4 py-3 text-left transition-colors hover:border-white/20'
+            : 'flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#191919] px-4 py-3 text-left transition-colors hover:border-white/20'
         }
       >
         {compacto ? (
           <span className="truncate">{active?.name ?? 'Ninguno todavía'}</span>
         ) : (
           <span className="flex min-w-0 flex-col">
-            <span className="font-sans text-[11px] uppercase tracking-wider text-white/35">
+            <span className="font-sans text-[11px] uppercase tracking-wider text-white">
               Espacio de trabajo
             </span>
             <span className="truncate font-sans text-base font-semibold text-white">
@@ -175,7 +175,7 @@ export function WorkspacePicker({
         )}
 
         <svg
-          className={`${compacto ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-white/55 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`${compacto ? 'h-3.5 w-3.5' : 'h-4 w-4'} shrink-0 text-white transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -201,7 +201,7 @@ export function WorkspacePicker({
                 <button
                   type="button"
                   onClick={cerrarGestion}
-                  className="shrink-0 cursor-pointer rounded-md px-2 py-1 font-sans text-xs text-white/55 transition-colors hover:bg-white/5 hover:text-white"
+                  className="shrink-0 cursor-pointer rounded-md px-2 py-1 font-sans text-xs text-white transition-colors hover:bg-white/5 hover:text-white"
                 >
                   Volver
                 </button>
@@ -261,12 +261,12 @@ export function WorkspacePicker({
                             puedeGestionar ? 'pr-1' : 'pr-3',
                             isActive
                               ? 'text-primary font-medium'
-                              : 'text-white/55 hover:text-white',
+                              : 'text-white hover:text-white',
                           ].join(' ')}
                         >
                           <span className="truncate font-sans text-sm">{workspace.name}</span>
                           <span
-                            className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-white/35'}`}
+                            className={`shrink-0 font-sans text-xs ${isActive ? 'text-primary opacity-80' : 'text-white'}`}
                           >
                             {workspace.boards.length}{' '}
                             {workspace.boards.length === 1 ? 'tablero' : 'tableros'}
@@ -279,7 +279,7 @@ export function WorkspacePicker({
                             onClick={() => setGestionando(workspace)}
                             aria-label={`Opciones del espacio ${workspace.name}`}
                             title="Renombrar o eliminar"
-                            className="mr-1.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-white/35 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            className="mr-1.5 shrink-0 cursor-pointer rounded-lg p-1.5 text-white transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           >
                             <svg
                               className="h-4 w-4"
@@ -306,7 +306,7 @@ export function WorkspacePicker({
                   onSubmit={(event) => {
                     if (clientError || !name.trim()) event.preventDefault();
                   }}
-                  className="flex flex-col gap-2 border-t border-white/10 p-2 bg-[#131312]"
+                  className="flex flex-col gap-2 border-t border-white/10 p-2 bg-[#191919]"
                 >
                   <input type="hidden" name="projectId" value={projectId} />
 
@@ -319,7 +319,7 @@ export function WorkspacePicker({
                       maxLength={WORKSPACE_NAME_MAX}
                       placeholder="Crear espacio nuevo..."
                       autoComplete="off"
-                      className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-white outline-none transition-colors placeholder:text-white/35 hover:bg-[#1c1c1b] focus:bg-[#1c1c1b] focus:border-white/10"
+                      className="h-8 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-sans text-sm text-white outline-none transition-colors placeholder:text-white hover:bg-[#1c1c1b] focus:bg-[#1c1c1b] focus:border-white/10"
                     />
                     <Button
                       type="submit"
@@ -342,7 +342,7 @@ export function WorkspacePicker({
               )}
 
               {workspaces.length === 0 && !canManage && (
-                <p className="px-4 py-3 font-sans text-sm text-white/35">
+                <p className="px-4 py-3 font-sans text-sm text-white">
                   Este proyecto todavía no tiene espacios.
                 </p>
               )}

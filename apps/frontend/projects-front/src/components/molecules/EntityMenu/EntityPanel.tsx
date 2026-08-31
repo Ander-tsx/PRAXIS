@@ -167,7 +167,7 @@ export function EntityPanel({
 
           <label
             htmlFor={idNombre}
-            className="font-sans text-[11px] uppercase tracking-wide text-white/35"
+            className="font-sans text-[11px] uppercase tracking-wide text-white"
           >
             Nombre del {entidad}
           </label>
@@ -186,7 +186,7 @@ export function EntityPanel({
                 evento.currentTarget.form?.requestSubmit();
               }
             }}
-            className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+            className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
           />
 
           {(errorDeNombre ?? renombrar.error) && (
@@ -227,7 +227,7 @@ export function EntityPanel({
             <>
               <label
                 htmlFor={idConfirmacion}
-                className="font-sans text-[11px] leading-snug text-white/55"
+                className="font-sans text-[11px] leading-snug text-white"
               >
                 Escribe <strong className="text-white">{nombre}</strong> para confirmar
               </label>
@@ -237,7 +237,7 @@ export function EntityPanel({
                 onChange={(evento) => setConfirmacion(evento.target.value)}
                 autoComplete="off"
                 aria-invalid={!puedeBorrar}
-                className="h-9 rounded-lg border border-white/10 bg-[#131312] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
+                className="h-9 rounded-lg border border-white/10 bg-[#191919] px-2.5 font-sans text-sm text-white outline-none focus:border-primary"
               />
             </>
           )}
@@ -296,7 +296,7 @@ function BotonVolver({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white/55 transition-colors hover:text-white"
+      className="cursor-pointer rounded-lg px-2 py-1.5 font-sans text-xs text-white transition-colors hover:text-white"
     >
       Cancelar
     </button>

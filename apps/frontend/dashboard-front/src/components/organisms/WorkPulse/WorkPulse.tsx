@@ -167,7 +167,7 @@ function RepartoDelTrabajo({ work }: { work: WorkSplit }) {
         {conDatos.map((tramo) => (
           <li
             key={tramo.clave}
-            className="flex items-center gap-1.5 font-sans text-xs text-text-secondary"
+            className="flex items-center gap-1.5 font-sans text-xs text-white"
           >
             <span
               aria-hidden="true"

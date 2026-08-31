@@ -171,7 +171,7 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
 
       <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
         <label className="flex flex-1 flex-col gap-1">
-          <span className="font-sans text-xs font-medium text-text-secondary">Nombre</span>
+          <span className="font-sans text-xs font-medium text-white">Nombre</span>
           <Input
             id={nombreId}
             name="name"
@@ -185,8 +185,8 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
           />
         </label>
         <label className="flex flex-1 flex-col gap-1">
-          <span className="font-sans text-xs font-medium text-text-secondary">
-            Descripción <span className="text-text-disabled">(opcional)</span>
+          <span className="font-sans text-xs font-medium text-white">
+            Descripción <span className="text-white">(opcional)</span>
           </span>
           <Input
             id={descripcionId}
@@ -310,7 +310,7 @@ export function RuleBuilder({ projectId, catalog, proyecto, rule, onClose }: Rul
           </>
         ) : (
           <>
-            <p className="font-sans text-xs text-text-disabled">
+            <p className="font-sans text-xs text-white">
               {hayCambios ? 'Hay cambios sin guardar.' : 'Nada que guardar todavía.'}
             </p>
             <div className="flex gap-2">

@@ -75,7 +75,7 @@ export function StatTile({
   const contenido = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className="font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary">
+        <span className="font-sans text-xs font-semibold uppercase tracking-wider text-white">
           {label}
         </span>
         <span
@@ -99,7 +99,7 @@ export function StatTile({
           aviso, y una flecha de texto sobre una tarjeta se lee como un carácter
           suelto, no como un icono. Que se puede pulsar ya lo dicen el cursor, el
           realce del borde y el pequeño levantamiento al apuntar. */}
-      <span className="font-sans text-xs text-text-disabled">{hint}</span>
+      <span className="font-sans text-xs text-white">{hint}</span>
     </>
   );
 

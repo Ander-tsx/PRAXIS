@@ -15,7 +15,7 @@ function Block({ className = '' }: { className?: string }) {
 export default function AssistantLoading() {
   return (
     <>
-      <header className="flex h-16 shrink-0 items-center border-b border-border bg-[#080807] px-4 sm:px-6">
+      <header className="flex h-16 shrink-0 items-center border-b border-border bg-[#191919] px-4 sm:px-6">
         <Block className="h-6 w-32" />
       </header>
 

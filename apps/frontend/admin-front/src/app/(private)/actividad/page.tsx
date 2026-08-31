@@ -98,7 +98,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
             No se pudo leer el registro. Vuelve a intentarlo.
           </p>
         ) : registro.items.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-text-secondary">
+          <p className="rounded-2xl border border-dashed border-border px-6 py-12 text-center font-sans text-sm text-white">
             {hayFiltros
               ? 'Ninguna acción encaja con estos filtros.'
               : 'Todavía no se ha registrado ninguna acción de administración.'}

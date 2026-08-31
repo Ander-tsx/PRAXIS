@@ -522,7 +522,7 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
               Análisis del Proyecto
             </h2>
-            <p className="max-w-2xl font-sans text-sm text-text-secondary">
+            <p className="max-w-2xl font-sans text-sm text-white">
               Monta la vista que necesites. Se guarda y te espera la próxima vez.
             </p>
           </div>
@@ -617,7 +617,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
           <h2 className="font-display text-3xl text-text-primary sm:text-4xl">
             Cómo va el trabajo
           </h2>
-          <p className="max-w-2xl font-serif text-lg italic text-text-secondary">
+          <p className="max-w-2xl font-serif text-lg italic text-white">
             Cuánto hay, cómo se mueve, cuánto tarda y qué cabe esperar.
           </p>
         </div>
@@ -629,7 +629,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
             <p className="font-display text-lg text-text-primary">
               Todavía no estás en ningún proyecto
             </p>
-            <p className="mt-1 font-sans text-sm text-text-secondary">
+            <p className="mt-1 font-sans text-sm text-white">
               Los reportes se calculan sobre el trabajo de un proyecto, así que necesitas estar en
               al menos uno.
             </p>
@@ -644,7 +644,7 @@ async function SinNingunProyecto({ api }: { api: ReturnType<typeof createServerA
 function NoDisponible() {
   return (
     <div className="flex h-full min-h-24 items-center justify-center px-4 text-center">
-      <p className="font-sans text-sm text-text-disabled">
+      <p className="font-sans text-sm text-white">
         No se pudo cargar este informe. Vuelve a intentarlo en un momento.
       </p>
     </div>

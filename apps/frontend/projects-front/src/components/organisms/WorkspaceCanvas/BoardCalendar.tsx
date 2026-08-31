@@ -90,6 +90,7 @@ export function BoardCalendar({
     [board.columns],
   );
   const dialog = useTaskDialog(tasks, openTaskId);
+  const [mostrarSinFecha, setMostrarSinFecha] = useState(false);
 
   const hoy = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
@@ -131,36 +132,48 @@ export function BoardCalendar({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
       {/* ── Calendario ── */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0a]">
-        <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-3 py-2.5">
-          <h4 className="font-sans text-lg font-semibold text-white">
-            {MESES[cursor.getMonth()]} {cursor.getFullYear()}
-          </h4>
-          <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setCursor(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}
-              className="rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              Hoy
-            </button>
-            <button
-              type="button"
-              aria-label="Mes anterior"
-              onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              <Chevron dir="left" />
-            </button>
-            <button
-              type="button"
-              aria-label="Mes siguiente"
-              onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-white/60 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              <Chevron dir="right" />
-            </button>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#202020]">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <h4 className="font-sans text-lg font-semibold text-white">
+              {MESES[cursor.getMonth()]} {cursor.getFullYear()}
+            </h4>
+            <div className="ml-2 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCursor(new Date(hoy.getFullYear(), hoy.getMonth(), 1))}
+                className="rounded-md px-2.5 py-1 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5 hover:text-white"
+              >
+                Hoy
+              </button>
+              <button
+                type="button"
+                aria-label="Mes anterior"
+                onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors hover:bg-white/5 hover:text-white"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Mes siguiente"
+                onClick={() => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors hover:bg-white/5 hover:text-white"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </button>
+            </div>
           </div>
+          {sinFecha.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMostrarSinFecha(v => !v)}
+            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 font-sans text-xs font-medium text-white transition-colors hover:bg-white/5"
+          >
+            <span>Sin fecha ({sinFecha.length})</span>
+            <svg className={`w-4 h-4 transition-transform ${mostrarSinFecha ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </button>
+          )}
         </div>
 
         <div className="grid shrink-0 grid-cols-7 border-b border-white/10">
@@ -210,19 +223,22 @@ export function BoardCalendar({
       </div>
 
       {/* ── Sin fecha ── */}
-      <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0a] lg:w-64">
-        <div className="shrink-0 border-b border-white/10 px-3 py-2.5">
-          <h4 className="font-sans text-sm font-semibold text-white">
-            Sin fecha <span className="font-normal text-white/35">{sinFecha.length}</span>
-          </h4>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
-          {sinFecha.length === 0 ? (
-            <p className="px-1 py-2 font-sans text-[11px] text-white/30">
-              Todas las tareas tienen fecha.
-            </p>
-          ) : (
-            sinFecha.map((t) => (
+      {sinFecha.length > 0 && (
+        <div 
+          className={`flex shrink-0 flex-col overflow-hidden rounded-xl bg-[#202020] border-white/10 transition-all duration-300 ease-in-out ${
+            mostrarSinFecha ? 'w-full lg:w-64 opacity-100 border' : 'w-0 opacity-0 border-0'
+          }`}
+        >
+          <div className="shrink-0 border-b border-white/10 px-3 py-2.5 flex items-center justify-between">
+            <h4 className="font-sans text-sm font-semibold text-white whitespace-nowrap">
+              Sin fecha <span className="font-normal text-white">{sinFecha.length}</span>
+            </h4>
+            <button onClick={() => setMostrarSinFecha(false)} className="text-white hover:text-white/70">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+            {sinFecha.map((t) => (
               <TareaChip
                 key={t.id}
                 task={t}
@@ -230,10 +246,10 @@ export function BoardCalendar({
                 columna={nombreDeColumna.get(t.columnId)}
                 onClick={() => dialog.open(t.id)}
               />
-            ))
-          )}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {dialog.renderedTask && (
         <TaskDialog

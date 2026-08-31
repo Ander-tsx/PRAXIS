@@ -59,7 +59,7 @@ export function PlanCatalog({
         <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white mb-4">
           Planes a la medida de tu equipo
         </h1>
-        <p className="text-lg text-white/50 max-w-2xl mx-auto font-sans">
+        <p className="text-lg text-white max-w-2xl mx-auto font-sans">
           Todos los planes de pago van por asiento y se asocian a tu organización. Comienza gratis y
           escala cuando lo necesites.
         </p>
@@ -98,7 +98,7 @@ export function PlanCatalog({
 
               <div className="mb-6">
                 <h3 className="text-xl font-bold text-white mb-2">{plan.nombre}</h3>
-                <p className="text-sm text-white/50 h-10">{plan.paraQuien}</p>
+                <p className="text-sm text-white h-10">{plan.paraQuien}</p>
               </div>
 
               <div className="mb-8">
@@ -113,30 +113,30 @@ export function PlanCatalog({
                           : `$${precio}`}
                   </span>
                   {plan.contratacion === 'AUTOSERVICIO' && (
-                    <span className="text-sm text-white/40 font-medium">/ mes</span>
+                    <span className="text-sm text-white font-medium">/ mes</span>
                   )}
                 </div>
                 {plan.contratacion === 'AUTOSERVICIO' && (
-                  <p className="text-xs text-white/30 mt-1">facturado por asiento</p>
+                  <p className="text-xs text-white mt-1">facturado por asiento</p>
                 )}
               </div>
 
               <div className="mb-8 flex-1">
                 <ul className="flex flex-col gap-4">
-                  <li className="flex items-start gap-3 text-sm text-white/70">
+                  <li className="flex items-start gap-3 text-sm text-white">
                     <CheckIcon />
                     <span>
                       <strong className="text-white">{tope(plan.quotas.asientos)}</strong> asientos
                     </span>
                   </li>
-                  <li className="flex items-start gap-3 text-sm text-white/70">
+                  <li className="flex items-start gap-3 text-sm text-white">
                     <CheckIcon />
                     <span>
                       <strong className="text-white">{tope(plan.quotas.proyectos)}</strong>{' '}
                       proyectos
                     </span>
                   </li>
-                  <li className="flex items-start gap-3 text-sm text-white/70">
+                  <li className="flex items-start gap-3 text-sm text-white">
                     <CheckIcon />
                     <span>
                       <strong className="text-white">
@@ -145,7 +145,7 @@ export function PlanCatalog({
                       consultas de IA/mes
                     </span>
                   </li>
-                  <li className="flex items-start gap-3 text-sm text-white/70">
+                  <li className="flex items-start gap-3 text-sm text-white">
                     <CheckIcon />
                     <span>
                       <strong className="text-white">
@@ -223,17 +223,17 @@ function TopesRebasados({ excedidas }: { excedidas: QuotaExcedida[] }) {
   if (excedidas.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3 p-6 sm:p-8 rounded-3xl bg-amber-500/10 border border-amber-500/30 mb-8">
+    <section className="flex flex-col gap-3 p-6 sm:p-8 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-8">
       <h2 className="text-lg font-bold text-white">
         Tu plan actual se queda corto para lo que ya tienes
       </h2>
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-white">
         No se ha borrado nada y no se va a borrar. Lo que hay sigue abierto y sigue funcionando; lo
         que no se puede es añadir más hasta que amplíes el plan o liberes sitio.
       </p>
       <ul className="flex flex-col gap-2 mt-2">
         {excedidas.map((excedida) => (
-          <li key={excedida.kind} className="text-sm text-white/80 flex gap-3">
+          <li key={excedida.kind} className="text-sm text-white flex gap-3">
             <span aria-hidden="true" className="text-amber-500">
               •
             </span>
@@ -255,7 +255,7 @@ function TuConsumo({
   const topeIa = resumen.quotas.iaMensualPorPersona;
 
   return (
-    <section className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
+    <section className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 sm:p-8 rounded-2xl bg-white/5 border border-white/10 mb-8 backdrop-blur-sm">
       <div className="flex flex-col gap-2">
         <h2 className="text-xl font-bold text-white flex items-center gap-3">
           Resumen de tu cuenta
@@ -265,7 +265,7 @@ function TuConsumo({
             </span>
           )}
         </h2>
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-white">
           Has usado <strong className="text-white">{resumen.uso.iaMensual}</strong> de{' '}
           <strong className="text-white">{topeIa === null ? 'ilimitados' : topeIa}</strong> mensajes
           a PRAX. Se reinician el {fechaCorta(resumen.iaReiniciaEn)}.

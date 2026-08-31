@@ -47,7 +47,7 @@ export function DeleteRuleButton({ projectId, ruleId, ruleName }: DeleteRuleButt
       <input type="hidden" name="ruleId" value={ruleId} />
 
       <div className="flex items-center gap-2">
-        <span className="font-sans text-xs text-text-secondary">¿Eliminar «{ruleName}»?</span>
+        <span className="font-sans text-xs text-white">¿Eliminar «{ruleName}»?</span>
         <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmando(false)}>
           No
         </Button>

@@ -87,7 +87,7 @@ export function OrgIdentityForm({
           <span className="truncate font-sans text-base text-text-primary">
             {initialName || 'Sin nombre'}
           </span>
-          <span className="font-sans text-xs text-text-secondary">
+          <span className="font-sans text-xs text-white">
             Solo quien administra la organización puede cambiar su nombre o su icono.
           </span>
         </div>

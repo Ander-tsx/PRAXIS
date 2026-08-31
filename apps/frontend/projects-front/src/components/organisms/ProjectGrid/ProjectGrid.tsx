@@ -60,7 +60,7 @@ export function ProjectGrid({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <ProjectSearch initialValue={search} />
 
-        <p className="font-sans text-sm text-text-secondary">
+        <p className="font-sans text-sm text-white">
           {buscando ? (
             <>
               <span className="font-semibold text-text-primary">{total}</span>{' '}
@@ -76,7 +76,7 @@ export function ProjectGrid({
             <>
               <span className="font-semibold text-text-primary">{total}</span>{' '}
               {total === 1 ? 'proyecto' : 'proyectos'}{' '}
-              <span className="text-text-disabled">· tuyos y donde te han añadido</span>
+              <span className="text-white">· tuyos y donde te han añadido</span>
             </>
           )}
         </p>
@@ -127,7 +127,7 @@ function SinResultados({ search }: { search: string }) {
     <section className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
       <span
         aria-hidden="true"
-        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-elevated text-text-disabled"
+        className="flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-elevated text-white"
       >
         <svg
           className="h-6 w-6"
@@ -147,7 +147,7 @@ function SinResultados({ search }: { search: string }) {
 
       <div className="flex flex-col gap-1">
         <h3 className="font-display text-xl text-text-primary">Ningún proyecto coincide</h3>
-        <p className="max-w-md font-sans text-sm text-text-secondary">
+        <p className="max-w-md font-sans text-sm text-white">
           No hay nada con «{search}» en el nombre ni en la descripción, entre los proyectos que
           puedes ver.
         </p>

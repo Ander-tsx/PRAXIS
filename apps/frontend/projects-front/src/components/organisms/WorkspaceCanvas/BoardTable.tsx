@@ -102,29 +102,29 @@ export function BoardTable({
 
   if (tasks.length === 0) {
     return (
-      <div className="flex min-h-0 flex-1 items-center justify-center rounded-xl border border-white/10 bg-[#0b0b0a] p-10 text-center">
-        <p className="font-sans text-sm text-white/40">Este tablero todavía no tiene tareas.</p>
+      <div className="flex h-fit max-h-full w-full items-center justify-center rounded-xl border border-white/10 bg-[#202020] p-10 text-center">
+        <p className="font-sans text-sm text-white">Este tablero todavía no tiene tareas.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-white/10 bg-[#0b0b0a]">
+    <div className="h-fit max-h-full overflow-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 w-full rounded-xl border border-white/10 bg-[#202020]">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-10 bg-[#0b0b0a]">
-          <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white/40">
-            <Th col="titulo" orden={orden} onSort={alOrdenar} className="min-w-[16rem]">
+        <thead className="sticky top-0 z-10 bg-[#202020]">
+          <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
+            <Th col="titulo" orden={orden} onSort={alOrdenar} className="min-w-[16rem] border border-white/5">
               Tarea
             </Th>
-            <Th col="columna" orden={orden} onSort={alOrdenar} className="w-40">
+            <Th col="columna" orden={orden} onSort={alOrdenar} className="w-40 border border-white/5">
               Columna
             </Th>
-            <th className="px-3 py-2.5 font-semibold">Encargados</th>
-            <th className="px-3 py-2.5 font-semibold">Etiquetas</th>
-            <Th col="vencimiento" orden={orden} onSort={alOrdenar} className="w-32">
+            <th className="px-3 py-2.5 font-semibold border border-white/5">Encargados</th>
+            <th className="px-3 py-2.5 font-semibold border border-white/5">Etiquetas</th>
+            <Th col="vencimiento" orden={orden} onSort={alOrdenar} className="w-32 border border-white/5">
               Vence
             </Th>
-            <Th col="prioridad" orden={orden} onSort={alOrdenar} className="w-28">
+            <Th col="prioridad" orden={orden} onSort={alOrdenar} className="w-28 border border-white/5">
               Prioridad
             </Th>
           </tr>
@@ -137,9 +137,9 @@ export function BoardTable({
               <tr
                 key={t.id}
                 onClick={() => dialog.open(t.id)}
-                className="cursor-pointer border-b border-white/[0.06] transition-colors last:border-0 hover:bg-white/[0.04]"
+                className="cursor-pointer border-b border-white/[0.06] transition-colors last:border-0 hover:bg-[#282828]"
               >
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 border border-white/5">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -151,14 +151,14 @@ export function BoardTable({
                     {t.title}
                   </button>
                 </td>
-                <td className="px-3 py-2.5">
-                  <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 font-sans text-[11px] text-white/70">
+                <td className="px-3 py-2.5 border border-white/5">
+                  <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 font-sans text-[11px] text-white">
                     {nombreDeColumna.get(t.columnId) ?? '—'}
                   </span>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 border border-white/5">
                   {t.assignees.length === 0 ? (
-                    <span className="font-sans text-[11px] text-white/25">—</span>
+                    <span className="font-sans text-[11px] text-white">—</span>
                   ) : (
                     <span className="flex -space-x-1.5">
                       {t.assignees.slice(0, 4).map((a) => {
@@ -173,14 +173,14 @@ export function BoardTable({
                         );
                       })}
                       {t.assignees.length > 4 && (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 font-sans text-[9px] text-white/60 ring-2 ring-[#0b0b0a]">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 font-sans text-[9px] text-white ring-2 ring-[#202020]">
                           +{t.assignees.length - 4}
                         </span>
                       )}
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 border border-white/5">
                   <span className="flex flex-wrap gap-1">
                     {t.labels.slice(0, 3).map(({ label }) => (
                       <span
@@ -195,13 +195,13 @@ export function BoardTable({
                       </span>
                     ))}
                     {t.labels.length > 3 && (
-                      <span className="font-sans text-[10px] text-white/30">
+                      <span className="font-sans text-[10px] text-white">
                         +{t.labels.length - 3}
                       </span>
                     )}
                   </span>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 border border-white/5">
                   {t.dueDate ? (
                     <span
                       className={`font-sans text-[12px] ${
@@ -209,16 +209,16 @@ export function BoardTable({
                           ? 'font-semibold text-error'
                           : due === 'soon'
                             ? 'text-warning'
-                            : 'text-white/60'
+                            : 'text-white'
                       }`}
                     >
                       {fechaCorta.format(new Date(t.dueDate))}
                     </span>
                   ) : (
-                    <span className="font-sans text-[11px] text-white/25">Sin fecha</span>
+                    <span className="font-sans text-[11px] text-white">Sin fecha</span>
                   )}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 border border-white/5">
                   <PrioridadChip priority={t.priority} />
                 </td>
               </tr>
@@ -271,7 +271,7 @@ function Th({
         type="button"
         onClick={() => onSort(col)}
         className={`flex items-center gap-1 font-semibold uppercase transition-colors hover:text-white ${
-          activo ? 'text-white/80' : ''
+          activo ? 'text-white' : ''
         }`}
       >
         {children}

@@ -17,7 +17,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   secondary:
     'bg-surface-elevated text-text-primary border border-border hover:border-border-strong hover:bg-surface active:scale-[0.98]',
   ghost:
-    'bg-transparent text-text-secondary hover:text-text-primary hover:bg-surface-elevated active:scale-[0.98]',
+    'bg-transparent text-white hover:text-text-primary hover:bg-surface-elevated active:scale-[0.98]',
   danger:
     'bg-error-muted text-error border border-error/30 hover:bg-error hover:text-white active:scale-[0.98]',
   accent: 'bg-accent text-accent-foreground hover:bg-accent-hover active:scale-[0.98]',

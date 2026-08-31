@@ -76,14 +76,14 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
             <p className="font-sans text-[15px] font-bold text-red-400 mb-1">
               Esto no se puede deshacer.
             </p>
-            <p className="font-sans text-[13px] text-white/50 leading-relaxed">
+            <p className="font-sans text-[13px] text-white leading-relaxed">
               Se borra tu cuenta y pierdes el acceso a los proyectos. Lo que hayas escrito
               sigue ahí, sin tu nombre.
             </p>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor={campoId} className="font-sans text-[13px] text-white/60">
+            <label htmlFor={campoId} className="font-sans text-[13px] text-white">
               Escribe <strong className="text-white font-medium">{email}</strong> para confirmar
             </label>
             <input
@@ -93,7 +93,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
               placeholder={email}
               autoComplete="off"
               disabled={borrando}
-              className="w-full bg-[#080807] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all disabled:opacity-50"
+              className="w-full bg-[#191919] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all disabled:opacity-50"
             />
           </div>
 
@@ -108,7 +108,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
               type="button"
               onClick={() => void eliminar()}
               disabled={!coincide || borrando}
-              className="flex-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:bg-white/5 disabled:text-white/20 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              className="flex-1 bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:bg-white/5 disabled:text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
             >
               {borrando ? 'Eliminando…' : 'Eliminar cuenta'}
             </button>
@@ -120,7 +120,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
                 setError(null);
               }}
               disabled={borrando}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white/50 hover:text-white hover:bg-white/5 transition-all"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:text-white hover:bg-white/5 transition-all"
             >
               Cancelar
             </button>

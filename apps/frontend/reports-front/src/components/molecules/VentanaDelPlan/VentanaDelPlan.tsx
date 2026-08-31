@@ -50,7 +50,7 @@ export function VentanaDelPlanAviso({ ventana }: { ventana: VentanaDelPlan | nul
       <p className="font-sans text-sm text-text-primary">
         Estos gráficos empiezan {desde ? <>el {desde}</> : <>hace {ventana.dias} días</>}, no antes.
       </p>
-      <p className="font-sans text-sm text-text-secondary">
+      <p className="font-sans text-sm text-white">
         Tu plan <strong className="font-semibold text-text-primary">{ventana.plan}</strong> guarda{' '}
         {ventana.dias} días de historial de análisis. Los datos anteriores siguen ahí; lo que no
         llega hasta ellos es el informe.

@@ -84,7 +84,7 @@ export function UserStatusDialog({ usuario, open, onClose }: UserStatusDialogPro
               message={state.error ?? undefined}
             />
 
-            <p className="rounded-lg bg-surface-elevated px-3 py-2 font-sans text-xs text-text-secondary">
+            <p className="rounded-lg bg-surface-elevated px-3 py-2 font-sans text-xs text-white">
               Su sesión abierta puede aguantar hasta <strong>15 minutos</strong>, lo que le quede a
               su token. No podrá volver a entrar ni renovarla.
             </p>
@@ -103,7 +103,7 @@ export function UserStatusDialog({ usuario, open, onClose }: UserStatusDialogPro
         </footer>
       </form>
 
-      <p className="mt-3 font-sans text-xs text-text-disabled">
+      <p className="mt-3 font-sans text-xs text-white">
         Estado actual: {ESTADOS[usuario.status].etiqueta}. {ESTADOS[usuario.status].descripcion}
       </p>
     </Dialog>

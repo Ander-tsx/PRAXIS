@@ -119,7 +119,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
           {/* ⚠️ Ni una cifra escrita aquí: los topes y los precios los sirve el
               catálogo, y repetirlos en un componente que vive en cinco zonas es
               garantizar que un día prometan lo que el servidor niega. */}
-          <p className="font-sans text-sm text-text-secondary">
+          <p className="font-sans text-sm text-white">
             Amplía los mensajes al mes para ti y para quien trabaje contigo.
           </p>
         </div>
@@ -127,7 +127,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
 
       {/* Lo que se lleva quien pague, dicho con lo que ya hace PRAX y no con
           adjetivos: son las capacidades que esta persona acaba de usar. */}
-      <ul className="flex flex-col gap-1.5 font-sans text-xs text-text-secondary">
+      <ul className="flex flex-col gap-1.5 font-sans text-xs text-white">
         <Ventaja>Pregunta por tus proyectos y responde con sus datos, no de memoria.</Ventaja>
         <Ventaja>Propone tareas, asignaciones y tableros que aceptas con un botón.</Ventaja>
         <Ventaja>Lee los archivos que le adjuntes y te contesta sobre ellos.</Ventaja>
@@ -139,7 +139,7 @@ export function AmpliarPlan({ cuota }: { cuota: AssistantQuota }) {
         </Button>
         {/* ⚠️ Se dice que se renueva, y se dice aquí. Cobrar un segundo mes a
             quien creía estar comprando uno suelto es la peor reseña posible. */}
-        <span className="font-sans text-xs text-text-disabled">
+        <span className="font-sans text-xs text-white">
           Suscripción mensual · tus {cuota.limite} mensajes vuelven el {reinicio}
         </span>
       </div>

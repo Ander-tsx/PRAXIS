@@ -142,7 +142,7 @@ export function DataTable<T>({
       style={{ '--praxis-tabla-cols': plantilla } as CSSProperties}
     >
       {/* Cabecera: solo en escritorio, donde de verdad hay columnas. */}
-      <div className="hidden rounded-t-2xl border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-text-secondary md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4">
+      <div className="hidden rounded-t-2xl border-b border-border bg-surface px-4 py-3 font-sans text-xs font-semibold uppercase tracking-wider text-white md:grid md:grid-cols-[var(--praxis-tabla-cols)] md:gap-4">
         {columns.map((columna) => (
           <span key={columna.key} className={columna.align === 'end' ? 'text-right' : undefined}>
             {columna.header}
@@ -178,7 +178,7 @@ export function DataTable<T>({
                       la cabecera, y repetirla en cada celda es la fila entera
                       escrita dos veces. */}
                   {conEtiqueta && (
-                    <span className="shrink-0 font-sans text-xs text-text-disabled md:hidden">
+                    <span className="shrink-0 font-sans text-xs text-white md:hidden">
                       {columna.mobileLabel ?? columna.header}
                     </span>
                   )}

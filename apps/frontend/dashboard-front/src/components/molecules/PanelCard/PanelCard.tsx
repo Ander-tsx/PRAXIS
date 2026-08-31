@@ -77,7 +77,7 @@ export function PanelCard({
             {/* `<h2>`: el `<h1>` de la pantalla lo pone `AppHeader`, y estos
                 encabezados son los que dan el esquema a un lector de pantalla. */}
             <h2 className="font-display text-xl text-text-primary">{title}</h2>
-            {description && <p className="font-sans text-sm text-text-secondary">{description}</p>}
+            {description && <p className="font-sans text-sm text-white">{description}</p>}
           </div>
         </div>
 

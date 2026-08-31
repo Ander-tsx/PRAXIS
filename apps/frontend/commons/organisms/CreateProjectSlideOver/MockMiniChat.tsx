@@ -122,7 +122,7 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
         <PraxAvatar size="sm" mood={isTyping ? 'thinking' : 'idle'} />
         <div>
           <h3 className="font-sans font-semibold text-text-primary text-sm">Asistente PRAX</h3>
-          <p className="font-sans text-xs text-text-secondary">Diseñando tu proyecto</p>
+          <p className="font-sans text-xs text-white">Diseñando tu proyecto</p>
         </div>
       </header>
 
@@ -218,7 +218,7 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
           </div>
         ))}
         {isTyping && (
-          <div className="flex gap-3 max-w-[85%] self-start items-center text-text-secondary font-sans text-[13px]">
+          <div className="flex gap-3 max-w-[85%] self-start items-center text-white font-sans text-[13px]">
             <PraxAvatar size="xs" mood="thinking" />
             <span className="animate-pulse">Escribiendo propuesta...</span>
           </div>
@@ -246,13 +246,13 @@ export function MockMiniChat({ onCancelar }: { onCancelar: () => void }) {
               area.style.height = `${Math.min(area.scrollHeight, 60)}px`;
             }}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-text-secondary py-1.5 resize-none"
+            className="flex-1 bg-transparent border-none focus:ring-0 outline-none font-sans text-[15px] placeholder:text-white py-1.5 resize-none"
             disabled={isTyping}
           />
 
           <button
             type="button"
-            className="p-2 text-text-secondary hover:text-text-primary rounded-sm transition-colors shrink-0"
+            className="p-2 text-white hover:text-text-primary rounded-sm transition-colors shrink-0"
             aria-label="Adjuntar archivo"
           >
             <svg
