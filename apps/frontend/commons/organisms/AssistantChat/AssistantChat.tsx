@@ -887,8 +887,8 @@ export function AssistantChat({
         }
         style={
           esFlotante
-            ? /* El minichat va sobre negro puro. */
-              { background: '#191919' }
+            ? /* El minichat comparte el tono de la barra lateral. */
+              { background: '#202020' }
             : aPantalla
               ? undefined
               : { borderColor: alpha(colors.primary, 25), background: colors.surface }
@@ -1628,8 +1628,10 @@ export function AssistantChat({
                  * queden abajo con el cursor en vez de subir con el borde.
                  */}
                 <div
-                  className="flex flex-col gap-1.5 rounded-2xl border p-2.5 transition-colors focus-within:border-white/25"
-                  style={{ borderColor: alpha(colors.border, 90), background: '#191919' }}
+                  /* Al enfocar el campo, el borde se pone morado igual que el
+                     resto de inputs del sistema (`focus:border-primary` + halo). */
+                  className="flex flex-col gap-1.5 rounded-2xl border border-white/10 p-2.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+                  style={{ background: '#191919' }}
                 >
                   <textarea
                     ref={campoRef}
@@ -1938,9 +1940,7 @@ function AdjuntoEnLaBurbuja({
 
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-sans text-xs text-text-primary">{adjunto.filename}</span>
-        <span className="font-sans text-[11px] text-white">
-          {enKilobytes(adjunto.size)}
-        </span>
+        <span className="font-sans text-[11px] text-white">{enKilobytes(adjunto.size)}</span>
       </span>
     </a>
   );
@@ -2155,12 +2155,10 @@ function NombreConRecientes({
       {abierto && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
+          className="absolute left-0 top-full z-20 mt-1.5 w-64 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           {recientes.length === 0 ? (
-            <p className="px-3 py-3 font-sans text-xs text-white">
-              Todavía no hay conversaciones.
-            </p>
+            <p className="px-3 py-3 font-sans text-xs text-white">Todavía no hay conversaciones.</p>
           ) : (
             recientes.map((c) => (
               <button
@@ -2272,7 +2270,7 @@ function ModoYCerrar({
       {menuAbierto && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
+          className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           <OpcionModo
             activa={modo === 'flotante'}
@@ -2401,7 +2399,7 @@ function ComposerMasMenu({
       {abierto && (
         <div
           role="menu"
-          className="absolute bottom-full left-0 z-30 mb-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
+          className="absolute bottom-full left-0 z-30 mb-2 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           <ItemMas
             etiqueta="Adjuntar imagen"

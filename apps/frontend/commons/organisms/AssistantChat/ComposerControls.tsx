@@ -128,7 +128,7 @@ export function ModeloSelector() {
       {abierto && (
         <div
           role="menu"
-          className="absolute bottom-full right-0 z-40 mb-2 w-60 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
+          className="absolute bottom-full right-0 z-40 mb-2 w-60 overflow-hidden rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           {MODELOS.map((g) => (
             <div key={g.grupo || 'auto'}>
@@ -219,6 +219,12 @@ export function AjustesMenu({
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [cfg, setCfg] = useState<RecursosCfg>({ total: true, permitidos: [] });
 
+  /* Los submenús se apilan encima de este menú; al cerrarlo hay que plegarlos,
+     o al reabrir aparece el último submenú que quedó abierto en vez del menú. */
+  useEffect(() => {
+    if (!abierto) setSub(null);
+  }, [abierto]);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(recursosKey(organizacionActivaId));
@@ -297,7 +303,7 @@ export function AjustesMenu({
           /* Los submenús se abren **arriba** de este menú (`bottom-full`), como un
              panel aparte apilado encima — no tapándolo ni a un lado (a un lado se
              salía del minichat). Se abren con clic, no con hover. */
-          className="absolute bottom-full left-0 z-40 mb-2 w-60 rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl"
+          className="absolute bottom-full left-0 z-40 mb-2 w-60 rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl"
         >
           {/* ── Vista principal ── */}
           <button
@@ -344,7 +350,7 @@ export function AjustesMenu({
 
           {/* ── Submenú: Recursos (arriba) ── */}
           {sub === 'recursos' && (
-            <div className="absolute bottom-full left-0 z-50 mb-2 flex max-h-[22rem] w-full flex-col rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl">
+            <div className="absolute bottom-full left-0 z-50 mb-2 flex max-h-[22rem] w-full flex-col rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl">
               <SubHeader titulo="Recursos" onVolver={() => setSub(null)} />
               <div className="min-h-0 flex-1 overflow-y-auto scrollbar-none">
                 <FilaToggle
@@ -386,7 +392,7 @@ export function AjustesMenu({
 
           {/* ── Submenú: Modo (arriba) ── */}
           {sub === 'modo' && (
-            <div className="absolute bottom-full left-0 z-50 mb-2 flex w-full flex-col rounded-xl border border-white/10 bg-[#0f0f0e] p-1 shadow-2xl">
+            <div className="absolute bottom-full left-0 z-50 mb-2 flex w-full flex-col rounded-xl border border-white/10 bg-[#2b2b2b] p-1 shadow-2xl">
               <SubHeader titulo="Modo" onVolver={() => setSub(null)} />
               <button
                 type="button"

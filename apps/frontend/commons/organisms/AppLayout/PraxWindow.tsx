@@ -163,11 +163,12 @@ function PraxHost({
   );
 
   if (enDock) {
-    /* El cajón trae su carcasa (alto, scroll). El fondo negro lo pone este
-       envoltorio para no teñir el cajón que también usa Análisis. */
+    /* El cajón trae su carcasa (alto, scroll). El fondo —el mismo tono que la
+       barra lateral— lo pone este envoltorio para no teñir el cajón que también
+       usa Análisis. */
     if (!dock?.hueco) return null;
     return createPortal(
-      <div className="flex min-h-0 flex-1 flex-col bg-black">{chat}</div>,
+      <div className="flex min-h-0 flex-1 flex-col bg-[#202020]">{chat}</div>,
       dock.hueco,
     );
   }
@@ -316,7 +317,7 @@ function PraxFloatingWindow({ visible, children }: { visible: boolean; children:
 
   return (
     <div
-      className={`fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#191919] shadow-2xl transition-opacity duration-150 ${
+      className={`fixed z-[60] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#202020] shadow-2xl transition-opacity duration-150 ${
         visible ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
       style={{ left: caja.x, top: caja.y, width: caja.w, height: caja.h }}

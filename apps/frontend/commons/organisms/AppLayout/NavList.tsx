@@ -134,19 +134,20 @@ export function NavList({
 
   return (
     <nav className="flex flex-col gap-4" aria-label="Secciones">
-      {grupos.map((grupo, indice) => {
+      {grupos.map((grupo) => {
         const compactado = !plegada && compactados.has(grupo.clave);
 
         return (
           <div key={grupo.clave} className="flex flex-col gap-1">
-            {indice > 0 && (
-              <div
-                className={
-                  plegada ? 'mx-1 mb-1 border-t border-border' : 'mb-1 border-t border-border'
-                }
-                aria-hidden="true"
-              />
-            )}
+            {/* Una raya fina encima de **cada** sección, no solo a partir de la
+                segunda: el grupo de arriba también necesita despegarse de lo que
+                tiene encima (el árbol de proyectos, el selector de organización). */}
+            <div
+              className={
+                plegada ? 'mx-1 mb-1 border-t border-border' : 'mb-1 border-t border-border'
+              }
+              aria-hidden="true"
+            />
             {!plegada && (
               <button
                 type="button"

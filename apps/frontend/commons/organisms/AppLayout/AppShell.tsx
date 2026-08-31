@@ -963,6 +963,7 @@ function SidebarProjectsTree({
   if (projects.length === 0 && !plegada) {
     return (
       <div className="px-3 py-1">
+        <div className="-mx-3 mb-1.5 border-t border-border" aria-hidden="true" />
         <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none block mb-1">
           Proyectos
         </span>
@@ -988,6 +989,11 @@ function SidebarProjectsTree({
 
   return (
     <div className="flex flex-col">
+      {/* Raya fina encima de la sección, igual que las de `NavList`. */}
+      <div
+        className={`${plegada ? 'mx-1' : ''} mb-1.5 border-t border-border`}
+        aria-hidden="true"
+      />
       {!plegada && (
         <div className="flex items-center justify-between px-3 mb-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-white select-none">
