@@ -80,9 +80,7 @@ export function TriggerSection({
                 value={String(config[campo.key] ?? campo.defaultValue)}
                 onChange={(event) => onChangeConfig(campo.key, Number(event.target.value))}
               />
-              {campo.help && (
-                <span className="font-sans text-xs text-white">{campo.help}</span>
-              )}
+              {campo.help && <span className="font-sans text-xs text-white">{campo.help}</span>}
             </label>
           ))}
         </div>

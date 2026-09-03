@@ -104,9 +104,7 @@ export function ActionsSection({ catalog, actions, onChange, proyecto }: Actions
                 const valor = accion.config[campo.key];
                 return (
                   <label key={campo.key} className="flex flex-col gap-1">
-                    <span className="font-sans text-xs font-medium text-white">
-                      {campo.label}
-                    </span>
+                    <span className="font-sans text-xs font-medium text-white">{campo.label}</span>
                     {opciones.length > 0 ? (
                       <Select
                         placeholder="Elige…"

@@ -611,9 +611,7 @@ export function MessageBubble({
    * página da exactamente el mismo tinte que se veía antes, pero como un color
    * sólido del que la esquina puede tirar.
    */
-  const fondo = mine
-    ? `color-mix(in srgb, ${colors.primary} 16%, #080807)`
-    : '#131312';
+  const fondo = mine ? `color-mix(in srgb, ${colors.primary} 16%, #080807)` : '#131312';
 
   /**
    * Si la flecha del desplegable tiene algo que desplegar.
@@ -701,7 +699,9 @@ export function MessageBubble({
         <div className={`flex min-w-0 max-w-[78%] flex-col gap-1 ${mine ? 'items-end' : ''}`}>
           {!continued && (
             <span className="flex items-center gap-2 px-1 mb-1">
-              <span className="font-display font-medium text-sm text-text-primary">{mine ? 'Tú' : nombre}</span>
+              <span className="font-display font-medium text-sm text-text-primary">
+                {mine ? 'Tú' : nombre}
+              </span>
               <span className="font-sans text-[10px] text-white0">
                 {soloHora(message.createdAt)}
               </span>
@@ -724,9 +724,7 @@ export function MessageBubble({
               <path strokeLinecap="round" d="M5.6 5.6l12.8 12.8" />
             </svg>
             <span className="font-sans text-xs italic text-white">Mensaje eliminado</span>
-            <span className="font-sans text-[11px] text-white">
-              {soloHora(message.createdAt)}
-            </span>
+            <span className="font-sans text-[11px] text-white">{soloHora(message.createdAt)}</span>
           </div>
         </div>
       </article>
@@ -796,7 +794,9 @@ export function MessageBubble({
                 {nombre}
               </a>
             ) : (
-              <span className="font-display font-medium text-[15px] text-text-primary">{mine ? 'Tú' : nombre}</span>
+              <span className="font-display font-medium text-[15px] text-text-primary">
+                {mine ? 'Tú' : nombre}
+              </span>
             )}
             {fijado && (
               <span
@@ -865,9 +865,7 @@ export function MessageBubble({
              confundiría. */
           className={`group/burbuja relative min-w-0 max-w-full rounded-2xl ${
             !mine && !continued ? 'rounded-tl-sm' : ''
-          } ${
-            mine && !continued ? 'rounded-tr-sm' : ''
-          } ${
+          } ${mine && !continued ? 'rounded-tr-sm' : ''} ${
             /* ⚠️ **Solo un medio: relleno igual por los cuatro lados.** El de
                un mensaje de texto (`px-4 py-2.5`) es más ancho que alto a
                propósito —así se lee mejor una línea— pero alrededor de una foto

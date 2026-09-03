@@ -113,18 +113,38 @@ export function BoardTable({
       <table className="w-full border-collapse text-left">
         <thead className="sticky top-0 z-10 bg-[#202020]">
           <tr className="border-b border-white/10 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
-            <Th col="titulo" orden={orden} onSort={alOrdenar} className="min-w-[16rem] border border-white/5">
+            <Th
+              col="titulo"
+              orden={orden}
+              onSort={alOrdenar}
+              className="min-w-[16rem] border border-white/5"
+            >
               Tarea
             </Th>
-            <Th col="columna" orden={orden} onSort={alOrdenar} className="w-40 border border-white/5">
+            <Th
+              col="columna"
+              orden={orden}
+              onSort={alOrdenar}
+              className="w-40 border border-white/5"
+            >
               Columna
             </Th>
             <th className="px-3 py-2.5 font-semibold border border-white/5">Encargados</th>
             <th className="px-3 py-2.5 font-semibold border border-white/5">Etiquetas</th>
-            <Th col="vencimiento" orden={orden} onSort={alOrdenar} className="w-32 border border-white/5">
+            <Th
+              col="vencimiento"
+              orden={orden}
+              onSort={alOrdenar}
+              className="w-32 border border-white/5"
+            >
               Vence
             </Th>
-            <Th col="prioridad" orden={orden} onSort={alOrdenar} className="w-28 border border-white/5">
+            <Th
+              col="prioridad"
+              orden={orden}
+              onSort={alOrdenar}
+              className="w-28 border border-white/5"
+            >
               Prioridad
             </Th>
           </tr>

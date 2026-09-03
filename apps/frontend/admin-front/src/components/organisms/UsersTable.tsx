@@ -100,9 +100,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
                   )}
                   {esMiCuenta && <span className="font-normal text-white">(tú)</span>}
                 </p>
-                <p className="truncate font-sans text-xs text-white">
-                  {usuario.credential.email}
-                </p>
+                <p className="truncate font-sans text-xs text-white">{usuario.credential.email}</p>
               </div>
             </div>
           );
@@ -146,9 +144,7 @@ export function UsersTable({ usuarios, miId, misRoles }: UsersTableProps) {
         header: 'Se registró',
         track: { fr: 1.1 },
         cell: (usuario) => (
-          <p className="truncate font-sans text-xs text-white">
-            {fechaYHora(usuario.createdAt)}
-          </p>
+          <p className="truncate font-sans text-xs text-white">{fechaYHora(usuario.createdAt)}</p>
         ),
       },
       {

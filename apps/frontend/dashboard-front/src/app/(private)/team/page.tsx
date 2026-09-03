@@ -1,7 +1,4 @@
-import {
-  MembersPanel,
-  RolesPanel,
-} from '@/components/organisms/Organizations';
+import { MembersPanel, RolesPanel } from '@/components/organisms/Organizations';
 import { AppHeader } from '@praxis/commons';
 import { createServerApiClient, loadPrivateChrome } from '@praxis/commons/auth';
 import type {
@@ -53,17 +50,23 @@ export default async function TeamPage() {
     <AppHeader title="Equipo">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 pb-16">
         <header className="flex flex-col gap-2 border-b border-white/[0.08] pb-6">
-          <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">Gestión de Equipo</h1>
+          <h1 className="font-sans text-3xl font-semibold tracking-tight text-white">
+            Gestión de Equipo
+          </h1>
           <p className="max-w-2xl font-sans text-sm text-white/70">
-            Administra los miembros, sus roles y los niveles de acceso para <strong className="text-white font-medium">{org.name}</strong>.
-            Actualmente tienes {org.seatsUsed} de {org.seats} asientos ocupados.
+            Administra los miembros, sus roles y los niveles de acceso para{' '}
+            <strong className="text-white font-medium">{org.name}</strong>. Actualmente tienes{' '}
+            {org.seatsUsed} de {org.seats} asientos ocupados.
           </p>
         </header>
 
         <div>
           <TeamTabs
             members={
-              <Seccion titulo="Directorio de miembros" entradilla="Invita o gestiona los miembros de tu organización.">
+              <Seccion
+                titulo="Directorio de miembros"
+                entradilla="Invita o gestiona los miembros de tu organización."
+              >
                 {miembros && roles ? (
                   <MembersPanel
                     organizationId={organizationId}
@@ -78,7 +81,10 @@ export default async function TeamPage() {
               </Seccion>
             }
             roles={
-              <Seccion titulo="Roles del sistema" entradilla="Configura permisos a nivel de organización.">
+              <Seccion
+                titulo="Roles del sistema"
+                entradilla="Configura permisos a nivel de organización."
+              >
                 {roles ? (
                   <RolesPanel
                     organizationId={organizationId}
@@ -98,7 +104,11 @@ export default async function TeamPage() {
   );
 }
 
-function Seccion({ titulo, entradilla, children }: { titulo: string; entradilla?: string; children: ReactNode }) {
+function Seccion({
+  titulo,
+  entradilla,
+  children,
+}: { titulo: string; entradilla?: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-6 pt-4 animate-in fade-in duration-300">
       <div className="flex flex-col gap-1.5">
@@ -111,9 +121,17 @@ function Seccion({ titulo, entradilla, children }: { titulo: string; entradilla?
 }
 
 function Vacio({ children }: { children: ReactNode }) {
-  return <p className="rounded-xl border border-white/10 bg-[#191919] p-5 font-sans text-sm text-white/80">{children}</p>;
+  return (
+    <p className="rounded-xl border border-white/10 bg-[#191919] p-5 font-sans text-sm text-white/80">
+      {children}
+    </p>
+  );
 }
 
 function Aviso({ children }: { children: ReactNode }) {
-  return <p className="max-w-xl border-l-2 border-primary py-2 pl-4 font-sans text-sm text-white/80 bg-primary/5 rounded-r-xl">{children}</p>;
+  return (
+    <p className="max-w-xl border-l-2 border-primary py-2 pl-4 font-sans text-sm text-white/80 bg-primary/5 rounded-r-xl">
+      {children}
+    </p>
+  );
 }

@@ -170,9 +170,7 @@ export function AssistedTemplate({
         {error && <Aviso texto={error} />}
 
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <span className="mr-auto font-sans text-xs text-white">
-            Nada de esto existe todavía.
-          </span>
+          <span className="mr-auto font-sans text-xs text-white">Nada de esto existe todavía.</span>
           <Button type="button" variant="ghost" onClick={() => setPaso('contar')}>
             Volver
           </Button>

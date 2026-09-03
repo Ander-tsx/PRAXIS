@@ -14,7 +14,9 @@ import {
 } from '@/app/(private)/proyecto-actions';
 import {
   type ChatMessagePage,
-  ChatPanel, AnimatedSearchButton, ProjectMonogram,
+  ChatPanel,
+  AnimatedSearchButton,
+  ProjectMonogram,
   type ChatPanelHandle,
   type Directory,
   alpha,

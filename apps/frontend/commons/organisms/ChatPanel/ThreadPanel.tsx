@@ -220,9 +220,7 @@ export function ThreadPanel({
       >
         {bubbles.map((mensaje, indice) => {
           const anterior = bubbles[indice - 1];
-          const continued =
-            anterior &&
-            anterior.authorId === mensaje.authorId;
+          const continued = anterior && anterior.authorId === mensaje.authorId;
           return (
             <div key={mensaje.id}>
               <MessageBubble

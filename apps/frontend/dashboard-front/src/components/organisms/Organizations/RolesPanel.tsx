@@ -61,8 +61,16 @@ export function RolesPanel({
             <tr>
               <th className="px-4 py-4 font-medium text-white/60 min-w-[250px]">Permiso</th>
               {roles.map((rol) => (
-                <th key={rol.id} className="px-4 py-4 font-medium text-center min-w-[140px] align-top">
-                  <RoleColumnHeader rol={rol} organizationId={organizationId} puedeEditar={puedeEditar} onEditar={() => setEditando(rol.id)} />
+                <th
+                  key={rol.id}
+                  className="px-4 py-4 font-medium text-center min-w-[140px] align-top"
+                >
+                  <RoleColumnHeader
+                    rol={rol}
+                    organizationId={organizationId}
+                    puedeEditar={puedeEditar}
+                    onEditar={() => setEditando(rol.id)}
+                  />
                 </th>
               ))}
             </tr>
@@ -74,8 +82,18 @@ export function RolesPanel({
                 {roles.map((rol) => (
                   <td key={rol.id} className="px-4 py-3 text-center">
                     {rol.permissions[clave] ? (
-                      <svg className="mx-auto h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="mx-auto h-5 w-5 text-primary"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2.5}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                     ) : (
                       <span className="text-white/20">-</span>
@@ -144,7 +162,12 @@ function Formulario({
           className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M10 19l-7-7m0 0l7-7m-7 7h18"
+            />
           </svg>
         </button>
         <h3 className="font-sans text-lg font-medium text-white">
@@ -166,14 +189,19 @@ function Formulario({
         </div>
 
         <div className="flex flex-col gap-4">
-          <h4 className="font-sans text-sm font-medium text-white border-b border-white/10 pb-2">Permisos</h4>
+          <h4 className="font-sans text-sm font-medium text-white border-b border-white/10 pb-2">
+            Permisos
+          </h4>
           <ul className="flex flex-col divide-y divide-white/5">
             {ORDEN.map((clave) => {
               const puedoDarlo = mios[clave];
               const activado = permisos[clave];
 
               return (
-                <li key={clave} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4">
+                <li
+                  key={clave}
+                  className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-4"
+                >
                   <span className="min-w-0 flex-1 font-sans text-sm text-white/90">
                     {TEXTO_DE_PERMISO[clave]}
                     {!puedoDarlo && (
@@ -241,12 +269,11 @@ function Formulario({
   );
 }
 
-
 function RoleColumnHeader({
   rol,
   organizationId,
   puedeEditar,
-  onEditar
+  onEditar,
 }: {
   rol: OrganizationRoleView;
   organizationId: string;
@@ -254,13 +281,15 @@ function RoleColumnHeader({
   onEditar: () => void;
 }) {
   const [state, formAction, pending] = useAccion(borrarPapelAction, ORGANIZACION_INITIAL_STATE);
-  
+
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-white">{rol.name}</span>
-      
+
       <span className="text-xs text-white/40 font-normal mt-1">
-        {rol.miembros === 0 ? 'Nadie lo lleva' : `${rol.miembros} ${rol.miembros === 1 ? 'persona' : 'personas'}`}
+        {rol.miembros === 0
+          ? 'Nadie lo lleva'
+          : `${rol.miembros} ${rol.miembros === 1 ? 'persona' : 'personas'}`}
       </span>
       {puedeEditar && (
         <div className="flex items-center gap-3 mt-3">

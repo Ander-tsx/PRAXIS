@@ -232,9 +232,7 @@ export function TaskProposalCard({
       <p className="font-sans text-base font-semibold text-text-primary">{propuesta.title}</p>
 
       {propuesta.description && (
-        <p className="font-sans text-sm leading-relaxed text-white">
-          {propuesta.description}
-        </p>
+        <p className="font-sans text-sm leading-relaxed text-white">{propuesta.description}</p>
       )}
 
       <dl className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -483,9 +481,7 @@ export function EditProposalCard({
       </dl>
 
       {propuesta.description !== undefined && (
-        <p className="font-sans text-sm leading-relaxed text-white">
-          {propuesta.description}
-        </p>
+        <p className="font-sans text-sm leading-relaxed text-white">{propuesta.description}</p>
       )}
 
       {propuesta.labelIds !== undefined &&
@@ -1601,9 +1597,7 @@ function Marco({
 function Campo({ termino, valor }: { termino: string; valor: string }) {
   return (
     <div className="flex items-baseline gap-1.5">
-      <dt className="font-sans text-[11px] uppercase tracking-wider text-white">
-        {termino}
-      </dt>
+      <dt className="font-sans text-[11px] uppercase tracking-wider text-white">{termino}</dt>
       <dd className="font-sans text-sm text-white">{valor}</dd>
     </div>
   );

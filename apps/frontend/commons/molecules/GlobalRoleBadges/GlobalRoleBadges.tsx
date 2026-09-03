@@ -1,4 +1,3 @@
-
 export interface GlobalRoleBadgesProps {
   /** Nombres de los roles globales, tal como los da `loadCurrentUser()`. */
   roles: readonly string[];
@@ -29,13 +28,13 @@ export function GlobalRoleBadges({ roles }: GlobalRoleBadgesProps) {
       {roles.map((role) => {
         const color = role === 'User' ? colors.primary : colors.accent;
         return (
-          <span 
-            key={role} 
+          <span
+            key={role}
             className="inline-flex items-center justify-center font-sans font-bold uppercase tracking-widest text-[10px] rounded-full px-3 py-1"
             style={{
               backgroundColor: alpha(color, 20),
               color: color,
-              border: `1px solid ${alpha(color, 30)}`
+              border: `1px solid ${alpha(color, 30)}`,
             }}
           >
             {role}
@@ -45,4 +44,3 @@ export function GlobalRoleBadges({ roles }: GlobalRoleBadgesProps) {
     </>
   );
 }
-

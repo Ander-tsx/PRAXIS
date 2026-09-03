@@ -412,9 +412,7 @@ export function TemplateResultSummary({ resultado }: { resultado: TemplateResult
       <div>
         <p className="font-display text-xl text-text-primary">«{proyecto.name}» está listo</p>
         {partes.length > 0 && (
-          <p className="mt-1 font-sans text-sm text-white">
-            Se han creado {lista(partes)}.
-          </p>
+          <p className="mt-1 font-sans text-sm text-white">Se han creado {lista(partes)}.</p>
         )}
       </div>
 

@@ -486,10 +486,7 @@ function SaveStatus({
   if (!saved) return null;
 
   return (
-    <span
-      className="flex items-center gap-1 font-sans text-xs text-white"
-      aria-live="polite"
-    >
+    <span className="flex items-center gap-1 font-sans text-xs text-white" aria-live="polite">
       <svg
         className="h-3.5 w-3.5"
         style={{ color: colors.success }}

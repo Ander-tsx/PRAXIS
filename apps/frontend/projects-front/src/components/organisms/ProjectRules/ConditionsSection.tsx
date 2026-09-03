@@ -156,9 +156,7 @@ export function ConditionsSection({
                       proyecto={proyecto}
                     />
                   )}
-                  {campo?.help && (
-                    <p className="mt-1 font-sans text-xs text-white">{campo.help}</p>
-                  )}
+                  {campo?.help && <p className="mt-1 font-sans text-xs text-white">{campo.help}</p>}
                 </div>
 
                 <button

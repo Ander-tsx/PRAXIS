@@ -22,7 +22,7 @@ export const FloatingLabelTextarea = forwardRef<HTMLTextAreaElement, FloatingLab
         />
       </div>
     );
-  }
+  },
 );
 
 FloatingLabelTextarea.displayName = 'FloatingLabelTextarea';

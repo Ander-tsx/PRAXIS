@@ -77,8 +77,8 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
               Esto no se puede deshacer.
             </p>
             <p className="font-sans text-[13px] text-white leading-relaxed">
-              Se borra tu cuenta y pierdes el acceso a los proyectos. Lo que hayas escrito
-              sigue ahí, sin tu nombre.
+              Se borra tu cuenta y pierdes el acceso a los proyectos. Lo que hayas escrito sigue
+              ahí, sin tu nombre.
             </p>
           </div>
 

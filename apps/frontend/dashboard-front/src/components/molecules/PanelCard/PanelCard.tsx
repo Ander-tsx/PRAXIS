@@ -65,7 +65,8 @@ export function PanelCard({
               aria-hidden="true"
               className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm"
               style={{
-                background: 'transparent', border: `1px solid ${colors.border}`,
+                background: 'transparent',
+                border: `1px solid ${colors.border}`,
                 color: peligro ? colors.error : colors.textPrimary,
               }}
             >

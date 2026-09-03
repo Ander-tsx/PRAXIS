@@ -120,9 +120,7 @@ export function SlideOver({
           <header className="mb-6 flex shrink-0 items-start justify-between gap-4">
             <div className="flex flex-col gap-1">
               {title && <h2 className="font-sans text-xl font-bold tracking-tight">{title}</h2>}
-              {description && (
-                <p className="font-sans text-sm text-white">{description}</p>
-              )}
+              {description && <p className="font-sans text-sm text-white">{description}</p>}
             </div>
             <button
               type="button"

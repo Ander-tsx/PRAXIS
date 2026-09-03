@@ -137,10 +137,7 @@ export function FlowChart({ flow }: { flow: ReportFlow }) {
        */}
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {flow.columnas.map((columna) => (
-          <li
-            key={columna.id}
-            className="flex items-center gap-2 font-sans text-xs text-white"
-          >
+          <li key={columna.id} className="flex items-center gap-2 font-sans text-xs text-white">
             <span
               aria-hidden="true"
               className="h-2.5 w-2.5 rounded-full"

@@ -68,9 +68,7 @@ export function NotFound({
 
       <h1 className="mt-4 font-display text-2xl text-text-primary sm:text-3xl">Aquí no hay nada</h1>
 
-      <p className="mt-3 max-w-md font-sans text-sm leading-relaxed text-white">
-        {descripcion}
-      </p>
+      <p className="mt-3 max-w-md font-sans text-sm leading-relaxed text-white">{descripcion}</p>
 
       {/* Un `<a>` con pinta de botón, no el átomo `Button`: aquel es un
           componente de cliente y esta pantalla no necesita JavaScript para

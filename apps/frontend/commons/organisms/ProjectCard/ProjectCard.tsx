@@ -279,9 +279,7 @@ function Equipo({
         })}
       </span>
 
-      {restantes > 0 && (
-        <span className="pl-2 font-sans text-xs text-white">+{restantes}</span>
-      )}
+      {restantes > 0 && <span className="pl-2 font-sans text-xs text-white">+{restantes}</span>}
     </span>
   );
 }

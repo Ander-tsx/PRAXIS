@@ -477,9 +477,7 @@ export function Composer({
               <span className="max-w-40 truncate" title={adjunto.filename}>
                 {adjunto.filename}
               </span>
-              <span className="shrink-0 text-[10px] text-white">
-                {formatBytes(adjunto.size)}
-              </span>
+              <span className="shrink-0 text-[10px] text-white">{formatBytes(adjunto.size)}</span>
               <button
                 type="button"
                 onClick={() => onQuitarAdjunto(adjunto.id)}

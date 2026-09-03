@@ -68,10 +68,7 @@ export function WidgetShell({
               <h3 className="truncate font-display text-lg text-text-primary" title={titulo}>
                 {titulo}
               </h3>
-              <p
-                className="truncate font-sans text-xs text-white"
-                title={subtitulo(widget)}
-              >
+              <p className="truncate font-sans text-xs text-white" title={subtitulo(widget)}>
                 {subtitulo(widget)}
               </p>
             </div>

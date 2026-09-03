@@ -85,9 +85,7 @@ export function RuleCard({
         </p>
       )}
 
-      <p className="mt-1 font-sans text-sm text-white">
-        {describeRule(catalog, rule, proyecto)}
-      </p>
+      <p className="mt-1 font-sans text-sm text-white">{describeRule(catalog, rule, proyecto)}</p>
 
       {/* Las condiciones, sueltas y en lista. Ya salen dentro de la frase de
           arriba encadenadas con «y»; con dos o tres hay que leerla entera para

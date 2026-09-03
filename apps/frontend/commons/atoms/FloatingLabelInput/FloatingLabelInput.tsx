@@ -22,7 +22,7 @@ export const FloatingLabelInput = forwardRef<HTMLInputElement, FloatingLabelInpu
         />
       </div>
     );
-  }
+  },
 );
 
 FloatingLabelInput.displayName = 'FloatingLabelInput';

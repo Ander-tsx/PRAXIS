@@ -140,10 +140,7 @@ function Categorico({
             imprescindible: sin eje, sin leyenda la identidad sería solo color. */}
         <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {filas.map((fila) => (
-            <li
-              key={fila.name}
-              className="flex items-center gap-2 font-sans text-xs text-white"
-            >
+            <li key={fila.name} className="flex items-center gap-2 font-sans text-xs text-white">
               <span
                 aria-hidden="true"
                 className="h-2.5 w-2.5 rounded-full"
@@ -223,10 +220,7 @@ function Temporal({
       {series.length > 1 && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {series.map((serie) => (
-            <li
-              key={serie.clave}
-              className="flex items-center gap-2 font-sans text-xs text-white"
-            >
+            <li key={serie.clave} className="flex items-center gap-2 font-sans text-xs text-white">
               <span
                 aria-hidden="true"
                 className="h-2.5 w-2.5 rounded-full"

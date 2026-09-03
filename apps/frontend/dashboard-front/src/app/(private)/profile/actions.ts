@@ -27,7 +27,8 @@ async function idDeLaSesion(): Promise<string | null> {
 function describir(error: unknown, porDefecto: string): string {
   if (error instanceof ApiError) {
     if (error.status >= 500) return porDefecto;
-    if (error.message.includes('File too large')) return 'El archivo es demasiado grande (máximo 5MB).';
+    if (error.message.includes('File too large'))
+      return 'El archivo es demasiado grande (máximo 5MB).';
     if (error.message.includes('Validation failed')) return 'Error de validación en los datos.';
     if (error.message.includes('Expected')) return 'El formato del archivo no es válido.';
     return error.message;

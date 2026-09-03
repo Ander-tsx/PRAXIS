@@ -126,9 +126,7 @@ export function ProjectPicker({
         className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left transition-colors hover:border-border-strong"
       >
         <span className="flex min-w-0 flex-col">
-          <span className="font-sans text-[11px] uppercase tracking-wider text-white">
-            {label}
-          </span>
+          <span className="font-sans text-[11px] uppercase tracking-wider text-white">{label}</span>
           <span className="truncate font-sans text-base font-semibold text-text-primary">
             {active?.name ?? placeholder}
           </span>

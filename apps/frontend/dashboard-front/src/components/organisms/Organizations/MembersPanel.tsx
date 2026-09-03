@@ -77,7 +77,7 @@ function Invitar({
 
   return (
     <div className="flex flex-col gap-3">
-            <form action={formAction} className="flex flex-wrap items-end gap-3" noValidate>
+      <form action={formAction} className="flex flex-wrap items-end gap-3" noValidate>
         <input type="hidden" name="organizationId" value={organizationId} />
 
         <div className="min-w-[16rem] flex-1">
@@ -94,13 +94,13 @@ function Invitar({
 
         <div className="w-44">
           <input type="hidden" name="role" value={role} />
-          <CustomFloatingRoleSelect 
-            value={role} 
-            onChange={setRole} 
+          <CustomFloatingRoleSelect
+            value={role}
+            onChange={setRole}
             options={[
               { value: 'MEMBER', label: 'Miembro' },
               { value: 'ADMIN', label: 'Administrador' },
-            ]} 
+            ]}
           />
         </div>
 
@@ -133,28 +133,30 @@ function Invitar({
               : `Invitación creada para ${state.email}, pero el correo no salió.`}{' '}
             Este enlace también sirve, y no se puede volver a ver:
           </p>
-          <code className="block break-all font-mono text-xs text-emerald-300 bg-black/40 p-2 rounded-lg">{state.enlace}</code>
+          <code className="block break-all font-mono text-xs text-emerald-300 bg-black/40 p-2 rounded-lg">
+            {state.enlace}
+          </code>
         </div>
       )}
     </div>
   );
 }
 
-function RoleDropdown({ 
-  value, 
-  options, 
-  onChange, 
-  disabled 
-}: { 
-  value: string; 
-  options: { id: string; name: string }[]; 
+function RoleDropdown({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  options: { id: string; name: string }[];
   onChange: (id: string) => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  
-  const selected = options.find(o => o.id === value) || options[0];
+
+  const selected = options.find((o) => o.id === value) || options[0];
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -175,7 +177,12 @@ function RoleDropdown({
         className="flex w-40 items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-left font-sans text-sm text-white transition-colors hover:bg-white/10 disabled:opacity-50"
       >
         <span className="truncate">{selected?.name ?? 'Seleccionar...'}</span>
-        <svg className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -197,7 +204,12 @@ function RoleDropdown({
                 <span className="flex-1 truncate">{opt.name}</span>
                 {value === opt.id && (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 )}
               </button>
@@ -232,20 +244,20 @@ function Fila({
     <tr className="group transition-colors hover:bg-white/[0.02]">
       <td className="px-4 py-3 align-middle">
         <div className="flex items-center gap-3">
-          <Avatar 
-            label={miembro.name ?? miembro.email} 
+          <Avatar
+            label={miembro.name ?? miembro.email}
             src={null} // Si tuvieras avatar URL, iría aquí
-            size="sm" 
+            size="sm"
           />
           <div className="flex flex-col min-w-0">
-            <span className="truncate font-medium text-white">
-              {miembro.name ?? miembro.email}
-            </span>
+            <span className="truncate font-medium text-white">{miembro.name ?? miembro.email}</span>
             {miembro.name && (
               <span className="truncate text-xs text-white/50">{miembro.email}</span>
             )}
             {(quitar.error || rolState.error) && (
-              <span className="text-[10px] text-red-400 mt-0.5">{quitar.error ?? rolState.error}</span>
+              <span className="text-[10px] text-red-400 mt-0.5">
+                {quitar.error ?? rolState.error}
+              </span>
             )}
           </div>
         </div>
@@ -298,11 +310,14 @@ function Fila({
   );
 }
 
-
-function CustomFloatingRoleSelect({ value, onChange, options }: { value: string, onChange: (v: string) => void, options: {value: string, label: string}[] }) {
+function CustomFloatingRoleSelect({
+  value,
+  onChange,
+  options,
+}: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find(o => o.value === value) || options[0];
+  const selected = options.find((o) => o.value === value) || options[0];
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -321,9 +336,18 @@ function CustomFloatingRoleSelect({ value, onChange, options }: { value: string,
         onClick={() => setOpen(!open)}
         className={`group relative flex w-full h-[58px] items-center justify-between border ${open ? 'border-primary ring-1 ring-primary' : 'border-white/20'} rounded-md px-3 pt-6 pb-2 transition-all bg-transparent text-white outline-none text-base text-left`}
       >
-        <span className={`absolute top-2 left-3 text-xs pointer-events-none transition-colors ${open ? 'text-primary' : 'text-white'}`}>Rol</span>
+        <span
+          className={`absolute top-2 left-3 text-xs pointer-events-none transition-colors ${open ? 'text-primary' : 'text-white'}`}
+        >
+          Rol
+        </span>
         <span className="truncate">{selected?.label}</span>
-        <svg className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180 text-primary' : 'text-white/50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180 text-primary' : 'text-white/50'}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -345,7 +369,12 @@ function CustomFloatingRoleSelect({ value, onChange, options }: { value: string,
                 <span className="flex-1 truncate">{opt.label}</span>
                 {value === opt.value && (
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                 )}
               </button>

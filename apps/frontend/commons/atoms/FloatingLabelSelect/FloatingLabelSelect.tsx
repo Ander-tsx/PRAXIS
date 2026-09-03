@@ -35,7 +35,7 @@ export const FloatingLabelSelect = forwardRef<HTMLSelectElement, FloatingLabelSe
         </div>
       </div>
     );
-  }
+  },
 );
 
 FloatingLabelSelect.displayName = 'FloatingLabelSelect';

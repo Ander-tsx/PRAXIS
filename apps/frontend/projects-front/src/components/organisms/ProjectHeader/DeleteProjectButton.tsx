@@ -130,9 +130,7 @@ export function DeleteProjectButton({
         <form action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="projectId" value={projectId} />
 
-          <div
-            className="flex flex-col gap-2 rounded-lg border px-4 py-3 border-red-500/30 bg-red-500/10"
-          >
+          <div className="flex flex-col gap-2 rounded-lg border px-4 py-3 border-red-500/30 bg-red-500/10">
             <p className="font-sans text-sm font-semibold text-white">Se eliminarán:</p>
 
             {counting && !inventory ? (
@@ -143,8 +141,8 @@ export function DeleteProjectButton({
                   <li key={line.plural} className="font-sans text-sm text-white">
                     {line.count === null ? (
                       <>
-                        Sus <strong className="text-white">{line.plural}</strong> — no se
-                        pudieron contar
+                        Sus <strong className="text-white">{line.plural}</strong> — no se pudieron
+                        contar
                       </>
                     ) : (
                       <>

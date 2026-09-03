@@ -392,9 +392,7 @@ function NewTaskInline({
         >
           Cancelar
         </button>
-        <span className="ml-auto pr-1 font-sans text-[10px] text-white">
-          Prioridad media
-        </span>
+        <span className="ml-auto pr-1 font-sans text-[10px] text-white">Prioridad media</span>
       </div>
 
       {state.error && (

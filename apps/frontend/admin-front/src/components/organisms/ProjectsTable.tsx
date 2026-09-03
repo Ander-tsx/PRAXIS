@@ -107,9 +107,7 @@ export function ProjectsTable({ proyectos }: ProjectsTableProps) {
         header: 'Se creó',
         track: { fr: 1.1 },
         cell: (proyecto) => (
-          <p className="truncate font-sans text-xs text-white">
-            {fechaYHora(proyecto.createdAt)}
-          </p>
+          <p className="truncate font-sans text-xs text-white">{fechaYHora(proyecto.createdAt)}</p>
         ),
       },
       {

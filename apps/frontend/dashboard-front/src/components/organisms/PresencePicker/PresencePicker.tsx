@@ -49,11 +49,7 @@ export function PresencePicker({ inicial }: PresencePickerProps) {
   return (
     /* `fieldset` deshabilitado mientras guarda: bloquea las seis de una vez sin
        repetir `disabled` en cada botón. */
-    <fieldset
-      className="flex flex-wrap gap-3"
-      disabled={guardando}
-      aria-busy={guardando}
-    >
+    <fieldset className="flex flex-wrap gap-3" disabled={guardando} aria-busy={guardando}>
       <legend className="sr-only">Tu estado</legend>
 
       {PRESENCES.filter((clave) => clave !== 'AWAY').map((clave) => {

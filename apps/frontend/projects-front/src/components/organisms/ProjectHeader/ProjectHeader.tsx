@@ -156,7 +156,9 @@ export function ProjectHeader({
             color={project.color ?? null}
             size="md"
           />
-          <h2 className="font-sans text-3xl font-semibold text-white sm:text-4xl">{project.name}</h2>
+          <h2 className="font-sans text-3xl font-semibold text-white sm:text-4xl">
+            {project.name}
+          </h2>
         </div>
 
         {project.description ? (

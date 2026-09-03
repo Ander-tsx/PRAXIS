@@ -165,10 +165,7 @@ function RepartoDelTrabajo({ work }: { work: WorkSplit }) {
 
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
         {conDatos.map((tramo) => (
-          <li
-            key={tramo.clave}
-            className="flex items-center gap-1.5 font-sans text-xs text-white"
-          >
+          <li key={tramo.clave} className="flex items-center gap-1.5 font-sans text-xs text-white">
             <span
               aria-hidden="true"
               className="h-2 w-2 rounded-sm"

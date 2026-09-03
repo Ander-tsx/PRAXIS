@@ -516,9 +516,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    */
   const historial = useMemo(() => {
     if (busquedaAbierta && resultados !== null) {
-      return [...resultados].filter((m) => m.visibleEnChat !== false).sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
+      return [...resultados]
+        .filter((m) => m.visibleEnChat !== false)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     }
 
     const porId = new Map<string, ChatMessage>();
@@ -1695,9 +1695,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           <div className="absolute inset-0 z-50 flex items-center justify-center rounded-xl bg-primary/10 border-2 border-dashed border-primary backdrop-blur-[2px] pointer-events-none m-2">
             <div className="flex flex-col items-center gap-2 text-primary">
               <svg className="w-10 h-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
               </svg>
-              <span className="font-sans text-sm font-semibold">Suelta el archivo para adjuntarlo</span>
+              <span className="font-sans text-sm font-semibold">
+                Suelta el archivo para adjuntarlo
+              </span>
             </div>
           </div>
         )}
@@ -1784,10 +1791,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                         message={mensaje}
                         author={directorio.perfiles.get(mensaje.authorId)}
                         mine={mensaje.authorId === currentUserId}
-                        continued={
-                          !separador &&
-                          anterior?.authorId === mensaje.authorId
-                        }
+                        continued={!separador && anterior?.authorId === mensaje.authorId}
                         canDelete={mensaje.authorId === currentUserId}
                         canReact={canWrite}
                         canFijar={canWrite}
@@ -1857,20 +1861,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             {/**
              * Estado de búsqueda si no hay resultados.
              */}
-            {busquedaAbierta && (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
-              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#191919]/90 backdrop-blur-sm">
-                <p className="font-sans text-sm text-white">
-                  {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
-                </p>
-                <button
-                  type="button"
-                  onClick={cerrarBusqueda}
-                  className="mt-4 rounded-lg border border-border px-4 py-2 font-sans text-xs text-text-primary hover:bg-white/5"
-                >
-                  Cerrar búsqueda
-                </button>
-              </div>
-            )}
+            {busquedaAbierta &&
+              (errorBusqueda || (resultados !== null && resultados.length === 0)) && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-[#191919]/90 backdrop-blur-sm">
+                  <p className="font-sans text-sm text-white">
+                    {errorBusqueda ? errorBusqueda : `Nada que coincida con «${terminoBuscado}».`}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={cerrarBusqueda}
+                    className="mt-4 rounded-lg border border-border px-4 py-2 font-sans text-xs text-text-primary hover:bg-white/5"
+                  >
+                    Cerrar búsqueda
+                  </button>
+                </div>
+              )}
           </div>
 
           {/**
@@ -2090,7 +2095,14 @@ function CurvedLine() {
       <svg width="100%" height="8" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id="wave" x="0" y="0" width="24" height="8" patternUnits="userSpaceOnUse">
-            <path d="M0,4 Q6,0 12,4 T24,4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path
+              d="M0,4 Q6,0 12,4 T24,4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </pattern>
         </defs>
         <rect width="100%" height="8" fill="url(#wave)" />

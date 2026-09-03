@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 
 /**
  * El armazón del chat privado.
- * 
+ *
  * Antes alojaba el ChatDirectory (lista izquierda), pero esa navegación
  * ahora se ha movido globalmente al Sidebar (AppShell). Aquí queda únicamente
  * la cabecera y el contenedor del chat en sí.

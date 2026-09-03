@@ -364,7 +364,9 @@ export function WorkspaceCanvas({
         </div>
 
         <div className="flex flex-col items-center justify-center flex-1 gap-3 px-6 py-16 text-center">
-          <h3 className="font-sans text-2xl font-semibold text-white">«{activeWorkspace.name}» está vacío</h3>
+          <h3 className="font-sans text-2xl font-semibold text-white">
+            «{activeWorkspace.name}» está vacío
+          </h3>
           <p className="max-w-md font-sans text-sm text-white">
             Un tablero organiza el trabajo en columnas.{' '}
             {canManage ? 'Crea el primero desde el botón de arriba.' : ''}

@@ -361,11 +361,7 @@ export function PersonasWidget({
                   <tr key={persona.userId} className="border-b border-border-subtle">
                     <td className="py-3 font-sans text-sm text-text-primary">
                       {user ? personLabel(user) : 'Alguien que ya no está'}
-                      {rol && (
-                        <span className="ml-2 font-sans text-xs text-white">
-                          {rol.name}
-                        </span>
-                      )}
+                      {rol && <span className="ml-2 font-sans text-xs text-white">{rol.name}</span>}
                     </td>
                     <td className="py-3 font-sans text-sm tabular-nums text-white">
                       {persona.abiertas}
@@ -548,9 +544,7 @@ function BloqueDinamica({
               <span className="min-w-0 truncate font-sans text-white" title={fila.titulo}>
                 {fila.titulo}
               </span>
-              <span className="shrink-0 tabular-nums font-sans text-white">
-                {fila.cifra}
-              </span>
+              <span className="shrink-0 tabular-nums font-sans text-white">{fila.cifra}</span>
             </li>
           ))}
         </ul>
@@ -630,10 +624,7 @@ export function TiempoPorColumnaWidget({ columnTime }: { columnTime: ReportColum
                 <span className="shrink-0 tabular-nums font-sans text-sm text-white">
                   {formatDuration(columna.p50Horas)}
                   {columna.p85Horas !== null && (
-                    <span className="text-white">
-                      {' '}
-                      · p85 {formatDuration(columna.p85Horas)}
-                    </span>
+                    <span className="text-white"> · p85 {formatDuration(columna.p85Horas)}</span>
                   )}
                 </span>
               </div>

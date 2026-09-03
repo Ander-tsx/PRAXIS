@@ -90,9 +90,7 @@ export function TabNav({
               <span
                 className={[
                   'rounded-full px-1.5 py-0.5 font-sans text-[11px] tabular-nums',
-                  isActive
-                    ? 'bg-white/10 text-white'
-                    : 'bg-white/5 text-white',
+                  isActive ? 'bg-white/10 text-white' : 'bg-white/5 text-white',
                 ].join(' ')}
               >
                 {tab.count}

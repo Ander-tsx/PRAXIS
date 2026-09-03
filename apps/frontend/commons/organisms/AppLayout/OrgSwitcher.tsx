@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
-import { OrgIdentityModal } from "./OrgIdentityModal";
+import { OrgIdentityModal } from './OrgIdentityModal';
 import type { OrgDelSelector } from './AppShell';
 
 /**
@@ -36,7 +36,9 @@ export function OrgSwitcher({
   zonePath: string;
 }) {
   const [abierto, setAbierto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'invite' | 'newSpace' | 'upgrade' | 'config' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    'invite' | 'newSpace' | 'upgrade' | 'config' | null
+  >(null);
 
   const lista = organizaciones ?? [];
   const activa = lista.find((org) => org.id === activaId) ?? null;
@@ -106,9 +108,7 @@ export function OrgSwitcher({
       >
         {cuadro}
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="font-sans text-[10px] text-white">
-            {etiquetaDePlan(activa?.tier)}
-          </span>
+          <span className="font-sans text-[10px] text-white">{etiquetaDePlan(activa?.tier)}</span>
           <span className="truncate font-sans text-[13px] font-semibold text-text-primary">
             {etiqueta}
           </span>
@@ -186,7 +186,10 @@ export function OrgSwitcher({
                   identidad a todo el mundo y el formulario solo a quien puede. */}
               {activaId && (
                 <button
-                  onClick={() => { setAbierto(false); setActiveModal('config'); }}
+                  onClick={() => {
+                    setAbierto(false);
+                    setActiveModal('config');
+                  }}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white hover:text-white transition-colors text-left w-full"
                 >
                   <svg
@@ -399,9 +402,7 @@ function InviteMemberModal({
                 >
                   <div className="flex flex-col gap-1 pr-6">
                     <span className="text-sm font-medium text-white">{r.name}</span>
-                    {r.description && (
-                      <span className="text-xs text-white">{r.description}</span>
-                    )}
+                    {r.description && <span className="text-xs text-white">{r.description}</span>}
                   </div>
                   {role === r.id && (
                     <svg
