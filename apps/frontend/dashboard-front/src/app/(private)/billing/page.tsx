@@ -82,6 +82,11 @@ export default async function BillingPage({
    */
   const precios = (): Partial<Record<PlanTier, string>> => ({
     FREE: '0',
+    /* ⚠️ **Uno por plan de autoservicio, y hay que acordarse al añadir uno.**
+       Pro se estrenó sin su línea aquí: el plan salía en la tabla, con su botón
+       de compra, y **sin precio** — que es peor que no ofrecerlo. No hay nada
+       que avise, porque un plan sin entrada simplemente no pinta la cifra. */
+    ...(process.env.NEXT_PUBLIC_PRECIO_PRO ? { PRO: process.env.NEXT_PUBLIC_PRECIO_PRO } : {}),
     ...(process.env.NEXT_PUBLIC_PRECIO_TEAM ? { TEAM: process.env.NEXT_PUBLIC_PRECIO_TEAM } : {}),
     ...(process.env.NEXT_PUBLIC_PRECIO_BUSINESS
       ? { BUSINESS: process.env.NEXT_PUBLIC_PRECIO_BUSINESS }

@@ -84,6 +84,28 @@ ENV JWT_SECRET=build-time-placeholder-sin-valor-en-runtime
 ARG GOOGLE_CLIENT_ID=""
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
 
+# Los precios que pinta la tabla comparativa, por el mismo motivo que el de
+# arriba: son `NEXT_PUBLIC_*`, o sea que Next los incrusta al construir.
+#
+# ⚠️ **Puestos solo como variable del servicio no harían nada**, y sin un solo
+# error: la tabla saldría con los planes, sus botones de compra y **sin cifra**.
+# Es el mismo fallo mudo que describe el bloque de arriba.
+#
+# Vacíos por defecto y no con un número: una instalación sin ellos enseña la
+# tabla sin precios, que es honesto. Un valor de relleno aquí sería un precio
+# inventado en la pantalla de alguien.
+#
+# No son secretos —acaban en el navegador de todas formas— y no deciden nada:
+# lo que se cobra es el `price_…` de Stripe que tiene el gateway. Esto es
+# cartelería, y por eso puede desincronizarse: si cambias la tarifa en Stripe,
+# cambia también estos.
+ARG NEXT_PUBLIC_PRECIO_PRO=""
+ENV NEXT_PUBLIC_PRECIO_PRO=$NEXT_PUBLIC_PRECIO_PRO
+ARG NEXT_PUBLIC_PRECIO_TEAM=""
+ENV NEXT_PUBLIC_PRECIO_TEAM=$NEXT_PUBLIC_PRECIO_TEAM
+ARG NEXT_PUBLIC_PRECIO_BUSINESS=""
+ENV NEXT_PUBLIC_PRECIO_BUSINESS=$NEXT_PUBLIC_PRECIO_BUSINESS
+
 # ⚠️ Tailwind v4 descarta en silencio las utilidades que no encuentra al
 # escanear. Si algún `@source` de commons/styles/theme.css se rompiera, esto
 # compilaría igual y el resultado saldría sin estilos. Ver CLAUDE.md.

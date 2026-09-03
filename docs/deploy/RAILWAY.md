@@ -176,7 +176,19 @@ build y el deploy. El `migrar.sh` del pre-deploy corre en cada release.
 | `GEMINI_API_KEY` | ✅ (opc.) | — | aistudio.google.com/apikey |
 | `MAIL_API_KEY` / `MAIL_FROM` | ✅ (opc.) | — | Resend |
 | `STRIPE_*` | ✅ (opc.) | — | dashboard de Stripe (webhook secret nuevo) |
-| `NEXT_PUBLIC_PRECIO_*` | — | ✅ (opc.) | cartelería del precio, sin símbolo |
+| `NEXT_PUBLIC_PRECIO_*` | — | ✅ (opc.) | cartelería del precio, sin símbolo. Uno por plan de autoservicio: `_PRO`, `_TEAM`, `_BUSINESS` |
+
+⚠️ **Las `NEXT_PUBLIC_*` son build-args, no variables de arranque.** Next las
+**incrusta en el JavaScript al construir**, así que ponerlas solo como variable
+del servicio no hace nada — y sin ningún error: la tabla sale con los planes, sus
+botones y **sin cifra**. Están declaradas como `ARG` en
+`infra/docker/images/frontend.Dockerfile` para que Railway las inyecte en el
+build; si añades un plan nuevo, hay que añadir su `ARG` ahí además de la
+variable.
+
+⚠️ **Y son cartelería: no deciden lo que se cobra.** Lo que se cobra es el
+`price_…` que tiene el gateway en `STRIPE_PRICE_*`. Si cambias una tarifa en
+Stripe, acuérdate de cambiar las dos — nada las mantiene sincronizadas.
 
 ## Cosas que cambian respecto a GCP
 
