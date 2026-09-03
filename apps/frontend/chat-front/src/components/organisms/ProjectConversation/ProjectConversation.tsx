@@ -111,8 +111,11 @@ export function ProjectConversation({
       pantallaCompletaEnMovil
       salidaMovil={
         <a
-          href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
+          /* ⚠️ `?lista=1`: sin él, el índice redirige a la última conversación
+             —esta— y el enlace de volver no vuelve a ningún sitio. Ver la
+             cabecera de `(conversaciones)/page.tsx`. */
+          href="/chat?lista=1"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"

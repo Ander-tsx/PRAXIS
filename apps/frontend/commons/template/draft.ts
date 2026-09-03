@@ -2,7 +2,6 @@ import type { ProjectTemplate, TemplateDraftResult, TemplateDraftState } from '.
 import { TEMPLATE_BRIEF_MAX, TEMPLATE_BRIEF_MIN } from '../api/domain';
 import { ApiError } from '../api/envelope';
 import { createServerApiClient } from '../auth/server-client';
-import { getOrganizacionActiva } from '../theme/organizacion';
 import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
 
 /**
@@ -12,8 +11,9 @@ import { QUOTA_EXCEEDED_CODE, detallesDeCuota } from '../billing/planes';
  * devuelve nombres. Quien los materializa es [`aplicarPlantilla`], y solo
  * después de que alguien haya visto el plan y lo haya aceptado.
  *
- * Vive en `commons` y no en cada zona porque el diálogo que la usa también:
- * `projects-front` y `dashboard-front` montan el mismo `CreateProjectDialog`.
+ * Vive en `commons` y no en la zona porque la revisión del plan
+ * (`TemplatePlanReview`) y su aplicación (`aplicarPlantilla`) también, y las
+ * tres tienen que estar de acuerdo sobre qué es una plantilla válida.
  *
  * ⚠️ Se valida el largo **aquí también**, aunque el DTO del gateway lo exija: el
  * mensaje llega antes y señala el campo, que es la regla de siempre al escribir
@@ -30,6 +30,18 @@ export async function pedirBorrador(
    * genera de cero, que es la primera vez.
    */
   ajuste?: { texto: string; previa: ProjectTemplate },
+  /**
+   * A qué organización se le cobra el turno de IA.
+   *
+   * ⚠️ **Ya resuelta** (`loadPrivateChrome` → `resolverOrganizacionActiva`), no
+   * la cookie en crudo. Aquí se leía con `getOrganizacionActiva()`, que devuelve
+   * lo que puso el navegador **sin comprobar**: con una cookie que apunta a una
+   * organización de la que ya te fueron, la barra lateral repliega a la personal
+   * y esto seguía mandando la vieja, así que el gateway respondía `403
+   * NOT_IN_ORG` y la pantalla solo decía que no se pudo. Ver el aviso de
+   * `theme/organizacion.ts`.
+   */
+  organizationId?: string | null,
 ): Promise<TemplateDraftState> {
   const texto = brief.trim();
 
@@ -51,8 +63,6 @@ export async function pedirBorrador(
     };
   }
 
-  const organizationId = await getOrganizacionActiva();
-
   try {
     const resultado = await createServerApiClient().post<TemplateDraftResult>(
       '/me/assistant/project-draft',
@@ -66,7 +76,8 @@ export async function pedirBorrador(
           : {}),
         /* Esta ruta **gasta cuota de IA y no crea nada**, así que hay que decir
            a qué organización se le cobra: el proyecto todavía no existe. El
-           gateway valida la pertenencia antes de usarla. */
+           gateway valida la pertenencia antes de usarla y responde 403
+           `NOT_IN_ORG` si no es tuya — es un filtro, no una llave. */
         ...(organizationId ? { organizationId } : {}),
       },
     );

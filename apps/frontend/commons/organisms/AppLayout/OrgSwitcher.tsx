@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, glyphByKey } from '../../atoms/GlyphPicker';
 import { OrgIdentityModal } from './OrgIdentityModal';
@@ -20,6 +22,34 @@ const NOMBRE_DE_PLAN: Record<string, string> = {
 
 function etiquetaDePlan(tier?: string | null): string {
   return (tier && NOMBRE_DE_PLAN[tier]) || 'Plan gratuito';
+}
+
+/**
+ * Rutas que enseñan **un recurso concreto** de la organización activa.
+ *
+ * ⚠️ Al cambiar de organización hay que salir de ellas, no recargarlas: el
+ * proyecto, el informe o el chat que hay debajo pertenecen a la que se acaba de
+ * dejar. Recargando, la barra lateral cambia entera y el contenido central se
+ * queda enseñando algo de otro sitio — o da un 403 sin explicar por qué.
+ *
+ * Estaba escrito como una sola comparación contra `/projects/`, así que
+ * `/chat/proyecto/:id` y `/reports/:id` se quedaban abiertos. Es una lista
+ * porque va a crecer con cada zona que enseñe un recurso de la organización.
+ *
+ * El valor es a dónde se sale: la raíz de esa misma zona, que sí se recalcula
+ * con la organización nueva.
+ */
+const RUTAS_DE_UN_RECURSO: ReadonlyArray<readonly [prefijo: string, salida: string]> = [
+  ['/projects/', '/projects'],
+  ['/chat/proyecto/', '/chat'],
+  ['/reports/', '/reports'],
+];
+
+export function OrgSwitcherSalida(pathname: string): string | null {
+  for (const [prefijo, salida] of RUTAS_DE_UN_RECURSO) {
+    if (pathname.startsWith(prefijo)) return salida;
+  }
+  return null;
 }
 
 export function OrgSwitcher({
@@ -68,8 +98,13 @@ export function OrgSwitcher({
 
   function elegir(id: string) {
     document.cookie = `praxis_org=${id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
-    if (window.location.pathname.startsWith('/projects/')) {
-      window.location.href = '/projects';
+    /* Navegación dura y no `router.push`: la cookie la lee el **servidor** al
+       pintar, así que hace falta una petición nueva. Y si lo que hay debajo es
+       un recurso de la organización que se acaba de dejar, se sale de él en vez
+       de recargarlo. Ver `RUTAS_DE_UN_RECURSO`. */
+    const salida = OrgSwitcherSalida(window.location.pathname);
+    if (salida) {
+      window.location.href = salida;
     } else {
       window.location.reload();
     }
@@ -138,7 +173,7 @@ export function OrgSwitcher({
               {activa?.soyDueno && (
                 <button
                   onClick={() => setActiveModal('upgrade')}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white hover:text-white transition-colors text-left w-full"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
                 >
                   <svg
                     className="w-4 h-4 text-white"
@@ -159,7 +194,7 @@ export function OrgSwitcher({
 
               <button
                 onClick={() => setActiveModal('invite')}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white hover:text-white transition-colors text-left w-full"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
               >
                 <svg
                   className="w-4 h-4 text-white"
@@ -190,7 +225,7 @@ export function OrgSwitcher({
                     setAbierto(false);
                     setActiveModal('config');
                   }}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-white hover:text-white transition-colors text-left w-full"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
                 >
                   <svg
                     className="w-4 h-4 text-white"
@@ -238,7 +273,7 @@ export function OrgSwitcher({
               {caben ? (
                 <button
                   onClick={() => setActiveModal('newSpace')}
-                  className="flex items-center gap-2.5 px-1 rounded-md hover:bg-white/5 text-[13px] text-white hover:text-white transition-colors text-left w-full"
+                  className="flex items-center gap-2.5 px-1 rounded-md hover:bg-white/5 text-[13px] text-text-secondary hover:text-white transition-colors text-left w-full"
                 >
                   <svg
                     className="w-4 h-4 text-white"
@@ -568,7 +603,7 @@ function ModalWrapper({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white hover:text-white"
+            className="p-2 rounded-full hover:bg-white/10 transition-colors text-text-secondary hover:text-white"
           >
             <svg
               className="w-5 h-5"

@@ -261,7 +261,7 @@ export function BoardCalendar({
             </h4>
             <button
               onClick={() => setMostrarSinFecha(false)}
-              className="text-white hover:text-white/70"
+              className="text-text-secondary hover:text-white/70"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path

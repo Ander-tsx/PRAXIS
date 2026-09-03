@@ -14,7 +14,14 @@ import { getSidebarPlegada } from '@praxis/commons/theme';
  * El grupo `(private)` no aparece en la URL: solo sirve para envolver.
  */
 export default async function PrivateLayout({ children }: { children: React.ReactNode }) {
-  const { profile, navItems, organizaciones, organizacionActivaId } = await loadPrivateChrome();
+  const {
+    profile,
+    navItems,
+    organizaciones,
+    organizacionActivaId,
+    mensajesSinLeer,
+    avisosSinLeer,
+  } = await loadPrivateChrome();
   /* La cookie del pliegue, leída en el servidor: sin esto la barra se
      serviría desplegada y se plegaría al hidratar, parpadeando en cada
      navegación —y en Multi-Zones cada cambio de zona es una carga entera. */
@@ -29,6 +36,11 @@ export default async function PrivateLayout({ children }: { children: React.Reac
          dos las resuelve `loadPrivateChrome`, así que aquí no cuestan nada. */
       organizaciones={organizaciones}
       organizacionActivaId={organizacionActivaId}
+      /* Las dos insignias de las pestañas de la barra: `loadPrivateChrome` ya
+         las trae, y a partir de aquí las mantiene vivas el propio armazón
+         escuchando el flujo. Ver `AppShellProps.mensajesSinLeer`. */
+      mensajesSinLeer={mensajesSinLeer}
+      avisosSinLeer={avisosSinLeer}
       user={{
         name: displayName(profile),
         email: profile.credential.email,

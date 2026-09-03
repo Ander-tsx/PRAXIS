@@ -71,7 +71,7 @@ export function OrgIdentityModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors text-white hover:text-white"
+            className="p-2 rounded-full hover:bg-white/10 transition-colors text-text-secondary hover:text-white"
           >
             <svg
               className="w-5 h-5"

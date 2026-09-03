@@ -13,7 +13,7 @@ import { alpha, colors } from '../../tokens';
 /* Los topes del formulario de proyecto, que son los mismos que valida el DTO:
    se importan de donde ya viven en vez de volver a escribirlos aquí, que es
    como dos números que dicen lo mismo acaban diciendo cosas distintas. */
-import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX } from '../CreateProjectSlideOver/project-form';
+import { PROJECT_DESCRIPTION_MAX, PROJECT_NAME_MAX } from '../CreateProjectForm/project-form';
 
 /**
  * El plan de proyecto que propone PRAX: cómo se revisa y cómo se poda.

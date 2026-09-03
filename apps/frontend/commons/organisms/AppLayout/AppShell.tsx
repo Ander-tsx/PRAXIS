@@ -2,7 +2,25 @@
 
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { createApiClient } from '../../api/client';
+import type {
+  AppNotification,
+  DirectConversation,
+  NotificationPage,
+  ProjectChatSummary,
+  UserProfile,
+} from '../../api/domain';
+import type { Paginated } from '../../api/envelope';
 import { personLabel } from '../../api/domain';
 import { avatarHref } from '../../api/presence';
 import { Avatar } from '../../atoms/Avatar';
@@ -10,6 +28,13 @@ import { ProjectMonogram } from '../../atoms/ProjectMonogram';
 import { LivePresences, LiveSource, useLiveEvent, useReconnection } from '../../realtime';
 import { usePresence } from '../../realtime/presence';
 import { useMessageCount } from '../../realtime/useMessageCount';
+import { avisarDeAvisosLeidos, useNoticeCount } from '../../realtime/useNoticeCount';
+import {
+  ABRIR_BANDEJA_EVENT,
+  type AvisoLegible,
+  describirAviso,
+  destinoDeAviso,
+} from '../../notifications/avisos';
 import { alpha, colors } from '../../tokens';
 import { KylooWordmark } from '../KylooWordmark';
 import { DockColumn, DockProvider } from './DockPanel';
@@ -105,6 +130,21 @@ export interface AppShellProps {
    */
   organizaciones?: OrgDelSelector[];
   organizacionActivaId?: string | null;
+  /**
+   * Las dos insignias de las pestañas, **sembradas por el servidor**.
+   *
+   * ⚠️ Estaban dentro de `navItems`, emparejadas por `href` contra dos entradas
+   * de menú (`/chat` y la bandeja) que `ac4caf1` borró al mudarlas a pestañas.
+   * El emparejamiento dejó de casar, y como es una comparación de cadenas no dio
+   * ningún error: los números se seguían calculando en el servidor y no los
+   * pintaba nadie. Ahora llegan como lo que son —dos contadores del armazón— y
+   * `useMessageCount` / `useNoticeCount` los mantienen vivos desde aquí.
+   *
+   * Ausentes, valen cero: una zona que todavía no los pase enseña las pestañas
+   * sin insignia, que es una degradación y no un fallo.
+   */
+  mensajesSinLeer?: number;
+  avisosSinLeer?: number;
   children: ReactNode;
 }
 
@@ -194,15 +234,15 @@ const UN_ANO = 60 * 60 * 24 * 365;
  */
 const CUENTA_HREF = '/main/profile';
 
-/**
- * Dónde vive el centro de mensajes.
+/*
+ * 🕳️ Aquí estaba `HREF_DE_MENSAJES = '/chat'`, espejo del `CHAT_HREF` de
+ * `commons/auth/nav.ts`.
  *
- * Espejo de `CHAT_HREF` en `commons/auth/nav.ts`. Se repite en vez de
- * importarse porque aquel es un módulo de **servidor** —usa `next/headers`— y
- * esto es un componente de cliente; importarlo arrastraría `next/headers` al
- * navegador. Mismo caso que `SIDEBAR_COOKIE`, arriba.
+ * Los dos servían para emparejar una insignia con una entrada de menú **que ya
+ * no existe**: el directorio de chats es una pestaña de esta misma barra desde
+ * `ac4caf1`. Las insignias llegan ahora como props (`mensajesSinLeer`,
+ * `avisosSinLeer`) y se pintan sobre su pestaña.
  */
-const HREF_DE_MENSAJES = '/chat';
 
 /**
  * El armazón, con las dos fuentes de tiempo real montadas por encima.
@@ -258,13 +298,15 @@ function ArmazonInterno({
   plegadaInicial = false,
   organizaciones,
   organizacionActivaId,
+  mensajesSinLeer: mensajesIniciales = 0,
+  avisosSinLeer: avisosIniciales = 0,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'inbox'>(() => {
+  const [activeTab, setActiveTab] = useState<SidebarTab>(() => {
     const isChat = zonePath === '/chat' || browserPath.startsWith('/chat');
     if (isChat) return 'chat';
 
@@ -280,6 +322,26 @@ function ArmazonInterno({
       localStorage.setItem('praxis:sidebarTab', activeTab);
     }
   }, [activeTab]);
+
+  /**
+   * Abrir la bandeja desde fuera del armazón.
+   *
+   * ⚠️ **La bandeja ya no tiene URL.** Cuando era una pantalla, la tarjeta de un
+   * aviso de automatización navegaba a `/main#avisos`; al pasar a pestaña, ese
+   * destino se quedó apuntando a una ruta que hoy redirige a la lista de
+   * proyectos. Ver `destinoDeAviso`.
+   *
+   * En móvil hay que abrir además el cajón: es donde viven las pestañas cuando
+   * no hay barra lateral.
+   */
+  useEffect(() => {
+    function abrir() {
+      setActiveTab('inbox');
+      if (window.matchMedia('(max-width: 767px)').matches) setMobileMenuOpen(true);
+    }
+    window.addEventListener(ABRIR_BANDEJA_EVENT, abrir);
+    return () => window.removeEventListener(ABRIR_BANDEJA_EVENT, abrir);
+  }, []);
   /**
    * ⚠️ **El estado nace de la cookie que ya leyó el servidor**, no de un efecto.
    *
@@ -316,30 +378,35 @@ function ArmazonInterno({
   const activePathDeSecciones = enCuenta ? '' : activePath;
 
   /**
-   * La insignia de Mensajes, **viva**.
+   * Las dos insignias de las pestañas, **vivas**.
    *
-   * ⚠️ El número llega del servidor dentro de `navItems`, y solo cambiaba al
-   * recargar: lo que lo actualizaba era el `router.refresh()` por evento de
-   * chat, que se quitó al desatascar la cola del App Router. Se quedó sin
-   * fuente — sonaba el aviso y el número no se movía. Ahora escucha el flujo
-   * como el resto; ver `useMessageCount`.
+   * ⚠️ El número que sirve el servidor solo cambiaba al recargar: lo que lo
+   * actualizaba era el `router.refresh()` por evento, que se quitó al desatascar
+   * la cola del App Router. Se quedó sin fuente — sonaba el aviso y el número no
+   * se movía. Ahora las dos escuchan el flujo; ver `useMessageCount` y
+   * `useNoticeCount`.
    *
-   * Se sustituye **solo esa entrada**: las demás insignias las sigue
-   * calculando el servidor porque cambian con cosas que no viajan por el flujo
-   * de chat.
+   * Y ahora se **pintan**, que es la otra mitad: se emparejaban por `href`
+   * contra entradas de menú que ya no existen. Ver la prop.
    */
-  const mensajesSinLeer = useMessageCount(
-    navItems.find((item) => item.href === HREF_DE_MENSAJES)?.badge ?? 0,
-    `${zonePath}/api/gateway`,
-  );
-
-  const navItemsVivos = navItems.map((item) =>
-    item.href === HREF_DE_MENSAJES ? { ...item, badge: mensajesSinLeer } : item,
-  );
+  const mensajesSinLeer = useMessageCount(mensajesIniciales, `${zonePath}/api/gateway`);
+  const avisosSinLeer = useNoticeCount(avisosIniciales, `${zonePath}/api/gateway`);
 
   return (
     <AppShellContext.Provider value={{ openMenu: () => setMobileMenuOpen(true), plegada }}>
-      <div className="flex h-screen overflow-hidden bg-[#191919] font-sans text-text-primary">
+      {/**
+       * ⚠️ **`h-dvh` y no `h-screen`.**
+       *
+       * `h-screen` es `100vh`, que en un móvil mide la ventana **con la barra de
+       * direcciones retraída** — o sea más alto de lo que se ve. Con
+       * `overflow-hidden` aquí, lo que sobresale por abajo no se puede
+       * desplazar: en el chat, el compositor se quedaba debajo del borde de la
+       * pantalla y no había forma de llegar a él.
+       *
+       * `dvh` es la unidad dinámica: mide lo que se ve ahora, y se recalcula
+       * cuando la barra del navegador aparece o desaparece.
+       */}
+      <div className="flex h-dvh overflow-hidden bg-[#191919] font-sans text-text-primary">
         {/* ── Barra lateral (escritorio) ───────────────────────── */}
         <aside
           className={`hidden shrink-0 flex-col border-r border-border bg-[#202020] transition-[width] duration-200 md:flex ${
@@ -388,105 +455,67 @@ function ArmazonInterno({
               />
             </div>
 
-            {!plegada && (
-              <div className="mb-4 flex items-center gap-1.5 px-1 overflow-x-auto whitespace-nowrap scrollbar-none">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('home')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'home'
-                      ? 'bg-white/10 text-white'
-                      : 'text-white hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                    />
-                  </svg>
-                  Inicio
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('chat')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'chat'
-                      ? 'bg-white/10 text-white'
-                      : 'text-white hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
-                  Chat
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('inbox')}
-                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
-                    activeTab === 'inbox'
-                      ? 'bg-white/10 text-white'
-                      : 'text-white hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-                    />
-                  </svg>
-                  Bandeja de entrada
-                </button>
-              </div>
-            )}
-            {activeTab === 'home' && (
-              <div className="flex flex-col gap-4">
-                <SidebarProjectsTree
-                  zonePath={zonePath}
-                  plegada={plegada}
-                  activePath={activePathDeSecciones}
-                  organizacionActivaId={organizacionActivaId ?? null}
-                />
-                <NavList
-                  navItems={navItemsVivos.filter((i) => i.href !== '/projects')}
-                  activePath={activePathDeSecciones}
-                  plegada={plegada}
-                />
-              </div>
-            )}
-            {activeTab === 'chat' && (
+            {/**
+             * ⚠️ **Plegada también hay pestañas, solo que en columna.**
+             *
+             * Estaban tras un `{!plegada && …}` mientras que el **contenido** de
+             * la pestaña activa se seguía pintando. O sea: si la dejabas en
+             * «Chat» y plegabas la barra, veías una columna de avatares sin
+             * ninguna forma de volver a «Inicio». Un control que desaparece
+             * dejando puesto lo que controlaba.
+             */}
+            <SidebarTabs
+              activa={activeTab}
+              onCambiar={setActiveTab}
+              mensajesSinLeer={mensajesSinLeer}
+              avisosSinLeer={avisosSinLeer}
+              plegada={plegada}
+            />
+            {/**
+             * 🔴 **Las tres pestañas se montan siempre; se esconden con CSS.**
+             *
+             * Estaban tras `{activeTab === '…' && …}`, así que la que no se
+             * mira **no existe en el árbol**. Y estas listas no son pantallas:
+             * son suscripciones. Desmontadas,
+             *
+             * - `SidebarChatList` pierde sus `useLiveEvent('chat.mensaje')` y
+             *   `('chat.leido')`, así que las burbujas por conversación no se
+             *   acumulan mientras no la mires: al volver se pide todo de cero y
+             *   se ve un esqueleto;
+             * - se pierde también el buscador escrito y la posición del
+             *   desplazamiento, en cada ida y vuelta.
+             *
+             * `hidden` de Tailwind es `display:none`, que saca el panel del
+             * flujo y del foco por teclado sin desmontar nada. Es la diferencia
+             * entre esconder una lista y tirarla.
+             *
+             * ⚠️ **Sí paga el coste de mantenerlas vivas**, que es justo lo que
+             * se quiere: son tres suscripciones al mismo `EventSource` que ya
+             * está abierto, no tres conexiones.
+             */}
+            <div className={activeTab === 'home' ? 'flex flex-col gap-4' : 'hidden'}>
+              <SidebarProjectsTree
+                zonePath={zonePath}
+                plegada={plegada}
+                activePath={activePathDeSecciones}
+                organizacionActivaId={organizacionActivaId ?? null}
+              />
+              <NavList
+                navItems={navItems.filter((i) => i.href !== '/projects')}
+                activePath={activePathDeSecciones}
+                plegada={plegada}
+              />
+            </div>
+            <div className={activeTab === 'chat' ? undefined : 'hidden'}>
               <SidebarChatList
                 zonePath={zonePath}
                 plegada={plegada}
                 organizacionActivaId={organizacionActivaId ?? null}
               />
-            )}
-            {activeTab === 'inbox' && <SidebarInboxList zonePath={zonePath} plegada={plegada} />}
+            </div>
+            <div className={activeTab === 'inbox' ? undefined : 'hidden'}>
+              <SidebarInboxList zonePath={zonePath} plegada={plegada} />
+            </div>
           </div>
 
           <div className={`border-t border-border ${plegada ? 'p-2' : 'p-4'}`}>
@@ -592,7 +621,7 @@ function ArmazonInterno({
                 </button>
               </div>
 
-              <div className="flex flex-col gap-6 flex-1 overflow-y-auto scrollbar-none mb-6">
+              <div className="flex flex-col gap-4 flex-1 overflow-y-auto scrollbar-none mb-6">
                 <OrgSwitcher
                   name={user.name}
                   plegada={false}
@@ -601,11 +630,48 @@ function ArmazonInterno({
                   zonePath={zonePath}
                 />
 
-                <NavList
-                  navItems={navItemsVivos}
-                  activePath={activePathDeSecciones}
-                  onNavigate={() => setMobileMenuOpen(false)}
+                {/**
+                 * 🔴 **Las tres pestañas, también aquí.**
+                 *
+                 * Este cajón tenía solo `NavList`, y las pestañas —con el
+                 * directorio de chats y la bandeja dentro— viven en el `<aside
+                 * hidden … md:flex>`, o sea **solo en escritorio**. Sumado a que
+                 * `ac4caf1` borró la entrada `/chat` de la lista canónica, el
+                 * resultado era que desde un teléfono no había **un solo enlace
+                 * hacia una conversación** en toda la aplicación: ni en el menú,
+                 * ni en el cajón, ni en ninguna pantalla.
+                 *
+                 * Comparte estado (`activeTab`) con la barra de escritorio a
+                 * propósito: es la misma preferencia de la misma persona, y ya
+                 * se guarda en `localStorage`.
+                 */}
+                <SidebarTabs
+                  activa={activeTab}
+                  onCambiar={setActiveTab}
+                  mensajesSinLeer={mensajesSinLeer}
+                  avisosSinLeer={avisosSinLeer}
                 />
+
+                {/* Aquí sí se monta y se desmonta, al revés que en el escritorio:
+                    el cajón entero solo existe mientras está abierto, así que
+                    las suscripciones de estas listas ya viven en la barra de
+                    escritorio cuando la hay, y en un teléfono no hay ninguna
+                    barra que mantener viva por detrás. */}
+                {activeTab === 'home' && (
+                  <NavList
+                    navItems={navItems}
+                    activePath={activePathDeSecciones}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+                )}
+                {activeTab === 'chat' && (
+                  <SidebarChatList
+                    zonePath={zonePath}
+                    plegada={false}
+                    organizacionActivaId={organizacionActivaId ?? null}
+                  />
+                )}
+                {activeTab === 'inbox' && <SidebarInboxList zonePath={zonePath} plegada={false} />}
               </div>
 
               <div className="border-t border-border pt-4">
@@ -824,46 +890,286 @@ interface SidebarProject {
   workspaces: Array<{ id: string; name: string }>;
 }
 
+/**
+ * Los proyectos de la organización activa, **en una sola petición**.
+ *
+ * ## 🔴 Eran hasta 51, en serie, cada 30 segundos
+ *
+ * Esto pedía la lista (`limit: 50`) y después **un `GET /projects/:id` por
+ * proyecto, con `await` dentro de un `for`**: encadenadas, no en paralelo. Y se
+ * repetía al montar —que en Multi-Zones es cada cambio de zona—, cada 30 s por
+ * un `setInterval` y otra vez en cada `focus` de la ventana. En las siete zonas.
+ *
+ * Todo eso era para leer los **espacios** de cada proyecto, que es lo que cuelga
+ * de la fila cuando la despliegas. O sea: se pagaban cincuenta peticiones para
+ * pintar unos hijos que casi nunca están a la vista.
+ *
+ * Ahora la lista es lo único que se pide siempre, y los espacios se piden
+ * **solo de lo que está desplegado**, en paralelo. Ver `fetchWorkspaces`.
+ *
+ * ⚠️ No se ha tocado el backend. `GET /projects` podría devolver los espacios y
+ * ahorrarse hasta eso, pero es otro equipo y esto ya deja de ser un problema.
+ */
 async function fetchProjectsTree(
   zonePath: string,
   organizacionActivaId: string | null,
 ): Promise<SidebarProject[]> {
   const params = new URLSearchParams({ limit: '50' });
-  if (organizacionActivaId) {
-    params.set('organizationId', organizacionActivaId);
-  }
+  if (organizacionActivaId) params.set('organizationId', organizacionActivaId);
 
-  const listBody = await fetch(`${zonePath}/api/gateway/projects?${params.toString()}`, {
-    cache: 'no-store',
-  })
-    .then((r) => r.json())
+  const api = createApiClient({ gatewayPath: `${zonePath}/api/gateway` });
+  const page = await api
+    .get<Paginated<SidebarProjectResumen>>(`/projects?${params}`)
     .catch(() => null);
 
-  // El backend devuelve { data: { items: [...] } } o { data: [...] }
-  const items: any[] =
-    listBody?.data?.items ?? (Array.isArray(listBody?.data) ? listBody.data : []);
-  if (items.length === 0) return [];
+  return (page?.items ?? []).map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    iconKey: project.iconKey ?? null,
+    color: project.color ?? null,
+    /* Vacío hasta que alguien despliegue la fila. */
+    workspaces: [],
+  }));
+}
 
-  const resolved = [];
-  for (const p of items) {
-    const detail = await fetch(`${zonePath}/api/gateway/projects/${p.id}`, { cache: 'no-store' })
-      .then((r) => r.json())
-      .catch(() => null);
-    const workspaces: Array<{ id: string; name: string }> = (detail?.data?.workspaces ?? []).map(
-      (w: any) => ({ id: w.id, name: w.name }),
-    );
-    resolved.push({
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      /* `GET /projects` ya trae la identidad visual; el detalle también, y es
-         lo que gana si difieren. */
-      iconKey: detail?.data?.iconKey ?? p.iconKey ?? null,
-      color: detail?.data?.color ?? p.color ?? null,
-      workspaces,
-    });
+/** Lo que `GET /projects` trae de cada uno y aquí se usa. */
+interface SidebarProjectResumen {
+  id: string;
+  name: string;
+  slug: string;
+  iconKey?: string | null;
+  color?: string | null;
+}
+
+/**
+ * Los espacios de unos cuantos proyectos, **en paralelo**.
+ *
+ * Se pide el detalle solo de lo desplegado: un `GET /projects/:id` por fila
+ * abierta, todas a la vez, y una sola vez —lo ya resuelto no se vuelve a pedir—.
+ * Con la barra recién abierta y todo desplegado son las mismas peticiones que
+ * antes; con la barra como la deja la gente, son dos o tres.
+ *
+ * Los fallos se tragan por proyecto: uno que no responda deja su fila sin
+ * espacios, no la barra lateral sin proyectos.
+ */
+async function fetchWorkspaces(
+  zonePath: string,
+  ids: string[],
+): Promise<Map<string, Array<{ id: string; name: string }>>> {
+  const api = createApiClient({ gatewayPath: `${zonePath}/api/gateway` });
+
+  const resueltos = await Promise.all(
+    ids.map(async (id) => {
+      const detalle = await api
+        .get<{ workspaces?: Array<{ id: string; name: string }> }>(`/projects/${id}`)
+        .catch(() => null);
+      return [id, (detalle?.workspaces ?? []).map((w) => ({ id: w.id, name: w.name }))] as const;
+    }),
+  );
+
+  return new Map(resueltos);
+}
+
+/** Cuál de las tres secciones de la barra lateral se está mirando. */
+type SidebarTab = 'home' | 'chat' | 'inbox';
+
+/**
+ * La insignia de una pestaña.
+ *
+ * Sin nada pendiente **no se pinta**, y no es un detalle: una insignia que
+ * enseña un cero es una insignia que enseña nada, y encima desplaza la etiqueta
+ * de sitio cada vez que el número aparece y desaparece.
+ *
+ * `99+` porque a partir de ahí el número deja de informar y solo estorba al
+ * ancho de la pestaña, que es el mismo criterio que usan las filas del
+ * directorio.
+ */
+function InsigniaDePestana({ cuantos }: { cuantos: number }) {
+  if (cuantos <= 0) return null;
+  return (
+    <span
+      className="ml-0.5 min-w-[18px] rounded-full bg-primary px-1.5 py-px text-center font-sans text-[10px] font-semibold text-primary-foreground"
+      aria-label={`${cuantos} sin leer`}
+    >
+      {cuantos > 99 ? '99+' : cuantos}
+    </span>
+  );
+}
+
+/**
+ * Las tres secciones de la barra lateral: Inicio, Chat y Bandeja.
+ *
+ * ## Por qué está extraído y no en línea
+ *
+ * Porque se pinta **dos veces**: en la barra de escritorio y en el cajón móvil.
+ * En línea eran ciento veinte líneas de JSX repetidas, y esa duplicación es
+ * exactamente el motivo de que el cajón móvil se quedara sin pestañas cuando se
+ * añadieron —ver `AppShell`—: nadie copia ciento veinte líneas por gusto.
+ *
+ * ## Las insignias van aquí y no en `NavList`
+ *
+ * `NavList` pinta entradas de menú, y estas dos ya no son entradas de menú:
+ * `ac4caf1` las convirtió en pestañas. Emparejarlas por `href` con la lista
+ * canónica es lo que dejó los dos contadores calculándose sin que nadie los
+ * pintara. Ver el aviso de `AppShellProps.mensajesSinLeer`.
+ */
+function SidebarTabs({
+  activa,
+  onCambiar,
+  mensajesSinLeer,
+  avisosSinLeer,
+  plegada = false,
+}: {
+  activa: SidebarTab;
+  onCambiar: (tab: SidebarTab) => void;
+  mensajesSinLeer: number;
+  avisosSinLeer: number;
+  /** Plegada: solo los iconos, en columna, y la insignia se reduce a un punto. */
+  plegada?: boolean;
+}) {
+  const pestanas: Array<{
+    id: SidebarTab;
+    etiqueta: string;
+    insignia: number;
+    icono: ReactNode;
+  }> = [
+    {
+      id: 'home',
+      etiqueta: 'Inicio',
+      insignia: 0,
+      icono: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+        />
+      ),
+    },
+    {
+      id: 'chat',
+      etiqueta: 'Chat',
+      insignia: mensajesSinLeer,
+      icono: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+        />
+      ),
+    },
+    {
+      id: 'inbox',
+      etiqueta: 'Bandeja',
+      insignia: avisosSinLeer,
+      icono: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+        />
+      ),
+    },
+  ];
+
+  return (
+    /* `role="tablist"` y no una lista de botones sueltos: son tres controles que
+       se excluyen entre sí sobre paneles hermanos, que es literalmente lo que
+       describe el patrón. Sin esto, un lector de pantalla lee «botón Chat» sin
+       decir que hay tres ni cuál está puesta. */
+    <div
+      role="tablist"
+      aria-label="Secciones de la barra lateral"
+      className={
+        plegada
+          ? 'mb-4 flex flex-col items-center gap-1'
+          : 'mb-4 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap px-1 scrollbar-none'
+      }
+    >
+      {pestanas.map((pestana) => {
+        const puesta = activa === pestana.id;
+        return (
+          <button
+            key={pestana.id}
+            type="button"
+            role="tab"
+            aria-selected={puesta}
+            onClick={() => onCambiar(pestana.id)}
+            /* Plegada, la etiqueta se va y hace falta un `title`: un icono solo
+               no dice qué es, y aquí no hay texto al lado que lo explique. */
+            title={plegada ? pestana.etiqueta : undefined}
+            className={`flex shrink-0 items-center font-sans text-[13px] font-semibold transition-colors ${
+              plegada
+                ? 'relative justify-center rounded-lg p-2'
+                : 'gap-1.5 rounded-full px-3 py-1.5'
+            } ${
+              puesta
+                ? 'bg-white/10 text-white'
+                : 'text-text-secondary hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+              aria-hidden="true"
+            >
+              {pestana.icono}
+            </svg>
+            {plegada ? (
+              /* El número no cabe en 36 px: se reduce a un punto, que es lo que
+                 hace falta saber —hay algo— con el `title` para el resto. */
+              pestana.insignia > 0 && (
+                <span
+                  className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"
+                  aria-label={`${pestana.insignia} sin leer`}
+                />
+              )
+            ) : (
+              <>
+                {pestana.etiqueta}
+                <InsigniaDePestana cuantos={pestana.insignia} />
+              </>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Dónde se recuerda qué filas del árbol están abiertas. */
+const DESPLEGADOS_KEY = 'praxis_sidebar_projects_expanded';
+
+/**
+ * Qué proyectos estaban desplegados.
+ *
+ * ⚠️ En un `useState` perezoso y no en un `useEffect`: leerlo después de montar
+ * pintaba el árbol replegado y lo abría un instante más tarde, y en Multi-Zones
+ * cada cambio de zona es una carga completa, así que ese salto salía en cada
+ * navegación. Es el mismo motivo por el que el pliegue de la barra vive en una
+ * cookie.
+ *
+ * `try` porque `localStorage` lanza —no devuelve `null`— en un contexto sin
+ * acceso a almacenamiento.
+ */
+function desplegadosGuardados(): Set<string> {
+  try {
+    const guardado = localStorage.getItem(DESPLEGADOS_KEY);
+    return guardado ? new Set<string>(JSON.parse(guardado)) : new Set<string>();
+  } catch {
+    return new Set<string>();
   }
-  return resolved;
+}
+
+function guardarDesplegados(desplegados: Set<string>): void {
+  try {
+    localStorage.setItem(DESPLEGADOS_KEY, JSON.stringify([...desplegados]));
+  } catch {
+    /* Sin almacenamiento, el árbol se abre de cero en cada carga. Se vive. */
+  }
 }
 
 function SidebarProjectsTree({
@@ -879,74 +1185,87 @@ function SidebarProjectsTree({
 }) {
   const [projects, setProjects] = useState<SidebarProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(() => desplegadosGuardados());
 
-  useEffect(() => {
-    try {
-      const guardado = localStorage.getItem('praxis_sidebar_projects_expanded');
-      if (guardado) {
-        setExpanded(new Set(JSON.parse(guardado)));
-      }
-    } catch (e) {}
-  }, []);
-
-  const load = (esInicial = false) => {
+  const cargar = useCallback(() => {
     fetchProjectsTree(zonePath, organizacionActivaId)
-      .then((resolved) => {
-        setProjects((prev) => {
-          const prevStr = JSON.stringify(prev);
-          const nextStr = JSON.stringify(resolved);
-          if (prevStr === nextStr) return prev;
-
-          setExpanded((e) => {
-            const next = new Set(e);
-            resolved.forEach((p) => {
-              if (esInicial) {
-                // Solo si no habia nada guardado, expandimos por defecto
-                if (!localStorage.getItem('praxis_sidebar_projects_expanded')) {
-                  next.add(p.id);
-                }
-              } else if (!prev.find((pp) => pp.id === p.id)) {
-                // Es un proyecto nuevo recien creado, lo expandimos
-                next.add(p.id);
-              }
-            });
-            try {
-              localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
-            } catch (err) {}
-            return next;
-          });
-          return resolved;
+      .then((lista) => {
+        setProjects((previos) => {
+          /* Se conservan los espacios ya resueltos: la lista no los trae, y
+             perderlos en cada recarga replegaría el árbol a la vista. */
+          const espaciosPrevios = new Map(previos.map((p) => [p.id, p.workspaces]));
+          const siguiente = lista.map((p) => ({
+            ...p,
+            workspaces: espaciosPrevios.get(p.id) ?? [],
+          }));
+          /* Comparar antes de asignar: sin esto, cada recarga devuelve objetos
+             nuevos y repinta el árbol entero aunque nada haya cambiado. */
+          return JSON.stringify(previos) === JSON.stringify(siguiente) ? previos : siguiente;
         });
       })
-      .catch(() => {})
+      .catch(() => undefined)
       .finally(() => setLoading(false));
-  };
+  }, [zonePath, organizacionActivaId]);
 
   useEffect(() => {
-    load(true);
+    cargar();
+  }, [cargar]);
 
-    // Polling ligero: refresca cada 30 s para capturar proyectos nuevos
-    const interval = setInterval(load, 30_000);
-    return () => clearInterval(interval);
-  }, [zonePath]);
-
-  // Refresca al volver el foco a la ventana (usuario crea proyecto en otra pestaña)
+  /**
+   * ⚠️ **Ya no hay `setInterval` de 30 segundos.**
+   *
+   * Con el N+1 de antes, ese temporizador disparaba hasta 51 peticiones en serie
+   * cada medio minuto, en cada zona abierta, para enterarse de si alguien había
+   * creado un proyecto. Un proyecto nuevo se crea unas cuantas veces por semana.
+   *
+   * Lo que queda es el `focus` de la ventana —volver a la pestaña **es** el
+   * momento en que puede haber cambiado algo— y, sobre todo, `revalidatePath`,
+   * que ya refresca la zona al crear uno desde ella.
+   *
+   * ⚠️ Y `organizacionActivaId` está en las dependencias, que antes no lo estaba:
+   * el intervalo capturaba la organización del primer render y seguía pidiendo
+   * la de antes. No se notaba porque cambiar de organización recarga la página
+   * entera, pero era una bomba de relojería para el día que dejara de hacerlo.
+   */
   useEffect(() => {
-    const onFocus = () => load();
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [zonePath]);
+    window.addEventListener('focus', cargar);
+    return () => window.removeEventListener('focus', cargar);
+  }, [cargar]);
+
+  /**
+   * Los espacios, **solo de lo desplegado y solo una vez**.
+   *
+   * Es lo que convierte las 51 peticiones en dos o tres: el detalle de un
+   * proyecto se pide cuando su fila se abre, no al pintar la barra.
+   */
+  useEffect(() => {
+    const pendientes = projects
+      .filter((p) => expanded.has(p.id) && p.workspaces.length === 0)
+      .map((p) => p.id);
+    if (pendientes.length === 0) return;
+
+    let vigente = true;
+    fetchWorkspaces(zonePath, pendientes).then((porProyecto) => {
+      if (!vigente) return;
+      setProjects((previos) =>
+        previos.map((p) => {
+          const espacios = porProyecto.get(p.id);
+          return espacios?.length ? { ...p, workspaces: espacios } : p;
+        }),
+      );
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [projects, expanded, zonePath]);
 
   function toggleProject(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      try {
-        localStorage.setItem('praxis_sidebar_projects_expanded', JSON.stringify([...next]));
-      } catch (err) {}
-      return next;
+    setExpanded((previos) => {
+      const siguiente = new Set(previos);
+      if (siguiente.has(id)) siguiente.delete(id);
+      else siguiente.add(id);
+      guardarDesplegados(siguiente);
+      return siguiente;
     });
   }
 
@@ -969,7 +1288,7 @@ function SidebarProjectsTree({
         </span>
         <a
           href="/projects"
-          className="flex items-center gap-2 text-white hover:text-white text-[12px] py-1 transition-colors"
+          className="flex items-center gap-2 text-text-secondary hover:text-white text-[12px] py-1 transition-colors"
         >
           <svg
             className="h-3.5 w-3.5"
@@ -1002,7 +1321,7 @@ function SidebarProjectsTree({
           <a
             href="/projects"
             title="Ver todos los proyectos"
-            className="rounded p-0.5 text-white hover:text-white transition-colors"
+            className="rounded p-0.5 text-text-secondary hover:text-white transition-colors"
           >
             <svg
               className="h-3.5 w-3.5"
@@ -1061,7 +1380,7 @@ function SidebarProjectsTree({
                   onClick={() => toggleProject(project.id)}
                   aria-expanded={isOpen}
                   aria-label={isOpen ? `Colapsar ${project.name}` : `Expandir ${project.name}`}
-                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-white hover:text-white transition-colors"
+                  className="flex shrink-0 items-center justify-center w-4 h-4 rounded text-text-secondary hover:text-white transition-colors"
                 >
                   <ChevronIcon open={isOpen} />
                 </button>
@@ -1113,7 +1432,7 @@ function SidebarProjectsTree({
                             className={`flex items-center gap-2 rounded-md px-2 py-[5px] text-[12px] transition-colors ${
                               isActiveWs
                                 ? 'bg-white/10 text-white font-medium'
-                                : 'text-white hover:text-white hover:bg-white/[0.06]'
+                                : 'text-text-secondary hover:text-white hover:bg-white/[0.06]'
                             }`}
                           >
                             <WorkspaceLeafIcon />
@@ -1133,6 +1452,209 @@ function SidebarProjectsTree({
   );
 }
 
+/**
+ * Cuánto se espera antes de volver a pedir las conversaciones.
+ *
+ * ## 🔴 Sin esto eran seis peticiones por mensaje
+ *
+ * `fetchChats` pide `/me/chats`, `/me/chats/projects` y `/users?ids=…`, y estaba
+ * atado **directamente** a `chat.mensaje` y a `chat.leido`. Y `chat.leido` se
+ * dispara con cada mensaje que llega mientras tienes la conversación abierta, o
+ * sea que un chat de equipo animado disparaba las tres dos veces por mensaje.
+ *
+ * Es el mismo goteo que `useMessageCount` ya resolvió con la misma ventana y por
+ * el mismo motivo. Ver `ESPERA_DE_RECONCILIACION_MS` allí.
+ */
+const ESPERA_DEL_DIRECTORIO_MS = 700;
+
+/** Una fila de conversación privada. Fuera del componente: ver `SidebarChatList`. */
+function FilaDePersona({
+  conversacion,
+  peer,
+  activo,
+  plegada,
+  gatewayPath,
+}: {
+  conversacion: DirectConversation;
+  peer?: UserProfile;
+  activo: boolean;
+  plegada: boolean;
+  gatewayPath: string;
+}) {
+  const nombre = peer ? personLabel(peer) : 'Alguien';
+  const presencia = usePresence(conversacion.peerId, peer?.presence);
+
+  return (
+    <a
+      href={`/chat/${conversacion.peerId}`}
+      aria-current={activo ? 'page' : undefined}
+      className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
+        plegada ? 'justify-center px-0' : ''
+      } ${activo ? 'bg-white/10' : ''}`}
+    >
+      <span className="shrink-0">
+        <Avatar
+          label={nombre}
+          size="sm"
+          src={avatarHref(peer?.avatarUrl, gatewayPath)}
+          presence={presencia}
+        />
+      </span>
+      {!plegada && (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-baseline gap-2">
+            {/* Activo en blanco, el resto en secundario. Los dos decían
+                `text-white`: el ternario existía y devolvía lo mismo en las dos
+                ramas desde el rediseño monocromo, así que la fila abierta no se
+                distinguía de las demás. */}
+            <span
+              className={`truncate font-sans text-[13px] font-medium ${
+                activo ? 'text-white' : 'text-text-primary'
+              }`}
+            >
+              {nombre}
+            </span>
+            {conversacion.ultimo && (
+              <span className="ml-auto shrink-0 font-sans text-[10px] text-text-secondary">
+                {cuandoCorto(conversacion.ultimo.createdAt)}
+              </span>
+            )}
+          </span>
+          <span className="mt-0.5 flex items-center justify-between gap-2">
+            <span className="truncate font-sans text-[11px] text-text-secondary">
+              {conversacion.ultimo ? resumenDe(conversacion.ultimo) : 'Iniciar conversación'}
+            </span>
+            <InsigniaDeFila cuantos={conversacion.unread} />
+          </span>
+        </span>
+      )}
+    </a>
+  );
+}
+
+/** Una fila de chat de equipo. */
+function FilaDeProyecto({
+  chat,
+  autor,
+  activo,
+  plegada,
+}: {
+  chat: ProjectChatSummary;
+  autor?: UserProfile;
+  activo: boolean;
+  plegada: boolean;
+}) {
+  return (
+    <a
+      href={`/chat/proyecto/${chat.project.id}`}
+      aria-current={activo ? 'page' : undefined}
+      className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${
+        plegada ? 'justify-center px-0' : ''
+      } ${activo ? 'bg-white/10' : ''}`}
+    >
+      <span className="flex shrink-0 origin-center scale-90 items-center justify-center">
+        <ProjectMonogram
+          id={chat.project.id}
+          name={chat.project.name}
+          iconKey={chat.project.iconKey}
+          color={chat.project.color}
+        />
+      </span>
+      {!plegada && (
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-baseline gap-2">
+            <span
+              className={`truncate font-sans text-[13px] font-medium ${
+                activo ? 'text-white' : 'text-text-primary'
+              }`}
+            >
+              {chat.project.name}
+            </span>
+            {chat.ultimo && (
+              <span className="ml-auto shrink-0 font-sans text-[10px] text-text-secondary">
+                {cuandoCorto(chat.ultimo.createdAt)}
+              </span>
+            )}
+          </span>
+          <span className="mt-0.5 flex items-center justify-between gap-2">
+            <span className="truncate font-sans text-[11px] text-text-secondary">
+              {chat.ultimo
+                ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(chat.ultimo)}`
+                : 'Sin mensajes'}
+            </span>
+            <InsigniaDeFila cuantos={chat.unread} />
+          </span>
+        </span>
+      )}
+    </a>
+  );
+}
+
+/** Sin nada pendiente no se pinta: una insignia con un cero no informa de nada. */
+function InsigniaDeFila({ cuantos }: { cuantos: number }) {
+  if (cuantos <= 0) return null;
+  return (
+    <span
+      className="min-w-[18px] shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground"
+      aria-label={`${cuantos} sin leer`}
+    >
+      {cuantos > 99 ? '99+' : cuantos}
+    </span>
+  );
+}
+
+/**
+ * El resumen de una fila.
+ *
+ * ⚠️ `deletedAt` antes que `body`: al borrar, el servidor vacía el cuerpo, así
+ * que sin esta rama la fila se queda en blanco y se lee como si la conversación
+ * estuviera vacía.
+ */
+function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
+  if (mensaje.deletedAt) return 'Mensaje eliminado';
+  const plano = mensaje.body.replace(/<[^>]*>?/g, '').trim();
+  return plano.length > 50 ? `${plano.slice(0, 50)}…` : plano;
+}
+
+/** Hoy la hora; antes, el día. En una columna de 320 px no cabe más. */
+function cuandoCorto(iso: string): string {
+  const fecha = new Date(iso);
+  const ahora = new Date();
+  const mismoDia =
+    fecha.getDate() === ahora.getDate() &&
+    fecha.getMonth() === ahora.getMonth() &&
+    fecha.getFullYear() === ahora.getFullYear();
+
+  return mismoDia
+    ? fecha.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : fecha.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+}
+
+/**
+ * El directorio de conversaciones, en su pestaña de la barra lateral.
+ *
+ * ## ⚠️ Se monta **siempre**, aunque su pestaña no esté a la vista
+ *
+ * No es una pantalla: es una suscripción. Desmontada, sus `useLiveEvent` no
+ * existen y las burbujas por conversación dejan de acumularse mientras miras
+ * otra pestaña. Quien lo esconde es un `hidden` de CSS, no un `&&`. Ver
+ * `ArmazonInterno`.
+ *
+ * ## Las filas viven fuera del componente, y no es estilo
+ *
+ * `FilaDePersona` y `FilaDeProyecto` estaban declaradas **dentro** de esta
+ * función. Un componente declarado en el cuerpo del render es un **tipo nuevo en
+ * cada render**, así que React no los reconcilia: los desmonta y los vuelve a
+ * montar enteros. Con cada tecla del buscador y con cada mensaje que llegaba se
+ * tiraban y se rehacían todas las filas —y con ellas el `usePresence` de cada
+ * una, que se reiniciaba—.
+ *
+ * ## Y el filtro se aplica antes de mapear
+ *
+ * Estaba dentro de la fila, que devolvía `null` si no casaba. Las filas se
+ * montaban igual, y los encabezados «Proyectos» y «Privados» se quedaban
+ * puestos sobre cero resultados.
+ */
 function SidebarChatList({
   zonePath,
   plegada,
@@ -1144,296 +1666,310 @@ function SidebarChatList({
 }) {
   const pathname = usePathname();
   const browserPath = zonePath + (pathname === '/' ? '' : pathname);
-  const [directs, setDirects] = useState<any[]>([]);
-  const [projectsCrudos, setProjectsCrudos] = useState<any[]>([]);
-  /**
-   * Los chats de proyecto **de la organización activa**. Un chat de proyecto es
-   * 1:1 con un proyecto, y un proyecto pertenece a una sola organización, así que
-   * el directorio se recorta igual que el árbol del sidebar y la lista de
-   * proyectos. Los privados **no** se filtran: un DM no es de ninguna
-   * organización (ver la conversación de diseño).
-   */
-  const projects = organizacionActivaId
-    ? projectsCrudos.filter((c: any) => c?.project?.organizationId === organizacionActivaId)
-    : projectsCrudos;
-  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
+  const gatewayPath = `${zonePath}/api/gateway`;
+
+  const [directas, setDirectas] = useState<DirectConversation[]>([]);
+  const [deProyecto, setDeProyecto] = useState<ProjectChatSummary[]>([]);
+  const [directorio, setDirectorio] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [busqueda, setBusqueda] = useState('');
 
-  const [search, setSearch] = useState('');
+  const api = useMemo(() => createApiClient({ gatewayPath }), [gatewayPath]);
 
-  const fetchChats = useCallback(() => {
-    const fetchDirects = async () => {
-      try {
-        const res = await fetch(`${zonePath}/api/gateway/me/chats`);
-        return await res.json();
-      } catch {
-        return { data: [] };
-      }
-    };
+  const pedir = useCallback(() => {
+    /* Las dos en paralelo: iban encadenadas con `await`, y no dependen una de
+       la otra. Cada una degrada por su cuenta — que falle la de equipo no debe
+       borrar las privadas. */
+    Promise.all([
+      api.get<DirectConversation[]>('/me/chats').catch(() => null),
+      api.get<ProjectChatSummary[]>('/me/chats/projects').catch(() => null),
+    ])
+      .then(async ([privadas, equipos]) => {
+        if (privadas) setDirectas(privadas);
+        if (equipos) setDeProyecto(equipos);
 
-    const fetchProjects = async () => {
-      try {
-        const res = await fetch(`${zonePath}/api/gateway/me/chats/projects`);
-        return await res.json();
-      } catch {
-        return { data: [] };
-      }
-    };
+        const ids = [
+          ...new Set([
+            ...(privadas ?? []).map((c) => c.peerId),
+            ...(equipos ?? []).map((c) => c.ultimo?.authorId).filter((id): id is string => !!id),
+          ]),
+        ];
+        if (ids.length === 0) return;
 
-    const run = async () => {
-      const d = await fetchDirects();
-      const p = await fetchProjects();
-      const listD = Array.isArray(d?.data) ? d.data : [];
-      const listP = Array.isArray(p?.data) ? p.data : [];
-      setDirects(listD);
-      setProjectsCrudos(listP);
+        const perfiles = await api
+          .get<Paginated<UserProfile>>(`/users?ids=${ids.join(',')}`)
+          .catch(() => null);
+        if (perfiles) {
+          setDirectorio(new Map(perfiles.items.map((u: UserProfile) => [u.id, u])));
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [api]);
 
-      const ids = new Set<string>();
-      listD.forEach((c: any) => c.peerId && ids.add(c.peerId));
-      listP.forEach((c: any) => c.ultimo?.authorId && ids.add(c.ultimo.authorId));
+  /**
+   * La misma petición, agrupada.
+   *
+   * Ver `ESPERA_DEL_DIRECTORIO_MS`: sin esta ventana, una conversación viva
+   * dispara tres peticiones por mensaje recibido y otras tres por la marca de
+   * lectura que provoca.
+   */
+  const temporizador = useRef<number | null>(null);
+  const pedirAgrupado = useCallback(() => {
+    if (temporizador.current !== null) return;
+    temporizador.current = window.setTimeout(() => {
+      temporizador.current = null;
+      pedir();
+    }, ESPERA_DEL_DIRECTORIO_MS);
+  }, [pedir]);
 
-      if (ids.size > 0) {
-        fetch(`${zonePath}/api/gateway/users?ids=${Array.from(ids).join(',')}`)
-          .then((r) => r.json())
-          .then((ubody) => {
-            const uMap: Record<string, any> = {};
-            (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
-            setUsersMap(uMap);
-          })
-          .finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    };
-    run();
-  }, [zonePath]);
+  useEffect(
+    () => () => {
+      if (temporizador.current !== null) window.clearTimeout(temporizador.current);
+    },
+    [],
+  );
 
   useEffect(() => {
-    fetchChats();
-  }, [fetchChats]);
+    pedir();
+  }, [pedir]);
 
-  useLiveEvent('chat.mensaje', () => fetchChats());
-  useLiveEvent('chat.leido', () => fetchChats());
-  useReconnection(fetchChats);
+  useLiveEvent('chat.mensaje', pedirAgrupado);
+  useLiveEvent('chat.leido', pedirAgrupado);
+  /* Tras un corte se pide entero y sin esperar: hay un hueco real que rellenar. */
+  useReconnection(pedir);
+
+  /**
+   * Los chats de equipo **de la organización activa**.
+   *
+   * Un chat de proyecto es 1:1 con un proyecto, y un proyecto pertenece a una
+   * sola organización, así que el directorio se acota igual que el árbol lateral
+   * y la lista de proyectos. Los privados **no** se filtran: una conversación
+   * privada no es de ninguna organización, y esconder una con mensajes sin leer
+   * al cambiar de organización es peor que la incoherencia que evitaría (D5 de
+   * PLAN-ORGANIZACION-ACTIVA).
+   */
+  const termino = busqueda.trim().toLowerCase();
+  const proyectosVisibles = deProyecto
+    .filter((c) => !organizacionActivaId || c.project.organizationId === organizacionActivaId)
+    .filter((c) => !termino || c.project.name.toLowerCase().includes(termino));
+
+  const directasVisibles = directas.filter((c) => {
+    if (!termino) return true;
+    const peer = directorio.get(c.peerId);
+    return (peer ? personLabel(peer) : 'Alguien').toLowerCase().includes(termino);
+  });
 
   if (loading) {
     return (
       <div className="flex flex-col gap-2 px-1">
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
-        <div className="h-10 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-10 animate-pulse rounded-xl bg-white/5" />
+        <div className="h-10 animate-pulse rounded-xl bg-white/5" />
       </div>
     );
   }
-
-  function resumenDe(mensaje: { body: string; deletedAt?: string | null }): string {
-    if (mensaje.deletedAt) return 'Mensaje eliminado';
-    return (
-      mensaje.body.replace(/<[^>]*>?/gm, '').substring(0, 50) +
-      (mensaje.body.length > 50 ? '...' : '')
-    );
-  }
-
-  function cuandoCorto(iso: string) {
-    const d = new Date(iso);
-    const ahora = new Date();
-    if (
-      d.getDate() === ahora.getDate() &&
-      d.getMonth() === ahora.getMonth() &&
-      d.getFullYear() === ahora.getFullYear()
-    ) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
-  }
-
-  const PersonRow = ({ c, peer }: any) => {
-    const presencia = usePresence(c.peerId, peer?.presence);
-    const nombre = peer ? personLabel(peer) : 'Alguien';
-    const link = `/chat/${c.peerId}`;
-    const activo = browserPath === link;
-
-    // filter by search
-    if (search && !nombre.toLowerCase().includes(search.toLowerCase())) return null;
-
-    return (
-      <a
-        key={c.peerId || c.channelId}
-        href={link}
-        aria-current={activo ? 'page' : undefined}
-        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
-      >
-        <div className="shrink-0">
-          <Avatar
-            label={nombre}
-            size="sm"
-            src={avatarHref(peer?.avatarUrl, `${zonePath}/api/gateway`)}
-            presence={presencia}
-          />
-        </div>
-        {!plegada && (
-          <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span
-                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
-              >
-                {nombre}
-              </span>
-              {c.ultimo && (
-                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
-                  {cuandoCorto(c.ultimo.createdAt)}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span
-                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
-              >
-                {c.ultimo ? resumenDe(c.ultimo) : 'Iniciar conversación'}
-              </span>
-              {c.unread > 0 && (
-                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
-                  {c.unread > 99 ? '99+' : c.unread}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </a>
-    );
-  };
-
-  const ProjectRow = ({ c, autor }: any) => {
-    const link = `/chat/proyecto/${c.project.id}`;
-    const activo = browserPath === link;
-
-    // filter by search
-    if (search && !c.project.name.toLowerCase().includes(search.toLowerCase())) return null;
-
-    return (
-      <a
-        key={c.project.id}
-        href={link}
-        aria-current={activo ? 'page' : undefined}
-        className={`group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-white/10 ${plegada ? 'justify-center px-0' : ''} ${activo ? 'bg-white/10' : ''}`}
-      >
-        <div className="shrink-0 flex items-center justify-center scale-90 origin-center">
-          <ProjectMonogram
-            id={c.project.id}
-            name={c.project.name}
-            iconKey={c.project.iconKey}
-            color={c.project.color}
-          />
-        </div>
-        {!plegada && (
-          <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span
-                className={`truncate font-sans text-[13px] font-medium ${activo ? 'text-white' : 'text-white'}`}
-              >
-                {c.project.name}
-              </span>
-              {c.ultimo && (
-                <span className="ml-auto shrink-0 font-sans text-[10px] text-white">
-                  {cuandoCorto(c.ultimo.createdAt)}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span
-                className={`truncate font-sans text-[11px] ${!c.ultimo && !activo ? 'text-white' : 'text-white'}`}
-              >
-                {c.ultimo
-                  ? `${autor ? personLabel(autor) : 'Alguien'}: ${resumenDe(c.ultimo)}`
-                  : 'Sin mensajes'}
-              </span>
-              {c.unread > 0 && (
-                <span className="min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center font-sans text-[9px] font-semibold text-primary-foreground shrink-0">
-                  {c.unread > 99 ? '99+' : c.unread}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-      </a>
-    );
-  };
 
   return (
-    <div className="flex flex-col gap-4 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none pb-4 px-1">
-      {/* Search input */}
-      <div className="px-2">
-        <input
-          type="text"
-          placeholder="Buscar chats..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md bg-white/5 px-2 py-1 text-sm text-white placeholder-white/60 focus:outline-none"
-        />
-      </div>
-      {projects.length > 0 && (
+    <div className="flex max-h-[calc(100dvh-13rem)] flex-col gap-4 overflow-y-auto scrollbar-none px-1 pb-4">
+      {!plegada && (
+        <div className="px-2">
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar chats..."
+            aria-label="Buscar conversaciones"
+            className="w-full rounded-md bg-white/5 px-2 py-1 font-sans text-sm text-white placeholder-text-secondary focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+          />
+        </div>
+      )}
+
+      {proyectosVisibles.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               Proyectos
             </span>
           )}
-          {projects.map((c: any) => (
-            <ProjectRow
-              key={c.project.id}
-              c={c}
-              autor={c.ultimo?.authorId ? usersMap[c.ultimo.authorId] : null}
+          {proyectosVisibles.map((chat) => (
+            <FilaDeProyecto
+              key={chat.project.id}
+              chat={chat}
+              autor={chat.ultimo?.authorId ? directorio.get(chat.ultimo.authorId) : undefined}
+              activo={browserPath === `/chat/proyecto/${chat.project.id}`}
+              plegada={plegada}
             />
           ))}
         </div>
       )}
 
-      {directs.length > 0 && (
+      {directasVisibles.length > 0 && (
         <div className="flex flex-col gap-0.5">
           {!plegada && (
-            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-white">
+            <span className="mx-1 px-2 py-1.5 font-sans text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
               Privados
             </span>
           )}
-          {directs.map((c: any) => (
-            <PersonRow key={c.peerId} c={c} peer={usersMap[c.peerId]} />
+          {directasVisibles.map((conversacion) => (
+            <FilaDePersona
+              key={conversacion.peerId}
+              conversacion={conversacion}
+              peer={directorio.get(conversacion.peerId)}
+              activo={browserPath === `/chat/${conversacion.peerId}`}
+              plegada={plegada}
+              gatewayPath={gatewayPath}
+            />
           ))}
         </div>
+      )}
+
+      {/* Un buscador que no encuentra nada tiene que decirlo: con los dos grupos
+          vacíos y sin esto, la pestaña se quedaba en blanco y parecía rota. */}
+      {!plegada && termino && proyectosVisibles.length === 0 && directasVisibles.length === 0 && (
+        <p className="px-3 py-6 text-center font-sans text-[13px] text-text-secondary">
+          Ninguna conversación coincide con «{busqueda.trim()}».
+        </p>
       )}
     </div>
   );
 }
 
+/**
+ * La frase de una fila de la bandeja.
+ *
+ * ⚠️ **La tabla vive en `commons/notifications/avisos.ts`**, compartida con la
+ * tarjeta emergente. Estaba duplicada aquí con otra redacción: el mismo aviso se
+ * contaba distinto según lo leyeras en la tarjeta o en la fila.
+ *
+ * Lo único que se hace aquí es lo que sí es distinto: la fila tiene `actorId` y
+ * resuelve el nombre contra el directorio; la tarjeta recibe `actorName` ya
+ * resuelto por el gateway.
+ */
+function textoDeAviso(aviso: AppNotification, actor?: UserProfile): string {
+  const legible: AvisoLegible = {
+    type: aviso.type,
+    quien: actor ? personLabel(actor) : aviso.actorId ? 'Alguien' : null,
+    proyecto: aviso.projectName,
+    tarea: aviso.taskTitle,
+  };
+  return describirAviso(legible);
+}
+
+/**
+ * A dónde lleva una fila de la bandeja.
+ *
+ * ⚠️ `AppNotification` **no trae el slug** del proyecto, solo el UUID. Los dos
+ * resuelven en `/projects/:idOrSlug`, así que la URL sale menos legible y
+ * funciona igual; lo que no se hace es construirla a mano, que es lo que hacía
+ * antes (`/projects/${n.projectId}?task=…`) y es la trampa 10 de CLAUDE.md.
+ *
+ * Sin destino se queda en la bandeja: un aviso de automatización ya está
+ * contado aquí con su texto y su fecha, que es todo lo que hay que ver.
+ */
+function destinoDeUnAviso(aviso: AppNotification): string | undefined {
+  return (
+    destinoDeAviso({
+      type: aviso.type,
+      proyectoRef: aviso.projectId,
+      taskId: aviso.taskId,
+    }) ?? undefined
+  );
+}
+
+/**
+ * La bandeja de avisos, en su pestaña de la barra lateral.
+ *
+ * ## 🔴 Estaba siempre vacía, y el motivo era una letra
+ *
+ * Pedía `?limit=30&unread=true`. El DTO declara **`unreadOnly`**
+ * (`contracts/src/notifications/notification.dto.ts`) y el gateway arranca con
+ * `whitelist: true, forbidNonWhitelisted: true`: un campo que no reconoce no se
+ * ignora, **es un 400**. Es la primera regla de «Reglas al escribir un fetch» de
+ * CLAUDE.md, y aquí se incumplió por un nombre.
+ *
+ * Y el 400 se tragaba entero: `body?.data?.items || []` sobre un cuerpo de error
+ * da lista vacía, así que la pestaña decía «Nada nuevo por aquí» con la bandeja
+ * llena. «Sin leer» es la vista por defecto, o sea que era el caso normal.
+ *
+ * ⚠️ De ahí que ahora use `createApiClient`: desenvuelve `{ success, data,
+ * meta }` y **lanza** un `ApiError` en vez de devolver un objeto que se lee como
+ * una lista vacía. Con `fetch` a pelo, este fallo no tiene síntoma.
+ *
+ * ## Y no se enteraba de nada
+ *
+ * No tenía ni `useLiveEvent('aviso')` ni `useReconnection`: un aviso que llegaba
+ * con la pestaña abierta sacaba su tarjeta emergente —`LiveNotices` sí escucha—
+ * y no aparecía en la lista de debajo. Ahora escucha las dos cosas.
+ *
+ * ## Marcar leído
+ *
+ * Pulsar una fila navegaba y dejaba el aviso sin leer, así que la insignia no
+ * bajaba nunca. Se marca antes de navegar y se avisa a la insignia
+ * (`avisarDeAvisosLeidos`), que vuelve a preguntar en vez de restar a ciegas:
+ * restar aquí sería adivinar, y adivinar en un contador acaba en insignias que
+ * no se apagan.
+ */
 function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: boolean }) {
-  const [items, setItems] = useState<any[]>([]);
-  const [usersMap, setUsersMap] = useState<Record<string, any>>({});
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [directorio, setDirectorio] = useState<Map<string, UserProfile>>(new Map());
   const [loading, setLoading] = useState(true);
   const [mostrarTodos, setMostrarTodos] = useState(false);
 
+  const api = useMemo(
+    () => createApiClient({ gatewayPath: `${zonePath}/api/gateway` }),
+    [zonePath],
+  );
+
+  const cargar = useCallback(() => {
+    /* ⚠️ `unreadOnly`, no `unread`. Ver la cabecera de este componente. */
+    const filtro = mostrarTodos ? '' : '&unreadOnly=true';
+    api
+      .get<NotificationPage>(`/me/notifications?limit=30${filtro}`)
+      .then(async (pagina) => {
+        setItems(pagina.items);
+
+        const ids = [
+          ...new Set(pagina.items.map((n) => n.actorId).filter((id): id is string => !!id)),
+        ];
+        if (ids.length === 0) return;
+
+        /* Los nombres son decoración: si el directorio falla, las filas salen
+           con «Alguien» y la bandeja se lee igual. */
+        const perfiles = await api
+          .get<Paginated<UserProfile>>(`/users?ids=${ids.join(',')}`)
+          .catch(() => null);
+        setDirectorio(new Map((perfiles?.items ?? []).map((u: UserProfile) => [u.id, u])));
+      })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, [api, mostrarTodos]);
+
   useEffect(() => {
     setLoading(true);
-    const unreadParam = mostrarTodos ? '' : '&unread=true';
-    fetch(`${zonePath}/api/gateway/me/notifications?limit=30${unreadParam}`)
-      .then((res) => res.json())
-      .then((body) => {
-        const list = body?.data?.items || [];
-        setItems(list);
+    cargar();
+  }, [cargar]);
 
-        const ids = [...new Set(list.map((i: any) => i.actorId).filter((id: any) => !!id))];
-        if (ids.length > 0) {
-          fetch(`${zonePath}/api/gateway/users?ids=${ids.join(',')}`)
-            .then((r) => r.json())
-            .then((ubody) => {
-              const uMap: Record<string, any> = {};
-              (ubody?.data?.items || ubody?.data || []).forEach((u: any) => (uMap[u.id] = u));
-              setUsersMap(uMap);
-            })
-            .finally(() => setLoading(false));
-        } else {
-          setLoading(false);
-        }
-      })
-      .catch(() => setLoading(false));
-  }, [zonePath, mostrarTodos]);
+  /* Un aviso nuevo entra en la lista sin recargar nada. Antes solo se enteraba
+     al alternar «Sin leer / Todos». */
+  useLiveEvent('aviso', () => cargar());
+  useReconnection(cargar);
+
+  /**
+   * Marca leído y sigue.
+   *
+   * No se espera a la respuesta para navegar: el aviso ya está leído en cuanto
+   * se pulsa, y hacer esperar a alguien por un `PATCH` cosmético es peor que
+   * arriesgarse a que falle —si falla, sigue sin leer y se ve al recargar—.
+   */
+  function alPulsar(aviso: AppNotification) {
+    if (aviso.readAt) return;
+    setItems((previos) =>
+      previos.map((n) => (n.id === aviso.id ? { ...n, readAt: new Date().toISOString() } : n)),
+    );
+    api
+      .patch(`/me/notifications/${aviso.id}/read`, {})
+      .then(() => avisarDeAvisosLeidos())
+      .catch(() => undefined);
+  }
 
   const loader = (
     <div className="flex flex-col gap-2 px-1 py-2">
@@ -1443,121 +1979,91 @@ function SidebarInboxList({ zonePath, plegada }: { zonePath: string; plegada: bo
     </div>
   );
 
-  function getTitle(n: any) {
-    const who = n.actorId ? usersMap[n.actorId]?.name?.split(' ')[0] || 'Alguien' : 'El sistema';
-    const project = n.projectName ?? 'un proyecto';
-    const task = n.taskTitle ?? 'una tarea';
-
-    switch (n.type) {
-      case 'INVITATION_RECEIVED':
-        return `${who} te invitó a ${project}`;
-      case 'INVITATION_ACCEPTED':
-        return `${who} aceptó tu invitación a ${project}`;
-      case 'INVITATION_REJECTED':
-        return `${who} rechazó tu invitación a ${project}`;
-      case 'MEMBER_LEFT':
-        return `${who} salió de ${project}`;
-      case 'MEMBER_REMOVED':
-        return `${who} te sacó de ${project}`;
-      case 'TASK_ASSIGNED':
-        return `${who} te asignó ${task} en ${project}`;
-      case 'TASK_UNASSIGNED':
-        return `${who} te quitó de ${task} en ${project}`;
-      case 'AUTOMATION_TASK_DUE_SOON':
-        return `${task} vencerá pronto en ${project}`;
-      case 'AUTOMATION_TASK_STALE':
-        return `${task} lleva días sin movimiento en ${project}`;
-      case 'AUTOMATION_TASK_OVERDUE':
-        return `${task} ha vencido en ${project}`;
-      case 'AUTOMATION_TASK_UNASSIGNED':
-        return `${task} sigue sin encargado en ${project}`;
-      case 'AUTOMATION_TASK_CREATED':
-        return `Se creó ${task} en ${project}`;
-      case 'AUTOMATION_TASK_MOVED':
-        return `${task} cambió de columna en ${project}`;
-      case 'AUTOMATION_TASK_COMPLETED':
-        return `${task} se terminó en ${project}`;
-      case 'AUTOMATION_TASK_REOPENED':
-        return `${task} se reabrió en ${project}`;
-      case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
-        return `Cambiaron los encargados de ${task}`;
-      case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
-        return `Cambió el vencimiento de ${task}`;
-      default:
-        return 'Nueva notificación';
-    }
-  }
-
-  function getHref(n: any) {
-    if (!n.projectId || n.type === 'MEMBER_REMOVED') return '/projects';
-    if (n.taskId) return `/projects/${n.projectId}?task=${n.taskId}`;
-    return `/projects/${n.projectId}`;
-  }
-
   return (
-    <div className="flex flex-col max-h-[calc(100vh-200px)]">
+    <div className="flex flex-col max-h-[calc(100dvh-13rem)]">
       {!plegada && (
-        <div className="flex bg-white/5 rounded-lg p-0.5 mx-3 mb-3 shrink-0">
+        <div className="mx-3 mb-3 flex shrink-0 rounded-lg bg-white/5 p-0.5">
           <button
+            type="button"
             onClick={() => setMostrarTodos(false)}
-            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${!mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
+            className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
+              !mostrarTodos
+                ? 'bg-white/15 text-white shadow-sm'
+                : 'text-text-secondary hover:bg-white/5 hover:text-white'
+            }`}
           >
             Sin leer
           </button>
           <button
+            type="button"
             onClick={() => setMostrarTodos(true)}
-            className={`flex-1 text-[11px] font-medium py-1.5 rounded-md transition-colors ${mostrarTodos ? 'bg-white/15 text-white shadow-sm' : 'text-white hover:text-white hover:bg-white/5'}`}
+            className={`flex-1 rounded-md py-1.5 font-sans text-[11px] font-medium transition-colors ${
+              mostrarTodos
+                ? 'bg-white/15 text-white shadow-sm'
+                : 'text-text-secondary hover:bg-white/5 hover:text-white'
+            }`}
           >
             Todos
           </button>
         </div>
       )}
 
-      <div className="flex flex-col gap-1 overflow-y-auto scrollbar-none px-1 pb-4 flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto scrollbar-none px-1 pb-4">
         {loading ? (
           loader
         ) : items.length === 0 ? (
-          <div className="px-4 py-8 text-center text-white text-[13px] font-sans">
-            Nada nuevo por aquí.
+          <div className="px-4 py-8 text-center font-sans text-[13px] text-text-secondary">
+            {mostrarTodos ? 'No tienes avisos.' : 'Nada nuevo por aquí.'}
           </div>
         ) : (
-          items.map((n: any) => {
-            const actor = n.actorId ? usersMap[n.actorId] : null;
+          items.map((aviso) => {
+            const actor = aviso.actorId ? directorio.get(aviso.actorId) : undefined;
+            const sinLeer = !aviso.readAt;
             return (
               <a
-                key={n.id}
-                href={getHref(n)}
+                key={aviso.id}
+                href={destinoDeUnAviso(aviso)}
+                onClick={() => alPulsar(aviso)}
                 className={`relative flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-white/5 ${
-                  !n.readAt ? 'bg-white/[0.04]' : ''
+                  sinLeer ? 'bg-white/[0.04]' : ''
                 }`}
               >
                 {!plegada && (
-                  <div className="w-8 h-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
                     {actor?.avatarUrl ? (
                       <img
-                        src={`${zonePath}/api/gateway${actor.avatarUrl}`}
+                        src={avatarHref(actor.avatarUrl, `${zonePath}/api/gateway`) ?? undefined}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="h-full w-full object-cover"
                       />
                     ) : (
-                      <span className="text-white text-[11px] font-bold">
-                        {(actor?.name || 'S').charAt(0).toUpperCase()}
+                      <span className="font-sans text-[11px] font-bold text-white">
+                        {/* `personLabel` y no `actor.name`: aquel no existe en
+                            `UserProfile` —el nombre son `firstName`/`lastName`—
+                            y esto se escribió sobre un `any`, así que compilaba
+                            y pintaba «S» para todo el mundo. */}
+                        {(actor ? personLabel(actor) : 'S').charAt(0).toUpperCase()}
                       </span>
                     )}
-                  </div>
+                  </span>
                 )}
-                <div className={`flex flex-col min-w-0 flex-1 ${plegada ? 'hidden' : ''}`}>
+                <div className={`flex min-w-0 flex-1 flex-col ${plegada ? 'hidden' : ''}`}>
+                  {/* Sin leer pesa más y va en blanco; leído baja a secundario.
+                      Los dos decían `text-white`: el ternario existía y devolvía
+                      lo mismo en las dos ramas desde el rediseño monocromo. */}
                   <p
-                    className={`font-sans text-[12px] leading-snug line-clamp-2 ${!n.readAt ? 'text-white font-medium' : 'text-white'}`}
+                    className={`line-clamp-2 font-sans text-[12px] leading-snug ${
+                      sinLeer ? 'font-medium text-white' : 'text-text-secondary'
+                    }`}
                   >
-                    {getTitle(n)}
+                    {textoDeAviso(aviso, actor)}
                   </p>
-                  <span className="font-sans text-[10px] text-white mt-1">
-                    {new Date(n.createdAt).toLocaleDateString()}
+                  <span className="mt-1 font-sans text-[10px] text-text-secondary">
+                    {new Date(aviso.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                {!n.readAt && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-white mt-1.5 shrink-0" />
+                {sinLeer && (
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                 )}
               </a>
             );

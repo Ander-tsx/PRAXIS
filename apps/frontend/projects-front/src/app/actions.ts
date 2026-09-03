@@ -9,7 +9,7 @@ import {
   type TemplateDraftState,
   type TemplateResult,
 } from '@praxis/commons';
-import { createServerApiClient, getSession } from '@praxis/commons/auth';
+import { createServerApiClient, getSession, loadPrivateChrome } from '@praxis/commons/auth';
 import { detallesDeCuota } from '@praxis/commons/billing/planes';
 import { aplicarPlantilla, pedirBorrador } from '@praxis/commons/template';
 import { revalidatePath } from 'next/cache';
@@ -112,7 +112,12 @@ export async function borradorDePlantillaAction(
   if (!session) {
     return { resultado: null, error: 'Tu sesión ha caducado.', sinCuota: false, cuota: null };
   }
-  return pedirBorrador(brief, ajuste);
+  /* La organización activa **resuelta**, que es a la que se le cobra este turno
+     de IA. Se pide aquí y no dentro de `pedirBorrador` para que `commons` no
+     vuelva a leer la cookie por su cuenta: quien renderiza es quien sabe cuál
+     está mirando. Ver el aviso de la firma de `pedirBorrador`. */
+  const { organizacionActivaId } = await loadPrivateChrome();
+  return pedirBorrador(brief, ajuste, organizacionActivaId);
 }
 
 /**
@@ -134,7 +139,14 @@ export async function crearProyectoDesdePlantillaAction(
     };
   }
 
-  const resultado = await aplicarPlantilla(plantilla);
+  /* 🔴 **La organización activa, o el proyecto cae en la personal.** Es el
+     mismo campo que manda el formulario manual (`PraxCreateProjectTrigger`) y
+     que a esta ruta se le olvidó: sin él, crear con PRAX estando en el equipo
+     creaba el proyecto donde no lo ibas a ver, y su 402 de cuota hablaba de una
+     organización distinta de la que estabas mirando. */
+  const { organizacionActivaId } = await loadPrivateChrome();
+
+  const resultado = await aplicarPlantilla(plantilla, organizacionActivaId);
   if (resultado.proyecto) revalidatePath('/');
   return resultado;
 }

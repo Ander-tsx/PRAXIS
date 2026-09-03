@@ -24,8 +24,8 @@ import type {
   TemplateResult,
   Workspace,
 } from '../api/domain';
+import { loadPrivateChrome } from '../auth/nav';
 import { getSession } from '../auth/session';
-import { getOrganizacionActiva } from '../theme/organizacion';
 import type { QuotaExceededDetails } from '../billing/planes';
 import { detallesDeCuota } from '../billing/planes';
 import { aplicarPlantilla } from '../template/apply';
@@ -196,14 +196,22 @@ export async function preguntarAction(
        omitirlo cobraría el mensaje en la personal —gratuita— aunque se esté
        trabajando en el equipo que paga.
 
-       ⚠️ **Y no es una llave.** Sale de la cookie, que escribe el navegador; el
-       gateway comprueba la pertenencia antes de usarla
-       (`QuotaService.organizacionElegida`) y responde `403 NOT_IN_ORG` si no es
-       tuya. Es un filtro, como siempre.
+       ⚠️ **Y es la resuelta, no la cookie en crudo.** Estaba en
+       `getOrganizacionActiva()`, que devuelve lo que puso el navegador sin
+       comprobar: si la cookie apunta a una organización de la que ya te fueron,
+       la barra lateral repliega a la personal —`resolverOrganizacionActiva`— y
+       esto seguía mandando la vieja. El gateway respondía `403 NOT_IN_ORG` y en
+       pantalla solo se leía que PRAX no había contestado, con el selector
+       diciendo otra cosa. `loadPrivateChrome()` es donde ese repliegue ya está
+       hecho, y no cuesta una petición más: la lista de organizaciones se pide
+       igualmente en cada carga.
+
+       Sigue sin ser una llave: el gateway comprueba la pertenencia antes de
+       usarla (`QuotaService.organizacionElegida`). Es un filtro, como siempre.
 
        En la ruta de proyecto no se manda: allí la organización sale del propio
        proyecto, que es lo que no se puede falsificar. */
-    const organizationId = projectId ? null : await getOrganizacionActiva();
+    const organizationId = projectId ? null : (await loadPrivateChrome()).organizacionActivaId;
 
     const resultado = await api.post<AssistantChatResult>(ruta, {
       message: texto,
@@ -1015,7 +1023,13 @@ export async function aceptarPlantillaAction(plantilla: ProjectTemplate): Promis
     };
   }
 
-  return aplicarPlantilla(plantilla);
+  /* 🔴 **La organización activa, resuelta.** Sin ella `POST /projects` cae en la
+     personal, así que aceptar una plantilla de PRAX estando en el equipo creaba
+     el proyecto donde nadie lo iba a ver. Es el mismo campo que manda el
+     formulario manual; a las dos rutas de plantilla se les había olvidado. */
+  const { organizacionActivaId } = await loadPrivateChrome();
+
+  return aplicarPlantilla(plantilla, organizacionActivaId);
 }
 
 /**

@@ -1278,6 +1278,41 @@ export interface DirectConversation {
 }
 
 /**
+ * Un chat de equipo, tal y como lo devuelve `GET /me/chats/projects`.
+ *
+ * ⚠️ **No existía**, y por eso la barra lateral y el índice de Mensajes lo
+ * manejaban con `any`: dos superficies leyendo `c.project.organizationId` y
+ * `c.ultimo.body` sin que nada comprobara que esos campos vienen. Un cambio en
+ * el `select` del servicio no habría dado ni un error de compilación.
+ *
+ * `channelId` es `null` cuando el proyecto **todavía no tiene canal**: nadie ha
+ * escrito nunca. La fila se pinta igual —el chat se puede abrir y crear el canal
+ * al primer mensaje— y por eso `project` no es opcional pero `channelId` sí es
+ * nulo. Es un proyecto sin conversación, no una conversación sin proyecto.
+ */
+export interface ProjectChatSummary {
+  channelId: string | null;
+  project: {
+    id: string;
+    name: string;
+    slug: string;
+    iconKey: string | null;
+    color: string | null;
+    /** Con lo que el directorio lo acota a la organización activa. */
+    organizationId: string;
+  };
+  /** Mismo trato que en `DirectConversation`: `deletedAt` viaja para el resumen. */
+  ultimo: {
+    body: string;
+    authorId: string;
+    createdAt: string;
+    deletedAt?: string | null;
+  } | null;
+  unread: number;
+  muted: boolean;
+}
+
+/**
  * Alguien a quien puedes escribir, con **dónde coincidís y qué es allí**.
  *
  * El rol es por proyecto, no global: la misma persona puede ser quien administra

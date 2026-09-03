@@ -10,21 +10,25 @@ import { getOrganizacionActiva, resolverOrganizacionActiva } from '../theme/orga
 import { type CurrentUser, loadCurrentUser } from './current-user';
 import { createServerApiClient } from './server-client';
 
-/**
- * Dónde va la insignia de avisos sin leer: **en el Panel** (E4.3).
+/*
+ * 🕳️ Aquí vivían `AVISOS_HREF` y `CHAT_HREF`.
  *
- * La bandeja era una pantalla propia con su entrada de menú. Ahora es una
- * sección del panel, así que la entrada se ha ido y su insignia se muda a la del
- * Panel — que es donde lleva ese número si lo pulsas.
+ * 🔴 **Las insignias ya no se emparejan por `href`, y por eso desaparecieron.**
  *
- * ⚠️ Tiene que coincidir **exactamente** con el `href` de la entrada en
- * `navigation.tsx`: el emparejamiento es por igualdad de cadena, así que un
- * desajuste no da error, simplemente deja la insignia a cero para siempre.
+ * El emparejamiento era `item.href === CHAT_HREF`, con el aviso escrito de que
+ * un desajuste «no da error, simplemente deja la insignia a cero para siempre».
+ * Es exactamente lo que pasó: `ac4caf1` mudó el directorio de chats y la bandeja
+ * de avisos a **pestañas de la barra lateral** y borró sus entradas de
+ * `APP_NAV_ITEMS`, dejando esta función buscando dos `href` que ya no existían.
+ * Se seguían pidiendo cuatro endpoints por carga de página, en las siete zonas,
+ * para calcular dos números que no pintaba nadie.
+ *
+ * Los contadores ya no son de ninguna entrada de menú: son del armazón, que es
+ * quien dibuja esas pestañas. Salen de `loadPrivateChrome()` como campos
+ * propios —`mensajesSinLeer`, `avisosSinLeer`— y `AppShell` los pinta encima de
+ * su pestaña. `AppNavItem.badge` sigue existiendo para quien lo necesite; hoy no
+ * lo usa nadie.
  */
-const AVISOS_HREF = '/projects';
-
-/** Href de los mensajes directos, que llevan su propia insignia. */
-const CHAT_HREF = '/chat';
 
 export interface AppNavOptions {
   /**
@@ -85,47 +89,36 @@ async function loadChatUnreadCount(): Promise<number> {
 /**
  * La lista canónica adaptada a quien mira. Sin red: solo decide.
  *
- * Dos ajustes, y los dos tienen que pasar aquí y no en `APP_NAV_ITEMS`, que no
- * sabe quién está delante:
+ * Un solo ajuste, y tiene que pasar aquí y no en `APP_NAV_ITEMS`, que no sabe
+ * quién está delante: el grupo de administración entero se cae si la cuenta no
+ * administra. Las cuatro pantallas (`Cuentas`, `Proyectos`, `Organizaciones`,
+ * `Actividad`) comparten sección, así que se filtra por `section` y no
+ * comparando `href` sueltos, que es lo que habría habido que tocar al añadir la
+ * cuarta.
  *
- * - el grupo de administración entero se cae si la cuenta no administra —las
- *   cuatro pantallas (`Cuentas`, `Proyectos`, `Organizaciones`, `Actividad`)
- *   comparten sección, así que se filtra por `section` y no comparando `href`
- *   sueltos, que es lo que habría habido que tocar al añadir la cuarta;
- * - la insignia de avisos solo aparece con algo sin leer, porque una insignia que
- *   enseña un cero es una insignia que enseña nada.
+ * Las insignias ya no se ponen aquí: ver el hueco de arriba.
  */
-function buildNavItems({
-  roles,
-  unread,
-  mensajes,
-}: { roles: readonly string[]; unread: number; mensajes: number }) {
+function buildNavItems({ roles }: { roles: readonly string[] }) {
   const puedeAdministrar = hasAdminRole(roles);
 
   return APP_NAV_ITEMS.filter(
     (item) => item.section !== SECTION_ADMINISTRACION || puedeAdministrar,
-  ).map((item) => {
-    if (item.href === AVISOS_HREF && unread > 0) return { ...item, badge: unread };
-    /* Los mensajes llevan la suya, y por el mismo criterio: sin nada sin leer no
-       hay insignia, porque una que enseña un cero no informa de nada. */
-    if (item.href === CHAT_HREF && mensajes > 0) return { ...item, badge: mensajes };
-    return item;
-  });
+  );
 }
 
 /**
- * La navegación del área privada, con el contador puesto y la entrada de
- * administración solo si corresponde.
+ * La navegación del área privada, con la entrada de administración solo si
+ * corresponde.
  *
- * Existe porque **la insignia tiene que verse desde cualquier pantalla**, no solo
- * desde las dos que ya pedían la bandeja.
+ * ⚠️ Ya no pide nada: los contadores se fueron a `loadPrivateChrome()`, que es
+ * quien los sirve al armazón. Esto se queda porque hay pantallas que solo
+ * quieren la lista.
  *
  * Para una zona privada usa mejor `loadPrivateChrome()`, que resuelve esto y el
  * usuario de una vez y en paralelo.
  */
 export async function loadAppNavItems(options: AppNavOptions = {}): Promise<AppNavItem[]> {
-  const [unread, mensajes] = await Promise.all([loadUnreadCount(), loadChatUnreadCount()]);
-  return buildNavItems({ roles: options.roles ?? [], unread, mensajes });
+  return buildNavItems({ roles: options.roles ?? [] });
 }
 
 export interface PrivateChrome extends CurrentUser {
@@ -138,8 +131,25 @@ export interface PrivateChrome extends CurrentUser {
    * Un fallo aquí no puede dejar sin barra lateral a nadie.
    */
   organizaciones: OrgDelSelector[];
-  /** Cuál se está mirando. `null` es **todas**, no la personal. */
+  /**
+   * Cuál se está mirando, **ya resuelta**.
+   *
+   * ⚠️ `null` solo si no tienes ninguna organización, que no debería pasar: todo
+   * el mundo tiene la personal. **No significa «todas»** — eso se retiró el
+   * 2026-08-28 y el comentario que lo decía aquí se quedó mintiendo. Ver
+   * `resolverOrganizacionActiva`.
+   */
   organizacionActivaId: string | null;
+  /**
+   * Mensajes sin leer, privados y de equipo, para la pestaña «Chat».
+   *
+   * ⚠️ **Es una semilla, no la verdad.** El número se calcula al pintar en el
+   * servidor y a partir de ahí lo lleva `useMessageCount` escuchando el flujo:
+   * sin eso solo cambiaría al recargar. Ver su nota.
+   */
+  mensajesSinLeer: number;
+  /** Avisos de bandeja sin leer, para la pestaña «Bandeja de entrada». Ídem. */
+  avisosSinLeer: number;
 }
 
 /**
@@ -183,7 +193,9 @@ export async function loadPrivateChrome(): Promise<PrivateChrome> {
 
   return {
     ...user,
-    navItems: buildNavItems({ roles: user.roles, unread, mensajes }),
+    navItems: buildNavItems({ roles: user.roles }),
+    mensajesSinLeer: mensajes,
+    avisosSinLeer: unread,
     organizaciones,
     /* 🔴 **Resuelta, no la cookie en crudo.** Siempre hay una activa desde
        2026-08-28, y la cookie puede apuntar a una de la que ya te fueron: sin

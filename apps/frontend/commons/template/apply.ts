@@ -67,8 +67,30 @@ function vacio(): TemplateResult['creado'] {
  *
  * La única excepción es el propio `POST /projects`: si eso falla no hay dónde
  * colgar nada y se vuelve con el error tal cual.
+ *
+ * ## 🔴 `organizationId` no es opcional de verdad: es obligatorio y se olvidó
+ *
+ * ⚠️ **Sin él, el proyecto cae SIEMPRE en la organización personal**, aunque el
+ * selector esté en otra. `POST /projects` resuelve así el campo ausente
+ * (CLAUDE.md, trampa 17), y el formulario manual ya lo mandaba —
+ * `PraxCreateProjectTrigger` lleva ese aviso escrito desde que le pasó—. Esta
+ * ruta, la de la plantilla, se quedó sin el arreglo: el proyecto se creaba
+ * donde no lo ibas a mirar.
+ *
+ * Y lo que lo hacía difícil de leer como avería es la segunda consecuencia: la
+ * cuota de proyectos se cuenta **por organización**, así que llenar la personal
+ * a espaldas de quien mira acaba en un 402 «ya tienes 3» sobre una organización
+ * distinta de la que se está viendo.
+ *
+ * Sigue siendo un parámetro opcional en la firma porque el tipo no puede
+ * garantizar lo que sí garantiza quien llama: los dos llamantes lo sacan de
+ * `loadPrivateChrome()`, o sea de `resolverOrganizacionActiva`, **nunca de la
+ * cookie en crudo** (ver `theme/organizacion.ts`).
  */
-export async function aplicarPlantilla(plantilla: ProjectTemplate): Promise<TemplateResult> {
+export async function aplicarPlantilla(
+  plantilla: ProjectTemplate,
+  organizationId?: string | null,
+): Promise<TemplateResult> {
   const api = createServerApiClient();
   const fallos: string[] = [];
   const creado = vacio();
@@ -79,6 +101,7 @@ export async function aplicarPlantilla(plantilla: ProjectTemplate): Promise<Temp
       name: plantilla.nombre,
       /* Solo si la hay: un campo vacío de más es un 400 (CLAUDE.md). */
       ...(plantilla.descripcion ? { description: plantilla.descripcion } : {}),
+      ...(organizationId ? { organizationId } : {}),
     });
   } catch (error) {
     return {

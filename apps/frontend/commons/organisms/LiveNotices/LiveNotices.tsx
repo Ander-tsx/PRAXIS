@@ -2,18 +2,27 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toaster, sileo } from 'sileo';
-import { projectHref } from '../../api/routes';
+import {
+  type AvisoLegible,
+  abrirBandeja,
+  describirAviso,
+  destinoDeAviso,
+} from '../../notifications/avisos';
 
-/**
- * La bandeja del panel, en su ancla.
+/*
+ * 🕳️ Aquí estaba `BANDEJA_DE_AVISOS = '/main#avisos'`.
  *
- * ⚠️ **El ancla la pone `dashboard-front`** (`id="avisos"` en su sección de la
- * bandeja) y esto vive en `commons`, así que la constante está escrita a mano:
- * no hay forma de importarla sin que `commons` dependa de una zona. Si allí se
- * renombra el ancla, esto lleva al panel pero sin desplazarse — degrada bien,
- * pero conviene saberlo.
+ * 🔴 **Llevaba a ningún sitio, y hacía tiempo.** Su comentario decía que el
+ * ancla `id="avisos"` la ponía `dashboard-front`; hoy no la pone nadie —un
+ * `grep` sobre `apps/frontend` solo encontraba ese comentario— y la raíz de
+ * `/main` es un `useEffect` que hace `location.replace('/projects')`. O sea que
+ * pulsar «Ver» en la tarjeta de cualquier aviso de automatización dejaba a quien
+ * pulsaba en la lista de proyectos, sin relación con el aviso.
+ *
+ * La bandeja dejó de ser una pantalla: es una pestaña de la barra lateral, y una
+ * pestaña no tiene URL. Se abre con `abrirBandeja()`, que despacha un evento que
+ * escucha el armazón. Ver `commons/notifications/avisos.ts`.
  */
-const BANDEJA_DE_AVISOS = '/main#avisos';
 
 /**
  * El rayo de la insignia de un aviso de automatización.
@@ -88,6 +97,18 @@ import {
  * ya está guardado y se ve al entrar. Esto es una capa encima; que Redis o el
  * flujo fallen degrada el tiempo real y nada más.
  */
+/**
+ * Qué hace el botón de una tarjeta.
+ *
+ * Son dos cosas distintas y por eso no es una cadena: `ir` navega —duro, porque
+ * el destino puede estar en otra zona— y `bandeja` abre la pestaña de la barra
+ * lateral, que **no tiene URL** desde que la bandeja dejó de ser una pantalla.
+ *
+ * `null` es una tarjeta sin botón, que es lo correcto cuando no hay a dónde ir:
+ * `MEMBER_REMOVED`, por ejemplo, donde el enlace daría 403.
+ */
+type AccionDeTarjeta = { tipo: 'ir'; href: string } | { tipo: 'bandeja' } | null;
+
 export function LiveNotices() {
   const pedirRefresco = useRefrescoAgrupado();
   const tema = useCurrentTheme();
@@ -148,9 +169,13 @@ export function LiveNotices() {
    * aparece en cualquier zona y su destino puede vivir en otra —te llega estando
    * en el panel y lleva a `projects`—, así que la navegación tiene que ser dura.
    * Misma regla que la barra lateral (ESTADO-ACTUAL §16).
+   *
+   * ⚠️ **Y hay una acción que no navega a ninguna parte**: la de los avisos de
+   * automatización, que abren la pestaña «Bandeja» de la barra lateral. Es lo
+   * que sustituye al `/main#avisos` roto; ver `AccionDeTarjeta`.
    */
   const anunciar = useCallback(
-    (presentacion: Presentacion, descripcion: string, destino: string | null) => {
+    (presentacion: Presentacion, descripcion: string, accion: AccionDeTarjeta) => {
       sileo.show({
         type: presentacion.tipo,
         title: presentacion.titulo,
@@ -163,12 +188,19 @@ export function LiveNotices() {
         /* El tono de la píldora sale de la paleta de PRAXIS, no del blanco y
            negro casi puros que trae `sileo`. Ver `RELLENO_POR_TEMA`. */
         fill: RELLENO_POR_TEMA[tema],
-        ...(destino && presentacion.accion
+        ...(accion && presentacion.accion
           ? {
               button: {
-                title: presentacion.accion,
+                /* «Ver en la bandeja» y no la etiqueta de la presentación: el
+                   botón tiene que decir a dónde va, y aquí no va a ninguna
+                   pantalla — abre la pestaña de esta misma barra. */
+                title: accion.tipo === 'bandeja' ? 'Ver en la bandeja' : presentacion.accion,
                 onClick: () => {
-                  window.location.href = destino;
+                  if (accion.tipo === 'bandeja') {
+                    abrirBandeja();
+                    return;
+                  }
+                  window.location.href = accion.href;
                 },
               },
             }
@@ -236,19 +268,36 @@ export function LiveNotices() {
     const destino = destinoDeMensaje(evento);
     if (destino && mismaVista(destino, window.location)) return;
 
-    anunciar(PRESENTACION_DE_MENSAJE, textoDeMensaje(evento), destino);
+    anunciar(
+      PRESENTACION_DE_MENSAJE,
+      textoDeMensaje(evento),
+      destino ? { tipo: 'ir', href: destino } : null,
+    );
   });
 
   /** Los avisos de la bandeja: invitaciones, asignaciones, altas y bajas. */
   useLiveEvent('aviso', (evento) => {
-    /* Estos sí cambian lo que renderiza el servidor —la bandeja, el tablero— y
-       esas pantallas no escuchan nada. */
+    /* Estos sí cambian lo que renderiza el servidor —el tablero, la lista de
+       miembros— y esas pantallas no escuchan nada.
+
+       ⚠️ La **bandeja** ya no está entre ellas: su pestaña de la barra lateral
+       escucha este mismo evento por su cuenta desde que se arregló
+       (`SidebarInboxList`). El refresco se queda por las otras. */
     pedirRefresco();
 
-    const destino = destinoDeAviso(evento);
+    const destino = destinoDeUnAviso(evento);
     if (destino && mismaVista(destino, window.location)) return;
 
-    anunciar(presentacionDe(evento.type), describir(evento), destino);
+    /* Sin destino: los de automatización abren la bandeja —ahí está el aviso con
+       su texto y su fecha, que es lo que explica por qué te avisaron—. Los demás
+       sin destino se quedan sin botón, que es honesto. */
+    const accion: AccionDeTarjeta = destino
+      ? { tipo: 'ir', href: destino }
+      : evento.type.startsWith('AUTOMATION_')
+        ? { tipo: 'bandeja' }
+        : null;
+
+    anunciar(presentacionDe(evento.type), describir(evento), accion);
   });
 
   /**
@@ -342,120 +391,42 @@ function destinoDeMensaje(evento: ChatMessageEvent): string | null {
 /**
  * El texto de un aviso de bandeja.
  *
- * Con nombre desde que el gateway lo resuelve al relevar el evento: en un equipo,
- * «te han asignado algo» sin decir quién obliga a abrirlo para saber si te
- * incumbe. Degrada a impersonal cuando `actorName` no viene —credentials caído,
- * una cuenta borrada—, que es la forma que tenía antes: se pierde un dato, no el
- * aviso.
+ * ⚠️ **La tabla vive en `commons/notifications/avisos.ts`**, compartida con la
+ * fila de la bandeja lateral. Estaban duplicadas —dieciséis `case` cada una— y
+ * ya habían divergido: el mismo aviso se leía distinto según lo vieras en la
+ * tarjeta o en la lista.
+ *
+ * Lo que se hace aquí es lo único que es distinto: el evento del flujo trae
+ * `actorName` **ya resuelto por el gateway**, mientras que la fila de la bandeja
+ * tiene un `actorId` que resuelve contra el directorio.
  */
 function describir(evento: NoticeEvent): string {
-  const proyecto = evento.projectName ?? null;
-  const tarea = evento.taskTitle ?? 'una tarea';
-  const quien = evento.actorName?.trim() || null;
-  /* «en «Proyecto»» o nada. Se compone una vez para que ninguna rama se olvide
-     de contemplar el caso sin proyecto. */
-  const donde = proyecto ? ` en «${proyecto}»` : '';
-
-  switch (evento.type) {
-    case 'INVITATION_RECEIVED':
-      return quien
-        ? `${quien} te ha invitado a «${proyecto ?? 'un proyecto'}».`
-        : `Te han invitado a «${proyecto ?? 'un proyecto'}».`;
-    case 'INVITATION_ACCEPTED':
-      return quien
-        ? `${quien} ha aceptado tu invitación a «${proyecto ?? 'un proyecto'}».`
-        : `Han aceptado tu invitación a «${proyecto ?? 'un proyecto'}».`;
-    case 'INVITATION_REJECTED':
-      return quien
-        ? `${quien} ha rechazado tu invitación a «${proyecto ?? 'un proyecto'}».`
-        : `Han rechazado tu invitación a «${proyecto ?? 'un proyecto'}».`;
-    case 'MEMBER_LEFT':
-      return quien
-        ? `${quien} ha salido de «${proyecto ?? 'un proyecto'}».`
-        : `Alguien ha salido de «${proyecto ?? 'un proyecto'}».`;
-    case 'MEMBER_REMOVED':
-      return `Te han sacado de «${proyecto ?? 'un proyecto'}».`;
-    case 'TASK_ASSIGNED':
-      return quien
-        ? `${quien} te ha asignado «${tarea}»${donde}.`
-        : `Te han asignado «${tarea}»${donde}.`;
-    case 'TASK_UNASSIGNED':
-      return quien
-        ? `${quien} te ha quitado de «${tarea}»${donde}.`
-        : `Te han quitado de «${tarea}»${donde}.`;
-    /**
-     * ⚠️ **Los de automatización sí tienen texto, y antes no.**
-     *
-     * Caían al `default` —«Tienes un aviso nuevo»— porque este `switch` se
-     * escribió cuando solo existían los de equipo y tarea. Un aviso que no dice
-     * qué ha pasado obliga a abrirlo para averiguarlo, que es justo lo que un
-     * aviso viene a evitar.
-     */
-    case 'AUTOMATION_TASK_DUE_SOON':
-      return `«${tarea}» vencerá pronto${donde}.`;
-    case 'AUTOMATION_TASK_STALE':
-      return `«${tarea}» lleva varios días sin movimiento${donde}.`;
-    case 'AUTOMATION_TASK_OVERDUE':
-      return `«${tarea}» ha pasado su fecha de vencimiento${donde}.`;
-    case 'AUTOMATION_TASK_UNASSIGNED':
-      return `«${tarea}» sigue sin encargado${donde}.`;
-    case 'AUTOMATION_TASK_CREATED':
-      return `Se ha creado «${tarea}»${donde}.`;
-    case 'AUTOMATION_TASK_MOVED':
-      return `«${tarea}» ha cambiado de columna${donde}.`;
-    case 'AUTOMATION_TASK_COMPLETED':
-      return `«${tarea}» se ha dado por terminada${donde}.`;
-    case 'AUTOMATION_TASK_REOPENED':
-      return `«${tarea}» se ha vuelto a abrir${donde}.`;
-    case 'AUTOMATION_TASK_ASSIGNEES_CHANGED':
-      return `Han cambiado los encargados de «${tarea}»${donde}.`;
-    case 'AUTOMATION_TASK_DUE_DATE_CHANGED':
-      return `Ha cambiado el vencimiento de «${tarea}»${donde}.`;
-    default:
-      return 'Tienes un aviso nuevo.';
-  }
+  const legible: AvisoLegible = {
+    type: evento.type,
+    quien: evento.actorName?.trim() || null,
+    proyecto: evento.projectName,
+    tarea: evento.taskTitle,
+  };
+  return describirAviso(legible);
 }
 
 /**
  * A dónde lleva la tarjeta de un aviso de bandeja.
  *
- * ⚠️ **Se usa `projectHref` y no una plantilla a mano.** El slug va en la URL y
- * el UUID en la API, los dos son `string`, y confundirlos no da error de
- * compilación: sale una URL fea, un 403 o un desplegable vacío. Ya se coló en
- * cinco sitios (CLAUDE.md, trampa 10).
+ * Se prefiere el slug al UUID —los dos resuelven, pero el slug sale legible— y
+ * la ruta la construye `projectHref` dentro de la tabla común, nunca una
+ * plantilla a mano (CLAUDE.md, trampa 10).
  *
- * Sin `projectSlug` se cae al `projectId`, que el guard también resuelve: es
- * mejor una URL fea que una tarjeta que no lleva a ningún sitio.
+ * `null` en dos casos, y los dos son deliberados: los de automatización, que
+ * abren la **pestaña** de la bandeja en vez de navegar (ver el hueco de arriba),
+ * y `MEMBER_REMOVED`, donde el enlace daría 403 porque te acaban de sacar.
  */
-function destinoDeAviso(evento: NoticeEvent): string | null {
-  /**
-   * 🔴 **Un aviso de automatización lleva a la bandeja, no a la tarea.**
-   *
-   * Los demás avisos cuentan algo que hizo una persona y la tarea explica el
-   * resto: «te asignó esta tarea» y la tarea delante se entiende. Un aviso de
-   * automatización cuenta algo que hizo **una regla**, y la tarea no dice nada
-   * de la regla: abrirla dejaba a quien pulsó mirando una tarjeta normal, sin
-   * la frase que explicaba por qué le habían avisado — que era lo único que
-   * daba sentido al aviso.
-   *
-   * La bandeja del panel sí la conserva, con su texto y su fecha.
-   */
-  if (evento.type.startsWith('AUTOMATION_')) return BANDEJA_DE_AVISOS;
-
-  const identificador = evento.projectSlug || evento.projectId;
-  if (!identificador) return null;
-
-  /* Los avisos de tarea abren la tarea directamente. La página resuelve el
-     tablero desde `?task=`, así que no hace falta saberlo aquí. */
-  if (evento.taskId) {
-    return projectHref({ slug: identificador }, { task: evento.taskId });
-  }
-
-  /* Los de equipo llevan al proyecto sin más. `MEMBER_REMOVED` es la excepción:
-     te acaban de sacar, así que el enlace daría 403 y sería peor que nada. */
-  if (evento.type === 'MEMBER_REMOVED') return null;
-
-  return projectHref({ slug: identificador });
+function destinoDeUnAviso(evento: NoticeEvent): string | null {
+  return destinoDeAviso({
+    type: evento.type,
+    proyectoRef: evento.projectSlug || evento.projectId,
+    taskId: evento.taskId,
+  });
 }
 
 /*

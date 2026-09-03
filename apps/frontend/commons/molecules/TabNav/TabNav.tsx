@@ -124,6 +124,6 @@ export function tabLinkClasses(isActive: boolean): string {
     'shrink-0 border-b-2 px-4 py-3 font-sans text-sm transition-colors -mb-px',
     isActive
       ? 'border-white font-semibold text-white'
-      : 'border-transparent font-medium text-white hover:text-white',
+      : 'border-transparent font-medium text-text-secondary hover:text-white',
   ].join(' ');
 }

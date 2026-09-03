@@ -30,12 +30,47 @@ import { useMemo, useRef, useState } from 'react';
 export interface DirectConversationProps {
   peerId: string;
   peerNombre: string;
-  /** Dónde coincidís y qué es esa persona allí. */
+  /**
+   * Dónde coincidís y qué es esa persona allí.
+   *
+   * ⚠️ **Es decoración del encabezado, no un permiso.** Vacío significa «estáis
+   * en la misma organización pero todavía no compartís tablero», que desde la
+   * etapa de la organización activa es un estado normal y no una negativa. Ver
+   * `canWrite`.
+   */
   proyectosEnComun: { id: string; name: string; slug: string; rol: string }[];
   page: ChatMessagePage;
   /** Quién es quién, y si se pudo preguntar. Ver `commons/api/directory.ts`. */
   directorio: Directory;
   currentUserId: string;
+  /**
+   * Si el compositor está abierto.
+   *
+   * ## 🔴 Lo decide la página, y lo decide preguntándoselo al servidor
+   *
+   * Se calculaba aquí como `proyectosEnComun.length > 0 || isAdmin ||
+   * page.items.length > 0`, que era **la regla de antes del 2026-08-28**: la
+   * puerta del chat privado pasó de «compartís proyecto» a «compartís
+   * organización» (D5/B7 de `PLAN-ORGANIZACION-ACTIVA`) y esto se quedó atrás.
+   *
+   * El efecto era el peor posible: la conversación abría —el gateway sí
+   * dejaba— y el compositor salía apagado, sin decir por qué, con alguien de tu
+   * propio equipo al otro lado.
+   *
+   * Ahora lo trae la página, que es quien sabe si `GET
+   * /me/chats/:peerId/messages` respondió. Si respondió, puedes escribir: el
+   * gateway ya aplicó `puedeHablarCon`, y repetir esa decisión en el navegador
+   * es exactamente lo que la desincronizó.
+   */
+  canWrite: boolean;
+  /**
+   * Si quien mira administra la plataforma.
+   *
+   * ⚠️ **Ya no decide si se puede escribir** —eso es `canWrite`—: solo cambia la
+   * frase del encabezado cuando no hay proyectos en común, porque «puedes
+   * hablarle porque administras» y «puedes hablarle porque sois del mismo
+   * equipo» son dos motivos distintos y conviene decir cuál es.
+   */
   isAdmin?: boolean;
 }
 
@@ -55,6 +90,7 @@ export function DirectConversation({
   page,
   directorio,
   currentUserId,
+  canWrite,
   isAdmin = false,
 }: DirectConversationProps) {
   /* `useCallback` porque `ChatPanel` las tiene en las dependencias de un efecto:
@@ -82,10 +118,6 @@ export function DirectConversation({
 
   const chatRef = useRef<ChatPanelHandle>(null);
 
-  // Pueden escribir si comparten proyectos, si el usuario actual es admin,
-  // o si ya hay mensajes en la conversación (p. ej. un admin la inició o compartían proyecto antes).
-  const canWrite = proyectosEnComun.length > 0 || isAdmin || page.items.length > 0;
-
   return (
     <ChatPanel
       ref={chatRef}
@@ -96,8 +128,12 @@ export function DirectConversation({
       pantallaCompletaEnMovil
       salidaMovil={
         <a
-          href="/chat"
-          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-white transition-colors hover:text-text-primary"
+          /* ⚠️ `?lista=1` y no `/chat` a secas: el índice redirige a la última
+             conversación abierta, así que sin el parámetro este enlace devuelve
+             **a la conversación que se acaba de dejar** — pulsar «Conversaciones»
+             no hacía nada. Ver la cabecera de `(conversaciones)/page.tsx`. */
+          href="/chat?lista=1"
+          className="inline-flex items-center gap-1.5 rounded-lg px-1 py-1.5 font-sans text-sm text-text-secondary transition-colors hover:text-text-primary"
         >
           <svg
             className="h-4 w-4"
@@ -118,9 +154,7 @@ export function DirectConversation({
       acciones={acciones}
       gatewayPath="/chat/api/gateway"
       rutaCanal={`/me/chats/${peerId}`}
-      /**
-       * Puedes escribir mientras compartáis algún proyecto (o si eres admin, o si ya hay mensajes).
-       */
+      /* Lo decide la página contra la respuesta del gateway. Ver la prop. */
       canWrite={canWrite}
       /* Sois dos: el «visto por todos» se cumple en cuanto lo lee esa persona. */
       participantes={1}
@@ -141,7 +175,6 @@ export function DirectConversation({
           proyectos={proyectosEnComun}
           muted={page.muted}
           isAdmin={isAdmin}
-          hasMessages={page.items.length > 0}
           onSearch={(t) => chatRef.current?.buscarLocal(t)}
           onClear={() => chatRef.current?.cerrarBusqueda()}
         />
@@ -157,8 +190,11 @@ export function DirectConversation({
  * misma persona puede administrar un proyecto y solo mirar en otro, así que un
  * único rol junto a su nombre sería una jerarquía inventada.
  *
- * Si no coincidís en ninguno —salió de los equipos después de hablar— se dice
- * en vez de dejar el hueco: explica por qué ya no puedes escribirle.
+ * Si no coincidís en ninguno se dice en vez de dejar el hueco, pero **ya no
+ * como una negativa**: desde la etapa de la organización activa, no compartir
+ * tablero con alguien de tu equipo es un estado corriente y se puede escribir
+ * igual. El texto decía «puedes leer el chat, pero no escribir», que hoy es
+ * mentira y salía justo encima de un compositor abierto.
  */
 function Encabezado({
   perfil,
@@ -167,7 +203,6 @@ function Encabezado({
   proyectos,
   muted,
   isAdmin,
-  hasMessages,
   onSearch,
   onClear,
 }: {
@@ -177,7 +212,6 @@ function Encabezado({
   proyectos: { id: string; name: string; slug: string; rol: string }[];
   muted: boolean;
   isAdmin?: boolean;
-  hasMessages?: boolean;
   onSearch: (t: string) => void;
   onClear: () => void;
 }) {
@@ -247,12 +281,10 @@ function Encabezado({
           <h2 className="font-display text-2xl text-text-primary">{nombre}</h2>
 
           {proyectos.length === 0 ? (
-            <p className="font-sans text-xs text-white">
+            <p className="font-sans text-xs text-text-secondary">
               {isAdmin
-                ? 'No comparten ningún proyecto, pero como administrador puedes chatear.'
-                : hasMessages
-                  ? 'No comparten proyecto, pero pueden continuar esta conversación.'
-                  : 'Ya no comparten ningún proyecto. Puedes leer el chat, pero no escribir.'}
+                ? 'No compartís ningún proyecto; puedes chatear porque administras la plataforma.'
+                : 'Estáis en la misma organización. Todavía no compartís ningún proyecto.'}
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">

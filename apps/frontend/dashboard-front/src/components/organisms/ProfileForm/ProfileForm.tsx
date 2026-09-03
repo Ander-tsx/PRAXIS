@@ -38,7 +38,7 @@ export function ProfileForm({ initialFirstName, initialLastName }: ProfileFormPr
   return (
     <form
       action={formAction}
-      /** La validación y el mensaje son nuestros; ver CreateProjectDialog. */
+      /** La validación y el mensaje son nuestros; ver `CreateProjectForm/project-form.ts`. */
       noValidate
       onSubmit={(event) => {
         setTouched(true);

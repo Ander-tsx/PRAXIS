@@ -19,6 +19,7 @@ Monorepo SOFEA: microfrontends Next.js 16 + microservicios NestJS.
 | [docs/frontend/PLAN-ENTERPRISE.md](docs/frontend/PLAN-ENTERPRISE.md) | 🚫 **Deprecado.** No es una fuente de verdad: sus decisiones las reemplaza el plan de abajo. Se conserva porque describe el código que ya existe |
 | [docs/frontend/PLAN-ORGANIZACIONES.md](docs/frontend/PLAN-ORGANIZACIONES.md) | Etapa cerrada — la organización pasó a contener los proyectos, a cobrarse por asiento y a tener papeles. Se conserva por sus once decisiones y su registro; la continúa el plan de abajo |
 | [docs/PLAN-ORGANIZACION-ACTIVA.md](docs/PLAN-ORGANIZACION-ACTIVA.md) | **Etapa en curso** — desaparece «Todas las organizaciones»: siempre hay una activa y todo cuelga de ella. El plan vale solo dentro de la organización que lo paga, y hay tope de tres por persona. ⚠️ Es el primer plan que **toca el backend**, por excepción acordada. Siete decisiones, cinco invariantes y el orden |
+| [docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md](docs/AUDITORIA-ORGANIZACION-CHAT-MOVIL.md) | **Auditoría abierta** (2026-09-03) — los 30 hallazgos que dejaron la organización activa, la barra lateral segmentada y el rediseño monocromo. Proyectos que caen en la organización equivocada, insignias apuntando a entradas de menú que ya no existen, el chat privado negando el paso que el gateway concede, y el móvil sin una sola puerta a los chats. Con severidad, reproducción, orden propuesto y casilla por hallazgo — **se marca al cerrar cada uno** |
 | [kyloo-design/SKILL.md](kyloo-design/SKILL.md) | **Antes de tocar cualquier pantalla.** Cómo se componen: filas en vez de tarjetas, tipografía como jerarquía, activo por tono. ⚠️ **Su paleta, sus radios y sus fuentes están revertidos** (`3fa9b87`) y no se reaplican sin pedirlo — lee el aviso de su cabecera. §13 es la de dentro de la aplicación |
 | [STRUCTURE.md](STRUCTURE.md) | Dónde va cada archivo nuevo |
 | [docs/backend/permissions.md](docs/backend/permissions.md) | Modelo de permisos de dos capas |
@@ -66,12 +67,22 @@ que salieron de ahí:
 - Un organismo sube a `commons/organisms/` solo cuando lo usan ≥2 zonas
 - **La lógica de negocio (fetch, estado, validación) vive solo en las pages.** Moléculas y organismos reciben slots `ReactNode` y props. Patrón de referencia: `commons/molecules/AuthForm` + `auth-front/src/app/login/page.tsx`
 
-**Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`). Oscuro y
-claro: la elección se guarda en la cookie `praxis_theme` y **las siete zonas** la
-leen en su `layout.tsx` para estampar `data-theme` en el `<html>` sin parpadeo.
-Hay dos selectores y comparten componente (`commons/molecules/ThemeToggle`): el
-de Configuración y el del landing, que lo lleva en `PublicNavbar` porque quien
-entra sin cuenta no tiene dónde elegirlo. Detalle en ESTADO-ACTUAL §27 y §34.
+**Estilos:** Tailwind v4 con `@theme` en CSS (no hay `tailwind.config`).
+
+🚫 **El modo claro está retirado** (`2aae679`). `getTheme()` devuelve `'dark'`
+fijo e **ignora la cookie `praxis_theme`**, incluso una `=light` que quedara de
+antes. La infraestructura sigue en su sitio, dormida —la cookie,
+`:root[data-theme="light"]` en `theme.css`, el átomo
+`commons/molecules/ThemeToggle` y su uso en el landing—, así que volver a
+habilitarlo es restaurar la lectura de la cookie en `commons/theme/theme.ts`.
+
+⚠️ Mientras siga así, **una pantalla nueva no tiene que probarse en claro**, pero
+tampoco se le arranca el soporte: `theme.css` conserva las dos paletas y quitar
+una es trabajo que habría que rehacer. Lo que sí importa es **no escribir colores
+a pelo**: usa los tokens (`text-text-primary`, `text-text-secondary`,
+`bg-surface`…). Un `text-white` literal es exactamente lo que aplanó la jerarquía
+tipográfica de media aplicación cuando se pasó a la paleta monocroma — ver la
+auditoría, hallazgo E4.
 
 Los tokens viven **una sola vez** en `commons/styles/theme.css`. Cada `globals.css` de zona lo importa y solo añade lo suyo: `@source "../**/*.tsx"` y sus `@font-face` (que llevan el basePath).
 

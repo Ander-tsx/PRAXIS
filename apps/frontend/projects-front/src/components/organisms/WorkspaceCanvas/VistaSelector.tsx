@@ -48,7 +48,7 @@ export function VistaSelector({
             onClick={() => onChange(v)}
             title={CONFIG[v].etiqueta}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-sans text-xs font-medium transition-colors ${
-              activo ? 'bg-white/10 text-white' : 'text-white hover:text-white'
+              activo ? 'bg-white/10 text-white' : 'text-text-secondary hover:text-white'
             }`}
           >
             <svg

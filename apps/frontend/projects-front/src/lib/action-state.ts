@@ -13,7 +13,7 @@ import type { QuotaExceededDetails } from '@praxis/commons/billing/planes';
 
 /**
  * `CreateProjectState` y su estado inicial viven en commons, junto al organismo
- * que los consume: `commons/organisms/CreateProjectDialog/project-form.ts`.
+ * que los consume: `commons/organisms/CreateProjectForm/project-form.ts`.
  * Se reexportan para no tocar los imports existentes.
  */
 import type { AutomationReviewSummary } from '@praxis/commons';

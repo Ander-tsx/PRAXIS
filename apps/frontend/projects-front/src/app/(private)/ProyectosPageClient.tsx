@@ -122,7 +122,7 @@ export function ProyectosPageClient({
                 buscar('');
               }}
               aria-label="Quitar búsqueda"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-white hover:text-white transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-secondary hover:text-white transition-colors"
             >
               <svg
                 className="h-3.5 w-3.5"
@@ -145,7 +145,9 @@ export function ProyectosPageClient({
             onClick={() => cambiarVista('lista')}
             title="Vista lista"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              vistaActual === 'lista' ? 'bg-white/10 text-white' : 'text-white hover:text-white'
+              vistaActual === 'lista'
+                ? 'bg-white/10 text-white'
+                : 'text-text-secondary hover:text-white'
             }`}
           >
             <svg
@@ -165,7 +167,9 @@ export function ProyectosPageClient({
             onClick={() => cambiarVista('grilla')}
             title="Vista grilla"
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              vistaActual === 'grilla' ? 'bg-white/10 text-white' : 'text-white hover:text-white'
+              vistaActual === 'grilla'
+                ? 'bg-white/10 text-white'
+                : 'text-text-secondary hover:text-white'
             }`}
           >
             <svg
@@ -202,7 +206,7 @@ export function ProyectosPageClient({
                   setQuery('');
                   buscar('');
                 }}
-                className="text-white hover:text-white transition-colors underline-offset-2 hover:underline"
+                className="text-text-secondary hover:text-white transition-colors underline-offset-2 hover:underline"
               >
                 Ver todos
               </button>

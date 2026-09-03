@@ -15,20 +15,38 @@ interface PageProps {
 /**
  * Una conversación privada.
  *
- * ## Quién puede abrirla no se decide aquí
+ * ## Quién puede abrirla no se decide aquí, y esa es toda la regla
  *
  * Lo decide el gateway: `/me/chats/:peerId/messages` solo devuelve algo si
- * projects-service confirma que **compartís algún proyecto**. Si no, responde
- * 403 y esta pantalla cae a `notFound()` — no se enseña «no tienes permiso», que
- * ya sería confirmar que esa cuenta existe.
+ * `DirectChatController.puedeHablarCon` lo permite. Si no, responde 403 y esta
+ * pantalla cae a `notFound()` — no se enseña «no tienes permiso», que ya sería
+ * confirmar que esa cuenta existe.
+ *
+ * ## 🔴 La puerta es la organización, no el proyecto en común
+ *
+ * ⚠️ Desde el 2026-08-28 (D5/B7 de `PLAN-ORGANIZACION-ACTIVA`) se puede escribir
+ * a **quien comparta alguna organización contigo**, no solo a quien comparta un
+ * tablero. El asiento ya es la frontera del producto: exigir además un proyecto
+ * impedía escribirle a alguien de tu propio equipo al que todavía no has metido
+ * en nada.
+ *
+ * **Esta pantalla siguió aplicando la regla vieja durante toda la etapa**, y por
+ * su cuenta: `GET /me/chats/contacts` devolvía al compañero —el gateway lo
+ * compone a propósito con `proyectos: []`, y su comentario lo dice— el buscador
+ * lo ofrecía, y al pulsarlo este archivo respondía 404. Se retiró: **la única
+ * comprobación es la del gateway**, que es la que no se puede falsificar.
+ *
+ * Lo que sí sigue aquí es `proyectosEnComun`, y solo para **contarlo**: es la
+ * jerarquía que se pinta bajo el nombre («Administrador en Rediseño»). Vacío es
+ * un dato legítimo, no una negativa.
  */
 export default async function ConversacionPage({ params }: PageProps) {
   const { peerId } = await params;
   const { userId, roles } = await loadCurrentUser();
   const api = createServerApiClient();
 
-  /* Un 403 aquí significa que no compartís proyecto; un 404, que ese id no es
-     nadie. Los dos acaban igual: esta página no existe para ti. */
+  /* Un 403 aquí significa que no compartís **organización**; un 404, que ese id
+     no es nadie. Los dos acaban igual: esta página no existe para ti. */
   const page = await api
     .get<ChatMessagePage>(`/me/chats/${peerId}/messages?limit=50`)
     .catch(() => null);
@@ -80,8 +98,10 @@ export default async function ConversacionPage({ params }: PageProps) {
   const contactos = await api.get<ChatContact[]>('/me/chats/contacts').catch(() => []);
   const comun = contactos.find((contacto) => contacto.userId === peerId)?.proyectos ?? [];
 
-  // Solo se bloquea si no hay proyectos en común Y NO ES ADMIN Y NO HAY MENSAJES PREVIOS
-  if (comun.length === 0 && !isAdmin && safePage.items.length === 0) return notFound();
+  /* 🕳️ Aquí había una segunda puerta —«sin proyecto en común, 404»— y le cerraba
+     el paso a gente a la que el gateway ya había dejado entrar. Ver el aviso de
+     la cabecera. La única comprobación es la de arriba: si `messages` respondió,
+     puedes estar aquí. */
 
   return (
     <DirectConversation
@@ -94,6 +114,16 @@ export default async function ConversacionPage({ params }: PageProps) {
       page={safePage}
       directorio={directorio}
       currentUserId={userId}
+      /* 🔴 **Se puede escribir si el gateway dejó leer.** `page` es nulo solo
+         cuando `GET /me/chats/:peerId/messages` falló, y entonces ni siquiera
+         sabemos de qué canal es esta conversación (ver `safePage`): abrir el
+         compositor sería prometer un envío que no tiene a dónde ir.
+
+         Lo que NO se comprueba aquí es si compartís proyecto. Esa era la regla
+         de antes del 2026-08-28 y la aplicaba el navegador por su cuenta,
+         apagando el compositor con gente a la que el servidor sí deja
+         escribir. */
+      canWrite={page !== null}
       isAdmin={isAdmin}
     />
   );

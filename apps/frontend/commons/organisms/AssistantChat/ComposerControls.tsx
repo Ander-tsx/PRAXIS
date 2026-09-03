@@ -311,7 +311,7 @@ export function AjustesMenu({
             onClick={() => setSub((s) => (s === 'recursos' ? null : 'recursos'))}
             aria-expanded={sub === 'recursos'}
             className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors hover:bg-white/5 hover:text-white ${
-              sub === 'recursos' ? 'bg-white/5 text-white' : 'text-white'
+              sub === 'recursos' ? 'bg-white/5 text-white' : 'text-text-secondary'
             }`}
           >
             <IconoRecurso />
@@ -339,7 +339,7 @@ export function AjustesMenu({
             onClick={() => setSub((s) => (s === 'modo' ? null : 'modo'))}
             aria-expanded={sub === 'modo'}
             className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left font-sans text-[13px] transition-colors hover:bg-white/5 hover:text-white ${
-              sub === 'modo' ? 'bg-white/5 text-white' : 'text-white'
+              sub === 'modo' ? 'bg-white/5 text-white' : 'text-text-secondary'
             }`}
           >
             <IconoModo />
@@ -491,8 +491,16 @@ function FilaToggle({
     >
       <span className="min-w-0 flex-1">
         <span
+          /* Tres estados y **un solo color**: el ternario anidado devolvía
+             `text-white` en las tres ramas, así que un recurso bloqueado, uno
+             atenuado y uno disponible se leían exactamente igual — que es lo
+             contrario de lo que un control con tres estados tiene que hacer. */
           className={`block truncate font-sans text-[13px] ${
-            bloqueado ? 'text-white' : atenuado ? 'text-white' : 'text-white'
+            bloqueado
+              ? 'text-text-disabled'
+              : atenuado
+                ? 'text-text-secondary'
+                : 'text-text-primary'
           }`}
         >
           {etiqueta}

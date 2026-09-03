@@ -1,7 +1,7 @@
 /**
  * Validación de proyecto: **reexportada desde commons**.
  *
- * La definición vive en `commons/organisms/CreateProjectDialog/project-form.ts`
+ * La definición vive en `commons/organisms/CreateProjectForm/project-form.ts`
  * porque la comparten el organismo y las Server Actions de las dos zonas, y las
  * tres tienen que decir lo mismo. Estuvo copiada aquí y allí.
  *

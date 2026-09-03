@@ -101,9 +101,15 @@ export function FlujoDePensamiento({ alAvanzar }: FlujoDePensamientoProps) {
                 {hecho ? <IconoHecho /> : paso.icono}
               </span>
               <span
+                /* El paso en curso destaca; los ya hechos bajan a secundario. El
+                   ternario devolvía lo mismo en las dos ramas desde el rediseño
+                   monocromo, así que los pasos pesaban todos igual y no se veía
+                   por cuál iba. El icono sí lo distinguía —arriba, `primary`
+                   frente a `textDisabled`—, lo que hacía la incoherencia más
+                   visible, no menos. */
                 className={[
                   'font-sans text-sm transition-colors',
-                  enCurso ? 'text-white' : 'text-white',
+                  enCurso ? 'text-text-primary' : 'text-text-secondary',
                 ].join(' ')}
               >
                 {paso.texto}

@@ -120,7 +120,7 @@ export function DeleteAccount({ email }: DeleteAccountProps) {
                 setError(null);
               }}
               disabled={borrando}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white hover:text-white hover:bg-white/5 transition-all"
+              className="px-4 py-2 rounded-xl text-sm font-semibold text-text-secondary hover:text-white hover:bg-white/5 transition-all"
             >
               Cancelar
             </button>

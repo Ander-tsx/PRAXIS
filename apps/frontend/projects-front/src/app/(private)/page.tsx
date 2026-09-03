@@ -30,9 +30,15 @@ const POR_PAGINA = 24;
 
 export default async function ProjectsPage({ searchParams }: PageProps) {
   const { q, page: pageParam, vista } = await searchParams;
-  // Nota: NO filtramos por organizationId en el listado — el backend ya filtra
-  // por el usuario autenticado. Filtrar por org excluía proyectos de otras orgs
-  // que el usuario también puede ver.
+  /* El listado va acotado a la organización activa, y no es un permiso: el
+     backend ya filtra por «dueño o miembro» y `organizationId` se **suma** a ese
+     filtro (I1 de PLAN-ORGANIZACION-ACTIVA). Escribir la organización de otro en
+     la cookie devuelve cero proyectos, no los suyos.
+
+     ⚠️ Aquí hubo un comentario que decía lo contrario —«NO filtramos por
+     organizationId»— sobrevivido de antes del túnel, cuando existía «Todas tus
+     organizaciones». Ya no existe: siempre hay una activa y todo cuelga de
+     ella. */
   const { userId, organizacionActivaId } = await loadPrivateChrome();
   const api = createServerApiClient();
 
